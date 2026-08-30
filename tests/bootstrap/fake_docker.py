@@ -622,6 +622,10 @@ def main(argv: list[str]) -> int:
                         for path, arcname in members:
                             archive.add(path, arcname=arcname, recursive=path.is_dir())
 
+                if os.environ.get("FAKE_DOCKER_MALFORMED_TAR") == "1":
+                    sys.stdout.buffer.write(b"not a tar archive\n")
+                    print(f"volume-copy-digest\t{'0' * 64}", file=sys.stderr)
+                    return 0
                 if kind == "projection":
                     source_root = backing / "exchange"
                     if not source_root.is_dir() or source_root.is_symlink():

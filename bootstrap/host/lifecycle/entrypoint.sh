@@ -1048,14 +1048,70 @@ printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ); then
 _agent_canon_apply_volume_export() (
   set -e
   local kind=$1 host_path=$2 relative=$3 stream_path=$4 expected_digest=$5
-  local temporary member relative_path source_digest name staged target
-  [[ -f "$stream_path" && ! -L "$stream_path" && "$expected_digest" =~ ^[0-9a-f]{64}$ ]] ||
+  local temporary member_list member relative_path source_digest name staged target
+  local backup_root= transaction_target= transaction_backup= transaction_kind= transaction_had_old=0
+  cleanup_export() {
+    local cleanup_rc=$?
+    if [[ "$transaction_kind" == projection && -n "$transaction_target" ]]; then
+      for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+        rm -f -- "$transaction_target/$name"
+        if [[ -f "$transaction_backup/$name" ]]; then
+          mv -- "$transaction_backup/$name" "$transaction_target/$name" || true
+        fi
+      done
+    elif [[ -n "$transaction_target" ]]; then
+      if [[ -e "$transaction_target" || -L "$transaction_target" ]]; then
+        rm -rf -- "$transaction_target"
+      fi
+      if [[ "$transaction_had_old" == 1 && -e "$transaction_backup" ]]; then
+        mv -- "$transaction_backup" "$transaction_target" || true
+      fi
+    fi
+    rm -f -- "${member_list:-}" "${stream_path:-}"
+    rm -rf -- "${temporary:-}" "${backup_root:-}"
+    exit "$cleanup_rc"
+  }
+  trap cleanup_export EXIT
+  begin_directory_transaction() {
+    transaction_kind=directory
+    transaction_target=$1
+    backup_root=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.volume-export-backup.XXXXXX") || return 1
+    transaction_backup="$backup_root/old"
+    if [[ -e "$transaction_target" || -L "$transaction_target" ]]; then
+      [[ ! -L "$transaction_target" ]] || return 1
+      mv -- "$transaction_target" "$transaction_backup" || return 1
+      transaction_had_old=1
+    fi
+  }
+  finish_transaction() {
+    rm -rf -- "$backup_root"
+    transaction_target=
+    transaction_backup=
+    transaction_kind=
+    transaction_had_old=0
+    backup_root=
+  }
+  if [[ ! -f "$stream_path" || -L "$stream_path" || ! "$expected_digest" =~ ^[0-9a-f]{64}$ ]]; then
     _agent_canon_json_error volume_export_invalid "volume export stream or digest is invalid"
-  [[ -d "$host_path" && ! -L "$host_path" ]] ||
+    return 2
+  fi
+  if [[ ! -d "$host_path" || -L "$host_path" ]]; then
     _agent_canon_json_error volume_export_destination_invalid "volume export destination is not a directory"
-  temporary=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.volume-export.XXXXXX") ||
+    return 2
+  fi
+  temporary=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.volume-export.XXXXXX") || {
     _agent_canon_json_error volume_export_failed "volume export staging directory could not be created"
+    return 2
+  }
   chmod 700 "$temporary"
+  member_list=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.volume-export-members.XXXXXX") || {
+    _agent_canon_json_error volume_export_failed "volume export member list could not be created"
+    return 2
+  }
+  if ! tar -tf "$stream_path" >"$member_list"; then
+    _agent_canon_json_error volume_export_failed "volume export archive could not be listed"
+    return 2
+  fi
   while IFS= read -r member; do
     member=${member#./}
     member=${member%/}
@@ -1063,23 +1119,27 @@ _agent_canon_apply_volume_export() (
     [[ "$member" != /* && "$member" != *$'\n'* &&
        "$member" != *$'\r'* && "$member" != *$'\t'* && "$member" != ../* &&
        "$member" != */../* && "$member" != *'/..' ]] || {
-      rm -rf -- "$temporary"
       _agent_canon_json_error volume_export_invalid "volume export contains an unsafe archive member"
       return 2
     }
-  done < <(tar -tf "$stream_path") || {
-    rm -rf -- "$temporary"
-    _agent_canon_json_error volume_export_failed "volume export archive could not be listed"
-  }
+  done < "$member_list"
   if ! tar -xpf "$stream_path" --no-same-owner -C "$temporary"; then
-    rm -rf -- "$temporary"
     _agent_canon_json_error volume_export_failed "volume export archive could not be extracted"
+    return 2
+  fi
+  if [[ -n "$(find "$temporary" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ]]; then
+    _agent_canon_json_error volume_export_invalid "volume export contains a special file"
+    return 2
+  fi
+  if [[ -n "$(find "$temporary" -type f -links +1 -print -quit)" ]]; then
+    _agent_canon_json_error volume_export_invalid "volume export contains a hardlink"
+    return 2
   fi
   while IFS= read -r relative_path; do
     [[ "$relative_path" != *$'\n'* && "$relative_path" != *$'\r'* &&
        "$relative_path" != *$'\t'* ]] || {
-      rm -rf -- "$temporary"
       _agent_canon_json_error volume_export_invalid "volume export path contains a control character"
+      return 2
     }
   done < <(find "$temporary" -mindepth 1 -printf '%P\n')
   case "$kind" in
@@ -1107,17 +1167,43 @@ _agent_canon_apply_volume_export() (
           fi
         done | sha256sum | awk '{print $1}'
       )
+      transaction_kind=projection
+      transaction_target=$host_path
+      backup_root=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.volume-export-backup.XXXXXX") || {
+        _agent_canon_json_error volume_export_failed "controller projection backup could not be created"
+        return 2
+      }
+      transaction_backup="$backup_root/old"
+      mkdir -p "$transaction_backup"
+      for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+        target="$host_path/$name"
+        if [[ -e "$target" || -L "$target" ]]; then
+          [[ -f "$target" && ! -L "$target" ]] || {
+            _agent_canon_json_error volume_export_destination_invalid "controller projection target is not a regular file"
+            return 2
+          }
+          cp -a -- "$target" "$transaction_backup/$name" || {
+            _agent_canon_json_error volume_export_failed "controller projection backup could not be copied"
+            return 2
+          }
+        fi
+      done
       for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
         staged="$temporary/$name"
         target="$host_path/$name"
         if [[ -f "$staged" && ! -L "$staged" ]]; then
-          [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "controller projection target is a symlink"; }
-          mv -f -- "$staged" "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "controller projection file could not be published"; }
+          [[ ! -L "$target" ]] || { _agent_canon_json_error volume_export_destination_invalid "controller projection target is a symlink"; return 2; }
+          mv -f -- "$staged" "$target" || { _agent_canon_json_error volume_export_failed "controller projection file could not be published"; return 2; }
+          if [[ "${AGENT_CANON_TEST_VOLUME_EXPORT_FAIL_AFTER:-}" == "$name" ]]; then
+            _agent_canon_json_error volume_export_failed "injected controller projection publish failure"
+            return 2
+          fi
         elif [[ -e "$target" || -L "$target" ]]; then
-          [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "controller projection target is a symlink"; }
-          rm -f -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale controller projection could not be removed"; }
+          [[ ! -L "$target" ]] || { _agent_canon_json_error volume_export_destination_invalid "controller projection target is a symlink"; return 2; }
+          rm -f -- "$target" || { _agent_canon_json_error volume_export_failed "stale controller projection could not be removed"; return 2; }
         fi
-      done ;;
+      done
+      ;;
     skill)
       [[ -d "$temporary/skill-projection" && ! -L "$temporary/skill-projection" ]] || {
         rm -rf -- "$temporary"
@@ -1128,17 +1214,27 @@ _agent_canon_apply_volume_export() (
         _agent_canon_json_error volume_export_invalid "skill projection contains an unexpected path"
       }
       [[ -z "$(find "$temporary/skill-projection" -type l -print -quit)" ]] || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "skill projection contains a symlink"
+        return 2
+      }
+      [[ -z "$(find "$temporary/skill-projection" ! -type d ! -type f -print -quit)" ]] || {
+        _agent_canon_json_error volume_export_invalid "skill projection contains a special file"
+        return 2
       }
       source_digest=$(_agent_canon_path_digest "$temporary/skill-projection") || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "skill projection digest could not be computed"
+        return 2
       }
       target="$host_path/skill-projection"
-      [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "skill projection target is a symlink"; }
-      [[ ! -e "$target" ]] || rm -rf -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale skill projection could not be removed"; }
-      mv -- "$temporary/skill-projection" "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "skill projection could not be published"; } ;;
+      begin_directory_transaction "$target" || {
+        _agent_canon_json_error volume_export_destination_invalid "skill projection target is not a regular directory"
+        return 2
+      }
+      mv -- "$temporary/skill-projection" "$target" || {
+        _agent_canon_json_error volume_export_failed "skill projection could not be published"
+        return 2
+      }
+      ;;
     eval)
       [[ -d "$temporary/$relative" && ! -L "$temporary/$relative" ]] || {
         rm -rf -- "$temporary"
@@ -1149,57 +1245,71 @@ _agent_canon_apply_volume_export() (
         _agent_canon_json_error volume_export_invalid "evaluation export contains an unexpected path"
       }
       [[ -z "$(find "$temporary/$relative" -type l -print -quit)" ]] || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "evaluation export contains a symlink"
+        return 2
+      }
+      [[ -z "$(find "$temporary/$relative" ! -type d ! -type f -print -quit)" ]] || {
+        _agent_canon_json_error volume_export_invalid "evaluation export contains a special file"
+        return 2
       }
       source_digest=$(_agent_canon_path_digest "$temporary/$relative") || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "evaluation digest could not be computed"
+        return 2
       }
       target="$host_path/$relative"
-      [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "evaluation target is a symlink"; }
-      [[ ! -e "$target" ]] || rm -rf -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale evaluation tree could not be removed"; }
-      mv -- "$temporary/$relative" "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "evaluation tree could not be published"; } ;;
+      begin_directory_transaction "$target" || {
+        _agent_canon_json_error volume_export_destination_invalid "evaluation target is not a regular directory"
+        return 2
+      }
+      mv -- "$temporary/$relative" "$target" || {
+        _agent_canon_json_error volume_export_failed "evaluation tree could not be published"
+        return 2
+      }
+      ;;
     private-feedback)
       [[ -z "$(find "$temporary" -type l -print -quit)" ]] || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "private feedback contains a symlink"
+        return 2
+      }
+      [[ -z "$(find "$temporary" ! -type d ! -type f -print -quit)" ]] || {
+        _agent_canon_json_error volume_export_invalid "private feedback contains a special file"
+        return 2
       }
       source_digest=$(
         cd "$temporary" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + |
           LC_ALL=C sort | sha256sum | awk '{print $1}'
       )
-      find "$host_path" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + || {
-        rm -rf -- "$temporary"
-        _agent_canon_json_error volume_export_failed "stale private feedback could not be removed"
+      begin_directory_transaction "$host_path" || {
+        _agent_canon_json_error volume_export_destination_invalid "private feedback destination is not a regular directory"
+        return 2
       }
-      while IFS= read -r -d '' staged; do
-        mv -- "$staged" "$host_path/" || {
-          rm -rf -- "$temporary"
-          _agent_canon_json_error volume_export_failed "private feedback could not be published"
-        }
-      done < <(find "$temporary" -mindepth 1 -maxdepth 1 -print0) ;;
+      mv -- "$temporary" "$host_path" || {
+        _agent_canon_json_error volume_export_failed "private feedback could not be published"
+        return 2
+      }
+      ;;
     codex-home)
       _agent_canon_validate_codex_home "$temporary" || {
-        rm -rf -- "$temporary"
         _agent_canon_json_error volume_export_invalid "Codex home contains an unmanaged symlink"
+        return 2
       }
-      for name in config.toml agents hooks skills; do
-        staged="$temporary/$name"
-        target="$host_path/$name"
-        if [[ -e "$staged" || -L "$staged" ]]; then
-          [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "Codex target is a symlink"; }
-          [[ ! -e "$target" ]] || rm -rf -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale Codex path could not be removed"; }
-          mv -- "$staged" "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "Codex path could not be published"; }
-        elif [[ -e "$target" || -L "$target" ]]; then
-          [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "Codex target is a symlink"; }
-          rm -rf -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale Codex path could not be removed"; }
-        fi
-      done
-      source_digest=$(_agent_canon_codex_digest "$host_path") || {
-        rm -rf -- "$temporary"
+      [[ -z "$(find "$temporary" ! -type d ! -type f ! -type l -print -quit)" ]] || {
+        _agent_canon_json_error volume_export_invalid "Codex home contains a special file"
+        return 2
+      }
+      source_digest=$(_agent_canon_codex_digest "$temporary") || {
         _agent_canon_json_error volume_export_invalid "Codex home digest could not be computed"
-      } ;;
+        return 2
+      }
+      begin_directory_transaction "$host_path" || {
+        _agent_canon_json_error volume_export_destination_invalid "Codex home destination is not a regular directory"
+        return 2
+      }
+      mv -- "$temporary" "$host_path" || {
+        _agent_canon_json_error volume_export_failed "Codex home could not be published"
+        return 2
+      }
+      ;;
     *)
       rm -rf -- "$temporary"
       _agent_canon_json_error volume_export_invalid "volume export kind is not supported"
@@ -1210,6 +1320,7 @@ _agent_canon_apply_volume_export() (
     _agent_canon_json_error volume_copy_failed "volume export digest readback differs"
     return 2
   }
+  finish_transaction
   rm -rf -- "$temporary"
 )
 
