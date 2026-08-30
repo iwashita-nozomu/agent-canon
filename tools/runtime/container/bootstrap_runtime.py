@@ -5081,14 +5081,20 @@ class BootstrapRuntime:
             )
             idle_seconds = int(self.manifest["container"].get("idle_stop_seconds", 0))
             idle_age = max(0.0, time.time() - self.paths.state.stat().st_mtime)
-            idle_stop = bool(
-                idle_seconds
-                and idle_age >= idle_seconds
-                and not state.get("active_task_count", 0)
-                and state.get("resources", {}).get("container", {}).get("state") == "running"
-            )
+            idle_stop = False
+            if not self._container_control():
+                idle_stop = bool(
+                    idle_seconds
+                    and idle_age >= idle_seconds
+                    and not state.get("active_task_count", 0)
+                    and state.get("resources", {}).get("container", {}).get("state") == "running"
+                )
             current_image = state.get("resources", {}).get("image", {}).get("id")
-            owned_images = self.docker.owned_image_ids(self.control_digest)
+            owned_images = (
+                []
+                if self._container_control()
+                else self.docker.owned_image_ids(self.control_digest)
+            )
             max_images = int(self.manifest["container"].get("max_image_generations", 2))
             stale_images = [image for image in owned_images if image != current_image][
                 : max(0, len(owned_images) - max_images)
