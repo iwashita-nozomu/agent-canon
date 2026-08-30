@@ -1490,7 +1490,7 @@ elif [ "$direction" = import ]; then
   input=/agent-canon-copy-input
   case "$kind" in
     source-sync) destination="$root/source-sync.json"; mode=600; expected=file ;;
-    mount-registry) destination="$root/mount-registry.toml"; mode=600; expected=file ;;
+    mount-registry) destination="$root/mount-registry.toml"; mode=444; expected=file ;;
     host-mounts) destination="$root/host-mounts.tsv"; mode=600; expected=file ;;
     private-log) destination="$root/private-log"; mode=700; expected=directory ;;
     codex-home) destination="$root/codex-home"; mode=700; expected=directory ;;

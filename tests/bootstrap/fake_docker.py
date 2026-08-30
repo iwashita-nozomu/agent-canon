@@ -582,9 +582,12 @@ def main(argv: list[str]) -> int:
                 if source is None or destination is None or not source.exists() or source.is_symlink():
                     return 1
                 if kind in {"source-sync", "mount-registry", "host-mounts"}:
+                    if destination.is_symlink() or destination.is_file():
+                        destination.unlink()
                     shutil.copy2(source, destination)
                     if not expected_digest or hashlib.sha256(destination.read_bytes()).hexdigest() != expected_digest:
                         return 1
+                    destination.chmod(0o444 if kind == "mount-registry" else 0o600)
                     print(f"volume-copy-digest\t{expected_digest}")
                 else:
                     if not source.is_dir():

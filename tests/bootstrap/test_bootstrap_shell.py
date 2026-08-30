@@ -506,6 +506,13 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     assert volume["Mode"] == "0700"
     assert volume["ResidentWriteReadback"] is True
     volume_root = Path(volume["Mountpoint"])
+
+    def assert_volume_registry() -> None:
+        registry = volume_root / "mount-registry.toml"
+        assert registry.stat().st_mode & 0o777 == 0o444
+        assert not os.access(registry, os.W_OK)
+
+    assert_volume_registry()
     (volume_root / "host-mounts.tsv").write_text("stale\n", encoding="utf-8")
     copy_image = next(iter(docker_state["images"]))
     cleared = subprocess.run(
@@ -547,7 +554,26 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
         timeout=120,
     )
     assert added.returncode == 0, added.stderr
+    assert_volume_registry()
     target_digest = hashlib.sha256(str(target.resolve()).encode("utf-8")).hexdigest()
+    smoke = subprocess.run(
+        [
+            *common,
+            "tool",
+            "run",
+            "--root",
+            str(target),
+            "generate-agent-improvement-guide",
+            "--",
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert smoke.returncode == 0, smoke.stderr
     active_ref, image_a = active_image()
     first = run("update")
     assert first.returncode == 0, first.stderr
@@ -555,6 +581,7 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     updated_ref, image_b = active_image()
     assert updated_ref == active_ref
     assert image_b != image_a
+    assert_volume_registry()
     rollback_ref_a, rollback_id_a = rollback_plan()
     docker_state = json.loads(state_path.read_text(encoding="utf-8"))
     assert rollback_id_a == image_a
@@ -566,6 +593,7 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     updated_ref, image_c = active_image()
     assert updated_ref == active_ref
     assert image_c not in {image_a, image_b}
+    assert_volume_registry()
     rollback_ref_b, rollback_id_b = rollback_plan()
     docker_state = json.loads(state_path.read_text(encoding="utf-8"))
     assert rollback_id_b == image_b
@@ -586,10 +614,12 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
         mount["Destination"] == f"/targets/{target_digest}"
         for mount in docker_state["containers"][container_name]["Mounts"]
     )
+    assert_volume_registry()
     assert (runtime / "container-state" / "mounts.tsv").is_file()
     rollback_again = run("rollback")
     assert rollback_again.returncode == 0, rollback_again.stderr
     assert active_image()[1] == image_c
+    assert_volume_registry()
 
 
 def test_existing_controller_volume_requires_state_label(tmp_path: Path) -> None:
