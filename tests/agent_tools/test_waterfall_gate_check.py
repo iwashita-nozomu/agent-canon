@@ -420,21 +420,33 @@ def write_unknown_requirement_bundle(report_dir: Path) -> None:
 class WaterfallGateCheckTest(unittest.TestCase):
     """Verify that intermediate waterfall gates fail closed."""
 
-    def test_design_gate_rejects_unknown_packet_schema(self) -> None:
-        """An unknown packet schema is a typed design-owner blocker."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "unknown-packet-schema"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_approved_design_bundle(report_dir, design_brief_lines())
-            write_active_packet_manifest(report_dir, schema="waterfall.design_packet.v0")
-
-            result = run_gate(report_dir, "design")
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
+    def test_design_gate_rejects_invalid_packet_declarations(self) -> None:
+        """Invalid packet declarations fail closed from a complete bundle."""
+        cases = (
+            (
+                "unknown-schema",
+                "schema",
+                "waterfall.design_packet.v0",
                 "team_manifest.yaml:active_design_packet_schema_unknown:waterfall.design_packet.v0",
-                result.stdout,
-            )
+            ),
+            (
+                "outside-path",
+                "design_artifact",
+                "../design_brief.md",
+                "team_manifest.yaml:active_design_packet_field_invalid:design_artifact",
+            ),
+        )
+        for case_name, field, value, expected_error in cases:
+            with self.subTest(case=case_name), tempfile.TemporaryDirectory() as tmp_dir:
+                report_dir = Path(tmp_dir) / "reports" / case_name
+                report_dir.mkdir(parents=True, exist_ok=True)
+                write_approved_design_bundle(report_dir, design_brief_lines())
+                rewrite_active_packet_field(report_dir, field, value)
+
+                result = run_gate(report_dir, "design")
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_error, result.stdout)
 
     def test_design_gate_rejects_unknown_packet_field(self) -> None:
         """The gate should reject packet fields outside the typed contract."""
@@ -450,22 +462,6 @@ class WaterfallGateCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
                 "team_manifest.yaml:active_design_packet_field_unknown:unexpected_contract",
-                result.stdout,
-            )
-
-    def test_design_gate_rejects_packet_path_outside_bundle(self) -> None:
-        """A declared path cannot escape the run bundle."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "outside-packet"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_approved_design_bundle(report_dir, design_brief_lines())
-            write_active_packet_manifest(report_dir, design_artifact="../design_brief.md")
-
-            result = run_gate(report_dir, "design")
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "team_manifest.yaml:active_design_packet_field_invalid:design_artifact",
                 result.stdout,
             )
 
@@ -1343,46 +1339,6 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 report_dir,
                 "design_artifact",
                 str((report_dir / "design_brief.md").resolve()),
-            )
-
-            result = run_gate(report_dir, "design")
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "team_manifest.yaml:active_design_packet_field_invalid:design_artifact",
-                result.stdout,
-            )
-
-    def test_design_gate_rejects_unknown_packet_schema(self) -> None:
-        """Unknown active packet schemas are typed blockers."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "unknown-schema"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_active_packet_manifest(report_dir)
-            rewrite_active_packet_field(
-                report_dir,
-                "schema",
-                "waterfall.design_packet.v0",
-            )
-
-            result = run_gate(report_dir, "design")
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "team_manifest.yaml:active_design_packet_schema_unknown:waterfall.design_packet.v0",
-                result.stdout,
-            )
-
-    def test_design_gate_rejects_packet_path_outside_bundle(self) -> None:
-        """Declared packet paths cannot escape the report bundle."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "outside-path"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_active_packet_manifest(report_dir)
-            rewrite_active_packet_field(
-                report_dir,
-                "design_artifact",
-                "../graph_design_brief.md",
             )
 
             result = run_gate(report_dir, "design")
