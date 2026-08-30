@@ -28,6 +28,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 if __package__:
     from tools.repository.workspace.workspace_scope import resolve_report_root
 else:

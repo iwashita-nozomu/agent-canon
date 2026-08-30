@@ -23,6 +23,9 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 try:
     from tools.repository.git.conflict_preservation import capture_inventory, validate_plan
     from tools.runtime.authority.checkout_identity import resolve_checkout_identity

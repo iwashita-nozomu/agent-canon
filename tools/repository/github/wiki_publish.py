@@ -20,10 +20,14 @@ import re
 import subprocess
 import tempfile
 import os
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (

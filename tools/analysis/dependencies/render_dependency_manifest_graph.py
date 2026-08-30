@@ -26,6 +26,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 import tools.validation.semantic.tools.visualization_contract as viz_contract
 
 GRAPH_TSV_FIELD_COUNT = 4

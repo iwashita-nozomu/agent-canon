@@ -23,6 +23,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:

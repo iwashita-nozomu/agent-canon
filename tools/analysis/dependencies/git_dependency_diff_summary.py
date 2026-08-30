@@ -23,6 +23,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeAlias, cast
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 try:
     from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,

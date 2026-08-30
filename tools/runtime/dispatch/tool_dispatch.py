@@ -714,6 +714,15 @@ def _environment(root: Path, spec: ToolSpec, runtime: Path, output: Path | None)
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
         }
     )
+    source_path = str(root.resolve())
+    inherited_pythonpath = result.get("PYTHONPATH", "")
+    pythonpath_entries = [source_path]
+    pythonpath_entries.extend(
+        entry
+        for entry in inherited_pythonpath.split(os.pathsep)
+        if entry and entry != source_path
+    )
+    result["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
     if output is not None:
         result["AGENT_CANON_OUTPUT_ROOT"] = str(output)
     for key in ("AGENT_CANON_CONTROL_PARENT_ROOT", "AGENT_CANON_TASK_ROOT", "AGENT_CANON_TARGET_ROOT", "AGENT_CANON_EXPLICIT_CWD"):

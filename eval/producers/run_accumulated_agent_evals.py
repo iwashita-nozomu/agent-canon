@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
 from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402

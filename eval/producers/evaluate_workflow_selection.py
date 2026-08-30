@@ -23,6 +23,9 @@ UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from tools.agent.orchestration.prompt_classifier import (
     PromptClassifierInputs,
     SkillLaneEvidence,

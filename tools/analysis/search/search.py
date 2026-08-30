@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from tools.analysis.code import lsp_code_analysis  # noqa: E402
 import tools.analysis.search.search_index as search_index  # noqa: E402

@@ -18,9 +18,13 @@ import json
 import os
 import re
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal, cast
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (

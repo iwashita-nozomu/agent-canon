@@ -14,11 +14,15 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 
 UTC = timezone.utc
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import yaml
 

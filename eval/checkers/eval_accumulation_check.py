@@ -34,7 +34,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
 from tools.agent.orchestration.prompt_capture import redact_sensitive_text  # noqa: E402

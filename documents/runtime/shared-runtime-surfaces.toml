@@ -22,17 +22,25 @@ projection_kind = "runtime_surface"
 local_override_allowed = false
 
 [[surface]]
-path = "tools/agent_tools"
+path = "tools"
 mode = "tool"
-source = "tools/agent_tools"
+source = "tools"
 projection_producer = "agent-canon"
 projection_kind = "tool_surface"
 local_override_allowed = false
 
 [[surface]]
-path = "evidence/agent-evals"
+path = "eval"
 mode = "eval"
-source = "evidence/agent-evals"
+source = "eval"
 projection_producer = "agent-canon-log"
 projection_kind = "eval_surface"
+local_override_allowed = false
+
+[[surface]]
+path = "tools/runtime/dispatch/agent-canon"
+mode = "tool"
+source = "tools/runtime/dispatch/agent-canon"
+projection_producer = "agent-canon"
+projection_kind = "tool_surface"
 local_override_allowed = false

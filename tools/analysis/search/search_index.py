@@ -28,7 +28,7 @@ from typing import cast
 import yaml
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import tools.analysis.search.vector_search as vector_search  # noqa: E402
 

@@ -15,6 +15,7 @@ import argparse
 import json
 import subprocess
 import os
+import sys
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -27,6 +28,9 @@ from datetime import datetime, timezone
 UTC = timezone.utc
 from pathlib import Path
 from typing import cast
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]

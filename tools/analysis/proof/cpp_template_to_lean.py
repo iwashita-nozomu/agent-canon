@@ -16,6 +16,9 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 from tools.analysis.code.cpp_source_canonical_ir import build_cpp_source_canonical_ir, render_record
 from tools.analysis.proof.operational_ir_to_lean import (
     enforce_complete_coverage,

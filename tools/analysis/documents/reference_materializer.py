@@ -29,6 +29,9 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 try:
     from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationRequest,

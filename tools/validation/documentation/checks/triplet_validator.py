@@ -21,7 +21,8 @@ from pathlib import Path
 from time import time
 from typing import Dict, List, Set
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 from tools.support.error_handler import ErrorCode, ExecutionResult
 

@@ -21,6 +21,7 @@ import os
 import re
 import sqlite3
 import subprocess
+import sys
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -28,6 +29,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict, cast
 from urllib.parse import quote
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import yaml
 

@@ -15,11 +15,15 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import sys
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from tools.runtime.lifecycle.workflow_monitor import MonitoringEntries, append_monitoring
 
