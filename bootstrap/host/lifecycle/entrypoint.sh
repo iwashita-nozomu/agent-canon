@@ -477,6 +477,19 @@ _agent_canon_sync_operation() (
     _agent_canon_source_sync_failure source_sync_clone_failed "source-sync candidate clone failed"
     exit 2
   fi
+  # A local clone of a shallow source can carry only the checked-out commit;
+  # the freshly fetched remote-tracking candidate may not be present in its
+  # object store. Transport the intended branch into staging from the original
+  # remote before asking Git to detach at the candidate. The live checkout is
+  # not touched by this fetch and remains unchanged until candidate validation
+  # has completed.
+  if ! git -C "$staging_root" fetch --no-tags "$remote_url" \
+    "+refs/heads/$branch:refs/remotes/$remote/$branch" >/dev/null; then
+    rm -rf -- "$staging_root"
+    _agent_canon_source_sync_failure source_sync_candidate_fetch_failed \
+      "source-sync candidate fetch failed"
+    exit 2
+  fi
   if ! git -C "$staging_root" checkout --detach "$candidate_commit" >/dev/null; then
     rm -rf -- "$staging_root"
     _agent_canon_source_sync_failure source_sync_git_failed "source-sync candidate checkout failed"

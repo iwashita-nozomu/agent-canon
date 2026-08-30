@@ -2441,6 +2441,123 @@ _agent_canon_sync_operation
     assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
 
 
+def test_source_sync_transports_remote_candidate_from_shallow_source(
+    tmp_path: Path,
+) -> None:
+    """A shallow source stages a fetched remote candidate before live merge."""
+    bare = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    publisher = tmp_path / "publisher"
+    install = tmp_path / "install"
+    observed = tmp_path / "observed"
+    subprocess.run(["git", "init", "--bare", str(bare)], check=True, capture_output=True)
+    subprocess.run(["git", "init", str(seed)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(seed), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(seed), "config", "user.name", "AgentCanon Test"],
+        check=True,
+    )
+    (seed / "tracked.txt").write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(seed), "add", "tracked.txt"], check=True)
+    subprocess.run(
+        ["git", "-C", str(seed), "commit", "-m", "one"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "-C", str(seed), "branch", "-M", "main"], check=True)
+    subprocess.run(
+        ["git", "-C", str(seed), "remote", "add", "origin", str(bare)], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(seed), "push", "origin", "main"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "clone", "--depth", "1", f"file://{bare}", str(install)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "clone", str(bare), str(publisher)], check=True, capture_output=True
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(publisher),
+            "config",
+            "user.email",
+            "test@example.invalid",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(publisher), "config", "user.name", "AgentCanon Test"],
+        check=True,
+    )
+    (publisher / "tracked.txt").write_text("two\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(publisher), "commit", "-am", "two"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(publisher), "push", "origin", "main"],
+        check=True,
+        capture_output=True,
+    )
+    source_head = subprocess.run(
+        ["git", "-C", str(install), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    candidate_head = subprocess.run(
+        ["git", "-C", str(publisher), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path / "runtime")!r}
+command_args=(sync --install-root {str(install)!r} --remote origin --branch main)
+bootstrap_host_entrypoint() {{
+  printf '%s\\n' "$(git -C {str(install)!r} rev-parse HEAD)" > {str(observed)!r}
+  printf '%s\\n' "$(git -C "$1" rev-parse HEAD)" >> {str(observed)!r}
+  test "$(git -C "$1" show HEAD:tracked.txt)" = two
+}}
+_agent_canon_install_global_links() {{ return 0; }}
+_agent_canon_sync_operation
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert observed.read_text(encoding="utf-8").splitlines() == [
+        source_head,
+        candidate_head,
+    ]
+    assert (
+        subprocess.run(
+            ["git", "-C", str(install), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == candidate_head
+    )
+    assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+
+
 def test_target_mount_manifest_is_strict_and_reused_on_create() -> None:
     """Target mounts are emitted as allowlisted TSV and applied by host Docker."""
     text = ADAPTER.read_text(encoding="utf-8")
