@@ -1494,6 +1494,84 @@ def test_container_control_gc_delegates_to_runtime_gc(
     assert calls == [True]
 
 
+def test_container_control_gc_skips_docker_and_cleans_local_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resident GC works without Docker while retaining local cleanup."""
+    control = tmp_path / "control"
+    control.mkdir()
+    cache = tmp_path / "host-cache"
+    private_log = tmp_path / "private-log"
+    private_log.mkdir()
+    manifest = tmp_path / "manifest.toml"
+    manifest.write_text(
+        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml")
+        .read_text(encoding="utf-8")
+        .replace("cache_quota_bytes = 4294967296", "cache_quota_bytes = 1"),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(tmp_path / "exchange"))
+    monkeypatch.setenv("AGENT_CANON_HOST_CACHE_ROOT", str(cache))
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
+    missing_docker = DockerAdapter(str(tmp_path / "missing-docker"))
+    manager = BootstrapRuntime(
+        control,
+        control / "runtime",
+        repository_root=REPOSITORY_ROOT,
+        manifest_path=manifest,
+        docker=missing_docker,
+    )
+    state = manager._new_state()
+    state["state"] = "ready"
+    state["resources"] = {
+        "image": {"id": "sha256:stale-image", "owned": True},
+        "container": {"id": "container-live", "state": "running", "owned": True},
+    }
+    manager.paths.state.parent.mkdir(parents=True)
+    manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
+    cache.mkdir()
+    cached = cache / "stale"
+    cached.write_text("remove me", encoding="utf-8")
+
+    preview = manager.gc(dry_run=True)
+    assert preview["code"] == "gc_plan"
+    assert preview["details"]["idle_stop"] is False
+    assert preview["details"]["stale_images"] == []
+    assert cached.is_file()
+    assert missing_docker.commands == []
+
+    completed = manager.gc()
+    assert completed["code"] == "gc_complete"
+    assert "cache:stale" in completed["details"]["deleted"]
+    assert not cached.exists()
+    assert missing_docker.commands == []
+
+
+def test_non_container_gc_enumerates_owned_images(
+    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Host GC retains the Docker image-adapter path."""
+    manager = runtime(tmp_path, fake_docker)
+    state = manager._new_state()
+    state["state"] = "ready"
+    manager.paths.state.parent.mkdir(parents=True)
+    manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
+    calls: list[str] = []
+    monkeypatch.setattr(
+        fake_docker,
+        "owned_image_ids",
+        lambda digest: calls.append(digest) or [],
+    )
+
+    result = manager.gc(dry_run=True)
+
+    assert result["code"] == "gc_plan"
+    assert calls == [manager.control_digest]
+
+
 def test_gc_enforces_archive_quota_only_without_unpublished_spool(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:
