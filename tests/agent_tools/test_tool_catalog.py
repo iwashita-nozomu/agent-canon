@@ -20,6 +20,8 @@ from pathlib import Path
 
 import yaml
 
+from tools.runtime.manifest.tool_catalog import check_tool_docs_manifest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "runtime" / "manifest" / "tool_catalog.py"
 
@@ -172,6 +174,81 @@ class CheckToolCatalogTest(unittest.TestCase):
                 "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/missing_tool.py:missing-path",
                 result.stdout,
             )
+
+    def test_public_tool_declarations_are_bidirectionally_complete(self) -> None:
+        """The explicit docs owner and catalog public marks form one set."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_minimal_repo(root)
+            catalog = yaml.safe_load((root / "tools/catalog.yaml").read_text(encoding="utf-8"))
+            findings = check_tool_docs_manifest(root, catalog["entries"])
+            self.assertEqual(findings, [])
+
+            catalog["entries"][0].pop("public")
+            findings = check_tool_docs_manifest(root, catalog["entries"])
+            self.assertIn(
+                "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-public-mark:tool-catalog:tools/runtime/manifest/tool_catalog.py",
+                [finding.render() for finding in findings],
+            )
+
+            self.write_file(root, "tools/runtime/manifest/catalog_only.py", self.manifest("Catalog-only fixture."))
+            self.write_file(root, "documents/tools/catalog_only.md", self.manifest("Catalog-only doc."))
+            catalog_entry = dict(catalog["entries"][0])
+            catalog_entry.update(
+                {
+                    "id": "catalog-only",
+                    "path": "tools/runtime/manifest/catalog_only.py",
+                    "docs": ["documents/tools/catalog_only.md"],
+                    "public": True,
+                }
+            )
+            catalog["entries"].append(catalog_entry)
+            findings = check_tool_docs_manifest(root, catalog["entries"])
+            self.assertIn(
+                "TOOL_CATALOG_FINDING=public_tools:tools/catalog.yaml:missing-public-documentation:catalog-only:tools/runtime/manifest/catalog_only.py",
+                [finding.render() for finding in findings],
+            )
+
+    def test_missing_non_default_public_catalog_entry_is_reported(self) -> None:
+        """A public declaration fails even when it is absent from default wiring."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_minimal_repo(root)
+            self.write_file(root, "tools/runtime/manifest/extra.py", self.manifest("Extra fixture."))
+            self.write_file(root, "documents/tools/extra.md", self.manifest("Extra fixture doc."))
+            docs = root / "documents/tools/tool-docs.toml"
+            docs.write_text(
+                docs.read_text(encoding="utf-8")
+                + "\n[[tool]]\n"
+                + 'id = "extra-public"\n'
+                + 'classification = "public"\n'
+                + 'tool = "tools/runtime/manifest/extra.py"\n'
+                + 'doc = "documents/tools/extra.md"\n',
+                encoding="utf-8",
+            )
+            catalog = yaml.safe_load((root / "tools/catalog.yaml").read_text(encoding="utf-8"))
+            findings = check_tool_docs_manifest(root, catalog["entries"])
+            self.assertIn(
+                "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-catalog-entry:extra-public:tools/runtime/manifest/extra.py",
+                [finding.render() for finding in findings],
+            )
+
+    def test_internal_tool_declaration_is_excluded_from_public_set(self) -> None:
+        """Internal/support rows do not require a public catalog mark."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_minimal_repo(root)
+            docs = root / "documents/tools/tool-docs.toml"
+            docs.write_text(
+                docs.read_text(encoding="utf-8").replace(
+                    'classification = "public"', 'classification = "internal"'
+                ),
+                encoding="utf-8",
+            )
+            catalog = yaml.safe_load((root / "tools/catalog.yaml").read_text(encoding="utf-8"))
+            catalog["entries"][0].pop("public")
+            findings = check_tool_docs_manifest(root, catalog["entries"])
+            self.assertNotIn("public_tools", {finding.check for finding in findings})
 
     def test_legacy_entry_is_retired(self) -> None:
         """Legacy provenance entries are no longer accepted in AgentCanon."""
@@ -642,9 +719,11 @@ class CheckToolCatalogTest(unittest.TestCase):
                     "",
                     'catalog_kind = "agent_canon_tool_docs"',
                     "version = 1",
+                    'classification_values = ["public", "internal", "compat", "retired", "example"]',
                     "",
                     "[[tool]]",
                     'id = "tool-catalog"',
+                    'classification = "public"',
                     'tool = "tools/runtime/manifest/tool_catalog.py"',
                     'doc = "documents/tools/tool_catalog.md"',
                     "",
@@ -694,6 +773,7 @@ class CheckToolCatalogTest(unittest.TestCase):
                     "    family: agent_tools",
                     "    role: catalog",
                     "    status: canonical",
+                    "    public: true",
                     "    command: python3 tools/runtime/manifest/tool_catalog.py",
                     "    writes: false",
                     "    default_wiring:",

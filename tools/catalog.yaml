@@ -396,6 +396,7 @@ entries:
       - tests/agent_tools/test_surface_manifest.py
 
   - id: visualization-contract
+    public: true
     summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
     path: tools/validation/semantic/tools/visualization_contract.py
     family: agent_tools
@@ -417,6 +418,7 @@ entries:
       - tests/agent_tools/test_visualization_contract.py
 
   - id: render-dependency-manifest-graph
+    public: true
     summary: Renders dependency manifest graph TSV artifacts into repo-local Graph IR JSON with directory containment, Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.
     path: tools/analysis/dependencies/render_dependency_manifest_graph.py
     family: agent_tools
@@ -439,6 +441,7 @@ entries:
       - tests/agent_tools/test_render_dependency_manifest_graph.py
 
   - id: git-dependency-diff-summary
+    public: true
     summary: Summarizes Git diff paths, line counts, code dependency edges, and dependency-header edit-scope artifacts.
     path: tools/analysis/dependencies/git_dependency_diff_summary.py
     family: agent_tools
@@ -457,6 +460,7 @@ entries:
       - tests/agent_tools/test_git_dependency_diff_summary.py
 
   - id: classify-path-risk
+    public: true
     summary: Classifies changed paths into runtime profiles and targeted validation checks.
     path: tools/validation/semantic/path/classify_path_risk.py
     family: agent_tools
@@ -477,6 +481,7 @@ entries:
       - tests/agent_tools/test_classify_path_risk.py
 
   - id: formal-proof
+    public: true
     summary: Builds natural-language or Python AST-sourced formal-proof scaffold plans, Python-package trace modules, existing-proof search queries, and checker commands.
     path: tools/analysis/proof/formal_proof.py
     family: agent_tools
@@ -501,6 +506,7 @@ entries:
       - tests/agent_tools/test_formal_proof.py
 
   - id: lean-proof-env
+    public: true
     summary: Creates and checks reusable Lean 4 proof environments with Mathlib/Aesop for formal-proof workflows.
     path: tools/analysis/proof/lean_proof_env.py
     family: agent_tools
@@ -524,6 +530,7 @@ entries:
       - tests/agent_tools/test_lean_proof_env.py
 
   - id: tool-proof-coverage
+    public: true
     summary: Reports behavior and performance proof-obligation coverage for every cataloged tool without claiming unverified Lean proofs.
     path: tools/analysis/proof/tool_proof_coverage.py
     family: agent_tools
@@ -547,6 +554,7 @@ entries:
       - tests/agent_tools/test_tool_proof_coverage.py
 
   - id: jit-canonical-ir
+    public: true
     summary: Extracts StableHLO-derived JIT-canonical IR records and backend traces from a JIT root.
     path: tools/analysis/proof/jit_canonical_ir.py
     family: agent_tools
@@ -614,6 +622,7 @@ entries:
       - tests/agent_tools/test_cpp_source_canonical_ir.py
 
   - id: cpp-template-to-lean
+    public: true
     summary: Fully expands C++ template source roots into complete Lean evidence definitions.
     path: tools/analysis/proof/cpp_template_to_lean.py
     family: agent_tools
@@ -660,6 +669,7 @@ entries:
       - tests/agent_tools/test_operational_ir_to_lean.py
 
   - id: jit-ir-to-lean
+    public: true
     summary: Lowers JIT-canonical IR records into generated Lean evidence definitions.
     path: tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs
     family: agent_tools
@@ -682,6 +692,7 @@ entries:
       - tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs
 
   - id: check-proof-trace-alignment
+    public: true
     summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.
     path: tools/validation/semantic/proof/check_proof_trace_alignment.py
     family: agent_tools
@@ -704,6 +715,7 @@ entries:
       - tests/agent_tools/test_check_proof_trace_alignment.py
 
   - id: repo-structure-contract
+    public: true
     summary: Compares an observed repository tree with the AgentCanon structure contract.
     path: tools/validation/semantic/structure/repo_structure_contract.py
     family: agent_tools
@@ -745,6 +757,7 @@ entries:
       - tests/agent_tools/test_import_responsibility.py
 
   - id: github-publish
+    public: true
     summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
     path: tools/repository/github/github_publish.py
     family: agent_tools
@@ -766,6 +779,7 @@ entries:
       - tests/agent_tools/test_github_publish.py
 
   - id: wiki-publish
+    public: true
     summary: Publishes one markdown wiki page to the dedicated repo.wiki.git sidecar using default-branch-only clone, format gates, source commit binding, and exact readback identity.
     path: tools/repository/github/wiki_publish.py
     family: agent_tools
@@ -828,6 +842,7 @@ entries:
       - tests/agent_tools/test_generated_artifact_guard.py
 
   - id: compose-consumer-entrypoint
+    public: true
     summary: Composes a consumer-owned root AGENTS.md from the common ROOT_AGENTS.md base and specific instructions.
     path: tools/agent/templates/entrypoint_composer.py
     family: agent_tools
@@ -1060,6 +1075,7 @@ entries:
       - tests/agent_tools/test_evaluate_report_quality.py
 
   - id: test-design-check
+    public: true
     summary: Runs Rust-native diagnostics for brittle, redundant, or under-specified test design before code changes.
     path: tools/runtime/dispatch/agent-canon/src/test_design.rs
     family: root
@@ -1101,6 +1117,7 @@ entries:
       - tests/agent_tools/test_search.py
 
   - id: lsp-code-analysis
+    public: true
     summary: Runs one-shot LSP 3.17 code analysis and emits deterministic symbols, relations, diagnostics, lexical candidates, lifecycle, and provenance.
     path: tools/analysis/code/lsp_code_analysis.py
     family: agent_tools
@@ -1141,6 +1158,7 @@ entries:
       - tests/agent_tools/test_search.py
 
   - id: semantic-index
+    public: true
     summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, directory responsibility-tree coverage, merge, natural-relation, discourse-relation, thin-doc, provider-comparison, and Eval results.
     path: tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs
     family: root
@@ -1162,6 +1180,7 @@ entries:
       - tools/runtime/dispatch/agent-canon/src/semantic_index/tests.rs
 
   - id: semantic-provider-html-report
+    public: true
     summary: Renders semantic-index compare-providers JSON into a self-contained HTML projection report with the provider-delta-to-shared-candidate-logic figure.
     path: tools/analysis/search/reporting/semantic_provider_html_report.py
     family: agent_tools
@@ -1184,6 +1203,7 @@ entries:
       - tests/agent_tools/test_semantic_provider_html_report.py
 
   - id: prose-reasoning-graph
+    public: true
     summary: Builds SQLite-backed prose structure graphs and related projections in an explicit external runtime, with diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
     path: tools/analysis/documents/prose_reasoning_graph.py
     family: agent_tools
@@ -1207,6 +1227,7 @@ entries:
       - tests/agent_tools/test_prose_reasoning_graph.py
 
   - id: route
+    public: true
     summary: Maps long proposed tool/skill names to short task-routing areas and owns deterministic prompt skill routing.
     path: tools/agent/orchestration/route.py
     family: agent_tools
@@ -1278,6 +1299,7 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-design-doc-claims
+    public: true
     summary: Checks design-document claims against dependency-header, implementation, and parent-document evidence.
     path: tools/validation/semantic/documents/check_design_doc_claims.py
     family: agent_tools
@@ -1300,6 +1322,7 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-semantic-responsibility-contract
+    public: true
     summary: Validates semantic responsibility contract schema, identity, and references.
     path: tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py
     family: agent_tools
@@ -1473,6 +1496,7 @@ entries:
       - tests/agent_tools/test_orphan_lifecycle.py
 
   - id: repository-topic-clone
+    public: true
     summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
     path: tools/repository/workspace/repository_topic_clone.py
     family: agent_tools
@@ -1495,6 +1519,7 @@ entries:
       - tests/agent_tools/test_repository_topic_clone.py
 
   - id: conflict-preservation
+    public: true
     summary: Captures and validates three-way conflict and focused rework content-preservation packets.
     path: tools/repository/git/conflict_preservation.py
     family: agent_tools
@@ -1517,6 +1542,7 @@ entries:
       - tests/agent_tools/test_conflict_preservation.py
 
   - id: dependency-module-change
+    public: true
     summary: Decorates generic repository topic clones with .gitmodules, gitlink, pin, and projection policy.
     path: tools/repository/workspace/dependency_module_change.py
     family: agent_tools
@@ -1539,6 +1565,7 @@ entries:
       - tests/agent_tools/test_dependency_module_change.py
 
   - id: agent-canon-cli
+    public: true
     summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, docs, search, and analysis tools.
     path: tools/bin/agent-canon
     family: root
@@ -2028,6 +2055,7 @@ entries:
       - tools/runtime/dispatch/agent-canon/tests/python_algorithm_contract_cli.rs
 
   - id: oop-python-readability
+    public: true
     summary: Scores Python OOP readability risks.
     path: tools/validation/code/oop/python/readability.py
     family: oop_python
@@ -2046,6 +2074,7 @@ entries:
       - tests/agent_tools/test_analyze_oop_readability.py
 
   - id: oop-python-rule-inventory
+    public: true
     summary: Inventories Python OOP policy, tool, document, and test surfaces.
     path: tools/validation/code/oop/python/rule_inventory.py
     family: oop_python
@@ -2064,6 +2093,7 @@ entries:
       - tests/agent_tools/test_oop_rule_inventory.py
 
   - id: oop-cpp-readability
+    public: true
     summary: Scores C++ OOP readability risks.
     path: tools/validation/code/oop/cpp/readability.py
     family: oop_cpp
@@ -2082,6 +2112,7 @@ entries:
       - tests/agent_tools/test_analyze_oop_readability.py
 
   - id: oop-cpp-rule-inventory
+    public: true
     summary: Inventories C++ OOP policy, tool, document, and test surfaces.
     path: tools/validation/code/oop/cpp/rule_inventory.py
     family: oop_cpp
@@ -2528,6 +2559,7 @@ entries:
       - tests/tools/test_run_managed_experiment.py
 
   - id: html-artifact-access
+    public: true
     summary: Prints SSH tunnel and static-server commands for remote HTML artifacts.
     path: tools/experiments/artifacts/html_artifact_access.py
     family: experiments
@@ -2623,6 +2655,7 @@ entries:
       - tests/tools/test_notebook_quality.py
 
   - id: extract-docx
+    public: true
     summary: Decomposes an authorized DOCX into a searchable and auditable reference bundle.
     path: tools/analysis/documents/extraction/extract_docx.py
     family: docs

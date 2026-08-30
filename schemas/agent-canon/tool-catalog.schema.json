@@ -187,6 +187,7 @@
         "family": { "$ref": "#/$defs/nonEmptyString" },
         "role": { "$ref": "#/$defs/nonEmptyString" },
         "status": { "$ref": "#/$defs/nonEmptyString" },
+        "public": { "type": "boolean" },
         "audience": { "$ref": "#/$defs/nonEmptyString" },
         "placement": { "$ref": "#/$defs/nonEmptyString" },
         "command": { "$ref": "#/$defs/nonEmptyString" },

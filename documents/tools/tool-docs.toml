@@ -1,6 +1,7 @@
 # @dependency-start
 # contract reference
-# responsibility Maps canonical tools to same-named explanatory documents.
+# responsibility Maps canonical tools to same-named explanatory documents and
+# owns their public/internal/compat/retired/example classification.
 # upstream design README.md tool documentation placement policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 # upstream design visualization_contract.md canonical visualization contract/checker documentation
@@ -10,9 +11,14 @@
 
 catalog_kind = "agent_canon_tool_docs"
 version = 1
+# This is the sole tool-surface classification owner.  `public` rows must
+# match catalog entries carrying `public: true`; the other values document
+# why a referenced tool is not part of that public set.
+classification_values = ["public", "internal", "compat", "retired", "example"]
 
 [[tool]]
 id = "route"
+classification = "public"
 tool = "tools/agent/orchestration/route.py"
 doc = "documents/tools/route.md"
 language = "python"
@@ -20,6 +26,7 @@ summary = "Short task-routing tool documentation."
 
 [[tool]]
 id = "html-artifact-access"
+classification = "public"
 tool = "tools/experiments/artifacts/html_artifact_access.py"
 doc = "documents/tools/html_artifact_access.md"
 language = "python"
@@ -27,6 +34,7 @@ summary = "Remote HTML artifact browser-access command documentation."
 
 [[tool]]
 id = "oop-python-readability"
+classification = "public"
 tool = "tools/validation/code/oop/python/readability.py"
 doc = "documents/tools/oop/python/readability.md"
 language = "python"
@@ -34,6 +42,7 @@ summary = "Python OOP readability checker documentation."
 
 [[tool]]
 id = "oop-python-rule-inventory"
+classification = "public"
 tool = "tools/validation/code/oop/python/rule_inventory.py"
 doc = "documents/tools/oop/python/rule_inventory.md"
 language = "python"
@@ -41,6 +50,7 @@ summary = "Python OOP rule inventory documentation."
 
 [[tool]]
 id = "oop-cpp-readability"
+classification = "public"
 tool = "tools/validation/code/oop/cpp/readability.py"
 doc = "documents/tools/oop/cpp/readability.md"
 language = "cpp"
@@ -48,6 +58,7 @@ summary = "C++ OOP readability checker documentation."
 
 [[tool]]
 id = "oop-cpp-rule-inventory"
+classification = "public"
 tool = "tools/validation/code/oop/cpp/rule_inventory.py"
 doc = "documents/tools/oop/cpp/rule_inventory.md"
 language = "cpp"
@@ -55,6 +66,7 @@ summary = "C++ OOP rule inventory documentation."
 
 [[tool]]
 id = "semantic-index"
+classification = "public"
 tool = "tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs"
 doc = "documents/tools/semantic_index.md"
 language = "rust"
@@ -62,6 +74,7 @@ summary = "Semantic vector index and Eval harness documentation."
 
 [[tool]]
 id = "semantic-provider-html-report"
+classification = "public"
 tool = "tools/analysis/search/reporting/semantic_provider_html_report.py"
 doc = "documents/tools/semantic_provider_html_report.md"
 language = "python"
@@ -69,6 +82,7 @@ summary = "HTML renderer for semantic-index provider comparison evidence."
 
 [[tool]]
 id = "prose-reasoning-graph"
+classification = "public"
 tool = "tools/analysis/documents/prose_reasoning_graph.py"
 doc = "documents/tools/prose_reasoning_graph.md"
 language = "python"
@@ -76,6 +90,7 @@ summary = "SQLite-backed prose structure graph and external-runtime artifact bou
 
 [[tool]]
 id = "repo-structure-contract"
+classification = "public"
 tool = "tools/validation/semantic/structure/repo_structure_contract.py"
 doc = "documents/tools/repo_structure_contract.md"
 language = "python"
@@ -83,6 +98,7 @@ summary = "Repository tree versus AgentCanon structure contract checker document
 
 [[tool]]
 id = "agent-canon-cli"
+classification = "public"
 tool = "tools/bin/agent-canon"
 doc = "documents/tools/agent-canon.md"
 language = "rust"
@@ -90,6 +106,7 @@ summary = "Unified Rust CLI including Markdown documentation formatting and chec
 
 [[tool]]
 id = "test-design-check"
+classification = "public"
 tool = "tools/runtime/dispatch/agent-canon/src/test_design.rs"
 doc = "documents/tools/test_design.md"
 language = "rust"
@@ -97,6 +114,7 @@ summary = "Rust test design resilience diagnostics."
 
 [[tool]]
 id = "github-publish"
+classification = "public"
 tool = "tools/repository/github/github_publish.py"
 doc = "documents/tools/github_publish.md"
 language = "python"
@@ -104,6 +122,7 @@ summary = "gh-backed GitHub branch and PR publish tool documentation."
 
 [[tool]]
 id = "wiki-publish"
+classification = "public"
 tool = "tools/repository/github/wiki_publish.py"
 doc = "documents/tools/wiki_publish.md"
 language = "python"
@@ -111,6 +130,7 @@ summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with defau
 
 [[tool]]
 id = "visualization-contract"
+classification = "public"
 tool = "tools/validation/semantic/tools/visualization_contract.py"
 doc = "documents/tools/visualization_contract.md"
 language = "python"
@@ -118,6 +138,7 @@ summary = "Typed visualization universe, ToolCall, projection coverage, and post
 
 [[tool]]
 id = "render-dependency-manifest-graph"
+classification = "public"
 tool = "tools/analysis/dependencies/render_dependency_manifest_graph.py"
 doc = "documents/tools/render_dependency_manifest_graph.md"
 language = "python"
@@ -125,6 +146,7 @@ summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentat
 
 [[tool]]
 id = "git-dependency-diff-summary"
+classification = "public"
 tool = "tools/analysis/dependencies/git_dependency_diff_summary.py"
 doc = "documents/tools/git_dependency_diff_summary.md"
 language = "python"
@@ -132,6 +154,7 @@ summary = "Git diff and dependency expansion summary documentation."
 
 [[tool]]
 id = "check-design-doc-claims"
+classification = "public"
 tool = "tools/validation/semantic/documents/check_design_doc_claims.py"
 doc = "documents/tools/check_design_doc_claims.md"
 language = "python"
@@ -139,6 +162,7 @@ summary = "Design-document claim evidence checker documentation."
 
 [[tool]]
 id = "check-semantic-responsibility-contract"
+classification = "public"
 tool = "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"
 doc = "documents/tools/check_semantic_responsibility_contract.md"
 language = "python"
@@ -146,6 +170,7 @@ summary = "Semantic responsibility contract schema, identity, and reference chec
 
 [[tool]]
 id = "repository-topic-clone"
+classification = "public"
 tool = "tools/repository/workspace/repository_topic_clone.py"
 doc = "documents/tools/repository_topic_clone.md"
 language = "python"
@@ -153,6 +178,7 @@ summary = "Generic repository topic clone lifecycle and reconstructibility clean
 
 [[tool]]
 id = "conflict-preservation"
+classification = "public"
 tool = "tools/repository/git/conflict_preservation.py"
 doc = "documents/tools/conflict_preservation.md"
 language = "python"
@@ -160,6 +186,7 @@ summary = "Three-way conflict and focused rework content-preservation packet doc
 
 [[tool]]
 id = "compose-consumer-entrypoint"
+classification = "public"
 tool = "tools/agent/templates/entrypoint_composer.py"
 doc = "documents/tools/entrypoint_composer.md"
 language = "python"
@@ -167,6 +194,7 @@ summary = "Deterministic source-to-consumer root AGENTS.md composition documenta
 
 [[tool]]
 id = "dependency-module-change"
+classification = "public"
 tool = "tools/repository/workspace/dependency_module_change.py"
 doc = "documents/tools/dependency_module_change.md"
 language = "python"
@@ -174,6 +202,7 @@ summary = "Dependency policy decorator for the generic repository topic clone li
 
 [[tool]]
 id = "classify-path-risk"
+classification = "public"
 tool = "tools/validation/semantic/path/classify_path_risk.py"
 doc = "documents/tools/classify_path_risk.md"
 language = "python"
@@ -181,6 +210,7 @@ summary = "Path/risk check matrix classifier documentation."
 
 [[tool]]
 id = "formal-proof"
+classification = "public"
 tool = "tools/analysis/proof/formal_proof.py"
 doc = "documents/tools/formal_proof.md"
 language = "python"
@@ -188,6 +218,7 @@ summary = "Formal proof scaffold planner documentation, including natural-langua
 
 [[tool]]
 id = "lean-proof-env"
+classification = "public"
 tool = "tools/analysis/proof/lean_proof_env.py"
 doc = "documents/tools/lean_proof_env.md"
 language = "python"
@@ -195,6 +226,7 @@ summary = "Lean Mathlib/Aesop proof environment setup and checker routing docume
 
 [[tool]]
 id = "tool-proof-coverage"
+classification = "public"
 tool = "tools/analysis/proof/tool_proof_coverage.py"
 doc = "documents/tools/tool_proof_coverage.md"
 language = "python"
@@ -202,6 +234,7 @@ summary = "Tool behavior and performance Lean proof-obligation coverage checker 
 
 [[tool]]
 id = "jit-canonical-ir"
+classification = "public"
 tool = "tools/analysis/proof/jit_canonical_ir.py"
 doc = "documents/tools/jit_canonical_ir.md"
 language = "python"
@@ -209,6 +242,7 @@ summary = "JIT root to StableHLO-derived operational IR and backend trace docume
 
 [[tool]]
 id = "cpp-source-canonical-ir"
+classification = "internal"
 tool = "tools/analysis/code/cpp_source_canonical_ir.py"
 doc = "documents/tools/cpp_source_canonical_ir.md"
 language = "python"
@@ -216,6 +250,7 @@ summary = "C++ source-only operational IR wrapper documentation."
 
 [[tool]]
 id = "cpp-template-to-lean"
+classification = "public"
 tool = "tools/analysis/proof/cpp_template_to_lean.py"
 doc = "documents/tools/cpp_template_to_lean.md"
 language = "python"
@@ -223,6 +258,7 @@ summary = "Full C++ template source root to complete Lean evidence route documen
 
 [[tool]]
 id = "operational-ir-to-lean"
+classification = "internal"
 tool = "tools/analysis/proof/operational_ir_to_lean.py"
 doc = "documents/tools/operational_ir_to_lean.md"
 language = "python"
@@ -230,6 +266,7 @@ summary = "Shared thin operational IR to Lean evidence renderer documentation."
 
 [[tool]]
 id = "jit-ir-to-lean"
+classification = "public"
 tool = "tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs"
 doc = "documents/tools/jit_ir_to_lean.md"
 language = "rust"
@@ -237,6 +274,7 @@ summary = "JIT-canonical IR to Lean evidence-catalog documentation."
 
 [[tool]]
 id = "check-proof-trace-alignment"
+classification = "public"
 tool = "tools/validation/semantic/proof/check_proof_trace_alignment.py"
 doc = "documents/tools/check_proof_trace_alignment.md"
 language = "python"
@@ -244,6 +282,7 @@ summary = "Proof trace code-path and proposition alignment checker documentation
 
 [[tool]]
 id = "lsp-code-analysis"
+classification = "public"
 tool = "tools/analysis/code/lsp_code_analysis.py"
 doc = "documents/tools/lsp_code_analysis.md"
 language = "python"
@@ -251,6 +290,7 @@ summary = "Canonical LSP 3.17 code-analysis protocol, report schema, and legacy 
 
 [[tool]]
 id = "extract-docx"
+classification = "public"
 tool = "tools/analysis/documents/extraction/extract_docx.py"
 doc = "documents/tools/extract_docx.md"
 language = "python"
