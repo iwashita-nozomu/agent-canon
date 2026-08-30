@@ -505,6 +505,29 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     assert volume["GID"] == os.getgid()
     assert volume["Mode"] == "0700"
     assert volume["ResidentWriteReadback"] is True
+    volume_root = Path(volume["Mountpoint"])
+    (volume_root / "host-mounts.tsv").write_text("stale\n", encoding="utf-8")
+    copy_image = next(iter(docker_state["images"]))
+    cleared = subprocess.run(
+        [
+            str(fake_docker),
+            "run",
+            "--rm",
+            "--env",
+            "AGENT_CANON_COPY_DIRECTION=clear",
+            "--env",
+            "AGENT_CANON_COPY_KIND=host-mounts",
+            "--mount",
+            f"type=volume,src={volume['Name']},dst=/var/lib/agent-canon",
+            copy_image,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert cleared.returncode == 0
+    assert not (volume_root / "host-mounts.tsv").exists()
     target = tmp_path / "target"
     target.mkdir()
     added = subprocess.run(

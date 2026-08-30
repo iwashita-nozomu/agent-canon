@@ -1296,7 +1296,7 @@ class DockerAdapter:
         """Export one exact task subtree through Docker's UID normalization."""
         source_path = Path(source)
         if (
-            not source.startswith("/var/lib/agent-canon/runtime/tasks/")
+            not source.startswith("/var/lib/agent-canon/exchange/tasks/")
             or ".." in source_path.parts
         ):
             raise BootstrapError(
@@ -1360,6 +1360,8 @@ class RuntimePaths:
     @property
     def mounts(self) -> Path:
         """Return the mount registry path."""
+        if self._container_control():
+            return Path(REGISTRY_DESTINATION)
         return self.runtime_root / "mounts.toml"
 
     @property
@@ -1420,6 +1422,8 @@ class RuntimePaths:
     @property
     def source_sync(self) -> Path:
         """Return source/image correspondence state."""
+        if self._container_control():
+            return Path(SOURCE_SYNC_DESTINATION)
         return self.runtime_root / "source-sync.json"
 
     @property
@@ -1600,7 +1604,8 @@ class BootstrapRuntime:
         for path in (self.paths.spool, self.paths.archive, self.paths.cache, self.paths.codex_home):
             _ensure_directory(path)
             self._enforce_private_directory(path)
-        _ensure_directory(self.paths.container_runtime, mode=0o1777)
+        exchange_mode = 0o700 if self._container_control() else 0o1777
+        _ensure_directory(self.paths.container_runtime, mode=exchange_mode)
         if self._container_control():
             try:
                 exchange_mode = stat.S_IMODE(
@@ -1611,14 +1616,14 @@ class BootstrapRuntime:
                     "exchange_directory_invalid",
                     "cannot inspect container runtime exchange mode",
                 ) from exc
-            if exchange_mode != 0o1777:
+            if exchange_mode != 0o700:
                 raise BootstrapError(
                     "exchange_directory_invalid",
-                    "container runtime exchange mode is not 01777",
+                    "container runtime exchange mode is not 0700",
                 )
         else:
             try:
-                os.chmod(self.paths.container_runtime, 0o1777, follow_symlinks=False)
+                os.chmod(self.paths.container_runtime, exchange_mode, follow_symlinks=False)
             except OSError as exc:
                 raise BootstrapError(
                     "exchange_directory_invalid",
@@ -4764,7 +4769,7 @@ class BootstrapRuntime:
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
                 canon_root = "/usr/local/share/agent-canon/runtime"
-                container_runtime = "/var/lib/agent-canon/runtime"
+                container_runtime = "/var/lib/agent-canon/exchange"
                 exchange_runtime = (
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )
@@ -5549,6 +5554,8 @@ def _container_previous_target_manifest(runtime: BootstrapRuntime) -> dict[str, 
     """Read the host-provided previous target set without touching Docker."""
     supplied = os.environ.get("AGENT_CANON_ROLLBACK_MOUNTS_FILE", "").strip()
     if supplied:
+        if not Path(supplied).exists() and not Path(supplied).is_symlink():
+            return {}
         return _container_target_manifest(
             runtime,
             Path(supplied),

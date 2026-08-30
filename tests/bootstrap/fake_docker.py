@@ -134,15 +134,15 @@ def _formatted_container(record: dict, fmt: str) -> str | None:
 
 def _materialize_skill_exchange(state: dict, container: dict) -> None:
     """Model resident materializer output in the writable runtime exchange."""
-    exchange_mount = next(
+    volume_mount = next(
         (
             mount
             for mount in container.get("Mounts", [])
-            if mount["Destination"] == "/var/lib/agent-canon/exchange"
+            if mount["Destination"] == "/var/lib/agent-canon"
         ),
         None,
     )
-    if exchange_mount is None:
+    if volume_mount is None:
         return
     image_ref = container.get("Config", {}).get("Image", "")
     image = find(state, image_ref)
@@ -156,7 +156,7 @@ def _materialize_skill_exchange(state: dict, container: dict) -> None:
     materializer = Path(__file__).resolve().parents[2] / "tools/agent/skills/skill_shim_materializer.py"
     if not materializer.is_file():
         return
-    staging_root = Path(exchange_mount["Source"]) / "skill-projection"
+    staging_root = Path(volume_mount["Source"]) / "exchange" / "skill-projection"
     staged_skill = staging_root / ".codex/personal/skills/agent-orchestration/SKILL.md"
     if staged_skill.is_file():
         return
@@ -465,6 +465,142 @@ def main(argv: list[str]) -> int:
         # return without retaining a task container.
         if "--mount" not in argv:
             return 2
+        copy_environment = {}
+        for index, item in enumerate(argv):
+            if item == "--env" and index + 1 < len(argv) and "=" in argv[index + 1]:
+                key, value = argv[index + 1].split("=", 1)
+                copy_environment[key] = value
+        copy_direction = copy_environment.get("AGENT_CANON_COPY_DIRECTION", "")
+        if copy_direction:
+            volume_name = ""
+            input_source = ""
+            output_source = ""
+            for index, item in enumerate(argv):
+                if item != "--mount" or index + 1 >= len(argv):
+                    continue
+                values = dict(
+                    part.split("=", 1)
+                    for part in argv[index + 1].split(",")
+                    if "=" in part
+                )
+                if values.get("type") == "volume" and values.get("dst") == "/var/lib/agent-canon":
+                    volume_name = values.get("src", "")
+                elif values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon/input":
+                    input_source = values.get("src", "")
+                elif values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon/output":
+                    output_source = values.get("src", "")
+            if not volume_name:
+                return 2
+            backing = volume_path(volume_name)
+            kind = copy_environment.get("AGENT_CANON_COPY_KIND", "")
+            relative = copy_environment.get("AGENT_CANON_COPY_RELATIVE", "")
+            source = Path(input_source) if copy_direction == "import" else None
+            output = Path(output_source) if copy_direction == "export" else None
+            if copy_direction == "clear":
+                if kind != "host-mounts":
+                    return 1
+                (backing / "host-mounts.tsv").unlink(missing_ok=True)
+            elif copy_direction == "import":
+                destinations = {
+                    "source-sync": backing / "source-sync.json",
+                    "mount-registry": backing / "mounts.toml",
+                    "host-mounts": backing / "host-mounts.tsv",
+                    "private-log": backing / "private-log",
+                    "codex-home": backing / "codex-home",
+                }
+                destination = destinations.get(kind)
+                if source is None or destination is None or not source.exists() or source.is_symlink():
+                    return 1
+                if kind in {"source-sync", "mount-registry", "host-mounts"}:
+                    shutil.copy2(source, destination)
+                else:
+                    if not source.is_dir():
+                        return 1
+                    if destination.exists() or destination.is_symlink():
+                        if destination.is_symlink() or not destination.is_dir():
+                            return 1
+                        shutil.rmtree(destination)
+                    shutil.copytree(source, destination)
+                    if kind == "private-log":
+                        (destination / ".agent-canon-private-log-v1").write_text(
+                            f"agent-canon-private-log/v1\n{copy_environment.get('AGENT_CANON_COPY_DIGEST', '')}\n",
+                            encoding="utf-8",
+                        )
+            elif copy_direction == "export":
+                if output is None:
+                    return 1
+                output.mkdir(parents=True, exist_ok=True)
+                if kind == "projection":
+                    source_root = backing / "exchange"
+                    if not source_root.is_dir() or source_root.is_symlink():
+                        return 1
+                    for name in ("mounts.toml", "mounts.tsv", "rollback-plan.tsv", "rollback-mounts.tsv"):
+                        target = output / name
+                        if target.is_symlink():
+                            return 1
+                        target.unlink(missing_ok=True)
+                        source_file = source_root / name
+                        if source_file.exists():
+                            if source_file.is_symlink() or not source_file.is_file():
+                                return 1
+                            shutil.copy2(source_file, target)
+                elif kind == "skill":
+                    source_root = backing / "exchange" / "skill-projection"
+                    target = output / "skill-projection"
+                    if not source_root.is_dir() or source_root.is_symlink():
+                        return 1
+                    if target.exists() or target.is_symlink():
+                        if target.is_symlink():
+                            return 1
+                        shutil.rmtree(target)
+                    shutil.copytree(source_root, target)
+                elif kind == "eval":
+                    source_root = backing / "spool" / relative
+                    target = output / relative
+                    if not source_root.is_dir() or source_root.is_symlink():
+                        return 1
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    if target.exists() or target.is_symlink():
+                        if target.is_symlink():
+                            return 1
+                        shutil.rmtree(target)
+                    shutil.copytree(source_root, target)
+                elif kind == "private-feedback":
+                    source_root = backing / "spool" / "private-feedback"
+                    if not source_root.is_dir() or source_root.is_symlink():
+                        return 1
+                    for child in output.iterdir():
+                        if child.is_dir() and not child.is_symlink():
+                            shutil.rmtree(child)
+                        else:
+                            child.unlink()
+                    for child in source_root.iterdir():
+                        if child.is_symlink():
+                            return 1
+                        if child.is_dir():
+                            shutil.copytree(child, output / child.name)
+                        else:
+                            shutil.copy2(child, output / child.name)
+                elif kind == "codex-home":
+                    source_root = backing / "codex-home"
+                    if not source_root.is_dir() or source_root.is_symlink():
+                        return 1
+                    for child in output.iterdir():
+                        if child.is_dir() and not child.is_symlink():
+                            shutil.rmtree(child)
+                        else:
+                            child.unlink()
+                    for child in source_root.iterdir():
+                        if child.is_symlink():
+                            return 1
+                        if child.is_dir():
+                            shutil.copytree(child, output / child.name)
+                        else:
+                            shutil.copy2(child, output / child.name)
+                else:
+                    return 1
+            save(state)
+            return 0
         volume_name = ""
         legacy_source = ""
         for index, item in enumerate(argv):
@@ -475,7 +611,7 @@ def main(argv: list[str]) -> int:
                 for part in argv[index + 1].split(",")
                 if "=" in part
             )
-            if values.get("type") == "volume" and values.get("dst") == "/var/lib/agent-canon/runtime":
+            if values.get("type") == "volume" and values.get("dst") == "/var/lib/agent-canon":
                 volume_name = values.get("src", "")
             if values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon/legacy-state":
                 legacy_source = values.get("src", "")
@@ -483,6 +619,8 @@ def main(argv: list[str]) -> int:
             return 2
         backing = volume_path(volume_name)
         backing.mkdir(parents=True, exist_ok=True)
+        runtime_backing = backing / "runtime"
+        runtime_backing.mkdir(parents=True, exist_ok=True)
         legacy = Path(legacy_source) if legacy_source else None
         marker = backing / ".agent-canon-controller-volume-v1"
         digest = next(
@@ -533,9 +671,14 @@ def main(argv: list[str]) -> int:
         if not marker.exists() and legacy is not None and legacy.is_dir():
             for name in ("state.json", "owner.json"):
                 source = legacy / name
-                if source.exists() and (not source.is_file() or source.is_symlink() or not migrate_file(source, backing / name)):
+                if source.exists() and (not source.is_file() or source.is_symlink() or not migrate_file(source, runtime_backing / name)):
                     return 1
             for name in ("receipts", "generations", "tasks"):
+                source = legacy / name
+                destination = runtime_backing / name
+                if source.exists() and (not source.is_dir() or source.is_symlink() or not migrate_tree(source, destination)):
+                    return 1
+            for name in ("spool", "archive", "cache", "codex-home"):
                 source = legacy / name
                 destination = backing / name
                 if source.exists() and (not source.is_dir() or source.is_symlink() or not migrate_tree(source, destination)):
@@ -546,9 +689,13 @@ def main(argv: list[str]) -> int:
         if legacy is not None and legacy.is_dir():
             for name in ("state.json", "owner.json"):
                 source = legacy / name
-                if source.exists() and (not (backing / name).is_file() or source.read_bytes() != (backing / name).read_bytes()):
+                if source.exists() and (not (runtime_backing / name).is_file() or source.read_bytes() != (runtime_backing / name).read_bytes()):
                     return 1
             for name in ("receipts", "generations", "tasks"):
+                source = legacy / name
+                if source.exists() and (not (runtime_backing / name).is_dir() or not same_tree(source, runtime_backing / name)):
+                    return 1
+            for name in ("spool", "archive", "cache", "codex-home"):
                 source = legacy / name
                 if source.exists() and (not (backing / name).is_dir() or not same_tree(source, backing / name)):
                     return 1
@@ -623,7 +770,7 @@ def main(argv: list[str]) -> int:
             (
                 mount
                 for mount in found[1]["Mounts"]
-                if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                if mount["Destination"] == "/var/lib/agent-canon"
             ),
             None,
         )
@@ -634,7 +781,7 @@ def main(argv: list[str]) -> int:
             relative = Path(clean_source).relative_to("/var/lib/agent-canon/runtime")
         except ValueError:
             return 1
-        source = Path(runtime_mount["Source"]) / relative
+        source = Path(runtime_mount["Source"]) / "runtime" / relative
         destination = Path(argv[2])
         if not source.is_dir():
             return 1
@@ -657,7 +804,7 @@ def main(argv: list[str]) -> int:
             (
                 mount
                 for mount in found[1].get("Mounts", [])
-                if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                if mount["Destination"] == "/var/lib/agent-canon"
                 and mount.get("Type") == "volume"
             ),
             None,
@@ -705,7 +852,7 @@ def main(argv: list[str]) -> int:
                     (
                         mount
                         for mount in found[1]["Mounts"]
-                        if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                        if mount["Destination"] == "/var/lib/agent-canon"
                     ),
                     None,
                 )
@@ -713,7 +860,7 @@ def main(argv: list[str]) -> int:
                     (
                         mount
                         for mount in found[1]["Mounts"]
-                        if mount["Destination"] == "/var/lib/agent-canon/exchange"
+                        if mount["Destination"] == "/var/lib/agent-canon"
                     ),
                     None,
                 )
@@ -724,8 +871,8 @@ def main(argv: list[str]) -> int:
                 )
                 if runtime_mount is None or exchange_mount is None or not digest or not host_root:
                     return 1
-                runtime_root = Path(runtime_mount["Source"])
-                exchange_root = Path(exchange_mount["Source"])
+                runtime_root = Path(runtime_mount["Source"]) / "runtime"
+                exchange_root = Path(exchange_mount["Source"]) / "exchange"
                 state_path = runtime_root / "state.json"
                 if state_path.is_file():
                     lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
@@ -768,7 +915,7 @@ def main(argv: list[str]) -> int:
                     (
                         mount
                         for mount in found[1]["Mounts"]
-                        if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                        if mount["Destination"] == "/var/lib/agent-canon"
                     ),
                     None,
                 )
@@ -776,45 +923,23 @@ def main(argv: list[str]) -> int:
                 current_ref = exec_environment.get("AGENT_CANON_CURRENT_IMAGE_REF", "")
                 if runtime_mount is None or not current_id or not current_ref:
                     return 1
-                runtime_root = Path(runtime_mount["Source"])
-                private_log = exec_environment.get("AGENT_CANON_PRIVATE_LOG_ROOT", "")
-                source_sync_mount = next(
-                    mount
-                    for mount in found[1]["Mounts"]
-                    if mount["Destination"] == "/var/lib/agent-canon/source-sync.json"
-                )
-                registry_mount = next(
-                    mount
-                    for mount in found[1]["Mounts"]
-                    if mount["Destination"] == "/var/lib/agent-canon/mount-registry.toml"
-                )
-                exchange_mount = next(
-                    (
-                        mount
-                        for mount in found[1]["Mounts"]
-                        if mount["Destination"] == "/var/lib/agent-canon/exchange"
-                    ),
-                    None,
-                )
-                plan = (
-                    Path(exchange_mount["Source"]) / "rollback-plan.tsv"
-                    if exchange_mount is not None
-                    else runtime_root / "rollback-plan.tsv"
-                )
+                volume_root = Path(runtime_mount["Source"])
+                runtime_root = volume_root / "runtime"
+                host_install = Path(exec_environment.get("AGENT_CANON_HOST_INSTALL_ROOT", ""))
+                private_log = host_install.parent / "agent-canon-log"
+                source_sync_source = host_install / ".runtime" / "source-sync.json"
+                registry_source = host_install / ".runtime" / "container-state" / "mounts.toml"
+                plan = volume_root / "exchange" / "rollback-plan.tsv"
                 plan_lines = [
                     "schema\tagent-canon.rollback-plan.v1",
                     f"image-id\t{current_id}",
                     f"image-ref\t{current_ref}",
                     f"mount\tmount\t{runtime_root}\t/var/lib/agent-canon/runtime\tfalse",
-                    f"mount\tmount\t{source_sync_mount['Source']}\t/var/lib/agent-canon/source-sync.json\ttrue",
+                    f"mount\tmount\t{source_sync_source}\t/var/lib/agent-canon/source-sync.json\ttrue",
                     f"mount\tmount\t{private_log}\t/var/lib/agent-canon/private-log\ttrue",
-                    f"mount\tmount\t{registry_mount['Source']}\t/var/lib/agent-canon/mount-registry.toml\ttrue",
+                    f"mount\tmount\t{registry_source}\t/var/lib/agent-canon/mount-registry.toml\ttrue",
                 ]
-                mounts_path = (
-                    Path(exchange_mount["Source"]) / "mounts.tsv"
-                    if exchange_mount is not None
-                    else runtime_root / "mounts.tsv"
-                )
+                mounts_path = volume_root / "exchange" / "mounts.tsv"
                 if mounts_path.is_file():
                     for line in mounts_path.read_text(encoding="utf-8").splitlines():
                         fields = line.split("\t")
@@ -837,15 +962,17 @@ def main(argv: list[str]) -> int:
             operations = {"install", "update", "start", "stop", "uninstall"}
             operation = next((item for item in command[2:] if item in operations), "")
             if operation == "install" and runtime_mount is not None:
+                volume_root = Path(runtime_mount["Source"])
+                runtime_root = volume_root / "runtime"
                 for name in ("generations", "tasks"):
-                    directory = Path(runtime_mount["Source"]) / name
+                    directory = runtime_root / name
                     if directory.is_dir():
                         for child in directory.iterdir():
                             if child.is_dir() and not child.is_symlink():
                                 shutil.rmtree(child)
                             else:
                                 child.unlink()
-                state_path = Path(runtime_mount["Source"]) / "state.json"
+                state_path = runtime_root / "state.json"
                 if state_path.is_file():
                     lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
                     lifecycle.update(
@@ -860,21 +987,13 @@ def main(argv: list[str]) -> int:
                         }
                     )
                     state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
-                exchange_mount = next(
-                    (
-                        mount
-                        for mount in found[1]["Mounts"]
-                        if mount["Destination"] == "/var/lib/agent-canon/exchange"
-                    ),
-                    None,
+                exchange_root = volume_root / "exchange"
+                exchange_root.mkdir(parents=True, exist_ok=True)
+                (exchange_root / "mounts.tsv").write_text("", encoding="utf-8")
+                (exchange_root / "mounts.toml").write_text(
+                    'schema = "agent-canon.mount-registry.v2"\n',
+                    encoding="utf-8",
                 )
-                if exchange_mount is not None:
-                    exchange_root = Path(exchange_mount["Source"])
-                    (exchange_root / "mounts.tsv").write_text("", encoding="utf-8")
-                    (exchange_root / "mounts.toml").write_text(
-                        'schema = "agent-canon.mount-registry.v2"\n',
-                        encoding="utf-8",
-                    )
             if operation in {"install", "update"} or (
                 "codex" in command[2:] and "prepare" in command[2:]
             ):
@@ -912,9 +1031,9 @@ def main(argv: list[str]) -> int:
             target = next(
                 mount
                 for mount in found[1]["Mounts"]
-                if mount["Destination"] == "/var/lib/agent-canon/exchange"
+                if mount["Destination"] == "/var/lib/agent-canon"
             )
-            relative = Path(runtime_arg).relative_to("/var/lib/agent-canon/runtime")
+            relative = Path(runtime_arg).relative_to("/var/lib/agent-canon/exchange")
             exchange = Path(target["Source"]) / relative
             eval_failed = os.environ.get("FAKE_EVAL_FAIL") == "1"
             (exchange / "eval-results").mkdir(parents=True, exist_ok=True)
@@ -978,9 +1097,9 @@ def main(argv: list[str]) -> int:
             runtime_mount = next(
                 mount
                 for mount in found[1]["Mounts"]
-                if mount["Destination"] == "/var/lib/agent-canon/exchange"
+                if mount["Destination"] == "/var/lib/agent-canon"
             )
-            runtime_root = Path(runtime_mount["Source"])
+            runtime_root = Path(runtime_mount["Source"]) / "exchange"
             for child in runtime_root.iterdir():
                 if child.is_dir() and not child.is_symlink():
                     shutil.rmtree(child)
