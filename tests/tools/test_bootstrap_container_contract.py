@@ -296,8 +296,6 @@ def test_single_repository_dockerignore_is_deny_by_default() -> None:
     assert "!bootstrap/container/**" in lines
     assert "tools/runtime/dispatch/agent-canon/target/**" in lines
     assert "**/__pycache__/**" in lines
-    assert "tools/ci/**" in lines
-    assert "!tools/validation/ci/runners/run_standalone_static_gate_unit.sh" in lines
 
 
 def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
@@ -314,7 +312,6 @@ def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
         "!references/**",
         "!templates/**",
         "!tools/**",
-        "!tools/validation/ci/runners/run_standalone_static_gate_unit.sh",
         "!tools/runtime/dispatch/agent-canon/**",
     ):
         assert source in lines

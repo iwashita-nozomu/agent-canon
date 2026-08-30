@@ -32,7 +32,8 @@ if [[ ! -f /usr/local/share/agent-canon/.agent-canon-tool-container ]]; then
   exit 2
 fi
 ROOT="${AGENT_CANON_TARGET_ROOT:?AGENT_CANON_TARGET_ROOT is required}"
-TOOLS_ROOT=/usr/local/share/agent-canon/runtime/tools
+RUNTIME_ROOT=/usr/local/share/agent-canon/runtime
+TOOLS_ROOT="${RUNTIME_ROOT}/tools"
 
 assert_read_only_target() {
   python3 - "${ROOT}" <<'PY'
@@ -89,12 +90,12 @@ cd "${ROOT}"
 # the path resolver in runtime_artifacts.py as the single source of truth.
 runtime_boundary_root() {
   local candidate="$1"
-  PYTHONPATH="${TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${ROOT}" "${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
-from runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 source_root = Path(sys.argv[1])
 runtime_root = Path(sys.argv[2])
@@ -104,12 +105,12 @@ PY
 
 runtime_boundary_path() {
   local candidate="$1"
-  PYTHONPATH="${TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${ROOT}" "${AGENT_CANON_STATIC_RUNTIME_ROOT}" "${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
-from runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
 print(boundary.resolve(Path(sys.argv[3])))
@@ -173,13 +174,13 @@ run_contracts() {
   python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
   local base_ref="${GITHUB_BASE_REF:-main}"
   git rev-parse --verify "origin/${base_ref}^{commit}" >/dev/null
-  python3 "${TOOLS_ROOT}/agent_tools/import_responsibility.py" \
+  python3 "${TOOLS_ROOT}/analysis/code/import_responsibility.py" \
     --changed --baseline-ref "origin/${base_ref}"
-  PYTHONPATH="${ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
-  python3 "${TOOLS_ROOT}/agent_tools/check_convention_compliance.py" \
+  python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \
     --root "${ROOT}" --format json
-  python3 "${TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
+  python3 "${TOOLS_ROOT}/agent/skills/skill_tool_commands.py" check
 }
 
 run_eval() (
@@ -208,7 +209,7 @@ run_eval() (
   mkdir -p "${eval_log_dir}"
   set +e
   AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
-    python3 "${TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" \
+    python3 "${RUNTIME_ROOT}/eval/producers/run_accumulated_agent_evals.py" \
       --run-id agent-canon-pr-gate \
       --root "${ROOT}" \
       --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
@@ -232,12 +233,12 @@ run_eval() (
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
     AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
-      python3 "${TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" \
+      python3 "${RUNTIME_ROOT}/eval/checkers/eval_accumulation_check.py" \
         --root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}"
     primary_status=$?
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
-    PYTHONPATH="${ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+    PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
       python3 "${ROOT}/eval/checkers/smoke_test_research_perspective_pack.py"
     primary_status=$?
   fi
