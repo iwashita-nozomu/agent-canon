@@ -159,7 +159,7 @@ and [the tool catalog](tools/catalog.yaml).
 | `agents/` | Skills, workflows, roles, communication, and task contracts |
 | `documents/` | Design, runtime, tool, and responsibility contracts |
 | `tools/` | Host adapters, checkers, Python tools, and CLI wrappers |
-| `rust/` | Compiled AgentCanon tools |
+| `tools/runtime/dispatch/agent-canon/` | Compiled AgentCanon tools |
 | `tests/` | AgentCanon mechanism tests |
 | `bootstrap/` | Shared image and lifecycle manifest used by `bootstrap.sh` |
 

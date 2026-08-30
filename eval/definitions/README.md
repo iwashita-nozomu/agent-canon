@@ -61,21 +61,27 @@ order:
    evidence, then have the producer emit reports that satisfy the declared
    filename and run-id contract.
 
-Use these evals when changing a skill, workflow, or routing prompt:
+Use the bootstrap-owned collection route when changing a skill, workflow, or
+routing prompt. `eval collect` runs the registered producers and creates
+`collection.json` in the runtime spool; `eval sync` publishes that collection
+to the external `agent-canon-log` archive:
 
 ```bash
-python3 eval/producers/evaluate_skill_workflow_prompts.py \
-  --manifest eval/definitions/skill_workflow_prompt_eval.toml
+BOOTSTRAP=<agent-canon-source>/bootstrap.sh
+ROOT=<authorized-parent-root>
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval collect --root <project-root> --run-id <run-id>
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval sync --run-id <run-id>
 ```
 
-Agent-facing eval runs should write bounded statistics before the agent reads
+The collection and sync commands are the canonical user flow. Agent-facing eval
+runs write bounded statistics and `collection.json` before the agent reads
 details:
 
 ```bash
-python3 eval/producers/evaluate_skill_workflow_prompts.py \
-  --manifest eval/definitions/skill_workflow_prompt_eval.toml \
-  --runtime-root <install-root>/.runtime \
-  --compact-out <install-root>/.runtime/spool/<run-id>/skill-workflow-prompt-compact.json
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval collect --root <project-root> --run-id <run-id>
 ```
 
 When a run uses skills, run the same prompt eval with accumulated evidence.
@@ -85,13 +91,10 @@ written to the explicit runtime spool and then published to the external
 overwritten during normal agent work:
 
 ```bash
-python3 eval/producers/evaluate_skill_workflow_prompts.py \
-  --manifest eval/definitions/skill_workflow_prompt_eval.toml \
-  --runtime-root <install-root>/.runtime \
-  --accumulate \
-  --results-dir <install-root>/.runtime/spool/<run-id>/eval-results/skill-workflow-prompt \
-  --run-id <run-id> \
-  --skill-used agent-orchestration
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval collect --root <project-root> --run-id <run-id>
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval sync --run-id <run-id>
 ```
 
 The file name convention is:
@@ -125,11 +128,10 @@ The file name convention is:
 ## Behavior Eval Closeout Gate
 
 ```bash
-python3 eval/producers/evaluate_agent_run.py \
-  --runtime-root <install-root>/.runtime \
-  --report-dir <install-root>/.runtime/spool/<run-id> \
-  --behavior-manifest eval/definitions/agent_behavior_eval.toml \
-  --write
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval collect --root <project-root> --run-id <run-id>
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval sync --run-id <run-id>
 ```
 
 Behavior evals inspect `workflow_monitoring.md`, `agent_evaluation.md`, review artifacts,
@@ -163,20 +165,20 @@ they are not promoted to canonical evidence.
 | Legacy source-tree result path | `agents/evals/results/` is not a normal read or write location; old results must be imported into the external archive and deleted from source. |
 
 The archive boundary is documented in `documents/runtime/runtime-log-archive.md`.
-Run the mechanical producer before using accumulated evidence in a PR or guide:
+Run the bootstrap collection and archive sync before using accumulated evidence
+in a PR or guide:
 
 ```bash
-python3 eval/producers/run_accumulated_agent_evals.py \
-  --root . \
-  --runtime-root <install-root>/.runtime \
-  --run-id <run-id>
-python3 eval/checkers/eval_accumulation_check.py --root . \
-  --runtime-root <install-root>/.runtime
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval collect --root <project-root> --run-id <run-id>
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
+  eval sync --run-id <run-id>
 ```
 
-The producer runs the registered role, skill/workflow prompt,
-workflow-selection, and report-quality evals with `--accumulate`; stdout/stderr
-go to the explicit `<install-root>/.runtime/spool/<run-id>/` path. Agents do not
+The collection command runs the registered role, skill/workflow prompt,
+workflow-selection, and report-quality evals; stdout/stderr and
+`collection.json` go to the explicit `<install-root>/.runtime/spool/<run-id>/`
+path. The sync command is the only archive publication step. Agents do not
 hand-generate these reports. The gate validates directory mounted JSONL readability when available,
 every family declared in `eval_result_families.toml`, unique run ids,
 non-ignored tracked evidence paths, and intentionally ignored archive paths,
@@ -192,9 +194,9 @@ are transient producer output and are not an alternate oracle.
 
 | Eval surface | Command | Accumulated evidence and privacy rule |
 | --- | --- | --- |
-| Workflow selection | `python3 eval/producers/evaluate_workflow_selection.py --manifest eval/definitions/workflow_selection_eval.toml` | reports list case IDs, expected workflow labels, and observed workflow labels; they do not store raw prompt text. |
-| Report quality | `python3 eval/producers/evaluate_report_quality.py --manifest eval/definitions/report_quality_eval.toml` | reports list checklist IDs and missing patterns; they do not store raw report drafts or prompts. |
-| Codex subagent roles | `python3 eval/producers/evaluate_codex_agent_roles.py` | accumulated reports use `codex-agent-role-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>-<status>.md` and record `CODEX_AGENT_ROLE_EVAL_RUN_ID=<eval_run_id>`. |
+| Workflow selection | included in `bootstrap.sh ... eval collect --root <project-root> --run-id <run-id>` | reports list case IDs, expected workflow labels, and observed workflow labels; they do not store raw prompt text. |
+| Report quality | included in `bootstrap.sh ... eval collect --root <project-root> --run-id <run-id>` | reports list checklist IDs and missing patterns; they do not store raw report drafts or prompts. |
+| Codex subagent roles | included in `bootstrap.sh ... eval collect --root <project-root> --run-id <run-id>` | accumulated reports use `codex-agent-role-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>-<status>.md` and record `CODEX_AGENT_ROLE_EVAL_RUN_ID=<eval_run_id>`. |
 
 `workflow_selection_eval.toml` may define reusable `[[case_groups]]`.
 Each group supplies prompt templates, subjects, expected workflow labels, and
