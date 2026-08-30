@@ -521,14 +521,21 @@ def improvement_guide_trigger_findings(
             "improvement_guide_candidate_export_required",
         ),
         (
-            r'echo "AGENT_CANON_RUNTIME_ROOT=\$\{candidate_source\}/\.runtime" '
+            r'echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=\$\{candidate_source\}/\.runtime" '
             r'>> "\$\{GITHUB_ENV\}"',
-            "improvement_guide_candidate_runtime_export_required",
+            "improvement_guide_guide_runtime_export_required",
         ),
     )
     for pattern, message in candidate_requirements:
         if not re.search(pattern, workflow_text):
             findings.append(Finding("error", path, message))
+    if "AGENT_CANON_RUNTIME_ROOT" in workflow_text:
+        findings.append(Finding("error", path, "improvement_guide_runtime_env_forbidden"))
+    if not re.search(
+        r'\$\{AGENT_CANON_GUIDE_RUNTIME_ROOT\}/container-runtime/reports/',
+        workflow_text,
+    ):
+        findings.append(Finding("error", path, "improvement_guide_report_runtime_required"))
     if re.search(r"(?m)\bgit\s+[^\n]*\bpush\s+origin\b", workflow_text):
         findings.append(Finding("error", path, "improvement_guide_origin_push_forbidden"))
 

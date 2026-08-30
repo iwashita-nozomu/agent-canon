@@ -81,7 +81,12 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             text,
         )
         self.assertIn(
-            'echo "AGENT_CANON_RUNTIME_ROOT=${candidate_source}/.runtime"',
+            'echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=${candidate_source}/.runtime"',
+            text,
+        )
+        self.assertNotIn("AGENT_CANON_RUNTIME_ROOT", text)
+        self.assertIn(
+            '"${AGENT_CANON_GUIDE_RUNTIME_ROOT}/container-runtime/reports/agent-improvement-guide"',
             text,
         )
         bootstrap_lines = [
