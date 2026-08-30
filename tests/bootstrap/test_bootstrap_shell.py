@@ -1154,6 +1154,85 @@ def test_volume_export_digest_corruption_is_rejected(tmp_path: Path) -> None:
     assert json.loads(result.stderr)["code"] == "volume_copy_failed"
 
 
+def test_private_feedback_volume_copy_uses_canonical_subtree(tmp_path: Path) -> None:
+    """Private feedback export selects its fixed volume subtree and ID."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    stage = tmp_path / "stage"
+    control.mkdir()
+    runtime.mkdir()
+    stage.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    (stage / "stale.txt").write_text("stale\n", encoding="utf-8")
+    feedback = volume_root / "spool" / "private-feedback"
+    feedback.mkdir(parents=True)
+    (feedback / "feedback.json").write_text("feedback\n", encoding="utf-8")
+    (volume_root / "spool" / "other.txt").write_text("other\n", encoding="utf-8")
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {},
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    common = (
+        f"source {str(ADAPTER)!r}; "
+        f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+        f"AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}; "
+        f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+        f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+        f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
+        f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+        "AGENT_CANON_IMAGE_REF=image; "
+    )
+    exported = subprocess.run(
+        [
+            "bash",
+            "-c",
+            common
+            + f"_agent_canon_volume_copy export private-feedback {str(stage)!r} private-feedback",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert exported.returncode == 0, exported.stderr
+    assert not (stage / "stale.txt").exists()
+    assert (stage / "feedback.json").read_text(encoding="utf-8") == "feedback\n"
+    assert not (stage / "other.txt").exists()
+    assert '_agent_canon_volume_copy export private-feedback "$spool" private-feedback' in ADAPTER.read_text(
+        encoding="utf-8"
+    )
+    invalid = subprocess.run(
+        [
+            "bash",
+            "-c",
+            common
+            + f"_agent_canon_volume_copy export private-feedback {str(stage)!r} bad/id",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert invalid.returncode == 2
+    assert json.loads(invalid.stderr)["code"] == "volume_copy_invalid"
+
+
 def test_codex_volume_copy_rejects_unexpected_symlink_target(tmp_path: Path) -> None:
     """Codex export accepts only managed links into the live .codex tree."""
     control = tmp_path / "control"

@@ -3412,7 +3412,7 @@ _agent_canon_private_feedback_sync() {
   local spool="$AGENT_CANON_STATE_ROOT/spool/private-feedback"
   local request="$spool/sync-request.json"
   [[ -f "$request" && ! -L "$request" ]] || return 0
-  _agent_canon_volume_copy export private-feedback "$spool"
+  _agent_canon_volume_copy export private-feedback "$spool" private-feedback
   local request_body
   request_body=$(<"$request")
   request_body=${request_body%$'\n'}
