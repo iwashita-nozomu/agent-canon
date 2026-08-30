@@ -74,7 +74,6 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
         """Shell wrappers fail before writing when the runtime root is absent."""
         scripts = (
             PROJECT_ROOT / "tools" / "validation" / "tests" / "run_pytest_with_logs.sh",
-            PROJECT_ROOT / "tools" / "validation" / "review" / "run_comprehensive_review.sh",
             PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "check_worktree_scopes.sh",
         )
         for script in scripts:

@@ -2633,7 +2633,7 @@ entries:
     docs:
       - tools/README.md
     tests: []
-    test_exempt_reason: No dedicated unit test exists; command is currently exercised through `run_comprehensive_review.sh`.
+    test_exempt_reason: No dedicated unit test exists; invoke the checker directly through its catalog command.
 
 
   - id: notebook-quality
