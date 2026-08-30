@@ -55,7 +55,7 @@ jobs:
           git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main
           git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"
           printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\n' "${candidate_source}" >> "${GITHUB_ENV}"
-          echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=${candidate_source}/.runtime" >> "${GITHUB_ENV}"
+          echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=${candidate_source}/.runtime/container-state" >> "${GITHUB_ENV}"
 
       - name: Start shared tool runtime
         run: |
@@ -66,7 +66,7 @@ jobs:
       - name: Generate improvement guide
         id: guide
         run: |
-          report_dir="$(realpath -m "${AGENT_CANON_GUIDE_RUNTIME_ROOT}/container-runtime/reports/agent-improvement-guide")"
+          report_dir="$(realpath -m "${AGENT_CANON_GUIDE_RUNTIME_ROOT}/reports/agent-improvement-guide")"
           guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
