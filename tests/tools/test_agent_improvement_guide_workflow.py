@@ -49,17 +49,50 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         self.assertNotIn('mkdir -p "${report_dir}"', text)
         self.assertIn("--output-mode 644", text)
 
-    def test_pr_candidate_updates_runtime_and_keeps_target_registration(self) -> None:
-        """PR candidates build from the checked-out source before execution."""
+    def test_pr_candidate_clones_main_and_installs_runtime(self) -> None:
+        """PR candidates install from a local main clone before execution."""
         text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn(
+            'candidate_bare="${RUNNER_TEMP}/agent-canon-pr-candidate.git"',
+            text,
+        )
+        self.assertIn(
+            'candidate_source="${RUNNER_TEMP}/agent-canon-pr-candidate"',
+            text,
+        )
+        self.assertIn(
+            'git -C "${GITHUB_WORKSPACE}" push "${candidate_bare}" "HEAD:refs/heads/main"',
+            text,
+        )
+        self.assertIn(
+            'git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main',
+            text,
+        )
+        self.assertIn(
+            'git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"',
+            text,
+        )
+        self.assertIn(
+            "printf 'AGENT_CANON_CANDIDATE_SOURCE=%s",
+            text,
+        )
+        self.assertIn(
+            '"${candidate_source}" >> "${GITHUB_ENV}"',
+            text,
+        )
         bootstrap_lines = [
-            line.strip()
-            for line in text.splitlines()
-            if line.strip().startswith("./bootstrap.sh")
+            line.strip() for line in text.splitlines() if "bootstrap.sh" in line
         ]
 
-        self.assertTrue(any(line.endswith(" update") for line in bootstrap_lines))
-        self.assertFalse(any(line.endswith(" install") for line in bootstrap_lines))
+        self.assertTrue(bootstrap_lines)
+        self.assertTrue(
+            all(
+                line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
+                for line in bootstrap_lines
+            )
+        )
+        self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines))
+        self.assertFalse(any(line.endswith(" update") for line in bootstrap_lines))
         self.assertTrue(any(line.endswith(" start") for line in bootstrap_lines))
         self.assertTrue(any(" target add " in line for line in bootstrap_lines))
 

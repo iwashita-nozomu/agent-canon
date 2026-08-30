@@ -493,6 +493,40 @@ def improvement_guide_trigger_findings(
     if not re.search(r"(?m)^  workflow_dispatch:\s*$", workflow_text):
         findings.append(Finding("error", path, "improvement_guide_manual_dispatch_required"))
 
+    candidate_requirements = (
+        (
+            r'candidate_bare="\$\{RUNNER_TEMP\}/agent-canon-pr-candidate\.git"',
+            "improvement_guide_candidate_bare_path_required",
+        ),
+        (
+            r'candidate_source="\$\{RUNNER_TEMP\}/agent-canon-pr-candidate"',
+            "improvement_guide_candidate_source_path_required",
+        ),
+        (
+            r'git -C "\$\{GITHUB_WORKSPACE\}" push "\$\{candidate_bare\}" '
+            r'"HEAD:refs/heads/main"',
+            "improvement_guide_candidate_main_push_required",
+        ),
+        (
+            r'git --git-dir="\$\{candidate_bare\}" symbolic-ref HEAD refs/heads/main',
+            "improvement_guide_candidate_head_required",
+        ),
+        (
+            r'git clone --branch main --single-branch "\$\{candidate_bare\}" '
+            r'"\$\{candidate_source\}"',
+            "improvement_guide_candidate_clone_required",
+        ),
+        (
+            r"AGENT_CANON_CANDIDATE_SOURCE=%s\\n.*\$\{GITHUB_ENV\}",
+            "improvement_guide_candidate_export_required",
+        ),
+    )
+    for pattern, message in candidate_requirements:
+        if not re.search(pattern, workflow_text):
+            findings.append(Finding("error", path, message))
+    if re.search(r"(?m)\bgit\s+[^\n]*\bpush\s+origin\b", workflow_text):
+        findings.append(Finding("error", path, "improvement_guide_origin_push_forbidden"))
+
     runtime = re.search(
         r"(?ms)^      - name: Start shared tool runtime\s*\n"
         r"\s+run:\s+\|\n(?P<run>.*?)(?=\n      - name:|\Z)",
@@ -506,16 +540,34 @@ def improvement_guide_trigger_findings(
     bootstrap_lines = [
         line.strip()
         for line in run.splitlines()
-        if line.strip().startswith("./bootstrap.sh")
+        if "bootstrap.sh" in line
     ]
-    if not any(line.endswith(" update") for line in bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_pr_runtime_update_required"))
-    if any(line.endswith(" install") for line in bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_pr_runtime_install_forbidden"))
+    if not any(
+        line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
+        for line in bootstrap_lines
+    ):
+        findings.append(Finding("error", path, "improvement_guide_candidate_source_required"))
+    if any(line.startswith("./bootstrap.sh") for line in bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_original_source_forbidden"))
+    if not any(line.endswith(" install") for line in bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_pr_runtime_install_required"))
+    if any(line.endswith(" update") for line in bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_pr_runtime_update_forbidden"))
     if not any(line.endswith(" start") for line in bootstrap_lines):
         findings.append(Finding("error", path, "improvement_guide_runtime_start_required"))
     if not any(" target add " in line for line in bootstrap_lines):
         findings.append(Finding("error", path, "improvement_guide_runtime_target_add_required"))
+
+    all_bootstrap_lines = [
+        line.strip() for line in workflow_text.splitlines() if "bootstrap.sh" in line
+    ]
+    if any(line.startswith("./bootstrap.sh") for line in all_bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_cleanup_source_forbidden"))
+    if any(
+        not line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
+        for line in all_bootstrap_lines
+    ):
+        findings.append(Finding("error", path, "improvement_guide_cleanup_candidate_source_required"))
     return findings
 
 
