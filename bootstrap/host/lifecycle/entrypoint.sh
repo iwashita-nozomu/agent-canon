@@ -922,7 +922,7 @@ _agent_canon_init_state_volume() {
     --read-only \
     --network none \
     --tmpfs /tmp \
-    --mount "type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION" \
+    --mount "type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION,volume-nocopy" \
     --mount "type=bind,src=$AGENT_CANON_STATE_ROOT,dst=$AGENT_CANON_LEGACY_STATE_DESTINATION,readonly" \
     --env "AGENT_CANON_VOLUME_UID=$caller_uid" \
     --env "AGENT_CANON_VOLUME_GID=$caller_gid" \

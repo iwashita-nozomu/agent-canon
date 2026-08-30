@@ -732,6 +732,7 @@ def main(argv: list[str]) -> int:
             save(state)
             return 0
         volume_name = ""
+        volume_nocopy = False
         legacy_source = ""
         for index, item in enumerate(argv):
             if item != "--mount" or index + 1 >= len(argv):
@@ -743,6 +744,7 @@ def main(argv: list[str]) -> int:
             )
             if values.get("type") == "volume" and values.get("dst") == "/var/lib/agent-canon":
                 volume_name = values.get("src", "")
+                volume_nocopy = "volume-nocopy" in argv[index + 1].split(",")
             if values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon-legacy-state":
                 legacy_source = values.get("src", "")
         if not volume_name:
@@ -752,6 +754,8 @@ def main(argv: list[str]) -> int:
         runtime_backing = backing / "runtime"
         legacy = Path(legacy_source) if legacy_source else None
         marker = backing / ".agent-canon-controller-volume-v1"
+        if not volume_nocopy and not marker.exists():
+            runtime_backing.mkdir(parents=True, exist_ok=True)
         digest = next(
             (
                 item.split("=", 1)[1]

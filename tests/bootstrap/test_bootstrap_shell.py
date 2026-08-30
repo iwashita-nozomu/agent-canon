@@ -645,6 +645,64 @@ def test_existing_controller_volume_requires_state_label(tmp_path: Path) -> None
     assert json.loads(result.stderr)["code"] == "state_volume_ownership_mismatch"
 
 
+def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(tmp_path: Path) -> None:
+    """A fresh volume copy-up leaves an unmarked runtime and fails closed."""
+    legacy = tmp_path / "legacy-state"
+    legacy.mkdir()
+    control = tmp_path / "control"
+    control.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": control_digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(tmp_path / f".fake-volume-{volume_name}"),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            str(ROOT / "tests/bootstrap/fake_docker.py"),
+            "run",
+            "--rm",
+            "--mount",
+            f"type=volume,src={volume_name},dst=/var/lib/agent-canon",
+            "--mount",
+            f"type=bind,src={legacy},dst=/var/lib/agent-canon-legacy-state,readonly",
+            "--env",
+            "AGENT_CANON_VOLUME_UID=1000",
+            "--env",
+            "AGENT_CANON_VOLUME_GID=1000",
+            "--env",
+            f"AGENT_CANON_VOLUME_DIGEST={control_digest}",
+            "image",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 1
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    assert (volume_root / "runtime").is_dir()
+    assert not (volume_root / ".agent-canon-controller-volume-v1").exists()
+
+
 def test_fake_volume_initializer_preserves_readonly_legacy_source(tmp_path: Path) -> None:
     """Fake volume initialization copies legacy input without mutating it."""
     legacy = tmp_path / "legacy-state"
@@ -681,7 +739,7 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(tmp_path: Path
             "run",
             "--rm",
             "--mount",
-            f"type=volume,src={volume_name},dst=/var/lib/agent-canon",
+            f"type=volume,src={volume_name},dst=/var/lib/agent-canon,volume-nocopy",
             "--mount",
             f"type=bind,src={legacy},dst=/var/lib/agent-canon-legacy-state,readonly",
             "--env",
@@ -703,6 +761,10 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(tmp_path: Path
     assert legacy.stat().st_mode & 0o777 == 0o500
     volume_state = tmp_path / f".fake-volume-{volume_name}" / "runtime" / "state.json"
     assert volume_state.read_text(encoding="utf-8") == '{"legacy":true}\n'
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["volumes"][volume_name]["Mode"] == "0700"
+    assert state["volumes"][volume_name]["UID"] == os.getuid()
+    assert state["volumes"][volume_name]["GID"] == os.getgid()
 
 
 def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> None:
