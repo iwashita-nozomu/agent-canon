@@ -13,7 +13,7 @@
 # upstream design ../../documents/design/request-intent-and-update-relation.md cleanup/readback receipt closeout projection
 # downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py tests closeout
 # @dependency-end
-"""Evaluate whether one run bundle is ready for a user-facing completion report."""
+"""Own the sole terminal predicate for user-facing run completion."""
 
 from __future__ import annotations
 
@@ -1488,7 +1488,7 @@ def main() -> int:
         capacity_lifecycle_closeout_from_report(report_dir)
     )
 
-    checks = {
+    closeout_checks = {
         "verification_status": verification.get("status") == "pass",
         "verification_unlock": verification.get("user_completion_report") == "unlocked",
         "closeout_verifier_status": closeout.get("verifier_status") == "pass",
@@ -1705,7 +1705,7 @@ def main() -> int:
         "push_completed": closeout.get("push_completed") == "yes",
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
     }
-    ready = all(checks.values())
+    ready = all(closeout_checks.values())
 
     print(f"REPORT_DIR={report_dir}")
     print(f"VERIFICATION_STATUS={verification.get('status', '')}")
@@ -1963,7 +1963,9 @@ def main() -> int:
     print(f"CLOSEOUT_READY={'yes' if ready else 'no'}")
 
     if not ready:
-        missing = ",".join(key for key, passed in checks.items() if not passed)
+        missing = ",".join(
+            key for key, passed in closeout_checks.items() if not passed
+        )
         print(f"CLOSEOUT_BLOCKERS={missing}")
         return 1
     return 0
