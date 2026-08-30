@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 import unittest
 from decimal import Decimal
 from pathlib import Path
@@ -641,6 +642,100 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("EVAL_USED_SKILLS=agent-orchestration", text)
             self.assertIn("EVAL_ACCUMULATED_REPORT=", text)
             self.assertIn("EVAL_GIT_COMMIT=", text)
+
+    def test_prompt_eval_monitoring_preserves_concurrent_monitor_append(self) -> None:
+        """Concurrent canonical monitor writers retain both behavior events."""
+        import tools.runtime.lifecycle.workflow_monitor as workflow_monitor
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            runtime = external_runtime(root)
+            report_dir = runtime / "reports" / "agents" / "run-concurrent"
+            bundle = evaluator.EvalRunBundle(
+                manifest=Path("eval.toml"),
+                evals=(),
+                results=(),
+                audit=evaluator.ManifestAudit((), (), ()),
+                metadata=evaluator.EvalRunMetadata(
+                    created_at="2026-08-31T00:00:00+00:00",
+                    eval_run_id="skill-eval-concurrent",
+                    used_skills=("agent-orchestration",),
+                    run_id="run-concurrent",
+                    argv=(),
+                    cwd=str(root),
+                    root=str(root),
+                    manifest="eval.toml",
+                    git_branch="main",
+                    git_commit="head",
+                    git_dirty="no",
+                ),
+            )
+            actual_append = evaluator.append_monitoring
+            original_lock = workflow_monitor.locked_monitoring_artifact
+            first_writer_entered = threading.Event()
+            release_first_writer = threading.Event()
+            writer_errors: list[BaseException] = []
+
+            @contextlib.contextmanager
+            def controlled_lock(path: Path, runtime_root: Path | str | None = None):
+                with original_lock(path, runtime_root) as handle:
+                    first_writer_entered.set()
+                    if not release_first_writer.wait(timeout=5):
+                        raise AssertionError("concurrent writer did not release")
+                    yield handle
+
+            def append_with_concurrent_writer(
+                target: Path,
+                entries: evaluator.MonitoringEntries,
+                *,
+                runtime_root: Path | str | None = None,
+            ) -> Path:
+                def append_other_monitor_event() -> None:
+                    try:
+                        actual_append(
+                            target,
+                            evaluator.MonitoringEntries(
+                                behavior_events=("concurrent_writer=retained",)
+                            ),
+                            runtime_root=runtime_root,
+                        )
+                    except BaseException as exc:  # pragma: no cover - assertion below
+                        writer_errors.append(exc)
+
+                writer = threading.Thread(target=append_other_monitor_event)
+                writer.start()
+                self.assertTrue(first_writer_entered.wait(timeout=5))
+                release_first_writer.set()
+                result = actual_append(target, entries, runtime_root=runtime_root)
+                writer.join(timeout=5)
+                self.assertFalse(writer.is_alive())
+                self.assertEqual(writer_errors, [])
+                return result
+
+            with mock.patch.object(
+                workflow_monitor,
+                "locked_monitoring_artifact",
+                controlled_lock,
+            ), mock.patch.object(
+                evaluator,
+                "append_monitoring",
+                side_effect=append_with_concurrent_writer,
+            ):
+                evaluator.append_prompt_eval_monitoring(
+                    report_dir,
+                    bundle,
+                    runtime / "results" / "eval.md",
+                    runtime,
+                )
+
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            self.assertIn("concurrent_writer=retained", text)
+            self.assertIn("tool_call=evaluate_skill_workflow_prompts.py", text)
+            self.assertLess(
+                text.index("concurrent_writer=retained"),
+                text.index("tool_call=evaluate_skill_workflow_prompts.py"),
+            )
 
     def test_accumulated_report_dependencies_resolve_through_root_symlinks(
         self,
