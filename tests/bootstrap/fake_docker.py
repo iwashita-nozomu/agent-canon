@@ -795,19 +795,28 @@ def main(argv: list[str]) -> int:
             runtime_backing / "receipts",
             runtime_backing / "generations",
             runtime_backing / "tasks",
-            backing / "exchange",
             backing / "spool",
             backing / "archive",
             backing / "cache",
             backing / "codex-home",
-            backing / "private-log",
         ]
         for directory in required_dirs:
             if marked and (not directory.is_dir() or directory.is_symlink()):
                 return 1
             directory.mkdir(parents=True, exist_ok=True)
-        state["volumes"][volume_name]["UID"] = int(next(item.split("=", 1)[1] for item in argv if item.startswith("AGENT_CANON_VOLUME_UID=")))
-        state["volumes"][volume_name]["GID"] = int(next(item.split("=", 1)[1] for item in argv if item.startswith("AGENT_CANON_VOLUME_GID=")))
+        for directory in (backing / "exchange", backing / "private-log"):
+            if marked and (directory.exists() or directory.is_symlink()):
+                if not directory.is_dir() or directory.is_symlink():
+                    return 1
+            directory.mkdir(parents=True, exist_ok=True)
+        uid_value = int(next(item.split("=", 1)[1] for item in argv if item.startswith("AGENT_CANON_VOLUME_UID=")))
+        gid_value = int(next(item.split("=", 1)[1] for item in argv if item.startswith("AGENT_CANON_VOLUME_GID=")))
+        for directory in [backing, *backing.rglob("*")]:
+            if directory.is_dir() and not directory.is_symlink():
+                directory.chmod(0o700)
+        marker.chmod(0o600)
+        state["volumes"][volume_name]["UID"] = uid_value
+        state["volumes"][volume_name]["GID"] = gid_value
         state["volumes"][volume_name]["Mode"] = "0700"
         print(f"marker\t{digest}\ncontent\tok")
         save(state)

@@ -1019,11 +1019,20 @@ if [ "$marked" = 0 ]; then
     fi
   done
 fi
-for directory in "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$root/exchange" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home" "$root/private-log"; do
+for directory in "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home"; do
   if [ "$marked" = 0 ]; then
     mkdir -p "$directory"
   else
     [ -d "$directory" ] && [ ! -L "$directory" ] || exit 59
+  fi
+done
+for directory in "$root/exchange" "$root/private-log"; do
+  if [ "$marked" = 0 ]; then
+    mkdir -p "$directory"
+  elif [ -e "$directory" ] || [ -L "$directory" ]; then
+    [ -d "$directory" ] && [ ! -L "$directory" ] || exit 59
+  else
+    mkdir -p "$directory"
   fi
 done
 chown -R "$uid_value:$gid_value" "$root"
