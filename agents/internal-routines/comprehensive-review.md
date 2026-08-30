@@ -21,8 +21,7 @@ repo 全体を横断して、文書、skill、ツール、統合設定の破綻�
 
 ## Core References
 
-- `tools/validation/review/run_comprehensive_review.sh`
-- `documents/tools/README.md`
+- `documents/runtime/runtime-profiles-and-check-matrix.md`
 - `agents/internal-routines/project-review.md`
 
 ## Expected Outcome
@@ -31,29 +30,16 @@ repo 全体を横断して、文書、skill、ツール、統合設定の破綻�
 - どの validator が通り、どこが壊れているかをまとめて把握できる
 - 個別修正へ戻るか、repo-wide cleanup を続けるか判断できる
 
-## Mandatory Checklist
+## Selection
 
-- review 対象が docs、skills、tools、integration points をまたいでいる
-- `tools/validation/review/run_comprehensive_review.sh` の結果を確認している
-- fail した validator を個別に再現できる状態で残している
-- findings を repo-wide issue と局所 issue に分けている
-
-## Default Sequence
-
-1. `project-review` で inventory を取り、comprehensive に見る必要があるかを判断します。
-1. `bash tools/validation/review/run_comprehensive_review.sh` を実行します。
-1. 失敗した validator の log を見て、repo-wide issue と局所 issue を切り分けます。
-1. 必要に応じて `make agent-checks`、`tools/bin/agent-canon docs check`、`make ci-quick` へ掘り下げます。
-1. closeout では、通った validator、失敗した validator、未確認領域を残します。
-
-## Default Commands
-
-- `bash tools/validation/review/run_comprehensive_review.sh`
-- `bash tools/validation/review/run_comprehensive_review.sh --parallel`
-- `bash tools/validation/review/run_comprehensive_review.sh --report`
+`project-review` が inventory と責務範囲を確認し、repo-wide な調査が必要な
+場合だけこの route を選びます。選択した profile の validator を実行し、
+その失敗を個別に再現できる形で記録します。この文書は独自の checklist や
+command set を所有せず、profile 外の validator を追加しません。
 
 ## Boundary
 
 - 局所 diff のレビューだけなら `code-review` を使います。
 - repo-wide review の最上位入口としては `project-review` を使います。
 - 研究系の独立視点 review は `research-perspective-review` を使います。
+- profile activation と check の対応は `documents/runtime/runtime-profiles-and-check-matrix.md` が所有します。

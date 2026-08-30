@@ -21,10 +21,9 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `documents/tools/README.md`
+- `documents/runtime/runtime-profiles-and-check-matrix.md`
 - `documents/conventions/REVIEW_PROCESS.md`
-- `tools/validation/review/run_comprehensive_review.sh`
-- `tools/validation/dependencies/docker_dependency_validator.sh`
+- `agents/internal-routines/project-review.md`
 
 ## Expected Outcome
 
@@ -35,27 +34,21 @@ upstream design ../canonical/skills.md skill canon registry
 ## Monitoring Areas
 
 - agent runtime と skill mirror の同期
-- `make ci-quick` で見る基礎品質
+- 基礎品質の drift（profile は runtime matrix で選択）
 - Docker / dependency / runtime の drift
 - docs、workflow、tool 導線の stale 化
 - 長く残っている worktree、branch、未整理 note
 
-## Default Sequence
+## Selection
 
-1. 直近の変更有無に関わらず、まず `make agent-checks` と `make ci-quick` で基礎状態を見ます。
-1. 環境 drift を疑う場合は `bash tools/validation/dependencies/docker_dependency_validator.sh` を追加します。
-1. repo-wide な兆候がある場合は `bash tools/validation/review/run_comprehensive_review.sh` へ進みます。
-1. findings を `fix now`、`follow-up`、`watch` に分けます。
-1. ルール変更が必要なら `documents/` または `agents/` の正本更新へつなぎます。
-
-## Default Commands
-
-- `make agent-checks`
-- `make ci-quick`
-- `bash tools/validation/dependencies/docker_dependency_validator.sh`
-- `bash tools/validation/review/run_comprehensive_review.sh`
+変更や観測した drift の責務を `documents/runtime/runtime-profiles-and-check-matrix.md`
+で分類し、該当 profile の route だけを選びます。直近の変更がないという
+理由で基礎 command を一律に実行しません。repo-wide な兆候がある場合だけ
+`project-review` に調査を委譲し、findings を `fix now`、`follow-up`、`watch`
+に整理します。
 
 ## Boundary
 
 - 変更差分のレビューは `code-review` を使います。
 - repo-wide review の最上位入口としては `project-review` を使います。
+- profile の activation と check の対応は runtime profile/check matrix が所有します。

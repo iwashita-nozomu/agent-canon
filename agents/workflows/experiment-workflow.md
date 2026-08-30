@@ -12,7 +12,8 @@ upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md fi
 この文書は、repo 内で実験を進めるときの統合入口です。
 個別の `experiments/<topic>/README.md` は、その実験やモジュール固有の使い方として残し、この文書では topic をまたぐ汎用的な実験方法を扱います。
 
-扱う流れは次の 5 段階です。
+扱う段階は次の 5 つです。実際に進める段階は、topic の protocol、選択した
+runtime profile、または明示された依頼で決めます。
 
 1. 準備
 1. 実験コードの実装
@@ -20,14 +21,17 @@ upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md fi
 1. 実験実行
 1. 結果レポート
 
-さらに、実験を進めながらコード自体を改造する必要がある場合は、結果とレポートを毎回生成し、サブエージェントによる批判的レビューを挟んで反復する workflow を標準にします。外部調査つき実装、性能改善、比較検証では、この文書を `Research-Driven Change` の inner loop として使います。outer loop の正本は [research-workflow.md](research-workflow.md) です。
+実験を進めながらコード自体を改造する場合は、必要な成果物と review だけを
+protocol に選び、`Research-Driven Change` の inner loop として反復します。
+外部調査つき実装、性能改善、比較検証での outer loop の正本は
+[research-workflow.md](research-workflow.md) です。
 
 agent がこの反復を自律実行する場合、単一 run と rerun 分岐は `agents/skills/experiment-lifecycle.md`、改善 backlog を持つ継続反復は `agents/skills/adaptive-improvement-loop.md` を入口にします。loop 記録テンプレートは `templates/agents/experiment_change_loop.md` です。
 
 ## この文書の読み方
 
 - この文書は、repo 内実験の準備、実装、静的チェック、実行、結果レポートの実務入口を所有します。
-- `## 1. この文書の役割` は関連正本への分岐、`## 2. 段階別手順` は実験 run の手順、後半は log-derived 禁止事項、反復 workflow、個別 README、references を扱います。
+- `## 1. この文書の役割` は関連正本への分岐、`## 2. 段階別手順` は実験 run の手順、後半は evidence の境界、反復 workflow、個別 README、references を扱います。
 - experimenter は `## 2. 段階別手順` から topic / run layout を固定し、research-driven task では `research-workflow.md` と合わせて読みます。
 - chunked reading では、まずこの map と `## 1. この文書の役割` で責務を確認し、実行段階ごとの subsection だけを開きます。
 
@@ -46,7 +50,7 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 - エージェントごとの task workflow
   - [TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md)
 
-## 2. 段階別手順
+## 2. 段階別手順（選択した段階だけ実行）
 
 ### 1. 準備
 
@@ -242,52 +246,42 @@ topic、Hook、admission context、互換 wrapper が runner return を result �
 - partial run を前提にした resume protocol を作る
 - ad hoc な result path 命名を増やす
 
-### 3. 実験コードの静的チェック
+### 3. 実験コードの静的チェック（選択時）
 
-長時間 run の前に、少なくとも静的に次を確認します。
-
-- `pyright`
-  - 実験コード、`experiment_runner` 利用部分、集計コードの型整合を確認する。
-- `ruff check`
-  - import、未使用変数、到達不能コード、雑な例外処理を早めに落とす。
-- CLI help
-  - `python3 -m tools.experiments.execution.run_managed_experiment --help` で managed runner の CLI を確認し、topic の実行例は `--topic <topic> --variant formal -- python3 experiments/<topic>/run.py` の managed route と一致させる。
-- import path
-  - top-level import と package path が壊れていないことを確認する。
-- 出力 schema
-  - `summary/summary.json` に必要な key が揃うよう、集計コードを静的に読んでおく。
-- 設定 schema
-  - 実験 script が `--config {config_path}` で runner 生成の `config.json` を読めることを確認する。
-  - managed runner 経由の `config.json` と `config_source.yaml` から run 条件を復元できることを確認する。
-
-静的チェックの段階では、まだ正式な benchmark conclusion を出しません。
-ここでの目的は「長時間 run を始めても、型・import・引数の破綻で止まらない状態」にすることです。
+静的チェックを行う場合の profile、command、深さは
+`documents/runtime/runtime-profiles-and-check-matrix.md` と topic protocol で
+選びます。この workflow は pyright、ruff、CLI、import、出力 schema の固定
+リストを再定義しません。選択したチェックの目的は、型・import・引数などの
+実行境界を確認することであり、benchmark の結論を出すことではありません。
 
 `Note:`
 pickle 可否、JAX import 後の env 汚染、GPU visibility の実際の反映は静的チェックだけでは分かりません。
-それらは次の実行段階で smoke / verified として確認します。
+それらは、smoke / verified を選択した実行段階で確認します。
 
-server 実行の formal run では、`run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` が残ることを確認します。
-topic 固有の追加ログは `result/<run-id>/logs/` に出ることも確認します。
+server 実行で protocol が artifact を宣言した場合だけ、その宣言された
+manifest、設定、command、environment、source snapshot、log を確認します。
+topic 固有の追加ログも、producer が選んだ場合に限って
+`result/<run-id>/logs/` から辿れるようにします。
 
 ### 4. 実験実行
 
-実験実行は、少なくとも次の段階に分けます。
+実験実行は、protocol が選んだ段階だけを実行します。smoke、verified、formal
+はそれぞれ独立した選択肢です。
 
-#### 4.1 smoke
+#### 4.1 smoke（選択時）
 
-最小の CPU run か、ごく狭い case range で次を確認します。
+最小の CPU run か、ごく狭い case range で、protocol が選んだ実行境界を
+確認します。例として次があります。
 
 - import が通る
 - worker が起動する
-- JSONL が追記される
-- `summary/summary.json` が生成される
-- report 再生成の入口が成立する
+- producer が宣言した JSONL / summary が生成される
+- report 再生成を選んだ場合、その入口が成立する
 
-#### 4.2 verified
+#### 4.2 verified（選択時）
 
 本番に近い backend と env で、worker 数を絞って bounded run を行います。
-ここで確認するのは次です。
+protocol が必要とする場合、次を確認します。
 
 - GPU visibility
 - allocator 設定
@@ -295,7 +289,7 @@ topic 固有の追加ログは `result/<run-id>/logs/` に出ることも確認�
 - failure kind の記録
 - `summary/summary.json` と `summary/cases.jsonl` の整合
 
-#### 4.3 formal run
+#### 4.3 formal run（選択時）
 
 比較表や report の根拠にする run は、条件を固定した fresh run として 1 回で完走させます。
 
@@ -345,39 +339,21 @@ python3 -m tools.experiments.artifacts.save_experiment_result_annex \
 
 host 側で worker 状態や GPU 利用状況を見たい場合は、`RuntimeMonitor` を使います。
 ただし monitor は evidence そのものではなく、run の観測補助です。
-正式な evidence は最終的に JSON、JSONL、report、note へ落とします。
+選択した正式 evidence は、producer が宣言した artifact と、必要な場合の
+report / note に落とします。
 
-### 5. 結果レポート
+### 5. 結果レポート（選択時）
 
-run 後は、必ず結果を report と note に整理します。
-批判的レビューの観点は [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を正本にします。
-user-facing report の体裁と根拠導線は [experiment-report-style.md](../../documents/experiments/experiment-report-style.md) を正本にし、`report_reviewer` の独立レビューを必須にします。
+run 後に reader-facing report や横断的な note を作るかは、user request または
+topic protocol で決めます。run state と実在する artifact は lifecycle と
+`result-artifact-writeout` に委譲し、レポートを選んだ場合だけ
+批判的レビューの観点を [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md)、
+体裁と根拠導線を [experiment-report-style.md](../../documents/experiments/experiment-report-style.md)
+から参照します。report review は report-writing の選択した profile に従い、
+毎回の run の暗黙の gate にはしません。
 
-最低限残すものは次です。
-
-- `summary/summary.json`
-- `summary/cases.jsonl`
-- `config.json`
-- `config_source.yaml`
-- `run_manifest.json`
-- `eval_manifest.json`
-- `artifact_manifest.json`
-- `command.json`
-- `environment.json`
-- `source_snapshot.json`
-- `run.log`
-- `logs/startup.jsonl`
-- `logs/stdout.log`
-- `logs/stderr.log`
-- `visualization.py`
-- report へのリンク
-- `Result Summary:`
-- `Quantitative Summary:`
-- `Comparison Table:`
-- `Critical Review:`
-- `Report Review:`
-
-report 本文は次の構成を基本にします。
+成果物は producer が宣言したものだけを残します。report を選んだ場合の本文構成は
+次を基本にします。
 
 - `Question and Context`
 - `Protocol`
@@ -408,9 +384,11 @@ carry-over のルールは次です。
 - 複数 run をまたぐ知見だけを `documents/notes/` へ持ち上げる
 - partial run は診断用とし、正式な report の正本にしない
 
-## 2.5 Log-Derived Prohibitions
+## 2.5 Evidence Boundaries
 
-repo と対応する worktree logs から抽出した再発防止事項を、実験・性能改善の固定 gate として扱います。
+repo と対応する worktree logs から抽出した事項は、結果の解釈を誤らないための
+semantic guardrail です。これらは run、report、review、static check を自動的に
+activate する gate ではありません。
 
 - spot run、debug run、smoke run、partial run を正式 evidence にしません。
 - correctness evidence と performance evidence を混同しません。
@@ -430,7 +408,8 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 - 実行
 - 感想
 
-では終わらせず、毎回の実験で結果とレポートを生成し、サブエージェントによる批判的レビューを挟んで反復します。
+では終わらせず、protocol が選んだ成果物と review を、必要な iteration に
+対して生成して反復します。
 
 標準ループは次です。
 
@@ -438,24 +417,22 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
    - 今回の `Question:`、`Comparison Target:`、`Stop Condition:` を固定する。
 1. `implementer`
    - コード変更を入れる。
-1. `change_reviewer`
+1. `change_reviewer`（task または protocol が review を選んだ場合）
    - code diff を批判的にレビューする。
    - 数学的妥当性や報告内容も確認する場合は [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) の `Mathematical Validity` と `As Reported` を使う。
 1. `implementer`
-   - review を反映し、静的チェックを通す。
-1. `experimenter`
+   - review を反映し、選択した profile が要求する静的チェックだけを通す。
+1. `experimenter`（run を選んだ場合）
    - 同じ protocol で fresh run を実行する。
-1. `experimenter`
-   - `summary/summary.json`、`summary/cases.jsonl`、draft report を生成する。`documents/notes/` を使う場合は対応する experiment note も生成する。
-1. `experiment_reviewer`
+1. `experimenter`（成果物を選んだ場合）
+   - producer が宣言した結果や draft report を生成する。
+1. `experiment_reviewer`（review を選んだ場合）
    - report と結果の読み方を批判的にレビューする。
    - [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を使って、math validity、evidence sufficiency、figure validity、overclaim を確認する。
-1. `report_reviewer`
-   - user-facing report を独立にレビューする。
-   - 実験の概要、主要数値、figure / table、結論と根拠の対応、limitations を確認する。
-   - review outcome を `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`approved` のいずれかで返す。
-1. `experimenter`
-   - `report_rewrite_required` の場合、同じ result を使って report を書き直す。
+1. `report_reviewer`（reader-facing report の review を選んだ場合）
+   - `report-writing` が定める review route に従って確認する。
+1. `experimenter`（review の結果が修正を要求した場合）
+   - 同じ result を使った rewrite、追加検証、または新しい run を行う。
 
 この反復を agent が自律実行する場合は、1 iteration ごとに `Change:`、`Validation Plan:`、`Run Name / Path:`、`Decision:`、`Next Action:` を `templates/agents/experiment_change_loop.md` に記録します。
    - `extra_validation_required` の場合、同じ比較方針で追加検証を行う。
@@ -463,43 +440,27 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 1. `implementer`
    - code や protocol の修正が必要な場合だけ修正を入れる。
 1. 4-10 を終了条件まで反復する。
-1. `final_reviewer`
+1. `final_reviewer`（closeout review を選んだ場合）
    - 最終 code と最終 claim を独立にレビューする。
-1. `verifier`
-   - gate を実行する。
+1. `verifier`（profile が要求する場合）
+   - 選択した gate だけを実行する。
 
 この workflow の要点は次です。
 
 - repo に持ち帰る各 code change は [implementation-waterfall-workflow.md](implementation-waterfall-workflow.md) の 1 pass として扱う
-- 毎回の実験で、結果とレポートを必ず生成する
-- code review と report review を分ける
-- `experiment_reviewer` と `report_reviewer` を分ける
+- 選択した protocol の成果物だけを生成する
+- code review と、選択した場合の report review を分ける
+- `experiment_reviewer` と `report_reviewer` は必要な責務だけで使う
 - 同じ protocol で再実行し、都合のよい subset に逃げない
-- 修正のたびに静的チェックを挟む
+- 修正時の静的チェックは selected profile が要求する場合だけ行う
 - 良い結果だけでなく、失敗例、悪化例、未解決点も同じ note に残す
-- report review の outcome を `rewrite`、`extra validation`、`rerun` のどれかに明示する
-- 対処順は `rerun` → `extra validation` → `rewrite` → `approved` に固定する
+- report review を選んだ場合の outcome は report-writing の decision route に従う
 
-### 3.1 各サイクルで必ず残すもの
+### 3.1 反復記録（選択時）
 
-各 iteration で最低限残すものは次です。
-
-- `Change:`
-- `Expected Effect:`
-- `Validation Plan:`
-- 静的チェック結果
-- 実行コマンド
-- `result/<run-id>/` の所在
-- `result/<run-id>/logs/` の所在
-- 可視化 visualization.py renderer の所在
-- `config.json` と `config_source.yaml` の所在と主要 key
-- `command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json` の所在
-- report の所在
-- 置き場と命名規則の変更有無
-- `Critical Review:`
-- `Report Review:`
-- `Decision:`
-- `Next Idea:`
+反復記録を使う場合は、選択した loop template または明示された run plan の
+fields だけを残します。少なくとも変更、validation plan、run identity、decision、
+next action を残せば、成果物と review の有無を記録できます。
 
 ### 3.2 反復を止めてよい条件
 
@@ -550,7 +511,3 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 - Towards Scientific Discovery with Generative AI: Progress, Opportunities and Challenges
 - Wu et al. (2025), Automated Literature Research and Review-Generation Method Based on Large Language Models
 - OpenReviewer: A Specialized Large Language Model for Generating Critical Scientific Paper Reviews
-
-## Convention Compliance Gate
-
-Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

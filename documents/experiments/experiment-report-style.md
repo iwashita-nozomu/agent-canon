@@ -33,7 +33,9 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 
 ## この文書の読み方
 
-この文書は、実験レポートの置き場、標準構成、図表、sweep 設計、repo 用見出し、実験ログとの違いを説明します。まず基本方針と標準構成を読み、Title から Report Review Gate までを report skeleton として使います。図表や sweep の扱いは結果提示前に確認し、最後の章は実験ログや参考 source との境界確認に使います。
+この文書は、選択された experiment report の置き場、構成、図表、sweep 設計、
+repo 用見出し、実験ログとの違いを説明します。report を作る場合に基本方針と
+標準構成を読み、図表や sweep の扱いは結果提示前に確認します。
 
 ## 1. 基本方針
 
@@ -45,7 +47,9 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 - headline metric だけでなく、case 数、成功率、failure kind、ばらつき、比較条件を同時に示します。
 - 良い結果だけを report せず、negative result、unexpected result、limitations も同じ文書に残します。
 - 結論節では、根拠になった図表番号を明示して、結論と evidence の対応を切らさないようにします。
-- `experiments/<topic>/report/<run-id>.md` は、`experiment_reviewer` と独立した `report_reviewer` の両方を通すまで draft 扱いにします。
+- report review を選択した場合、`report-writing` の owner route に従うまで
+  `experiments/<topic>/report/<run-id>.md` は draft として扱います。review を
+  選択しない run に、ここから独立 review を追加しません。
 
 ## 2. 標準構成
 
@@ -248,10 +252,13 @@ repo では、次のラベルで observation と interpretation を分けると�
 - 図の表示方法が誤解を招かないか
 - 主要な計算式、変数、仮定が読者に見えるか
 
-## 2.11 Report Review Gate
+## 2.11 Report Review（選択時）
 
-- user-facing report は、`report_reviewer` による独立レビューを必須にします。
-- `report_reviewer` は少なくとも次を確認します。
+user-facing report の独立 review を選択した場合は、`report-writing` が
+review owner になります。この文書は確認観点を示しますが、全 run に review
+を activate する gate や decision enum を所有しません。
+
+- `report_reviewer` は、選択した profile に応じて次を確認します。
   - 実験の概要、問い、比較対象、protocol が冒頭で分かるか
   - `Abstract` が strongest result を numbers つきで述べるか
   - headline metric の近くに case 数、success / failure、failure kind があるか
@@ -259,18 +266,8 @@ repo では、次のラベルで observation と interpretation を分けると�
   - figure / table が単体で読めるか
   - `Results` と `Discussion` が分かれているか
   - limitations と missing evidence が report 内に明示されているか
-- review outcome は次の 4 つに固定します。
-  - `approved`
-  - `report_rewrite_required`
-  - `extra_validation_required`
-  - `rerun_required`
-- `report_rewrite_required` の場合だけ、同じ result を使った report の書き直しで閉じてよいです。
-- `extra_validation_required` と `rerun_required` の場合は、report を閉じずに実験 workflow へ戻ります。
-- 対処順は次に固定します。
-  - `rerun_required`
-  - `extra_validation_required`
-  - `report_rewrite_required`
-  - `approved`
+- review outcome と、rewrite / extra validation / rerun の分岐は
+  `report-writing` の選択した route に委譲します。
 
 ## 3. 図表の扱い
 
