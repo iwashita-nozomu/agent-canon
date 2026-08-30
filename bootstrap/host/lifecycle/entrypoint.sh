@@ -1450,16 +1450,24 @@ projection_digest() {
 validate_codex_links() {
   allowed="$install_root/.codex"
   require_targets="${2:-1}"
-  [ -d "$allowed" ] && [ ! -L "$allowed" ] || return 1
+  if [ "$require_targets" = 1 ]; then
+    [ -d "$allowed" ] && [ ! -L "$allowed" ] || return 1
+  else
+    [ "$allowed" = "${install_root}/.codex" ] || return 1
+  fi
   invalid=$(find "$1" -type l -print | while IFS= read -r link; do
     relative_link=${link#"$1"/}
     case "$relative_link" in
       config.toml|agents/*|hooks/*|skills/*) ;;
       *) printf "invalid\n"; continue ;;
     esac
-    target=$(readlink -f "$link" 2>/dev/null || true)
+    case "$relative_link" in
+      *//*|../*|*/../*|*/..|./*|*/./*|.) printf "invalid\\n"; continue ;;
+    esac
+    target=$(readlink -- "$link" 2>/dev/null || true)
+    expected="$allowed/$relative_link"
     case "$target" in
-      "$allowed"/*) [ "$require_targets" = 0 ] || [ -e "$target" ] || printf "invalid\\n" ;;
+      /*) [ "$target" = "$expected" ] || printf "invalid\\n" ;;
       *) printf "invalid\\n" ;;
     esac
   done)

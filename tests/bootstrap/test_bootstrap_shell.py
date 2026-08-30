@@ -986,7 +986,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     codex_stage.mkdir()
     (volume_root / "exchange").mkdir(parents=True)
     (volume_root / "codex-home").mkdir(parents=True)
-    (volume_root / "codex-home" / "config.toml").write_text("codex = true\n", encoding="utf-8")
+    (volume_root / "codex-home" / "config.toml").symlink_to(ROOT / ".codex" / "config.toml")
     (codex_stage / "config.toml").write_text("stale\n", encoding="utf-8")
     source_sync = runtime / "source-sync.json"
     source_sync.write_text("source-sync\n", encoding="utf-8")
@@ -1073,7 +1073,8 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     )
     assert codex_export.returncode == 0, codex_export.stderr
     assert codex_stage.is_dir()
-    assert (codex_stage / "config.toml").read_text(encoding="utf-8") == "codex = true\n"
+    assert (codex_stage / "config.toml").is_symlink()
+    assert (codex_stage / "config.toml").resolve() == (ROOT / ".codex" / "config.toml").resolve()
     (volume_root / "codex-home" / "agents").mkdir()
     (volume_root / "codex-home" / "agents" / "current.toml").write_text(
         "current\n", encoding="utf-8"
@@ -1098,6 +1099,23 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert (codex_stage / "config.toml").read_text(encoding="utf-8") == "old\n"
     assert (codex_stage / "agents" / "old.toml").read_text(encoding="utf-8") == "old\n"
     assert not (codex_stage / "agents" / "current.toml").exists()
+    (volume_root / "codex-home" / "config.toml").unlink()
+    (volume_root / "codex-home" / "config.toml").symlink_to("relative-config.toml")
+    relative_rejected = subprocess.run(
+        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_VOLUME_NAME": volume_name,
+            "FAKE_VOLUME_ROOT": str(volume_root),
+        },
+    )
+    assert relative_rejected.returncode == 2
+    assert json.loads(relative_rejected.stderr)["code"] == "volume_copy_failed"
+    (volume_root / "codex-home" / "config.toml").unlink()
+    (volume_root / "codex-home" / "config.toml").symlink_to(ROOT / ".codex" / "config.toml")
     (volume_root / "codex-home" / "unexpected").symlink_to(tmp_path / "outside")
     rejected = subprocess.run(
         ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
