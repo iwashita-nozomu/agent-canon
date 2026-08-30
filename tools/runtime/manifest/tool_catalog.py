@@ -44,6 +44,7 @@ else:
 CATALOG_PATH = "tools/catalog.yaml"
 TOOL_DOCS_PATH = "documents/tools/tool-docs.toml"
 PUBLIC_SURFACE_PRODUCER_VERSION = "public-surface.v1"
+TOOL_CLASSIFICATIONS = frozenset({"public", "internal", "compat", "retired", "example"})
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 TOOL_REFERENCE_RE = re.compile(
     r"(?<![A-Za-z0-9_./-])tools/[A-Za-z0-9_./-]+\.(?:py|sh)\b"
@@ -308,6 +309,8 @@ def check_entry(
 
     if not isinstance(entry_id, str) or not ID_RE.fullmatch(entry_id):
         findings.append(Finding("entry", path, "invalid-id"))
+    if "public" in entry and not isinstance(entry["public"], bool):
+        findings.append(Finding("entry", path, "invalid-public"))
     if not isinstance(family, str) or family not in families:
         findings.append(Finding("entry", path, "invalid-family"))
     if not isinstance(status, str) or status not in statuses:
@@ -416,19 +419,25 @@ def load_tool_docs(root: Path) -> tuple[list[Mapping[str, object]], list[Finding
     if not path.is_file():
         return [], [Finding("tool_docs", TOOL_DOCS_PATH, "missing-file")]
     raw = cast(Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
+    findings: list[Finding] = []
     if raw.get("catalog_kind") != "agent_canon_tool_docs":
         return [], [Finding("tool_docs", TOOL_DOCS_PATH, "invalid-catalog-kind")]
+    classifications = raw.get("classification_values")
+    if set(string_list(classifications)) != TOOL_CLASSIFICATIONS:
+        findings.append(Finding("tool_docs", TOOL_DOCS_PATH, "invalid-classification-values"))
     entries_raw = raw.get("tool")
     if not isinstance(entries_raw, list):
-        return [], [Finding("tool_docs", TOOL_DOCS_PATH, "missing-tool-list")]
+        findings.append(Finding("tool_docs", TOOL_DOCS_PATH, "missing-tool-list"))
+        return [], findings
     entries = cast(list[object], entries_raw)
     result: list[Mapping[str, object]] = []
     for entry in entries:
         mapping = as_mapping(entry)
         if mapping is None:
-            return [], [Finding("tool_docs", TOOL_DOCS_PATH, "tool-entry-not-mapping")]
+            findings.append(Finding("tool_docs", TOOL_DOCS_PATH, "tool-entry-not-mapping"))
+            continue
         result.append(mapping)
-    return result, []
+    return result, findings
 
 
 def check_tool_docs_manifest(
@@ -444,13 +453,21 @@ def check_tool_docs_manifest(
     }
     seen_tools: set[str] = set()
     seen_docs: set[str] = set()
+    documented_public_ids: set[str] = set()
+    documented_public_tools: dict[str, str] = {}
     for doc_entry in doc_entries:
         entry_id = doc_entry.get("id")
         tool = doc_entry.get("tool")
         doc = doc_entry.get("doc")
+        classification = doc_entry.get("classification")
         if not isinstance(entry_id, str) or not isinstance(tool, str) or not isinstance(doc, str):
             findings.append(Finding("tool_docs", TOOL_DOCS_PATH, "missing-id-tool-or-doc"))
             continue
+        if not isinstance(classification, str) or classification not in TOOL_CLASSIFICATIONS:
+            findings.append(Finding("tool_docs", tool, "invalid-classification"))
+        elif classification == "public":
+            documented_public_ids.add(entry_id)
+            documented_public_tools[entry_id] = tool
         if tool in seen_tools:
             findings.append(Finding("tool_docs", tool, "duplicate-tool"))
         if doc in seen_docs:
@@ -474,6 +491,28 @@ def check_tool_docs_manifest(
         docs = string_list(catalog_entry.get("docs"))
         if doc not in docs:
             findings.append(Finding("tool_docs", tool, f"catalog-doc-missing:{doc}"))
+
+    catalog_public_ids = {
+        entry_id
+        for entry_id, entry in catalog_by_id.items()
+        if entry.get("public") is True
+    }
+    catalog_ids = set(catalog_by_id)
+    for entry_id in sorted(documented_public_ids - catalog_public_ids):
+        detail = (
+            f"missing-catalog-entry:{entry_id}:{documented_public_tools[entry_id]}"
+            if entry_id not in catalog_ids
+            else f"missing-public-mark:{entry_id}:{documented_public_tools[entry_id]}"
+        )
+        findings.append(Finding("public_tools", TOOL_DOCS_PATH, detail))
+    documented_ids = {entry.get("id") for entry in doc_entries if isinstance(entry.get("id"), str)}
+    for entry_id in sorted(catalog_public_ids - documented_public_ids):
+        detail = (
+            f"missing-public-documentation:{entry_id}:{entry_path(catalog_by_id[entry_id])}"
+            if entry_id not in documented_ids
+            else f"non-public-documentation:{entry_id}:{entry_path(catalog_by_id[entry_id])}"
+        )
+        findings.append(Finding("public_tools", CATALOG_PATH, detail))
     return findings
 
 
@@ -779,23 +818,34 @@ def text_phrase_span(path: str, text: str, phrase: str) -> PublicSourceSpan | No
 
 
 def yaml_id_spans(path: str, text: str) -> dict[str, PublicSourceSpan]:
-    """Index exact YAML id declarations without interpreting YAML semantics."""
+    """Index YAML id declarations from the parser's source marks."""
     spans: dict[str, PublicSourceSpan] = {}
-    for line_number, source_line in enumerate(text.splitlines(), start=1):
-        stripped = source_line.strip()
-        prefix = "- id:"
-        if not stripped.startswith(prefix):
-            continue
-        identifier = stripped[len(prefix) :].strip().strip('"\'')
-        start = source_line.find(identifier)
-        if identifier and identifier not in spans:
-            spans[identifier] = PublicSourceSpan(
-                path=path,
-                start_line=line_number,
-                start_column=start + 1,
-                end_line=line_number,
-                end_column=start + len(identifier) + 1,
-            )
+
+    def visit(node: yaml.Node) -> None:
+        if isinstance(node, yaml.MappingNode):
+            for key, value in node.value:
+                if (
+                    isinstance(key, yaml.ScalarNode)
+                    and key.value == "id"
+                    and isinstance(value, yaml.ScalarNode)
+                    and value.value not in spans
+                ):
+                    spans[value.value] = PublicSourceSpan(
+                        path=path,
+                        start_line=value.start_mark.line + 1,
+                        start_column=value.start_mark.column + 1,
+                        end_line=value.end_mark.line + 1,
+                        end_column=value.end_mark.column + 1,
+                    )
+                visit(key)
+                visit(value)
+        elif isinstance(node, yaml.SequenceNode):
+            for child in node.value:
+                visit(child)
+
+    document = yaml.compose(text)
+    if document is not None:
+        visit(document)
     return spans
 
 
@@ -879,7 +929,11 @@ def extract_public_surface(root: Path) -> PublicSurfaceReport:
         tool_spans = yaml_id_spans(tool_path, texts[tool_path])
         for raw_entry in tool_entries:
             entry = as_mapping(raw_entry)
-            if entry is None or not isinstance(entry.get("id"), str):
+            if (
+                entry is None
+                or entry.get("public") is not True
+                or not isinstance(entry.get("id"), str)
+            ):
                 continue
             identifier = cast(str, entry["id"])
             span = tool_spans.get(identifier)
