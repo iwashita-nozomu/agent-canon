@@ -4396,8 +4396,12 @@ bootstrap_host_entrypoint() {
       return
       ;;
     install)
-      local install_rc=0
-      _agent_canon_install "$image_ref" || install_rc=$?
+      # Do not use if/|| around the install transaction. Bash suppresses
+      # errexit for every function and subshell reached from that context,
+      # which would let a failed phase continue into later lifecycle work.
+      local install_rc
+      _agent_canon_install "$image_ref"
+      install_rc=$?
       ((install_rc == 0)) || return "$install_rc"
       _agent_canon_finish_clean_install
       return 0
