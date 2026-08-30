@@ -520,6 +520,11 @@ def improvement_guide_trigger_findings(
             r"AGENT_CANON_CANDIDATE_SOURCE=%s\\n.*\$\{GITHUB_ENV\}",
             "improvement_guide_candidate_export_required",
         ),
+        (
+            r'echo "AGENT_CANON_RUNTIME_ROOT=\$\{candidate_source\}/\.runtime" '
+            r'>> "\$\{GITHUB_ENV\}"',
+            "improvement_guide_candidate_runtime_export_required",
+        ),
     )
     for pattern, message in candidate_requirements:
         if not re.search(pattern, workflow_text):
@@ -553,6 +558,8 @@ def improvement_guide_trigger_findings(
         findings.append(Finding("error", path, "improvement_guide_pr_runtime_install_required"))
     if any(line.endswith(" update") for line in bootstrap_lines):
         findings.append(Finding("error", path, "improvement_guide_pr_runtime_update_forbidden"))
+    if any("--runtime-root" in line for line in bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_runtime_override_forbidden"))
     if not any(line.endswith(" start") for line in bootstrap_lines):
         findings.append(Finding("error", path, "improvement_guide_runtime_start_required"))
     if not any(" target add " in line for line in bootstrap_lines):

@@ -80,6 +80,10 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             '"${candidate_source}" >> "${GITHUB_ENV}"',
             text,
         )
+        self.assertIn(
+            'echo "AGENT_CANON_RUNTIME_ROOT=${candidate_source}/.runtime"',
+            text,
+        )
         bootstrap_lines = [
             line.strip() for line in text.splitlines() if "bootstrap.sh" in line
         ]
@@ -90,6 +94,9 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
                 line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
                 for line in bootstrap_lines
             )
+        )
+        self.assertTrue(
+            all("--runtime-root" not in line for line in bootstrap_lines)
         )
         self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines))
         self.assertFalse(any(line.endswith(" update") for line in bootstrap_lines))
