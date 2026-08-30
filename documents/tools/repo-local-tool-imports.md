@@ -62,7 +62,6 @@ legacy subtree wording is unrelated to tool import disposition.
 | `scripts/tools/find_redundant_designs.py` | `tools/analysis/documents/analysis/find_redundant_designs.py` | Promoted as an external-runtime document consolidation helper; deletion requires an explicit mutation capability. |
 | `scripts/tools/find_similar_designs.py` | `tools/analysis/documents/analysis/find_similar_designs.py` | Promoted as an external-runtime design similarity helper. |
 | `scripts/tools/organize_designs.py` | `tools/validation/documentation/authoring/organize_designs.py` | Promoted as a read-only organization planner; source apply requires an explicit mutation capability. |
-| `scripts/tools/tfidf_similar_docs.py` | `tools/analysis/documents/analysis/tfidf_similar_docs.py` | Promoted as dependency-free similarity helper. |
 | `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/validation/code/oop/python/rule_inventory.py`, `tools/validation/code/oop/cpp/rule_inventory.py` | Reimplemented as repo-neutral, language-specific OOP rule inventories instead of project-root convention viewers. |
 | `scripts/restructure_code_review_skill.py` | Source repository only | Not promoted because it rewrites one historical skill layout. AgentCanon legacy tool storage is retired. |
 | `vendor/agent-canon/tools/experiments/artifacts/update_latest_result.py` | `tools/experiments/artifacts/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
