@@ -52,7 +52,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 
 ## この文書の読み方
 
-- この文書は、Codex runtime の subagent inventory、activation、handoff、budget、role mapping を所有します。
+- この文書は、Codex runtime の subagent inventory、handoff、budget、role mapping、および launch mechanics を所有します。positive workflow family、stage、required role、child activation は `agents/task_catalog.yaml#workflow_activation_policy` を読みます。
 - 前半は principles、budget、handoff context、wave plan、language / completeness / quality policy を扱い、後半は activation timing、command surface、role mapping、write safety、model settings、smoke test を扱います。
 - parent agent は `## Wave Plan Contract` と `## Handoff Context Contract` を先に読み、writer / reviewer は `## Permanent Team To Codex Mapping` と `## Recommended Routing` を参照します。
 - この文書の `parent Sol` は `.codex/config.toml` の parent projection を指し、
@@ -88,10 +88,11 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   `workflow_monitoring.md` に残します。
 - repo-changing task では、owner、責務、context、write authority、validation
   route が揃った launchable wave だけを立てる
-- repo-changing implementation / patch / doc-edit work は、bounded request を
-  含めて必ず write-capable implementer handoff first です。spawn authorization、
-  tool gate、または他の launch blocker がある場合は typed blocked/retry/user-report
-  packet を残し、親の直接編集へ切り替えません。
+- repo-changing implementation / patch / doc-edit work は、catalog の typed route が
+  要求する場合だけ write-capable implementer handoff first です。bounded owner/path/
+  targeted-validation route は、typed route が要求しない限り child を必要としません。
+  spawn authorization、tool gate、または他の launch blocker がある場合は typed
+  blocked/retry/user-report packet を残し、親の直接編集へ切り替えません。
 - 調査、レビュー、文書整備は分ける
 - fan-out は active spawn budget と stage wave plan の範囲で管理する
 - subagents may spawn bounded child subagents when their handoff packet includes `delegated_spawn_policy` with owner, input packet, expected output, dependency-expanded handoff scope, validation route, review gate, and remaining spawn budget

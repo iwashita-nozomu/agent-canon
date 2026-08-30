@@ -235,7 +235,7 @@ PARENT_ORCHESTRATION_DOCS = {
         "typed blocker",
     ),
     ROOT / "agents" / "skills" / "codex-task-workflow.md": (
-        "write-capable implementer even for bounded requests",
+        "write-capable implementer only when the catalog typed route requires a child",
         "parent does not",
     ),
     ROOT / "agents" / "skills" / "subagent-bootstrap.md": (

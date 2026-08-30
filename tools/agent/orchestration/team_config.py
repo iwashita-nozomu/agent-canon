@@ -562,27 +562,6 @@ def workflow_child_handoff_required(
     )
 
 
-def workflow_full_staging_required(
-    catalog: TaskCatalog | None,
-    workflow_family_id: str | None,
-) -> bool:
-    """Return whether a selected family is retained on the full coordination route."""
-    if catalog is None or not workflow_family_id:
-        return False
-    policy = _as_object_mapping(
-        catalog.raw.get("workflow_activation_policy"),
-        "workflow_activation_policy",
-    )
-    full_staging = _as_object_mapping(
-        policy.get("full_staging"),
-        "workflow_activation_policy.full_staging",
-    )
-    return workflow_family_id in _as_string_tuple(
-        full_staging.get("coordination_families"),
-        "workflow_activation_policy.full_staging.coordination_families",
-    )
-
-
 def load_codex_agent_configs() -> dict[str, dict[str, object]]:
     """Load Codex custom agent TOML files by declared agent name."""
     configs: dict[str, dict[str, object]] = {}
