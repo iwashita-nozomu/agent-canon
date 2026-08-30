@@ -46,9 +46,9 @@ config policy の第二の正本にはしません。
 - 計画レビュー agent、詳細設計レビュー agent、文書通読レビュー agent を分けたい
 - `/goal` 確定前に read-only subagent、または明示許可待ちの handoff plan で goal draft、repo survey、first-slice plan を固めたい
 - prompt、routing、subagent-config drift の修正前に dedicated prompt-audit subagent を挟みたい
-- repo-changing implementation / patch / doc-edit work で、parent が
-  orchestrator / integrator に徹し、write-capable subagent handoff を既定 route
-  にする必要がある
+- 選択した typed workflow route が child handoff を要求し、parent が
+  orchestrator / integrator に徹する必要がある。必要な場合の
+  write-capable child route をここで launch します
 
 ## Core References
 
@@ -123,9 +123,10 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --workspace-root "$PWD"
 ```
 
-repo-changing task では、`--task-id` は catalog の候補を参照するだけです。
-specialist と review pack は owner-critical decision、artifact operation、
-または selected review gate が必要な場合だけ有効化します。
+repo-changing task では、`--task-id` から catalog の typed family、stage、required
+role、child/bundle activation を解決します。specialist と review pack は
+owner-critical decision、artifact operation、または selected review gate が必要な
+場合だけ有効化します。
 handoff / capsule fields の正本は `agents/COMMUNICATION_PROTOCOL.md` です。この skill は launch timing、role selection、wave ledger、authorization、closeout mechanics を所有し、capsule field list を第二の正本にしません。
 Git 状態に関係する handoff は `python3 tools/runtime/authority/checkout_identity.py --format lines` の
 `checkout_identity` block（絶対 cwd、Git root、branch または detached、HEAD、normalized
@@ -135,18 +136,18 @@ subagent-only startup / internal skill routes are owned by `agents/internal-rout
 prompt / routing / subagent-config drift を直す task では、shared policy prose を
 直接広く書き換える前に `prompt_config_reviewer` を prompt/config audit wave として起動し、
 対象 surface は route seed として扱い、責務検索、再利用確認、stale surface scan、dependency expansion を通して handoff scope へ落とします。
-goal-driven repo-changing task では、coordination/resumption が必要な場合にだけ
-provisional run bundle を作ります。planned wave は launchable な owner,
+goal-driven repo-changing task では、catalog の typed route が full staging/bundle を
+要求する coordination/resumption の場合に provisional run bundle を作ります。planned wave は launchable な owner,
 context, write authority, validation route, and review gate が揃ったものだけ
 materialize し、authority-blocked or conditional work を予定行として先に積みません。
 catalog の `manager`、`explorer`、`execution_planner`、`plan_reviewer` は候補であり、
 owner-critical evidence がある場合だけ起動します。
-goal-driven task でも repository mirror file を readiness gate にしません。semantic handoff、または選択された run bundle が dependency-expanded scope、validation route、必要な owner-critical gate を閉じたら、launchable な write-capable implementer を起動または schedule します。read-only wave は setup evidence であり、実装を遅らせる固定 intake ではありません。
+goal-driven task でも repository mirror file を readiness gate にしません。catalog の typed route が child handoff を要求し、semantic handoff または選択された run bundle が dependency-expanded scope、validation route、必要な owner-critical gate を閉じたら、launchable な write-capable implementer を起動または schedule します。read-only wave は setup evidence であり、実装を遅らせる固定 intake ではありません。
 active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
 command output の generated model/profile view と `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認します。implementation-executable handoff は semantic decision sufficiency が mechanism と validation route を閉じた場合だけ materialize し、post-completion gate は実際に選択された owner gate だけを続けます。
 subagent の model / reasoning は該当 `.codex/agents/*.toml` を先に読みます。
 read-only exploration に切る前に、その質問を所有する checker、router、semantic index、dashboard があるか確認し、ある場合は tool を先に呼びます。subagent は structured tool artifact が曖昧な場合の解釈や、tool-covered ではない judgement の独立 review に使い、同じ文書を読み直して決定論的 check を反復しません。
-repo inventory、tool drift survey、機械 report 要約、experiment/log execution は、implementation の critical path を塞がない独立検証または実験実行として Luna/high の通常 role に切ります。mini/medium は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。static validation triage、diff-local Python / C++ review、bounded review、report traceability、checklist-style review gate は、該当 decision があるときに一つの accountable `gpt-5.6-luna/high` review role へ切ります。writer と owner gate/review は、semantic decision と selected validation route が要求する場合だけ分けます。repo-changing task は bounded でも write-capable child route を要求します。
+repo inventory、tool drift survey、機械 report 要約、experiment/log execution は、implementation の critical path を塞がない独立検証または実験実行として Luna/high の通常 role に切ります。mini/medium は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。static validation triage、diff-local Python / C++ review、bounded review、report traceability、checklist-style review gate は、該当 decision があるときに一つの accountable `gpt-5.6-luna/high` review role へ切ります。writer と owner gate/review は、semantic decision と selected validation route が要求する場合だけ分けます。write-capable child は catalog の typed route が要求するときだけ起動します。
 - fixed packet の worker substitution、smaller slice、speculative test、repeated preflight、rollback checkpoint、compatibility fallback は禁止します。compile/static failure は `ImplementationFeedback`、exact target contradiction は一度の `StructuralDesignGap` と同じ Spark の resume です。
 選択済み candidate が起動できない場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録します。candidate を変える場合は explicit revised parent packet と wave を必須にします。`skill_evaluator`、実験実行 role、または review role の起動失敗は、同じ role packet と該当 `.codex/agents/*.toml` の `model` / `model_reasoning_effort` で原因を切り分けます。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt は `agents/COMMUNICATION_PROTOCOL.md` の `Context Visibility Contract` と `Fresh Subagent Context Capsule` を満たすように、`team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` から selected fields だけを入れます。full packet、raw stdout、raw logs、broad chat summary は prompt に貼りません。
@@ -185,9 +186,9 @@ validation failure を次 writer に返す場合は、handoff に `failing_contr
 `observation_level`、`cause_classification`、`intent_preservation`、`evidence`
 を含め、pass 目的の単純化、revert、intended behavior / test 削除、
 oracle weakening、validation downscope を禁止事項として明示します。
-調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog
-側の候補として管理します。owner-critical な decision、unresolved branch、または
-selected validation route が必要とした場合だけ有効化します。
+調査、環境変更、学術文章、包括的開発の強い review coverage は task catalog の
+typed family candidates として管理します。owner-critical な decision、unresolved
+branch、または selected validation route が必要とした場合だけ有効化します。
 `test_designer` は default の実装前 gate ではありません。implementer が
 owning mechanism を確立または修復した後、static analysis、既存 checker、
 targeted validation が所有しない具体的な oracle / specification / regression /
@@ -295,7 +296,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    only when its owner-critical evidence can change the next decision. The
    catalog `manager`, `requirements_organizer`, `explorer`, `execution_planner`,
    and `plan_reviewer` roles remain candidates until activated.
-1. For goal-driven and ordinary repo-changing coding, implementation, patch, or doc-edit work, use the same readiness boundary. After the structured handoff or, when selected, the run bundle and pre-handoff investigation packet derive dependency-expanded handoff scope, validation plan, and tool-rejection preflight evidence, launch or schedule the selected write-capable implementer; do not wait for a repository mirror of session goal state. Read-only waves are setup evidence, not a substitute for the implementation handoff. The parent remains orchestrator only; integration, validation, review, and closeout are child-owned routes.
+1. For goal-driven and ordinary repo-changing coding, implementation, patch, or doc-edit work, use the same readiness boundary when the catalog typed route requires a child. After the structured handoff or, when selected, the run bundle and pre-handoff investigation packet derive dependency-expanded handoff scope, validation plan, and tool-rejection preflight evidence, launch or schedule the selected write-capable implementer; do not wait for a repository mirror of session goal state. Read-only waves are setup evidence, not a substitute for the selected implementation handoff. The parent remains orchestrator only; integration, validation, review, and closeout are child-owned routes.
 1. If the active runtime requires explicit user authorization before `spawn_agent`, do not silently spawn even read-only pre-goal agents. Record the fan-out plan, handoff packets, and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` in the run bundle, then wait for or request authorization.
 1. Use `--task-id` when the selected route needs catalog evidence; task-default
    specialists and review packs are candidates, not automatic work.
@@ -318,7 +319,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Before assigning read-only exploration, run the canonical checker, router, semantic index, or dashboard when one owns the question. Use subagents to interpret ambiguous structured tool artifacts or independently review non-tool-covered judgment, not to repeat deterministic tool checks by reading the same documents.
 1. For repo inventory, tool drift survey, machine-report summarization, and experiment/log execution, use the ordinary `gpt-5.6-luna/high` roles when they are independent verification or bounded execution that does not delay the implementation critical path. Reserve `gpt-5.4-mini/medium` for the fresh, read-only, artifact-only `skill_evaluator` in explicit T14 `skill_evaluation`; it is absent from permanent team roles.
 1. For static validation triage, diff-local Python / C++ review, bounded review, report traceability, and checklist-style review gates, select one accountable `gpt-5.6-luna/high` review role for the active decision; use `gpt-5.6-luna/xhigh` only for `ship_reviewer` findings.
-1. For coding / implementation / patch / doc-edit requests, describe the default route as write-capable handoff first. Once route seed, responsibility search, reuse survey, stale-surface scan, dependency expansion, validation plan, and tool-rejection preflight produce a handoff packet, schedule or launch the selected write-capable implementer; parent owns packet selection, packet relay, dependency order, status, and final external readback.
+1. For coding / implementation / patch / doc-edit requests, describe the catalog-selected route first. When that typed route requires a child, route seed, responsibility search, reuse survey, stale-surface scan, dependency expansion, validation plan, and tool-rejection preflight produce a handoff packet; schedule or launch the selected write-capable implementer, while the parent owns packet selection, packet relay, dependency order, status, and final external readback.
 1. Treat a bounded implementation slice as `spark_worker` eligible only when it is derived from the Abstract Design Frame and is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable. Eligibility does not replace the explicit typed parent-packet selection.
 1. Keep every handoff packet owned after discovery: include dependency-expanded `allowed_paths`, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema, with context artifacts referenced through the protocol-owned capsule. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, retain deterministic router recovery output only as local provisional source-packet evidence or record `router_unavailable_blocker` before handoff. This evidence does not select a new candidate or public route; confirm the handoff paths through responsibility search and dependency scope.
 1. For a fresh launch, build the `Fresh Subagent Context Capsule` through

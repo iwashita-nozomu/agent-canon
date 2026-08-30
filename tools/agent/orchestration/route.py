@@ -109,51 +109,6 @@ PRIVATE_ROUTE_STRUCTURAL_FIELDS = (
     "internal_skill_routes",
 )
 
-IMPLEMENTATION_HANDOFF_TRIGGER_GROUPS: tuple[tuple[str, ...], ...] = (
-    ("implementation",),
-    ("implement",),
-    ("実装",),
-    ("patch",),
-    ("パッチ",),
-    ("fix",),
-    ("修正",),
-    ("refactor",),
-    ("リファクタ",),
-    ("doc-edit",),
-    ("doc", "edit"),
-    ("docs", "edit"),
-    ("document", "edit"),
-    ("ドキュメント", "編集"),
-    ("文書", "編集"),
-    ("文書", "修正"),
-    ("write-capable", "handoff"),
-    ("implementation", "handoff"),
-    ("edit", "handoff"),
-)
-NON_IMPLEMENTATION_REVIEW_GROUPS: tuple[tuple[str, ...], ...] = (
-    ("do", "not", "edit"),
-    ("don't", "edit"),
-    ("do-not-edit",),
-    ("no", "edits"),
-    ("no", "patch"),
-    ("review-only",),
-    ("review", "only"),
-    ("read-only",),
-    ("advisory",),
-    ("do", "not", "implement"),
-    ("編集しない",),
-    ("修正しない",),
-    ("実装しない",),
-    ("レビューのみ",),
-    ("読取専用",),
-)
-IMPLEMENTATION_DELEGATION_GROUPS: tuple[tuple[str, ...], ...] = (
-    ("サブエージェント", "依頼"),
-    ("エージェント", "起動"),
-)
-NO_PATCH_RE = re.compile(
-    r"(?<![A-Za-z0-9])(?:no|without)\s+(?:code\s+)?patch(?:es|ing)?(?![A-Za-z0-9])"
-)
 SUPPLEMENTAL_SKILL_ROUTE_GROUPS: Mapping[str, tuple[tuple[str, ...], ...]] = {}
 BROAD_REFACTOR_ROUTE_GROUPS: tuple[tuple[str, ...], ...] = (
     ("refactor",),
@@ -1099,27 +1054,15 @@ def infer_mode(prompt: str, requested_mode: str) -> str:
     return requested_mode
 
 
-def implementation_handoff_required(prompt: str, mode: str = "repo-changing") -> bool:
-    """Return whether prompt text asks for a write-capable implementation handoff."""
-    if mode != "repo-changing":
-        return False
-    text = prompt.lower()
-    if any(
-        text_matches_group(text, group)
-        for group in NON_IMPLEMENTATION_REVIEW_GROUPS
-        if group != ("no", "patch")
-    ):
-        return False
-    if NO_PATCH_RE.search(text):
-        return False
-    if any(
-        text_matches_group(text, group) for group in IMPLEMENTATION_DELEGATION_GROUPS
-    ):
-        return True
-    return any(
-        text_matches_group(text, group)
-        for group in IMPLEMENTATION_HANDOFF_TRIGGER_GROUPS
-    )
+def implementation_handoff_required(
+    prompt: str,
+    mode: str = "repo-changing",
+    *,
+    typed_route_required: bool = False,
+) -> bool:
+    """Return whether the selected typed route requires a write handoff."""
+    del prompt
+    return mode == "repo-changing" and typed_route_required
 
 
 def is_current_stage_skill(

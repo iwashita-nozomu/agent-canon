@@ -93,6 +93,7 @@ if __package__:
         resolve_workflow_family,
         select_roles,
         task_ids,
+        workflow_child_handoff_required,
     )
 else:
     from tools.agent.orchestration.team_config import (
@@ -114,6 +115,7 @@ else:
         resolve_workflow_family,
         select_roles,
         task_ids,
+        workflow_child_handoff_required,
     )
 
 if __package__:
@@ -136,7 +138,6 @@ if __package__:
         suggested_public_skills,
         user_facing_language_policy_output_lines,
         writer_target_policy_output_lines,
-        implementation_handoff_required,
     )
 else:
     from tools.runtime.manifest.manifest_rendering import (
@@ -158,7 +159,6 @@ else:
         suggested_public_skills,
         user_facing_language_policy_output_lines,
         writer_target_policy_output_lines,
-        implementation_handoff_required,
     )
 
 if __package__:
@@ -261,6 +261,7 @@ def suggested_skills(
     task_text: str = "",
     *,
     source_root: Path | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> tuple[str, ...]:
     """Return the public skills that should be read before work starts."""
     return suggested_public_skills(
@@ -268,6 +269,7 @@ def suggested_skills(
         workflow_family_id,
         task_text,
         source_root=source_root,
+        issue_worker_candidate=issue_worker_candidate,
     )
 
 
@@ -490,17 +492,6 @@ def resolve_bootstrap_context(
     issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> BootstrapRunContext:
     """Resolve workflow family, specialists, and report paths for one run."""
-    if implementation_handoff_required(args.task):
-        implementer_roles = [
-            role
-            for role in (*config.always_on_roles, *config.specialist_roles)
-            if role.id == "implementer" and role.codex_agents
-        ]
-        if not implementer_roles:
-            raise RuntimeError(
-                "WRITE_SUBAGENT_AUTHORIZATION=required;"
-                "PARENT_BLOCKED_ROUTE=typed_blocked_retry_or_user_report"
-            )
     created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     # The parent capability authorizes the eventual write; it does not replace
@@ -548,11 +539,29 @@ def resolve_bootstrap_context(
             )
         # Task-catalog specialists and default review packs remain candidates;
         # explicit enablement or an owner-critical route activates them.
+    if workflow_child_handoff_required(
+        config,
+        catalog,
+        workflow_family_id,
+        issue_worker_candidate,
+    ):
+        write_roles = [
+            role
+            for role in (*config.always_on_roles, *config.specialist_roles)
+            if role.write_policy.mode not in {"read_only", "artifacts_only"}
+            and role.codex_agents
+        ]
+        if not write_roles:
+            raise RuntimeError(
+                "WRITE_SUBAGENT_AUTHORIZATION=required;"
+                "PARENT_BLOCKED_ROUTE=typed_blocked_retry_or_user_report"
+            )
     selected_route_skills = suggested_skills(
         args.task_id,
         workflow_family_id,
         args.task,
         source_root=(repository_roots.agentcanon_source_root if repository_roots else None),
+        issue_worker_candidate=issue_worker_candidate,
     )
     math_route = mathematical_intent_route_for_task(
         catalog,
@@ -644,12 +653,29 @@ def emit_bootstrap_output(
         context.workflow_family_id,
         args.task,
         source_root=source_root,
+        issue_worker_candidate=context.issue_worker_candidate,
     )
     active_skills = current_stage_skills(
-        selected_skills, args.task, source_root=source_root
+        selected_skills,
+        args.task,
+        source_root=source_root,
+        typed_route_required=workflow_child_handoff_required(
+            config,
+            catalog,
+            context.workflow_family_id,
+            context.issue_worker_candidate,
+        ),
     )
     deferred_skills = deferred_stage_skills(
-        selected_skills, args.task, source_root=source_root
+        selected_skills,
+        args.task,
+        source_root=source_root,
+        typed_route_required=workflow_child_handoff_required(
+            config,
+            catalog,
+            context.workflow_family_id,
+            context.issue_worker_candidate,
+        ),
     )
     review_roles = selected_review_roles(runtime.roles)
     public_layout = getattr(repository_roots, "layout", None)
@@ -832,7 +858,15 @@ def emit_bootstrap_output(
         print(line)
     for line in user_facing_language_policy_output_lines():
         print(line)
-    for line in contract_complete_implementation_policy_output_lines(args.task):
+    for line in contract_complete_implementation_policy_output_lines(
+        args.task,
+        child_handoff_required=workflow_child_handoff_required(
+            config,
+            catalog,
+            context.workflow_family_id,
+            context.issue_worker_candidate,
+        ),
+    ):
         print(line)
     for line in repo_tool_routing_policy_output_lines(
         selected_skills,
@@ -1245,6 +1279,7 @@ def main(
         context.workflow_family_id,
         args.task,
         source_root=repository_roots.agentcanon_source_root,
+        issue_worker_candidate=context.issue_worker_candidate,
     )
     run_spec = RunBundleSpec(
             config=config,

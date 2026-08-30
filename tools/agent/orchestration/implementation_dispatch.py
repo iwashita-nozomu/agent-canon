@@ -930,21 +930,6 @@ def workflow_topology_policy_violations(
     catalog: TaskCatalog,
 ) -> tuple[tuple[str, str], ...]:
     """Return lean-topology violations without duplicating catalog role lists."""
-    owner_bounded_always_on = ("manager", "implementer", "verifier", "auditor")
-    delivery_always_on = (
-        "manager",
-        "designer",
-        "implementer",
-        "verifier",
-        "auditor",
-    )
-    deferred_delivery_reviews = {
-        "manager_reviewer",
-        "design_reviewer",
-        "document_flow_reviewer",
-        "change_reviewer",
-        "final_reviewer",
-    }
     violations: list[tuple[str, str]] = []
     for family in catalog.workflow_families:
         family_id = family.get("id")
@@ -988,17 +973,6 @@ def workflow_topology_policy_violations(
         elif family_id == "issue_worker_publication":
             if always_on or specialists != ("publisher",):
                 violations.append((family_id, "publisher-only-topology"))
-        elif family_id == "owner_bounded_change":
-            if always_on != owner_bounded_always_on:
-                violations.append((family_id, "owner-bounded-producer-core"))
-            if "change_reviewer" not in specialists:
-                violations.append((family_id, "change-reviewer-not-deferred"))
-        else:
-            if always_on != delivery_always_on:
-                violations.append((family_id, "delivery-producer-core"))
-            missing_reviews = deferred_delivery_reviews - set(specialists)
-            if missing_reviews:
-                violations.append((family_id, "reviewers-not-deferred"))
         active_budget, write_budget = workflow_spawn_budget(catalog, family_id)
         if active_budget < 1 or write_budget < 1 or write_budget > active_budget:
             violations.append((family_id, "derived-spawn-budget"))

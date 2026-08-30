@@ -959,6 +959,47 @@ def validate_task_catalog_references() -> None:
         not (SCOPED_MODEL_POLICY_KEYS & set(catalog.raw)),
         "task_catalog.yaml must not own model, effort, review model, or tier policy",
     )
+    activation_policy = require_mapping(
+        catalog.raw.get("workflow_activation_policy"),
+        "workflow_activation_policy must be a mapping",
+    )
+    ensure(
+        activation_policy.get("family_selector") == "tasks[].family",
+        "workflow_activation_policy family selector must be tasks[].family",
+    )
+    ensure(
+        activation_policy.get("stage_owner") == "role_topology_defaults.stage_waves",
+        "workflow_activation_policy stage owner must be role_topology_defaults.stage_waves",
+    )
+    ensure(
+        activation_policy.get("required_role_owner") == "workflow_families[].roles",
+        "workflow_activation_policy required-role owner must be workflow_families[].roles",
+    )
+    child_handoff = require_mapping(
+        activation_policy.get("child_handoff"),
+        "workflow_activation_policy child_handoff must be a mapping",
+    )
+    ensure(
+        child_handoff.get("activation") == "selected_typed_route",
+        "workflow_activation_policy child handoff must be selected-route-only",
+    )
+    ensure(
+        child_handoff.get("required_role_owner")
+        == "workflow_families[].roles",
+        "workflow_activation_policy child role owner must be family roles",
+    )
+    ensure(
+        child_handoff.get("write_capable") is True,
+        "workflow_activation_policy child handoff must be write-capable",
+    )
+    full_staging = require_mapping(
+        activation_policy.get("full_staging"),
+        "workflow_activation_policy full_staging must be a mapping",
+    )
+    ensure(
+        full_staging.get("activation") == "selected_coordination_route",
+        "workflow_activation_policy full staging must be selected-route-only",
+    )
     review_policy = require_mapping(
         catalog.raw.get("review_activation_policy"),
         "review_activation_policy must be a mapping",
@@ -1102,6 +1143,18 @@ def validate_task_catalog_references() -> None:
         require_string(family.get("id"), "workflow family id must be a string")
         for family in catalog.workflow_families
     }
+    coordination_families = require_string_list(
+        full_staging.get("coordination_families"),
+        "workflow_activation_policy coordination_families must be a list",
+    )
+    ensure(
+        set(coordination_families).issubset(family_ids),
+        "workflow_activation_policy coordination family is unknown",
+    )
+    ensure(
+        "comprehensive_development" in coordination_families,
+        "workflow_activation_policy must retain comprehensive_development full staging",
+    )
 
     task_by_id_map = {
         require_string(task.get("id"), "task id must be a string"): task

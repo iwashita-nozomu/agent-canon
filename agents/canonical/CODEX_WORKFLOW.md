@@ -117,10 +117,10 @@ the applicable validation and checker obligations.
 
 - A runtime profile selects validation and checker obligations only. It does
   not limit context size, work scope, team mode, or task size.
-- For every repo-changing implementation / patch / doc-edit work, including
-  bounded owner/path/targeted-validation requests, use the selected
-  write-capable `worker` / `spark_worker` handoff. Spawn or tool blockers produce
-  typed blocked/retry/user-report evidence; the parent does not write.
+- For repo-changing implementation / patch / doc-edit work, use the selected
+  write-capable `worker` / `spark_worker` handoff only when the catalog typed
+  route requires a child. Spawn or tool blockers produce typed
+  blocked/retry/user-report evidence; the parent does not write.
 - Record the selected profile and the evidence that made it applicable;
   inactive profiles remain unrecorded unless an active workflow explicitly
   asks for their status.
@@ -156,7 +156,7 @@ decision が選択された後、必要な topic だけを `agent-canon k search
 logへ on-demand に検索します。stable preference は対象 owner への明示変更として扱います。
 
 raw text search の hit だけで編集対象を決めません。
-検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を write-capable child handoff へ materialize します。空の unresolved-decision set は即時に one-pass handoff へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request も同じ child route で進めます。
+検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を作ります。write-capable child handoff は `agents/task_catalog.yaml#workflow_activation_policy` が要求する typed route だけで materialize します。空の unresolved-decision set は即時に選択 route へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request も同じ typed route で扱います。
 bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。#335 の既存 tool 先行実行は維持しますが、結果の解釈や修正に入る前に、生成された compact `SKILL.md` を `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` で `file_eof=true` まで読みます。Skill が委譲する場合だけ、canonical owner document の必要な見出しを `section_eof=true` まで読みます。canonical ファイル全体の EOF は要求しません。`implementation_read=ready` はこの条件を満たしたときだけ使い、可視 prefix や既知 path だけでは unlock しません。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ### Skill read admission
@@ -252,10 +252,13 @@ repo-changing run では `team_manifest.yaml` の
 ### Design Integrity Gate
 
 実装前の設計判断は、近い file、現在の finding、会話印象ではなく
-owning responsibility model から始めます。Full staged route では `Abstract Design
-Frame`、`Implementation Source Packet`、`Design Side-Effect Map`、
-`Design-To-Implementation Trace` をそろえます。親は edit authorization を持たず、
-write-capable child handoff の packet と gate を選択・relay します。
+owning responsibility model から始めます。選択した typed route が full staging を
+要求する場合は、`Abstract Design Frame`、`Implementation Source Packet`、
+`Design Side-Effect Map`、`Design-To-Implementation Trace` をそろえます。親は edit
+authorization を持たず、catalog の `workflow_activation_policy` と選択 family の
+role/stage records に従って child handoff の packet と gate を選択・relay します。
+Child or tool blockers remain typed blocked/retry/user-report evidence; the parent does not
+perform a direct write as a fallback.
 Gate 6 の detailed design review は、owner/design boundary、API shape、仕様解釈、
 または別の unresolved claim が owning review gate では判定できない場合だけ選択します。
 設計文書の存在だけでは別 review stage や artifact を生成しません。reviewer output は
@@ -311,7 +314,8 @@ retry loops, apply `agents/workflows/token-efficient-codex-workflow.md`.
   context required by request clauses, owner boundaries, or traceability.
 - Keep `worker` as the implementation default. Select `spark_worker` only from
   the typed parent packet. Explicit bounded owner/path/validation requests may
-  close through the selected write-capable child route.
+  close through the selected write-capable child route when the typed route
+  requires one.
 - Attribute change with the existing session comparison, role evaluator, and
   runtime dashboard tools. Missing post-change runtime evidence remains
   `missing`; it is not inferred from fewer configured roles.
@@ -582,15 +586,17 @@ materialize しません。active runtime が明示許可を要求する場合�
 - 長めの task で run 単位の記録が必要
 - subagent と parent の責務を分けたい
 
-full staged route でも、`scheduler`、`schedule_reviewer`、`designer`、`design_reviewer`、
-active gate の場合の `document_flow_reviewer` は候補です。owner-critical decision または
-distinct unresolved claim/risk が選択した stage だけを materialize し、W2 の completion
-gate は approved typed contract evidence と active owner route で確定します。
-bounded owner route は `external public API/behavior/schema unchanged` の場合だけ維持します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更がある場合は `scoped_change` または broader route へ進み、`dependency/consumer/migration/docs closure` を scope 形成します。reader-facing docs、新用語、cross-surface risk がある場合も従来どおり broader route へ進みますが、その理由だけで同 closure を無条件要求しません。
-Codex subagent では、候補 role を workflow family に応じて宣言しますが、owner-critical
-decision、distinct unresolved claim/risk、または selected validation route が要求した
-role だけを materialize します。W2 の completion predicate は approved typed contract
-evidence と active owner route に結び付けます。
+Full staging、bounded execution、child handoff の positive selectionは、
+`agents/task_catalog.yaml#workflow_activation_policy` と選択 family の
+`roles` / `role_topology` records から解決します。owner-critical decision、distinct
+unresolved claim/risk、または selected validation route が要求した role だけを
+materialize します。W2 の completion predicate は approved typed contract evidence と
+active owner route に結び付けます。bounded owner route は
+`external public API/behavior/schema unchanged` の場合だけ維持します。public surface
+の追加、縮小、削除、rename、restriction、deprecation、意味変更がある場合は
+`scoped_change` または broader route へ進み、`dependency/consumer/migration/docs closure`
+を scope 形成します。reader-facing docs、新用語、cross-surface risk がある場合も
+従来どおり broader route へ進みますが、その理由だけで同 closure を無条件要求しません。
 Agent Wave に固定 plan-review-edit 順序はありません。bootstrap は selected stages だけを
 `team_manifest.yaml`、`schedule.md`、`workflow_monitoring.md` に記録します。
 bootstrap は `run.pre_handoff_scope_policy` も出します。implementation
@@ -727,11 +733,11 @@ cost を無視して review coverage を優先する run では、research-drive
 - worker の実装入力は、各 implementation slice の前に明示された design artifact path、design section、request clause ID です。test plan item は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ実装入力に含めます
 - worker は docs、workflow、prompt/config、validation output、dependency manifest、user-facing surface へ波及する変更を `Design Side-Effect Map` の item として扱い、implementation summary に owner stage と review gate を残す
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、選択された場合の承認済み `design_review.md`、design gate check、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。design review が未選択なら semantic decision sufficiency と owner validation evidence を使い、欠けた場合だけ Gate 5-6 へ戻る
-- 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact または structured handoff に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い bounded task も write-capable child packet を作って継続する
+- 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact または structured handoff に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い bounded task は、catalog の typed route が要求する場合だけ write-capable child packet を作って継続します
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、別経路、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
 - legacy-route drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
-- `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は、bounded でも write-capable handoff で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は typed blocker を記録し、親は実行しません。
+- `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、catalog の typed route が要求する implementation work だけを write-capable handoff で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は typed blocker を記録し、親は実行しません。
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
   config key は、implementation handoff 前に naming plan で固定する。naming plan は
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
