@@ -533,13 +533,14 @@ def main(argv: list[str]) -> int:
                 )
                 if values.get("type") == "volume" and values.get("dst") == "/var/lib/agent-canon":
                     volume_name = values.get("src", "")
-                elif values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon/input":
+                elif values.get("type") == "bind" and values.get("dst") == "/agent-canon-copy-input":
                     input_source = values.get("src", "")
-                elif values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon/output":
+                elif values.get("type") == "bind" and values.get("dst") == "/agent-canon-copy-output":
                     output_source = values.get("src", "")
             if not volume_name:
                 return 2
             backing = volume_path(volume_name)
+            backing.mkdir(parents=True, exist_ok=True)
             kind = copy_environment.get("AGENT_CANON_COPY_KIND", "")
             relative = copy_environment.get("AGENT_CANON_COPY_RELATIVE", "")
             expected_digest = copy_environment.get("AGENT_CANON_COPY_DIGEST", "")
@@ -742,7 +743,7 @@ def main(argv: list[str]) -> int:
             )
             if values.get("type") == "volume" and values.get("dst") == "/var/lib/agent-canon":
                 volume_name = values.get("src", "")
-            if values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon/legacy-state":
+            if values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon-legacy-state":
                 legacy_source = values.get("src", "")
         if not volume_name:
             return 2

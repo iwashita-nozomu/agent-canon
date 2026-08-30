@@ -17,6 +17,7 @@ AGENT_CANON_CONTAINER_MEMORY=4g
 AGENT_CANON_CONTAINER_PIDS=512
 AGENT_CANON_CONTAINER_NETWORK=none
 AGENT_CANON_VOLUME_DESTINATION=/var/lib/agent-canon
+AGENT_CANON_LEGACY_STATE_DESTINATION=/var/lib/agent-canon-legacy-state
 AGENT_CANON_RUNTIME_DESTINATION=/var/lib/agent-canon/runtime
 AGENT_CANON_EXCHANGE_DESTINATION=/var/lib/agent-canon/exchange
 AGENT_CANON_SPOOL_DESTINATION=/var/lib/agent-canon/spool
@@ -917,7 +918,7 @@ _agent_canon_init_state_volume() {
     --network none \
     --tmpfs /tmp \
     --mount "type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION" \
-    --mount "type=bind,src=$AGENT_CANON_STATE_ROOT,dst=/var/lib/agent-canon/legacy-state,readonly" \
+    --mount "type=bind,src=$AGENT_CANON_STATE_ROOT,dst=$AGENT_CANON_LEGACY_STATE_DESTINATION,readonly" \
     --env "AGENT_CANON_VOLUME_UID=$caller_uid" \
     --env "AGENT_CANON_VOLUME_GID=$caller_gid" \
     --env "AGENT_CANON_VOLUME_DIGEST=$(_agent_canon_control_digest)" \
@@ -926,7 +927,7 @@ _agent_canon_init_state_volume() {
     -c 'set -eu
 root=/var/lib/agent-canon
 runtime="$root/runtime"
-legacy=/var/lib/agent-canon/legacy-state
+legacy=/var/lib/agent-canon-legacy-state
 uid_value="$AGENT_CANON_VOLUME_UID"
 gid_value="$AGENT_CANON_VOLUME_GID"
 digest="$AGENT_CANON_VOLUME_DIGEST"
@@ -1039,9 +1040,9 @@ _agent_canon_volume_copy() {
   fi
   local -a mounts=(--mount "type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION")
   if [[ "$direction" == import ]]; then
-    mounts+=(--mount "type=bind,src=$host_path,dst=/var/lib/agent-canon/input,readonly")
+    mounts+=(--mount "type=bind,src=$host_path,dst=/agent-canon-copy-input,readonly")
   elif [[ "$direction" == export ]]; then
-    mounts+=(--mount "type=bind,src=$host_path,dst=/var/lib/agent-canon/output")
+    mounts+=(--mount "type=bind,src=$host_path,dst=/agent-canon-copy-output")
   fi
   if [[ "$kind" == codex-home ]]; then
     mounts+=(--mount "type=bind,src=$AGENT_CANON_REPOSITORY_ROOT,dst=$AGENT_CANON_REPOSITORY_ROOT,readonly")
@@ -1123,7 +1124,7 @@ validate_codex_links() {
     *) exit 81 ;;
   esac
 elif [ "$direction" = import ]; then
-  input=/var/lib/agent-canon/input
+  input=/agent-canon-copy-input
   case "$kind" in
     source-sync) destination="$root/source-sync.json"; mode=600; expected=file ;;
     mount-registry) destination="$root/mount-registry.toml"; mode=600; expected=file ;;
@@ -1136,7 +1137,7 @@ elif [ "$direction" = import ]; then
     [ -f "$input" ] && [ ! -L "$input" ] || exit 65
     temporary="$destination.$$"
     cp -- "$input" "$temporary"
-    [ -n "$digest" ] && [ "$(sha256sum "$temporary" | awk "{print \\$1}")" = "$digest" ] || exit 82
+    [ -n "$digest" ] && [ "$(sha256sum "$temporary" | awk "{print \$1}")" = "$digest" ] || exit 82
     chmod "$mode" "$temporary"
     chown "$uid_value:$gid_value" "$temporary"
     mv -f -- "$temporary" "$destination"
@@ -1187,42 +1188,42 @@ else
     projection)
       source="$root/exchange"; [ -d "$source" ] && [ ! -L "$source" ] || exit 69
       for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
-        [ ! -L "/var/lib/agent-canon/output/$name" ] || exit 70
-        rm -f -- "/var/lib/agent-canon/output/$name"
+        [ ! -L "/agent-canon-copy-output/$name" ] || exit 70
+        rm -f -- "/agent-canon-copy-output/$name"
         if [ -e "$source/$name" ]; then
           [ -f "$source/$name" ] && [ ! -L "$source/$name" ] || exit 71
-          cp -- "$source/$name" "/var/lib/agent-canon/output/$name"
+          cp -- "$source/$name" "/agent-canon-copy-output/$name"
         fi
       done ;;
     skill)
       source="$root/exchange/skill-projection"; [ -d "$source" ] && [ ! -L "$source" ] || exit 72
-      rm -rf -- /var/lib/agent-canon/output/skill-projection
-      mkdir -p /var/lib/agent-canon/output
-      cp -a "$source" /var/lib/agent-canon/output/skill-projection
-      [ -z "$(find /var/lib/agent-canon/output/skill-projection -type l -print -quit)" ] || exit 73 ;;
+      rm -rf -- /agent-canon-copy-output/skill-projection
+      mkdir -p /agent-canon-copy-output
+      cp -a "$source" /agent-canon-copy-output/skill-projection
+      [ -z "$(find /agent-canon-copy-output/skill-projection -type l -print -quit)" ] || exit 73 ;;
     eval)
       source="$root/spool/$relative"; [ -d "$source" ] && [ ! -L "$source" ] || exit 74
-      rm -rf -- "/var/lib/agent-canon/output/$relative"
-      cp -a "$source" "/var/lib/agent-canon/output/$relative"
-      [ -z "$(find "/var/lib/agent-canon/output/$relative" -type l -print -quit)" ] || exit 75 ;;
+      rm -rf -- "/agent-canon-copy-output/$relative"
+      cp -a "$source" "/agent-canon-copy-output/$relative"
+      [ -z "$(find "/agent-canon-copy-output/$relative" -type l -print -quit)" ] || exit 75 ;;
     private-feedback)
       source="$root/spool/private-feedback"; [ -d "$source" ] && [ ! -L "$source" ] || exit 76
-      rm -rf -- /var/lib/agent-canon/output
-      mkdir -p /var/lib/agent-canon/output
-      cp -a "$source/." /var/lib/agent-canon/output/
-      [ -z "$(find /var/lib/agent-canon/output -type l -print -quit)" ] || exit 77 ;;
+      rm -rf -- /agent-canon-copy-output
+      mkdir -p /agent-canon-copy-output
+      cp -a "$source/." /agent-canon-copy-output/
+      [ -z "$(find /agent-canon-copy-output -type l -print -quit)" ] || exit 77 ;;
     codex-home)
       source="$root/codex-home"; [ -d "$source" ] && [ ! -L "$source" ] || exit 78
       validate_codex_links "$source" || exit 79
-      rm -rf -- /var/lib/agent-canon/output
-      mkdir -p /var/lib/agent-canon/output
-      cp -a "$source/." /var/lib/agent-canon/output/
-      validate_codex_links /var/lib/agent-canon/output || exit 79 ;;
+      rm -rf -- /agent-canon-copy-output
+      mkdir -p /agent-canon-copy-output
+      cp -a "$source/." /agent-canon-copy-output/
+      validate_codex_links /agent-canon-copy-output || exit 79 ;;
     *) exit 80 ;;
   esac
   if [ "$kind" = projection ]; then
     source_digest=$(projection_digest "$source")
-    destination_digest=$(projection_digest /var/lib/agent-canon/output)
+    destination_digest=$(projection_digest /agent-canon-copy-output)
   else
     if [ "$kind" = codex-home ]; then
       source_digest=$(codex_digest "$source")
@@ -1230,14 +1231,14 @@ else
       source_digest=$(tree_digest "$source")
     fi
     if [ "$kind" = eval ]; then
-      destination_digest=$(tree_digest "/var/lib/agent-canon/output/$relative")
+      destination_digest=$(tree_digest "/agent-canon-copy-output/$relative")
     elif [ "$kind" = skill ]; then
-      destination_digest=$(tree_digest /var/lib/agent-canon/output/skill-projection)
+      destination_digest=$(tree_digest /agent-canon-copy-output/skill-projection)
     else
       if [ "$kind" = codex-home ]; then
-        destination_digest=$(codex_digest /var/lib/agent-canon/output)
+        destination_digest=$(codex_digest /agent-canon-copy-output)
       else
-        destination_digest=$(tree_digest /var/lib/agent-canon/output)
+        destination_digest=$(tree_digest /agent-canon-copy-output)
       fi
     fi
   fi
