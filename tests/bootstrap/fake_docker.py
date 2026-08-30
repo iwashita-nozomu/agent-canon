@@ -15,7 +15,7 @@ def load() -> dict:
     """Load fake daemon state from the test-owned file."""
     path = Path(os.environ["FAKE_DOCKER_STATE"])
     if not path.exists():
-        return {"images": {}, "containers": {}, "next": 1}
+        return {"images": {}, "containers": {}, "volumes": {}, "next": 1}
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -24,6 +24,11 @@ def save(state: dict) -> None:
     Path(os.environ["FAKE_DOCKER_STATE"]).write_text(
         json.dumps(state, sort_keys=True), encoding="utf-8"
     )
+
+
+def volume_path(name: str) -> Path:
+    """Return the fake daemon's private backing directory for one volume."""
+    return Path(os.environ["FAKE_DOCKER_STATE"]).parent / f".fake-volume-{name}"
 
 
 def labels(argv: list[str]) -> dict[str, str]:
@@ -107,6 +112,17 @@ def _formatted_container(record: dict, fmt: str) -> str | None:
         return str(host.get("Memory", 0))
     if fmt == "{{.HostConfig.PidsLimit}}":
         return str(host.get("PidsLimit", 0))
+    if fmt == '{{range .Mounts}}{{if eq .Type "volume"}}{{printf "volume:%s\\t%s\\t%t\\n" .Name .Destination .RW}}{{else}}{{printf "%s\\t%s\\t%t\\n" .Source .Destination .RW}}{{end}}{{end}}':
+        return "".join(
+            (
+                f"volume:{mount['Name']}\t{mount['Destination']}\t"
+                f"{'true' if mount.get('RW') else 'false'}\n"
+                if mount.get("Type") == "volume"
+                else f"{mount['Source']}\t{mount['Destination']}\t"
+                f"{'true' if mount.get('RW') else 'false'}\n"
+            )
+            for mount in record.get("Mounts", [])
+        )
     if fmt == "{{range .Mounts}}{{printf \"%s\\t%s\\t%t\\n\" .Source .Destination .RW}}{{end}}":
         return "".join(
             f"{mount['Source']}\t{mount['Destination']}\t"
@@ -118,15 +134,15 @@ def _formatted_container(record: dict, fmt: str) -> str | None:
 
 def _materialize_skill_exchange(state: dict, container: dict) -> None:
     """Model resident materializer output in the writable runtime exchange."""
-    runtime_mount = next(
+    exchange_mount = next(
         (
             mount
             for mount in container.get("Mounts", [])
-            if mount["Destination"] == "/var/lib/agent-canon/runtime"
+            if mount["Destination"] == "/var/lib/agent-canon/exchange"
         ),
         None,
     )
-    if runtime_mount is None:
+    if exchange_mount is None:
         return
     image_ref = container.get("Config", {}).get("Image", "")
     image = find(state, image_ref)
@@ -140,7 +156,7 @@ def _materialize_skill_exchange(state: dict, container: dict) -> None:
     materializer = Path(__file__).resolve().parents[2] / "tools/agent/skills/skill_shim_materializer.py"
     if not materializer.is_file():
         return
-    staging_root = Path(runtime_mount["Source"]) / "container-runtime/skill-projection"
+    staging_root = Path(exchange_mount["Source"]) / "skill-projection"
     staged_skill = staging_root / ".codex/personal/skills/agent-orchestration/SKILL.md"
     if staged_skill.is_file():
         return
@@ -188,6 +204,52 @@ def main(argv: list[str]) -> int:
         with Path(event_log).open("a", encoding="utf-8") as handle:
             handle.write("docker\n")
     state = load()
+    state.setdefault("volumes", {})
+    if argv[:2] == ["volume", "inspect"]:
+        name = argv[-1]
+        record = state["volumes"].get(name)
+        if record is None:
+            return 1
+        if "--format" in argv:
+            fmt = argv[argv.index("--format") + 1]
+            if fmt == "{{.Name}}":
+                print(name)
+                return 0
+            if fmt == '{{index .Labels "io.agent-canon.runtime"}}':
+                print(record.get("Labels", {}).get("io.agent-canon.runtime", ""))
+                return 0
+            if fmt == '{{index .Labels "io.agent-canon.control-root-digest"}}':
+                print(record.get("Labels", {}).get("io.agent-canon.control-root-digest", ""))
+                return 0
+            return 2
+        print(json.dumps([record]))
+        return 0
+    if argv[:2] == ["volume", "create"]:
+        name = argv[-1]
+        if name in state["volumes"]:
+            print(name)
+            return 0
+        record = {
+            "Name": name,
+            "Labels": labels(argv),
+            "Mountpoint": str(volume_path(name)),
+            "UID": None,
+            "GID": None,
+            "Mode": "0755",
+        }
+        volume_path(name).mkdir(parents=True, exist_ok=True)
+        state["volumes"][name] = record
+        save(state)
+        print(name)
+        return 0
+    if argv[:2] == ["volume", "ls"]:
+        filters = _label_filters(argv)
+        names = [
+            name for name, record in state["volumes"].items()
+            if all(record.get("Labels", {}).get(key) == value for key, value in filters.items())
+        ]
+        print("\n".join(names))
+        return 0
     if argv[:2] == ["image", "inspect"]:
         identifier = argv[-1]
         found = find(state, identifier)
@@ -321,21 +383,40 @@ def main(argv: list[str]) -> int:
             values = dict(
                 part.split("=", 1) for part in argv[index + 1].split(",") if "=" in part
             )
-            source = values["src"]
+            mount_type = values.get("type", "bind")
+            source = values.get("src", "")
+            name_value = source
+            if mount_type == "volume":
+                volume_path(source).mkdir(parents=True, exist_ok=True)
+                state["volumes"].setdefault(
+                    source,
+                    {
+                        "Name": source,
+                        "Labels": {},
+                        "Mountpoint": str(volume_path(source)),
+                        "UID": None,
+                        "GID": None,
+                        "Mode": "0755",
+                    },
+                )
+                source = str(volume_path(source))
             if os.environ.get("FAKE_DOCKER_CANONICALIZE_MOUNTS") == "1":
                 source = str(Path(source).resolve())
             parsed_mounts.append(
                 {
-                    "Type": "bind",
+                    "Type": mount_type,
                     "Source": source,
+                    "Name": name_value,
                     "Destination": values["dst"],
                     "RW": "readonly" not in argv[index + 1],
                     "Mode": "ro" if "readonly" in argv[index + 1] else "rw",
                 }
             )
             if values["dst"] == "/var/lib/agent-canon/mount-registry.toml":
-                mount_snapshots[values["dst"]] = Path(source).read_text(
-                    encoding="utf-8"
+                mount_snapshots[values["dst"]] = (
+                    Path(source).read_text(encoding="utf-8")
+                    if Path(source).is_file()
+                    else ""
                 )
         cid = f"container-{state['next']}"
         state["next"] += 1
@@ -373,6 +454,105 @@ def main(argv: list[str]) -> int:
         if not found or found[0] != "image":
             return 1
         state["images"][argv[2]] = {**found[1], "RepoTags": [argv[2]]}
+        save(state)
+        return 0
+    if argv[:1] == ["run"]:
+        # The real initializer is a short-lived container that prepares the
+        # named controller-state volume.  Model its one-time legacy copy and
+        # return without retaining a task container.
+        if "--mount" not in argv:
+            return 2
+        volume_name = ""
+        legacy_source = ""
+        for index, item in enumerate(argv):
+            if item != "--mount" or index + 1 >= len(argv):
+                continue
+            values = dict(
+                part.split("=", 1)
+                for part in argv[index + 1].split(",")
+                if "=" in part
+            )
+            if values.get("type") == "volume" and values.get("dst") == "/var/lib/agent-canon/runtime":
+                volume_name = values.get("src", "")
+            if values.get("type") == "bind" and values.get("dst") == "/var/lib/agent-canon/legacy-state":
+                legacy_source = values.get("src", "")
+        if not volume_name:
+            return 2
+        backing = volume_path(volume_name)
+        backing.mkdir(parents=True, exist_ok=True)
+        legacy = Path(legacy_source) if legacy_source else None
+        marker = backing / ".agent-canon-controller-volume-v1"
+        digest = next(
+            (
+                item.split("=", 1)[1]
+                for item in argv
+                if item.startswith("AGENT_CANON_VOLUME_DIGEST=")
+            ),
+            "",
+        )
+
+        def same_tree(source: Path, destination: Path) -> bool:
+            source_files = sorted(
+                item.relative_to(source).as_posix()
+                for item in source.rglob("*")
+                if not item.is_dir()
+            )
+            destination_files = sorted(
+                item.relative_to(destination).as_posix()
+                for item in destination.rglob("*")
+                if not item.is_dir()
+            )
+            if source_files != destination_files:
+                return False
+            return all(
+                (source / relative).is_file()
+                and not (source / relative).is_symlink()
+                and (destination / relative).is_file()
+                and not (destination / relative).is_symlink()
+                and (source / relative).read_bytes() == (destination / relative).read_bytes()
+                for relative in source_files
+            )
+
+        def migrate_file(source: Path, destination: Path) -> bool:
+            if destination.exists():
+                return destination.is_file() and not destination.is_symlink() and source.read_bytes() == destination.read_bytes()
+            shutil.copy2(source, destination)
+            return True
+
+        def migrate_tree(source: Path, destination: Path) -> bool:
+            if destination.exists():
+                return destination.is_dir() and not destination.is_symlink() and same_tree(source, destination)
+            shutil.copytree(source, destination)
+            return True
+
+        if marker.is_symlink() or (marker.exists() and marker.read_text(encoding="utf-8") != f"agent-canon-controller-volume/v1\n{digest}\n"):
+            return 1
+        if not marker.exists() and legacy is not None and legacy.is_dir():
+            for name in ("state.json", "owner.json"):
+                source = legacy / name
+                if source.exists() and (not source.is_file() or source.is_symlink() or not migrate_file(source, backing / name)):
+                    return 1
+            for name in ("receipts", "generations", "tasks"):
+                source = legacy / name
+                destination = backing / name
+                if source.exists() and (not source.is_dir() or source.is_symlink() or not migrate_tree(source, destination)):
+                    return 1
+            marker.write_text(f"agent-canon-controller-volume/v1\n{digest}\n", encoding="utf-8")
+        if marker.read_text(encoding="utf-8") != f"agent-canon-controller-volume/v1\n{digest}\n":
+            return 1
+        if legacy is not None and legacy.is_dir():
+            for name in ("state.json", "owner.json"):
+                source = legacy / name
+                if source.exists() and (not (backing / name).is_file() or source.read_bytes() != (backing / name).read_bytes()):
+                    return 1
+            for name in ("receipts", "generations", "tasks"):
+                source = legacy / name
+                if source.exists() and (not (backing / name).is_dir() or not same_tree(source, backing / name)):
+                    return 1
+        state["volumes"][volume_name]["UID"] = int(next(item.split("=", 1)[1] for item in argv if item.startswith("AGENT_CANON_VOLUME_UID=")))
+        state["volumes"][volume_name]["GID"] = int(next(item.split("=", 1)[1] for item in argv if item.startswith("AGENT_CANON_VOLUME_GID=")))
+        state["volumes"][volume_name]["Mode"] = "0700"
+        print(f"marker\t{digest}\ncontent\tok")
         save(state)
         return 0
     if argv[:1] == ["start"]:
@@ -421,6 +601,16 @@ def main(argv: list[str]) -> int:
             del state["images"][key]
         save(state)
         return 0
+    if argv[:2] == ["volume", "rm"] and len(argv) == 3:
+        name = argv[2]
+        if name not in state["volumes"]:
+            return 1
+        del state["volumes"][name]
+        backing = volume_path(name)
+        if backing.is_dir():
+            shutil.rmtree(backing)
+        save(state)
+        return 0
     if argv[:1] == ["cp"] and len(argv) == 3:
         identifier, _, container_source = argv[1].partition(":")
         found = find(state, identifier)
@@ -460,6 +650,32 @@ def main(argv: list[str]) -> int:
         found = find(state, identifier)
         if not found:
             return 0
+        runtime_mount = next(
+            (
+                mount
+                for mount in found[1].get("Mounts", [])
+                if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                and mount.get("Type") == "volume"
+            ),
+            None,
+        )
+        if runtime_mount is not None:
+            volume = state["volumes"].get(runtime_mount.get("Name", ""), {})
+            user = str(found[1].get("Config", {}).get("User", ""))
+            uid, _, gid = user.partition(":")
+            if (
+                volume.get("UID") != int(uid or -1)
+                or volume.get("GID") != int(gid or -1)
+                or volume.get("Mode") != "0700"
+            ):
+                return 1
+            probe = Path(runtime_mount["Source"]) / ".fake-resident-write-read"
+            probe.write_text("resident\n", encoding="utf-8")
+            if probe.read_text(encoding="utf-8") != "resident\n":
+                return 1
+            probe.unlink()
+            volume["ResidentWriteReadback"] = True
+            save(state)
         if command[:2] == [
             "python3",
             "/usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py",
@@ -490,14 +706,23 @@ def main(argv: list[str]) -> int:
                     ),
                     None,
                 )
+                exchange_mount = next(
+                    (
+                        mount
+                        for mount in found[1]["Mounts"]
+                        if mount["Destination"] == "/var/lib/agent-canon/exchange"
+                    ),
+                    None,
+                )
                 digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
                 host_root = exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT", "")
                 container_root = exec_environment.get(
                     "AGENT_CANON_TARGET_CONTAINER_ROOT", f"/targets/{digest}"
                 )
-                if runtime_mount is None or not digest or not host_root:
+                if runtime_mount is None or exchange_mount is None or not digest or not host_root:
                     return 1
                 runtime_root = Path(runtime_mount["Source"])
+                exchange_root = Path(exchange_mount["Source"])
                 state_path = runtime_root / "state.json"
                 if state_path.is_file():
                     lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
@@ -511,12 +736,12 @@ def main(argv: list[str]) -> int:
                 }
                 lifecycle.setdefault("targets", {})[digest] = target
                 state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
-                (runtime_root / "mounts.tsv").write_text(
+                (exchange_root / "mounts.tsv").write_text(
                     f"target\t{digest}\t{host_root}\t/targets/{digest}\tread-only\n",
                     encoding="utf-8",
                 )
-                (runtime_root / "mounts.toml").write_text(
-                    "[targets.{}]\nroot = \"{}\"\nmode = \"read-only\"\ndigest = \"{}\"\n".format(
+                (exchange_root / "mounts.toml").write_text(
+                    "schema = \"agent-canon.mount-registry.v2\"\n\n[targets.{}]\nroot = \"{}\"\nmode = \"read-only\"\ndigest = \"{}\"\n".format(
                         digest, container_root, digest
                     ),
                     encoding="utf-8",
@@ -549,19 +774,44 @@ def main(argv: list[str]) -> int:
                 if runtime_mount is None or not current_id or not current_ref:
                     return 1
                 runtime_root = Path(runtime_mount["Source"])
-                host_runtime_root = runtime_root.parent
                 private_log = exec_environment.get("AGENT_CANON_PRIVATE_LOG_ROOT", "")
-                plan = runtime_root / "rollback-plan.tsv"
+                source_sync_mount = next(
+                    mount
+                    for mount in found[1]["Mounts"]
+                    if mount["Destination"] == "/var/lib/agent-canon/source-sync.json"
+                )
+                registry_mount = next(
+                    mount
+                    for mount in found[1]["Mounts"]
+                    if mount["Destination"] == "/var/lib/agent-canon/mount-registry.toml"
+                )
+                exchange_mount = next(
+                    (
+                        mount
+                        for mount in found[1]["Mounts"]
+                        if mount["Destination"] == "/var/lib/agent-canon/exchange"
+                    ),
+                    None,
+                )
+                plan = (
+                    Path(exchange_mount["Source"]) / "rollback-plan.tsv"
+                    if exchange_mount is not None
+                    else runtime_root / "rollback-plan.tsv"
+                )
                 plan_lines = [
                     "schema\tagent-canon.rollback-plan.v1",
                     f"image-id\t{current_id}",
                     f"image-ref\t{current_ref}",
                     f"mount\tmount\t{runtime_root}\t/var/lib/agent-canon/runtime\tfalse",
-                    f"mount\tmount\t{host_runtime_root / 'source-sync.json'}\t/var/lib/agent-canon/source-sync.json\ttrue",
+                    f"mount\tmount\t{source_sync_mount['Source']}\t/var/lib/agent-canon/source-sync.json\ttrue",
                     f"mount\tmount\t{private_log}\t/var/lib/agent-canon/private-log\ttrue",
-                    f"mount\tmount\t{runtime_root / 'mounts.toml'}\t/var/lib/agent-canon/mount-registry.toml\ttrue",
+                    f"mount\tmount\t{registry_mount['Source']}\t/var/lib/agent-canon/mount-registry.toml\ttrue",
                 ]
-                mounts_path = runtime_root / "mounts.tsv"
+                mounts_path = (
+                    Path(exchange_mount["Source"]) / "mounts.tsv"
+                    if exchange_mount is not None
+                    else runtime_root / "mounts.tsv"
+                )
                 if mounts_path.is_file():
                     for line in mounts_path.read_text(encoding="utf-8").splitlines():
                         fields = line.split("\t")
@@ -620,7 +870,7 @@ def main(argv: list[str]) -> int:
             target = next(
                 mount
                 for mount in found[1]["Mounts"]
-                if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                if mount["Destination"] == "/var/lib/agent-canon/exchange"
             )
             relative = Path(runtime_arg).relative_to("/var/lib/agent-canon/runtime")
             exchange = Path(target["Source"]) / relative
@@ -686,7 +936,7 @@ def main(argv: list[str]) -> int:
             runtime_mount = next(
                 mount
                 for mount in found[1]["Mounts"]
-                if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                if mount["Destination"] == "/var/lib/agent-canon/exchange"
             )
             runtime_root = Path(runtime_mount["Source"])
             for child in runtime_root.iterdir():

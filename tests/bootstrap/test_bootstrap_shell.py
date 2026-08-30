@@ -498,6 +498,13 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
 
     installed = run("install")
     assert installed.returncode == 0, installed.stderr
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume = docker_state["volumes"][f"agent-canon-runtime-{control_digest}"]
+    assert volume["UID"] == os.getuid()
+    assert volume["GID"] == os.getgid()
+    assert volume["Mode"] == "0700"
+    assert volume["ResidentWriteReadback"] is True
     target = tmp_path / "target"
     target.mkdir()
     added = subprocess.run(
