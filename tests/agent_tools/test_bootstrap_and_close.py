@@ -2241,141 +2241,106 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("agent type selection for implementer must be one of", result.stdout)
             self.assertFalse((report_root / "test-invalid-selection").exists())
 
-    def test_bootstrap_plain_fix_waits_for_typed_route(self) -> None:
-        """Plain fix prompts defer child activation until a typed route is selected."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            seed_workspace_config(workspace_root)
-            report_root.mkdir(parents=True, exist_ok=True)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "Fix the failing tests in the repository.",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "test-plain-fix-route-parity",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--skip-agent-canon-preflight",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+    def test_bootstrap_activation_policy_cases(self) -> None:
+        """Bootstrap preserves route activation boundaries across equivalent prompt cases."""
+        cases = (
+            (
+                "plain-fix",
+                "Fix the failing tests in the repository.",
+                "test-plain-fix-route-parity",
+                (
+                    "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow",
+                    "ACTIVE_SKILLS=$agent-orchestration",
+                    "DEFERRED_SKILLS=$codex-task-workflow",
+                ),
+                (),
+                False,
+            ),
+            (
+                "plain-refactor",
+                "Refactor the repository routing helpers.",
+                "test-plain-refactor-route-parity",
+                (
+                    "SUGGESTED_SKILLS=",
+                    "ACTIVE_SKILLS=",
+                    "$agent-orchestration",
+                    "$task-routing",
+                    "$refactor-loop",
+                    "$structure-refactor",
+                    "DEFERRED_SKILLS=$codex-task-workflow",
+                ),
+                (),
+                False,
+            ),
+            (
+                "review-only",
+                "Use subagents for review only; do not edit files.",
+                "test-review-only-no-edit",
+                (
+                    "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap",
+                    "ACTIVE_SKILLS=$agent-orchestration",
+                    "DEFERRED_SKILLS=$codex-task-workflow,$subagent-bootstrap",
+                ),
+                (
+                    "PARENT_REPO_EDITS_ALLOWED=no",
+                    "IMPLEMENTATION_HANDOFF_REQUIRED=yes",
+                ),
+                True,
+            ),
+        )
+        for name, task, run_id, expected, forbidden, check_review_policy in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory(
+                dir=TEST_TEMP_ROOT
+            ) as tmp_dir:
+                workspace_root = Path(tmp_dir) / "workspace"
+                report_root = Path(tmp_dir) / "reports"
+                workspace_root.mkdir(parents=True, exist_ok=True)
+                seed_workspace_config(workspace_root)
+                report_root.mkdir(parents=True, exist_ok=True)
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(BOOTSTRAP_SCRIPT),
+                        "--task",
+                        task,
+                        "--owner",
+                        "codex",
+                        "--run-id",
+                        run_id,
+                        "--workspace-root",
+                        str(workspace_root),
+                        "--report-root",
+                        str(report_root),
+                        "--skip-agent-canon-preflight",
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow",
-                result.stdout,
-            )
-            self.assertIn(
-                "ACTIVE_SKILLS=$agent-orchestration",
-                result.stdout,
-            )
-            self.assertIn("DEFERRED_SKILLS=$codex-task-workflow", result.stdout)
-            self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
-
-    def test_bootstrap_plain_refactor_waits_for_typed_route(self) -> None:
-        """Plain refactor prompts defer child activation until a typed route is selected."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            seed_workspace_config(workspace_root)
-            report_root.mkdir(parents=True, exist_ok=True)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "Refactor the repository routing helpers.",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "test-plain-refactor-route-parity",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--skip-agent-canon-preflight",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("SUGGESTED_SKILLS=", result.stdout)
-            self.assertIn("ACTIVE_SKILLS=", result.stdout)
-            for skill in (
-                "$agent-orchestration",
-                "$task-routing",
-                "$refactor-loop",
-                "$structure-refactor",
-            ):
-                self.assertIn(skill, result.stdout)
-            self.assertIn("DEFERRED_SKILLS=$codex-task-workflow", result.stdout)
-            self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
-
-    def test_bootstrap_review_only_does_not_activate_subagent_bootstrap(self) -> None:
-        """Review-only do-not-edit prompts should not emit implementation handoff."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            seed_workspace_config(workspace_root)
-            report_root.mkdir(parents=True, exist_ok=True)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "Use subagents for review only; do not edit files.",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "test-review-only-no-edit",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--skip-agent-canon-preflight",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap",
-                result.stdout,
-            )
-            self.assertIn("ACTIVE_SKILLS=$agent-orchestration", result.stdout)
-            self.assertIn(
-                "DEFERRED_SKILLS=$codex-task-workflow,$subagent-bootstrap",
-                result.stdout,
-            )
-            self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
-            self.assertNotIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
-            manifest_text = (
-                report_root / "test-review-only-no-edit" / "team_manifest.yaml"
-            ).read_text(encoding="utf-8")
-            manifest = yaml.safe_load(manifest_text)
-            contract_policy = manifest["run"]["contract_complete_implementation_policy"]
-            self.assertNotIn("implementation_handoff_required", contract_policy)
-            self.assertNotIn("parent_repo_edits_allowed", contract_policy)
-            self.assertNotIn("parent_orchestration_only", contract_policy)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                for marker in expected:
+                    self.assertIn(marker, result.stdout)
+                for marker in forbidden:
+                    self.assertNotIn(marker, result.stdout)
+                self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
+                if not check_review_policy:
+                    continue
+                manifest = yaml.safe_load(
+                    (report_root / run_id / "team_manifest.yaml").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                contract_policy = manifest["run"][
+                    "contract_complete_implementation_policy"
+                ]
+                for key in (
+                    "implementation_handoff_required",
+                    "parent_repo_edits_allowed",
+                    "parent_orchestration_only",
+                ):
+                    self.assertNotIn(key, contract_policy)
 
     def test_academic_route_uses_current_bounded_dynamic_waves(self) -> None:
         """Academic routing follows the current bounded designer/worker sequence."""
