@@ -22,6 +22,17 @@ class HistoricalSkillUsageReaderTest(unittest.TestCase):
             path.write_text('{"skills":["task-routing"]}\n', encoding="utf-8")
             self.assertEqual(len(read_skill_usage_history(path).records), 1)
 
+    def test_reports_malformed_history(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "skill_usage.jsonl"
+            path.write_text("not-json\n", encoding="utf-8")
+
+            readback = read_skill_usage_history(path)
+
+            self.assertEqual(readback.malformed_count, 1)
+            self.assertEqual(readback.malformed_by_reason, {"json": 1})
+            self.assertEqual(readback.status, "malformed")
+
 
 if __name__ == "__main__":
     unittest.main()
