@@ -705,6 +705,153 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(tmp_path: Path
     assert volume_state.read_text(encoding="utf-8") == '{"legacy":true}\n'
 
 
+def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> None:
+    """A marked volume is adopted without comparing evolved host legacy state."""
+    legacy = tmp_path / "legacy-state"
+    (legacy / "receipts").mkdir(parents=True)
+    (legacy / "receipts" / "old.json").write_text("host-only\n", encoding="utf-8")
+    (legacy / "spool").mkdir()
+    (legacy / "spool" / "host-only").write_text("preserve\n", encoding="utf-8")
+    control = tmp_path / "control"
+    control.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    (volume_root / "runtime" / "receipts").mkdir(parents=True)
+    (volume_root / "runtime" / "receipts" / "current.json").write_text(
+        "volume-owned\n", encoding="utf-8"
+    )
+    for directory in (
+        "runtime/generations",
+        "runtime/tasks",
+        "exchange",
+        "spool",
+        "archive",
+        "cache",
+        "codex-home",
+        "private-log",
+    ):
+        (volume_root / directory).mkdir(parents=True)
+    (volume_root / ".agent-canon-controller-volume-v1").write_text(
+        f"agent-canon-controller-volume/v1\n{control_digest}\n", encoding="utf-8"
+    )
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": control_digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+                f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert (volume_root / "runtime" / "receipts" / "current.json").read_text(
+        encoding="utf-8"
+    ) == "volume-owned\n"
+    assert (legacy / "spool" / "host-only").read_text(encoding="utf-8") == "preserve\n"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["volumes"][volume_name]["Mode"] == "0700"
+    assert state["volumes"][volume_name]["UID"] == os.getuid()
+    assert state["volumes"][volume_name]["GID"] == os.getgid()
+
+
+def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path) -> None:
+    """Initializer failure aborts target replacement and restores the prior resident."""
+    home = tmp_path / "home"
+    control = tmp_path / "control"
+    repository = tmp_path / "agent-canon"
+    home.mkdir()
+    control.mkdir()
+    subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
+        check=True,
+    )
+    state_path = tmp_path / "docker-state.json"
+    fake_docker = ROOT / "tests/bootstrap/fake_docker.py"
+    environment = {
+        **os.environ,
+        "HOME": str(home),
+        "AGENT_CANON_DOCKER": str(fake_docker),
+        "FAKE_DOCKER_STATE": str(state_path),
+        "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+    }
+    common = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(control),
+    ]
+    installed = subprocess.run(
+        [*common, "install"], check=False, capture_output=True, text=True, env=environment
+    )
+    assert installed.returncode == 0, installed.stderr
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    container_name = f"agent-canon-tools-{control_digest[:16]}"
+    old_container = state["containers"][container_name]
+    old_image = old_container["Config"]["Image"]
+    old_mounts = list(old_container["Mounts"])
+    target = tmp_path / "target"
+    target.mkdir()
+    failed_environment = {**environment, "FAKE_DOCKER_FAIL_STATE_VOLUME_INIT_ONCE": "1"}
+    failed = subprocess.run(
+        [*common, "target", "add", "--root", str(target), "--mode", "read-only"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=failed_environment,
+    )
+    assert failed.returncode == 2
+    assert '"code":"state_volume_init_failed"' in failed.stderr
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    restored = state["containers"][container_name]
+    assert restored["Config"]["Image"] == old_image
+    assert restored["Mounts"] == old_mounts
+    assert (repository / ".runtime" / "container-state" / "mounts.tsv").read_text(
+        encoding="utf-8"
+    ) == ""
+
+
 def test_volume_input_imports_use_exact_runtime_paths(tmp_path: Path) -> None:
     """Source-sync and registry imports land at their canonical volume paths."""
     control = tmp_path / "control"

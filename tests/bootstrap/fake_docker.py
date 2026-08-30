@@ -750,7 +750,6 @@ def main(argv: list[str]) -> int:
         backing = volume_path(volume_name)
         backing.mkdir(parents=True, exist_ok=True)
         runtime_backing = backing / "runtime"
-        runtime_backing.mkdir(parents=True, exist_ok=True)
         legacy = Path(legacy_source) if legacy_source else None
         marker = backing / ".agent-canon-controller-volume-v1"
         digest = next(
@@ -761,6 +760,12 @@ def main(argv: list[str]) -> int:
             ),
             "",
         )
+        if os.environ.get("FAKE_DOCKER_FAIL_STATE_VOLUME_INIT_ONCE") == "1" and not state.get(
+            "_state_volume_init_failed_once"
+        ):
+            state["_state_volume_init_failed_once"] = True
+            save(state)
+            return 1
 
         def same_tree(source: Path, destination: Path) -> bool:
             source_files = sorted(
@@ -796,9 +801,13 @@ def main(argv: list[str]) -> int:
             shutil.copytree(source, destination)
             return True
 
-        if marker.is_symlink() or (marker.exists() and marker.read_text(encoding="utf-8") != f"agent-canon-controller-volume/v1\n{digest}\n"):
+        marked = marker.exists()
+        if marker.is_symlink() or (marked and marker.read_text(encoding="utf-8") != f"agent-canon-controller-volume/v1\n{digest}\n"):
             return 1
-        if not marker.exists() and legacy is not None and legacy.is_dir():
+        if not marked and any(backing.iterdir()):
+            return 1
+        if not marked and legacy is not None and legacy.is_dir():
+            runtime_backing.mkdir(parents=True, exist_ok=True)
             for name in ("state.json", "owner.json"):
                 source = legacy / name
                 if source.exists() and (not source.is_file() or source.is_symlink() or not migrate_file(source, runtime_backing / name)):
@@ -816,7 +825,7 @@ def main(argv: list[str]) -> int:
             marker.write_text(f"agent-canon-controller-volume/v1\n{digest}\n", encoding="utf-8")
         if marker.read_text(encoding="utf-8") != f"agent-canon-controller-volume/v1\n{digest}\n":
             return 1
-        if legacy is not None and legacy.is_dir():
+        if not marked and legacy is not None and legacy.is_dir():
             for name in ("state.json", "owner.json"):
                 source = legacy / name
                 if source.exists() and (not (runtime_backing / name).is_file() or source.read_bytes() != (runtime_backing / name).read_bytes()):
@@ -829,6 +838,22 @@ def main(argv: list[str]) -> int:
                 source = legacy / name
                 if source.exists() and (not (backing / name).is_dir() or not same_tree(source, backing / name)):
                     return 1
+        required_dirs = [
+            runtime_backing,
+            runtime_backing / "receipts",
+            runtime_backing / "generations",
+            runtime_backing / "tasks",
+            backing / "exchange",
+            backing / "spool",
+            backing / "archive",
+            backing / "cache",
+            backing / "codex-home",
+            backing / "private-log",
+        ]
+        for directory in required_dirs:
+            if marked and (not directory.is_dir() or directory.is_symlink()):
+                return 1
+            directory.mkdir(parents=True, exist_ok=True)
         state["volumes"][volume_name]["UID"] = int(next(item.split("=", 1)[1] for item in argv if item.startswith("AGENT_CANON_VOLUME_UID=")))
         state["volumes"][volume_name]["GID"] = int(next(item.split("=", 1)[1] for item in argv if item.startswith("AGENT_CANON_VOLUME_GID=")))
         state["volumes"][volume_name]["Mode"] = "0700"

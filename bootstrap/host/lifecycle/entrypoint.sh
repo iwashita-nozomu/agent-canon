@@ -889,12 +889,14 @@ _agent_canon_init_state_volume() {
       "$volume" >/dev/null; then
       _agent_canon_json_error state_volume_create_failed \
         "controller state volume could not be created"
+      return 2
     fi
   fi
   if ! volume_id=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
     --format '{{.Name}}' "$volume" 2>/dev/null); then
     _agent_canon_json_error state_volume_readback_failed \
       "controller state volume could not be inspected"
+    return 2
   fi
   label_runtime=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
     --format '{{index .Labels "io.agent-canon.runtime"}}' "$volume" 2>/dev/null || true)
@@ -907,6 +909,9 @@ _agent_canon_init_state_volume() {
      "$label_state" == controller-v1 ]] ||
     _agent_canon_json_error state_volume_ownership_mismatch \
       "controller state volume has unexpected identity or owner"
+  [[ "$volume_id" == "$volume" && "$label_runtime" == shared-v1 &&
+     "$label_control" == "$(_agent_canon_control_digest)" &&
+     "$label_state" == controller-v1 ]] || return 2
 
   caller_uid=$(id -u)
   caller_gid=$(id -g)
@@ -954,13 +959,17 @@ copy_directory() {
     cp -a "$source" "$destination"
   fi
 }
-mkdir -p "$root" "$runtime"
+marked=0
+[ -d "$root" ] && [ ! -L "$root" ] || exit 47
 if [ -e "$marker" ] || [ -L "$marker" ]; then
   [ -f "$marker" ] && [ ! -L "$marker" ] || exit 47
+  marked=1
 else
+  [ -z "$(find "$root" -mindepth 1 -maxdepth 1 -print -quit)" ] || exit 48
+  mkdir -p "$runtime"
   for file in state.json owner.json; do
     if [ -e "$legacy/$file" ] || [ -L "$legacy/$file" ]; then
-      [ -f "$legacy/$file" ] && [ ! -L "$legacy/$file" ] || exit 48
+      [ -f "$legacy/$file" ] && [ ! -L "$legacy/$file" ] || exit 49
       copy_file "$legacy/$file" "$runtime/$file"
     fi
   done
@@ -980,35 +989,59 @@ else
 fi
 marker_tmp="$root/.agent-canon-marker-check.$$"
 printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" > "$marker_tmp"
-cmp -s "$marker" "$marker_tmp" || exit 49
+cmp -s "$marker" "$marker_tmp" || exit 50
 rm -f "$marker_tmp"
-for file in state.json owner.json; do
-  if [ -e "$legacy/$file" ] || [ -L "$legacy/$file" ]; then
-    [ -f "$legacy/$file" ] && [ -f "$runtime/$file" ] && [ ! -L "$legacy/$file" ] && [ ! -L "$runtime/$file" ] || exit 50
-    cmp -s "$legacy/$file" "$runtime/$file" || exit 51
+if [ "$marked" = 0 ]; then
+  for file in state.json owner.json; do
+    if [ -e "$legacy/$file" ] || [ -L "$legacy/$file" ]; then
+      [ -f "$legacy/$file" ] && [ -f "$runtime/$file" ] && [ ! -L "$legacy/$file" ] && [ ! -L "$runtime/$file" ] || exit 51
+      cmp -s "$legacy/$file" "$runtime/$file" || exit 52
+    fi
+  done
+  for directory in receipts generations tasks; do
+    if [ -e "$legacy/$directory" ] || [ -L "$legacy/$directory" ]; then
+      [ -d "$legacy/$directory" ] && [ -d "$runtime/$directory" ] || exit 53
+      [ -z "$(find "$legacy/$directory" -type l -print -quit)" ] || exit 54
+      diff -qr "$legacy/$directory" "$runtime/$directory" >/dev/null || exit 55
+    fi
+  done
+  for directory in spool archive cache codex-home; do
+    if [ -e "$legacy/$directory" ] || [ -L "$legacy/$directory" ]; then
+      [ -d "$legacy/$directory" ] && [ -d "$root/$directory" ] || exit 56
+      [ -z "$(find "$legacy/$directory" -type l -print -quit)" ] || exit 57
+      diff -qr "$legacy/$directory" "$root/$directory" >/dev/null || exit 58
+    fi
+  done
+fi
+for directory in "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$root/exchange" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home" "$root/private-log"; do
+  if [ "$marked" = 0 ]; then
+    mkdir -p "$directory"
+  else
+    [ -d "$directory" ] && [ ! -L "$directory" ] || exit 59
   fi
-done
-for directory in receipts generations tasks; do
-  if [ -e "$legacy/$directory" ] || [ -L "$legacy/$directory" ]; then
-    [ -d "$legacy/$directory" ] && [ -d "$runtime/$directory" ] || exit 52
-    [ -z "$(find "$legacy/$directory" -type l -print -quit)" ] || exit 53
-    diff -qr "$legacy/$directory" "$runtime/$directory" >/dev/null || exit 54
-  fi
-done
-for directory in "$root" "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$root/exchange" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home" "$root/private-log"; do
-  mkdir -p "$directory"
 done
 chown -R "$uid_value:$gid_value" "$root"
 find "$root" -type d -exec chmod 700 {} +
 chmod 600 "$marker"
 chown "$uid_value:$gid_value" "$marker"
+for directory in "$root" "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$root/exchange" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home" "$root/private-log"; do
+  [ "$(stat -c "%a:%u:%g" "$directory")" = "700:$uid_value:$gid_value" ] || exit 60
+done
+[ "$(stat -c "%a:%u:%g" "$marker")" = "600:$uid_value:$gid_value" ] || exit 61
+write_probe="$root/.agent-canon-volume-write.$$"
+printf "write\n" > "$write_probe"
+[ "$(cat "$write_probe")" = "write" ] || exit 62
+rm -f "$write_probe"
 printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ); then
     _agent_canon_json_error state_volume_init_failed \
       "controller state volume could not be initialized"
+    return 2
   fi
-  [[ "$init_readback" == $'marker\t'"$(_agent_canon_control_digest)"$'\ncontent\tok' ]] ||
+  if [[ "$init_readback" != $'marker\t'"$(_agent_canon_control_digest)"$'\ncontent\tok' ]]; then
     _agent_canon_json_error state_volume_readback_failed \
       "controller state volume marker or migrated content readback failed"
+    return 2
+  fi
   _agent_canon_drop_legacy_controller_state
 }
 
@@ -2305,8 +2338,18 @@ _agent_canon_ensure_container() {
   else
     local caller_user
     caller_user=$(_agent_canon_caller_user)
-    _agent_canon_init_state_volume
-    _agent_canon_import_host_inputs
+    if _agent_canon_init_state_volume; then
+      :
+    else
+      local state_volume_rc=$?
+      return "$state_volume_rc"
+    fi
+    if _agent_canon_import_host_inputs; then
+      :
+    else
+      local host_input_rc=$?
+      return "$host_input_rc"
+    fi
     if ! "$AGENT_CANON_DOCKER_CMD" create \
       --name "$container" \
       --user "$caller_user" \
@@ -2439,25 +2482,29 @@ _agent_canon_restore_candidate_failure() {
   export AGENT_CANON_RESTORE_IMAGE_ID
   restore_output=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stdout.XXXXXX")
   restore_error=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stderr.XXXXXX")
-  if _agent_canon_container_exec "$container" \
-    python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
-    --container-control \
-    --repository-root /usr/local/share/agent-canon/runtime \
-    --control-parent-root /var/lib/agent-canon \
-    --runtime-root /var/lib/agent-canon/runtime \
-    restore >"$restore_output" 2>"$restore_error"; then
-    :
-  else
-    restore_rc=$?
-    recovery_errors+=("state_restore_exit=$restore_rc")
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
+    if _agent_canon_container_exec "$container" \
+      python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
+      --container-control \
+      --repository-root /usr/local/share/agent-canon/runtime \
+      --control-parent-root /var/lib/agent-canon \
+      --runtime-root /var/lib/agent-canon/runtime \
+      restore >"$restore_output" 2>"$restore_error"; then
+      :
+    else
+      restore_rc=$?
+      recovery_errors+=("state_restore_exit=$restore_rc")
+    fi
   fi
   rm -f -- "$restore_output" "$restore_error"
   unset AGENT_CANON_RESTORE_IMAGE_ID
-  if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$container" >/dev/null 2>&1; then
-    recovery_errors+=("candidate_stop_failed")
-  fi
-  if ! "$AGENT_CANON_DOCKER_CMD" rm "$container" >/dev/null 2>&1; then
-    recovery_errors+=("candidate_remove_failed")
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
+    if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$container" >/dev/null 2>&1; then
+      recovery_errors+=("candidate_stop_failed")
+    fi
+    if ! "$AGENT_CANON_DOCKER_CMD" rm "$container" >/dev/null 2>&1; then
+      recovery_errors+=("candidate_remove_failed")
+    fi
   fi
   AGENT_CANON_IMAGE_REF=$old_image_ref
   AGENT_CANON_EXPECTED_IMAGE_ID=$old_image_id
@@ -4206,7 +4253,26 @@ bootstrap_host_entrypoint() {
         "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$target_container" >/dev/null
         "$AGENT_CANON_DOCKER_CMD" rm "$target_container" >/dev/null
       fi
-      target_candidate=$(_agent_canon_ensure_container)
+      if target_candidate=$(_agent_canon_ensure_container); then
+        :
+      else
+        target_rc=$?
+        unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
+        if [[ -n "$target_current_image_id" ]]; then
+          AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=$target_current_image
+          export AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF
+          if ! _agent_canon_restore_candidate_failure "$target_container" \
+            "$target_current_image_id" "$target_current_image_id"; then
+            _agent_canon_json_error rollback_failed \
+              "target mount replacement recovery was incomplete"
+            return 2
+          fi
+          unset AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF
+        fi
+        unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT
+        unset AGENT_CANON_TARGET_DIGEST
+        return "$target_rc"
+      fi
       command_args=("target" "$target_action" --root "$target_container_root" --mode read-only)
       AGENT_CANON_TARGET_HOST_ROOT=$target_host_root
       AGENT_CANON_TARGET_CONTAINER_ROOT=$target_container_root
