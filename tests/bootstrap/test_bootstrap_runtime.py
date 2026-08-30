@@ -19,6 +19,7 @@ from tools.runtime.container.bootstrap_runtime import (  # noqa: E402
     BootstrapError,
     BootstrapRuntime,
     DockerAdapter,
+    RuntimePaths,
     _container_source_identity,
     _container_request_environment,
     build_parser,
@@ -233,6 +234,45 @@ def test_explicit_roots_reject_escape_and_symlink_without_rootless_policy(
     link.symlink_to(outside, target_is_directory=True)
     with pytest.raises(BootstrapError, match="symlink_path_rejected"):
         validate_roots(control, link / "runtime")
+
+
+def test_runtime_paths_preserve_host_roots_and_fixed_container_destinations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resolve runtime-local host paths and resident fixed destinations without Docker."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    paths = RuntimePaths(control, runtime_root)
+
+    monkeypatch.delenv("AGENT_CANON_CONTAINER_CONTROL", raising=False)
+    assert paths.mounts == runtime_root / "mounts.toml"
+    assert paths.source_sync == runtime_root / "source-sync.json"
+    assert paths.codex_home == runtime_root / "codex-home"
+    assert paths.spool == runtime_root / "spool"
+    assert paths.archive == runtime_root / "archive"
+    assert paths.cache == runtime_root / "cache"
+    assert paths.container_runtime == runtime_root / "container-runtime"
+
+    exchange = tmp_path / "exchange"
+    host_surfaces = {
+        "CODEX_HOME": tmp_path / "codex-home",
+        "SPOOL": tmp_path / "spool",
+        "ARCHIVE": tmp_path / "archive",
+        "CACHE": tmp_path / "cache",
+    }
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(exchange))
+    for name, path in host_surfaces.items():
+        monkeypatch.setenv(f"AGENT_CANON_HOST_{name}_ROOT", str(path))
+
+    assert paths.mounts == Path(bootstrap_runtime_module.REGISTRY_DESTINATION)
+    assert paths.source_sync == Path(bootstrap_runtime_module.SOURCE_SYNC_DESTINATION)
+    assert paths.codex_home == host_surfaces["CODEX_HOME"]
+    assert paths.spool == host_surfaces["SPOOL"]
+    assert paths.archive == host_surfaces["ARCHIVE"]
+    assert paths.cache == host_surfaces["CACHE"]
+    assert paths.container_runtime == exchange
+    assert BootstrapRuntime._container_control() is True
 
 
 def test_default_source_runtime_rebuilds_without_copying_legacy_state(
