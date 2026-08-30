@@ -37,30 +37,15 @@ upstream implementation ../../tools/validation/ci/runners/run_standalone_static_
 - deeper review や追加 validation が必要か判断できる
 - full-confidence check の前後で caller checkout の tracked working tree と index が変化していない
 
-## Check Selection
+## Selection
 
-- agent runtime、skill、mirror を触ったら `make agent-checks` を先に実行します。
-- code / docs 変更では、まず `make ci-quick` を基礎 gate にします。
-- Python / C++ 実装変更では `python3 tools/validation/semantic/code/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を追加します。
-- Markdown 中心の変更では `tools/bin/agent-canon docs check` を追加します。
-- Docker / runtime / dependency 変更では `make docker-build-check` を追加します。
-- 失敗が出た場合は、追加コマンドを増やす前に、どの gate が不足しているかを明示します。
+`documents/runtime/runtime-profiles-and-check-matrix.md` を読み、変更した
+責務に対応する profile と、その profile が要求する route だけを選びます。
+この入口は command list や default sequence を再定義しません。選択した
+route の結果（pass / fail / 未実行）と追加調査の要否だけを記録します。
 
-## Default Sequence
-
-1. 変更対象を見て、code、docs、runtime、agent のどこを触ったかを固定します。
-1. 最低限必要な gate を選び、`make agent-checks`、`make ci-quick`、`tools/bin/agent-canon docs check`、`make docker-build-check` から組み合わせます。
-1. 速い gate を先に実行し、失敗したらその時点で原因を切り分けます。
-1. full-confidence が必要な場合は、下記の shared runtime/read-only target routeを使います。
-1. 追加の深い検証が必要なら `static-validation` へ進みます。
-1. closeout では、通ったもの、失敗したもの、まだ回していないものを分けて残します。
-
-## Default Commands
-
-- `make agent-checks`
-- `make ci-quick`
-- `tools/bin/agent-canon docs check`
-- `make docker-build-check`
+full-confidence が必要な場合だけ、下記の shared runtime/read-only target
+route に進みます。
 
 ## Read-only Full Confidence
 
@@ -92,7 +77,8 @@ COMMON=(
 
 ## Boundary
 
-- この repo では `static-validation` が基礎 gate の正本です。
+- profile activation は runtime profile/check matrix が正本です。
+- `static-validation` は選択結果の意味を説明する入口であり、別の default gate を追加しません。
 - `run_all_checks.sh` は read-only target内で再利用する既存 check bodyです。Host checkoutからの direct full-confidence routeは使用しません。
 - GitHub metadata、receipt publication、control-parent transactionを持つ `check_agent_canon_pr.sh` の移行は別責務です。
 - 深い diff review は `change-review` または `code-review` を使います。
