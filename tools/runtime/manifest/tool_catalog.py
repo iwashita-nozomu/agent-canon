@@ -446,11 +446,11 @@ def check_tool_docs_manifest(
 ) -> list[Finding]:
     """Validate same-named one-to-one tool documentation entries."""
     doc_entries, findings = load_tool_docs(root)
-    catalog_by_id = {
-        entry.get("id"): entry
-        for entry in catalog_entries
-        if isinstance(entry.get("id"), str)
-    }
+    catalog_by_id: dict[str, Mapping[str, object]] = {}
+    for entry in catalog_entries:
+        entry_id = entry.get("id")
+        if isinstance(entry_id, str):
+            catalog_by_id[entry_id] = entry
     seen_tools: set[str] = set()
     seen_docs: set[str] = set()
     documented_public_ids: set[str] = set()
@@ -492,12 +492,12 @@ def check_tool_docs_manifest(
         if doc not in docs:
             findings.append(Finding("tool_docs", tool, f"catalog-doc-missing:{doc}"))
 
-    catalog_public_ids = {
+    catalog_public_ids: set[str] = {
         entry_id
         for entry_id, entry in catalog_by_id.items()
         if entry.get("public") is True
     }
-    catalog_ids = set(catalog_by_id)
+    catalog_ids: set[str] = set(catalog_by_id)
     for entry_id in sorted(documented_public_ids - catalog_public_ids):
         detail = (
             f"missing-catalog-entry:{entry_id}:{documented_public_tools[entry_id]}"
@@ -505,7 +505,11 @@ def check_tool_docs_manifest(
             else f"missing-public-mark:{entry_id}:{documented_public_tools[entry_id]}"
         )
         findings.append(Finding("public_tools", TOOL_DOCS_PATH, detail))
-    documented_ids = {entry.get("id") for entry in doc_entries if isinstance(entry.get("id"), str)}
+    documented_ids: set[str] = set()
+    for entry in doc_entries:
+        entry_id = entry.get("id")
+        if isinstance(entry_id, str):
+            documented_ids.add(entry_id)
     for entry_id in sorted(catalog_public_ids - documented_public_ids):
         detail = (
             f"missing-public-documentation:{entry_id}:{entry_path(catalog_by_id[entry_id])}"
