@@ -382,6 +382,53 @@ def current_changed_markdown_paths(workspace: Path = PROJECT_ROOT) -> tuple[str,
     return tuple(sorted(paths))
 
 
+def initialize_clean_workspace(workspace: Path) -> None:
+    """Create a clean Git checkout for no-change task-close fixtures."""
+    workspace.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "init", "-q"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Task Close Test",
+            "-c",
+            "user.email=task-close@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "init",
+        ],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def mark_diff_check_not_applicable(report_dir: Path) -> None:
+    """Mark an existing fixture as an explicitly unselected diff-check route."""
+    closeout_path = report_dir / "closeout_gate.md"
+    replacements = {
+        "- required_reviews_complete: yes": "- required_reviews_complete: not_applicable",
+        "- diff_check_agent_complete: yes": "- diff_check_agent_complete: not_applicable",
+        "- diff_check_agent_role: reviewer": "- diff_check_agent_role: not_applicable",
+        "- diff_check_agent_decision: approve": "- diff_check_agent_decision: not_applicable",
+        "- diff_check_artifact: diff_check_review.md": "- diff_check_artifact: not_applicable",
+    }
+    lines = []
+    for line in closeout_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("- diff_check_latest_diff_ref: "):
+            line = "- diff_check_latest_diff_ref: not_applicable"
+        lines.append(replacements.get(line, line))
+    closeout_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def ready_closeout_evidence_lines(
     diff_ref: str | None = None, workspace: Path = PROJECT_ROOT
 ) -> list[str]:
@@ -3745,6 +3792,73 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("CLOSEOUT_READY=no", result.stdout)
                     self.assertIn(expected_blocker, result.stdout)
+
+    def test_task_close_accepts_unselected_diff_check_on_clean_no_change_workspace(self) -> None:
+        """An unselected diff-check is valid only for a clean no-change checkout."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            root = Path(tmp_dir)
+            workspace_root = root / "workspace"
+            initialize_clean_workspace(workspace_root)
+            report_dir = root / "reports" / "test-task-close-no-change"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, "test-task-close-no-change", workspace_root)
+            mark_diff_check_not_applicable(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=workspace_root,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_PARENT_ROOT": str(workspace_root),
+                    "AGENT_CANON_RUNTIME_ROOT": str(TEST_TEMP_ROOT),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+            self.assertIn("DIFF_CHECK_AGENT_COMPLETE=not_applicable", result.stdout)
+
+    def test_task_close_rejects_unselected_diff_check_on_dirty_workspace(self) -> None:
+        """A dirty checkout cannot use an unselected diff-check closeout."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            root = Path(tmp_dir)
+            workspace_root = root / "workspace"
+            initialize_clean_workspace(workspace_root)
+            (workspace_root / "changed.txt").write_text("changed\n", encoding="utf-8")
+            report_dir = root / "reports" / "test-task-close-dirty-no-change"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, "test-task-close-dirty-no-change", workspace_root)
+            mark_diff_check_not_applicable(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=workspace_root,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_PARENT_ROOT": str(workspace_root),
+                    "AGENT_CANON_RUNTIME_ROOT": str(TEST_TEMP_ROOT),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("diff_check_not_applicable_route", result.stdout)
 
     def test_task_close_rejects_incomplete_review_convergence_evidence(self) -> None:
         """task_close should fail when review convergence structured evidence is incomplete."""

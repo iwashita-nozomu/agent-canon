@@ -55,10 +55,9 @@ MINIMAL_HANDOFF_KEYS = (
     "fixed_source_packet",
     "acceptance_identity",
 )
-DECISION_PATTERN = re.compile(r"\b(APPROVE|REVISE|ESCALATE)\b", re.IGNORECASE)
 DECISION_LINE_PATTERN = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?(?:decision|review_decision)\s*[:=]\s*"
-    r"(APPROVE|ACCEPT|REVISE|CHANGES-REQUIRED|ESCALATE)\s*$"
+    r"([A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*)*)\s*$"
 )
 TERMINAL_RUNTIME_STATUSES = frozenset({"completed", "errored", "shutdown"})
 ALLOWED_REVIEW_ROLES = {
@@ -87,7 +86,6 @@ DECISION_ALIASES = {
     "ACCEPT": "APPROVE",
     "CHANGES-REQUIRED": "REVISE",
 }
-REVIEW_OUTCOMES = frozenset({"accept", "changes-required"})
 
 
 def normalize_finding_status(value: object) -> str:
@@ -907,20 +905,24 @@ def record_current_review_decision(
     text = absolute_artifact.read_text(encoding="utf-8")
     finding_rows = parse_finding_rows(text)
     derived_outcome = derive_review_outcome(finding_rows) if finding_rows else None
-    decisions = DECISION_LINE_PATTERN.findall(text)
+    decisions = tuple(
+        canonicalize_review_decision(decision)
+        for decision in DECISION_LINE_PATTERN.findall(text)
+    )
     if derived_outcome is None and not decisions:
         raise AutomaticReviewError("automatic_review:decision_missing")
-    if decisions and len({decision.upper() for decision in decisions}) != 1:
+    if decisions and len(set(decisions)) != 1:
         raise AutomaticReviewError("automatic_review:decision_ambiguous")
-    decision = decisions[-1].upper() if decisions else derived_outcome.upper()
-    explicit_escalate_decision = "ESCALATE" in {decision.upper() for decision in decisions}
-    if derived_outcome == "changes-required" and decision in {"APPROVE", "ACCEPT"}:
+    decision = decisions[-1] if decisions else canonicalize_review_decision(
+        derived_outcome
+    )
+    explicit_escalate_decision = "ESCALATE" in decisions
+    if derived_outcome == "changes-required" and decision == "APPROVE":
         raise AutomaticReviewError("automatic_review:approve_with_blocking_finding")
     if derived_outcome == "accept" and decision in {"REVISE", "ESCALATE"}:
         # A reviewer may still explicitly escalate a question.
         if not explicit_escalate_decision:
-            decision = "ACCEPT"
-    decision = canonicalize_review_decision(decision)
+            decision = canonicalize_review_decision("ACCEPT")
     if decision == "APPROVE" and re.search(
         r"(?im)^\s*(?:[-*]|\|)\s*.*\b(?:fail|revise|required_change|blocker)\b",
         _review_text_without_rejected_hypotheses(text),

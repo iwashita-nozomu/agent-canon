@@ -79,5 +79,8 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Decision（判定）
 
-<!-- `accept` is valid when no unresolved finding has status `blocking`; use
-     `changes-required` only when a blocking finding remains. -->
+<!-- Review decision parsing and alias normalization are owned by
+     `tools/agent/orchestration/review_dispatch.py`; this template records its
+     normalized result. A selected owning gate performs a focused rerun after
+     an accepted behavior, owner-boundary, correctness, validation, or
+     publication change. -->

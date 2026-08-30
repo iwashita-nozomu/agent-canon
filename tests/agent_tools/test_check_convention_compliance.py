@@ -196,8 +196,8 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "owner, replaceable unit replaceable unit mechanism validation route unresolved branch "
         "design_issue_blocker implementation shortcut\n"
         "user-facing completion\n"
-        "repo_wide_static_analysis_complete\n"
-        "repo_wide_dependency_tools_complete\n"
+        "[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)\n"
+        "sole terminal readiness predicate\n"
         "run_repo_dependency_review.sh\n"
         "bounded route existing tool targeted validation follow-up context\n"
         "external public API/behavior/schema unchanged scoped_change "
@@ -520,7 +520,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "check_github_workflows.py bootstrap_runtime.py check_runtime_profile_inventory.py\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
-        'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
+        'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
         "python3 tools/validation/ci/checks/check_github_workflows.py\n"
     ),
     "tools/runtime/dispatch/agent-canon/src/docs.rs": "runtime profile inventory\n",
@@ -550,7 +550,8 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "changed_markdown_paths Document Structure Evidence "
         "document_structure_evidence DOCUMENT_STRUCTURE_REQUIRED "
         "document_split_decision DOCUMENT_SPLIT_DECISION_EVIDENCE "
-        "document_split_decision_ready\n"
+        "document_split_decision_ready closeout_checks "
+        "ready = all(closeout_checks.values())\n"
     ),
     "ROOT_AGENTS.md": (
         "Multiple chats or sessions unknown dirty Proven exact task ownership "
@@ -709,7 +710,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
-                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
+                'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py"'
                 ' --root "${WORKSPACE_ROOT}" --format json\n',
                 encoding="utf-8",
             )
@@ -760,6 +761,39 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "forbidden-convention-compliance-suppression",
+                result.stdout,
+            )
+
+    def test_closeout_readiness_accepts_owner_delegation_without_field_markers(self) -> None:
+        """Closeout wiring delegates evidence fields instead of copying them into workflow markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+
+            result = self.run_checker(root)
+
+            self.assertNotIn("workflow_readiness:", result.stdout)
+
+    def test_closeout_readiness_requires_task_close_owner_delegation(self) -> None:
+        """Removing the task-close delegation is a convention finding."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)",
+                    "closeout owner",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "workflow_readiness:agents/canonical/CODEX_WORKFLOW.md:"
+                "missing-owner-delegation:[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)",
                 result.stdout,
             )
 

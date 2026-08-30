@@ -77,6 +77,15 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - repo-wide な棚卸しや canon 整理
   - `change-review` を基底にし、必要なら docs consistency review と research perspective review pack を追加
 
+## Decision ownership and selected reruns
+
+Review decision parsing and alias normalization are owned by
+[`canonicalize_review_decision`](../../tools/agent/orchestration/review_dispatch.py).
+Review artifacts record that normalized result; handback statuses and finding
+dispositions remain separate. Only the selected owning gate reruns after an
+accepted behavior, owner-boundary, correctness, validation, or publication
+change. A no-change or unselected route records its rationale as evidence.
+
 ## 実行チェック
 
 - 軽い検証では `make ci-quick` を使います。
@@ -109,8 +118,8 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. requirements review で、過去ログ由来の user trait が現在の task requirement へ silent に混入していないことを確認します。
 1. requirements review または management review で、導入済みライブラリ棚卸しと既存実装棚卸しを先に行い、何を見たか、何を再利用するか、既存では足りない理由が artifact に残っていることを確認します。
 1. 必要なら research review で外部根拠と既存 code 調査の妥当性を確認します。
-1. plan review で execution order、担当 subagent、rollback point を確認し、decision が `approve` でなければ planner に戻します。
-1. detailed design review で reuse plan、existing-style adherence、design doc completeness を確認し、decision が `approve` でなければ designer に戻します。
+1. plan review で execution order、担当 subagent、rollback point を確認し、normalized decision が承認でなければ planner に戻します。
+1. detailed design review で reuse plan、existing-style adherence、design doc completeness を確認し、normalized decision が承認でなければ designer に戻します。
 1. detailed design review で、`Installed Libraries And Existing Implementation Survey` が dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙していることを確認します。
 1. detailed design review で、新規または rename する identifier、path、CLI flag、config key、public API が design または local precedent で固定され、worker が reusable / user-facing な名前を発明しなくてよいことを確認します。naming plan は対象概念、責務語彙、既存 naming family、採用名、禁止名を含み、`documents/rule/naming.md` と言語別規約に合っている必要があります。
 1. detailed design review で、tree 上の親文書だけを読んで sibling / cross-cutting 文書を見落としていないか、`Cross-Doc Coverage Review` を確認します。
@@ -119,11 +128,11 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. 大規模 refactor では project review で stale path、delete 漏れ、cross-module drift、semantic delta 混入を確認します。
 1. 大規模改修、統合、rename、構成変更では review 中に、旧実装 path、旧 helper 名、旧 guide / workflow / README / 規約文書 path への参照 sweep を行い、reader が削除済み・置換済み surface へ誘導されないことを確認します。残っていれば `fix now` です。
 1. 長文文書では、別 reviewer による docs completeness review で reader が不足なく作業できるか確認します。
-1. document flow review で、上から順に読んだときの section order、用語導入、reader path を確認し、decision が `approve` でなければ designer に戻します。
+1. document flow review で、上から順に読んだときの section order、用語導入、reader path を確認し、normalized decision が承認でなければ designer に戻します。
 1. 学術文章では notation review で、記号、略語、technical term、unit、index、assumption の definition-before-use と一貫性を確認します。
 1. 学術文章では logic-gap review で、claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認します。
-1. 実装中に checkpoint review を入れ、decision が `approve` でない限り implementer に戻します。
-1. review artifact が `revise`、`required_change`、`rejected`、または
+1. 実装中に checkpoint review を入れ、normalized decision が承認でない限り implementer に戻します。
+1. review artifact が修理要求、`required_change`、`rejected`、または
    requested-change review を返した場合、その判定は user request や design intent
    を rollback する権限ではありません。実行 role は、runtime profile taxonomy の
    intent-preservation route、または review-only disposition
@@ -141,15 +150,15 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. checkpoint review と final acceptance review では、task が数式、擬似コード、仕様、protocol を持つ場合、implementation boundary が Boundary Map と一致しているか、どこに近似や逸脱があるかを確認します。run が成功しても alignment が崩れていれば `fix now` です。
 1. checkpoint review と final acceptance review では、文書や prompt の readability / reader flow を tool 結果だけで accept せず、`document_flow_reviewer` や別 reviewer の judgement が artifact に残っていることを確認します。
 1. checkpoint review と final acceptance review では、implementation が設計上の問題を勝手に吸収していないことを確認します。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾が local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで処理されていれば `fix now` です。正しい処理は `design_issue_blocker` と evidence を残して design gate へ戻すことです。
-1. checkpoint review と final acceptance review では、`bash tools/analysis/dependencies/run_repo_dependency_review.sh` を全 repo に対して実行し、missing header、invalid manifest、isolated manifest、self reference、cycle が残っていないことを確認します。`--changed` だけの依存チェックは review evidence として不足です。
-1. checkpoint review 後から closeout までに、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目がある限り closeout へ進みません。
+1. selected final candidate contract が要求する場合だけ `bash tools/analysis/dependencies/run_repo_dependency_review.sh` を全 repo に対して実行します。それ以外は affected dependency evidence と targeted checks を記録します。
+1. checkpoint review 後から closeout までに、planned work、review findings、selected validation、dependency/static evidence、commit / push、shared canon sync、follow-up 判断を列挙し、未完了項目がある限り closeout へ進みません。
 1. checkpoint review と final acceptance review では、`fix now` と
    `follow-up` finding ごとに `issue_route` を記録します。現在の review loop で
    閉じる finding は `run_local_resolution:<evidence>`、durable に残す finding は
    `existing_issue:<owner/repository#number-or-url>`、GitHub で見える triage が必要な
    finding は `github_issue:<owner/repository#number-or-url>` を使います。
-1. final acceptance review 前に read-only diff-check agent が最新 diff を確認し、decision、findings disposition、再実行 evidence を artifact に残します。指摘に応じて修正した場合は loop を先頭へ戻し、最新 diff で再度 diff-check agent を通します。
-1. review artifact が `revise`、`required_change`、または fix-now finding を返し、その指摘に応じて実装・文書・test・workflow を修正した場合は、修正の大小に関係なく required review family 全体を最新 diff に対してやり直します。直前の approve を流用して closeout してはいけません。
+1. selected owning review gate が diff-check を要求する場合だけ read-only diff-check agent が最新 diff を確認し、decision、findings disposition、再実行 evidence を artifact に残します。指摘に応じて修正した場合は selected gate の focused rerun を行います。
+1. review artifact が修理要求または fix-now finding を返し、その指摘に応じて実装・文書・test・workflow を修正した場合は、selected owning gate の最新 diff rerun を行います。直前の decision を流用して closeout してはいけません。
 1. 各 review では artifact に `request_clause_ids` があるか確認し、無い場合は差し戻します。
 1. final acceptance review では、全 must-do / completion-evidence clause が product surface、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応しているか確認します。
 1. final acceptance review では、cross-cutting packet に含まれる文書のうち今回の task に効くものが review から漏れていないか確認します。
@@ -168,8 +177,8 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
    です。この review checklist は slug list を独自定義せず、runtime profile
    taxonomy の owner route に従って approved intent を保った修正または intent
    変更前の escalation を確認します。
-1. review artifact が `revise`、`required_change`、または `fix now` finding を返し、その後に code / docs / workflow / config の修正が入った場合は、その修正量に関わらず full required review set を最初から再実行します。
-1. focused recheck では、少なくとも `change_review.md`、`final_review.md`、task に必要な language / docs / specialist review artifact を最新の fix 後に作り直します。
+1. review artifact が修理要求、`required_change`、または `fix now` finding を返し、その後に code / docs / workflow / config の修正が入った場合は、selected owning gate の focused rerun を行います。
+1. focused recheck では、selected gate が要求する review artifact だけを最新の fix 後に作り直します。
 1. validation 実行後に final acceptance review を行い、必要なら追加修正や追加検証を行います。
 1. audit review で required reviews と evidence の欠落を確認します。
 1. run 固有の review artifact は `reports/agents/<run-id>/` に残します。
@@ -177,9 +186,9 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 
 ## マージ条件
 
-- 必要な review family が完了していること
-- requirements review、計画レビュー、詳細設計レビュー、文書通読レビュー、checkpoint review、final acceptance review、audit review が揃っていること
-- 計画レビュー、詳細設計レビュー、文書通読レビュー、checkpoint review の decision がすべて `approve` であること
+- selected review family が完了していること
+- selected requirements、計画、詳細設計、文書通読、checkpoint、final acceptance、audit review の evidence が揃っていること
+- selected review の normalized decision が承認であること
 - `user_request_contract.md` の全 clause が source bucket を持ち、unknown が silent assumption に変換されていないこと
 - 詳細設計の identifier naming plan が解決済みで、worker に命名裁量を残していないこと
 - 詳細設計に導入済みライブラリ棚卸しと既存実装棚卸しがあり、新規追加が必要な理由が明記されていること
@@ -187,19 +196,14 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - 学術文章では、notation review と logic-gap review も揃っていること
 - 対象に応じた validation 結果が確認されていること
 - runtime success だけでなく、task に式、仕様、protocol、method contract がある場合は alignment evidence が review artifact に残っていること
-- checkpoint review と final acceptance review で、全 repo 対象の dependency review が pass していること
-- review convergence gate と read-only diff-check agent review が最新 diff に対して pass していること
-- review-driven fix が入った場合、最新 diff に対する full review rerun evidence が残っていること
+- selected final candidate contract が要求した dependency review が pass していること
+- selected diff-check route がある場合だけ、その review が最新 diff に対して pass していること
+- review-driven fix が入った場合、selected gate の focused rerun evidence が残っていること
 - 変更理由と影響範囲が追えること
 - コンフリクトがないこと
 - tracked tree に current tree head 以外の implementation truth や古い説明文書が残っていないこと
 - README、guide、workflow、規約文書が最新実装を説明していること
-- `verification.txt` が `status=pass` であること
-- `closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` であること
-- `closeout_gate.md` が `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]` を記録していること
-- `closeout_gate.md` が `focused_recheck_complete=yes` であること
-- `closeout_gate.md` が `review_convergence_complete=yes` かつ `diff_check_agent_complete=yes` であること
-- `user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` であること
+- terminal readiness は [`task_close.py`](../../tools/runtime/lifecycle/task_close.py) の closeout predicate が返すこと
 
 ## エビデンス保存
 
@@ -218,7 +222,7 @@ findings は少なくとも次に分けます。
 
 - `fix now`
   - この変更で直さないと回帰や矛盾が残るもの
-  - 修正後は、どの差分でも full required review set を再実行する
+  - 修正後は、selected owning gate の focused rerun を実行する
   - review reject / requested-change への応答が、同じ user request と design
     intent を保つ修正や再設計ではなく、blanket revert、discard、または
     completion scope の縮小になっているもの
