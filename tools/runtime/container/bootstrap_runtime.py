@@ -46,6 +46,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 SCHEMA_STATE = "agent-canon.bootstrap-state.v2"
 SCHEMA_RECEIPT = "agent-canon.bootstrap-receipt.v2"
 SCHEMA_MOUNTS = "agent-canon.mount-registry.v2"

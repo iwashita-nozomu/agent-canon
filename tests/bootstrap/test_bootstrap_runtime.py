@@ -97,6 +97,59 @@ def test_source_identity_operation_has_no_runtime_side_effects(tmp_path: Path) -
     )
 
 
+def test_direct_container_materializer_bootstraps_without_pythonpath(
+    tmp_path: Path,
+) -> None:
+    """Direct container control loads the materializer from its source root."""
+    control = tmp_path / "control"
+    runtime = control / "runtime"
+    control.mkdir()
+    probe = """
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+controller_path, repository_root, control_root, runtime_root = map(Path, sys.argv[1:])
+spec = importlib.util.spec_from_file_location("agent_canon_bootstrap_runtime", controller_path)
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+manager = module.BootstrapRuntime(
+    control_root,
+    runtime_root,
+    repository_root=repository_root,
+)
+result = manager._materialize_skill_view()
+print(json.dumps({"mode": result["mode"], "materialized": result["materialized"]}))
+"""
+    environment = {**os.environ, "AGENT_CANON_CONTAINER_CONTROL": "1"}
+    environment.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            probe,
+            str(REPOSITORY_ROOT / "tools/runtime/container/bootstrap_runtime.py"),
+            str(REPOSITORY_ROOT),
+            str(control),
+            str(runtime),
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "mode": "resident-exchange",
+        "materialized": True,
+    }
+    assert (runtime / "container-runtime" / "skill-projection").is_dir()
+
+
 def test_source_identity_accepts_transport_variants_and_rejects_other_repo() -> None:
     """The host comparison can accept equivalent URLs without merging repositories."""
     equivalent = (
