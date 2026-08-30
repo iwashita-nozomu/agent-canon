@@ -6,6 +6,7 @@
 # upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml default prompt eval manifest
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # upstream implementation ./runtime_artifacts.py owns external prompt-eval artifact writes
+# upstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py owns canonical monitoring appends
 # downstream implementation ../../tests/agent_tools/test_evaluate_skill_workflow_prompts.py tests it
 # @dependency-end
 """Evaluate skill and workflow prompt surfaces against frozen checklist evals."""
@@ -42,6 +43,7 @@ from eval.checkers.eval_manifest_paths import (
 )
 from tools.runtime.archive.runtime_log_paths import agent_canon_root, eval_results_dir
 from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
+from tools.runtime.lifecycle.workflow_monitor import MonitoringEntries, append_monitoring
 
 DEFAULT_RESULTS_FAMILY = "skill-workflow-prompt"
 REPORT_STATUS_LINE_LIMIT = 13
@@ -1558,15 +1560,11 @@ def append_prompt_eval_monitoring(
         f"EVAL_GIT_DIRTY={metadata.git_dirty}"
     )
     boundary = runtime_artifact_boundary(Path(bundle.metadata.root), runtime_root)
-    monitoring_path = boundary.resolve(report_dir) / "workflow_monitoring.md"
-    existing = monitoring_path.read_text(encoding="utf-8") if monitoring_path.is_file() else (
-        "# Workflow Monitoring\n\n## Behavior Events\n\n"
+    return append_monitoring(
+        boundary.resolve(report_dir),
+        MonitoringEntries(behavior_events=(event,)),
+        runtime_root=boundary.root,
     )
-    marker = "## Behavior Events"
-    if marker not in existing:
-        existing = existing.rstrip() + f"\n\n{marker}\n\n"
-    updated = existing.rstrip() + "\n\n- " + event + "\n"
-    return boundary.atomic_write_text(monitoring_path, updated)
 
 
 def run(args: argparse.Namespace) -> int:
