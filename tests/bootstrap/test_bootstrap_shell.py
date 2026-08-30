@@ -764,6 +764,88 @@ def test_volume_input_imports_use_exact_runtime_paths(tmp_path: Path) -> None:
     assert (volume_root / "mount-registry.toml").read_text(encoding="utf-8") == "mount-registry\n"
 
 
+def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) -> None:
+    """The exact Docker run argv executes the embedded copy script with /bin/sh."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    stage = tmp_path / "stage"
+    volume_root = tmp_path / "volume"
+    control.mkdir()
+    runtime.mkdir()
+    stage.mkdir()
+    (volume_root / "exchange").mkdir(parents=True)
+    source_sync = runtime / "source-sync.json"
+    source_sync.write_text("source-sync\n", encoding="utf-8")
+    (volume_root / "exchange" / "mounts.tsv").write_text("target\n", encoding="utf-8")
+    (volume_root / "exchange" / "mounts.toml").write_text(
+        'schema = "agent-canon.mount-registry.v2"\n', encoding="utf-8"
+    )
+    volume_name = "agent-canon-runtime-real-shell"
+    docker = tmp_path / "docker-real-shell"
+    docker.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "script= input= output= volume=\n"
+        "while [ \"$#\" -gt 0 ]; do\n"
+        "  case \"$1\" in\n"
+        "    --mount)\n"
+        "      shift\n"
+        "      spec=$1\n"
+        "      case \"$spec\" in\n"
+        "        type=volume,src=*,dst=/var/lib/agent-canon)\n"
+        "          volume=${spec#type=volume,src=}; volume=${volume%,dst=/var/lib/agent-canon} ;;\n"
+        "        type=bind,src=*,dst=/agent-canon-copy-input,readonly)\n"
+        "          input=${spec#type=bind,src=}; input=${input%,dst=/agent-canon-copy-input,readonly} ;;\n"
+        "        type=bind,src=*,dst=/agent-canon-copy-output)\n"
+        "          output=${spec#type=bind,src=}; output=${output%,dst=/agent-canon-copy-output} ;;\n"
+        "      esac ;;\n"
+        "    --env) shift; export \"$1\" ;;\n"
+        "    -c) shift; script=$1 ;;\n"
+        "  esac\n"
+        "  shift\n"
+        "done\n"
+        "[ \"$volume\" = \"$FAKE_VOLUME_NAME\" ]\n"
+        "[ -n \"$script\" ]\n"
+        "script=$(printf \"%s\" \"$script\" | sed -e \"s|/var/lib/agent-canon|$FAKE_VOLUME_ROOT|g\" -e \"s|/agent-canon-copy-input|$input|g\" -e \"s|/agent-canon-copy-output|$output|g\")\n"
+        "exec /bin/sh -c \"$script\"\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    common = (
+        f"source {str(ADAPTER)!r}; "
+        f"AGENT_CANON_DOCKER_CMD={str(docker)!r}; "
+        f"AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}; "
+        f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+        f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+        f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
+        f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+        "AGENT_CANON_IMAGE_REF=image; "
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            common
+            + f"_agent_canon_volume_copy import source-sync {str(source_sync)!r}; "
+            + f"_agent_canon_volume_copy export projection {str(stage)!r}",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_VOLUME_NAME": volume_name,
+            "FAKE_VOLUME_ROOT": str(volume_root),
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert (volume_root / "source-sync.json").read_text(encoding="utf-8") == "source-sync\n"
+    assert (stage / "mounts.tsv").read_text(encoding="utf-8") == "target\n"
+    assert (stage / "mounts.toml").read_text(encoding="utf-8").startswith(
+        'schema = "agent-canon.mount-registry.v2"'
+    )
+
+
 def test_volume_export_digest_corruption_is_rejected(tmp_path: Path) -> None:
     """A corrupted host projection fails the Docker copy readback digest."""
     control = tmp_path / "control"

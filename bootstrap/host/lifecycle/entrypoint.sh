@@ -1073,8 +1073,19 @@ uid_value="$AGENT_CANON_COPY_UID"
 gid_value="$AGENT_CANON_COPY_GID"
 digest="$AGENT_CANON_COPY_DIGEST"
 install_root="$AGENT_CANON_COPY_INSTALL_ROOT"
+digest_field() {
+  set -- $(cat)
+  [ "$#" -ge 1 ] || return 1
+  printf "%s" "$1"
+}
+file_digest() {
+  result=$(sha256sum -- "$1") || return 1
+  set -- $result
+  [ "$#" -ge 1 ] || return 1
+  printf "%s" "$1"
+}
 tree_digest() {
-  (cd "$1" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + | LC_ALL=C sort | sha256sum | awk "{print \$1}")
+  (cd "$1" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + | LC_ALL=C sort | sha256sum | digest_field)
 }
 codex_digest() {
   validate_codex_links "$1" || return 1
@@ -1082,24 +1093,24 @@ codex_digest() {
     cd "$1"
     {
       find . -type f -print | LC_ALL=C sort | while IFS= read -r link; do
-        mode=$(stat -c '%a' -- "$link") || exit 1
-        printf 'file\t%s\t%s\t%s\n' "$link" "$mode" \
-          "$(sha256sum -- "$link" | awk '{print $1}')"
+        mode=$(stat -c "%a" -- "$link") || exit 1
+        printf "file\t%s\t%s\t%s\n" "$link" "$mode" \
+          "$(file_digest "$link")"
       done
       find . -type l -print | LC_ALL=C sort | while IFS= read -r link; do
-        printf 'link\t%s\t%s\n' "$link" "$(readlink -- "$link")"
+        printf "link\t%s\t%s\n" "$link" "$(readlink -- "$link")"
       done
-    } | sha256sum | awk '{print $1}'
+    } | sha256sum | digest_field
   )
 }
 projection_digest() {
   for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
     if [ -f "$1/$name" ] && [ ! -L "$1/$name" ]; then
-      printf "%s\t%s\n" "$name" "$(sha256sum "$1/$name" | awk "{print \$1}")"
+      printf "%s\t%s\n" "$name" "$(file_digest "$1/$name")"
     else
       printf "%s\\tabsent\\n" "$name"
     fi
-  done | sha256sum | awk "{print \$1}"
+  done | sha256sum | digest_field
 }
 validate_codex_links() {
   allowed="$install_root/.codex"
@@ -1108,12 +1119,12 @@ validate_codex_links() {
     relative_link=${link#"$1"/}
     case "$relative_link" in
       config.toml|agents/*|hooks/*|skills/*) ;;
-      *) printf 'invalid\n'; continue ;;
+      *) printf "invalid\n"; continue ;;
     esac
     target=$(readlink -f "$link" 2>/dev/null || true)
     case "$target" in
-      "$allowed"/*) [ -e "$target" ] || printf 'invalid\\n' ;;
-      *) printf 'invalid\\n' ;;
+      "$allowed"/*) [ -e "$target" ] || printf "invalid\\n" ;;
+      *) printf "invalid\\n" ;;
     esac
   done)
   [ -z "$invalid" ]
@@ -1137,7 +1148,7 @@ elif [ "$direction" = import ]; then
     [ -f "$input" ] && [ ! -L "$input" ] || exit 65
     temporary="$destination.$$"
     cp -- "$input" "$temporary"
-    [ -n "$digest" ] && [ "$(sha256sum "$temporary" | awk "{print \$1}")" = "$digest" ] || exit 82
+    [ -n "$digest" ] && [ "$(file_digest "$temporary")" = "$digest" ] || exit 82
     chmod "$mode" "$temporary"
     chown "$uid_value:$gid_value" "$temporary"
     mv -f -- "$temporary" "$destination"
@@ -1149,7 +1160,7 @@ elif [ "$direction" = import ]; then
       [ -z "$(find "$input" -type l -print -quit)" ] || exit 67
     fi
     skip_copy=0
-    marker_value=$(printf 'agent-canon-private-log/v1\n%s' "$digest")
+    marker_value=$(printf "agent-canon-private-log/v1\n%s" "$digest")
     if [ "$kind" = private-log ] && [ -f "$destination/.agent-canon-private-log-v1" ] &&
        [ "$(cat "$destination/.agent-canon-private-log-v1")" = "$marker_value" ] &&
        [ "$(tree_digest "$destination")" = "$digest" ]; then
