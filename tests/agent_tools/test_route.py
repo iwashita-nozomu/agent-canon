@@ -303,7 +303,6 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("AREA=search", result.stdout)
         self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
         self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
-        self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
 
     def test_search_alias_resolves_to_search_area(self) -> None:
         """Legacy vector-search names should route to coordinated search."""
@@ -544,107 +543,71 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(active.requested_max_threads(), 28)
         self.assertEqual(active.peak_family.direct_frontier_count, 22)
 
-    def test_prompt_routes_subagent_first_implementation_active(self) -> None:
-        """Implementation, patch, and doc-edit prompts defer bootstrap without a typed route."""
-        result = self.run_route(
-            "--prompt",
+    def test_prompt_routes_subagent_bootstrap_activation_cases(self) -> None:
+        """Activation stays deferred unless the prompt carries a typed handoff signal."""
+        cases = (
             (
+                "implementation",
                 "Repo-changing implementation patch doc-edit work should be "
-                "subagent-first; parent only orchestrates and integrates."
+                "subagent-first; parent only orchestrates and integrates.",
+                {"matched_skills": ("subagent-bootstrap",), "deferred_skills": ("subagent-bootstrap",)},
+                {"active_skills": ("subagent-bootstrap",)},
             ),
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertIn("subagent-bootstrap", decision["matched_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
-
-    def test_prompt_routes_plain_fix_to_active_subagent_bootstrap(self) -> None:
-        """Plain fix prompts wait for typed workflow selection."""
-        result = self.run_route(
-            "--prompt",
-            "Fix the failing tests in the repository.",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertNotIn("subagent-bootstrap", decision["skills"])
-        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-
-    def test_prompt_routes_plain_refactor_to_active_subagent_bootstrap(self) -> None:
-        """Plain refactor prompts wait for typed workflow selection."""
-        result = self.run_route(
-            "--prompt",
-            "Refactor the repository routing helpers.",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertNotIn("subagent-bootstrap", decision["skills"])
-        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
-
-    def test_prompt_routes_review_only_subagent_without_bootstrap_activation(
-        self,
-    ) -> None:
-        """Review-only or do-not-edit prompts should not activate bootstrap."""
-        result = self.run_route(
-            "--prompt",
-            "Use subagents for review only; do not edit files.",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertIn("subagent-bootstrap", decision["matched_skills"])
-        self.assertIn("subagent-bootstrap", decision["skills"])
-        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
-
-    def test_prompt_routes_explicit_japanese_delegation_to_subagent_bootstrap(
-        self,
-    ) -> None:
-        """Explicit Japanese delegation prompts defer bootstrap without a typed route."""
-        result = self.run_route(
-            "--prompt",
             (
-                "作業はすべてサブエージェントに依頼し，"
-                "親は監視，エージェント起動，追加指示に徹する"
+                "plain-fix",
+                "Fix the failing tests in the repository.",
+                {},
+                {"skills": ("subagent-bootstrap",), "active_skills": ("subagent-bootstrap",)},
             ),
-            "--format",
-            "json",
+            (
+                "plain-refactor",
+                "Refactor the repository routing helpers.",
+                {},
+                {
+                    "skills": ("subagent-bootstrap",),
+                    "active_skills": ("subagent-bootstrap",),
+                    "deferred_skills": ("subagent-bootstrap",),
+                },
+            ),
+            (
+                "review-only",
+                "Use subagents for review only; do not edit files.",
+                {
+                    "matched_skills": ("subagent-bootstrap",),
+                    "skills": ("subagent-bootstrap",),
+                    "deferred_skills": ("subagent-bootstrap",),
+                },
+                {"active_skills": ("subagent-bootstrap",)},
+            ),
+            (
+                "japanese-delegation",
+                "作業はすべてサブエージェントに依頼し，親は監視，エージェント起動，追加指示に徹する",
+                {"matched_skills": ("subagent-bootstrap",), "deferred_skills": ("subagent-bootstrap",)},
+                {"active_skills": ("subagent-bootstrap",)},
+            ),
+            (
+                "review-without-delegation",
+                "レビューを依頼します",
+                {},
+                {
+                    "matched_skills": ("subagent-bootstrap",),
+                    "active_skills": ("subagent-bootstrap",),
+                    "deferred_skills": ("subagent-bootstrap",),
+                },
+            ),
         )
+        for name, prompt, expected, forbidden in cases:
+            with self.subTest(case=name):
+                result = self.run_route("--prompt", prompt, "--format", "json")
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertIn("subagent-bootstrap", decision["matched_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
-
-    def test_prompt_routes_review_request_without_subagent_markers_does_not_activate_bootstrap(
-        self,
-    ) -> None:
-        """Review-only dependency words should not trigger write-capable handoff."""
-        result = self.run_route(
-            "--prompt",
-            "レビューを依頼します",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertNotIn("subagent-bootstrap", decision["matched_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                for field, values in expected.items():
+                    for value in values:
+                        self.assertIn(value, decision[field])
+                for field, values in forbidden.items():
+                    for value in values:
+                        self.assertNotIn(value, decision[field])
 
     def test_prompt_routes_direct_review_to_change_review_without_bootstrap(
         self,
