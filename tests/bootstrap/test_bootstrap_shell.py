@@ -4726,3 +4726,54 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         ).stdout.splitlines()
         for image_id in image_ids:
             subprocess.run(["docker", "image", "rm", image_id], check=False, capture_output=True)
+
+
+def test_public_install_failure_is_terminal_before_follow_on_target(
+    tmp_path: Path,
+) -> None:
+    """A typed install failure cannot fall through to start or target add."""
+    repository = tmp_path / "agent-canon"
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    marker = tmp_path / "phases"
+    foreign = tmp_path / "foreign-resource"
+    repository.mkdir()
+    control.mkdir()
+    foreign.write_text("foreign\n", encoding="utf-8")
+    source_head = "0" * 40
+    script = f"""
+source {str(ADAPTER)!r}
+_agent_canon_validate_roots() {{ :; }}
+_agent_canon_install_source_admission() {{
+  printf 'up_to_date\\t{source_head}\\t{source_head}\\torigin\\n'
+}}
+_agent_canon_prepare_host_runtime() {{
+  AGENT_CANON_STATE_ROOT="$AGENT_CANON_RUNTIME_ROOT/container-state"
+  export AGENT_CANON_STATE_ROOT
+  mkdir -p "$AGENT_CANON_RUNTIME_ROOT/host-state" "$AGENT_CANON_STATE_ROOT"
+}}
+_agent_canon_source_sync_write() {{ :; }}
+_agent_canon_finish_clean_install() {{
+  printf '%s\\n' finish >> {str(marker)!r}
+}}
+_agent_canon_install_locked() {{
+  printf '%s\\n' install >> {str(marker)!r}
+  _agent_canon_json_error install_probe_failed "install transaction failed"
+  printf '%s\\n' late-install >> {str(marker)!r}
+}}
+AGENT_CANON_DOCKER=/bin/true
+export AGENT_CANON_DOCKER
+set -e
+bootstrap_host_entrypoint {str(repository)!r} \\
+  --control-parent-root {str(control)!r} \\
+  --runtime-root {str(runtime)!r} install
+printf '%s\\n' start >> {str(marker)!r}
+printf '%s\\n' target-add >> {str(marker)!r}
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 2
+    assert completed.stderr.count('"code":"install_probe_failed"') == 1
+    assert marker.read_text(encoding="utf-8").splitlines() == ["install"]
+    assert foreign.read_text(encoding="utf-8") == "foreign\n"

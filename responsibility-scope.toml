@@ -228,7 +228,6 @@ paths = [
   "README.md",
   "responsibility-scope.toml",
   "codex-cli-guide/**",
-  "completion-first-review/**",
   "documents/**",
   "memory/**",
   "references/**",
