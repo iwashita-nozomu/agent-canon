@@ -834,6 +834,47 @@ _agent_canon_path_digest() {
   (cd "$path" && find . -type f -exec sha256sum {} + | LC_ALL=C sort | sha256sum | awk '{print $1}')
 }
 
+_agent_canon_validate_codex_home() {
+  local path=$1 allowed link relative_link target invalid
+  allowed="$AGENT_CANON_REPOSITORY_ROOT/.codex"
+  [[ -d "$path" && ! -L "$path" && -d "$allowed" && ! -L "$allowed" ]] || return 1
+  invalid=$(find "$path" -type l -print | while IFS= read -r link; do
+    relative_link=${link#"$path"/}
+    case "$relative_link" in
+      config.toml|agents/*|hooks/*|skills/*) ;;
+      *) printf 'invalid\n'; continue ;;
+    esac
+    target=$(readlink -f "$link" 2>/dev/null || true)
+    [[ "$target" != *$'\n'* && "$target" != *$'\r'* && "$target" != *$'\t'* ]] || {
+      printf 'invalid\n'
+      continue
+    }
+    case "$target" in
+      "$allowed"/*) [ -e "$target" ] || printf 'invalid\n' ;;
+      *) printf 'invalid\n' ;;
+    esac
+  done)
+  [[ -z "$invalid" ]]
+}
+
+_agent_canon_codex_digest() {
+  local path=$1 link mode
+  _agent_canon_validate_codex_home "$path" || return 1
+  (
+    cd "$path"
+    {
+      find . -type f -print | LC_ALL=C sort | while IFS= read -r link; do
+        mode=$(stat -c '%a' -- "$link") || exit 1
+        printf 'file\t%s\t%s\t%s\n' "$link" "$mode" \
+          "$(sha256sum -- "$link" | awk '{print $1}')"
+      done
+      find . -type l -print | LC_ALL=C sort | while IFS= read -r link; do
+        printf 'link\t%s\t%s\n' "$link" "$(readlink -- "$link")"
+      done
+    } | sha256sum | awk '{print $1}'
+  )
+}
+
 _agent_canon_init_state_volume() {
   local volume="$AGENT_CANON_STATE_VOLUME_NAME"
   local label_runtime label_control label_state volume_id caller_uid caller_gid init_name init_readback
@@ -1019,7 +1060,7 @@ _agent_canon_volume_copy() {
     --env "AGENT_CANON_COPY_UID=$(id -u)" \
     --env "AGENT_CANON_COPY_GID=$(id -g)" \
     --env "AGENT_CANON_COPY_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT" \
-    --env "AGENT_CANON_COPY_DIGEST=$([[ "$direction" == import ]] && _agent_canon_path_digest "$host_path" 2>/dev/null || true)" \
+    --env "AGENT_CANON_COPY_DIGEST=$([[ "$direction" == import ]] && { if [[ "$kind" == codex-home ]]; then _agent_canon_codex_digest "$host_path"; else _agent_canon_path_digest "$host_path"; fi; } 2>/dev/null || true)" \
     --entrypoint /bin/sh \
     "$AGENT_CANON_IMAGE_REF" \
     -c 'set -eu
@@ -1033,6 +1074,22 @@ digest="$AGENT_CANON_COPY_DIGEST"
 install_root="$AGENT_CANON_COPY_INSTALL_ROOT"
 tree_digest() {
   (cd "$1" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + | LC_ALL=C sort | sha256sum | awk "{print \$1}")
+}
+codex_digest() {
+  validate_codex_links "$1" || return 1
+  (
+    cd "$1"
+    {
+      find . -type f -print | LC_ALL=C sort | while IFS= read -r link; do
+        mode=$(stat -c '%a' -- "$link") || exit 1
+        printf 'file\t%s\t%s\t%s\n' "$link" "$mode" \
+          "$(sha256sum -- "$link" | awk '{print $1}')"
+      done
+      find . -type l -print | LC_ALL=C sort | while IFS= read -r link; do
+        printf 'link\t%s\t%s\n' "$link" "$(readlink -- "$link")"
+      done
+    } | sha256sum | awk '{print $1}'
+  )
 }
 projection_digest() {
   for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
@@ -1108,7 +1165,11 @@ elif [ "$direction" = import ]; then
       if [ "$kind" = codex-home ]; then
         validate_codex_links "$destination" || exit 85
       fi
-      [ -n "$digest" ] && [ "$(tree_digest "$destination")" = "$digest" ] || exit 83
+      if [ "$kind" = codex-home ]; then
+        [ -n "$digest" ] && [ "$(codex_digest "$destination")" = "$digest" ] || exit 83
+      else
+        [ -n "$digest" ] && [ "$(tree_digest "$destination")" = "$digest" ] || exit 83
+      fi
       find "$destination" -type d -exec chmod 700 {} +
       chown -R "$uid_value:$gid_value" "$destination"
     fi
@@ -1163,13 +1224,21 @@ else
     source_digest=$(projection_digest "$source")
     destination_digest=$(projection_digest /var/lib/agent-canon/output)
   else
-    source_digest=$(tree_digest "$source")
+    if [ "$kind" = codex-home ]; then
+      source_digest=$(codex_digest "$source")
+    else
+      source_digest=$(tree_digest "$source")
+    fi
     if [ "$kind" = eval ]; then
       destination_digest=$(tree_digest "/var/lib/agent-canon/output/$relative")
     elif [ "$kind" = skill ]; then
       destination_digest=$(tree_digest /var/lib/agent-canon/output/skill-projection)
     else
-      destination_digest=$(tree_digest /var/lib/agent-canon/output)
+      if [ "$kind" = codex-home ]; then
+        destination_digest=$(codex_digest /var/lib/agent-canon/output)
+      else
+        destination_digest=$(tree_digest /var/lib/agent-canon/output)
+      fi
     fi
   fi
   [ "$source_digest" = "$destination_digest" ] || exit 84

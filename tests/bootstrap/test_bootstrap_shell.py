@@ -766,6 +766,70 @@ def test_codex_volume_copy_rejects_unexpected_symlink_target(tmp_path: Path) -> 
     assert json.loads(result.stderr)["code"] == "volume_copy_failed"
 
 
+def test_codex_volume_copy_roundtrips_managed_symlink(tmp_path: Path) -> None:
+    """Managed Codex links retain their target and mode through both copies."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    stage = tmp_path / "stage"
+    control.mkdir()
+    runtime.mkdir()
+    stage.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    codex_home = volume_root / "codex-home"
+    codex_home.mkdir(parents=True)
+    (codex_home / "config.toml").symlink_to(ROOT / ".codex" / "config.toml")
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {},
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    common = (
+        f"source {str(ADAPTER)!r}; "
+        f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+        f"AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}; "
+        f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+        f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+        f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
+        f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+        "AGENT_CANON_IMAGE_REF=image; "
+    )
+    exported = subprocess.run(
+        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(stage)!r}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert exported.returncode == 0, exported.stderr
+    assert (stage / "config.toml").is_symlink()
+    assert (stage / "config.toml").resolve() == (ROOT / ".codex" / "config.toml").resolve()
+    imported = subprocess.run(
+        ["bash", "-c", common + f"_agent_canon_volume_copy import codex-home {str(stage)!r}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert imported.returncode == 0, imported.stderr
+    assert (codex_home / "config.toml").is_symlink()
+    assert (codex_home / "config.toml").resolve() == (ROOT / ".codex" / "config.toml").resolve()
+
+
 @pytest.mark.skipif(
     shutil.which("docker") is None
     or os.environ.get("AGENT_CANON_RUN_REAL_UPDATE_TESTS") != "1",

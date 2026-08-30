@@ -61,6 +61,24 @@ def projection_digest(root: Path) -> str:
     return hashlib.sha256("".join(entries).encode("utf-8")).hexdigest()
 
 
+def codex_digest(root: Path) -> str:
+    """Hash Codex regular files/modes and managed link path/targets."""
+    entries = []
+    regular = sorted(path for path in root.rglob("*") if path.is_file() and not path.is_symlink())
+    links = sorted(path for path in root.rglob("*") if path.is_symlink())
+    for path in regular:
+        entries.append(
+            f"file\t./{path.relative_to(root).as_posix()}\t"
+            f"{path.stat(follow_symlinks=False).st_mode & 0o777}\t"
+            f"{hashlib.sha256(path.read_bytes()).hexdigest()}\n"
+        )
+    for path in links:
+        entries.append(
+            f"link\t./{path.relative_to(root).as_posix()}\t{os.readlink(path)}\n"
+        )
+    return hashlib.sha256("".join(entries).encode("utf-8")).hexdigest()
+
+
 def labels(argv: list[str]) -> dict[str, str]:
     """Extract Docker label arguments."""
     result = {}
@@ -591,7 +609,8 @@ def main(argv: list[str]) -> int:
                         shutil.rmtree(destination)
                     if not skip_copy:
                         shutil.copytree(source, destination, symlinks=kind == "codex-home")
-                    if not expected_digest or tree_digest(destination) != expected_digest:
+                    digest_value = codex_digest(destination) if kind == "codex-home" else tree_digest(destination)
+                    if not expected_digest or digest_value != expected_digest:
                         return 1
                     if kind == "private-log" and not skip_copy:
                         (destination / ".agent-canon-private-log-v1").write_text(
@@ -698,13 +717,13 @@ def main(argv: list[str]) -> int:
                     elif kind == "private-feedback":
                         source_digest = tree_digest(backing / "spool" / "private-feedback")
                     else:
-                        source_digest = tree_digest(backing / "codex-home")
+                        source_digest = codex_digest(backing / "codex-home")
                     if kind == "eval":
                         destination_digest = tree_digest(output / relative)
                     elif kind == "skill":
                         destination_digest = tree_digest(output / "skill-projection")
                     else:
-                        destination_digest = tree_digest(output)
+                        destination_digest = codex_digest(output) if kind == "codex-home" else tree_digest(output)
                     readback_digest = source_digest
                 if readback_digest != destination_digest:
                     return 1
