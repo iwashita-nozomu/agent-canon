@@ -61,7 +61,7 @@ cleanup executors retain their existing owners and receipt formats.
 - 次の role が判断に使う情報は artifact に残します。
 - reviewer は repo を直接修正せず、required change を artifact に残します。
 - review を受けた role は `resolved`、`rejected`、`escalated` のいずれかで必ず応答します。
-- review の `rejected`、`revise`、`required_change` は、提案された実装や
+- review の `rejected`、`required_change` は、提案された実装や
   修正方法への判定であり、user request や design intent を rollback する権限では
   ありません。実行 role は、同じ意図を保つ修正、同じ意図を保つ再設計、または
   design / scope conflict の escalation に接続します。
@@ -340,11 +340,12 @@ descendants, unknown descendants, missing handback, and reservation leaks fail.
 `pre_handoff_gate_status` records gate evidence before a write-capable
 implementation handoff. Design-backed implementation handoffs require the
 current `design_brief.md` path or revision and the selected owner/design gate.
-`design_review.md` `Design Artifact Under Review`, approve evidence,
+`design_review.md` `Design Artifact Under Review`, normalized decision evidence
+from the [review dispatcher](../tools/agent/orchestration/review_dispatch.py),
 `waterfall-gate-check --gate design` evidence, and selected
 `document_flow_review.md` status are required only when those gates are active.
 Missing candidate review artifacts do not block an otherwise semantically
-sufficient handoff; an active gate with missing, stale, or non-approve evidence
+sufficient handoff; an active gate with missing, stale, or non-approval evidence
 returns the task to its owning route.
 
 ## Active Design Packet Schema
@@ -585,6 +586,15 @@ references (`documents/runtime/runtime-profiles-and-check-matrix.json` and its
 generated Markdown reader), same-intent repair or escalation, its owner and
 result, and result artifact references. The taxonomy text is not copied into
 this schema.
+
+## Review Decision Boundary
+
+Review decision normalization is owned solely by
+[`canonicalize_review_decision`](../tools/agent/orchestration/review_dispatch.py).
+The dispatcher owns the canonical review-decision vocabulary and its aliases;
+workflow and reader surfaces consume the normalized result instead of defining
+another token set. Generic handback and lifecycle statuses remain separate
+facts and are not review decisions.
 
 ## Review Packet
 

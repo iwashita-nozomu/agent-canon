@@ -129,7 +129,13 @@ class ReviewDispatchTest(unittest.TestCase):
         )
 
     def test_decision_aliases_are_canonicalized_at_dispatch(self) -> None:
-        """Template aliases preserve the canonical publication decision vocabulary."""
+        """All canonical decisions and template aliases share one boundary."""
+        for value in ("APPROVE", "REVISE", "ESCALATE"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    review_dispatch.canonicalize_review_decision(value.lower()),
+                    value,
+                )
         self.assertEqual(
             review_dispatch.canonicalize_review_decision("ACCEPT"),
             "APPROVE",
@@ -138,6 +144,14 @@ class ReviewDispatchTest(unittest.TestCase):
             review_dispatch.canonicalize_review_decision("CHANGES-REQUIRED"),
             "REVISE",
         )
+
+    def test_invalid_review_decisions_fail_closed(self) -> None:
+        """Unknown and mistyped review decisions cannot enter the ledger."""
+        for value in (None, "", "BLOCK", "APPROVED"):
+            with self.subTest(value=value), self.assertRaises(
+                review_dispatch.AutomaticReviewError
+            ):
+                review_dispatch.canonicalize_review_decision(value)
 
     def test_record_decision_canonicalizes_aliases_and_blocking_derived_state(self) -> None:
         """Recorded events retain APPROVE/REVISE for publication consumers."""

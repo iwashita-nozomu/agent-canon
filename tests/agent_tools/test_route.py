@@ -349,8 +349,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("subagent-bootstrap", decision["skills"])
         self.assertIn("agent-orchestration", decision["active_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertIn("subagent-bootstrap", decision["active_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
@@ -366,7 +366,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
         self.assertIn("computational-optimization", decision["active_skills"])
-        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
         self.assertNotIn("environment-maintenance", decision["active_skills"])
 
     def test_explicit_math_owner_survives_proof_tool_context(self) -> None:
@@ -537,7 +537,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(active.peak_family.direct_frontier_count, 22)
 
     def test_prompt_routes_subagent_first_implementation_active(self) -> None:
-        """Implementation, patch, and doc-edit prompts should activate bootstrap."""
+        """Implementation, patch, and doc-edit prompts defer bootstrap without a typed route."""
         result = self.run_route(
             "--prompt",
             (
@@ -551,11 +551,11 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
         self.assertIn("subagent-bootstrap", decision["matched_skills"])
-        self.assertIn("subagent-bootstrap", decision["active_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
 
     def test_prompt_routes_plain_fix_to_active_subagent_bootstrap(self) -> None:
-        """Plain fix prompts should activate write-capable handoff."""
+        """Plain fix prompts wait for typed workflow selection."""
         result = self.run_route(
             "--prompt",
             "Fix the failing tests in the repository.",
@@ -565,12 +565,11 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("subagent-bootstrap", decision["skills"])
-        self.assertIn("subagent-bootstrap", decision["active_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
 
     def test_prompt_routes_plain_refactor_to_active_subagent_bootstrap(self) -> None:
-        """Plain refactor prompts should activate write-capable handoff."""
+        """Plain refactor prompts wait for typed workflow selection."""
         result = self.run_route(
             "--prompt",
             "Refactor the repository routing helpers.",
@@ -580,8 +579,8 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("subagent-bootstrap", decision["skills"])
-        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
         self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
 
     def test_prompt_routes_review_only_subagent_without_bootstrap_activation(
@@ -605,7 +604,7 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_explicit_japanese_delegation_to_subagent_bootstrap(
         self,
     ) -> None:
-        """Explicit Japanese delegation prompts should activate bootstrap as write-capable."""
+        """Explicit Japanese delegation prompts defer bootstrap without a typed route."""
         result = self.run_route(
             "--prompt",
             (
@@ -619,8 +618,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
         self.assertIn("subagent-bootstrap", decision["matched_skills"])
-        self.assertIn("subagent-bootstrap", decision["active_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
 
     def test_prompt_routes_review_request_without_subagent_markers_does_not_activate_bootstrap(
         self,
@@ -776,8 +775,8 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertEqual(decision["mode"], "repo-changing")
         self.assertIn("subagent-bootstrap", decision["skills"])
-        self.assertIn("subagent-bootstrap", decision["active_skills"])
-        self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
 
     def test_prompt_plain_refactor_does_not_route_user_guided_debugging(self) -> None:
         """Ordinary refactor prompts should not select user-guided-debugging."""

@@ -51,7 +51,7 @@ if __package__:
 else:
     from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
-from tools.agent.orchestration.route import decide_skills, implementation_handoff_required, load_skill_route_rules
+from tools.agent.orchestration.route import decide_skills, load_skill_route_rules
 from tools.agent.skills.skill_tool_commands import (
     SkillCommandPacket,
     packet_for_skill,
@@ -127,7 +127,10 @@ if __package__:
         _as_required_string,
         _as_string_tuple,
         normalized_public_skill_name,
+        load_task_catalog,
+        load_team_config,
         resolve_workflow_family,
+        workflow_child_handoff_required,
     )
 else:
     from tools.agent.orchestration.team_config import (
@@ -142,7 +145,10 @@ else:
         _as_required_string,
         _as_string_tuple,
         normalized_public_skill_name,
+        load_task_catalog,
+        load_team_config,
         resolve_workflow_family,
+        workflow_child_handoff_required,
     )
 
 if __package__:
@@ -731,10 +737,13 @@ def user_facing_language_policy_output_lines() -> tuple[str, ...]:
 
 def contract_complete_implementation_policy_output_lines(
     task_text: str = "",
+    *,
+    child_handoff_required: bool = False,
 ) -> tuple[str, ...]:
     """Return stdout lines for contract-complete implementation policy."""
+    del task_text
     handoff_lines: tuple[str, ...] = ()
-    if implementation_handoff_required(task_text):
+    if child_handoff_required:
         handoff_lines = (
             f"IMPLEMENTATION_HANDOFF_REQUIRED={IMPLEMENTATION_HANDOFF_REQUIRED}",
             f"PARENT_REPO_EDITS_ALLOWED={PARENT_REPO_EDITS_ALLOWED}",
@@ -880,9 +889,19 @@ def suggested_public_skills(
     task_text: str = "",
     *,
     source_root: Path | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> tuple[str, ...]:
     """Return the public skill set required by the selected route."""
-    selected = ["$agent-orchestration", "$codex-task-workflow", "$subagent-bootstrap"]
+    selected = ["$agent-orchestration", "$codex-task-workflow"]
+    config = load_team_config()
+    catalog = load_task_catalog(config, source_root or ROOT)
+    if workflow_child_handoff_required(
+        config,
+        catalog,
+        workflow_family_id,
+        issue_worker_candidate,
+    ):
+        selected.append("$subagent-bootstrap")
     if workflow_family_id == "research_driven_change":
         selected.append("$literature-survey")
         selected.append("$research-workflow")
@@ -1463,7 +1482,15 @@ def manifest_run_lines(
             "    gate_order: 'selected_stages_only'",
             "    edit_handoff_rule: 'selected owner-critical edit stage only; no fixed plan-review-edit sequence'",
             *manifest_user_facing_language_policy_lines(),
-            *manifest_contract_complete_implementation_policy_lines(spec.task),
+            *manifest_contract_complete_implementation_policy_lines(
+                spec.task,
+                child_handoff_required=workflow_child_handoff_required(
+                    spec.config,
+                    spec.task_catalog,
+                    spec.workflow_family_id or None,
+                    spec.issue_worker_candidate,
+                ),
+            ),
             *manifest_pre_handoff_scope_policy_lines(),
             *manifest_pre_handoff_gate_status_lines(
                 active_design_packet,
@@ -1807,6 +1834,8 @@ def manifest_run_lines(
 
 def manifest_contract_complete_implementation_policy_lines(
     task_text: str = "",
+    *,
+    child_handoff_required: bool = False,
 ) -> list[str]:
     """Render contract-complete implementation policy lines."""
     lines = [
@@ -1818,7 +1847,7 @@ def manifest_contract_complete_implementation_policy_lines(
         f"    rule: {CONTRACT_COMPLETE_IMPLEMENTATION_RULE!r}",
         "    required_inputs:",
     ]
-    if implementation_handoff_required(task_text):
+    if child_handoff_required:
         lines[
             CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX:CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX
         ] = [
@@ -1922,6 +1951,7 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
         None,
         spec.workflow_family_id or None,
         source_root=_required_spec_source_root(spec),
+        issue_worker_candidate=spec.issue_worker_candidate,
     )
     skill_names = selected_skill_names(selected_skills)
     source_root = _required_spec_source_root(spec)

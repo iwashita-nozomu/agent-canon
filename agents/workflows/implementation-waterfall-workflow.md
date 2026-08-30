@@ -150,7 +150,7 @@ path acceptance は lexical component の non-symlink、run bundle containment�
 file の三条件を要求します。schema、unknown field、必須 field、outside-bundle path、missing artifact
 は typed design-owner blocker です。technical review と required な document-flow review
 は、それぞれ `Design artifact path:` が manifest の `design_artifact` と一致し、最終
-decision が `approve` の場合に approval evidence になります。
+decision が承認の場合に approval evidence になります。
 
 ### Cycle A. 条件付き計画・レビュー
 
@@ -162,9 +162,8 @@ decision が `approve` の場合に approval evidence になります。
 - reviewer:
   - selected owning review gate only
 - 反復規則:
-  - selected review の decision が accepted repair を要求する場合だけ owning stage に戻します
-  - `revise` は Gate 3 へ戻します
-  - `escalate` は Gate 1 または Gate 2 へ戻して scope / research を修正します
+  - selected review の decision が修理を要求する場合だけ owning stage に戻します
+  - selected review の escalation は Gate 1 または Gate 2 へ戻して scope / research を修正します
 - 完了条件:
   - stage 順序、handoff、rollback、validation sequence が hidden step なしで実行できる
   - selected review gate と parent-managed write-scope discipline が崩れていない
@@ -187,13 +186,13 @@ decision が `approve` の場合に approval evidence になります。
   - Gate 6 は実装 diff ではなく、Gate 5 で作られた同一の詳細設計文書
     そのものを review 対象にし、`design_review.md` に design artifact path
     と対象 revision / section を記録します
-  - selected Gate 6 の decision が `approve` でない場合だけ Gate 5 に戻します。reviewer
+  - selected Gate 6 の decision が承認でない場合だけ Gate 5 に戻します。reviewer
     output は hypothesis であり、decision-owning reviewer が current snapshot、
     reachable path、contract、witness/static proof を確認して adjudicate します
-  - 文書通読レビューが active gate の場合は、`document_flow_review.md` の decision が `approve` でない限り Gate 5 に戻します
+  - 文書通読レビューが active gate の場合は、`document_flow_review.md` の decision が承認でない限り Gate 5 に戻します
   - accepted finding が behavior、owner/design boundary、correctness、validation、
-    または publication state を変える場合だけ `revise` は Gate 5 へ戻します
-  - `escalate` は Gate 3 へ戻して設計方針を組み替えます
+    または publication state を変える場合だけ修理要求は Gate 5 へ戻します
+  - selected review の escalation は Gate 3 へ戻して設計方針を組み替えます
 - 完了条件:
 - 実装者が文書だけ読んで着手できる
 - `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` が揃っている
@@ -213,11 +212,11 @@ decision が `approve` の場合に approval evidence になります。
 - reviewer:
   - selected owning review gate (`change_reviewer` when activated)
 - 反復規則:
-  - selected owning review gate がある場合、その decision が `approve` でない限り Gate 8 に戻します
-  - selected gate の `revise` は Gate 8 へ戻します
+  - selected owning review gate がある場合、その decision が承認でない限り Gate 8 に戻します
+  - selected gate の修理要求は Gate 8 へ戻します
   - selected gate の accepted `required_change`、または rejected slice への応答は、同じ
     request clause と approved design intent を保つ修正として行います
-  - selected gate の `escalate` は Gate 5 へ戻して詳細設計を修正し、test-design route が
+  - selected gate の escalation は Gate 5 へ戻して詳細設計を修正し、test-design route が
     active な場合だけ Gate 8.5 の evidence も更新します
 - 完了条件:
 - diff が approved design と canonical validation evidence に一致する
@@ -401,12 +400,12 @@ exit 条件:
 - candidate stage は飛ばしや merge ができます。owner-critical decision、distinct
   unresolved claim/risk、または selected validation route が要求した stage だけを
   schedule し、selected stage の順序と gate evidence は保持します
-- `schedule_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
-- `revise` または `escalate` のまま Gate 5 へ進みません
+- `schedule_review.md` の decision は [review dispatcher の正規化境界](../../tools/agent/orchestration/review_dispatch.py) を参照します
+- selected review の修理要求または escalation が残るまま Gate 5 へ進みません
 
 exit 条件:
 - `schedule_review.md` が `resolved` になっている
-- decision が `approve` になっている
+- decision が承認になっている
 - `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate plan"` が pass している
 
 ### Gate 5. 詳細設計
@@ -535,16 +534,16 @@ exit 条件:
 ルール:
 - `詳細設計レビュー` は candidate gate です。one owning review gate が判断できない
   distinct unresolved claim のときだけ有効化します
-- selected `design_review.md` の decision が `approve` になるまで、その design claim
+- selected `design_review.md` の decision が承認になるまで、その design claim
   を前提にした実装へ進みません。candidate artifact の不在だけでは停止しません
 - 承認は latest design artifact にだけ有効です。Gate 5 で設計を修正したら、
-  旧 `approve` を流用せず Gate 6 を再実行します
+  旧承認を流用せず Gate 6 を再実行します
 - decision-owning design reviewer が accepted と adjudicate した design concern を解消しないまま実装へ進みません
-- naming plan、API shape、path layout、boundary choice の不足は `revise` blocker とします
-- `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、または `Design-To-Implementation Trace` の不足は `revise` blocker とします
-- `Dependency Manifest Plan` の不足、reverse edge 欠落、旧形式温存は `revise` blocker とします
+- naming plan、API shape、path layout、boundary choice の不足は修理要求 blocker とします
+- `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、または `Design-To-Implementation Trace` の不足は修理要求 blocker とします
+- `Dependency Manifest Plan` の不足、reverse edge 欠落、旧形式温存は修理要求 blocker とします
 - refactor pass では `project_reviewer` の stale path 指摘を未解消のまま実装へ進みません
-- `design_review.md` の decision は `approve`、`revise`、`escalate` のいずれかに固定します
+- `design_review.md` の decision は [review dispatcher の正規化境界](../../tools/agent/orchestration/review_dispatch.py) を参照します
 
 exit 条件:
 - `design_review.md` が `resolved` になっている
@@ -554,7 +553,7 @@ exit 条件:
 - dependency manifest plan と graph validation plan の懸念が解消している
 - canonical tree-head plan の懸念が解消している
 - naming plan の懸念が解消している
-- selected design review がある場合は decision が `approve` になっている
+- selected design review がある場合は decision が承認になっている
 - selected design review がある場合は `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate design"` が pass している。未選択の場合は semantic decision sufficiency と owner validation evidence を記録する
 
 ### Gate 7. 文書通読レビュー
@@ -609,7 +608,7 @@ exit 条件:
   owns merge/conflict resolution, and a publisher owns Issue/PR writes.
 - Gate 8 cannot start from a detailed design when a selected design review is
   unresolved. In that case `pre_handoff_gate_status` records the current design
-  artifact, `design_review.md decision=approve`, and
+  artifact, `design_review.md` の承認 decision, and
   `waterfall-gate-check --gate design` pass evidence. A candidate review does not
   block the handoff.
 - Once edit scope is known, launch or schedule the selected write-capable
@@ -654,12 +653,12 @@ exit 条件:
 - `change_reviewer`
   - 各 changed slice が `Abstract Design Frame`、approved design section、`Implementation Source Packet` entry、request clause ID を引用し、test-design route が active な場合だけ test plan item も引用しているか確認する
   - changed slice と関連 docs / workflow / prompt/config / validation / dependency-manifest update が approved `Design Side-Effect Map` に trace できるか確認する
-  - changed slice が nearest file、helper、current finding、chat context だけで正当化され、抽象責務 model へ trace できない場合は revise blocker として扱う
+  - changed slice が nearest file、helper、current finding、chat context だけで正当化され、抽象責務 model へ trace できない場合は修理要求 blocker として扱う
   - changed human-authored text file が `@dependency-start` / `@dependency-end` 形式を持ち、旧 `Dependency Files:` block を残していないか確認する
   - 追加・変更された dependency edge に reverse edge、kind match、自己参照なし、cycle risk なしの evidence があるか確認する
   - design packet から外れた変更、または design gap を実装で埋めた変更を blocker として扱う
   - non-canonical design doc、implementation copy、snapshot、backup path が tracked tree に残っていないか確認する
-  - chunk / slice の checkpoint approve を user request 全体の完了として扱っていないか確認する
+  - chunk / slice の checkpoint 承認を user request 全体の完了として扱っていないか確認する
   - remaining planned work units と next required gate が実装 handoff に残っているか確認する
   - selected owning review gate として、構造、境界、明白な回帰、設計逸脱を確認する
   - `Large Delivery` または `Platform And Environment` の追加 review は、distinct unresolved claim/risk が必要な場合だけ選択する
@@ -748,7 +747,7 @@ exit 条件:
   または publication state を変える accepted finding だけ Gate 8 の same-owner repair
   に戻します。rejected finding は `reason_code` と `evidence_ref` を記録し、rollback / wave
   を起こしません
-- review の `revise`、`required_change`、`rejected`、または requested-change は、
+- review の修理要求、`required_change`、`rejected`、または requested-change は、
   user request や approved design intent を戻す権限ではありません。実装担当は
   同じ意図を保つ修正、同じ意図を保つ再設計、または design / scope conflict の
   escalation として扱います。実装 slice を削除、revert、discard する場合は、
@@ -779,40 +778,19 @@ exit 条件:
 最低限の確認:
 - acceptance criteria の達成
 - repo 正本の同期
-- closeout command の実行
-- dependency manifest checks の実行
-- commit / push の成否確認
-- `verification.txt` の `status=pass`
-- `closeout_gate.md` の `auditor_status=resolved` と `user_completion_report=unlocked`
-- `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
-- `closeout_gate.md` の `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]`
-- selected review gate の post-fix evidence (full review は touched contract が要求する final candidate の場合だけ)
-- `closeout_gate.md` の `review_convergence_complete=yes` と構造化 loop evidence
-- selected diff-check review がある場合だけ `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local artifact evidence
-- `closeout_gate.md` の `canonical_tree_head_complete=yes`
-- `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
-- `schedule.md` の TODO 行が空ではない
-- `work_log.md` に meaningful step が記録されている
+- selected validation、dependency、review、commit / push の stage evidence
+- [`task_close.py`](../../tools/runtime/lifecycle/task_close.py) の実行結果
 
 選択レビュー (owner-critical decision または distinct unresolved claim/risk):
 - `auditor`
   - selected reviews が揃っているか、activated artifact と closeout evidence が欠けていないか確認する
 
 exit 条件:
-- auditor review が `resolved` になっている
-- verifier が gate を閉じている
-- user-facing completion report の unlock 条件が `closeout_gate.md` に記録されている
-- chunk、slice、checkpoint、subpass ではなく、user request 全体の完了であることが `Completion Boundary Evidence` に記録されている
-- 仕様と product surface の gap が残っていないことが `Spec-To-Product Coverage Evidence` に記録されている
-- accepted review findings のみが反映済み、再レビュー済み、または escalated であることを `Review Finding Integration Evidence` に記録し、rejected findings は `reason_code` と `evidence_ref` を残す
-- review reject / requested-change への応答が user-requested behavior の blanket
-  revert ではなく、intent-preserving repair / redesign / escalation として
-  証跡化されていることが `Review Finding Integration Evidence` に記録されている
-- review-driven fix が入った場合、changed behavior / owner / correctness / validation / publication を変えた accepted finding に限り selected gate の latest diff rerun evidence を記録する。full review rerun は final candidate が要求した場合だけ行う
-- planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Review Convergence Evidence` に記録されている
-- selected owning review gate の decision、latest diff ref、findings disposition が記録される。read-only diff-check artifact はその gate が選択した場合だけ要求する
-- canonical design path と implementation path だけが tracked tree に残っていることが `Canonical Tree-Head Evidence` に記録されている
-- user request clause の未解決がない
+- [`task_close.py`](../../tools/runtime/lifecycle/task_close.py) が terminal
+  readiness を返している
+- selected review と validation の stage evidence が closeout に記録されている
+- diff-check は選択時だけ artifact と latest diff evidence を記録し、未選択または
+  no-change route は `not_applicable` と rationale を記録している
 
 ## 5. 差し戻しルール
 
@@ -888,24 +866,17 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 ## 8. reuse-first の必須ルール
 
-- まず既存 module、既存 helper、既存 abstraction を探します
 - まず導入済みライブラリ、既存 module、既存 helper、既存 abstraction を探します
 - 既存 API shape、命名、error handling、test style、docs style を優先します
 - 新しい pattern を導入するときは、詳細設計文書に既存 pattern や導入済みライブラリでは足りない理由を書きます
 - 新しい identifier や path は worker の自由裁量にせず、詳細設計の naming plan または明白な局所 precedent に結び付けます
 - 既存コードを踏襲できるなら、完全新規実装を選びません
 
-## 9. closeout の必須項目
+## 9. closeout evidence handoff
 
-- 実行した validation
-- 未実行 validation と理由
-- `python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed`
-- `bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing`
-- `bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header`
-- dependency edge を追加・変更した場合は `bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges` の結果、または移行中 baseline failure と今回差分で新規 graph error を増やしていない evidence
-- 更新した repo 正本
-- commit hash
-- push の成否
+- 実行した validation と未実行理由を stage evidence として残す
+- 更新した repo 正本、commit hash、push の成否を残す
+- 最終 readiness は [`task_close.py`](../../tools/runtime/lifecycle/task_close.py) に委譲する
 
 ## 関連正本
 
@@ -915,7 +886,3 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 - [agents/workflows/research-workflow.md](research-workflow.md)
 - [agents/workflows/experiment-workflow.md](experiment-workflow.md)
 - [agents/workflows/workflow-references.md](workflow-references.md)
-
-## Convention Compliance Gate
-
-Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

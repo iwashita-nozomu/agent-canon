@@ -347,7 +347,7 @@ BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_CONSUMERS = ("tools/validation/ci/checks/check_agent_canon_pr.sh",)
 WORKFLOW_GATE_COMMAND_RE = re.compile(
-    r'(?m)^\s*python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/check_convention_compliance\.py"\s+'
+    r'(?m)^\s*python3\s+"\$\{WORKSPACE_ROOT\}/tools/validation/semantic/convention/check_convention_compliance\.py"\s+'
     r'--root\s+"\$\{WORKSPACE_ROOT\}"\s+--format\s+json$'
 )
 WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
@@ -355,11 +355,15 @@ WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"check_convention_compliance\.py|check_convention_compliance\.py"
     r"(?:\S+\s+){0,6}?(?:optional|not\s+required)"
 )
-CLOSEOUT_READINESS_MARKERS = (
-    "Completion Readiness",
-    "user-facing completion",
-    "repo_wide_static_analysis_complete",
-    "repo_wide_dependency_tools_complete",
+CLOSEOUT_WORKFLOW_PATH = "agents/canonical/CODEX_WORKFLOW.md"
+CLOSEOUT_OWNER_PATH = "tools/runtime/lifecycle/task_close.py"
+CLOSEOUT_WORKFLOW_DELEGATION_MARKERS = (
+    "[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)",
+    "sole terminal readiness predicate",
+)
+CLOSEOUT_OWNER_MARKERS = (
+    "closeout_checks",
+    "ready = all(closeout_checks.values())",
 )
 DOCUMENT_CLAIM_GROUNDING_MARKERS = {
     "documents/conventions/common/05_docs.md": (
@@ -1077,17 +1081,36 @@ def collect_marker_contract_findings(
 
 
 def check_closeout_readiness(root: Path) -> list[Finding]:
-    """Verify workflow completion readiness remains wired into the workflow."""
-    path = "agents/canonical/CODEX_WORKFLOW.md"
-    findings = check_required_files(root, (path,), "workflow_readiness")
-    if findings:
-        return findings
-    text = read_text(root, path)
-    for marker in CLOSEOUT_READINESS_MARKERS:
-        if marker not in text:
-            findings.append(
-                Finding("workflow_readiness", path, f"missing-marker:{marker}")
-            )
+    """Verify workflow delegates terminal readiness to the closeout owner."""
+    findings = check_required_files(
+        root,
+        (CLOSEOUT_WORKFLOW_PATH, CLOSEOUT_OWNER_PATH),
+        "workflow_readiness",
+    )
+    workflow = readable_path(root, CLOSEOUT_WORKFLOW_PATH)
+    if workflow is not None:
+        text = workflow.read_text(encoding="utf-8")
+        for marker in CLOSEOUT_WORKFLOW_DELEGATION_MARKERS:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "workflow_readiness",
+                        CLOSEOUT_WORKFLOW_PATH,
+                        f"missing-owner-delegation:{marker}",
+                    )
+                )
+    owner = readable_path(root, CLOSEOUT_OWNER_PATH)
+    if owner is not None:
+        text = owner.read_text(encoding="utf-8")
+        for marker in CLOSEOUT_OWNER_MARKERS:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "workflow_readiness",
+                        CLOSEOUT_OWNER_PATH,
+                        f"missing-terminal-owner-marker:{marker}",
+                    )
+                )
     return findings
 
 

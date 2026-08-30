@@ -9,6 +9,23 @@
 # @dependency-end
 version: 2
 
+# Positive workflow activation is resolved from the typed family and topology
+# records below.  Consumers must not infer a family, stage, or child from
+# prompt prose; authority and safety prohibitions remain with their canonical
+# workflow/authority owners.
+workflow_activation_policy:
+  family_selector: tasks[].family
+  stage_owner: role_topology_defaults.stage_waves
+  required_role_owner: workflow_families[].roles
+  child_handoff:
+    activation: selected_typed_route
+    required_role_owner: workflow_families[].roles
+    write_capable: true
+  full_staging:
+    activation: selected_coordination_route
+    coordination_families:
+      - comprehensive_development
+
 review_activation_policy:
   mode: candidate_only
   owner_gate_cardinality: one_gate_per_replaceable_responsibility

@@ -416,6 +416,38 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "implementation role family"):
                 runtime_alignment.validate_task_catalog_references()
 
+    def test_task_catalog_activation_policy_owns_positive_route_selection(self) -> None:
+        """Family, stage, and child activation pointers remain catalog-owned."""
+        catalog = loaded_task_catalog_raw()
+        policy = cast(dict[str, object], catalog["workflow_activation_policy"])
+        self.assertEqual(policy["family_selector"], "tasks[].family")
+        self.assertEqual(policy["stage_owner"], "role_topology_defaults.stage_waves")
+        self.assertEqual(policy["required_role_owner"], "workflow_families[].roles")
+        child_handoff = cast(dict[str, object], policy["child_handoff"])
+        self.assertEqual(child_handoff["activation"], "selected_typed_route")
+        self.assertEqual(
+            child_handoff["required_role_owner"],
+            "workflow_families[].roles",
+        )
+        self.assertTrue(child_handoff["write_capable"])
+        full_staging = cast(dict[str, object], policy["full_staging"])
+        self.assertEqual(full_staging["activation"], "selected_coordination_route")
+        self.assertIn(
+            "comprehensive_development",
+            cast(list[str], full_staging["coordination_families"]),
+        )
+
+    def test_task_catalog_rejects_activation_owner_drift(self) -> None:
+        """A positive route owner cannot silently move to a prose projection."""
+        raw = loaded_task_catalog_raw()
+        policy = cast(dict[str, object], raw["workflow_activation_policy"])
+        policy["stage_owner"] = "agents/skills/agent-orchestration.md"
+        catalog = task_catalog_from_raw(raw)
+
+        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
+            with self.assertRaisesRegex(RuntimeError, "stage owner must be"):
+                runtime_alignment.validate_task_catalog_references()
+
     def test_checked_in_workflow_topologies_use_active_decision_roles(self) -> None:
         """Repo-changing families keep reviewers deferred until their decision exists."""
         catalog = task_catalog_from_raw(loaded_task_catalog_raw())
@@ -423,7 +455,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         self.assertEqual(workflow_topology_policy_violations(catalog), ())
 
     def test_workflow_topology_policy_rejects_always_on_delivery_reviewer(self) -> None:
-        """A delivery reviewer must not return to an always-on child wave."""
+        """A catalog-owned role move is not rejected by a duplicate role table."""
         raw = loaded_task_catalog_raw()
         families = cast(list[dict[str, object]], raw["workflow_families"])
         scoped = next(family for family in families if family["id"] == "scoped_change")
@@ -434,7 +466,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         specialists.remove("manager_reviewer")
         catalog = task_catalog_from_raw(raw)
 
-        self.assertIn(
+        self.assertNotIn(
             ("scoped_change", "delivery-producer-core"),
             workflow_topology_policy_violations(catalog),
         )

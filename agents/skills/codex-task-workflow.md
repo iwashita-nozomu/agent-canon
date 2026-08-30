@@ -56,10 +56,12 @@ validation で完了し、DIC fingerprint/closure を作りません。
 - Boundary: task-specific behavior still comes from the user-request clauses,
   source packet, selected skills, and validation route.
 
-Routing mode, decision sufficiency, bounded-owner policy, and coordination
-activation remain owned by `agent-orchestration`; route names and compact
+Routing mode and decision sufficiency remain owned by `agent-orchestration`,
+while positive workflow-family, stage, and child activation are owned by
+`agents/task_catalog.yaml#workflow_activation_policy`. Route names and compact
 commands remain owned by `task-routing`. This document owns only the execution
-transport, selected stages, and closeout readback.
+transport, selected stages, and closeout readback; safety and blocker
+prohibitions remain with the canonical workflow/authority owners.
 
 ## Purpose
 
@@ -156,18 +158,20 @@ route are ready.
   する場合にだけ実行する。作業が repo を変更することだけでは bundle の
   根拠にならない
 - bounded owner route では boundary-evidenced local route を使い、document-flow / broad design review は escalation 条件がある場合だけ起動する
-- repo-changing implementation / patch / doc-edit work では、bounded request を
-  含めて selected write-capable implementer handoff を必ず bootstrap または
-  schedule する。owner、責務、context、write authority、validation route が同一の
-  active agent は revised scope でも再利用する。独立 review、disjoint write
+- repo-changing implementation / patch / doc-edit work では、
+  `agents/task_catalog.yaml#workflow_activation_policy` が child handoff を
+  要求する typed route だけを bootstrap または schedule する。bounded
+  owner/path/targeted-validation route は、typed route が要求しない限り
+  child を必要とせず、選択された route の owner、責務、context、write
+  authority、validation route を保ちます。独立 review、disjoint write
   authority、異なる owner/context、または context integrity failure の場合だけ
-  fresh agent を起動する。spawn/authorization/tool gate が欠ける場合は typed
-  blocker を記録し、親は編集へ切り替えない
+  fresh agent を起動します。spawn/authorization/tool gate が欠ける場合は
+  typed blocker を記録し、親は編集へ切り替えない
 - Routine docs / Focused code でも targeted validation は使うが、
   task-catalog の role や default review pack は候補であり、selected
   owner-critical operation または unresolved branch が有効化した場合だけ
   handoff、review、wave を作る
-- repo-changing execution の編集では、既存 tool の実行を前提に runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に write-capable child の packet へ渡し、結果の解釈や修正は対応する child owner に委ねます。owner boundary、差し替え可能な単位、targeted validation route、`external public API/behavior/schema unchanged` が evidence で閉じた bounded 修正も child route とし、親は実行結果を判定しません。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route に進め、`dependency/consumer/migration/docs closure` を scope 形成する。外形的な作業量、file 数、近接 owner だけでは route や closure を縮めません。実装 behavior は契約完全実装ポリシーから導く
+- repo-changing execution の編集では、既存 tool の実行を前提に runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、選択された typed route が child handoff を要求する場合だけ write-capable child の packet へ渡します。結果の解釈や修正は対応する owner に委ねます。owner boundary、差し替え可能な単位、targeted validation route、`external public API/behavior/schema unchanged` が evidence で閉じた bounded 修正は、その typed route のまま扱い、child を要求しない route の親は実行結果を直接判定できます。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route に進め、`dependency/consumer/migration/docs closure` を scope 形成する。外形的な作業量、file 数、近接 owner だけでは route や closure を縮めません。実装 behavior は契約完全実装ポリシーから導く
 - research-backed implementation、benchmark、external research、prior art、
   公式 docs、文献由来の design decision によって code、protocol、report claim、
   design を変える場合は、`skills=...` / run bundle の skill call sequence で
@@ -176,8 +180,8 @@ route are ready.
   limitation、contrary / narrowing evidence、adoption/exclusion decision を
   `Implementation Source Packet` に接続し、post-hoc citation cleanup や一時的な
   browser context から実装 claim を閉じません。
-- ユーザーが coding / implementation / patch / editing を明示的に依頼した場合は、read-only wave を completion ルートにしない。要件整理、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation route、`tool_rejection_preflight` evidence から dependency-expanded handoff scope を作り、選択済み write-capable implementer を起動してから実装へ進む
-- repo-changing implementation / patch / doc-edit task では `$agent-orchestration` を先頭に置き、必ず `$subagent-bootstrap` を併用する。bounded request も owner と targeted validation を write-capable child packet に渡す
+- ユーザーが coding / implementation / patch / editing を明示的に依頼した場合、selected typed route が child を要求するなら read-only wave を completion ルートにしない。要件整理、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation route、`tool_rejection_preflight` evidence から dependency-expanded handoff scope を作り、選択済み write-capable implementer を起動してから実装へ進む
+- repo-changing implementation / patch / doc-edit task では `$agent-orchestration` を先頭に置き、catalog typed route が要求する場合だけ `$subagent-bootstrap` を併用する。bounded request は typed route が child を要求しない限り owner/path/targeted-validation route に留める
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
 - ユーザー向けの作業報告、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書きます。内部の項目名、列挙値、役割名、補助関数風の語は、コマンド、パス、表、正確な根拠の引用に閉じます。専門語が必要な場合は、既存のリポジトリ用語または外部標準の用語を使い、自然文で説明します。
 - AgentCanon update は standalone source または親repoの ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` cloneで行い、`agents/workflows/agent-canon-pr-workflow.md` に従って source branch/PR/main readbackを閉じる。親repoへvendor/submodule/root projectionを作らない
@@ -285,8 +289,8 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. ユーザー向けの作業更新、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書く。内部の field name、enum value、role key、helper 風の語は、command、path、table、正確な evidence reference に閉じる。専門語が必要な場合は、既存の repository term または外部標準 term を使い、自然文で説明する。
 1. During requirements, resolve avoidable ambiguity from notes, guardrails, documents, prior logs, and local code or tests before asking the user; record the sweep and evidence in `user_request_contract.md`.
 1. Keep `unknown_or_open_question` out of active must-do, must-not-do, and completion-evidence clauses; move remaining unknowns to deferred or escalation entries after the sweep.
-1. For repo-changing implementation / patch / doc-edit work, bootstrap or schedule a selected write-capable implementer even for bounded requests. Reuse the same active agent for revised scope; independent review, disjoint write authority, differing owner/context, or failed context integrity require a fresh agent. Plan, detailed-design, and document-flow reviewers are selected only when an owner-critical validation or unresolved branch activates them. Routine docs and Focused code still use targeted validation through the child route.
-1. If the user explicitly asks for subagent coding/implementation/patch/editing, route completion through the selected write-capable implementer after the pre-handoff investigation packet derives dependency-expanded handoff scope, validation route, and `tool_rejection_preflight` evidence from route seed, responsibility search, reuse survey, and stale-surface scan.
+1. For repo-changing implementation / patch / doc-edit work, bootstrap or schedule a selected write-capable implementer only when the catalog typed route requires a child, including when a bounded route explicitly selects that child. Reuse the same active agent for revised scope; independent review, disjoint write authority, differing owner/context, or failed context integrity require a fresh agent. Plan, detailed-design, and document-flow reviewers are selected only when an owner-critical validation or unresolved branch activates them. Routes without child activation remain on their owner/path/targeted-validation route.
+1. If the user explicitly asks for subagent coding/implementation/patch/editing, preserve that request as route evidence, but route completion through the selected write-capable implementer only when the catalog typed route requires a child. The pre-handoff investigation packet still derives dependency-expanded handoff scope, validation route, and `tool_rejection_preflight` evidence from route seed, responsibility search, reuse survey, and stale-surface scan.
 1. Use `agents/canonical/ARTIFACT_PLACEMENT.md` before creating task-facing documents.
 1. Before detailed design selects implementation paths, write or cite an abstract design frame: responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and canonical-surface relationships. Implementation scope, file list, and validation must be derived from that frame rather than from the nearest editable path or current finding alone.
 1. Before implementation path selection, run or cite the deterministic provider search only when owner, replaceable unit, implementation mechanism, or validation route remains unknown. Explicit owner/path or approved design evidence skips the provider sweep. A failed search is diagnostic; it becomes `router_unavailable_blocker` only when owner/path ambiguity remains. Any continuation records the local/tool blocker evidence required by the selected handoff route.

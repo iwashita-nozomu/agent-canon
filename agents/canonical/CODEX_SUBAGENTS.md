@@ -52,7 +52,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 
 ## この文書の読み方
 
-- この文書は、Codex runtime の subagent inventory、activation、handoff、budget、role mapping を所有します。
+- この文書は、Codex runtime の subagent inventory、handoff、budget、role mapping、および launch mechanics を所有します。positive workflow family、stage、required role、child activation は `agents/task_catalog.yaml#workflow_activation_policy` を読みます。
 - 前半は principles、budget、handoff context、wave plan、language / completeness / quality policy を扱い、後半は activation timing、command surface、role mapping、write safety、model settings、smoke test を扱います。
 - parent agent は `## Wave Plan Contract` と `## Handoff Context Contract` を先に読み、writer / reviewer は `## Permanent Team To Codex Mapping` と `## Recommended Routing` を参照します。
 - この文書の `parent Sol` は `.codex/config.toml` の parent projection を指し、
@@ -88,10 +88,11 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   `workflow_monitoring.md` に残します。
 - repo-changing task では、owner、責務、context、write authority、validation
   route が揃った launchable wave だけを立てる
-- repo-changing implementation / patch / doc-edit work は、bounded request を
-  含めて必ず write-capable implementer handoff first です。spawn authorization、
-  tool gate、または他の launch blocker がある場合は typed blocked/retry/user-report
-  packet を残し、親の直接編集へ切り替えません。
+- repo-changing implementation / patch / doc-edit work は、catalog の typed route が
+  要求する場合だけ write-capable implementer handoff first です。bounded owner/path/
+  targeted-validation route は、typed route が要求しない限り child を必要としません。
+  spawn authorization、tool gate、または他の launch blocker がある場合は typed
+  blocked/retry/user-report packet を残し、親の直接編集へ切り替えません。
 - 調査、レビュー、文書整備は分ける
 - fan-out は active spawn budget と stage wave plan の範囲で管理する
 - subagents may spawn bounded child subagents when their handoff packet includes `delegated_spawn_policy` with owner, input packet, expected output, dependency-expanded handoff scope, validation route, review gate, and remaining spawn budget
@@ -116,8 +117,8 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - 実装では既存コード、既存の命名、既存の文書スタイルの踏襲を優先する
 - Codex の role ごとの model / reasoning 設定は `agents/model_profiles.toml` を正本にし、`.codex/agents/*.toml` は registry-generated view とする
 - `implementer.codex_agents` は canonical model/profile registry の generated view です。implementation-executable fixed packet は Decision Sufficiency の `execute_spark` から `spark_worker` 一体を直接 materialize し、同じ packet の post-completion owning gate だけを続けます。Luna は ambiguous design、causal repair、graph-owned cross-owner integration、review を所有します。
-- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch / doc-edit work が scope にある task では、write-capable handoff を既定 route として説明する。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、選択済み write-capable implementer の handoff を schedule し、parent は packet relay、依存順、status、最終 readback に集中する
-- user が coding / implementation / patch / doc-edit work を求めた task では、read-only wave は setup evidence です。requirements、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、bounded request でも write-capable implementer を起動または schedule します。親は packet relay、依存順、status、最終 readback だけを担当します。
+- repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch / doc-edit work が scope にある task では、`agents/task_catalog.yaml#workflow_activation_policy` が child handoff を要求する typed route の場合に限り、write-capable handoff を既定 route として説明する。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、選択済み write-capable implementer の handoff を schedule し、parent は packet relay、依存順、status、最終 readback に集中する
+- user が coding / implementation / patch / doc-edit work を求めた task では、read-only wave は setup evidence です。selected typed route が child を要求する場合に限り、requirements、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作って write-capable implementer を起動または schedule します。prompt-only bounded route は semantic handoff と targeted validation のまま child を必要としません。spawn authorization、tool gate、または他の launch blocker がある場合は typed blocked/retry/user-report packet を残し、親の直接編集へ切り替えません。親は packet relay、依存順、status、最終 readback だけを担当します。
 - 分割境界は差し替え可能性で判断します。別実装、別証明、別 validation oracle、別 review decision に置き換えられる単位なら worker scope にできます。数理的に差し替えが起きない境界、記法だけの境界、固定 context、同じ oracle を共有する連続導出は、過剰な subagent 分割を避けて同じ input packet に残します。
 - 固定 packet の candidate replacement は行いません。capacity/model failure は typed event として同じ immutable packet を queue し、exact target contradiction だけを一度の `StructuralDesignGap` として修復後、同じ Spark を再開します。
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution は
@@ -842,7 +843,7 @@ runtime は再生成後に restart し、readback で反映を確認します。
 - Spark model は `spark_worker` の低遅延 implementation loop に集約し、repo inventory、tool drift survey、machine-report / experiment-log summarization、execution-only experiment / log work は Luna/high の通常 role に置きます。mini/medium は明示的な T14 skill validation の `skill_evaluator` に限ります。
 - `spark_worker` へ渡す条件は、Abstract Design Frame、Implementation Source Packet、Design-To-Implementation Trace、identifier naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、typed parent-packet selection が stdout / manifest に記録されていることです
 - 明示 spawn 許可がある repo-changing task では、coding / implementation / patch / doc-edit work の implementation critical path を pre-handoff investigation packet で作ってから、次の判断を変える独立検証だけを Luna review child へ切ります。各 replaceable responsibility は一つの owning review gate で足り、文書 flow、requirements / plan、report traceability、research perspective は distinct unresolved claim / risk が owning gate で判定できないときだけ specialist wave として起動します。
-- coding / implementation / patch / doc-edit work を求める repo-changing task では、read-only / review wave は write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は、bounded request でも `worker` を既定として起動または schedule し、`spark_worker` は explicit parent-packet selection が記録された場合だけ使います。completion route は handoff、integration、review、validation で構成し、親は直接編集・テスト・判定を行いません。
+- coding / implementation / patch / doc-edit work を求める repo-changing task では、read-only / review wave は selected typed route が child を要求する場合だけ write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は、その route が要求する場合に `worker` を既定として起動または schedule し、`spark_worker` は explicit parent-packet selection が記録された場合だけ使います。prompt-only bounded route は semantic handoff と targeted validation のまま child を必要としません。completion route は selected route の handoff、integration、review、validation で構成し、親は直接編集・テスト・判定を行いません。spawn authorization、tool gate、または他の launch blocker がある場合は typed blocked/retry/user-report packet を残し、親の直接編集へ切り替えません。
 - `spark_worker` を選択できる実装は、Abstract Design Frame から導かれた差し替え可能な単位で、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです。この eligibility evidence に加えて typed parent-packet selection が必要です。
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
 - Terra は canonical 登録された conditional read-only cross-cutting specialist candidate であり、always-on role ではありません。multi-owner dependency closure、compaction・long-run・incomplete handoff の context reconstruction、または複数案・finding の contradiction validation の evidence がある場合だけ active にし、evidence なしには選択しません。coordinator や general worker としては使わず、capability は `cross_owner_integration`、`context_reconstruction`、`adversarial_contradiction_validation` に限定します。
