@@ -2,7 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Provides legacy worktree cleanup diagnostic repository automation.
-# upstream design README.md shared automation index
+# upstream design ../../README.md shared automation index
+# upstream implementation ../workspace/worktree_start.py owns legacy cleanup diagnostics
 # @dependency-end
 
 set -euo pipefail
@@ -21,4 +22,4 @@ if [ -z "$PYTHON_BIN" ]; then
   fi
 fi
 
-exec "$PYTHON_BIN" "${SCRIPT_DIR}/agent_tools/worktree_start.py" "$@"
+exec "$PYTHON_BIN" "${SCRIPT_DIR}/../workspace/worktree_start.py" "$@"

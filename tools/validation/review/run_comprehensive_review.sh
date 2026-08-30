@@ -3,6 +3,10 @@
 # contract tool
 # responsibility Provides run comprehensive review repository automation.
 # upstream design ../../README.md shared automation index
+# upstream implementation ../documentation/checks/triplet_validator.py owns doc-test-code triplet checks
+# upstream implementation ../semantic/convention/check_convention_compliance.py owns convention checks
+# upstream implementation ../dependencies/docker_dependency_validator.sh owns dependency validation
+# upstream implementation ../../bin/agent-canon owns canonical documentation checks
 # @dependency-end
 
 #
@@ -118,6 +122,11 @@ export XDG_CACHE_HOME="${XDG_CACHE_DIR}"
 # checkout instead of inheriting a caller's parent-repository cwd.
 cd "${PROJECT_ROOT}"
 
+TRIPLET_CHECK="${PROJECT_ROOT}/tools/validation/documentation/checks/triplet_validator.py"
+CONVENTION_CHECK="${PROJECT_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py"
+DOCKER_DEPENDENCY_CHECK="${PROJECT_ROOT}/tools/validation/dependencies/docker_dependency_validator.sh"
+AGENT_CANON="${PROJECT_ROOT}/tools/bin/agent-canon"
+
 # タイムスタンプ
 START_TIME=$(date +%s)
 START_DATE=$(date '+%Y-%m-%d %H:%M:%S')
@@ -187,13 +196,13 @@ if [ "$RUN_PARALLEL" = true ]; then
     log_info "Running tools in parallel mode..."
     
     # Background jobs
-    "$PYTHON_BIN" "$SCRIPT_DIR/validation/triplet_validator.py" > "$LOG_DIR/triplet_check.log" 2>&1 &
+    "$PYTHON_BIN" "$TRIPLET_CHECK" > "$LOG_DIR/triplet_check.log" 2>&1 &
     PID_TRIPLET=$!
     
-    "$PYTHON_BIN" "$SCRIPT_DIR/check_convention_consistency.py" > "$LOG_DIR/convention_check.log" 2>&1 &
+    "$PYTHON_BIN" "$CONVENTION_CHECK" > "$LOG_DIR/convention_check.log" 2>&1 &
     PID_CONVENTION=$!
     
-    bash "$SCRIPT_DIR/docker_dependency_validator.sh" > "$LOG_DIR/docker_check.log" 2>&1 &
+    bash "$DOCKER_DEPENDENCY_CHECK" "$PROJECT_ROOT" > "$LOG_DIR/docker_check.log" 2>&1 &
     PID_DOCKER=$!
     
     
@@ -221,7 +230,7 @@ else
     # Sequential execution
     log_info ""
     log_info "4/4️⃣ Doc-Test-Code Triplet Check..."
-    if "$PYTHON_BIN" "$SCRIPT_DIR/validation/triplet_validator.py" > "$LOG_DIR/triplet_check.log" 2>&1; then
+    if "$PYTHON_BIN" "$TRIPLET_CHECK" > "$LOG_DIR/triplet_check.log" 2>&1; then
         log_success "triplet check: OK"
     else
         log_error "triplet check: FAILED"
@@ -229,7 +238,7 @@ else
     
     log_info ""
     log_info "5️⃣/6️⃣ Convention Consistency Check..."
-    if "$PYTHON_BIN" "$SCRIPT_DIR/check_convention_consistency.py" > "$LOG_DIR/convention_check.log" 2>&1; then
+    if "$PYTHON_BIN" "$CONVENTION_CHECK" > "$LOG_DIR/convention_check.log" 2>&1; then
         log_success "convention check: OK"
     else
         log_error "convention check: FAILED"
@@ -237,7 +246,7 @@ else
     
     log_info ""
     log_info "6️⃣/7️⃣ Docker Dependency Validation..."
-    if bash "$SCRIPT_DIR/docker_dependency_validator.sh" > "$LOG_DIR/docker_check.log" 2>&1; then
+    if bash "$DOCKER_DEPENDENCY_CHECK" "$PROJECT_ROOT" > "$LOG_DIR/docker_check.log" 2>&1; then
         log_success "docker check: OK"
     else
         log_error "docker check: FAILED"
@@ -251,7 +260,7 @@ log_info "【Document Checks】"
 
 log_info ""
 log_info "8️⃣ Documentation checks..."
-if "$SCRIPT_DIR/bin/agent-canon" docs check > "$LOG_DIR/docs_check.log" 2>&1; then
+if "$AGENT_CANON" docs check > "$LOG_DIR/docs_check.log" 2>&1; then
     log_success "docs-check: OK"
 else
     log_error "docs-check: FAILED (see $LOG_DIR/docs_check.log)"
