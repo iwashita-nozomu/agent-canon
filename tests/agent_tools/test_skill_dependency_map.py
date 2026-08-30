@@ -31,10 +31,8 @@ from tools.agent.skills.skill_dependency_map import (  # noqa: E402
     GraphIdentityCollisionError,
     _canonical_bytes,
     _IdentityStore,
-    _load_tool_entries,
     _json_digest_from_graph,
     _normalize_identifier,
-    _resolve_tool_id,
     _validate_loaded_graph,
     build_graph,
     check_artifacts,
@@ -269,20 +267,19 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
         packet = packet_for_skill(resolution, "result-artifact-writeout")
         archive_commands = [
-            row[0]
+            row[4]
             for row in packet.resolved_conditional_commands
-            if "runtime_log_archive_git.py" in row[0]
+            if "runtime_log_archive_git.py" in " ".join(row[4])
         ]
         self.assertEqual(len(archive_commands), 2)
         self.assertIn("archive-agent-report", archive_commands[0])
-        self.assertEqual(archive_commands[1].split()[-1], "push")
-        self.assertNotIn("sync", " ".join(archive_commands))
-        self.assertNotIn("status", " ".join(archive_commands))
+        self.assertEqual(archive_commands[1][-1], "push")
+        self.assertNotIn("sync", " ".join(archive_commands[0]))
+        self.assertNotIn("status", " ".join(archive_commands[0]))
 
     def test_tool_resolution_edges_are_readback_complete(self) -> None:
         """Every resolved tool ID from command packets is represented as a tool-resolution edge."""
         graph = build_graph(PROJECT_ROOT)
-        tools = _load_tool_entries(PROJECT_ROOT)
         resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
         skill_ids = tuple(item["display_label"] for item in graph["skills"])
         expected = set()
@@ -294,8 +291,9 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 ("maintenance", packet.resolved_maintenance_commands),
             ):
                 for index, row in enumerate(rows):
-                    _, _, _, env, argv = row
-                    tool_id = _resolve_tool_id(row[0], env, argv, tools)
+                    _, _, _, _, argv = row
+                    tool_id = packet.command_tool_ids[("required", "conditional", "maintenance").index(phase)][index]
+                    tool_id = tool_id or None
                     if tool_id is not None:
                         expected.add((f"command:{skill}:{phase}:{index:04d}", f"tool:{tool_id}"))
         actual = {

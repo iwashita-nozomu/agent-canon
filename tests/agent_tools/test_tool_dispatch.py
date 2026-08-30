@@ -115,10 +115,15 @@ class ToolDispatchTest(unittest.TestCase):
             if item["id"] == "issue-finding-report"
         )
         commands = entry["tool_commands"]["conditional"]
-        lookup_commands = [command for command in commands if "gh issue view" in command]
+        lookup_commands = [
+            command
+            for command in commands
+            if command.get("executable") == "gh"
+            and command.get("argv", [])[:2] == ["issue", "view"]
+        ]
         self.assertEqual(len(lookup_commands), 1)
-        self.assertIn("gh issue view", lookup_commands[0])
-        self.assertNotIn("issue-sync", lookup_commands[0])
+        self.assertEqual(lookup_commands[0]["argv"][:2], ["issue", "view"])
+        self.assertNotEqual(lookup_commands[0].get("tool_id"), "issue-sync")
 
     def test_dashboard_uses_container_and_external_artifact_route(self) -> None:
         """The canonical dashboard route keeps source read-only and output external."""

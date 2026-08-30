@@ -89,10 +89,53 @@
       "additionalProperties": false,
       "required": ["required", "conditional"],
       "properties": {
-        "required": { "$ref": "#/$defs/stringList" },
-        "conditional": { "$ref": "#/$defs/stringList" },
-        "maintenance": { "$ref": "#/$defs/stringList" }
+        "required": { "$ref": "#/$defs/commandList" },
+        "conditional": { "$ref": "#/$defs/commandList" },
+        "maintenance": { "$ref": "#/$defs/commandList" }
       }
+    },
+    "commandList": {
+      "type": "array",
+      "items": { "oneOf": [{ "$ref": "#/$defs/catalogCommand" }, { "$ref": "#/$defs/nativeCommand" }] },
+      "uniqueItems": true
+    },
+    "catalogCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_id"],
+      "properties": {
+        "tool_id": { "$ref": "#/$defs/identifier" },
+        "operation_id": { "$ref": "#/$defs/identifier" },
+        "argv_suffix": { "$ref": "#/$defs/argvList" },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/inputBinding" }
+        }
+      }
+    },
+    "nativeCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable", "argv"],
+      "properties": {
+        "executable": { "$ref": "#/$defs/nonEmptyString" },
+        "argv": { "$ref": "#/$defs/argvList" }
+      }
+    },
+    "inputBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from"],
+      "properties": {
+        "from": { "$ref": "#/$defs/nonEmptyString" },
+        "type": { "enum": ["string", "literal", "path", "path-list", "enum", "integer", "boolean", "oid", "issue-number"] },
+        "repeat": { "type": "boolean" },
+        "choices": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "argvList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonEmptyString" }
     },
     "toolRuntime": {
       "type": "object",

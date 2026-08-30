@@ -168,7 +168,11 @@
           "uniqueItems": true
         },
         "parity": { "enum": ["legacy", "verified"] },
-        "parity_fixture": { "$ref": "#/$defs/path" }
+        "parity_fixture": { "$ref": "#/$defs/path" },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/argument" }
+        }
       }
     },
     "entry": {
@@ -215,6 +219,18 @@
         },
         "test_exempt_reason": { "$ref": "#/$defs/nonEmptyString" },
         "dispatch": { "$ref": "#/$defs/dispatch" }
+      }
+    },
+    "argument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["string", "literal", "path", "path-list", "enum", "integer", "boolean", "oid", "issue-number"] },
+        "flag": { "$ref": "#/$defs/nonEmptyString" },
+        "repeat": { "type": "boolean" },
+        "required": { "type": "boolean" },
+        "choices": { "$ref": "#/$defs/nonEmptyStringList" }
       }
     }
   }

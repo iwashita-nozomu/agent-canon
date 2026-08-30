@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
@@ -53,6 +52,7 @@ else:
 
 from tools.agent.orchestration.route import decide_skills, load_skill_route_rules
 from tools.agent.skills.skill_tool_commands import (
+    CommandPlan,
     SkillCommandPacket,
     packet_for_skill,
     project_public_command_for_layout,
@@ -603,16 +603,6 @@ COORDINATION_RECEIPT_CONTRACT_REF = (
 )
 COORDINATION_OPERATION_OBSERVATION = COLLABORATION_OPERATIONS
 
-SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
-    "python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir {report_dir} "
-    '--subagent-wave "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> '
-    "spawn_authority=<authority> trigger=<trigger> budget_before=<used/limit> "
-    "budget_after=<used/limit> runtime_max_threads=<n> runtime_max_depth=<n> "
-    "spawned_roles=<roles-or-none> role_instances=<role_id:instance_id:agent_type:packet> "
-    "skipped_roles=<roles-or-none> allowed_paths=<paths> do_not_read=<paths> "
-    "write_scope=<scope> validation_route=<route> review_gate=<gate> "
-    'handoff_artifacts=<artifacts> status=<status>"'
-)
 
 COMMON_PROMPT_MUST_INCLUDE = (
     "request_clause_ids",
@@ -931,19 +921,31 @@ def subagent_wave_record_command(
     layout: str = "standalone",
 ) -> str:
     """Return the canonical command for recording a spawned subagent wave."""
-    logical = SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE.format(report_dir=str(report_dir))
-    projection = project_public_command_for_layout(logical, layout=layout)
-    return shlex.join(
-        [*(f"{key}={value}" for key, value in projection.public_env), *projection.public_argv]
+    argv = (
+        "python3",
+        "tools/runtime/lifecycle/workflow_monitor.py",
+        "--report-dir",
+        str(report_dir),
+        "--subagent-wave",
+        "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> spawn_authority=<authority> "
+        "trigger=<trigger> budget_before=<used/limit> budget_after=<used/limit> "
+        "runtime_max_threads=<n> runtime_max_depth=<n> spawned_roles=<roles-or-none> "
+        "role_instances=<role_id:instance_id:agent_type:packet> skipped_roles=<roles-or-none> "
+        "allowed_paths=<paths> do_not_read=<paths> write_scope=<scope> "
+        "validation_route=<route> review_gate=<gate> handoff_artifacts=<artifacts> status=<status>",
     )
+    plan = CommandPlan(json.dumps(list(argv)), ".", ".", (), argv)
+    projection = project_public_command_for_layout(plan, layout=layout)
+    return json.dumps(list(projection.public_argv), ensure_ascii=False)
 
 
 def public_command_for_layout(logical_command: str, layout: str) -> str:
     """Render one logical command through the selected public layout."""
-    projection = project_public_command_for_layout(logical_command, layout=layout)
-    return shlex.join(
-        [*(f"{key}={value}" for key, value in projection.public_env), *projection.public_argv]
-    )
+    del layout
+    # Legacy manifest constants are documentation projections. They are not
+    # accepted by the command resolver and are intentionally returned without
+    # shell parsing or shell-string reconstruction.
+    return logical_command
 
 
 def public_command_for_spec(spec: RunBundleSpec, logical_command: str) -> str:
@@ -1919,11 +1921,17 @@ def manifest_pre_handoff_gate_status_lines(
     layout: str = "standalone",
 ) -> list[str]:
     """Render the pre-handoff gate status contract."""
-    design_projection = project_public_command_for_layout(
-        "python3 tools/validation/semantic/lifecycle/waterfall_gate_check.py --report-dir <report-dir> --gate design",
-        layout=layout,
+    design_argv = (
+        "python3",
+        "tools/validation/semantic/lifecycle/waterfall_gate_check.py",
+        "--report-dir",
+        "<report-dir>",
+        "--gate",
+        "design",
     )
-    design_command = shlex.join(design_projection.public_argv)
+    design_plan = CommandPlan(json.dumps(list(design_argv)), ".", ".", (), design_argv)
+    design_projection = project_public_command_for_layout(design_plan, layout=layout)
+    design_command = json.dumps(list(design_projection.public_argv), ensure_ascii=False)
     lines = [
         "  pre_handoff_gate_status:",
         "    enabled: true",
