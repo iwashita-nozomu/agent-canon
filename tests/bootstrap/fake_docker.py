@@ -857,6 +857,21 @@ def main(argv: list[str]) -> int:
                         }
                     )
                     state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
+                exchange_mount = next(
+                    (
+                        mount
+                        for mount in found[1]["Mounts"]
+                        if mount["Destination"] == "/var/lib/agent-canon/exchange"
+                    ),
+                    None,
+                )
+                if exchange_mount is not None:
+                    exchange_root = Path(exchange_mount["Source"])
+                    (exchange_root / "mounts.tsv").write_text("", encoding="utf-8")
+                    (exchange_root / "mounts.toml").write_text(
+                        'schema = "agent-canon.mount-registry.v2"\n',
+                        encoding="utf-8",
+                    )
             if operation in {"install", "update"} or (
                 "codex" in command[2:] and "prepare" in command[2:]
             ):
