@@ -505,16 +505,48 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     assert volume["GID"] == os.getgid()
     assert volume["Mode"] == "0700"
     assert volume["ResidentWriteReadback"] is True
+    assert not (runtime / "host-state" / "state-volume-created.tsv").exists()
     volume_root = Path(volume["Mountpoint"])
+    for directory in (
+        "runtime/container-runtime",
+        "runtime/spool",
+        "runtime/archive",
+        "runtime/cache",
+        "runtime/codex-home",
+    ):
+        assert (volume_root / directory).is_dir()
 
     def assert_volume_registry() -> None:
         registry = volume_root / "mount-registry.toml"
         assert registry.stat().st_mode & 0o777 == 0o444
         assert not os.access(registry, os.W_OK)
 
-    assert_volume_registry()
-    (volume_root / "host-mounts.tsv").write_text("stale\n", encoding="utf-8")
     copy_image = next(iter(docker_state["images"]))
+    stale_mounts = tmp_path / "stale-mounts.tsv"
+    stale_mounts.write_text("stale\n", encoding="utf-8")
+    imported = subprocess.run(
+        [
+            str(fake_docker),
+            "run",
+            "--rm",
+            "--env",
+            "AGENT_CANON_COPY_DIRECTION=import",
+            "--env",
+            "AGENT_CANON_COPY_KIND=host-mounts",
+            "--env",
+            f"AGENT_CANON_COPY_DIGEST={hashlib.sha256(bytes([115, 116, 97, 108, 101, 10])).hexdigest()}",
+            "--mount",
+            f"type=volume,src={volume['Name']},dst=/var/lib/agent-canon",
+            "--mount",
+            f"type=bind,src={stale_mounts},dst=/agent-canon-copy-input,readonly",
+            copy_image,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert imported.returncode == 0, imported.stderr
     cleared = subprocess.run(
         [
             str(fake_docker),
@@ -630,6 +662,11 @@ def test_existing_controller_volume_requires_state_label(tmp_path: Path) -> None
     runtime.mkdir()
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    volume_root.mkdir()
+    sentinel = volume_root / "foreign-state"
+    sentinel.write_bytes(b"foreign-volume-bytes\n")
+    sentinel.chmod(0o640)
     state_path = tmp_path / "docker-state.json"
     state_path.write_text(
         json.dumps(
@@ -651,6 +688,8 @@ def test_existing_controller_volume_requires_state_label(tmp_path: Path) -> None
         ),
         encoding="utf-8",
     )
+    state_before = state_path.read_bytes()
+    sentinel_before = (sentinel.read_bytes(), sentinel.stat().st_mode & 0o777)
     result = subprocess.run(
         [
             "bash",
@@ -673,6 +712,8 @@ def test_existing_controller_volume_requires_state_label(tmp_path: Path) -> None
     )
     assert result.returncode == 2
     assert json.loads(result.stderr)["code"] == "state_volume_ownership_mismatch"
+    assert state_path.read_bytes() == state_before
+    assert (sentinel.read_bytes(), sentinel.stat().st_mode & 0o777) == sentinel_before
 
 
 def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(tmp_path: Path) -> None:
@@ -793,12 +834,827 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(tmp_path: Path
     assert volume_state.read_text(encoding="utf-8") == '{"legacy":true}\n'
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["volumes"][volume_name]["Mode"] == "0700"
-    assert state["volumes"][volume_name]["UID"] == os.getuid()
-    assert state["volumes"][volume_name]["GID"] == os.getgid()
+    assert state["volumes"][volume_name]["UID"] == 1000
+    assert state["volumes"][volume_name]["GID"] == 1000
+
+
+@pytest.mark.parametrize(
+    "failure_environment",
+    [
+        {"FAKE_DOCKER_FAIL_VOLUME_NAME_READBACK_ONCE": "1"},
+        {"FAKE_DOCKER_FAIL_VOLUME_LABEL_READBACK_ONCE": "io.agent-canon.runtime"},
+    ],
+)
+def test_state_volume_readback_failure_removes_fresh_volume_and_allows_retry(
+    tmp_path: Path, failure_environment: dict[str, str]
+) -> None:
+    """A post-create identity readback failure cannot strand a fresh volume."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    control.mkdir()
+    runtime.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    state_path = tmp_path / "docker-state.json"
+    calls_path = tmp_path / "docker.calls"
+    fake = ROOT / "tests/bootstrap/fake_docker.py"
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_DOCKER_CMD={str(fake)!r}
+FAKE_DOCKER_STATE={str(state_path)!r}
+FAKE_DOCKER_CALLS={str(calls_path)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}
+AGENT_CANON_IMAGE_REF=image
+export AGENT_CANON_DOCKER_CMD FAKE_DOCKER_STATE FAKE_DOCKER_CALLS
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_IMAGE_REF
+_agent_canon_init_state_volume
+first=$?
+_agent_canon_init_state_volume
+second=$?
+printf 'first=%s second=%s\\n' "$first" "$second"
+exit "$second"
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path), **failure_environment},
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "first=2 second=0" in completed.stdout
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert list(state["volumes"]) == [volume_name]
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    assert (volume_root / ".agent-canon-controller-volume-v1").is_file()
+    calls = calls_path.read_text(encoding="utf-8").splitlines()
+    assert f"volume\trm\t{volume_name}" in calls
+
+
+def test_fresh_controller_failure_cleans_candidate_resources(tmp_path: Path) -> None:
+    """A first resident failure removes its container, image, and volume."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    state_root.mkdir(parents=True)
+    (state_root / "mounts.tsv").write_text("", encoding="utf-8")
+    control = tmp_path / "control"
+    control.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    calls = tmp_path / "docker.calls"
+    docker = tmp_path / "docker"
+    candidate_id = "sha256:" + "1" * 64
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
+        f"  printf '%s\\n' {candidate_id!r}; exit 0\n"
+        "fi\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        "  [[ \"${@: -1}\" == candidate ]] || exit 1\n"
+        f"  grep -q '^rm candidate$' {str(calls)!r} && exit 1\n"
+        "  case \"${4:-}\" in\n"
+        "    *'{{.Id}}'*) printf 'candidate\\n' ;;\n"
+        "    *State.Running*) printf 'false\\n' ;;\n"
+        "    *Config.Image*) printf 'candidate-ref\\n' ;;\n"
+        "    *io.agent-canon.runtime*) printf 'shared-v1\\n' ;;\n"
+        f"    *io.agent-canon.control-root-digest*) printf '{control_digest}\\n' ;;\n"
+        "  esac\n"
+        "  exit 0\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+    AGENT_CANON_STATE_VOLUME_NAME=fresh-volume
+    AGENT_CANON_STATE_VOLUME_CREATED_HERE=1
+    AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT={str(runtime / 'candidate-container.tsv')!r}
+    export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+    export AGENT_CANON_DOCKER_CMD AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_STATE_VOLUME_CREATED_HERE AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT
+    _agent_canon_state_volume_labels_match() {{ return 0; }}
+    _agent_canon_ensure_container() {{
+      mkdir -p {str(runtime)!r}
+      _agent_canon_write_candidate_identity_receipt candidate candidate candidate-ref {candidate_id!r}
+      printf 'candidate\\n'
+    }}
+_agent_canon_run_controller() {{ return 41; }}
+_agent_canon_replace_resident_locked candidate-ref {candidate_id!r} update
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 41
+    assert "rc=41" in completed.stdout
+    operations = calls.read_text(encoding="utf-8").splitlines()
+    assert any(
+        operation.endswith(" candidate") and operation.startswith("stop ")
+        for operation in operations
+    )
+    assert any(operation.startswith("rm candidate") for operation in operations)
+    assert any(operation.startswith(f"image rm {candidate_id}") for operation in operations)
+    assert "volume rm fresh-volume" in operations
+
+
+@pytest.mark.parametrize(
+    "failure_environment",
+    [
+        {"FAKE_DOCKER_FAIL_START": "1"},
+        {"FAKE_DOCKER_HEALTH_NEVER": "1"},
+    ],
+)
+def test_missing_resident_start_or_health_failure_preserves_existing_volume_and_image(
+    tmp_path: Path, failure_environment: dict[str, str]
+) -> None:
+    """Direct start removes its new container but preserves adopted resources."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    private_log = tmp_path / "private-log"
+    fake_bin = tmp_path / "fake-bin"
+    control.mkdir()
+    (state_root).mkdir(parents=True)
+    (runtime / "host-state").mkdir()
+    private_log.mkdir()
+    fake_bin.mkdir(exist_ok=True)
+    (fake_bin / "id").write_text(
+        "#!/bin/sh\n"
+        "case \"$1\" in\n"
+        "  -u|-g) printf '1000\\n' ;;\n"
+        "  *) exec /usr/bin/id \"$@\" ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    (fake_bin / "id").chmod(0o755)
+    (state_root / "mounts.tsv").write_text("", encoding="utf-8")
+    (state_root / "mounts.toml").write_text("", encoding="utf-8")
+    (runtime / "source-sync.json").write_text("{}\n", encoding="utf-8")
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    for directory in (
+        "runtime/receipts",
+        "runtime/generations",
+        "runtime/tasks",
+        "runtime/container-runtime",
+        "runtime/spool/private-feedback",
+        "runtime/archive",
+        "runtime/cache",
+        "runtime/codex-home",
+        "private-log",
+    ):
+        (volume_root / directory).mkdir(parents=True, exist_ok=True)
+    (volume_root / "runtime" / "state.json").write_text(
+        "existing-volume\n", encoding="utf-8"
+    )
+    marker = volume_root / ".agent-canon-controller-volume-v1"
+    marker.write_text(
+        f"agent-canon-controller-volume/v1\n{digest}\n", encoding="utf-8"
+    )
+    volume_root.chmod(0o711)
+    marker.chmod(0o444)
+    for directory in (volume_root / "runtime").rglob("*"):
+        if directory.is_dir():
+            directory.chmod(0o700)
+    (volume_root / "runtime").chmod(0o700)
+    (volume_root / "private-log").chmod(0o555)
+    candidate_id = "sha256:" + "1" * 64
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {
+                    "candidate": {
+                        "Id": candidate_id,
+                        "RepoTags": ["candidate"],
+                        "Config": {"Labels": {}},
+                    }
+                },
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                        "UID": 1000,
+                        "GID": 1000,
+                        "Mode": "0700",
+                        "RootUID": 0,
+                        "RootGID": 0,
+                        "RootMode": "0711",
+                        "MarkerUID": 0,
+                        "MarkerGID": 0,
+                        "MarkerMode": "0444",
+                        "PrivateLogUID": 0,
+                        "PrivateLogGID": 0,
+                        "PrivateLogMode": "0555",
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_PRIVATE_LOG_ROOT={str(private_log)!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}
+AGENT_CANON_IMAGE_REF=candidate
+AGENT_CANON_EXPECTED_IMAGE_ID={candidate_id!r}
+AGENT_CANON_HEALTH_ATTEMPTS=1
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_PRIVATE_LOG_ROOT AGENT_CANON_DOCKER_CMD AGENT_CANON_STATE_VOLUME_NAME
+export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID AGENT_CANON_HEALTH_ATTEMPTS
+_agent_canon_ensure_container
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit 0
+"""
+    result = subprocess.run(
+        ["timeout", "10s", "bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+            **failure_environment,
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert "rc=2" in result.stdout
+    if failure_environment.get("FAKE_DOCKER_HEALTH_NEVER") == "1":
+        assert '"code":"container_unhealthy"' in result.stderr
+        assert "rollback_failed" not in result.stderr
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["containers"] == {}
+    assert list(state["volumes"]) == [volume_name]
+    assert list(state["images"]) == ["candidate"]
+    assert (volume_root / "runtime" / "state.json").read_text(
+        encoding="utf-8"
+    ) == "existing-volume\n"
+    assert not (runtime / "host-state" / "candidate-container.tsv").exists()
+
+
+def test_existing_volume_transaction_restores_only_authoritative_set(tmp_path: Path) -> None:
+    """A failed replacement restores the bounded volume set, not private lifecycles."""
+    control = tmp_path / "control"
+    control.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    runtime_root = volume_root / "runtime"
+    for directory in (
+        "receipts",
+        "generations",
+        "tasks",
+        "container-runtime",
+        "spool/private-feedback",
+        "archive",
+        "cache",
+        "codex-home",
+        "private-log",
+    ):
+        (runtime_root / directory).mkdir(parents=True)
+    (volume_root / "private-log").mkdir()
+    (runtime_root / "state.json").write_text("old-state\n", encoding="utf-8")
+    (runtime_root / "owner.json").write_text("old-owner\n", encoding="utf-8")
+    (runtime_root / "mounts.toml").write_text("old-mounts\n", encoding="utf-8")
+    (runtime_root / "mounts.tsv").write_text("old-targets\n", encoding="utf-8")
+    (runtime_root / "rollback-plan.tsv").write_text("old-plan\n", encoding="utf-8")
+    (runtime_root / "rollback-mounts.tsv").write_text("old-rollback\n", encoding="utf-8")
+    (runtime_root / "generations" / "generation.json").write_text(
+        "old-generation\n", encoding="utf-8"
+    )
+    (runtime_root / "tasks" / "task.json").write_text("old-task\n", encoding="utf-8")
+    (runtime_root / "container-runtime" / "resident.tsv").write_text(
+        "old-resident\n", encoding="utf-8"
+    )
+    unrelated = {
+        runtime_root / "spool" / "sentinel": b"spool-preserved\n",
+        runtime_root / "archive" / "sentinel": b"archive-preserved\n",
+        runtime_root / "cache" / "sentinel": b"cache-preserved\n",
+        runtime_root / "codex-home" / "sentinel": b"codex-preserved\n",
+        volume_root / "private-log" / "sentinel": b"private-log-preserved\n",
+    }
+    for path, value in unrelated.items():
+        path.write_bytes(value)
+    for path in runtime_root.rglob("*"):
+        if path.is_dir():
+            path.chmod(0o700)
+    (volume_root / "private-log").chmod(0o555)
+    for path in (volume_root / "private-log").rglob("*"):
+        path.chmod(0o444)
+    marker = volume_root / ".agent-canon-controller-volume-v1"
+    marker.write_text(
+        f"agent-canon-controller-volume/v1\n{control_digest}\n", encoding="utf-8"
+    )
+    volume_root.chmod(0o711)
+    marker.chmod(0o444)
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": control_digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                        "UID": os.getuid(),
+                        "GID": os.getgid(),
+                        "Mode": "0700",
+                        "RootUID": 0,
+                        "RootGID": 0,
+                        "RootMode": "0711",
+                        "MarkerUID": 0,
+                        "MarkerGID": 0,
+                        "MarkerMode": "0444",
+                        "PrivateLogUID": 0,
+                        "PrivateLogGID": 0,
+                        "PrivateLogMode": "0555",
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    authoritative = [
+        runtime_root / "state.json",
+        runtime_root / "owner.json",
+        runtime_root / "mounts.toml",
+        runtime_root / "mounts.tsv",
+        runtime_root / "rollback-plan.tsv",
+        runtime_root / "rollback-mounts.tsv",
+        runtime_root / "generations" / "generation.json",
+        runtime_root / "tasks" / "task.json",
+        runtime_root / "container-runtime" / "resident.tsv",
+    ]
+    before = {
+        path: (path.read_bytes(), path.stat().st_mode & 0o777) for path in authoritative
+    }
+    fake = ROOT / "tests/bootstrap/fake_docker.py"
+    script = f"""
+source {str(ADAPTER)!r}
+set -e
+AGENT_CANON_DOCKER_CMD={str(fake)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path / 'host-runtime')!r}
+AGENT_CANON_STATE_ROOT={str(tmp_path / 'legacy-state')!r}
+AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}
+AGENT_CANON_IMAGE_REF=image
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+export AGENT_CANON_STATE_ROOT AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_IMAGE_REF
+mkdir -p "$AGENT_CANON_RUNTIME_ROOT" "$AGENT_CANON_STATE_ROOT"
+_agent_canon_prepare_state_volume_snapshot
+printf 'active=%s\\n' "$AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE"
+printf 'changed-state\\n' > {str(runtime_root / 'state.json')!r}
+rm -rf -- {str(runtime_root / 'generations')!r} {str(runtime_root / 'tasks')!r}
+mkdir -p -- {str(runtime_root / 'generations')!r} {str(runtime_root / 'tasks')!r}
+printf 'changed-task\\n' > {str(runtime_root / 'tasks' / 'changed.json')!r}
+printf 'changed-generation\\n' > {str(runtime_root / 'generations' / 'changed.json')!r}
+printf 'created-previous-image\\n' > {str(runtime_root / 'previous-image-id')!r}
+_agent_canon_restore_state_volume_snapshot
+printf 'active-after=%s\\n' "$AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["active=1", "active-after=0"]
+    for path, (value, mode) in before.items():
+        assert (path.read_bytes(), path.stat().st_mode & 0o777) == (value, mode)
+    assert not (runtime_root / "previous-image-id").exists()
+    assert not (volume_root / ".agent-canon-bootstrap-transaction-v1").exists()
+    for path, value in unrelated.items():
+        assert path.read_bytes() == value
+
+
+def test_candidate_cleanup_refuses_name_replacement_foreign_container(
+    tmp_path: Path,
+) -> None:
+    """Candidate cleanup uses the immutable identity, not a reused name."""
+    control = tmp_path / "control"
+    control.mkdir()
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    container_name = f"agent-canon-tools-{digest[:16]}"
+    candidate_id = "sha256:" + "1" * 64
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {
+                    "candidate": {
+                        "Id": candidate_id,
+                        "RepoTags": ["candidate"],
+                        "Config": {"Labels": {}},
+                    }
+                },
+                "containers": {
+                    container_name: {
+                        "Id": "container-candidate",
+                        "Name": "/" + container_name,
+                        "Config": {
+                            "Image": "candidate",
+                            "User": "1000:1000",
+                            "Labels": {
+                                "io.agent-canon.runtime": "shared-v1",
+                                "io.agent-canon.control-root-digest": digest,
+                            },
+                        },
+                        "State": {"Running": True, "Health": {"Status": "healthy"}},
+                        "HostConfig": {},
+                        "Mounts": [],
+                    }
+                },
+                "volumes": {},
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    script = f"""
+source {str(ADAPTER)!r}
+    set +e
+    AGENT_CANON_CONTROL_ROOT={str(control)!r}
+    AGENT_CANON_RUNTIME_ROOT={str(tmp_path)!r}
+    AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+    export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_DOCKER_CMD
+    _agent_canon_write_candidate_identity_receipt {container_name!r} container-candidate candidate {candidate_id!r}
+    _agent_canon_cleanup_candidate_resources {container_name!r} {candidate_id!r} ''
+printf 'rc=%s\\n' "$?"
+exit 0
+"""
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "FAKE_DOCKER_REPLACE_CONTAINER_ON_ID_READ": "container-candidate",
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert "rc=1" in result.stdout
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    foreign = state["containers"][container_name]
+    assert foreign["Id"] == "container-foreign-replacement"
+    assert foreign["Config"]["Labels"] == {
+        "io.agent-canon.runtime": "foreign-v1",
+        "io.agent-canon.control-root-digest": "foreign-control-root",
+    }
+    assert foreign["State"]["Running"] is True
+    assert state["images"] == {}
+
+
+def test_candidate_cleanup_without_receipt_uses_name_only_to_prove_absence(
+    tmp_path: Path,
+) -> None:
+    """A mutable name cannot supply the immutable candidate cleanup identity."""
+    control = tmp_path / "control"
+    control.mkdir()
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    container_name = f"agent-canon-tools-{digest[:16]}"
+    candidate_id = "sha256:" + "2" * 64
+    state_path = tmp_path / "docker-state.json"
+    original_state = {
+        "images": {
+            "candidate": {
+                "Id": candidate_id,
+                "RepoTags": ["candidate"],
+                "Config": {"Labels": {}},
+            }
+        },
+        "containers": {
+            container_name: {
+                "Id": "container-candidate",
+                "Name": "/" + container_name,
+                "Config": {
+                    "Image": "candidate",
+                    "User": "1000:1000",
+                    "Labels": {
+                        "io.agent-canon.runtime": "shared-v1",
+                        "io.agent-canon.control-root-digest": digest,
+                    },
+                },
+                "State": {"Running": True, "Health": {"Status": "healthy"}},
+                "HostConfig": {},
+                "Mounts": [],
+            }
+        },
+        "volumes": {},
+        "next": 1,
+    }
+    state_path.write_text(json.dumps(original_state), encoding="utf-8")
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path)!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_DOCKER_CMD
+_agent_canon_cleanup_candidate_resources {container_name!r} {candidate_id!r} ''
+printf 'rc=%s\n' "$?"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "rc=1"
+    assert json.loads(state_path.read_text(encoding="utf-8")) == original_state
+
+
+def test_candidate_cleanup_releases_stale_receipt_only_after_id_and_name_absent(
+    tmp_path: Path,
+) -> None:
+    """An absent immutable candidate makes its valid receipt retryably stale."""
+    control = tmp_path / "control"
+    control.mkdir()
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    container_name = f"agent-canon-tools-{digest[:16]}"
+    candidate_id = "sha256:" + "3" * 64
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps({"images": {}, "containers": {}, "volumes": {}, "next": 1}),
+        encoding="utf-8",
+    )
+    receipt = tmp_path / "host-state" / "candidate-container.tsv"
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path)!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_DOCKER_CMD
+_agent_canon_write_candidate_identity_receipt {container_name!r} missing-id candidate {candidate_id!r}
+_agent_canon_cleanup_candidate_resources {container_name!r} '' ''
+printf 'rc=%s\n' "$?"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "rc=0"
+    assert not receipt.exists()
+
+
+@pytest.mark.parametrize(
+    ("failure_stage", "expected_rc", "expected_calls"),
+    [
+        ("labels", 2, ["labels"]),
+        ("probe", 2, ["labels", "probe"]),
+        ("import", 43, ["labels", "probe", "import"]),
+    ],
+)
+def test_ensure_container_gates_are_terminal_when_errexit_is_suppressed(
+    tmp_path: Path,
+    failure_stage: str,
+    expected_rc: int,
+    expected_calls: list[str],
+) -> None:
+    """Ownership, probe, and import errors return before later mutation."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    state_root.mkdir(parents=True)
+    (state_root / "mounts.tsv").write_text("", encoding="utf-8")
+    control = tmp_path / "control"
+    control.mkdir()
+    calls = tmp_path / "calls"
+    docker_calls = tmp_path / "docker-calls"
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(docker_calls)!r}\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        "  case \"${4:-}\" in *'{{.Id}}'*) printf 'resident-id\\n' ;; esac\n"
+        "  exit 0\n"
+        "fi\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+AGENT_CANON_STATE_VOLUME_NAME=volume
+AGENT_CANON_IMAGE_REF=image
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_IMAGE_REF
+_agent_canon_state_volume_labels_match() {{
+  printf 'labels\n' >> {str(calls)!r}
+  [[ {failure_stage!r} != labels ]]
+}}
+_agent_canon_probe_state_volume() {{
+  printf 'probe\n' >> {str(calls)!r}
+  [[ {failure_stage!r} != probe ]]
+}}
+_agent_canon_import_host_inputs() {{
+  printf 'import\n' >> {str(calls)!r}
+  [[ {failure_stage!r} != import ]] || return 43
+}}
+_agent_canon_validate_existing_container() {{
+  printf 'validate\n' >> {str(calls)!r}
+}}
+if _agent_canon_ensure_container >/dev/null; then rc=0; else rc=$?; fi
+printf 'rc=%s\n' "$rc"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == f"rc={expected_rc}"
+    assert calls.read_text(encoding="utf-8").splitlines() == expected_calls
+    assert all(
+        not call.startswith(("create ", "start ", "volume create"))
+        for call in docker_calls.read_text(encoding="utf-8").splitlines()
+    )
+
+
+def test_fake_volume_snapshot_rejects_cross_boundary_hardlinks(tmp_path: Path) -> None:
+    """Snapshot admission rejects a hardlink that aliases outside its set."""
+    control = tmp_path / "control"
+    control.mkdir()
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    runtime = volume_root / "runtime"
+    runtime.mkdir(parents=True)
+    (runtime / "state.json").write_text("authoritative\n", encoding="utf-8")
+    os.link(runtime / "state.json", runtime / "outside-alias")
+    marker = volume_root / ".agent-canon-controller-volume-v1"
+    marker.write_text(f"agent-canon-controller-volume/v1\n{digest}\n", encoding="utf-8")
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            str(ROOT / "tests/bootstrap/fake_docker.py"),
+            "run",
+            "--rm",
+            "--mount",
+            f"type=volume,src={volume_name},dst=/var/lib/agent-canon,volume-nocopy",
+            "--env",
+            "AGENT_CANON_VOLUME_TRANSACTION_ACTION=snapshot",
+            "image",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 1
+    assert (runtime / "state.json").read_text(encoding="utf-8") == "authoritative\n"
+    assert not (volume_root / ".agent-canon-bootstrap-transaction-v1").exists()
+
+
+def test_fake_volume_restore_failure_preserves_live_tree_and_snapshot(tmp_path: Path) -> None:
+    """A staged mid-restore failure rolls back and keeps retry state."""
+    control = tmp_path / "control"
+    control.mkdir()
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    runtime = volume_root / "runtime"
+    (runtime / "tasks").mkdir(parents=True)
+    (runtime / "state.json").write_text("before\n", encoding="utf-8")
+    (runtime / "tasks" / "task.json").write_text("task-before\n", encoding="utf-8")
+    (volume_root / ".agent-canon-controller-volume-v1").write_text(
+        f"agent-canon-controller-volume/v1\n{digest}\n", encoding="utf-8"
+    )
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    common = [
+        str(ROOT / "tests/bootstrap/fake_docker.py"),
+        "run",
+        "--rm",
+        "--mount",
+        f"type=volume,src={volume_name},dst=/var/lib/agent-canon,volume-nocopy",
+        "image",
+    ]
+    snapshot = subprocess.run(
+        [*common, "--env", "AGENT_CANON_VOLUME_TRANSACTION_ACTION=snapshot"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert snapshot.returncode == 0, snapshot.stderr
+    (runtime / "state.json").write_text("changed\n", encoding="utf-8")
+    (runtime / "tasks" / "task.json").write_text("task-changed\n", encoding="utf-8")
+    restore = subprocess.run(
+        [
+            *common,
+            "--env",
+            "AGENT_CANON_VOLUME_TRANSACTION_ACTION=restore",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "FAKE_DOCKER_VOLUME_RESTORE_FAIL_AFTER": "tasks",
+        },
+    )
+    assert restore.returncode == 1
+    assert (runtime / "state.json").read_text(encoding="utf-8") == "changed\n"
+    assert (runtime / "tasks" / "task.json").read_text(
+        encoding="utf-8"
+    ) == "task-changed\n"
+    assert (volume_root / ".agent-canon-bootstrap-transaction-v1").is_dir()
 
 
 def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> None:
-    """A marked volume is adopted without comparing evolved host legacy state."""
+    """A marked pre-762 volume migrates its root layout transactionally."""
     legacy = tmp_path / "legacy-state"
     (legacy / "receipts").mkdir(parents=True)
     (legacy / "receipts" / "old.json").write_text("host-only\n", encoding="utf-8")
@@ -806,6 +1662,18 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
     (legacy / "spool" / "host-only").write_text("preserve\n", encoding="utf-8")
     control = tmp_path / "control"
     control.mkdir()
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir(exist_ok=True)
+    (fake_bin / "id").write_text(
+        "#!/bin/sh\n"
+        "case \"$1\" in\n"
+        "  -u) printf '1000\\n' ;;\n"
+        "  -g) printf '1000\\n' ;;\n"
+        "  *) exec /usr/bin/id \"$@\" ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    (fake_bin / "id").chmod(0o755)
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     volume_name = f"agent-canon-runtime-{control_digest}"
     volume_root = tmp_path / f".fake-volume-{volume_name}"
@@ -823,6 +1691,7 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
     for directory in (
         "runtime/generations",
         "runtime/tasks",
+        "exchange",
         "spool",
         "archive",
         "cache",
@@ -831,19 +1700,30 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
         (volume_root / directory).mkdir(parents=True)
     for relative, content in preserved_files.items():
         (volume_root / relative).write_text(content, encoding="utf-8")
+    (volume_root / "exchange" / "mounts.tsv").write_text(
+        "legacy-mount\n", encoding="utf-8"
+    )
+    (volume_root / "spool" / "volume-owned").write_text(
+        "volume-spool\n", encoding="utf-8"
+    )
+    codex_target = tmp_path / "codex-target.toml"
+    codex_target.write_text("managed-config\n", encoding="utf-8")
+    (volume_root / "codex-home" / "config.toml").symlink_to(codex_target)
+    (volume_root / "private-log").mkdir()
     for directory in (
         volume_root,
         volume_root / "runtime",
+        volume_root / "exchange",
         volume_root / "spool",
         volume_root / "archive",
         volume_root / "cache",
         volume_root / "codex-home",
     ):
-        directory.chmod(0o755)
+        directory.chmod(0o700)
     (volume_root / ".agent-canon-controller-volume-v1").write_text(
         f"agent-canon-controller-volume/v1\n{control_digest}\n", encoding="utf-8"
     )
-    (volume_root / ".agent-canon-controller-volume-v1").chmod(0o640)
+    (volume_root / ".agent-canon-controller-volume-v1").chmod(0o600)
     state_path = tmp_path / "docker-state.json"
     state_path.write_text(
         json.dumps(
@@ -859,6 +1739,18 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
                             "io.agent-canon.state": "controller-v1",
                         },
                         "Mountpoint": str(volume_root),
+                        "UID": 1000,
+                        "GID": 1000,
+                        "Mode": "0700",
+                        "RootUID": 1000,
+                        "RootGID": 1000,
+                        "RootMode": "0700",
+                        "MarkerUID": 1000,
+                        "MarkerGID": 1000,
+                        "MarkerMode": "0600",
+                        "PrivateLogUID": 1000,
+                        "PrivateLogGID": 1000,
+                        "PrivateLogMode": "0700",
                     }
                 },
                 "next": 1,
@@ -884,28 +1776,196 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+        },
     )
     assert result.returncode == 0, result.stderr
     for relative, content in preserved_files.items():
-        assert (volume_root / relative).read_text(encoding="utf-8") == content
-    assert (volume_root / "exchange").is_dir()
+        destination = volume_root / relative
+        if not relative.startswith("runtime/"):
+            destination = volume_root / "runtime" / relative
+        assert destination.read_text(encoding="utf-8") == content
+    assert not (volume_root / "exchange").exists()
+    assert not (volume_root / "spool").exists()
+    assert not (volume_root / "archive").exists()
+    assert not (volume_root / "cache").exists()
+    assert not (volume_root / "codex-home").exists()
+    assert (volume_root / "runtime" / "container-runtime" / "mounts.tsv").read_text(
+        encoding="utf-8"
+    ) == "legacy-mount\n"
+    assert (volume_root / "runtime" / "spool" / "volume-owned").read_text(
+        encoding="utf-8"
+    ) == "volume-spool\n"
+    assert (volume_root / "runtime" / "codex-home" / "config.toml").is_symlink()
+    assert (volume_root / "runtime" / "codex-home" / "config.toml").readlink() == codex_target
     assert (volume_root / "private-log").is_dir()
-    for directory in (
-        volume_root,
-        volume_root / "runtime",
-        volume_root / "exchange",
-        volume_root / "private-log",
-    ):
-        assert directory.stat().st_mode & 0o777 == 0o700
     assert (
         volume_root / ".agent-canon-controller-volume-v1"
-    ).stat().st_mode & 0o777 == 0o600
+    ).stat().st_mode & 0o777 == 0o444
     assert (legacy / "spool" / "host-only").read_text(encoding="utf-8") == "preserve\n"
+    probe = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; set +e; "
+                f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "AGENT_CANON_IMAGE_REF=image; "
+                "export AGENT_CANON_DOCKER_CMD AGENT_CANON_CONTROL_ROOT "
+                "AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_IMAGE_REF; "
+                f"_agent_canon_probe_state_volume {volume_name!r}; "
+                "printf 'normalized=%s\\n' $?; "
+                f"_agent_canon_probe_state_volume {volume_name!r} 1; "
+                "printf 'legacy=%s\\n' $?"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+        },
+    )
+    assert probe.returncode == 0, probe.stderr
+    assert probe.stdout.splitlines() == ["normalized=1", "legacy=0"]
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["volumes"][volume_name]["Mode"] == "0700"
-    assert state["volumes"][volume_name]["UID"] == os.getuid()
-    assert state["volumes"][volume_name]["GID"] == os.getgid()
+    assert state["volumes"][volume_name]["UID"] == 1000
+    assert state["volumes"][volume_name]["GID"] == 1000
+
+
+def test_fake_marked_layout_migration_failure_restores_old_tree(tmp_path: Path) -> None:
+    """An old-layout migration failure leaves the marked volume untouched."""
+    control = tmp_path / "control"
+    control.mkdir()
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    (volume_root / "exchange").mkdir(parents=True)
+    (volume_root / "exchange" / "mounts.tsv").write_text(
+        "old-layout\n", encoding="utf-8"
+    )
+    (volume_root / "runtime" / "spool").mkdir(parents=True)
+    (volume_root / "runtime" / "spool" / "sentinel").write_text(
+        "preserve\n", encoding="utf-8"
+    )
+    (volume_root / ".agent-canon-controller-volume-v1").write_text(
+        f"agent-canon-controller-volume/v1\n{digest}\n", encoding="utf-8"
+    )
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            str(ROOT / "tests/bootstrap/fake_docker.py"),
+            "run",
+            "--rm",
+            "--mount",
+            f"type=volume,src={volume_name},dst=/var/lib/agent-canon,volume-nocopy",
+            "--env",
+            "AGENT_CANON_VOLUME_UID=1000",
+            "--env",
+            "AGENT_CANON_VOLUME_GID=1000",
+            "--env",
+            f"AGENT_CANON_VOLUME_DIGEST={digest}",
+            "image",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "FAKE_DOCKER_FAIL_LAYOUT_MIGRATION_AFTER": "exchange",
+        },
+    )
+    assert result.returncode == 1
+    assert (volume_root / "exchange" / "mounts.tsv").read_text(
+        encoding="utf-8"
+    ) == "old-layout\n"
+    assert (volume_root / "runtime" / "spool" / "sentinel").read_text(
+        encoding="utf-8"
+    ) == "preserve\n"
+    assert not (volume_root / "runtime" / "container-runtime").exists()
+    assert (volume_root / ".agent-canon-controller-volume-v1").is_file()
+
+
+def test_legacy_controller_cleanup_failure_restores_receipts_and_state(tmp_path: Path) -> None:
+    """Legacy cleanup stages all members and restores them after a late failure."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (state_root / "receipts").mkdir(parents=True)
+    (state_root / "generations").mkdir()
+    (state_root / "tasks").mkdir()
+    (state_root / "state.json").write_text("state\n", encoding="utf-8")
+    (state_root / "owner.json").write_text("owner\n", encoding="utf-8")
+    (state_root / "receipts" / "receipt.json").write_text(
+        "receipt\n", encoding="utf-8"
+    )
+    (state_root / "generations" / "generation.json").write_text(
+        "generation\n", encoding="utf-8"
+    )
+    (state_root / "tasks" / "task.json").write_text("task\n", encoding="utf-8")
+    receipt = runtime / "host-state" / "state-volume-created.tsv"
+    receipt.parent.mkdir()
+    receipt.write_text("operation receipt\n", encoding="utf-8")
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(state_root)!r}; "
+                "AGENT_CANON_TEST_DROP_LEGACY_FAIL_AFTER=receipts; "
+                "export AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT "
+                "AGENT_CANON_TEST_DROP_LEGACY_FAIL_AFTER; "
+                "set +e; _agent_canon_drop_legacy_controller_state; "
+                "printf 'rc=%s\\n' $?"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == "rc=2"
+    assert (state_root / "state.json").read_text(encoding="utf-8") == "state\n"
+    assert (state_root / "owner.json").read_text(encoding="utf-8") == "owner\n"
+    assert (state_root / "receipts" / "receipt.json").read_text(
+        encoding="utf-8"
+    ) == "receipt\n"
+    assert (state_root / "generations" / "generation.json").read_text(
+        encoding="utf-8"
+    ) == "generation\n"
+    assert (state_root / "tasks" / "task.json").read_text(encoding="utf-8") == "task\n"
+    assert receipt.read_text(encoding="utf-8") == "operation receipt\n"
 
 
 def test_fake_marked_volume_rejects_invalid_marker(tmp_path: Path) -> None:
@@ -1020,6 +2080,19 @@ def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path)
     old_container = state["containers"][container_name]
     old_image = old_container["Config"]["Image"]
     old_mounts = list(old_container["Mounts"])
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_record = state["volumes"][volume_name]
+    assert volume_record["PrivateLogUID"] == 0
+    assert volume_record["PrivateLogGID"] == 0
+    private_log = Path(volume_record["Mountpoint"]) / "private-log"
+    private_log.chmod(0o700)
+    private_sentinel = private_log / "nonroot-host-owner"
+    private_sentinel.write_text("preserved\n", encoding="utf-8")
+    private_sentinel.chmod(0o444)
+    private_log.chmod(0o555)
+    if os.geteuid() != 0:
+        assert private_sentinel.stat().st_uid == os.geteuid()
+        assert private_sentinel.stat().st_uid != volume_record["PrivateLogUID"]
     target = tmp_path / "target"
     target.mkdir()
     failed_environment = {**environment, "FAKE_DOCKER_FAIL_STATE_VOLUME_INIT_ONCE": "1"}
@@ -1033,9 +2106,11 @@ def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path)
     assert failed.returncode == 2
     assert '"code":"state_volume_init_failed"' in failed.stderr
     state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert set(state["containers"]) == {container_name}
     restored = state["containers"][container_name]
     assert restored["Config"]["Image"] == old_image
     assert restored["Mounts"] == old_mounts
+    assert restored["State"]["Running"] is True
     assert (repository / ".runtime" / "container-state" / "mounts.tsv").read_text(
         encoding="utf-8"
     ) == ""
@@ -1100,6 +2175,141 @@ def test_volume_input_imports_use_exact_runtime_paths(tmp_path: Path) -> None:
     assert (volume_root / "mount-registry.toml").read_text(encoding="utf-8") == "mount-registry\n"
 
 
+def test_volume_input_import_failure_stops_follow_on_imports(tmp_path: Path) -> None:
+    """A failed first import cannot fall through to later volume writes."""
+    calls = tmp_path / "imports"
+    script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path)!r}
+AGENT_CANON_STATE_ROOT={str(tmp_path)!r}
+AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / 'private-log')!r}
+export AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
+_agent_canon_volume_copy() {{
+  printf '%s\\n' "$2" >> {str(calls)!r}
+  [[ "$2" != source-sync ]] || return 41
+}}
+set +e
+_agent_canon_import_host_inputs
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 41
+    assert calls.read_text(encoding="utf-8").splitlines() == ["source-sync"]
+
+
+def test_private_log_import_failure_restores_old_tree_then_retry_normalizes(
+    tmp_path: Path,
+) -> None:
+    """Private-log publication is atomic and its normalized retry is exact."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    source = tmp_path / "private-log-input"
+    control.mkdir()
+    runtime.mkdir()
+    source.mkdir()
+    (source / "nested").mkdir()
+    (source / "nested" / "new.txt").write_text("new\n", encoding="utf-8")
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    private_log = volume_root / "private-log"
+    (private_log / "nested").mkdir(parents=True)
+    (private_log / "nested" / "new.txt").write_text("new\n", encoding="utf-8")
+    content_digest = hashlib.sha256(b"new\n").hexdigest()
+    source_digest = hashlib.sha256(
+        f"{content_digest}  ./nested/new.txt\n".encode("utf-8")
+    ).hexdigest()
+    (private_log / ".agent-canon-private-log-v1").write_text(
+        f"agent-canon-private-log/v1\n{source_digest}\n", encoding="utf-8"
+    )
+    for path in private_log.rglob("*"):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    private_log.chmod(0o700)
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                        "PrivateLogUID": os.getuid(),
+                        "PrivateLogGID": os.getgid(),
+                        "PrivateLogMode": "0700",
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+AGENT_CANON_IMAGE_REF=image
+export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+export AGENT_CANON_STATE_ROOT AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_DOCKER_CMD AGENT_CANON_IMAGE_REF
+_agent_canon_volume_copy import private-log {str(source)!r}
+printf 'rc=%s\n' "$?"
+"""
+    failed = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "FAKE_DOCKER_FAIL_PRIVATE_LOG_IMPORT_AFTER_PUBLISH": "1",
+        },
+    )
+    assert failed.returncode == 0
+    assert failed.stdout.strip() == "rc=2"
+    assert (private_log / "nested" / "new.txt").read_text(
+        encoding="utf-8"
+    ) == "new\n"
+    assert private_log.stat().st_mode & 0o777 == 0o700
+
+    retried = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert retried.returncode == 0, retried.stderr
+    assert retried.stdout.splitlines()[-1] == "rc=0"
+    assert (private_log / "nested" / "new.txt").read_text(
+        encoding="utf-8"
+    ) == "new\n"
+    assert private_log.stat().st_mode & 0o777 == 0o555
+    assert all(
+        path.stat().st_mode & 0o777 == (0o555 if path.is_dir() else 0o444)
+        for path in private_log.rglob("*")
+    )
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["volumes"][volume_name]["PrivateLogMode"] == "0555"
+    assert state["volumes"][volume_name]["PrivateLogUID"] == 0
+    assert state["volumes"][volume_name]["PrivateLogGID"] == 0
+
+
 def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) -> None:
     """The exact Docker run argv executes the embedded copy script with /bin/sh."""
     control = tmp_path / "control"
@@ -1136,6 +2346,20 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     )
     volume_name = "agent-canon-runtime-real-shell"
     docker = tmp_path / "docker-real-shell"
+    helper_bin = tmp_path / "root-helper-bin"
+    helper_bin.mkdir()
+    chown_receipt = tmp_path / "root-helper-chown.tsv"
+    chown = helper_bin / "chown"
+    chown.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "[ \"$#\" -eq 2 ]\n"
+        "[ \"$1\" = 0:0 ]\n"
+        "case \"$2\" in \"$FAKE_VOLUME_ROOT\"/*) ;; *) exit 92 ;; esac\n"
+        "printf '%s\\t%s\\n' \"$1\" \"$2\" >> \"$FAKE_CHOWN_RECEIPT\"\n",
+        encoding="utf-8",
+    )
+    chown.chmod(0o755)
     docker.write_text(
         "#!/bin/sh\n"
         "set -eu\n"
@@ -1163,6 +2387,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
         "[ \"$volume\" = \"$FAKE_VOLUME_NAME\" ]\n"
         "[ -n \"$script\" ]\n"
         "script=$(printf \"%s\" \"$script\" | sed -e \"s|/var/lib/agent-canon|$FAKE_VOLUME_ROOT|g\" -e \"s|/agent-canon-copy-input|$input|g\")\n"
+        "PATH=$FAKE_ROOT_HELPER_BIN:$PATH; export PATH\n"
         "exec /bin/sh -c \"$script\"\n",
         encoding="utf-8",
     )
@@ -1192,10 +2417,21 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
             **os.environ,
             "FAKE_VOLUME_NAME": volume_name,
             "FAKE_VOLUME_ROOT": str(volume_root),
+            "FAKE_ROOT_HELPER_BIN": str(helper_bin),
+            "FAKE_CHOWN_RECEIPT": str(chown_receipt),
         },
     )
     assert result.returncode == 0, result.stderr
-    assert (volume_root / "source-sync.json").read_text(encoding="utf-8") == "source-sync\n"
+    copied_source_sync = volume_root / "source-sync.json"
+    assert copied_source_sync.read_text(encoding="utf-8") == "source-sync\n"
+    assert hashlib.sha256(copied_source_sync.read_bytes()).digest() == hashlib.sha256(
+        source_sync.read_bytes()
+    ).digest()
+    assert copied_source_sync.stat().st_mode & 0o777 == 0o444
+    chown_fields = chown_receipt.read_text(encoding="utf-8").strip().split("\t")
+    assert chown_fields[0] == "0:0"
+    assert Path(chown_fields[1]).parent == volume_root
+    assert Path(chown_fields[1]).name.startswith("source-sync.json.")
     assert (stage / "mounts.tsv").read_text(encoding="utf-8") == "target\n"
     assert (stage / "mounts.toml").read_text(encoding="utf-8").startswith(
         'schema = "agent-canon.mount-registry.v2"'
@@ -1209,6 +2445,8 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
             **os.environ,
             "FAKE_VOLUME_NAME": volume_name,
             "FAKE_VOLUME_ROOT": str(volume_root),
+            "FAKE_ROOT_HELPER_BIN": str(helper_bin),
+            "FAKE_CHOWN_RECEIPT": str(chown_receipt),
         },
     )
     assert codex_export.returncode == 0, codex_export.stderr
@@ -1236,6 +2474,8 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
             **os.environ,
             "FAKE_VOLUME_NAME": volume_name,
             "FAKE_VOLUME_ROOT": str(volume_root),
+            "FAKE_ROOT_HELPER_BIN": str(helper_bin),
+            "FAKE_CHOWN_RECEIPT": str(chown_receipt),
             "AGENT_CANON_TEST_VOLUME_EXPORT_FAIL_AFTER": "codex-home",
         },
     )
@@ -1255,6 +2495,8 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
             **os.environ,
             "FAKE_VOLUME_NAME": volume_name,
             "FAKE_VOLUME_ROOT": str(volume_root),
+            "FAKE_ROOT_HELPER_BIN": str(helper_bin),
+            "FAKE_CHOWN_RECEIPT": str(chown_receipt),
         },
     )
     assert relative_rejected.returncode == 2
@@ -1273,6 +2515,8 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
             **os.environ,
             "FAKE_VOLUME_NAME": volume_name,
             "FAKE_VOLUME_ROOT": str(volume_root),
+            "FAKE_ROOT_HELPER_BIN": str(helper_bin),
+            "FAKE_CHOWN_RECEIPT": str(chown_receipt),
         },
     )
     assert rejected.returncode == 2
@@ -1342,6 +2586,147 @@ def test_volume_export_digest_corruption_is_rejected(tmp_path: Path) -> None:
     )
     assert result.returncode == 2
     assert json.loads(result.stderr)["code"] == "volume_copy_failed"
+
+
+def test_fake_docker_projection_capability_routes_legacy_runtime_layout(
+    tmp_path: Path,
+) -> None:
+    """A label-less main image uses fixed runtime projection paths."""
+    control = tmp_path / "control"
+    repository = tmp_path / "repository"
+    volume_root = tmp_path / "volume"
+    state_path = tmp_path / "docker-state.json"
+    control.mkdir()
+    repository.mkdir()
+    (volume_root / "runtime").mkdir(parents=True)
+    (tmp_path / "host-runtime").mkdir()
+    old_ref = "agent-canon-tools:d282"
+    current_ref = "agent-canon-tools:current"
+    old_id = "sha256:" + "d" * 64
+    current_id = "sha256:" + "c" * 64
+    container_name = "agent-canon-tools-capability"
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    target = tmp_path / "target"
+    target.mkdir()
+    target_digest = hashlib.sha256(str(target.resolve()).encode("utf-8")).hexdigest()
+    labels = {
+        "io.agent-canon.runtime": "shared-v1",
+        "io.agent-canon.control-root-digest": digest,
+    }
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {
+                    old_ref: {
+                        "Id": old_id,
+                        "RepoTags": [old_ref],
+                        "Config": {"Labels": {}},
+                        "SourceRoot": str(repository),
+                    },
+                    current_ref: {
+                        "Id": current_id,
+                        "RepoTags": [current_ref],
+                        "Config": {
+                            "Labels": {
+                                "io.agent-canon.projection-layout": "container-runtime-v1"
+                            }
+                        },
+                        "SourceRoot": str(repository),
+                    },
+                },
+                "containers": {
+                    container_name: {
+                        "Id": "container-capability",
+                        "Name": "/" + container_name,
+                        "Config": {
+                            "Image": old_ref,
+                            "User": "1000:1000",
+                            "Labels": labels,
+                        },
+                        "State": {"Running": True, "Health": {"Status": "healthy"}},
+                        "Mounts": [
+                            {
+                                "Type": "volume",
+                                "Source": str(volume_root),
+                                "Name": "state-volume",
+                                "Destination": "/var/lib/agent-canon",
+                                "RW": True,
+                            }
+                        ],
+                    }
+                },
+                "volumes": {
+                    "state-volume": {
+                        "Name": "state-volume",
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                        "UID": 1000,
+                        "GID": 1000,
+                        "Mode": "0700",
+                        "RootUID": 0,
+                        "RootGID": 0,
+                        "RootMode": "0711",
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    fake = ROOT / "tests/bootstrap/fake_docker.py"
+    common = f"""
+source {str(ADAPTER)!r}
+set -e
+AGENT_CANON_DOCKER_CMD={str(fake)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path / 'host-runtime')!r}
+AGENT_CANON_STATE_ROOT={str(tmp_path / 'host-runtime')!r}
+AGENT_CANON_STATE_VOLUME_NAME=state-volume
+AGENT_CANON_IMAGE_REF={old_ref!r}
+AGENT_CANON_CURRENT_IMAGE_ID={current_id!r}
+AGENT_CANON_CURRENT_IMAGE_REF={current_ref!r}
+AGENT_CANON_TARGET_DIGEST={target_digest!r}
+AGENT_CANON_TARGET_HOST_ROOT={str(target)!r}
+AGENT_CANON_TARGET_CONTAINER_ROOT=/targets/{target_digest}
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT
+export AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT AGENT_CANON_STATE_VOLUME_NAME
+export AGENT_CANON_IMAGE_REF AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF
+export AGENT_CANON_TARGET_DIGEST AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT
+_agent_canon_run_controller {container_name!r} rollback
+"""
+    old_result = subprocess.run(
+        ["bash", "-c", common],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert old_result.returncode == 0, old_result.stderr
+    assert (volume_root / "runtime" / "rollback-plan.tsv").is_file()
+    assert not (volume_root / "runtime" / "container-runtime" / "rollback-plan.tsv").exists()
+
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["containers"][container_name]["Config"]["Image"] = current_ref
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    current_result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            common.replace(f"AGENT_CANON_IMAGE_REF={old_ref!r}", f"AGENT_CANON_IMAGE_REF={current_ref!r}")
+            .replace("_agent_canon_run_controller " + repr(container_name) + " rollback", "_agent_canon_run_controller " + repr(container_name) + " target add --root " + repr("/targets/" + target_digest) + " --mode read-only"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert current_result.returncode == 0, current_result.stderr
+    assert (volume_root / "runtime" / "container-runtime" / "mounts.tsv").is_file()
 
 
 def test_volume_export_rejects_fifo_before_publish(tmp_path: Path) -> None:
@@ -1562,6 +2947,180 @@ def test_projection_later_move_failure_restores_exact_previous_state(tmp_path: P
     assert (stage / "mounts.tsv").read_text(encoding="utf-8") == "old-tsv\n"
     assert not (stage / "rollback-plan.tsv").exists()
     assert not (stage / "rollback-mounts.tsv").exists()
+
+
+def test_projection_backup_can_survive_late_activation_and_restore(tmp_path: Path) -> None:
+    """The outer activation keeps projection backup until commit or rollback."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    host_state = runtime / "host-state"
+    volume_root = tmp_path / ".fake-volume-volume"
+    exchange = volume_root / "exchange"
+    control.mkdir()
+    state_root.mkdir(parents=True)
+    host_state.mkdir(parents=True)
+    exchange.mkdir(parents=True)
+    (exchange / "mounts.toml").write_text(
+        'schema = "agent-canon.mount-registry.v2"\n', encoding="utf-8"
+    )
+    (state_root / "mounts.toml").write_text("old-registry\n", encoding="utf-8")
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    "volume": {
+                        "Name": "volume",
+                        "Labels": {},
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_STATE_VOLUME_NAME=volume
+AGENT_CANON_IMAGE_REF=image
+AGENT_CANON_KEEP_CONTROLLER_PROJECTION_BACKUP=1
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT
+export AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT AGENT_CANON_STATE_VOLUME_NAME
+export AGENT_CANON_IMAGE_REF AGENT_CANON_KEEP_CONTROLLER_PROJECTION_BACKUP
+_agent_canon_publish_controller_projection
+publish_rc=$?
+printf 'publish=%s backup=%s\\n' "$publish_rc" "$(test -d "$AGENT_CANON_RUNTIME_ROOT/host-state/.controller-projection-backup"; echo $?)"
+_agent_canon_restore_controller_projection
+restore_rc=$?
+printf 'restore=%s\\n' "$restore_rc"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["publish=0 backup=0", "restore=0"]
+    assert (state_root / "mounts.toml").read_text(encoding="utf-8") == "old-registry\n"
+    assert (state_root / "mounts.tsv").exists() is False
+    assert not (host_state / ".controller-projection-backup").exists()
+
+
+def test_committed_activation_cleanup_failure_retries_without_rollback(
+    tmp_path: Path,
+) -> None:
+    """A post-commit cleanup failure retains one receipt and retries safely."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    host_state = runtime / "host-state"
+    state_root = runtime / "container-state"
+    control.mkdir()
+    host_state.mkdir(parents=True)
+    state_root.mkdir(parents=True)
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    (volume_root / "runtime").mkdir(parents=True)
+    (volume_root / ".agent-canon-controller-volume-v1").write_text(
+        f"agent-canon-controller-volume/v1\n{digest}\n", encoding="utf-8"
+    )
+    transaction = volume_root / ".agent-canon-bootstrap-transaction-v1"
+    transaction.mkdir()
+    (transaction / "manifest.tsv").write_text(
+        "schema\tagent-canon.volume-transaction.v1\n", encoding="utf-8"
+    )
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    projection_backup = host_state / ".controller-projection-backup"
+    skill_backup = host_state / ".skill-view-backup"
+    global_backup = host_state / ".global-links-transaction"
+    projection_backup.mkdir()
+    skill_backup.mkdir()
+    global_backup.mkdir()
+    activation_receipt = host_state / "activation-committed.tsv"
+    candidate_receipt = host_state / "candidate-container.tsv"
+    volume_receipt = host_state / "state-volume-created.tsv"
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}
+AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT={str(volume_receipt)!r}
+AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT={str(candidate_receipt)!r}
+AGENT_CANON_ACTIVATION_COMMIT_RECEIPT={str(activation_receipt)!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+AGENT_CANON_IMAGE_REF=image
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT
+export AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT AGENT_CANON_ACTIVATION_COMMIT_RECEIPT
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_IMAGE_REF
+_agent_canon_state_volume_write_creation_receipt {volume_name!r}
+_agent_canon_write_candidate_identity_receipt candidate missing-id image {'sha256:' + '4' * 64!r}
+_agent_canon_write_activation_commit_receipt {'sha256:' + '4' * 64!r} candidate
+AGENT_CANON_TEST_CONTROLLER_PROJECTION_COMMIT_FAIL=1
+export AGENT_CANON_TEST_CONTROLLER_PROJECTION_COMMIT_FAIL
+_agent_canon_finish_committed_activation_cleanup
+first=$?
+unset AGENT_CANON_TEST_CONTROLLER_PROJECTION_COMMIT_FAIL
+printf 'first=%s retained=%s\n' "$first" "$(test -f {str(activation_receipt)!r}; echo $?)"
+_agent_canon_finish_committed_activation_cleanup
+second=$?
+printf 'second=%s retained=%s\n' "$second" "$(test -f {str(activation_receipt)!r}; echo $?)"
+exit 0
+"""
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        "first=2 retained=0",
+        "second=0 retained=1",
+    ]
+    assert "controller projection backup could not be released" in result.stderr
+    assert not transaction.exists()
+    assert not projection_backup.exists()
+    assert not skill_backup.exists()
+    assert not global_backup.exists()
+    assert not candidate_receipt.exists()
+    assert not volume_receipt.exists()
 
 
 def test_private_feedback_volume_copy_uses_canonical_subtree(tmp_path: Path) -> None:
@@ -2532,6 +4091,151 @@ def test_uninstall_preserves_foreign_links_and_restores_owned_config() -> None:
     assert 'for link in "$home_root/.codex/agents"/*' not in remove_section
 
 
+def test_global_links_preflight_collision_preserves_regular_config_and_manifest(
+    tmp_path: Path,
+) -> None:
+    """A later link collision cannot publish an earlier config migration."""
+    home = tmp_path / "home"
+    repository = tmp_path / "repository"
+    state_root = tmp_path / "runtime" / "container-state"
+    (home / ".codex").mkdir(parents=True)
+    (home / ".agents" / "skills" / "managed").mkdir(parents=True)
+    (repository / ".codex" / "personal").mkdir(parents=True)
+    (repository / "agents" / "skills" / "managed").mkdir(parents=True)
+    state_root.mkdir(parents=True)
+    (home / ".codex" / "config.toml").write_text("legacy\n", encoding="utf-8")
+    (home / ".agents" / "skills" / "managed" / "collision").write_text(
+        "foreign\n", encoding="utf-8"
+    )
+    (repository / "agents" / "skills" / "managed" / "SKILL.md").write_text(
+        "managed\n", encoding="utf-8"
+    )
+    manifest = state_root / "global-links.tsv"
+    manifest.write_text("old-manifest\n", encoding="utf-8")
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; set +e; "
+                f"AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}; "
+                f"AGENT_CANON_CONTROL_ROOT={str(home)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(tmp_path / 'runtime')!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(state_root)!r}; "
+                "export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT "
+                "AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT; "
+                "_agent_canon_install_global_links; printf 'rc=%s\\n' $?"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "HOME": str(home)},
+    )
+    assert result.returncode == 0
+    assert "rc=2" in result.stdout
+    assert (home / ".codex" / "config.toml").read_text(encoding="utf-8") == "legacy\n"
+    assert not (repository / ".codex" / "personal" / "config.toml").exists()
+    assert (home / ".agents" / "skills" / "managed" / "collision").read_text(
+        encoding="utf-8"
+    ) == "foreign\n"
+    assert manifest.read_text(encoding="utf-8") == "old-manifest\n"
+    assert not (tmp_path / "runtime" / "host-state" / ".global-links-transaction").exists()
+
+
+def test_global_links_rejects_foreign_agents_symlink_without_mutation(
+    tmp_path: Path,
+) -> None:
+    """A foreign .agents symlink is never followed or replaced."""
+    home = tmp_path / "home"
+    repository = tmp_path / "repository"
+    runtime = tmp_path / "runtime"
+    (home / ".codex").mkdir(parents=True)
+    (repository / ".codex" / "personal").mkdir(parents=True)
+    runtime.mkdir()
+    foreign = tmp_path / "foreign-agents"
+    foreign.mkdir()
+    (home / ".agents").symlink_to(foreign, target_is_directory=True)
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; set +e; "
+                f"AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}; "
+                f"AGENT_CANON_CONTROL_ROOT={str(home)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(runtime / 'container-state')!r}; "
+                "export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT "
+                "AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT; "
+                "_agent_canon_install_global_links; printf 'rc=%s\\n' $?"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "HOME": str(home)},
+    )
+    assert result.returncode == 0
+    assert "rc=2" in result.stdout
+    assert (home / ".agents").is_symlink()
+    assert (home / ".agents").readlink() == foreign
+    assert not (runtime / "host-state" / ".global-links-transaction").exists()
+
+
+def test_global_links_transaction_restores_config_links_and_manifest(
+    tmp_path: Path,
+) -> None:
+    """An applied global-link transaction restores every prior leaf exactly."""
+    home = tmp_path / "home"
+    repository = tmp_path / "repository"
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (home / ".codex").mkdir(parents=True)
+    (repository / ".codex" / "agents").mkdir(parents=True)
+    (repository / "agents" / "skills" / "managed").mkdir(parents=True)
+    state_root.mkdir(parents=True)
+    (home / ".codex" / "config.toml").write_text("legacy\n", encoding="utf-8")
+    (repository / ".codex" / "agents" / "agent.toml").write_text(
+        "agent\n", encoding="utf-8"
+    )
+    (repository / "agents" / "skills" / "managed" / "SKILL.md").write_text(
+        "managed\n", encoding="utf-8"
+    )
+    manifest = state_root / "global-links.tsv"
+    manifest.write_text("old-manifest\n", encoding="utf-8")
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+_agent_canon_install_global_links
+install_rc=$?
+_agent_canon_restore_global_links
+restore_rc=$?
+printf 'install=%s restore=%s\\n' "$install_rc" "$restore_rc"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "HOME": str(home)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "install=0 restore=0"
+    assert (home / ".codex" / "config.toml").is_file()
+    assert not (home / ".codex" / "config.toml").is_symlink()
+    assert (home / ".codex" / "config.toml").read_text(encoding="utf-8") == "legacy\n"
+    assert not (repository / ".codex" / "personal" / "config.toml").exists()
+    assert not (home / ".agents" / "skills" / "managed").exists()
+    assert not (home / ".codex" / "agents" / "agent.toml").exists()
+    assert manifest.read_text(encoding="utf-8") == "old-manifest\n"
+
+
 def test_container_controller_routes_non_docker_public_operations() -> None:
     """Documented non-Docker operations enter the resident Python owner."""
     controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
@@ -2992,6 +4696,104 @@ exit "$rc"
     assert "up_to_date" not in completed.stdout
 
 
+def test_up_to_date_cleanup_failure_occurs_after_commit_without_rollback(
+    tmp_path: Path,
+) -> None:
+    """The up-to-date path retains receipts after its single commit point."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (runtime / "host-state").mkdir(parents=True)
+    state_root.mkdir()
+    (state_root / "mounts.tsv").write_text("", encoding="utf-8")
+    control = tmp_path / "control"
+    control.mkdir()
+    calls = tmp_path / "calls"
+    docker = tmp_path / "docker"
+    image_id = "sha256:" + "5" * 64
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
+        f"  printf '%s\\n' {image_id!r}; exit 0\n"
+        "fi\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then exit 0; fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    candidate_receipt = runtime / "host-state" / "candidate-container.tsv"
+    activation_receipt = runtime / "host-state" / "activation-committed.tsv"
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT={str(candidate_receipt)!r}
+AGENT_CANON_ACTIVATION_COMMIT_RECEIPT={str(activation_receipt)!r}
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT
+export AGENT_CANON_ACTIVATION_COMMIT_RECEIPT
+eval "$(declare -f _agent_canon_write_activation_commit_receipt | sed \
+  '1s/_agent_canon_write_activation_commit_receipt/_agent_canon_real_write_activation_commit_receipt/')"
+_agent_canon_classify_existing_container() {{
+  AGENT_CANON_OBSERVED_CONTAINER_ID=old-container-id
+  AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=shared-v1
+  AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$(_agent_canon_control_digest)
+}}
+_agent_canon_prune_stale_target_manifest() {{ AGENT_CANON_TARGET_PRUNE_DIGESTS=; }}
+_agent_canon_validate_target_manifest() {{ :; }}
+_agent_canon_prepare_state_volume_snapshot() {{
+  AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE=1
+  export AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE
+  printf 'snapshot\n' >> {str(calls)!r}
+}}
+_agent_canon_use_active_image() {{
+  AGENT_CANON_IMAGE_REF=candidate
+  AGENT_CANON_ACTIVE_IMAGE_ID={image_id!r}
+  AGENT_CANON_EXPECTED_IMAGE_ID={image_id!r}
+  export AGENT_CANON_IMAGE_REF AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID
+}}
+_agent_canon_validate_existing_container() {{ return 0; }}
+_agent_canon_ensure_container() {{
+  _agent_canon_write_candidate_identity_receipt candidate candidate-id candidate {image_id!r}
+  printf 'ensure\n' >> {str(calls)!r}
+  printf 'candidate\n'
+}}
+_agent_canon_record_active_container() {{ printf 'active\n' >> {str(calls)!r}; }}
+_agent_canon_discard_pending_rollback_plan() {{ printf 'discard\n' >> {str(calls)!r}; }}
+_agent_canon_write_activation_commit_receipt() {{
+  printf 'commit\n' >> {str(calls)!r}
+  _agent_canon_real_write_activation_commit_receipt "$@"
+}}
+_agent_canon_finish_committed_activation_cleanup() {{
+  printf 'cleanup\n' >> {str(calls)!r}
+  [[ -f {str(candidate_receipt)!r} && -f {str(activation_receipt)!r} ]] || return 19
+  return 41
+}}
+_agent_canon_restore_state_volume_snapshot() {{ printf 'rollback\n' >> {str(calls)!r}; return 0; }}
+_agent_canon_replace_resident_locked candidate {image_id!r} update
+printf 'rc=%s\n' "$?"
+exit 0
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == "rc=2"
+    assert calls.read_text(encoding="utf-8").splitlines() == [
+        "snapshot",
+        "ensure",
+        "active",
+        "discard",
+        "commit",
+        "cleanup",
+    ]
+    assert candidate_receipt.is_file()
+    assert activation_receipt.is_file()
+
+
 def test_replacement_rollback_failure_is_reported_after_controller_failure(
     tmp_path: Path,
 ) -> None:
@@ -3042,6 +4844,42 @@ exit "$rc"
     assert completed.returncode == 2
     assert '"code":"rollback_failed"' in completed.stderr
     assert "up_to_date" not in completed.stdout
+
+
+def test_restore_failure_skips_previous_resident_restart(tmp_path: Path) -> None:
+    """A required restore failure leaves the old resident quiesced."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    state_root.mkdir(parents=True)
+    calls = tmp_path / "calls"
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_DOCKER_CMD=/bin/false
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT AGENT_CANON_DOCKER_CMD
+_agent_canon_cleanup_candidate_resources() {{ printf 'candidate-cleanup\\n' >> {str(calls)!r}; return 0; }}
+_agent_canon_restore_state_volume_snapshot() {{ return 13; }}
+_agent_canon_restore_controller_projection() {{ return 0; }}
+_agent_canon_restore_global_links() {{ return 0; }}
+_agent_canon_restore_skill_view_backup() {{ return 0; }}
+_agent_canon_ensure_container() {{ printf 'unexpected-old-create\\n' >> {str(calls)!r}; return 0; }}
+_agent_canon_run_controller() {{ printf 'unexpected-old-start\\n' >> {str(calls)!r}; return 0; }}
+_agent_canon_restore_candidate_failure candidate old-image new-image
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit 0
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 0
+    assert completed.stdout.strip() == "rc=2"
+    assert '"code":"rollback_failed"' in completed.stderr
+    assert "required restoration failed: state_volume_restore_failed" in completed.stderr
+    assert calls.read_text(encoding="utf-8").splitlines() == ["candidate-cleanup"]
 
 
 @pytest.mark.parametrize(
@@ -3497,6 +5335,11 @@ def test_public_clean_install_materializes_source_view_and_first_target(
         check=True,
         capture_output=True,
     )
+    subprocess.run(
+        ["git", "--git-dir", str(origin), "symbolic-ref", "HEAD", "refs/heads/main"],
+        check=True,
+        capture_output=True,
+    )
     repository = home / "agent-canon"
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(origin), str(repository)],
@@ -3714,6 +5557,11 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
         check=True,
         capture_output=True,
     )
+    subprocess.run(
+        ["git", "--git-dir", str(origin), "symbolic-ref", "HEAD", "refs/heads/main"],
+        check=True,
+        capture_output=True,
+    )
     repository = home / "agent-canon"
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(origin), str(repository)],
@@ -3868,6 +5716,11 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         check=True,
         capture_output=True,
     )
+    subprocess.run(
+        ["git", "--git-dir", str(origin), "symbolic-ref", "HEAD", "refs/heads/main"],
+        check=True,
+        capture_output=True,
+    )
     repository = home / "agent-canon"
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(origin), str(repository)],
@@ -3885,6 +5738,19 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
     container_name = "agent-canon-tools-" + hashlib.sha256(
         str(home.resolve()).encode("utf-8")
     ).hexdigest()[:16]
+    id_bin = tmp_path / "id-bin"
+    id_bin.mkdir()
+    id_shim = id_bin / "id"
+    id_shim.write_text(
+        "#!/bin/sh\n"
+        "case \"${1:-}\" in\n"
+        "  -u) printf '1000\\n' ;;\n"
+        "  -g) printf '1000\\n' ;;\n"
+        "  *) exec /usr/bin/id \"$@\" ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    id_shim.chmod(0o755)
     common = [
         str(BOOTSTRAP),
         "--repository-root",
@@ -3900,6 +5766,7 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         "XDG_CONFIG_HOME": str(home / ".config"),
         "AGENT_CANON_DOCKER": docker,
         "DOCKER_HOST": docker_host,
+        "PATH": f"{id_bin}{os.pathsep}{os.environ.get('PATH', '')}",
     }
     assert not runtime.exists()
     assert not personal_skills.exists()
@@ -3923,6 +5790,24 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         assert personal_skills.is_dir()
         assert list(personal_skills.glob("*/SKILL.md"))
         assert not legacy_runtime.exists()
+        source_sync = json.loads(
+            (runtime / "source-sync.json").read_text(encoding="utf-8")
+        )
+        source_head = subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert source_sync["status"] == "success"
+        assert source_sync["branch"] == "main"
+        assert source_sync["source_head"] == source_head
+        assert subprocess.run(
+            ["git", "-C", str(repository), "symbolic-ref", "--quiet", "--short", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+        ).stdout.strip() == "main"
 
         started = subprocess.run(
             [*common, "start"],
@@ -3950,6 +5835,157 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
             timeout=120,
         )
         assert added.returncode == 0, added.stderr
+        control_digest = hashlib.sha256(str(home.resolve()).encode("utf-8")).hexdigest()
+        state_volume_name = f"agent-canon-runtime-{control_digest}"
+        volume = json.loads(
+            subprocess.run(
+                [docker, "volume", "inspect", state_volume_name],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            ).stdout
+        )[0]
+        resident = json.loads(
+            subprocess.run(
+                [docker, "inspect", container_name],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            ).stdout
+        )[0]
+        assert resident["Config"]["User"] == "1000:1000"
+        volume_mounts = [
+            mount
+            for mount in resident["Mounts"]
+            if mount.get("Type") == "volume"
+            and mount.get("Destination") == "/var/lib/agent-canon"
+        ]
+        assert len(volume_mounts) == 1
+        assert volume_mounts[0]["Name"] == state_volume_name
+        assert volume_mounts[0]["RW"] is True
+        assert all(
+            mount.get("Type") != "bind" or mount.get("RW") is False
+            for mount in resident["Mounts"]
+        )
+        image_ref = resident["Config"]["Image"]
+        assert [
+            mount
+            for mount in resident["Mounts"]
+            if mount.get("Type") == "volume" and mount.get("RW") is True
+        ] == volume_mounts
+        image_capability = subprocess.run(
+            [
+                docker,
+                "image",
+                "inspect",
+                "--format",
+                '{{index .Config.Labels "io.agent-canon.projection-layout"}}',
+                image_ref,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        assert image_capability.returncode == 0, image_capability.stderr
+        assert image_capability.stdout.strip() == "container-runtime-v1"
+        ownership_probe = subprocess.run(
+            [
+                docker,
+                "run",
+                "--rm",
+                "--read-only",
+                "--network",
+                "none",
+                "--tmpfs",
+                "/tmp",
+                "--user",
+                "0:0",
+                "--mount",
+                f"type=volume,src={state_volume_name},dst=/var/lib/agent-canon,volume-nocopy",
+                "--entrypoint",
+                "/bin/sh",
+                image_ref,
+                "-c",
+                "set -eu; "
+                "root=/var/lib/agent-canon; runtime=$root/runtime; "
+                "test \"$(stat -c '%a:%u:%g' \"$root\")\" = 711:0:0; "
+                "test \"$(stat -c '%a:%u:%g' \"$runtime\")\" = 700:1000:1000; "
+                "for input in source-sync.json mount-registry.toml host-mounts.tsv .agent-canon-controller-volume-v1; do "
+                "test \"$(stat -c '%a:%u:%g' \"$root/$input\")\" = 444:0:0; "
+                "done; "
+                "private_log=$root/private-log; "
+                "test \"$(stat -c '%a:%u:%g' \"$private_log\")\" = 555:0:0; "
+                "test -z \"$(find \"$private_log\" -type l -print -quit)\"; "
+                "test -z \"$(find \"$private_log\" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)\"; "
+                "while IFS= read -r path; do test -z \"$path\" || "
+                "if test -d \"$path\"; then test \"$(stat -c '%a:%u:%g' \"$path\")\" = 555:0:0; "
+                "else test \"$(stat -c '%a:%u:%g' \"$path\")\" = 444:0:0; fi; done <<EOF_PRIVATE_LOG\n"
+                "$(find \"$private_log\" -mindepth 1 -print)\nEOF_PRIVATE_LOG",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=120,
+        )
+        assert ownership_probe.returncode == 0, ownership_probe.stderr
+
+        def run_as_resident(command: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [
+                    docker,
+                    "run",
+                    "--rm",
+                    "--read-only",
+                    "--network",
+                    "none",
+                    "--user",
+                    "1000:1000",
+                    "--mount",
+                    f"type=volume,src={state_volume_name},dst=/var/lib/agent-canon,volume-nocopy",
+                    "--entrypoint",
+                    "/bin/sh",
+                    image_ref,
+                    "-c",
+                    command,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=120,
+            )
+
+        writable_probe = run_as_resident(
+            "set -eu; "
+            "probe=/var/lib/agent-canon/runtime/.uid1000-probe; "
+            "printf 'probe\\n' > \"$probe\"; "
+            "test \"$(cat \"$probe\")\" = probe; "
+            "mv \"$probe\" \"$probe.renamed\"; "
+            "test -f \"$probe.renamed\"; "
+            "rm \"$probe.renamed\""
+        )
+        assert writable_probe.returncode == 0, writable_probe.stderr
+        readonly_probe = run_as_resident(
+            "set -eu; "
+            "source=/var/lib/agent-canon/source-sync.json; "
+            "before=$(sha256sum \"$source\"); "
+            "if chmod 600 \"$source\"; then exit 41; fi; "
+            "if rm -f \"$source\"; then exit 42; fi; "
+            "if mv \"$source\" \"$source.replacement\"; then exit 43; fi; "
+            "test -f \"$source\"; "
+            "test \"$before\" = \"$(sha256sum \"$source\")\""
+        )
+        assert readonly_probe.returncode == 0, readonly_probe.stderr
+        target_digest = hashlib.sha256(str(repository.resolve()).encode("utf-8")).hexdigest()
+        assert {
+            (mount["Source"], mount["Destination"], mount["RW"])
+            for mount in resident["Mounts"]
+            if mount.get("Type") == "bind"
+        } == {(str(repository.resolve()), f"/targets/{target_digest}", False)}
         mounts = (runtime / "container-state" / "mounts.tsv").read_text(
             encoding="utf-8"
         ).splitlines()
@@ -4003,6 +6039,12 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
                 encoding="utf-8"
             ).splitlines()
         ) == 1
+        repeated_source_sync = json.loads(
+            (runtime / "source-sync.json").read_text(encoding="utf-8")
+        )
+        assert repeated_source_sync["status"] == "success"
+        assert repeated_source_sync["branch"] == "main"
+        assert repeated_source_sync["source_head"] == source_head
     finally:
         subprocess.run(
             [*common, "uninstall"],

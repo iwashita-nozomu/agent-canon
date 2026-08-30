@@ -547,9 +547,20 @@ def _normalize_absolute_path(path: Path) -> Path:
     return Path(os.path.normpath(os.fspath(path)))
 
 
-def _open_dir(path: Path) -> int:
+def _open_dir(path: Path, *, traversal_only: bool = False) -> int:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if traversal_only:
+        # Linux O_PATH validates directory identity and traversal without
+        # requiring read permission on a 0711 ancestor.  Other platforms keep
+        # the previous O_RDONLY behavior; writable parent descriptors still
+        # use O_RDONLY because _atomic_bytes must fsync them.
+        flags = (
+            getattr(os, "O_PATH", os.O_RDONLY)
+            | os.O_DIRECTORY
+            | os.O_NOFOLLOW
+        )
     try:
-        return os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        return os.open(path, flags)
     except OSError as exc:
         if exc.errno in (errno.ELOOP, errno.ENOTDIR):
             raise BootstrapError(
@@ -687,7 +698,7 @@ def _ensure_directory(path: Path, *, mode: int = 0o700) -> None:
             raise BootstrapError(
                 "symlink_path_rejected", f"directory path is unsafe: {current}"
             )
-        os.close(_open_dir(current))
+        os.close(_open_dir(current, traversal_only=True))
 
 
 def _safe_read(path: Path, *, field: str) -> bytes:
@@ -1303,7 +1314,7 @@ class DockerAdapter:
         """Export one exact task subtree through Docker's UID normalization."""
         source_path = Path(source)
         if (
-            not source.startswith("/var/lib/agent-canon/exchange/tasks/")
+            not source.startswith("/var/lib/agent-canon/runtime/container-runtime/tasks/")
             or ".." in source_path.parts
         ):
             raise BootstrapError(
@@ -4776,7 +4787,7 @@ class BootstrapRuntime:
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
                 canon_root = "/usr/local/share/agent-canon/runtime"
-                container_runtime = "/var/lib/agent-canon/exchange"
+                container_runtime = "/var/lib/agent-canon/runtime/container-runtime"
                 exchange_runtime = (
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )

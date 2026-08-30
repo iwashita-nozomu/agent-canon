@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Verify native runner
@@ -100,8 +100,63 @@ jobs:
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=pr-${GITHUB_SHA}" \
+            --label io.agent-canon.projection-layout=container-runtime-v1 \
             --output type=cacheonly \
             .
+
+      - name: Set up Python for #989 native acceptance
+        if: github.event_name == 'pull_request'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install #989 acceptance test dependency
+        if: github.event_name == 'pull_request'
+        run: python3 -m pip install --disable-pip-version-check "pytest==8.3.5"
+
+      - name: Run #989 native ownership contract
+        if: github.event_name == 'pull_request'
+        env:
+          AGENT_CANON_RUN_REAL_CLEAN_E2E: "1"
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q \
+            tests/bootstrap/test_bootstrap_shell.py::test_existing_controller_volume_requires_state_label \
+            tests/bootstrap/test_bootstrap_shell.py::test_fake_volume_initializer_rejects_image_copy_up_without_nocopy \
+            tests/bootstrap/test_bootstrap_shell.py::test_fake_volume_initializer_preserves_readonly_legacy_source \
+            tests/bootstrap/test_bootstrap_shell.py::test_state_volume_readback_failure_removes_fresh_volume_and_allows_retry \
+            tests/bootstrap/test_bootstrap_shell.py::test_fresh_controller_failure_cleans_candidate_resources \
+            tests/bootstrap/test_bootstrap_shell.py::test_existing_volume_transaction_restores_only_authoritative_set \
+            tests/bootstrap/test_bootstrap_shell.py::test_candidate_cleanup_refuses_name_replacement_foreign_container \
+            tests/bootstrap/test_bootstrap_shell.py::test_fake_volume_snapshot_rejects_cross_boundary_hardlinks \
+            tests/bootstrap/test_bootstrap_shell.py::test_fake_volume_restore_failure_preserves_live_tree_and_snapshot \
+            tests/bootstrap/test_bootstrap_shell.py::test_fake_marked_volume_adopts_divergent_legacy_state \
+            tests/bootstrap/test_bootstrap_shell.py::test_fake_marked_layout_migration_failure_restores_old_tree \
+            tests/bootstrap/test_bootstrap_shell.py::test_legacy_controller_cleanup_failure_restores_receipts_and_state \
+            tests/bootstrap/test_bootstrap_shell.py::test_target_add_init_failure_restores_previous_fake_resident \
+            tests/bootstrap/test_bootstrap_shell.py::test_volume_input_imports_use_exact_runtime_paths \
+            tests/bootstrap/test_bootstrap_shell.py::test_volume_input_import_failure_stops_follow_on_imports \
+            tests/bootstrap/test_bootstrap_shell.py::test_private_log_import_failure_restores_old_tree_then_retry_normalizes \
+            tests/bootstrap/test_bootstrap_shell.py::test_ensure_container_gates_are_terminal_when_errexit_is_suppressed \
+            tests/bootstrap/test_bootstrap_shell.py::test_missing_resident_start_or_health_failure_preserves_existing_volume_and_image \
+            tests/bootstrap/test_bootstrap_shell.py::test_candidate_cleanup_without_receipt_uses_name_only_to_prove_absence \
+            tests/bootstrap/test_bootstrap_shell.py::test_committed_activation_cleanup_failure_retries_without_rollback \
+            tests/bootstrap/test_bootstrap_shell.py::test_up_to_date_cleanup_failure_occurs_after_commit_without_rollback \
+            tests/bootstrap/test_bootstrap_shell.py::test_volume_copy_runs_embedded_helper_with_real_posix_shell \
+            tests/bootstrap/test_bootstrap_shell.py::test_fake_docker_projection_capability_routes_legacy_runtime_layout \
+            tests/bootstrap/test_bootstrap_shell.py::test_volume_export_digest_corruption_is_rejected \
+            tests/bootstrap/test_bootstrap_shell.py::test_volume_export_rejects_fifo_before_publish \
+            tests/bootstrap/test_bootstrap_shell.py::test_volume_export_list_failure_is_typed_and_preserves_destination \
+            tests/bootstrap/test_bootstrap_shell.py::test_projection_later_move_failure_restores_exact_previous_state \
+            tests/bootstrap/test_bootstrap_shell.py::test_projection_backup_can_survive_late_activation_and_restore \
+            tests/bootstrap/test_bootstrap_shell.py::test_private_feedback_volume_copy_uses_canonical_subtree \
+            tests/bootstrap/test_bootstrap_shell.py::test_codex_volume_copy_rejects_unexpected_symlink_target \
+            tests/bootstrap/test_bootstrap_shell.py::test_codex_volume_copy_roundtrips_managed_symlink \
+            tests/bootstrap/test_bootstrap_shell.py::test_global_links_preflight_collision_preserves_regular_config_and_manifest \
+            tests/bootstrap/test_bootstrap_shell.py::test_global_links_rejects_foreign_agents_symlink_without_mutation \
+            tests/bootstrap/test_bootstrap_shell.py::test_global_links_transaction_restores_config_links_and_manifest \
+            tests/bootstrap/test_bootstrap_shell.py::test_restore_failure_skips_previous_resident_restart \
+            tests/bootstrap/test_bootstrap_shell.py::test_real_docker_public_clean_install_e2e
 
       - name: Build and publish native architecture image
         if: github.event_name != 'pull_request'
@@ -116,6 +171,7 @@ jobs:
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=sha-${GITHUB_SHA}" \
+            --label io.agent-canon.projection-layout=container-runtime-v1 \
             --push \
             .
 

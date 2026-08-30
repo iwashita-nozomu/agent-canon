@@ -19,11 +19,11 @@ AGENT_CANON_CONTAINER_NETWORK=none
 AGENT_CANON_VOLUME_DESTINATION=/var/lib/agent-canon
 AGENT_CANON_LEGACY_STATE_DESTINATION=/var/lib/agent-canon-legacy-state
 AGENT_CANON_RUNTIME_DESTINATION=/var/lib/agent-canon/runtime
-AGENT_CANON_EXCHANGE_DESTINATION=/var/lib/agent-canon/exchange
-AGENT_CANON_SPOOL_DESTINATION=/var/lib/agent-canon/spool
-AGENT_CANON_ARCHIVE_DESTINATION=/var/lib/agent-canon/archive
-AGENT_CANON_CACHE_DESTINATION=/var/lib/agent-canon/cache
-AGENT_CANON_CODEX_HOME_DESTINATION=/var/lib/agent-canon/codex-home
+AGENT_CANON_EXCHANGE_DESTINATION=/var/lib/agent-canon/runtime/container-runtime
+AGENT_CANON_SPOOL_DESTINATION=/var/lib/agent-canon/runtime/spool
+AGENT_CANON_ARCHIVE_DESTINATION=/var/lib/agent-canon/runtime/archive
+AGENT_CANON_CACHE_DESTINATION=/var/lib/agent-canon/runtime/cache
+AGENT_CANON_CODEX_HOME_DESTINATION=/var/lib/agent-canon/runtime/codex-home
 AGENT_CANON_PRIVATE_LOG_DESTINATION=/var/lib/agent-canon/private-log
 AGENT_CANON_MOUNT_REGISTRY_DESTINATION=/var/lib/agent-canon/mount-registry.toml
 AGENT_CANON_HOST_MOUNTS_DESTINATION=/var/lib/agent-canon/host-mounts.tsv
@@ -32,6 +32,13 @@ AGENT_CANON_HEALTH_ATTEMPTS=120
 AGENT_CANON_PRIVATE_LOG_ROOT=
 AGENT_CANON_TARGET_PRUNE_DIGESTS=
 AGENT_CANON_STATE_VOLUME_NAME=
+AGENT_CANON_STATE_VOLUME_CREATED_HERE=0
+AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT=
+AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT=
+AGENT_CANON_CANDIDATE_CONTAINER_ID=
+AGENT_CANON_CANDIDATE_CONTAINER_CREATED_HERE=0
+AGENT_CANON_ACTIVATION_COMMIT_RECEIPT=
+AGENT_CANON_PROJECTION_LAYOUT=
 
 _agent_canon_caller_user() {
   local caller_uid caller_gid
@@ -776,6 +783,8 @@ _agent_canon_validate_private_log_mount() {
 _agent_canon_prepare_host_runtime() {
   AGENT_CANON_STATE_ROOT="$AGENT_CANON_RUNTIME_ROOT/container-state"
   AGENT_CANON_STATE_VOLUME_NAME="agent-canon-runtime-$(_agent_canon_control_digest)"
+  AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT="$AGENT_CANON_RUNTIME_ROOT/host-state/state-volume-created.tsv"
+  AGENT_CANON_ACTIVATION_COMMIT_RECEIPT="$AGENT_CANON_RUNTIME_ROOT/host-state/activation-committed.tsv"
   AGENT_CANON_INITIAL_MOUNTS_TOML_EXISTS=0
   AGENT_CANON_INITIAL_MOUNTS_TSV_EXISTS=0
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.toml" ]] && AGENT_CANON_INITIAL_MOUNTS_TOML_EXISTS=1
@@ -783,6 +792,21 @@ _agent_canon_prepare_host_runtime() {
   export AGENT_CANON_STATE_ROOT
   export AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_INITIAL_MOUNTS_TOML_EXISTS \
     AGENT_CANON_INITIAL_MOUNTS_TSV_EXISTS
+  AGENT_CANON_STATE_VOLUME_CREATED_HERE=0
+  if _agent_canon_state_volume_creation_receipt_matches "$AGENT_CANON_STATE_VOLUME_NAME"; then
+    AGENT_CANON_STATE_VOLUME_CREATED_HERE=1
+  elif [[ -e "$AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT" &&
+          ! -L "$AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT" ]]; then
+    if ! rm -f -- "$AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT" ||
+       [[ -e "$AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT" ||
+          -L "$AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT" ]]; then
+      _agent_canon_json_error rollback_failed \
+        "stale state-volume creation receipt could not be released"
+    fi
+  fi
+  AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT="$AGENT_CANON_RUNTIME_ROOT/host-state/candidate-container.tsv"
+  export AGENT_CANON_STATE_VOLUME_CREATED_HERE AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT \
+    AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT AGENT_CANON_ACTIVATION_COMMIT_RECEIPT
   [[ ! -L "$AGENT_CANON_RUNTIME_ROOT/host-state" ]] ||
     _agent_canon_json_error active_image_invalid "host-owned image state directory must not be a symlink"
   mkdir -p "$AGENT_CANON_RUNTIME_ROOT" \
@@ -805,22 +829,95 @@ _agent_canon_prepare_host_runtime() {
 }
 
 _agent_canon_drop_legacy_controller_state() {
-  local path
+  local path relative backup_root backup_path cleanup_rc
+  local -a paths=(
+    "$AGENT_CANON_STATE_ROOT/state.json"
+    "$AGENT_CANON_STATE_ROOT/owner.json"
+    "$AGENT_CANON_STATE_ROOT/receipts"
+    "$AGENT_CANON_STATE_ROOT/generations"
+    "$AGENT_CANON_STATE_ROOT/tasks"
+  )
+  # Validate the complete set and stage every existing member before the
+  # first deletion.  The receipt directory is part of this rollback unit.
+  for path in "${paths[@]}"; do
+    [[ ! -L "$path" ]] ||
+      _agent_canon_json_error controller_state_projection_invalid \
+        "legacy controller state is a symlink: $path"
+    if [[ -d "$path" ]]; then
+      [[ -z "$(find "$path" -type l -print -quit)" ]] ||
+        _agent_canon_json_error controller_state_projection_invalid \
+          "legacy controller state contains a symlink: $path"
+    fi
+  done
+  backup_root=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.legacy-controller-drop.XXXXXX") ||
+    _agent_canon_json_error controller_state_projection_failed \
+      "legacy controller state backup could not be created"
+  for path in "${paths[@]}"; do
+    [[ -e "$path" ]] || continue
+    relative=${path#"$AGENT_CANON_STATE_ROOT"/}
+    backup_path="$backup_root/$relative"
+    mkdir -p -- "$(dirname -- "$backup_path")" || {
+      rm -rf -- "$backup_root"
+      _agent_canon_json_error controller_state_projection_failed \
+        "legacy controller state backup directory could not be created"
+    }
+    if ! cp -a -- "$path" "$backup_path"; then
+      rm -rf -- "$backup_root"
+      _agent_canon_json_error controller_state_projection_failed \
+        "legacy controller state backup could not be copied"
+    fi
+    if [[ -d "$path" ]]; then
+      [[ -d "$backup_path" && ! -L "$backup_path" ]] || {
+        rm -rf -- "$backup_root"
+        _agent_canon_json_error controller_state_projection_failed \
+          "legacy controller state backup readback was invalid"
+      }
+    else
+      [[ -f "$backup_path" && ! -L "$backup_path" ]] || {
+        rm -rf -- "$backup_root"
+        _agent_canon_json_error controller_state_projection_failed \
+          "legacy controller state backup readback was invalid"
+      }
+    fi
+  done
+  cleanup_legacy_controller_state() {
+    cleanup_rc=${1:-$?}
+    if ((cleanup_rc != 0)); then
+      for path in "${paths[@]}"; do
+        if [[ -d "$path" && ! -L "$path" ]]; then
+          rm -rf -- "$path"
+        elif [[ -e "$path" || -L "$path" ]]; then
+          rm -f -- "$path"
+        fi
+      done
+      for path in "${paths[@]}"; do
+        relative=${path#"$AGENT_CANON_STATE_ROOT"/}
+        backup_path="$backup_root/$relative"
+        [[ -e "$backup_path" && ! -L "$backup_path" ]] || continue
+        cp -a -- "$backup_path" "$path" || cleanup_rc=2
+      done
+    fi
+    rm -rf -- "$backup_root"
+    return "$cleanup_rc"
+  }
   for path in \
     "$AGENT_CANON_STATE_ROOT/state.json" \
     "$AGENT_CANON_STATE_ROOT/owner.json" \
     "$AGENT_CANON_STATE_ROOT/receipts" \
     "$AGENT_CANON_STATE_ROOT/generations" \
     "$AGENT_CANON_STATE_ROOT/tasks"; do
-    [[ ! -L "$path" ]] ||
-      _agent_canon_json_error controller_state_projection_invalid \
-        "legacy controller state is a symlink: $path"
     if [[ -d "$path" ]]; then
-      rm -rf -- "$path"
+      rm -rf -- "$path" || { cleanup_legacy_controller_state 2; return 2; }
     elif [[ -e "$path" ]]; then
-      rm -f -- "$path"
+      rm -f -- "$path" || { cleanup_legacy_controller_state 2; return 2; }
+    fi
+    relative=${path#"$AGENT_CANON_STATE_ROOT"/}
+    if [[ "${AGENT_CANON_TEST_DROP_LEGACY_FAIL_AFTER:-}" == "$relative" ]]; then
+      cleanup_legacy_controller_state 2
+      return 2
     fi
   done
+  cleanup_legacy_controller_state 0
 }
 
 _agent_canon_path_digest() {
@@ -882,12 +979,606 @@ _agent_canon_codex_digest() {
   )
 }
 
+_agent_canon_state_volume_labels_match() {
+  local volume="${1:-$AGENT_CANON_STATE_VOLUME_NAME}"
+  local volume_id label_runtime label_control label_state expected
+  expected=$(_agent_canon_control_digest)
+  volume_id=$("$AGENT_CANON_DOCKER_CMD" volume inspect --format '{{.Name}}' "$volume" 2>/dev/null) || return 1
+  label_runtime=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
+    --format '{{index .Labels "io.agent-canon.runtime"}}' "$volume" 2>/dev/null) || return 1
+  label_control=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
+    --format '{{index .Labels "io.agent-canon.control-root-digest"}}' "$volume" 2>/dev/null) || return 1
+  label_state=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
+    --format '{{index .Labels "io.agent-canon.state"}}' "$volume" 2>/dev/null) || return 1
+  [[ "$volume_id" == "$volume" && "$label_runtime" == shared-v1 &&
+     "$label_control" == "$expected" && "$label_state" == controller-v1 ]]
+}
+
+_agent_canon_state_volume_creation_receipt_matches() {
+  local volume=${1:-$AGENT_CANON_STATE_VOLUME_NAME}
+  local receipt="${AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/state-volume-created.tsv}"
+  [[ -f "$receipt" && ! -L "$receipt" ]] || return 1
+  [[ "$(<"$receipt")" == $'schema\tagent-canon.state-volume-created.v1\nvolume\t'"$volume" ]]
+}
+
+_agent_canon_state_volume_write_creation_receipt() {
+  local volume=${1:-$AGENT_CANON_STATE_VOLUME_NAME}
+  local receipt="${AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/state-volume-created.tsv}"
+  local temporary
+  [[ -n "$volume" && "$volume" != */* && "$volume" != *$'\n'* ]] || return 1
+  mkdir -p -- "$(dirname -- "$receipt")" || return 1
+  temporary=$(mktemp "$receipt.tmp.XXXXXX") || return 1
+  if ! {
+    printf 'schema\tagent-canon.state-volume-created.v1\nvolume\t%s\n' "$volume" > "$temporary"
+    chmod 600 "$temporary"
+    mv -f -- "$temporary" "$receipt"
+  }; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+}
+
+_agent_canon_state_volume_clear_creation_receipt() {
+  local receipt="${AGENT_CANON_STATE_VOLUME_CREATION_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/state-volume-created.tsv}"
+  [[ ! -L "$receipt" ]] || return 1
+  if [[ "${AGENT_CANON_TEST_STATE_VOLUME_RECEIPT_REMOVE_FAIL:-0}" == 1 ]]; then
+    return 1
+  fi
+  rm -f -- "$receipt" || return 1
+  [[ ! -e "$receipt" && ! -L "$receipt" ]] || return 1
+  AGENT_CANON_STATE_VOLUME_CREATED_HERE=0
+  export AGENT_CANON_STATE_VOLUME_CREATED_HERE
+}
+
+_agent_canon_write_candidate_identity_receipt() {
+  local container=$1 container_id=$2 image_ref=$3 image_id=$4
+  local receipt="${AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/candidate-container.tsv}"
+  local temporary
+  [[ -n "$container" && "$container" != *$'\n'* && "$container" != *$'\t'* &&
+     -n "$container_id" && "$container_id" != *$'\n'* && "$container_id" != *$'\t'* &&
+     -n "$image_ref" && "$image_ref" != *$'\n'* && "$image_ref" != *$'\t'* &&
+     -n "$image_id" && "$image_id" != *$'\n'* && "$image_id" != *$'\t'* ]] || return 1
+  mkdir -p -- "$(dirname -- "$receipt")" || return 1
+  temporary=$(mktemp "$receipt.tmp.XXXXXX") || return 1
+  if ! {
+    printf 'schema\tagent-canon.candidate-container.v1\n'
+    printf 'name\t%s\n' "$container"
+    printf 'id\t%s\n' "$container_id"
+    printf 'image-ref\t%s\n' "$image_ref"
+    printf 'image-id\t%s\n' "$image_id"
+    printf 'runtime\tshared-v1\n'
+    printf 'control-root-digest\t%s\n' "$(_agent_canon_control_digest)"
+  } > "$temporary"; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+  chmod 600 "$temporary" || { rm -f -- "$temporary"; return 1; }
+  if ! mv -f -- "$temporary" "$receipt" ||
+     [[ ! -f "$receipt" || -L "$receipt" ]]; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+  AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT=$receipt
+  AGENT_CANON_CANDIDATE_CONTAINER_ID=$container_id
+  export AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT AGENT_CANON_CANDIDATE_CONTAINER_ID
+}
+
+_agent_canon_read_candidate_identity_receipt() {
+  local container=$1
+  local receipt="${AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/candidate-container.tsv}"
+  local key value schema= name= container_id= image_ref= image_id= runtime= control= count=0
+  [[ -f "$receipt" && ! -L "$receipt" ]] || return 1
+  while IFS=$'\t' read -r key value; do
+    case "$key" in
+      schema) schema=$value; count=$((count + 1)) ;;
+      name) name=$value; count=$((count + 1)) ;;
+      id) container_id=$value; count=$((count + 1)) ;;
+      image-ref) image_ref=$value; count=$((count + 1)) ;;
+      image-id) image_id=$value; count=$((count + 1)) ;;
+      runtime) runtime=$value; count=$((count + 1)) ;;
+      control-root-digest) control=$value; count=$((count + 1)) ;;
+      *) return 1 ;;
+    esac
+  done < "$receipt"
+  [[ "$count" == 7 && "$schema" == agent-canon.candidate-container.v1 &&
+     "$name" == "$container" && -n "$container_id" && -n "$image_ref" &&
+     -n "$image_id" && "$runtime" == shared-v1 &&
+     "$control" == "$(_agent_canon_control_digest)" ]] || return 1
+  AGENT_CANON_CANDIDATE_CONTAINER_ID=$container_id
+  export AGENT_CANON_CANDIDATE_CONTAINER_ID
+  return 0
+}
+
+_agent_canon_clear_candidate_identity_receipt() {
+  local receipt="${AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/candidate-container.tsv}"
+  [[ ! -L "$receipt" ]] || return 1
+  rm -f -- "$receipt" || return 1
+  [[ ! -e "$receipt" && ! -L "$receipt" ]] || return 1
+  unset AGENT_CANON_CANDIDATE_CONTAINER_ID AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT
+}
+
+_agent_canon_write_activation_commit_receipt() {
+  local image_id=$1 container=$2
+  local receipt="${AGENT_CANON_ACTIVATION_COMMIT_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/activation-committed.tsv}"
+  local temporary
+  [[ "$image_id" == sha256:* && -n "$container" &&
+     "$container" != *$'\n'* && "$container" != *$'\t'* ]] || return 1
+  [[ ! -L "$receipt" ]] || return 1
+  mkdir -p -- "$(dirname -- "$receipt")" || return 1
+  temporary=$(mktemp "$receipt.tmp.XXXXXX") || return 1
+  if ! {
+    printf 'schema\tagent-canon.activation-committed.v1\n'
+    printf 'image-id\t%s\n' "$image_id"
+    printf 'container\t%s\n' "$container"
+  } > "$temporary"; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+  chmod 600 "$temporary" || { rm -f -- "$temporary"; return 1; }
+  if ! mv -f -- "$temporary" "$receipt" ||
+     [[ ! -f "$receipt" || -L "$receipt" ]]; then
+    rm -f -- "$temporary"
+    return 1
+  fi
+  AGENT_CANON_ACTIVATION_COMMIT_RECEIPT=$receipt
+  export AGENT_CANON_ACTIVATION_COMMIT_RECEIPT
+}
+
+_agent_canon_activation_commit_receipt_valid() {
+  local receipt="${AGENT_CANON_ACTIVATION_COMMIT_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/activation-committed.tsv}"
+  local key value schema= image_id= container= count=0
+  [[ -f "$receipt" && ! -L "$receipt" ]] || return 1
+  while IFS=$'\t' read -r key value; do
+    case "$key" in
+      schema) schema=$value; count=$((count + 1)) ;;
+      image-id) image_id=$value; count=$((count + 1)) ;;
+      container) container=$value; count=$((count + 1)) ;;
+      *) return 1 ;;
+    esac
+  done < "$receipt"
+  [[ "$count" == 3 && "$schema" == agent-canon.activation-committed.v1 &&
+     "$image_id" == sha256:* && -n "$container" ]]
+}
+
+_agent_canon_clear_activation_commit_receipt() {
+  local receipt="${AGENT_CANON_ACTIVATION_COMMIT_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/activation-committed.tsv}"
+  [[ ! -L "$receipt" ]] || return 1
+  if [[ "${AGENT_CANON_TEST_ACTIVATION_COMMIT_RECEIPT_REMOVE_FAIL:-0}" == 1 ]]; then
+    return 1
+  fi
+  rm -f -- "$receipt" || return 1
+  [[ ! -e "$receipt" && ! -L "$receipt" ]] || return 1
+  unset AGENT_CANON_ACTIVATION_COMMIT_RECEIPT
+}
+
+_agent_canon_remove_fresh_state_volume() {
+  local volume="${AGENT_CANON_STATE_VOLUME_NAME:-}"
+  if [[ "${AGENT_CANON_STATE_VOLUME_CREATED_HERE:-0}" != 1 ]] &&
+     _agent_canon_state_volume_creation_receipt_matches "$volume"; then
+    AGENT_CANON_STATE_VOLUME_CREATED_HERE=1
+    export AGENT_CANON_STATE_VOLUME_CREATED_HERE
+  fi
+  [[ "${AGENT_CANON_STATE_VOLUME_CREATED_HERE:-0}" == 1 && -n "$volume" ]] || return 0
+  if ! "$AGENT_CANON_DOCKER_CMD" volume inspect "$volume" >/dev/null 2>&1; then
+    _agent_canon_state_volume_clear_creation_receipt || return 1
+    return 0
+  fi
+  # Re-read ownership before cleanup. A name collision or daemon race must
+  # never turn candidate cleanup into deletion of another owner's volume.
+  _agent_canon_state_volume_labels_match "$volume" || return 1
+  "$AGENT_CANON_DOCKER_CMD" volume rm "$volume" >/dev/null 2>&1 || return 1
+  _agent_canon_state_volume_clear_creation_receipt || return 1
+}
+
+_agent_canon_remove_fresh_candidate_resources() {
+  local container=$(_agent_canon_container_name)
+  local candidate_container_id=${1:-${AGENT_CANON_CANDIDATE_CONTAINER_ID:-}}
+  local candidate_image_id=${AGENT_CANON_EXPECTED_IMAGE_ID:-}
+  local cleanup_rc=0
+  # Container creation and volume creation are independent receipts.  A
+  # start/health failure with an adopted volume still owns the new candidate
+  # container and must remove it, while preserving the adopted volume.
+  if [[ "${AGENT_CANON_CANDIDATE_CONTAINER_CREATED_HERE:-0}" == 1 ]]; then
+    # Ensure/start does not own the already-selected image.  The outer image
+    # replacement transaction, when present, decides whether that image is a
+    # failed candidate.  This local cleanup owns only the newly-created
+    # container and independently-created volume.
+    if _agent_canon_cleanup_candidate_resources "$container" "$candidate_image_id" \
+      "$candidate_image_id" \
+      "$candidate_container_id"; then
+      AGENT_CANON_CANDIDATE_CONTAINER_CREATED_HERE=0
+      export AGENT_CANON_CANDIDATE_CONTAINER_CREATED_HERE
+    else
+      cleanup_rc=1
+    fi
+  fi
+  if [[ "${AGENT_CANON_STATE_VOLUME_CREATED_HERE:-0}" == 1 ]] &&
+     ! _agent_canon_remove_fresh_state_volume; then
+    cleanup_rc=1
+  fi
+  return "$cleanup_rc"
+}
+
+_agent_canon_cleanup_candidate_resources() {
+  local container=${1:-} candidate_image_id=${2:-} old_image_id=${3:-}
+  local expected_container_id=${4:-}
+  local cleanup_rc=0
+  local candidate_absent=0
+  local candidate_receipt="${AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/candidate-container.tsv}"
+  local observed_image_ref observed_image_id observed_runtime observed_control running
+  if [[ -z "$expected_container_id" && -n "$container" ]]; then
+    if _agent_canon_read_candidate_identity_receipt "$container"; then
+      expected_container_id=$AGENT_CANON_CANDIDATE_CONTAINER_ID
+    fi
+  fi
+  if [[ -z "$expected_container_id" && -n "$container" ]]; then
+    # A name without a captured immutable ID is not evidence of the candidate.
+    # It may only be used to prove that no object remains; an existing name is
+    # a possible replacement and must not be mutated.
+    if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
+      return 1
+    fi
+    if [[ -e "$candidate_receipt" || -L "$candidate_receipt" ]]; then
+      _agent_canon_clear_candidate_identity_receipt || return 1
+    fi
+    candidate_absent=1
+  fi
+  if [[ -n "$expected_container_id" ]]; then
+    # Every candidate field is read back through the captured immutable ID.
+    # A missing ID is safe (the candidate is already absent); a failed stop or
+    # remove is not, because recovery must not race a still-running process.
+    if "$AGENT_CANON_DOCKER_CMD" container inspect "$expected_container_id" >/dev/null 2>&1; then
+      if ! observed_runtime=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+        --format '{{index .Config.Labels "io.agent-canon.runtime"}}' "$expected_container_id" 2>/dev/null) ||
+        ! observed_control=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+          --format '{{index .Config.Labels "io.agent-canon.control-root-digest"}}' "$expected_container_id" 2>/dev/null) ||
+        ! observed_image_ref=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+          --format '{{.Config.Image}}' "$expected_container_id" 2>/dev/null) ||
+        [[ "$observed_runtime" != shared-v1 ||
+           "$observed_control" != "$(_agent_canon_control_digest)" ||
+           -z "$observed_image_ref" ]]; then
+        cleanup_rc=1
+      elif ! observed_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+        --format '{{.Id}}' "$observed_image_ref" 2>/dev/null) ||
+        [[ -n "$candidate_image_id" && "$observed_image_id" != "$candidate_image_id" ]]; then
+        cleanup_rc=1
+      elif ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$expected_container_id" >/dev/null 2>&1 ||
+        ! running=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+          --format '{{.State.Running}}' "$expected_container_id" 2>/dev/null) ||
+        [[ "$running" != false ]] ||
+        ! "$AGENT_CANON_DOCKER_CMD" rm "$expected_container_id" >/dev/null 2>&1 ||
+        "$AGENT_CANON_DOCKER_CMD" container inspect "$expected_container_id" >/dev/null 2>&1; then
+        cleanup_rc=1
+      fi
+    fi
+  elif ((candidate_absent == 0)); then
+    cleanup_rc=1
+  fi
+  if [[ -n "$candidate_image_id" && "$candidate_image_id" != "$old_image_id" ]] &&
+     "$AGENT_CANON_DOCKER_CMD" image inspect "$candidate_image_id" >/dev/null 2>&1; then
+    "$AGENT_CANON_DOCKER_CMD" image rm "$candidate_image_id" >/dev/null 2>&1 || cleanup_rc=1
+  fi
+  if ((cleanup_rc == 0)); then
+    _agent_canon_clear_candidate_identity_receipt || cleanup_rc=1
+  fi
+  return "$cleanup_rc"
+}
+
+_agent_canon_probe_state_volume() {
+  local volume="${1:-$AGENT_CANON_STATE_VOLUME_NAME}"
+  local allow_legacy=${2:-0}
+  local caller_uid caller_gid probe_name
+  [[ "$allow_legacy" == 0 || "$allow_legacy" == 1 ]] || return 1
+  caller_uid=$(id -u)
+  caller_gid=$(id -g)
+  probe_name="agent-canon-volume-probe-$(_agent_canon_control_digest | cut -c1-16)-$$"
+  "$AGENT_CANON_DOCKER_CMD" run --rm \
+    --name "$probe_name" \
+    --user "$caller_uid:$caller_gid" \
+    --read-only \
+    --network none \
+    --tmpfs /tmp \
+    --mount "type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION,volume-nocopy" \
+    --env AGENT_CANON_VOLUME_PROBE=1 \
+    --env "AGENT_CANON_VOLUME_UID=$caller_uid" \
+    --env "AGENT_CANON_VOLUME_GID=$caller_gid" \
+    --env "AGENT_CANON_VOLUME_DIGEST=$(_agent_canon_control_digest)" \
+    --env "AGENT_CANON_VOLUME_ALLOW_LEGACY=$allow_legacy" \
+    --entrypoint /bin/sh \
+    "$AGENT_CANON_IMAGE_REF" \
+    -c 'set -eu
+root=/var/lib/agent-canon
+runtime="$root/runtime"
+uid_value="$AGENT_CANON_VOLUME_UID"
+gid_value="$AGENT_CANON_VOLUME_GID"
+digest="$AGENT_CANON_VOLUME_DIGEST"
+allow_legacy="$AGENT_CANON_VOLUME_ALLOW_LEGACY"
+[ "$(id -u)" = "$uid_value" ] && [ "$(id -g)" = "$gid_value" ]
+[ "$(stat -c "%a:%u:%g" "$root")" = "711:0:0" ]
+marker="$root/.agent-canon-controller-volume-v1"
+[ "$(stat -c "%a:%u:%g" "$runtime")" = "700:$uid_value:$gid_value" ]
+[ "$(stat -c "%a:%u:%g" "$marker")" = "444:0:0" ]
+[ -f "$marker" ] && [ "$(cat "$marker")" = "agent-canon-controller-volume/v1
+$digest" ]
+private_log="$root/private-log"
+[ -d "$private_log" ] && [ ! -L "$private_log" ]
+private_log_stat=$(stat -c "%a:%u:%g" "$private_log")
+if [ "$private_log_stat" = "555:0:0" ]; then
+  [ -z "$(find "$private_log" -type l -print -quit)" ]
+  [ -z "$(find "$private_log" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ]
+  while IFS= read -r private_log_path; do
+    [ -z "$private_log_path" ] && continue
+    if [ -d "$private_log_path" ]; then
+      [ "$(stat -c "%a:%u:%g" "$private_log_path")" = "555:0:0" ]
+    else
+      [ "$(stat -c "%a:%u:%g" "$private_log_path")" = "444:0:0" ]
+    fi
+  done <<EOF_PRIVATE_LOG
+$(find "$private_log" -mindepth 1 -print)
+EOF_PRIVATE_LOG
+else
+  [ "$allow_legacy" = 1 ]
+  [ "$private_log_stat" = "700:$uid_value:$gid_value" ]
+  [ -z "$(find "$private_log" -type l -print -quit)" ]
+  [ -z "$(find "$private_log" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ]
+fi
+probe="$runtime/.agent-canon-non-root-probe.$$"
+printf "probe\n" > "$probe"
+[ "$(cat "$probe")" = probe ]
+mv "$probe" "$probe.renamed"
+rm -f "$probe.renamed"'
+}
+
+_agent_canon_state_volume_transaction() {
+  local action=$1 volume="${AGENT_CANON_STATE_VOLUME_NAME:-}"
+  local transaction_name="agent-canon-volume-transaction-$(_agent_canon_control_digest | cut -c1-16)-$$"
+  [[ "$action" == snapshot || "$action" == restore || "$action" == clear ]] ||
+    _agent_canon_json_error state_volume_transaction_invalid \
+      "controller state volume transaction action is invalid"
+  [[ -n "$volume" ]] ||
+    _agent_canon_json_error state_volume_transaction_invalid \
+      "controller state volume transaction volume is unavailable"
+  _agent_canon_state_volume_labels_match "$volume" ||
+    _agent_canon_json_error state_volume_ownership_mismatch \
+      "controller state volume identity changed before transaction"
+  "$AGENT_CANON_DOCKER_CMD" run --rm \
+    --name "$transaction_name" \
+    --user 0:0 \
+    --read-only \
+    --network none \
+    --tmpfs /tmp \
+    --mount "type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION,volume-nocopy" \
+    --env "AGENT_CANON_VOLUME_TRANSACTION_ACTION=$action" \
+    --env "AGENT_CANON_VOLUME_DIGEST=$(_agent_canon_control_digest)" \
+    --env "AGENT_CANON_TEST_VOLUME_RESTORE_FAIL_AFTER=${AGENT_CANON_TEST_VOLUME_RESTORE_FAIL_AFTER:-}" \
+    --entrypoint /bin/sh \
+    "$AGENT_CANON_IMAGE_REF" \
+    -c 'set -eu
+root=/var/lib/agent-canon
+runtime="$root/runtime"
+[ -d "$root" ] && [ ! -L "$root" ] || exit 89
+[ -d "$runtime" ] && [ ! -L "$runtime" ] || exit 89
+transaction="$root/.agent-canon-bootstrap-transaction-v1"
+manifest="$transaction/manifest.tsv"
+logical_paths="state.json
+owner.json
+mounts.toml
+mounts.tsv
+rollback-plan.tsv
+rollback-mounts.tsv
+previous-image-id
+generations
+tasks
+container-runtime"
+action="$AGENT_CANON_VOLUME_TRANSACTION_ACTION"
+cleanup_snapshot() {
+  cleanup_rc=$?
+  if [ "$action" = snapshot ] && [ "$cleanup_rc" -ne 0 ]; then
+    rm -rf -- "$transaction" 2>/dev/null || :
+  fi
+  exit "$cleanup_rc"
+}
+trap cleanup_snapshot 0
+is_logical_path() {
+  case "$1" in
+    state.json|owner.json|mounts.toml|mounts.tsv|rollback-plan.tsv|rollback-mounts.tsv|previous-image-id|generations|tasks|container-runtime) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+remove_path() {
+  path=$1
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    rm -rf -- "$path"
+  fi
+}
+case "$action" in
+  snapshot)
+    [ -f "$root/.agent-canon-controller-volume-v1" ] || exit 90
+    [ ! -e "$transaction" ] && [ ! -L "$transaction" ] || exit 91
+    umask 077
+    mkdir "$transaction"
+    chmod 700 "$transaction"
+    printf "schema\tagent-canon.volume-transaction.v1\n" > "$manifest"
+    for relative in $logical_paths; do
+      source="$runtime/$relative"
+      if [ -e "$source" ] || [ -L "$source" ]; then
+        [ ! -L "$source" ] || exit 92
+        if [ -d "$source" ]; then
+          [ -z "$(find "$source" -type l -print -quit)" ] || exit 93
+          [ -z "$(find "$source" -type f -links +1 -print -quit)" ] || exit 94
+          [ -z "$(find "$source" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ] || exit 95
+        else
+          [ -f "$source" ] || exit 96
+          [ "$(stat -c "%h" "$source")" = 1 ] || exit 97
+        fi
+        printf "present\t%s\n" "$relative" >> "$manifest"
+        cp -a -- "$source" "$transaction/$relative"
+        if [ -d "$source" ]; then
+          [ -z "$(find "$transaction/$relative" -type l -print -quit)" ] || exit 98
+          [ -z "$(find "$transaction/$relative" -type f -links +1 -print -quit)" ] || exit 99
+          [ -z "$(find "$transaction/$relative" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ] || exit 100
+        else
+          [ "$(stat -c "%h" "$transaction/$relative")" = 1 ] || exit 101
+        fi
+      else
+        printf "absent\t%s\n" "$relative" >> "$manifest"
+      fi
+    done
+    [ "$(wc -l < "$manifest")" = 11 ] || exit 102
+    ;;
+  restore)
+    [ -d "$transaction" ] && [ ! -L "$transaction" ] || exit 95
+    [ -f "$manifest" ] && [ ! -L "$manifest" ] || exit 96
+    [ "$(sed -n "1p" "$manifest")" = "schema\tagent-canon.volume-transaction.v1" ] || exit 97
+    manifest_index=0
+    while IFS="$(printf "\t")" read -r status relative; do
+      [ "$status" = schema ] && continue
+      is_logical_path "$relative" || exit 98
+      manifest_index=$((manifest_index + 1))
+      expected_relative=$(printf "%s\n" $logical_paths | sed -n "${manifest_index}p")
+      [ "$relative" = "$expected_relative" ] || exit 98
+      case "$status" in
+        present)
+          [ -e "$transaction/$relative" ] && [ ! -L "$transaction/$relative" ] || exit 103
+          if [ -d "$transaction/$relative" ]; then
+            [ -z "$(find "$transaction/$relative" -type l -print -quit)" ] || exit 104
+            [ -z "$(find "$transaction/$relative" -type f -links +1 -print -quit)" ] || exit 105
+            [ -z "$(find "$transaction/$relative" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ] || exit 106
+          else
+            [ -f "$transaction/$relative" ] || exit 107
+            [ "$(stat -c "%h" "$transaction/$relative")" = 1 ] || exit 108
+          fi ;;
+        absent) [ ! -e "$transaction/$relative" ] && [ ! -L "$transaction/$relative" ] || exit 109 ;;
+        *) exit 101 ;;
+      esac
+    done < "$manifest"
+    [ "$manifest_index" -eq 10 ] || exit 98
+    restore_stage="$transaction/.restore-stage"
+    restore_old="$transaction/.restore-old"
+    restore_touched="$transaction/.restore-touched"
+    [ ! -e "$restore_stage" ] && [ ! -L "$restore_stage" ] || exit 110
+    [ ! -e "$restore_old" ] && [ ! -L "$restore_old" ] || exit 111
+    mkdir -p "$restore_stage/runtime" "$restore_old/runtime"
+    : > "$restore_touched"
+    for relative in $logical_paths; do
+      status=$(grep -F "$(printf '\t')$relative" "$manifest" | cut -f1)
+      if [ "$status" = present ]; then
+        mkdir -p "$(dirname "$restore_stage/runtime/$relative")"
+        cp -a -- "$transaction/$relative" "$restore_stage/runtime/$relative"
+      fi
+    done
+    [ -z "$(find "$restore_stage/runtime" -type l -print -quit)" ] || exit 112
+    [ -z "$(find "$restore_stage/runtime" -type f -links +1 -print -quit)" ] || exit 113
+    [ -z "$(find "$restore_stage/runtime" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ] || exit 114
+    restore_cleanup() {
+      restore_rc=$?
+      if [ "$restore_rc" -ne 0 ]; then
+        while IFS= read -r relative; do
+          [ -n "$relative" ] || continue
+          remove_path "$runtime/$relative"
+          if [ -e "$restore_old/runtime/$relative" ] || [ -L "$restore_old/runtime/$relative" ]; then
+            mkdir -p "$(dirname "$runtime/$relative")"
+            mv "$restore_old/runtime/$relative" "$runtime/$relative" 2>/dev/null || :
+          fi
+        done < "$restore_touched"
+      fi
+      rm -rf "$restore_stage" "$restore_old" "$restore_touched"
+      trap - 0
+      exit "$restore_rc"
+    }
+    trap restore_cleanup 0
+    for relative in $logical_paths; do
+      status=$(grep -F "$(printf '\t')$relative" "$manifest" | cut -f1)
+      if [ -e "$runtime/$relative" ] || [ -L "$runtime/$relative" ]; then
+        mkdir -p "$(dirname "$restore_old/runtime/$relative")"
+        mv "$runtime/$relative" "$restore_old/runtime/$relative" || exit 115
+        printf '%s\n' "$relative" >> "$restore_touched"
+      fi
+      if [ "$status" = present ]; then
+        mkdir -p "$(dirname "$runtime/$relative")"
+        mv "$restore_stage/runtime/$relative" "$runtime/$relative" || exit 116
+        if ! grep -Fqx "$relative" "$restore_touched"; then
+          printf '%s\n' "$relative" >> "$restore_touched"
+        fi
+      fi
+      [ "${AGENT_CANON_TEST_VOLUME_RESTORE_FAIL_AFTER:-}" != "$relative" ] || exit 117
+    done
+    trap - 0
+    rm -rf "$restore_stage" "$restore_old" "$restore_touched"
+    ;;
+  clear)
+    if [ -e "$transaction" ] || [ -L "$transaction" ]; then
+      [ -d "$transaction" ] && [ ! -L "$transaction" ] || exit 102
+      rm -rf -- "$transaction"
+    fi
+    ;;
+  *) exit 103 ;;
+esac'
+}
+
+_agent_canon_prepare_state_volume_snapshot() {
+  local volume="${AGENT_CANON_STATE_VOLUME_NAME:-}"
+  # Finish every retained post-commit cleanup owner before arming a new
+  # rollback generation.  A cleanup error is not an activation failure and
+  # must never adopt the committed snapshot as the next rollback payload.
+  _agent_canon_finish_committed_activation_cleanup || return $?
+  [[ -n "$volume" ]] || return 0
+  if [[ "${AGENT_CANON_STATE_VOLUME_CREATED_HERE:-0}" == 1 ]] ||
+     _agent_canon_state_volume_creation_receipt_matches "$volume"; then
+    return 0
+  fi
+  if ! "$AGENT_CANON_DOCKER_CMD" volume inspect "$volume" >/dev/null 2>&1; then
+    return 0
+  fi
+  _agent_canon_init_state_volume || return $?
+  _agent_canon_state_volume_transaction snapshot || return $?
+  AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE=1
+  export AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE
+}
+
+_agent_canon_restore_state_volume_snapshot() {
+  local volume="${AGENT_CANON_STATE_VOLUME_NAME:-}"
+  [[ "${AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE:-0}" == 1 ]] || return 0
+  [[ -n "$volume" ]] || return 2
+  if ! "$AGENT_CANON_DOCKER_CMD" volume inspect "$volume" >/dev/null 2>&1; then
+    return 2
+  fi
+  _agent_canon_state_volume_labels_match "$volume" || return 2
+  _agent_canon_state_volume_transaction restore || return $?
+  _agent_canon_state_volume_transaction clear || return $?
+  AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE=0
+  export AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE
+}
+
+_agent_canon_clear_state_volume_snapshot() {
+  local volume="${AGENT_CANON_STATE_VOLUME_NAME:-}"
+  [[ "${AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE:-0}" == 1 ]] || return 0
+  [[ -n "$volume" ]] || return 2
+  if ! "$AGENT_CANON_DOCKER_CMD" volume inspect "$volume" >/dev/null 2>&1; then
+    return 2
+  fi
+  _agent_canon_state_volume_labels_match "$volume" || return 2
+  _agent_canon_state_volume_transaction clear || return $?
+  AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE=0
+  export AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE
+}
+
 _agent_canon_init_state_volume() {
   local volume="$AGENT_CANON_STATE_VOLUME_NAME"
   local label_runtime label_control label_state volume_id caller_uid caller_gid init_name init_readback
-  label_runtime=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
-    --format '{{index .Labels "io.agent-canon.runtime"}}' "$volume" 2>/dev/null || true)
-  if [[ -z "$label_runtime" ]]; then
+  if [[ -e "$AGENT_CANON_STATE_ROOT/codex-home" || -L "$AGENT_CANON_STATE_ROOT/codex-home" ]]; then
+    if ! _agent_canon_validate_codex_home "$AGENT_CANON_STATE_ROOT/codex-home"; then
+      _agent_canon_json_error codex_home_invalid \
+        "legacy Codex home contains an unmanaged or unsafe link"
+      return 2
+    fi
+  fi
+  AGENT_CANON_STATE_VOLUME_CREATED_HERE=0
+  if _agent_canon_state_volume_creation_receipt_matches "$volume"; then
+    AGENT_CANON_STATE_VOLUME_CREATED_HERE=1
+  fi
+  export AGENT_CANON_STATE_VOLUME_CREATED_HERE
+  if ! "$AGENT_CANON_DOCKER_CMD" volume inspect "$volume" >/dev/null 2>&1; then
     if ! "$AGENT_CANON_DOCKER_CMD" volume create \
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$(_agent_canon_control_digest)" \
@@ -895,6 +1586,15 @@ _agent_canon_init_state_volume() {
       "$volume" >/dev/null; then
       _agent_canon_json_error state_volume_create_failed \
         "controller state volume could not be created"
+      _agent_canon_state_volume_clear_creation_receipt || :
+      return 2
+    fi
+    AGENT_CANON_STATE_VOLUME_CREATED_HERE=1
+    export AGENT_CANON_STATE_VOLUME_CREATED_HERE
+    if ! _agent_canon_state_volume_write_creation_receipt "$volume"; then
+      _agent_canon_json_error state_volume_readback_failed \
+        "fresh controller state volume creation receipt could not be recorded"
+      _agent_canon_remove_fresh_state_volume || :
       return 2
     fi
   fi
@@ -902,6 +1602,7 @@ _agent_canon_init_state_volume() {
     --format '{{.Name}}' "$volume" 2>/dev/null); then
     _agent_canon_json_error state_volume_readback_failed \
       "controller state volume could not be inspected"
+    _agent_canon_remove_fresh_state_volume || :
     return 2
   fi
   label_runtime=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
@@ -910,14 +1611,14 @@ _agent_canon_init_state_volume() {
     --format '{{index .Labels "io.agent-canon.control-root-digest"}}' "$volume" 2>/dev/null || true)
   label_state=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
     --format '{{index .Labels "io.agent-canon.state"}}' "$volume" 2>/dev/null || true)
-  [[ "$volume_id" == "$volume" && "$label_runtime" == shared-v1 &&
+  if ! [[ "$volume_id" == "$volume" && "$label_runtime" == shared-v1 &&
      "$label_control" == "$(_agent_canon_control_digest)" &&
-     "$label_state" == controller-v1 ]] ||
+     "$label_state" == controller-v1 ]]; then
     _agent_canon_json_error state_volume_ownership_mismatch \
-      "controller state volume has unexpected identity or owner"
-  [[ "$volume_id" == "$volume" && "$label_runtime" == shared-v1 &&
-     "$label_control" == "$(_agent_canon_control_digest)" &&
-     "$label_state" == controller-v1 ]] || return 2
+      "controller state volume has unexpected identity or owner" || :
+    _agent_canon_remove_fresh_state_volume || :
+    return 2
+  fi
 
   caller_uid=$(id -u)
   caller_gid=$(id -g)
@@ -932,7 +1633,9 @@ _agent_canon_init_state_volume() {
     --mount "type=bind,src=$AGENT_CANON_STATE_ROOT,dst=$AGENT_CANON_LEGACY_STATE_DESTINATION,readonly" \
     --env "AGENT_CANON_VOLUME_UID=$caller_uid" \
     --env "AGENT_CANON_VOLUME_GID=$caller_gid" \
+    --env "AGENT_CANON_VOLUME_CREATED_HERE=${AGENT_CANON_STATE_VOLUME_CREATED_HERE:-0}" \
     --env "AGENT_CANON_VOLUME_DIGEST=$(_agent_canon_control_digest)" \
+    --env "AGENT_CANON_TEST_LAYOUT_MIGRATION_AFTER=${AGENT_CANON_TEST_LAYOUT_MIGRATION_AFTER:-}" \
     --entrypoint /bin/sh \
     "$AGENT_CANON_IMAGE_REF" \
     -c 'set -eu
@@ -955,23 +1658,39 @@ copy_file() {
 copy_directory() {
   source=$1
   destination=$2
+  allow_links=${3:-0}
   [ ! -L "$source" ] || exit 42
   [ -d "$source" ] || exit 43
   if [ -e "$destination" ] || [ -L "$destination" ]; then
     [ -d "$destination" ] && [ ! -L "$destination" ] || exit 44
-    [ -z "$(find "$destination" -type l -print -quit)" ] || exit 45
+    if [ "$allow_links" != 1 ]; then
+      [ -z "$(find "$destination" -type l -print -quit)" ] || exit 45
+    fi
     diff -qr "$source" "$destination" >/dev/null || exit 46
   else
     cp -a "$source" "$destination"
   fi
 }
 marked=0
+root_empty=0
 [ -d "$root" ] && [ ! -L "$root" ] || exit 47
 if [ -e "$marker" ] || [ -L "$marker" ]; then
   [ -f "$marker" ] && [ ! -L "$marker" ] || exit 47
   marked=1
 else
   [ -z "$(find "$root" -mindepth 1 -maxdepth 1 -print -quit)" ] || exit 48
+  root_empty=1
+  marker_tmp=
+  write_probe=
+  cleanup_failed() {
+    cleanup_rc=$?
+    if [ "$cleanup_rc" -ne 0 ] && [ "$root_empty" = 1 ]; then
+      rm -f "$marker" "$marker_tmp" "$write_probe" 2>/dev/null || :
+      rm -rf "$runtime" "$root/private-log" 2>/dev/null || :
+    fi
+    exit "$cleanup_rc"
+  }
+  trap cleanup_failed 0
   mkdir -p "$runtime"
   for file in state.json owner.json; do
     if [ -e "$legacy/$file" ] || [ -L "$legacy/$file" ]; then
@@ -986,17 +1705,132 @@ else
   done
   for directory in spool archive cache codex-home; do
     if [ -e "$legacy/$directory" ] || [ -L "$legacy/$directory" ]; then
-      copy_directory "$legacy/$directory" "$root/$directory"
+      if [ "$directory" = codex-home ]; then
+        copy_directory "$legacy/$directory" "$runtime/$directory" 1
+      else
+        copy_directory "$legacy/$directory" "$runtime/$directory"
+      fi
     fi
   done
-  marker_tmp="$marker.$$"
-  printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" > "$marker_tmp"
-  mv -f "$marker_tmp" "$marker"
 fi
-marker_tmp="$root/.agent-canon-marker-check.$$"
-printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" > "$marker_tmp"
-cmp -s "$marker" "$marker_tmp" || exit 50
-rm -f "$marker_tmp"
+if [ "$marked" = 1 ]; then
+  # Pre-762 marked volumes kept operation data beside the marker.  Migrate
+  # those directories as one transaction so a failed move cannot leave a
+  # valid marker over a partially populated main-era runtime tree.
+  root_stat=$(stat -c "%a:%u:%g" "$root")
+  [ "$root_stat" = "700:$uid_value:$gid_value" ] ||
+    [ "$root_stat" = "711:0:0" ] || exit 63
+  marker_stat=$(stat -c "%a:%u:%g" "$marker")
+  [ "$marker_stat" = "600:$uid_value:$gid_value" ] ||
+    [ "$marker_stat" = "444:0:0" ] || exit 64
+  migration="$root/.agent-canon-layout-migration-v1"
+  migration_needed=0
+  for name in exchange spool archive cache codex-home; do
+    if [ -e "$root/$name" ] || [ -L "$root/$name" ]; then
+      migration_needed=1
+    fi
+  done
+  if [ "$migration_needed" = 1 ]; then
+    [ ! -e "$migration" ] && [ ! -L "$migration" ] || exit 65
+    mkdir -m 700 "$migration" "$migration/old" "$migration/staged" \
+      "$migration/staged/runtime"
+    created_runtime=0 created_receipts=0 created_generations=0 created_tasks=0
+    moved_old= moved_new=
+    [ -d "$runtime" ] && [ ! -L "$runtime" ] || {
+      [ ! -e "$runtime" ] && [ ! -L "$runtime" ] || exit 81
+      mkdir -m 700 "$runtime"
+      created_runtime=1
+    }
+    [ -d "$runtime/receipts" ] || created_receipts=1
+    [ -d "$runtime/generations" ] || created_generations=1
+    [ -d "$runtime/tasks" ] || created_tasks=1
+    migration_failed() {
+      migration_rc=$?
+      if [ "$migration_rc" -ne 0 ]; then
+        for destination in $moved_new; do
+          rm -rf "$runtime/$destination" 2>/dev/null || :
+        done
+        [ "$created_receipts" = 0 ] || rm -rf "$runtime/receipts" 2>/dev/null || :
+        [ "$created_generations" = 0 ] || rm -rf "$runtime/generations" 2>/dev/null || :
+        [ "$created_tasks" = 0 ] || rm -rf "$runtime/tasks" 2>/dev/null || :
+        [ "$created_runtime" = 0 ] || rmdir "$runtime" 2>/dev/null || :
+        for name in $moved_old; do
+          if [ -e "$migration/old/$name" ] || [ -L "$migration/old/$name" ]; then
+            mv "$migration/old/$name" "$root/$name" 2>/dev/null || :
+          fi
+        done
+      fi
+      rm -rf "$migration"
+      trap - 0
+      exit "$migration_rc"
+    }
+    trap migration_failed 0
+    for name in exchange spool archive cache codex-home; do
+      source="$root/$name"
+      [ -e "$source" ] || [ -L "$source" ] || continue
+      [ -d "$source" ] && [ ! -L "$source" ] || exit 66
+      if [ "$name" = codex-home ]; then
+        while IFS= read -r link; do
+          [ -n "$link" ] || continue
+          relative=${link#"$source"/}
+          case "$relative" in
+            config.toml|agents/*|hooks/*|skills/*) ;;
+            *) exit 67 ;;
+          esac
+          case "$relative" in
+            *//*|../*|*/../*|*/..|./*|*/./*|.) exit 68 ;;
+          esac
+          target=$(readlink "$link") || exit 69
+          [ -n "$target" ] || exit 70
+          case "$target" in
+            *..*|*"$(printf '\n')"*|*"$(printf '\r')"*|*"$(printf '\t')"*) exit 70 ;;
+          esac
+        done <<EOF_LINKS
+$(find "$source" -type l -print)
+EOF_LINKS
+      else
+        [ -z "$(find "$source" -type l -print -quit)" ] || exit 71
+      fi
+      destination=container-runtime
+      [ "$name" = exchange ] || destination=$name
+      [ ! -e "$runtime/$destination" ] && [ ! -L "$runtime/$destination" ] || exit 72
+      cp -a "$source" "$migration/staged/runtime/$destination" || exit 73
+      [ -d "$migration/staged/runtime/$destination" ] &&
+        [ ! -L "$migration/staged/runtime/$destination" ] || exit 74
+      [ -z "$(find "$migration/staged/runtime/$destination" \
+        ! -type d ! -type f ! -type l -print -quit)" ] || exit 75
+      [ "$(stat -c "%a:%u:%g" "$migration/staged/runtime/$destination")" = \
+        "700:$uid_value:$gid_value" ] || exit 82
+    done
+    for name in exchange spool archive cache codex-home; do
+      if [ -e "$root/$name" ] || [ -L "$root/$name" ]; then
+        mv "$root/$name" "$migration/old/$name" || exit 76
+        moved_old="$moved_old $name"
+        [ "${AGENT_CANON_TEST_LAYOUT_MIGRATION_AFTER:-}" != "$name" ] || exit 80
+      fi
+    done
+    for name in container-runtime spool archive cache codex-home; do
+      [ -e "$migration/staged/runtime/$name" ] || continue
+      mv "$migration/staged/runtime/$name" "$runtime/$name" || exit 77
+      moved_new="$moved_new $name"
+    done
+    for name in receipts generations tasks; do
+      if [ -e "$runtime/$name" ] || [ -L "$runtime/$name" ]; then
+        [ -d "$runtime/$name" ] && [ ! -L "$runtime/$name" ] || exit 78
+      fi
+      mkdir -m 700 -p "$runtime/$name" || exit 78
+    done
+    [ -d "$runtime/spool" ] || exit 78
+    if [ -e "$runtime/spool/private-feedback" ] ||
+       [ -L "$runtime/spool/private-feedback" ]; then
+      [ -d "$runtime/spool/private-feedback" ] &&
+        [ ! -L "$runtime/spool/private-feedback" ] || exit 79
+    fi
+    mkdir -m 700 -p "$runtime/spool/private-feedback" || exit 79
+    rm -rf "$migration"
+    trap - 0
+  fi
+fi
 if [ "$marked" = 0 ]; then
   for file in state.json owner.json; do
     if [ -e "$legacy/$file" ] || [ -L "$legacy/$file" ]; then
@@ -1013,20 +1847,24 @@ if [ "$marked" = 0 ]; then
   done
   for directory in spool archive cache codex-home; do
     if [ -e "$legacy/$directory" ] || [ -L "$legacy/$directory" ]; then
-      [ -d "$legacy/$directory" ] && [ -d "$root/$directory" ] || exit 56
-      [ -z "$(find "$legacy/$directory" -type l -print -quit)" ] || exit 57
-      diff -qr "$legacy/$directory" "$root/$directory" >/dev/null || exit 58
+      [ -d "$legacy/$directory" ] && [ -d "$runtime/$directory" ] || exit 56
+      if [ "$directory" != codex-home ]; then
+        [ -z "$(find "$legacy/$directory" -type l -print -quit)" ] || exit 57
+      fi
+      diff -qr "$legacy/$directory" "$runtime/$directory" >/dev/null || exit 58
     fi
   done
 fi
-for directory in "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home"; do
+for directory in "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" \
+  "$runtime/container-runtime" "$runtime/spool" "$runtime/archive" "$runtime/cache" \
+  "$runtime/spool/private-feedback" "$runtime/codex-home" "$root/private-log"; do
   if [ "$marked" = 0 ]; then
     mkdir -p "$directory"
   else
     [ -d "$directory" ] && [ ! -L "$directory" ] || exit 59
   fi
 done
-for directory in "$root/exchange" "$root/private-log"; do
+for directory in "$root/private-log"; do
   if [ "$marked" = 0 ]; then
     mkdir -p "$directory"
   elif [ -e "$directory" ] || [ -L "$directory" ]; then
@@ -1035,29 +1873,78 @@ for directory in "$root/exchange" "$root/private-log"; do
     mkdir -p "$directory"
   fi
 done
-chown -R "$uid_value:$gid_value" "$root"
-find "$root" -type d -exec chmod 700 {} +
-chmod 600 "$marker"
-chown "$uid_value:$gid_value" "$marker"
-for directory in "$root" "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$root/exchange" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home" "$root/private-log"; do
-  [ "$(stat -c "%a:%u:%g" "$directory")" = "700:$uid_value:$gid_value" ] || exit 60
+if [ "$marked" = 0 ]; then
+  chown -R "$uid_value:$gid_value" "$root"
+  find "$root" -type d -exec chmod 700 {} +
+fi
+chown 0:0 "$root"
+chmod 711 "$root"
+for directory in "$root" "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" \
+  "$runtime/container-runtime" "$runtime/spool" "$runtime/archive" "$runtime/cache" \
+  "$runtime/spool/private-feedback" "$runtime/codex-home" "$root/private-log"; do
+  if [ "$directory" = "$root" ]; then
+    [ "$(stat -c "%a:%u:%g" "$directory")" = "711:0:0" ] || exit 60
+  elif [ "$directory" = "$root/private-log" ] && [ "$marked" = 1 ]; then
+    private_log_stat=$(stat -c "%a:%u:%g" "$directory")
+    if [ "$private_log_stat" != "555:0:0" ]; then
+      [ "$private_log_stat" = "700:$uid_value:$gid_value" ] || exit 60
+      [ -z "$(find "$root/private-log" -type l -print -quit)" ] || exit 62
+      [ -z "$(find "$root/private-log" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ] || exit 62
+    fi
+  else
+    [ "$(stat -c "%a:%u:%g" "$directory")" = "700:$uid_value:$gid_value" ] || exit 60
+  fi
 done
-[ "$(stat -c "%a:%u:%g" "$marker")" = "600:$uid_value:$gid_value" ] || exit 61
-write_probe="$root/.agent-canon-volume-write.$$"
+if [ "$marked" = 1 ] && [ "$(stat -c "%a:%u:%g" "$root/private-log")" = "555:0:0" ]; then
+  [ -z "$(find "$root/private-log" -type l -print -quit)" ] || exit 62
+  [ -z "$(find "$root/private-log" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ] || exit 62
+  while IFS= read -r private_log_path; do
+    [ -z "$private_log_path" ] && continue
+    if [ -d "$private_log_path" ]; then
+      [ "$(stat -c "%a:%u:%g" "$private_log_path")" = "555:0:0" ] || exit 62
+    else
+      [ "$(stat -c "%a:%u:%g" "$private_log_path")" = "444:0:0" ] || exit 62
+    fi
+  done <<EOF_PRIVATE_LOG
+$(find "$root/private-log" -mindepth 1 -print)
+EOF_PRIVATE_LOG
+fi
+write_probe="$runtime/.agent-canon-volume-write.$$"
 printf "write\n" > "$write_probe"
 [ "$(cat "$write_probe")" = "write" ] || exit 62
 rm -f "$write_probe"
+if [ "$marked" = 0 ]; then
+  marker_tmp="$marker.$$"
+  printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" > "$marker_tmp"
+  chmod 444 "$marker_tmp"
+  chown 0:0 "$marker_tmp"
+  mv -f "$marker_tmp" "$marker"
+fi
+chown 0:0 "$marker"
+chmod 444 "$marker"
+marker_tmp="$root/.agent-canon-marker-check.$$"
+printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" > "$marker_tmp"
+cmp -s "$marker" "$marker_tmp" || exit 50
+rm -f "$marker_tmp"
+[ "$(stat -c "%a:%u:%g" "$marker")" = "444:0:0" ] || exit 61
 printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ); then
     _agent_canon_json_error state_volume_init_failed \
       "controller state volume could not be initialized"
+    _agent_canon_remove_fresh_state_volume || :
     return 2
   fi
   if [[ "$init_readback" != $'marker\t'"$(_agent_canon_control_digest)"$'\ncontent\tok' ]]; then
     _agent_canon_json_error state_volume_readback_failed \
       "controller state volume marker or migrated content readback failed"
+    _agent_canon_remove_fresh_state_volume || :
     return 2
   fi
-  _agent_canon_drop_legacy_controller_state
+  if ! _agent_canon_probe_state_volume "$volume" 1; then
+    _agent_canon_json_error state_volume_access_failed \
+      "the resident caller could not access the controller state volume"
+    _agent_canon_remove_fresh_state_volume || :
+    return 2
+  fi
 }
 
 _agent_canon_apply_volume_export() (
@@ -1065,6 +1952,7 @@ _agent_canon_apply_volume_export() (
   local kind=$1 host_path=$2 relative=$3 stream_path=$4 expected_digest=$5
   local temporary member_list member relative_path source_digest name staged target
   local backup_root= transaction_target= transaction_backup= transaction_kind= transaction_had_old=0
+  local retain_backup=0
   cleanup_export() {
     local cleanup_rc=$?
     if [[ "$transaction_kind" == projection && -n "$transaction_target" ]]; then
@@ -1083,10 +1971,11 @@ _agent_canon_apply_volume_export() (
       fi
     fi
     rm -f -- "${member_list:-}" "${stream_path:-}"
-    rm -rf -- "${temporary:-}" "${backup_root:-}"
+    rm -rf -- "${temporary:-}"
+    [[ "$retain_backup" == 1 ]] || rm -rf -- "${backup_root:-}"
     exit "$cleanup_rc"
   }
-  trap cleanup_export EXIT
+  trap cleanup_export 0
   begin_directory_transaction() {
     transaction_kind=directory
     transaction_target=$1
@@ -1367,6 +2256,7 @@ _agent_canon_volume_copy() {
   local direction=$1 kind=$2 host_path=$3 relative=${4:-}
   local volume=${AGENT_CANON_STATE_VOLUME_NAME:-}
   local copy_name="agent-canon-copy-$(_agent_canon_control_digest | cut -c1-16)-$$"
+  _agent_canon_ensure_projection_layout || return $?
   [[ "$direction" == import || "$direction" == export || "$direction" == clear ]] ||
     _agent_canon_json_error volume_copy_invalid "volume copy direction is invalid"
   if [[ "$direction" != clear ]]; then
@@ -1375,6 +2265,7 @@ _agent_canon_volume_copy() {
       _agent_canon_json_error volume_copy_invalid "volume copy host path is invalid"
   fi
   [[ "$kind" == source-sync || "$kind" == mount-registry || "$kind" == host-mounts ||
+     "$kind" == rollback-mounts ||
      "$kind" == private-log || "$kind" == codex-home || "$kind" == projection ||
      "$kind" == skill || "$kind" == eval || "$kind" == private-feedback ]] ||
     _agent_canon_json_error volume_copy_invalid "volume copy kind is not allowlisted"
@@ -1411,11 +2302,25 @@ _agent_canon_volume_copy() {
     --env "AGENT_CANON_COPY_UID=$(id -u)" \
     --env "AGENT_CANON_COPY_GID=$(id -g)" \
     --env "AGENT_CANON_COPY_INSTALL_ROOT=${AGENT_CANON_REPOSITORY_ROOT:-}" \
+    --env "AGENT_CANON_PROJECTION_LAYOUT=$AGENT_CANON_PROJECTION_LAYOUT" \
+    --env "AGENT_CANON_TEST_PRIVATE_LOG_IMPORT_FAIL_AFTER=${AGENT_CANON_TEST_PRIVATE_LOG_IMPORT_FAIL_AFTER:-}" \
     --env "AGENT_CANON_COPY_DIGEST=$([[ "$direction" == import ]] && { if [[ "$kind" == codex-home ]]; then _agent_canon_codex_digest "$host_path"; else _agent_canon_path_digest "$host_path"; fi; } 2>/dev/null || true)" \
     --entrypoint /bin/sh \
     "$AGENT_CANON_IMAGE_REF" \
     -c 'set -eu
 root=/var/lib/agent-canon
+runtime="$root/runtime"
+[ -d "$runtime" ] || runtime="$root"
+exchange_root="$runtime/container-runtime"
+spool_root="$runtime/spool"
+codex_root="$runtime/codex-home"
+[ -d "$exchange_root" ] || exchange_root="$root/exchange"
+[ -d "$spool_root" ] || spool_root="$root/spool"
+[ -d "$codex_root" ] || codex_root="$root/codex-home"
+projection_root="$exchange_root"
+if [ "${AGENT_CANON_PROJECTION_LAYOUT:-container-runtime-v1}" = legacy-runtime-v1 ]; then
+  projection_root="$runtime"
+fi
 direction="$AGENT_CANON_COPY_DIRECTION"
 kind="$AGENT_CANON_COPY_KIND"
 relative="$AGENT_CANON_COPY_RELATIVE"
@@ -1490,19 +2395,21 @@ validate_codex_links() {
   done)
   [ -z "$invalid" ]
 }
-  if [ "$direction" = clear ]; then
+if [ "$direction" = clear ]; then
   case "$kind" in
     host-mounts) rm -f -- "$root/host-mounts.tsv" ;;
+    rollback-mounts) rm -f -- "$runtime/rollback-mounts.tsv" ;;
     *) exit 81 ;;
   esac
 elif [ "$direction" = import ]; then
   input=/agent-canon-copy-input
   case "$kind" in
-    source-sync) destination="$root/source-sync.json"; mode=600; expected=file ;;
+    source-sync) destination="$root/source-sync.json"; mode=444; expected=file ;;
     mount-registry) destination="$root/mount-registry.toml"; mode=444; expected=file ;;
-    host-mounts) destination="$root/host-mounts.tsv"; mode=600; expected=file ;;
-    private-log) destination="$root/private-log"; mode=700; expected=directory ;;
-    codex-home) destination="$root/codex-home"; mode=700; expected=directory ;;
+    host-mounts) destination="$root/host-mounts.tsv"; mode=444; expected=file ;;
+    rollback-mounts) destination="$runtime/rollback-mounts.tsv"; mode=444; expected=file ;;
+    private-log) destination="$root/private-log"; mode=555; expected=directory ;;
+    codex-home) destination="$codex_root"; mode=700; expected=directory ;;
     *) exit 64 ;;
   esac
   if [ "$expected" = file ]; then
@@ -1511,7 +2418,7 @@ elif [ "$direction" = import ]; then
     cp -- "$input" "$temporary"
     [ -n "$digest" ] && [ "$(file_digest "$temporary")" = "$digest" ] || exit 82
     chmod "$mode" "$temporary"
-    chown "$uid_value:$gid_value" "$temporary"
+    chown 0:0 "$temporary"
     mv -f -- "$temporary" "$destination"
   else
     [ -d "$input" ] && [ ! -L "$input" ] || exit 66
@@ -1519,15 +2426,48 @@ elif [ "$direction" = import ]; then
       validate_codex_links "$input" || exit 67
     else
       [ -z "$(find "$input" -type l -print -quit)" ] || exit 67
+      [ -z "$(find "$input" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ] || exit 67
     fi
     skip_copy=0
     marker_value=$(printf "agent-canon-private-log/v1\n%s" "$digest")
-    if [ "$kind" = private-log ] && [ -f "$destination/.agent-canon-private-log-v1" ] &&
-       [ "$(cat "$destination/.agent-canon-private-log-v1")" = "$marker_value" ] &&
-       [ "$(tree_digest "$destination")" = "$digest" ]; then
+    # Always stage private-log before publication.  A matching content marker
+    # does not prove that an adopted legacy tree already has normalized
+    # ownership and modes.
+    if [ "$kind" = private-log ] && [ "$skip_copy" = 0 ]; then
+      temporary="$destination.tmp.$$"
+      backup="$destination.backup.$$"
+      rm -rf "$temporary" "$backup"
+      mkdir -p "$temporary"
+      cp -a "$input/." "$temporary/"
+      [ "$(tree_digest "$temporary")" = "$digest" ] || exit 83
+      printf "agent-canon-private-log/v1\n%s\n" "$digest" > "$temporary/.agent-canon-private-log-v1"
+      find "$temporary" -type d -exec chmod 555 {} +
+      find "$temporary" -type f -exec chmod 444 {} +
+      chown -R 0:0 "$temporary"
+      [ "$(stat -c "%a:%u:%g" "$temporary")" = 555:0:0 ] || exit 83
+      [ "$(cat "$temporary/.agent-canon-private-log-v1")" = "$marker_value" ] || exit 83
+      had_backup=0
+      if [ -e "$destination" ] || [ -L "$destination" ]; then
+        [ -d "$destination" ] && [ ! -L "$destination" ] || exit 68
+        mv "$destination" "$backup"
+        had_backup=1
+      fi
+      if ! mv "$temporary" "$destination"; then
+        rm -rf "$temporary" "$destination"
+        [ "$had_backup" = 0 ] || mv "$backup" "$destination"
+        exit 84
+      fi
+      if [ "${AGENT_CANON_TEST_PRIVATE_LOG_IMPORT_FAIL_AFTER:-}" = publish ] ||
+         [ "$(tree_digest "$destination")" != "$digest" ] ||
+         [ "$(stat -c "%a:%u:%g" "$destination")" != 555:0:0 ] ||
+         [ "$(cat "$destination/.agent-canon-private-log-v1")" != "$marker_value" ]; then
+        rm -rf "$destination"
+        [ "$had_backup" = 0 ] || mv "$backup" "$destination"
+        exit 84
+      fi
+      rm -rf "$backup"
       skip_copy=1
-    fi
-    if [ "$skip_copy" = 0 ] && { [ -e "$destination" ] || [ -L "$destination" ]; }; then
+    elif [ "$skip_copy" = 0 ] && { [ -e "$destination" ] || [ -L "$destination" ]; }; then
       [ -d "$destination" ] && [ ! -L "$destination" ] || exit 68
       find "$destination" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
     elif [ "$skip_copy" = 0 ]; then
@@ -1546,10 +2486,20 @@ elif [ "$direction" = import ]; then
       find "$destination" -type d -exec chmod 700 {} +
       chown -R "$uid_value:$gid_value" "$destination"
     fi
-    if [ "$kind" = private-log ] && [ "$skip_copy" = 0 ]; then
-      printf "agent-canon-private-log/v1\n%s\n" "$digest" > "$destination/.agent-canon-private-log-v1"
-      chmod 600 "$destination/.agent-canon-private-log-v1"
-      chown "$uid_value:$gid_value" "$destination/.agent-canon-private-log-v1"
+    if [ "$kind" = private-log ]; then
+      [ -d "$destination" ] && [ ! -L "$destination" ] || exit 86
+      [ -z "$(find "$destination" -type l -print -quit)" ] || exit 86
+      [ -z "$(find "$destination" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)" ] || exit 86
+      while IFS= read -r private_log_path; do
+        [ -n "$private_log_path" ] || continue
+        if [ -d "$private_log_path" ]; then
+          [ "$(stat -c "%a:%u:%g" "$private_log_path")" = 555:0:0 ] || exit 86
+        else
+          [ "$(stat -c "%a:%u:%g" "$private_log_path")" = 444:0:0 ] || exit 86
+        fi
+      done <<EOF_PRIVATE_LOG
+$(find "$destination" -mindepth 1 -print)
+EOF_PRIVATE_LOG
     fi
   fi
   if [ "$direction" = import ]; then
@@ -1558,7 +2508,7 @@ elif [ "$direction" = import ]; then
 else
   case "$kind" in
     projection)
-      source="$root/exchange"; [ -d "$source" ] && [ ! -L "$source" ] || exit 69
+      source="$projection_root"; [ -d "$source" ] && [ ! -L "$source" ] || exit 69
       members=$(mktemp)
       for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
         if [ -e "$source/$name" ]; then
@@ -1570,22 +2520,26 @@ else
       tar -cf - -C "$source" --no-recursion -T "$members"
       rm -f "$members" ;;
     skill)
-      source="$root/exchange/skill-projection"; [ -d "$source" ] && [ ! -L "$source" ] || exit 71
+      source="$exchange_root/skill-projection"; [ -d "$source" ] && [ ! -L "$source" ] || exit 71
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 72
+      [ -z "$(find "$source" ! -type d ! -type f ! -type l -print -quit)" ] || {
+        printf 'volume-export-invalid\n' >&2
+        exit 72
+      }
       source_digest=$(tree_digest "$source")
-      tar -cf - -C "$root/exchange" skill-projection ;;
+      tar -cf - -C "$exchange_root" skill-projection ;;
     eval)
-      source="$root/spool/$relative"; [ -d "$source" ] && [ ! -L "$source" ] || exit 73
+      source="$spool_root/$relative"; [ -d "$source" ] && [ ! -L "$source" ] || exit 73
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 74
       source_digest=$(tree_digest "$source")
-      tar -cf - -C "$root/spool" "$relative" ;;
+      tar -cf - -C "$spool_root" "$relative" ;;
     private-feedback)
-      source="$root/spool/private-feedback"; [ -d "$source" ] && [ ! -L "$source" ] || exit 75
+      source="$spool_root/private-feedback"; [ -d "$source" ] && [ ! -L "$source" ] || exit 75
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 76
       source_digest=$(tree_digest "$source")
       tar -cf - -C "$source" . ;;
     codex-home)
-      source="$root/codex-home"; [ -d "$source" ] && [ ! -L "$source" ] || exit 77
+      source="$codex_root"; [ -d "$source" ] && [ ! -L "$source" ] || exit 77
       validate_codex_links "$source" 0 || exit 78
       source_digest=$(codex_digest "$source" 0)
       tar -cf - -C "$source" . ;;
@@ -1602,6 +2556,10 @@ fi' )
       _agent_canon_json_error volume_copy_failed "volume export digest file could not be created"
     }
     if ! "${copy_command[@]}" >"$stream_path" 2>"$digest_path"; then
+      if grep -Fq 'volume-export-invalid' "$digest_path"; then
+        rm -f -- "$stream_path" "$digest_path"
+        _agent_canon_json_error volume_export_invalid "volume export contains an unsupported file type"
+      fi
       rm -f -- "$stream_path" "$digest_path"
       _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
     fi
@@ -1635,18 +2593,52 @@ fi' )
 }
 
 _agent_canon_import_host_inputs() {
+  local import_rc
   _agent_canon_volume_copy import source-sync \
-    "$AGENT_CANON_RUNTIME_ROOT/source-sync.json"
+    "$AGENT_CANON_RUNTIME_ROOT/source-sync.json" || {
+      import_rc=$?
+      return "$import_rc"
+    }
   _agent_canon_volume_copy import mount-registry \
-    "$AGENT_CANON_STATE_ROOT/mounts.toml"
+    "$AGENT_CANON_STATE_ROOT/mounts.toml" || {
+      import_rc=$?
+      return "$import_rc"
+    }
   _agent_canon_volume_copy import host-mounts \
-    "$AGENT_CANON_STATE_ROOT/mounts.tsv"
-  _agent_canon_volume_copy import private-log "$AGENT_CANON_PRIVATE_LOG_ROOT"
+    "$AGENT_CANON_STATE_ROOT/mounts.tsv" || {
+      import_rc=$?
+      return "$import_rc"
+    }
+  _agent_canon_volume_copy import private-log "$AGENT_CANON_PRIVATE_LOG_ROOT" || {
+    import_rc=$?
+    return "$import_rc"
+  }
 }
 
-_agent_canon_publish_controller_projection() {
+_agent_canon_publish_controller_projection() (
+  set -e
+  _agent_canon_ensure_projection_layout
   local exchange="$AGENT_CANON_STATE_ROOT/container-runtime"
-  local staging source target expected_digest actual_digest
+  [[ "$AGENT_CANON_PROJECTION_LAYOUT" == legacy-runtime-v1 ]] &&
+    exchange="$AGENT_CANON_STATE_ROOT"
+  local staging= backup_root= backup_presence= transaction_active=0 retain_backup=0
+  local source target expected_digest actual_digest name
+  cleanup_projection() {
+    local cleanup_rc=$?
+    if [[ "$transaction_active" == 1 ]]; then
+      for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+        target="$AGENT_CANON_STATE_ROOT/$name"
+        rm -f -- "$target" || true
+        if [[ -f "$backup_root/$name" ]]; then
+          mv -- "$backup_root/$name" "$target" || true
+        fi
+      done
+    fi
+    rm -rf -- "${staging:-}"
+    [[ "${retain_backup:-0}" == 1 ]] || rm -rf -- "${backup_root:-}"
+    exit "$cleanup_rc"
+  }
+  trap cleanup_projection 0
   _agent_canon_volume_copy export projection "$exchange"
   [[ -d "$exchange" && ! -L "$exchange" ]] ||
     _agent_canon_json_error controller_projection_invalid \
@@ -1654,88 +2646,162 @@ _agent_canon_publish_controller_projection() {
   staging=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.manifest-projection.XXXXXX") ||
     _agent_canon_json_error controller_projection_invalid \
       "controller projection staging directory could not be created"
-  # global-links.tsv is host-owned.  It is intentionally not a resident
+  chmod 700 "$staging"
+  # global-links.tsv is host-owned. It is intentionally not a resident
   # projection: a resident-authored deletion list must never drive host
   # symlink removal.
   for source in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
     if [[ -e "$exchange/$source" || -L "$exchange/$source" ]]; then
-      [[ -f "$exchange/$source" && ! -L "$exchange/$source" ]] || {
-        rm -rf -- "$staging"
+      [[ -f "$exchange/$source" && ! -L "$exchange/$source" ]] ||
         _agent_canon_json_error controller_projection_invalid \
           "controller projection is not a regular file: $source"
-      }
-      cp -- "$exchange/$source" "$staging/$source" || {
-        rm -rf -- "$staging"
+      cp -- "$exchange/$source" "$staging/$source" ||
         _agent_canon_json_error controller_projection_invalid \
           "controller projection could not be staged: $source"
-      }
     fi
+  done
+  for source in $(find "$staging" -mindepth 1 -maxdepth 1 -printf '%f\n'); do
+    case "$source" in
+      mounts.toml|mounts.tsv|rollback-plan.tsv|rollback-mounts.tsv) ;;
+      *) _agent_canon_json_error controller_projection_invalid \
+           "controller projection contains an unexpected path: $source" ;;
+    esac
   done
   if [[ -f "$staging/mounts.tsv" ]]; then
     local kind digest mounted_source destination mode
     while IFS=$'\t' read -r kind digest mounted_source destination mode; do
       [[ "$kind" == target && "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ &&
          "$mounted_source" = /* && -d "$mounted_source" && ! -L "$mounted_source" &&
-         "$destination" == "/targets/$digest" && "$mode" == read-only ]] || {
-        rm -rf -- "$staging"
+         "$destination" == "/targets/$digest" && "$mode" == read-only ]] ||
         _agent_canon_json_error controller_projection_invalid \
           "controller target projection is invalid"
-      }
     done < "$staging/mounts.tsv"
   fi
   if [[ -f "$staging/mounts.toml" ]]; then
-    grep -Fqx 'schema = "agent-canon.mount-registry.v2"' "$staging/mounts.toml" || {
-      rm -rf -- "$staging"
+    grep -Fqx 'schema = "agent-canon.mount-registry.v2"' "$staging/mounts.toml" ||
       _agent_canon_json_error controller_projection_invalid \
         "controller mount registry schema is invalid"
-    }
   fi
-  for source in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
-    target="$AGENT_CANON_STATE_ROOT/$source"
+  # Back up the complete fixed-file destination set before publishing any
+  # member. The transaction is armed only after every backup is validated.
+  backup_root=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.manifest-projection-backup.XXXXXX") ||
+    _agent_canon_json_error controller_projection_publish_failed \
+      "controller projection backup directory could not be created"
+  chmod 700 "$backup_root"
+  backup_presence=$(mktemp "$backup_root/presence.XXXXXX")
+  chmod 600 "$backup_presence"
+  for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+    target="$AGENT_CANON_STATE_ROOT/$name"
     if [[ -e "$target" || -L "$target" ]]; then
-      [[ -f "$target" && ! -L "$target" ]] || {
-        rm -rf -- "$staging"
+      [[ -f "$target" && ! -L "$target" ]] ||
         _agent_canon_json_error controller_projection_invalid \
-          "projected controller file is not a regular file: $source"
-      }
-    fi
-    if [[ -f "$staging/$source" ]]; then
-      chmod 644 "$staging/$source"
-      expected_digest=$(sha256sum "$staging/$source" | awk '{print $1}')
-      mv -f -- "$staging/$source" "$target" || {
-        rm -rf -- "$staging"
+          "projected controller file is not a regular file: $name"
+      cp -a -- "$target" "$backup_root/$name" ||
         _agent_canon_json_error controller_projection_publish_failed \
-          "controller projection could not be published: $source"
-      }
-      [[ -f "$target" && ! -L "$target" ]] || {
-        rm -rf -- "$staging"
+          "controller projection backup could not be copied: $name"
+      [[ -f "$backup_root/$name" &&
+         "$(_agent_canon_sha256 "$target")" == "$(_agent_canon_sha256 "$backup_root/$name")" ]] ||
         _agent_canon_json_error controller_projection_publish_failed \
-          "controller projection readback is not a regular file: $source"
-      }
-      actual_digest=$(sha256sum "$target" | awk '{print $1}')
-      [[ "$actual_digest" == "$expected_digest" ]] || {
-        rm -rf -- "$staging"
-        _agent_canon_json_error controller_projection_publish_failed \
-          "controller projection readback differs: $source"
-      }
+          "controller projection backup readback differs: $name"
+      printf 'present\t%s\n' "$name" >> "$backup_presence"
     else
-      # An absent controller export is authoritative.  Remove only an exact
-      # regular-file projection, then verify that no stale path remains.
-      if [[ -e "$target" || -L "$target" ]]; then
-        rm -f -- "$target" || {
-          rm -rf -- "$staging"
-          _agent_canon_json_error controller_projection_publish_failed \
-            "stale controller projection could not be removed: $source"
-        }
-      fi
-      [[ ! -e "$target" && ! -L "$target" ]] || {
-        rm -rf -- "$staging"
-        _agent_canon_json_error controller_projection_publish_failed \
-          "stale controller projection remains after removal: $source"
-      }
+      printf 'absent\t%s\n' "$name" >> "$backup_presence"
     fi
   done
-  rmdir "$staging" 2>/dev/null || true
+  [[ "$(wc -l < "$backup_presence")" == 4 ]] ||
+    _agent_canon_json_error controller_projection_publish_failed \
+      "controller projection backup presence readback is incomplete"
+  mv -- "$backup_presence" "$backup_root/presence" ||
+    _agent_canon_json_error controller_projection_publish_failed \
+      "controller projection backup presence could not be published"
+  backup_presence="$backup_root/presence"
+  transaction_active=1
+  for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+    target="$AGENT_CANON_STATE_ROOT/$name"
+    if [[ -f "$staging/$name" && ! -L "$staging/$name" ]]; then
+      chmod 644 "$staging/$name"
+      expected_digest=$(_agent_canon_sha256 "$staging/$name")
+      mv -f -- "$staging/$name" "$target" ||
+        _agent_canon_json_error controller_projection_publish_failed \
+          "controller projection could not be published: $name"
+      if [[ "${AGENT_CANON_TEST_CONTROLLER_PROJECTION_FAIL_AFTER:-}" == "$name" ]]; then
+        _agent_canon_json_error controller_projection_publish_failed \
+          "injected controller projection publish failure"
+      fi
+      [[ -f "$target" && ! -L "$target" ]] ||
+        _agent_canon_json_error controller_projection_publish_failed \
+          "controller projection readback is not a regular file: $name"
+      actual_digest=$(_agent_canon_sha256 "$target")
+      [[ "$actual_digest" == "$expected_digest" ]] ||
+        _agent_canon_json_error controller_projection_publish_failed \
+          "controller projection readback differs: $name"
+    elif [[ -e "$target" || -L "$target" ]]; then
+      [[ ! -L "$target" ]] ||
+        _agent_canon_json_error controller_projection_publish_failed \
+          "controller projection target is a symlink: $name"
+      rm -f -- "$target" ||
+        _agent_canon_json_error controller_projection_publish_failed \
+          "stale controller projection could not be removed: $name"
+      if [[ "${AGENT_CANON_TEST_CONTROLLER_PROJECTION_FAIL_AFTER:-}" == "$name" ]]; then
+        _agent_canon_json_error controller_projection_publish_failed \
+          "injected controller projection publish failure"
+      fi
+      [[ ! -e "$target" && ! -L "$target" ]] ||
+        _agent_canon_json_error controller_projection_publish_failed \
+          "stale controller projection remains after removal: $name"
+    fi
+  done
+  if [[ "${AGENT_CANON_KEEP_CONTROLLER_PROJECTION_BACKUP:-0}" == 1 ]]; then
+    local retained_backup="$AGENT_CANON_RUNTIME_ROOT/host-state/.controller-projection-backup"
+    [[ ! -e "$retained_backup" && ! -L "$retained_backup" ]] ||
+      _agent_canon_json_error controller_projection_publish_failed \
+        "controller projection backup transaction already exists"
+    mv -- "$backup_root" "$retained_backup" ||
+      _agent_canon_json_error controller_projection_publish_failed \
+        "controller projection backup could not be retained"
+    backup_root="$retained_backup"
+    retain_backup=1
+  else
+    rm -rf -- "$backup_root"
+  fi
+  transaction_active=0
+  rm -rf -- "$staging"
+)
+
+_agent_canon_restore_controller_projection() {
+  local backup_root="$AGENT_CANON_RUNTIME_ROOT/host-state/.controller-projection-backup"
+  local name target backup_path restore_rc=0
+  [[ -d "$backup_root" && ! -L "$backup_root" ]] || return 0
+  [[ -f "$backup_root/presence" && ! -L "$backup_root/presence" ]] || return 2
+  while IFS=$'\t' read -r presence name; do
+    [[ "$presence" == present || "$presence" == absent ]] || { restore_rc=2; continue; }
+    case "$name" in
+      mounts.toml|mounts.tsv|rollback-plan.tsv|rollback-mounts.tsv) ;;
+      *) restore_rc=2; continue ;;
+    esac
+    target="$AGENT_CANON_STATE_ROOT/$name"
+    if [[ -e "$target" || -L "$target" ]]; then
+      rm -f -- "$target" || restore_rc=2
+    fi
+    if [[ "$presence" == present ]]; then
+      backup_path="$backup_root/$name"
+      [[ -f "$backup_path" && ! -L "$backup_path" ]] || { restore_rc=2; continue; }
+      cp -a -- "$backup_path" "$target" || restore_rc=2
+    fi
+  done < "$backup_root/presence"
+  if ((restore_rc == 0)); then
+    rm -rf -- "$backup_root" || restore_rc=2
+  fi
+  return "$restore_rc"
+}
+
+_agent_canon_commit_controller_projection() {
+  local backup_root="$AGENT_CANON_RUNTIME_ROOT/host-state/.controller-projection-backup"
+  if [[ -e "$backup_root" || -L "$backup_root" ]]; then
+    [[ "${AGENT_CANON_TEST_CONTROLLER_PROJECTION_COMMIT_FAIL:-0}" != 1 ]] || return 2
+    rm -rf -- "$backup_root" || return 2
+    [[ ! -e "$backup_root" && ! -L "$backup_root" ]] || return 2
+  fi
 }
 
 _agent_canon_prepare_clean_install() {
@@ -1793,6 +2859,7 @@ _agent_canon_prepare_clean_install() {
     fi
   done
   for directory in \
+    "$AGENT_CANON_STATE_ROOT/receipts" \
     "$AGENT_CANON_STATE_ROOT/generations" \
     "$AGENT_CANON_STATE_ROOT/tasks" \
     "$AGENT_CANON_STATE_ROOT/container-runtime"; do
@@ -1830,6 +2897,7 @@ _agent_canon_restore_clean_install() {
     rm -f -- "$path"
   done
   for directory in \
+    "$AGENT_CANON_STATE_ROOT/receipts" \
     "$AGENT_CANON_STATE_ROOT/generations" \
     "$AGENT_CANON_STATE_ROOT/tasks" \
     "$AGENT_CANON_STATE_ROOT/container-runtime"; do
@@ -1864,7 +2932,10 @@ _agent_canon_restore_clean_install() {
 
 _agent_canon_discard_clean_install_backup() {
   local backup=${AGENT_CANON_CLEAN_INSTALL_BACKUP:-}
-  [[ -z "$backup" ]] || rm -rf -- "$backup"
+  if [[ -n "$backup" ]]; then
+    rm -rf -- "$backup" || return 2
+    [[ ! -e "$backup" && ! -L "$backup" ]] || return 2
+  fi
   unset AGENT_CANON_CLEAN_INSTALL_BACKUP
 }
 
@@ -1917,16 +2988,24 @@ _agent_canon_restore_clean_install_resident() {
 _agent_canon_clean_install_exit() {
   local rc=$?
   if [[ "${AGENT_CANON_CLEAN_INSTALL_ACTIVE:-0}" == 1 ]]; then
-    if [[ "${AGENT_CANON_CLEAN_INSTALL_SUCCESS:-0}" == 1 ]]; then
+    if [[ "${AGENT_CANON_CLEAN_INSTALL_SUCCESS:-0}" == 1 ||
+          "${AGENT_CANON_CLEAN_INSTALL_COMMITTED:-0}" == 1 ]]; then
       _agent_canon_discard_clean_install_backup || rc=2
     else
-      local restore_rc=0
-      _agent_canon_discard_clean_install_rollback_tag || restore_rc=2
-      _agent_canon_restore_clean_install_resident || restore_rc=2
-      _agent_canon_restore_clean_install || restore_rc=2
-      if ((restore_rc != 0)); then
+      local restore_rc=0 restore_errors=()
+      _agent_canon_discard_clean_install_rollback_tag || restore_errors+=("rollback_tag_cleanup_failed")
+      _agent_canon_restore_state_volume_snapshot || restore_errors+=("state_volume_restore_failed")
+      _agent_canon_restore_controller_projection || restore_errors+=("controller_projection_restore_failed")
+      _agent_canon_restore_global_links || restore_errors+=("global_links_restore_failed")
+      _agent_canon_restore_skill_view_backup || restore_errors+=("skill_view_restore_failed")
+      _agent_canon_restore_clean_install || restore_errors+=("clean_install_host_restore_failed")
+      if ((${#restore_errors[@]} == 0)); then
+        _agent_canon_restore_clean_install_resident || restore_errors+=("previous_resident_restore_failed")
+      fi
+      if ((${#restore_errors[@]})); then
+        restore_rc=2
         _agent_canon_json_error rollback_failed \
-          "clean install state could not be restored after candidate failure"
+          "clean install restoration failed; previous resident restart skipped: ${restore_errors[*]}"
         rc=2
       fi
     fi
@@ -1986,22 +3065,28 @@ _agent_canon_finish_clean_install() {
 _agent_canon_container_exec() {
   local container=$1
   shift
-  local image_id container_id source_head
+  local image_id container_id source_head rollback_kind=host-mounts
+  local rollback_destination=$AGENT_CANON_HOST_MOUNTS_DESTINATION
+  image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
+  _agent_canon_image_projection_layout "$image_id" || return $?
+  if [[ "$AGENT_CANON_PROJECTION_LAYOUT" == legacy-runtime-v1 ]]; then
+    rollback_kind=rollback-mounts
+    rollback_destination="$AGENT_CANON_RUNTIME_DESTINATION/rollback-mounts.tsv"
+  fi
   if [[ -n "${AGENT_CANON_ROLLBACK_MOUNTS_FILE:-}" ]]; then
     if [[ -f "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" && ! -L "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" ]]; then
-      _agent_canon_volume_copy import host-mounts "$AGENT_CANON_ROLLBACK_MOUNTS_FILE"
+      _agent_canon_volume_copy import "$rollback_kind" "$AGENT_CANON_ROLLBACK_MOUNTS_FILE"
     else
-      _agent_canon_volume_copy clear host-mounts ""
+      _agent_canon_volume_copy clear "$rollback_kind" ""
     fi
   fi
   if [[ -n "${AGENT_CANON_RESTORE_TARGETS_FILE:-}" ]]; then
     if [[ -f "$AGENT_CANON_RESTORE_TARGETS_FILE" && ! -L "$AGENT_CANON_RESTORE_TARGETS_FILE" ]]; then
-      _agent_canon_volume_copy import host-mounts "$AGENT_CANON_RESTORE_TARGETS_FILE"
+      _agent_canon_volume_copy import "$rollback_kind" "$AGENT_CANON_RESTORE_TARGETS_FILE"
     else
-      _agent_canon_volume_copy clear host-mounts ""
+      _agent_canon_volume_copy clear "$rollback_kind" ""
     fi
   fi
-  image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
   container_id=$("$AGENT_CANON_DOCKER_CMD" container inspect --format '{{.Id}}' "$container")
   source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD)
   local -a extra_env=()
@@ -2018,9 +3103,9 @@ _agent_canon_container_exec() {
   [[ -n "${AGENT_CANON_PREVIOUS_IMAGE_REF:-}" ]] &&
     extra_env+=(--env "AGENT_CANON_PREVIOUS_IMAGE_REF=$AGENT_CANON_PREVIOUS_IMAGE_REF")
   [[ -n "${AGENT_CANON_RESTORE_TARGETS_FILE:-}" ]] &&
-    extra_env+=(--env "AGENT_CANON_RESTORE_TARGETS_FILE=$AGENT_CANON_HOST_MOUNTS_DESTINATION")
+    extra_env+=(--env "AGENT_CANON_RESTORE_TARGETS_FILE=$rollback_destination")
   [[ -n "${AGENT_CANON_ROLLBACK_MOUNTS_FILE:-}" ]] &&
-    extra_env+=(--env "AGENT_CANON_ROLLBACK_MOUNTS_FILE=$AGENT_CANON_HOST_MOUNTS_DESTINATION")
+    extra_env+=(--env "AGENT_CANON_ROLLBACK_MOUNTS_FILE=$rollback_destination")
   [[ -n "${AGENT_CANON_REPOSITORY_ROOT:-}" ]] &&
     extra_env+=(--env "AGENT_CANON_HOST_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT")
   [[ -n "${AGENT_CANON_TARGET_HOST_ROOT:-}" ]] &&
@@ -2030,7 +3115,12 @@ _agent_canon_container_exec() {
   [[ -n "${AGENT_CANON_TARGET_DIGEST:-}" ]] &&
     extra_env+=(--env "AGENT_CANON_TARGET_DIGEST=$AGENT_CANON_TARGET_DIGEST")
   extra_env+=(--env "AGENT_CANON_PRIVATE_LOG_ROOT=$AGENT_CANON_PRIVATE_LOG_DESTINATION")
-  extra_env+=(--env "AGENT_CANON_EXCHANGE_ROOT=$AGENT_CANON_EXCHANGE_DESTINATION")
+  if [[ "$AGENT_CANON_PROJECTION_LAYOUT" == legacy-runtime-v1 ]]; then
+    extra_env+=(--env "AGENT_CANON_EXCHANGE_ROOT=$AGENT_CANON_RUNTIME_DESTINATION")
+  else
+    extra_env+=(--env "AGENT_CANON_EXCHANGE_ROOT=$AGENT_CANON_EXCHANGE_DESTINATION")
+  fi
+  extra_env+=(--env "AGENT_CANON_PROJECTION_LAYOUT=$AGENT_CANON_PROJECTION_LAYOUT")
   extra_env+=(--env "AGENT_CANON_HOST_SPOOL_ROOT=$AGENT_CANON_SPOOL_DESTINATION")
   extra_env+=(--env "AGENT_CANON_HOST_ARCHIVE_ROOT=$AGENT_CANON_ARCHIVE_DESTINATION")
   extra_env+=(--env "AGENT_CANON_HOST_CACHE_ROOT=$AGENT_CANON_CACHE_DESTINATION")
@@ -2147,11 +3237,62 @@ _agent_canon_image() {
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$control_digest" \
       --label "io.agent-canon.source-revision=$source_head" \
+      --label io.agent-canon.projection-layout=container-runtime-v1 \
       "$AGENT_CANON_REPOSITORY_ROOT"; then
       _agent_canon_json_error candidate_image_build_failed "candidate image build failed"
       return 2
     fi
   fi
+}
+
+_agent_canon_image_projection_layout() {
+  local image_id=${1:-} capability
+  [[ -n "$image_id" ]] || {
+    _agent_canon_json_error image_capability_unavailable \
+      "resident image identity is unavailable for projection routing"
+    return 2
+  }
+  if ! capability=$(
+    "$AGENT_CANON_DOCKER_CMD" image inspect \
+      --format '{{index .Config.Labels "io.agent-canon.projection-layout"}}' \
+      "$image_id" 2>/dev/null
+  ); then
+    _agent_canon_json_error image_capability_unavailable \
+      "resident image projection capability could not be inspected"
+    return 2
+  fi
+  case "$capability" in
+    container-runtime-v1)
+      AGENT_CANON_PROJECTION_LAYOUT=container-runtime-v1
+      ;;
+    "")
+      # Released main-era images predate the capability label and write their
+      # controller projection directly below /var/lib/agent-canon/runtime.
+      AGENT_CANON_PROJECTION_LAYOUT=legacy-runtime-v1
+      ;;
+    *)
+      _agent_canon_json_error image_capability_unknown \
+        "resident image declares an unsupported projection capability"
+      return 2
+      ;;
+  esac
+  export AGENT_CANON_PROJECTION_LAYOUT
+}
+
+_agent_canon_ensure_projection_layout() {
+  [[ -n "${AGENT_CANON_PROJECTION_LAYOUT:-}" ]] && return 0
+  local image_id
+  if image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+    --format '{{.Id}}' "${AGENT_CANON_IMAGE_REF:-}" 2>/dev/null) &&
+     [[ -n "$image_id" ]]; then
+    _agent_canon_image_projection_layout "$image_id"
+    return $?
+  fi
+  # Standalone copy helpers used by recovery tests can operate on a mounted
+  # volume without an image record. The full resident execution path performs
+  # strict immutable-image capability inspection before reaching this helper.
+  AGENT_CANON_PROJECTION_LAYOUT=container-runtime-v1
+  export AGENT_CANON_PROJECTION_LAYOUT
 }
 
 _agent_canon_write_active_image() {
@@ -2502,7 +3643,7 @@ _agent_canon_validate_existing_container() {
   local state_volume="${AGENT_CANON_STATE_VOLUME_NAME:-agent-canon-runtime-$(_agent_canon_control_digest)}"
   local mount_manifest=${2:-${AGENT_CANON_ROLLBACK_MOUNTS_FILE:-$AGENT_CANON_STATE_ROOT/mounts.tsv}}
   local include_pending=${3:-1}
-  local observed_runtime observed_control observed_image observed_image_id observed_network
+  local observed_runtime observed_control observed_image observed_image_id observed_network observed_user
   local observed_rootfs observed_capdrop observed_security observed_cpus
   local observed_memory observed_pids observed_mounts expected_mounts mount_manifest
   local require_source_sync=${4:-1}
@@ -2514,6 +3655,11 @@ _agent_canon_validate_existing_container() {
   if ! observed_control=$("$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{index .Config.Labels "io.agent-canon.control-root-digest"}}' "$container"); then
     _agent_canon_json_error container_ownership_mismatch "resident ownership readback failed"
+    return 2
+  fi
+  if ! observed_user=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.Config.User}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident caller identity readback failed"
     return 2
   fi
   if ! observed_image=$("$AGENT_CANON_DOCKER_CMD" container inspect \
@@ -2572,7 +3718,8 @@ _agent_canon_validate_existing_container() {
         "$observed_security" != no-new-privileges ||
         "$observed_cpus" != 2000000000 ||
         "$observed_memory" != 4294967296 ||
-        "$observed_pids" != 512 ]]; then
+        "$observed_pids" != 512 ||
+        "$observed_user" != "$(_agent_canon_caller_user)" ]]; then
     _agent_canon_json_error container_ownership_mismatch "named resident has unexpected owner, image, mount, or security configuration"
     return 2
   fi
@@ -2632,11 +3779,48 @@ _agent_canon_container_name() {
 
 _agent_canon_ensure_container() {
   local container=$(_agent_canon_container_name)
+  local candidate_container_id= candidate_container_ref="$container"
+  local candidate_image_id=${AGENT_CANON_EXPECTED_IMAGE_ID:-}
+  AGENT_CANON_CANDIDATE_CONTAINER_CREATED_HERE=0
+  export AGENT_CANON_CANDIDATE_CONTAINER_CREATED_HERE
   AGENT_CANON_STATE_VOLUME_NAME="${AGENT_CANON_STATE_VOLUME_NAME:-agent-canon-runtime-$(_agent_canon_control_digest)}"
   export AGENT_CANON_STATE_VOLUME_NAME
+  _agent_canon_finish_committed_activation_cleanup || return $?
   local -a target_mount_args=()
   local target_source target_digest target_destination target_mode
   local target_manifest="${AGENT_CANON_ROLLBACK_MOUNTS_FILE:-$AGENT_CANON_STATE_ROOT/mounts.tsv}"
+  local candidate_receipt="${AGENT_CANON_CANDIDATE_IDENTITY_RECEIPT:-$AGENT_CANON_RUNTIME_ROOT/host-state/candidate-container.tsv}"
+  local receipt_container_id= receipt_name_id=
+  if [[ -e "$candidate_receipt" || -L "$candidate_receipt" ]]; then
+    if ! _agent_canon_read_candidate_identity_receipt "$container"; then
+      _agent_canon_json_error candidate_ensure_failed \
+        "resident container identity receipt is invalid"
+      return 2
+    fi
+    receipt_container_id=$AGENT_CANON_CANDIDATE_CONTAINER_ID
+    if ! "$AGENT_CANON_DOCKER_CMD" container inspect "$receipt_container_id" >/dev/null 2>&1; then
+      # A receipt is stale only when both its immutable ID and the mutable name
+      # are absent.  If the name is present, it may be a replacement and is
+      # never adopted or removed through the stale receipt.
+      if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
+        _agent_canon_json_error candidate_ensure_failed \
+          "resident name is occupied after the recorded candidate disappeared"
+        return 2
+      fi
+      if ! _agent_canon_clear_candidate_identity_receipt; then
+        _agent_canon_json_error candidate_ensure_failed \
+          "stale resident container identity receipt could not be cleared"
+        return 2
+      fi
+      receipt_container_id=
+    elif ! receipt_name_id=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+      --format '{{.Id}}' "$container" 2>/dev/null) ||
+      [[ "$receipt_name_id" != "$receipt_container_id" ]]; then
+      _agent_canon_json_error candidate_ensure_failed \
+        "recorded candidate is not reachable through its expected name"
+      return 2
+    fi
+  fi
   while IFS=$'\t' read -r target_kind target_digest target_source target_destination target_mode; do
     [[ -n "$target_kind" ]] || continue
     if [[ "$target_kind" != target ||
@@ -2666,10 +3850,43 @@ _agent_canon_ensure_container() {
     )
   fi
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
-    if "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
-      _agent_canon_import_host_inputs
+    if ! candidate_container_id=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+      --format '{{.Id}}' "$container" 2>/dev/null) || [[ -z "$candidate_container_id" ]]; then
+      _agent_canon_json_error candidate_ensure_failed \
+        "resident container identity could not be read back"
+      return 2
     fi
-    _agent_canon_validate_existing_container "$container"
+    if [[ -n "$receipt_container_id" &&
+          "$candidate_container_id" != "$receipt_container_id" ]]; then
+      _agent_canon_json_error candidate_ensure_failed \
+        "resident name no longer identifies the recorded candidate"
+      return 2
+    fi
+    candidate_container_ref=$candidate_container_id
+    if ! _agent_canon_state_volume_labels_match "$AGENT_CANON_STATE_VOLUME_NAME"; then
+      _agent_canon_json_error state_volume_ownership_mismatch \
+        "resident controller state volume has unexpected identity or owner"
+      return 2
+    fi
+    if ! _agent_canon_probe_state_volume "$AGENT_CANON_STATE_VOLUME_NAME" 1; then
+      _agent_canon_json_error state_volume_access_failed \
+        "the resident caller could not access the controller state volume"
+      return 2
+    fi
+    if _agent_canon_import_host_inputs; then
+      :
+    else
+      local host_input_rc=$?
+      _agent_canon_json_error state_volume_import_failed \
+        "host-authored state could not be imported into the controller volume"
+      return "$host_input_rc"
+    fi
+    if ! _agent_canon_probe_state_volume "$AGENT_CANON_STATE_VOLUME_NAME"; then
+      _agent_canon_json_error state_volume_access_failed \
+        "the resident caller could not access the normalized controller state volume"
+      return 2
+    fi
+    _agent_canon_validate_existing_container "$candidate_container_id"
     local validate_rc=$?
     ((validate_rc == 0)) || return "$validate_rc"
   else
@@ -2685,9 +3902,25 @@ _agent_canon_ensure_container() {
       :
     else
       local host_input_rc=$?
+      _agent_canon_remove_fresh_state_volume || :
       return "$host_input_rc"
     fi
-    if ! "$AGENT_CANON_DOCKER_CMD" create \
+    if ! _agent_canon_probe_state_volume "$AGENT_CANON_STATE_VOLUME_NAME"; then
+      _agent_canon_json_error state_volume_access_failed \
+        "the resident caller could not access the normalized controller state volume"
+      _agent_canon_remove_fresh_state_volume || :
+      return 2
+    fi
+    if [[ -z "$candidate_image_id" ]]; then
+      if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+        --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF" 2>/dev/null); then
+        _agent_canon_json_error candidate_ensure_failed \
+          "resident image identity could not be read back"
+        _agent_canon_remove_fresh_state_volume || :
+        return 2
+      fi
+    fi
+    if ! candidate_container_id=$("$AGENT_CANON_DOCKER_CMD" create \
       --name "$container" \
       --user "$caller_user" \
       --read-only \
@@ -2702,20 +3935,60 @@ _agent_canon_ensure_container() {
       --label "io.agent-canon.control-root-digest=$(_agent_canon_control_digest)" \
       --mount "type=volume,src=$AGENT_CANON_STATE_VOLUME_NAME,dst=$AGENT_CANON_VOLUME_DESTINATION" \
       "${target_mount_args[@]}" \
-      "$AGENT_CANON_IMAGE_REF" >/dev/null; then
+      "$AGENT_CANON_IMAGE_REF"); then
       _agent_canon_json_error candidate_ensure_failed "resident container could not be created"
+      _agent_canon_remove_fresh_candidate_resources ||
+        _agent_canon_json_error rollback_failed \
+          "fresh resident resources could not be removed after create failure"
       return 2
     fi
-    _agent_canon_validate_existing_container "$container"
+    candidate_container_ref=$candidate_container_id
+    AGENT_CANON_CANDIDATE_CONTAINER_CREATED_HERE=1
+    export AGENT_CANON_CANDIDATE_CONTAINER_CREATED_HERE
+    # Persist immutable identity immediately after create.  Callers normally
+    # capture this function with command substitution, so exported variables
+    # cannot bridge a later failure back to the parent shell.
+    _agent_canon_write_candidate_identity_receipt "$container" "$candidate_container_id" \
+      "$AGENT_CANON_IMAGE_REF" "$candidate_image_id" || {
+      _agent_canon_json_error candidate_ensure_failed \
+        "resident container identity receipt could not be recorded"
+      _agent_canon_remove_fresh_candidate_resources "$candidate_container_id" || :
+      return 2
+    }
+    _agent_canon_validate_existing_container "$candidate_container_id"
     local validate_rc=$?
-    ((validate_rc == 0)) || return "$validate_rc"
+    if ((validate_rc != 0)); then
+      _agent_canon_remove_fresh_candidate_resources "$candidate_container_id" ||
+        _agent_canon_json_error rollback_failed \
+          "fresh resident resources could not be removed after readback failure"
+      return "$validate_rc"
+    fi
   fi
+  if [[ -z "$candidate_image_id" ]]; then
+    if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+      --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF" 2>/dev/null); then
+      _agent_canon_json_error candidate_ensure_failed \
+        "resident image identity could not be read back"
+      _agent_canon_remove_fresh_candidate_resources "$candidate_container_id" || :
+      return 2
+    fi
+  fi
+  _agent_canon_write_candidate_identity_receipt "$container" "$candidate_container_id" \
+    "$AGENT_CANON_IMAGE_REF" "$candidate_image_id" || {
+    _agent_canon_json_error candidate_ensure_failed \
+      "resident container identity receipt could not be recorded"
+    _agent_canon_remove_fresh_candidate_resources "$candidate_container_id" || :
+    return 2
+  }
   local running
   running=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.State.Running}}' "$container" 2>/dev/null || printf false)
+    --format '{{.State.Running}}' "$candidate_container_ref" 2>/dev/null || printf false)
   if [[ "$running" != true ]]; then
-    if ! "$AGENT_CANON_DOCKER_CMD" start "$container" >/dev/null; then
+    if ! "$AGENT_CANON_DOCKER_CMD" start "$candidate_container_ref" >/dev/null; then
       _agent_canon_json_error candidate_ensure_failed "resident container could not be started"
+      _agent_canon_remove_fresh_candidate_resources "$candidate_container_id" ||
+        _agent_canon_json_error rollback_failed \
+          "fresh resident resources could not be removed after start failure"
       return 2
     fi
   fi
@@ -2723,19 +3996,25 @@ _agent_canon_ensure_container() {
   while ((attempts < AGENT_CANON_HEALTH_ATTEMPTS)); do
     health=$("$AGENT_CANON_DOCKER_CMD" container inspect \
       --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' \
-      "$container" 2>/dev/null || printf missing)
+      "$candidate_container_ref" 2>/dev/null || printf missing)
     if [[ "$health" == healthy ]]; then
       printf '%s\n' "$container"
       return 0
     fi
     if [[ "$health" == missing ]]; then
       _agent_canon_json_error runtime_unavailable "resident container disappeared"
+      _agent_canon_remove_fresh_candidate_resources "$candidate_container_id" ||
+        _agent_canon_json_error rollback_failed \
+          "fresh resident resources could not be removed after disappearance"
       return 2
     fi
     sleep 1
     attempts=$((attempts + 1))
   done
   _agent_canon_json_error container_unhealthy "resident container did not become healthy"
+  _agent_canon_remove_fresh_candidate_resources "$candidate_container_id" ||
+    _agent_canon_json_error rollback_failed \
+      "fresh resident resources could not be removed after health timeout"
   return 2
 }
 
@@ -2810,38 +4089,143 @@ _agent_canon_sync_personal_skill_view() {
   return 0
 }
 
+_agent_canon_prepare_skill_view_backup() {
+  local source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills"
+  local backup_root="$AGENT_CANON_RUNTIME_ROOT/host-state/.skill-view-backup"
+  [[ ! -e "$backup_root" && ! -L "$backup_root" ]] || return 2
+  [[ ! -L "$source_root" ]] || return 2
+  mkdir -p -- "$backup_root" || return 2
+  if [[ -e "$source_root" ]]; then
+    [[ -d "$source_root" ]] || return 2
+    cp -a -- "$source_root" "$backup_root/skills" || return 2
+    printf 'present\n' > "$backup_root/presence"
+  else
+    printf 'absent\n' > "$backup_root/presence"
+  fi
+}
+
+_agent_canon_restore_skill_view_backup() {
+  local source_root=
+  local backup_root="$AGENT_CANON_RUNTIME_ROOT/host-state/.skill-view-backup"
+  local presence restore_rc=0
+  [[ -d "$backup_root" && ! -L "$backup_root" ]] || return 0
+  [[ -n "${AGENT_CANON_REPOSITORY_ROOT:-}" ]] || return 2
+  source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills"
+  [[ -f "$backup_root/presence" && ! -L "$backup_root/presence" ]] || return 2
+  presence=$(<"$backup_root/presence")
+  [[ "$presence" == present || "$presence" == absent ]] || return 2
+  if [[ -e "$source_root" || -L "$source_root" ]]; then
+    rm -rf -- "$source_root" || restore_rc=2
+  fi
+  if [[ "$presence" == present ]]; then
+    [[ -d "$backup_root/skills" && ! -L "$backup_root/skills" ]] || return 2
+    mkdir -p -- "$(dirname -- "$source_root")" || restore_rc=2
+    cp -a -- "$backup_root/skills" "$source_root" || restore_rc=2
+  fi
+  if ((restore_rc == 0)); then
+    rm -rf -- "$backup_root" || restore_rc=2
+  fi
+  return "$restore_rc"
+}
+
+_agent_canon_commit_skill_view_backup() {
+  local backup_root="$AGENT_CANON_RUNTIME_ROOT/host-state/.skill-view-backup"
+  if [[ -e "$backup_root" || -L "$backup_root" ]]; then
+    [[ "${AGENT_CANON_TEST_SKILL_VIEW_COMMIT_FAIL:-0}" != 1 ]] || return 2
+    rm -rf -- "$backup_root" || return 2
+    [[ ! -e "$backup_root" && ! -L "$backup_root" ]] || return 2
+  fi
+}
+
+_agent_canon_finish_committed_activation_cleanup() {
+  local cleanup_rc=0
+  local receipt="${AGENT_CANON_ACTIVATION_COMMIT_RECEIPT:-${AGENT_CANON_RUNTIME_ROOT:-}/host-state/activation-committed.tsv}"
+  local volume="${AGENT_CANON_STATE_VOLUME_NAME:-}"
+  if [[ ! -e "$receipt" && ! -L "$receipt" ]]; then
+    return 0
+  fi
+  if ! _agent_canon_activation_commit_receipt_valid; then
+    _agent_canon_json_error rollback_failed \
+      "activation commit receipt is invalid; retained transaction state was not released"
+    return 2
+  fi
+  # The commit receipt is the sole boundary between rollback and cleanup.
+  # Clear the committed in-volume snapshot idempotently before any new
+  # snapshot can be taken, then attempt every retained backup owner.  Missing
+  # backups/receipts are already-cleaned success on retry.
+  if [[ -n "$volume" ]] && {
+    ! "$AGENT_CANON_DOCKER_CMD" volume inspect "$volume" >/dev/null 2>&1 ||
+    ! _agent_canon_state_volume_labels_match "$volume" ||
+    ! _agent_canon_state_volume_transaction clear
+  }; then
+      _agent_canon_json_error rollback_failed \
+        "committed controller state volume transaction could not be released"
+      cleanup_rc=2
+  elif [[ -n "$volume" ]]; then
+    AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE=0
+    export AGENT_CANON_STATE_VOLUME_SNAPSHOT_ACTIVE
+  fi
+  if ! _agent_canon_state_volume_clear_creation_receipt; then
+    _agent_canon_json_error rollback_failed \
+      "state volume creation receipt could not be released"
+    cleanup_rc=2
+  fi
+  if ! _agent_canon_clear_candidate_identity_receipt; then
+    _agent_canon_json_error rollback_failed \
+      "candidate identity receipt could not be released"
+    cleanup_rc=2
+  fi
+  if ! _agent_canon_commit_global_links; then
+    cleanup_rc=2
+  fi
+  if ! _agent_canon_commit_controller_projection; then
+    _agent_canon_json_error rollback_failed \
+      "controller projection backup could not be released"
+    cleanup_rc=2
+  fi
+  if ! _agent_canon_commit_skill_view_backup; then
+    _agent_canon_json_error rollback_failed \
+      "skill view backup could not be released"
+    cleanup_rc=2
+  fi
+  if ((cleanup_rc == 0)) && ! _agent_canon_clear_activation_commit_receipt; then
+    _agent_canon_json_error rollback_failed \
+      "activation commit receipt could not be released"
+    cleanup_rc=2
+  fi
+  return "$cleanup_rc"
+}
+
 _agent_canon_restore_candidate_failure() {
   local container=$1 old_image_id=$2 candidate_image_id=$3
   local old_image_ref=${AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF:-$old_image_id}
-  local restore_output restore_error restore_rc=0
   local recovery_errors=()
-  AGENT_CANON_RESTORE_IMAGE_ID=$old_image_id
-  export AGENT_CANON_RESTORE_IMAGE_ID
-  restore_output=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stdout.XXXXXX")
-  restore_error=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stderr.XXXXXX")
-  if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
-    if _agent_canon_container_exec "$container" \
-      python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
-      --container-control \
-      --repository-root /usr/local/share/agent-canon/runtime \
-      --control-parent-root /var/lib/agent-canon \
-      --runtime-root /var/lib/agent-canon/runtime \
-      restore >"$restore_output" 2>"$restore_error"; then
-      :
-    else
-      restore_rc=$?
-      recovery_errors+=("state_restore_exit=$restore_rc")
-    fi
+  # Quiesce and remove the candidate before restoring the authoritative
+  # volume snapshot. A failed cleanup is recorded, but never skips recovery.
+  if ! _agent_canon_cleanup_candidate_resources "$container" "$candidate_image_id" "$old_image_id"; then
+    recovery_errors+=("candidate_cleanup_failed")
   fi
-  rm -f -- "$restore_output" "$restore_error"
-  unset AGENT_CANON_RESTORE_IMAGE_ID
-  if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
-    if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$container" >/dev/null 2>&1; then
-      recovery_errors+=("candidate_stop_failed")
-    fi
-    if ! "$AGENT_CANON_DOCKER_CMD" rm "$container" >/dev/null 2>&1; then
-      recovery_errors+=("candidate_remove_failed")
-    fi
+  if ((${#recovery_errors[@]})); then
+    _agent_canon_json_error rollback_failed \
+      "previous resident restart skipped; candidate quiescence was not proven: ${recovery_errors[*]}"
+    return 2
+  fi
+  if ! _agent_canon_restore_state_volume_snapshot; then
+    recovery_errors+=("state_volume_restore_failed")
+  fi
+  if ! _agent_canon_restore_controller_projection; then
+    recovery_errors+=("controller_projection_restore_failed")
+  fi
+  if ! _agent_canon_restore_global_links; then
+    recovery_errors+=("global_links_restore_failed")
+  fi
+  if ! _agent_canon_restore_skill_view_backup; then
+    recovery_errors+=("skill_view_restore_failed")
+  fi
+  if ((${#recovery_errors[@]})); then
+    _agent_canon_json_error rollback_failed \
+      "previous resident restart skipped; required restoration failed: ${recovery_errors[*]}"
+    return 2
   fi
   AGENT_CANON_IMAGE_REF=$old_image_ref
   AGENT_CANON_EXPECTED_IMAGE_ID=$old_image_id
@@ -2856,11 +4240,6 @@ _agent_canon_restore_candidate_failure() {
   if [[ -n "${AGENT_CANON_PREVIOUS_IMAGE_REF:-}" ]]; then
     if ! _agent_canon_write_active_image "$AGENT_CANON_PREVIOUS_IMAGE_REF" "$old_image_id"; then
       recovery_errors+=("previous_active_image_write_failed")
-    fi
-  fi
-  if [[ -n "$candidate_image_id" && "$candidate_image_id" != "$old_image_id" ]]; then
-    if ! "$AGENT_CANON_DOCKER_CMD" image rm "$candidate_image_id" >/dev/null 2>&1; then
-      recovery_errors+=("candidate_image_remove_failed")
     fi
   fi
   if ((${#recovery_errors[@]})); then
@@ -2998,6 +4377,7 @@ _agent_canon_replace_resident_locked() {
   if [[ "$clean_install_prepared" != 1 ]]; then
     AGENT_CANON_CLEAN_INSTALL_ACTIVE=0
     AGENT_CANON_CLEAN_INSTALL_SUCCESS=0
+    AGENT_CANON_CLEAN_INSTALL_COMMITTED=0
     AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER=
     AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=
     AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID=
@@ -3005,12 +4385,13 @@ _agent_canon_replace_resident_locked() {
     AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED=0
   else
     AGENT_CANON_CLEAN_INSTALL_SUCCESS=0
+    AGENT_CANON_CLEAN_INSTALL_COMMITTED=0
   fi
   export AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER \
     AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF \
     AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID \
     AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED \
-    AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED
+    AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED AGENT_CANON_CLEAN_INSTALL_COMMITTED
   trap '_agent_canon_clean_install_exit' EXIT
   if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$candidate_image_ref"); then
     _agent_canon_json_error candidate_image_missing "candidate resident image disappeared before replacement"
@@ -3101,6 +4482,14 @@ _agent_canon_replace_resident_locked() {
   AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
   export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
 
+  # Existing volumes carry the authoritative rollback payload. Preserve its
+  # bounded logical set before any candidate ensure/import can mutate it.
+  if ! _agent_canon_prepare_state_volume_snapshot; then
+    _agent_canon_json_error rollback_snapshot_failed \
+      "controller state volume rollback snapshot could not be prepared"
+    return 2
+  fi
+
   # This readback happens after the replacement lock is acquired.  A build
   # may have completed while another update owned the resident, so the
   # resident state—not the caller's pre-lock snapshot—is authoritative.
@@ -3134,15 +4523,65 @@ _agent_canon_replace_resident_locked() {
         :
       else
         rc=$?
+        _agent_canon_restore_state_volume_snapshot || {
+          _agent_canon_json_error rollback_failed \
+            "controller state volume snapshot could not be restored"
+          return 2
+        }
+        _agent_canon_clear_candidate_identity_receipt || {
+          _agent_canon_json_error rollback_failed \
+            "up-to-date candidate identity receipt could not be released after rollback"
+          return 2
+        }
         return "$rc"
       fi
       if _agent_canon_record_active_container "$candidate"; then
         :
       else
         rc=$?
+        _agent_canon_restore_state_volume_snapshot || {
+          _agent_canon_json_error rollback_failed \
+            "controller state volume snapshot could not be restored"
+          return 2
+        }
+        _agent_canon_clear_candidate_identity_receipt || {
+          _agent_canon_json_error rollback_failed \
+            "up-to-date candidate identity receipt could not be released after rollback"
+          return 2
+        }
         return "$rc"
       fi
-      _agent_canon_discard_pending_rollback_plan
+      if _agent_canon_discard_pending_rollback_plan; then
+        :
+      else
+        rc=$?
+        _agent_canon_restore_state_volume_snapshot || rc=2
+        _agent_canon_clear_candidate_identity_receipt || rc=2
+        return "$rc"
+      fi
+      if ! _agent_canon_write_activation_commit_receipt "$candidate_image_id" "$candidate"; then
+        _agent_canon_json_error rollback_failed \
+          "up-to-date activation commit receipt could not be published"
+        _agent_canon_restore_state_volume_snapshot || {
+          _agent_canon_json_error rollback_failed \
+            "controller state volume snapshot could not be restored"
+          return 2
+        }
+        _agent_canon_clear_candidate_identity_receipt || {
+          _agent_canon_json_error rollback_failed \
+            "up-to-date candidate identity receipt could not be released after rollback"
+          return 2
+        }
+        return 2
+      fi
+      AGENT_CANON_CLEAN_INSTALL_COMMITTED=1
+      AGENT_CANON_CLEAN_INSTALL_SUCCESS=1
+      export AGENT_CANON_CLEAN_INSTALL_COMMITTED AGENT_CANON_CLEAN_INSTALL_SUCCESS
+      _agent_canon_finish_committed_activation_cleanup || {
+        _agent_canon_json_error rollback_failed \
+          "up-to-date committed activation cleanup remains pending"
+        return 2
+      }
       printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"%s","code":"up_to_date","changed":false}\n' \
         "$replacement_operation"
       return 0
@@ -3197,21 +4636,25 @@ _agent_canon_replace_resident_locked() {
     :
   else
     local candidate_rc=$?
-    if "$AGENT_CANON_DOCKER_CMD" container inspect "$(_agent_canon_container_name)" >/dev/null 2>&1; then
-      if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$(_agent_canon_container_name)" >/dev/null 2>&1; then
-        _agent_canon_json_error rollback_failed "candidate container stop failed after health failure"
-        return 2
-      fi
-      if ! "$AGENT_CANON_DOCKER_CMD" rm "$(_agent_canon_container_name)" >/dev/null 2>&1; then
-        _agent_canon_json_error rollback_failed "candidate container removal failed after health failure"
-        return 2
-      fi
+    local candidate_cleanup_rc=0
+    _agent_canon_cleanup_candidate_resources "$(_agent_canon_container_name)" \
+      "${candidate_image_id:-}" "$old_image_id" || candidate_cleanup_rc=1
+    if ((candidate_cleanup_rc != 0)); then
+      _agent_canon_json_error rollback_failed \
+        "candidate quiescence was not proven; volume restoration was skipped"
+      return 2
     fi
-    if [[ -n "${candidate_image_id:-}" && "$candidate_image_id" != "$old_image_id" ]]; then
-      if ! "$AGENT_CANON_DOCKER_CMD" image rm "$candidate_image_id" >/dev/null 2>&1; then
-        _agent_canon_json_error rollback_failed "candidate image removal failed after health failure"
-        return 2
-      fi
+    if ! _agent_canon_restore_state_volume_snapshot; then
+      _agent_canon_json_error rollback_failed \
+        "controller state volume snapshot could not be restored"
+      return 2
+    fi
+    if ! _agent_canon_restore_controller_projection ||
+       ! _agent_canon_restore_global_links ||
+       ! _agent_canon_restore_skill_view_backup; then
+      _agent_canon_json_error rollback_failed \
+        "late activation state could not be restored"
+      return 2
     fi
     if ((clean_install == 1)); then
       if _agent_canon_discard_clean_install_rollback_tag &&
@@ -3222,6 +4665,11 @@ _agent_canon_replace_resident_locked() {
           "clean install state could not be restored after candidate failure"
         return 2
       fi
+    fi
+    if ((candidate_cleanup_rc != 0)); then
+      _agent_canon_json_error rollback_failed \
+        "candidate resources could not be removed after health failure"
+      return 2
     fi
     if [[ -n "$old_image_id" ]]; then
       AGENT_CANON_IMAGE_REF=$old_image_id
@@ -3248,6 +4696,8 @@ _agent_canon_replace_resident_locked() {
     rc=$?
   fi
   if ((rc == 0)); then
+    AGENT_CANON_KEEP_CONTROLLER_PROJECTION_BACKUP=1
+    export AGENT_CANON_KEEP_CONTROLLER_PROJECTION_BACKUP
     if _agent_canon_publish_controller_projection; then
       :
     else
@@ -3255,10 +4705,17 @@ _agent_canon_replace_resident_locked() {
     fi
   fi
   if ((rc == 0)) && [[ -n "${AGENT_CANON_REPOSITORY_ROOT:-}" ]]; then
-    if _agent_canon_sync_personal_skill_view "$candidate"; then
+    if _agent_canon_prepare_skill_view_backup; then
       :
     else
       rc=$?
+    fi
+    if ((rc == 0)); then
+      if _agent_canon_sync_personal_skill_view "$candidate"; then
+        :
+      else
+        rc=$?
+      fi
     fi
   fi
   if ((rc == 0)) && [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
@@ -3282,7 +4739,62 @@ _agent_canon_replace_resident_locked() {
       rc=$?
     fi
   fi
-  if ((rc != 0)) && ((clean_install == 1)); then
+  if ((rc == 0)) && ((clean_install == 1)); then
+    if _agent_canon_drop_legacy_controller_state; then
+      :
+    else
+      rc=$?
+    fi
+  fi
+  if ((rc == 0)); then
+    if ! _agent_canon_write_activation_commit_receipt "$candidate_image_id" "$candidate"; then
+      _agent_canon_json_error rollback_failed \
+        "activation commit receipt could not be published"
+      rc=2
+    fi
+  fi
+  if ((rc == 0)); then
+    # All activation readbacks have succeeded.  Mark the transaction committed
+    # before any backup/receipt removal so a cleanup failure cannot enter the
+    # old-generation recovery path after partial publication.
+    AGENT_CANON_CLEAN_INSTALL_COMMITTED=1
+    AGENT_CANON_CLEAN_INSTALL_SUCCESS=1
+    export AGENT_CANON_CLEAN_INSTALL_COMMITTED AGENT_CANON_CLEAN_INSTALL_SUCCESS
+  fi
+  if [[ "${AGENT_CANON_CLEAN_INSTALL_COMMITTED:-0}" == 1 ]]; then
+    if ! _agent_canon_finish_committed_activation_cleanup; then
+      _agent_canon_json_error state_volume_transaction_cleanup_failed \
+        "committed activation cleanup remains pending"
+      rc=2
+    else
+      unset AGENT_CANON_KEEP_CONTROLLER_PROJECTION_BACKUP
+    fi
+  fi
+  if ((rc != 0)) && [[ "${AGENT_CANON_CLEAN_INSTALL_COMMITTED:-0}" != 1 ]] &&
+     [[ -z "$old_image_id" ]]; then
+    local fresh_cleanup_rc=0
+    _agent_canon_cleanup_candidate_resources "${candidate:-$(_agent_canon_container_name)}" \
+      "${candidate_image_id:-}" "$old_image_id" || fresh_cleanup_rc=1
+    if ((fresh_cleanup_rc != 0)); then
+      _agent_canon_json_error rollback_failed \
+        "candidate quiescence was not proven; volume restoration was skipped"
+      return 2
+    fi
+    if ! _agent_canon_restore_state_volume_snapshot; then
+      fresh_cleanup_rc=1
+    fi
+    _agent_canon_restore_controller_projection || fresh_cleanup_rc=1
+    _agent_canon_restore_global_links || fresh_cleanup_rc=1
+    _agent_canon_restore_skill_view_backup || fresh_cleanup_rc=1
+    _agent_canon_remove_fresh_state_volume || fresh_cleanup_rc=1
+    if ((fresh_cleanup_rc != 0)); then
+      _agent_canon_json_error rollback_failed \
+        "fresh candidate resources could not be removed after failure"
+      return 2
+    fi
+  fi
+  if ((rc != 0)) && [[ "${AGENT_CANON_CLEAN_INSTALL_COMMITTED:-0}" != 1 ]] &&
+     ((clean_install == 1)); then
     if _agent_canon_discard_clean_install_rollback_tag &&
        _agent_canon_restore_clean_install; then
       AGENT_CANON_CLEAN_INSTALL_ACTIVE=0
@@ -3292,7 +4804,8 @@ _agent_canon_replace_resident_locked() {
       return 2
     fi
   fi
-  if ((rc != 0)) && [[ -n "$old_image_id" ]]; then
+  if ((rc != 0)) && [[ "${AGENT_CANON_CLEAN_INSTALL_COMMITTED:-0}" != 1 ]] &&
+     [[ -n "$old_image_id" ]]; then
     if ! _agent_canon_restore_candidate_failure "$candidate" "$old_image_id" "$candidate_image_id"; then
       _agent_canon_json_error rollback_failed "candidate failure recovery was incomplete"
       return 2
@@ -3748,8 +5261,8 @@ _agent_canon_private_feedback_sync() {
   local container=${1:-}
   local spool="$AGENT_CANON_STATE_ROOT/spool/private-feedback"
   local request="$spool/sync-request.json"
-  [[ -f "$request" && ! -L "$request" ]] || return 0
   _agent_canon_volume_copy export private-feedback "$spool" private-feedback
+  [[ -f "$request" && ! -L "$request" ]] || return 0
   local request_body
   request_body=$(<"$request")
   request_body=${request_body%$'\n'}
@@ -4049,83 +5562,305 @@ _agent_canon_remove_global_links() {
   fi
 }
 
-_agent_canon_install_global_links() {
+_agent_canon_prepare_global_links() {
   local home_root
-  home_root=$(realpath -e -- "$HOME")
+  home_root=$(realpath -e -- "$HOME") || return 2
   [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
   local source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal"
   local skill_source_root="$AGENT_CANON_REPOSITORY_ROOT/agents/skills"
   local manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
   local config_target="$home_root/.codex/config.toml"
   local config_source="$source_root/config.toml"
-  local link source resolved mode digest
+  local transaction="$AGENT_CANON_RUNTIME_ROOT/host-state/.global-links-transaction"
+  local stage="$transaction/stage" backup="$transaction/backup"
+  local link source resolved mode digest index=0
   local failures=()
-  mkdir -p "$home_root/.agents/skills" "$home_root/.codex/agents" "$source_root"
-  : > "$manifest"
-  printf 'schema\tagent-canon.global-links.v1\n' >> "$manifest"
+  [[ ! -e "$transaction" && ! -L "$transaction" ]] ||
+    { _agent_canon_json_error global_link_transaction_exists \
+        "global link transaction already exists"; return 2; }
+  [[ ! -L "$source_root" && ! -L "$skill_source_root" ]] ||
+    { _agent_canon_json_error global_link_source_invalid \
+        "global link source directory is a symlink"; return 2; }
+  [[ ! -e "$source_root" || -d "$source_root" ]] ||
+    { _agent_canon_json_error global_link_source_invalid \
+        "global link source directory is not a directory"; return 2; }
+  [[ ! -e "$skill_source_root" || -d "$skill_source_root" ]] ||
+    { _agent_canon_json_error global_link_source_invalid \
+        "global skill source directory is not a directory"; return 2; }
+  for source in "$home_root/.codex" "$home_root/.agents" \
+    "$home_root/.codex/agents" "$home_root/.agents/skills"; do
+    [[ ! -L "$source" ]] ||
+      { _agent_canon_json_error global_link_collision \
+          "global link parent is a symlink: $source"; return 2; }
+    [[ ! -e "$source" || -d "$source" ]] ||
+      { _agent_canon_json_error global_link_collision \
+          "global link parent is not a directory: $source"; return 2; }
+  done
+  if [[ -e "$config_source" || -L "$config_source" ]]; then
+    [[ -f "$config_source" && ! -L "$config_source" ]] ||
+      { _agent_canon_json_error global_link_source_invalid \
+          "personal Codex configuration is not a regular file"; return 2; }
+  fi
   if [[ -e "$config_target" || -L "$config_target" ]]; then
-    resolved=$(readlink -f -- "$config_target" 2>/dev/null || printf '')
-    if [[ -L "$config_target" && "$resolved" == "$config_source" ]]; then
-      mode=$(stat -c '%a' -- "$config_source")
-    elif [[ -L "$config_target" ]]; then
-      failures+=("$config_target")
-    elif [[ -f "$config_target" ]]; then
-      if [[ -e "$config_source" && ! -f "$config_source" ]]; then
+    if [[ -L "$config_target" ]]; then
+      resolved=$(readlink -f -- "$config_target" 2>/dev/null || printf '')
+      [[ -f "$config_source" && "$resolved" == "$(realpath -e -- "$config_source")" ]] ||
         failures+=("$config_target")
-      else
-        if ! cp --preserve=mode,timestamps -- "$config_target" "$config_source"; then
-          failures+=("$config_target")
-        fi
-        mode=$(stat -c '%a' -- "$config_target")
-        rm -f -- "$config_target"
-        ln -s -- "$config_source" "$config_target"
-      fi
+      mode=$(stat -c '%a' -- "$config_source")
+    elif [[ -f "$config_target" ]]; then
+      mode=$(stat -c '%a' -- "$config_target")
     else
       failures+=("$config_target")
     fi
   else
-    if [[ ! -f "$config_source" ]]; then
-      printf '# AgentCanon personal Codex configuration.\n' > "$config_source"
-      chmod 600 "$config_source"
+    if [[ -f "$config_source" ]]; then
+      mode=$(stat -c '%a' -- "$config_source")
+    else
+      mode=600
     fi
-    mode=$(stat -c '%a' -- "$config_source")
-    ln -s -- "$config_source" "$config_target"
   fi
-  if [[ -L "$config_target" && "$(readlink -f -- "$config_target")" == "$config_source" ]]; then
-    digest=$(_agent_canon_sha256 "$config_source")
-    printf 'config\t%s\t%s\t%s\t%s\n' "$config_target" "$config_source" "$mode" "$digest" >> "$manifest"
-  fi
-  for source in "$skill_source_root"/*; do
+  shopt -s nullglob
+  local -a skill_sources=("$skill_source_root"/*)
+  local -a agent_sources=("$AGENT_CANON_REPOSITORY_ROOT/.codex/agents"/*.toml)
+  shopt -u nullglob
+  for source in "${skill_sources[@]}"; do
     [[ -d "$source" && ! -L "$source" ]] || continue
     link="$home_root/.agents/skills/${source##*/}"
     if [[ -L "$link" ]]; then
       resolved=$(readlink -f -- "$link" 2>/dev/null || printf '')
-      [[ "$resolved" == "$(realpath -e -- "$source")" ]] || { failures+=("$link"); continue; }
+      [[ "$resolved" == "$(realpath -e -- "$source")" ]] || failures+=("$link")
     elif [[ -e "$link" ]]; then
       failures+=("$link")
-      continue
-    else
-      ln -s -- "$source" "$link"
     fi
-    printf 'link\t%s\t%s\n' "$link" "$source" >> "$manifest"
   done
-  for source in "$AGENT_CANON_REPOSITORY_ROOT/.codex/agents"/*.toml; do
+  for source in "${agent_sources[@]}"; do
     [[ -f "$source" && ! -L "$source" ]] || continue
     link="$home_root/.codex/agents/${source##*/}"
     if [[ -L "$link" ]]; then
       resolved=$(readlink -f -- "$link" 2>/dev/null || printf '')
-      [[ "$resolved" == "$(realpath -e -- "$source")" ]] || { failures+=("$link"); continue; }
+      [[ "$resolved" == "$(realpath -e -- "$source")" ]] || failures+=("$link")
     elif [[ -e "$link" ]]; then
       failures+=("$link")
-      continue
-    else
-      ln -s -- "$source" "$link"
     fi
-    printf 'link\t%s\t%s\n' "$link" "$source" >> "$manifest"
   done
-  if ((${#failures[@]})); then
-    _agent_canon_json_error global_link_collision "global link install preserved collisions: ${failures[*]}"
+  ((${#failures[@]} == 0)) ||
+    { _agent_canon_json_error global_link_collision \
+        "global link install preserved collisions: ${failures[*]}"; return 2; }
+
+  mkdir -p -- "$stage" "$backup" ||
+    _agent_canon_json_error global_link_transaction_failed \
+      "global link transaction could not be staged"
+  chmod 700 "$transaction" "$stage" "$backup"
+  : > "$transaction/paths.tsv"
+  : > "$transaction/targets.tsv"
+  if [[ -e "$manifest" || -L "$manifest" ]]; then
+    [[ -f "$manifest" && ! -L "$manifest" ]] ||
+      _agent_canon_json_error global_link_manifest_invalid \
+        "global link manifest is not a regular file"
+    cp -a -- "$manifest" "$backup/manifest" ||
+      _agent_canon_json_error global_link_transaction_failed \
+        "global link manifest backup failed"
+    printf 'present\tmanifest\n' >> "$transaction/paths.tsv"
+  else
+    printf 'absent\tmanifest\n' >> "$transaction/paths.tsv"
   fi
+  for source in "$config_source" "$config_target"; do
+    local key
+    if [[ "$source" == "$config_source" ]]; then key=config-source; else key=config-target; fi
+    if [[ -e "$source" || -L "$source" ]]; then
+      cp -a -- "$source" "$backup/$key" ||
+        _agent_canon_json_error global_link_transaction_failed \
+          "global link backup failed: $source"
+      printf 'present\t%s\n' "$key" >> "$transaction/paths.tsv"
+    else
+      printf 'absent\t%s\n' "$key" >> "$transaction/paths.tsv"
+    fi
+  done
+  index=0
+  for source in "${skill_sources[@]}"; do
+    [[ -d "$source" && ! -L "$source" ]] || continue
+    link="$home_root/.agents/skills/${source##*/}"
+    index=$((index + 1))
+    if [[ -e "$link" || -L "$link" ]]; then
+      cp -a -- "$link" "$backup/link-$index" ||
+        _agent_canon_json_error global_link_transaction_failed \
+          "global link backup failed: $link"
+      printf 'present\tlink-%s\n' "$index" >> "$transaction/paths.tsv"
+    else
+      printf 'absent\tlink-%s\n' "$index" >> "$transaction/paths.tsv"
+    fi
+    printf 'link-%s\t%s\n' "$index" "$link" >> "$transaction/targets.tsv"
+  done
+  for source in "${agent_sources[@]}"; do
+    [[ -f "$source" && ! -L "$source" ]] || continue
+    link="$home_root/.codex/agents/${source##*/}"
+    index=$((index + 1))
+    if [[ -e "$link" || -L "$link" ]]; then
+      cp -a -- "$link" "$backup/link-$index" ||
+        _agent_canon_json_error global_link_transaction_failed \
+          "global link backup failed: $link"
+      printf 'present\tlink-%s\n' "$index" >> "$transaction/paths.tsv"
+    else
+      printf 'absent\tlink-%s\n' "$index" >> "$transaction/paths.tsv"
+    fi
+    printf 'link-%s\t%s\n' "$index" "$link" >> "$transaction/targets.tsv"
+  done
+  if [[ -e "$config_target" && ! -L "$config_target" ]]; then
+    cp -a -- "$config_target" "$stage/config-source" ||
+      _agent_canon_json_error global_link_transaction_failed \
+        "regular Codex configuration could not be staged"
+    chmod "$mode" "$stage/config-source"
+    printf '1\n' > "$transaction/update-source"
+  elif [[ ! -e "$config_source" ]]; then
+    printf '# AgentCanon personal Codex configuration.\n' > "$stage/config-source"
+    chmod 600 "$stage/config-source"
+    printf '1\n' > "$transaction/update-source"
+  else
+    printf '0\n' > "$transaction/update-source"
+  fi
+  {
+    printf 'schema\tagent-canon.global-links.v1\n'
+    digest=$(_agent_canon_sha256 "$stage/config-source" 2>/dev/null ||
+      _agent_canon_sha256 "$config_source")
+    printf 'config\t%s\t%s\t%s\t%s\n' "$config_target" "$config_source" "$mode" "$digest"
+    for source in "${skill_sources[@]}"; do
+      [[ -d "$source" && ! -L "$source" ]] || continue
+      printf 'link\t%s/.agents/skills/%s\t%s\n' "$home_root" "${source##*/}" "$source"
+    done
+    for source in "${agent_sources[@]}"; do
+      [[ -f "$source" && ! -L "$source" ]] || continue
+      printf 'link\t%s/.codex/agents/%s\t%s\n' "$home_root" "${source##*/}" "$source"
+    done
+  } > "$stage/global-links.tsv" ||
+    _agent_canon_json_error global_link_transaction_failed \
+      "global link manifest could not be staged"
+  chmod 600 "$stage/global-links.tsv" "$transaction/paths.tsv" "$transaction/update-source"
+  AGENT_CANON_GLOBAL_LINK_TRANSACTION_ROOT=$transaction
+  AGENT_CANON_GLOBAL_LINK_TRANSACTION_ACTIVE=1
+  export AGENT_CANON_GLOBAL_LINK_TRANSACTION_ROOT AGENT_CANON_GLOBAL_LINK_TRANSACTION_ACTIVE
+}
+
+_agent_canon_restore_global_links() {
+  local transaction=${AGENT_CANON_GLOBAL_LINK_TRANSACTION_ROOT:-$AGENT_CANON_RUNTIME_ROOT/host-state/.global-links-transaction}
+  local backup="$transaction/backup" presence key target restore_rc=0
+  [[ -d "$transaction" && ! -L "$transaction" ]] || return 0
+  [[ -f "$transaction/paths.tsv" && ! -L "$transaction/paths.tsv" ]] || return 2
+  while IFS=$'\t' read -r presence key; do
+    case "$key" in
+      manifest) target="$AGENT_CANON_STATE_ROOT/global-links.tsv" ;;
+      config-source) target="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/config.toml" ;;
+      config-target) target="$(realpath -e -- "$HOME")/.codex/config.toml" ;;
+      link-*)
+        target=$(awk -F $'\t' -v backup_key="$key" '$1 == backup_key { print $2; exit }' "$transaction/targets.tsv" 2>/dev/null || printf '')
+        ;;
+      *) restore_rc=2; continue ;;
+    esac
+    if [[ -e "$target" || -L "$target" ]]; then
+      rm -rf -- "$target" || restore_rc=2
+    fi
+    if [[ "$presence" == present ]]; then
+      [[ -e "$backup/$key" || -L "$backup/$key" ]] || { restore_rc=2; continue; }
+      cp -a -- "$backup/$key" "$target" || restore_rc=2
+    elif [[ "$presence" != absent ]]; then
+      restore_rc=2
+    fi
+  done < "$transaction/paths.tsv"
+  if ((restore_rc == 0)); then
+    rm -rf -- "$transaction" || restore_rc=2
+    unset AGENT_CANON_GLOBAL_LINK_TRANSACTION_ROOT AGENT_CANON_GLOBAL_LINK_TRANSACTION_ACTIVE
+  fi
+  return "$restore_rc"
+}
+
+_agent_canon_commit_global_links() {
+  local transaction=${AGENT_CANON_GLOBAL_LINK_TRANSACTION_ROOT:-$AGENT_CANON_RUNTIME_ROOT/host-state/.global-links-transaction}
+  [[ ! -e "$transaction" && ! -L "$transaction" ]] && {
+    unset AGENT_CANON_GLOBAL_LINK_TRANSACTION_ROOT AGENT_CANON_GLOBAL_LINK_TRANSACTION_ACTIVE
+    return 0
+  }
+  if [[ "${AGENT_CANON_TEST_GLOBAL_LINK_COMMIT_FAIL:-0}" == 1 ]] ||
+     ! rm -rf -- "$transaction" ||
+     [[ -e "$transaction" || -L "$transaction" ]]; then
+    _agent_canon_json_error rollback_failed \
+      "global-link transaction backup could not be released"
+    return 2
+  fi
+  unset AGENT_CANON_GLOBAL_LINK_TRANSACTION_ROOT AGENT_CANON_GLOBAL_LINK_TRANSACTION_ACTIVE
+}
+
+_agent_canon_apply_global_links() {
+  local transaction=${AGENT_CANON_GLOBAL_LINK_TRANSACTION_ROOT:-} stage backup
+  local home_root source_root config_source config_target manifest key target source
+  [[ -n "$transaction" && -d "$transaction" && ! -L "$transaction" ]] || return 2
+  stage="$transaction/stage"
+  backup="$transaction/backup"
+  home_root=$(realpath -e -- "$HOME") || return 2
+  source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal"
+  config_source="$source_root/config.toml"
+  config_target="$home_root/.codex/config.toml"
+  manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
+  mkdir -p -- "$home_root/.agents/skills" "$home_root/.codex/agents" "$source_root" || {
+    _agent_canon_restore_global_links
+    return 2
+  }
+  if [[ "$(<"$transaction/update-source")" == 1 ]]; then
+    cp -a -- "$stage/config-source" "$config_source" || {
+      _agent_canon_restore_global_links
+      return 2
+    }
+  fi
+  if [[ -e "$config_target" || -L "$config_target" ]]; then
+    if [[ -L "$config_target" ]]; then
+      resolved=$(readlink -f -- "$config_target" 2>/dev/null || printf '')
+      [[ "$resolved" == "$(realpath -e -- "$config_source")" ]] || {
+        _agent_canon_restore_global_links
+        return 2
+      }
+    else
+      rm -f -- "$config_target" || {
+        _agent_canon_restore_global_links
+        return 2
+      }
+      ln -s -- "$config_source" "$config_target" || {
+        _agent_canon_restore_global_links
+        return 2
+      }
+    fi
+  else
+    ln -s -- "$config_source" "$config_target" || {
+      _agent_canon_restore_global_links
+      return 2
+    }
+  fi
+  while IFS=$'\t' read -r key target source; do
+    [[ "$key" == link ]] || continue
+    if [[ -L "$target" ]]; then
+      resolved=$(readlink -f -- "$target" 2>/dev/null || printf '')
+      [[ "$resolved" == "$(realpath -e -- "$source")" ]] || {
+        _agent_canon_restore_global_links
+        return 2
+      }
+    elif [[ -e "$target" ]]; then
+      _agent_canon_restore_global_links
+      return 2
+    else
+      ln -s -- "$source" "$target" || {
+        _agent_canon_restore_global_links
+        return 2
+      }
+    fi
+  done < "$stage/global-links.tsv"
+  mv -f -- "$stage/global-links.tsv" "$manifest" || {
+    _agent_canon_restore_global_links
+    return 2
+  }
+  return 0
+}
+
+_agent_canon_install_global_links() {
+  _agent_canon_prepare_global_links || return $?
+  [[ "${AGENT_CANON_GLOBAL_LINK_TRANSACTION_ACTIVE:-0}" == 1 ]] || return 0
+  _agent_canon_apply_global_links
 }
 
 bootstrap_host_entrypoint() {
@@ -4359,13 +6094,13 @@ bootstrap_host_entrypoint() {
         fi
       fi
       local state_volume="agent-canon-runtime-$(_agent_canon_control_digest)"
-      local volume_owner
-      if volume_owner=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
-        --format '{{index .Labels "io.agent-canon.control-root-digest"}}' \
-        "$state_volume" 2>/dev/null); then
-        [[ "$volume_owner" == "$(_agent_canon_control_digest)" ]] ||
+      if "$AGENT_CANON_DOCKER_CMD" volume inspect "$state_volume" >/dev/null 2>&1; then
+        _agent_canon_state_volume_labels_match "$state_volume" ||
           _agent_canon_json_error uninstall_volume_ownership_mismatch \
-            "controller state volume is owned by another control root"
+            "controller state volume does not have the exact AgentCanon ownership labels"
+        _agent_canon_probe_state_volume "$state_volume" ||
+          _agent_canon_json_error uninstall_volume_marker_invalid \
+            "controller state volume marker or access contract is invalid"
         if ! "$AGENT_CANON_DOCKER_CMD" volume rm "$state_volume" >/dev/null; then
           _agent_canon_json_error uninstall_volume_remove_failed \
             "Docker could not remove the owned controller state volume"
