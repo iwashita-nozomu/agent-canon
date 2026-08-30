@@ -2414,9 +2414,14 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     fake_state.write_text(json.dumps(docker_state), encoding="utf-8")
 
     state_root = repository / ".runtime" / "container-state"
+    docker_state = json.loads(fake_state.read_text(encoding="utf-8"))
+    control_digest = hashlib.sha256(str(home.resolve()).encode("utf-8")).hexdigest()
+    volume_root = Path(
+        docker_state["volumes"][f"agent-canon-runtime-{control_digest}"]["Mountpoint"]
+    )
     stale_target = home / "removed-agent-canon"
     stale_digest = hashlib.sha256(str(stale_target).encode("utf-8")).hexdigest()
-    stale_state = json.loads((state_root / "state.json").read_text(encoding="utf-8"))
+    stale_state = json.loads((volume_root / "state.json").read_text(encoding="utf-8"))
     stale_state["targets"] = {
         stale_digest: {
             "root": str(stale_target),
@@ -2426,7 +2431,7 @@ def test_public_clean_install_materializes_source_view_and_first_target(
         }
     }
     stale_state["rollback_generation"] = "generation-stale"
-    (state_root / "state.json").write_text(
+    (volume_root / "state.json").write_text(
         json.dumps(stale_state), encoding="utf-8"
     )
     (state_root / "mounts.tsv").write_text(
@@ -2436,14 +2441,14 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     (state_root / "rollback-plan.tsv").write_text(
         "schema\tagent-canon.rollback-plan.v1\n", encoding="utf-8"
     )
-    (state_root / "generations" / "stale-generation").mkdir()
+    (volume_root / "generations" / "stale-generation").mkdir()
 
     repeated_install = subprocess.run(
         [*common, "install"], check=False, capture_output=True, text=True, env=environment
     )
     assert repeated_install.returncode == 0, repeated_install.stderr
     assert not (state_root / "rollback-plan.tsv").exists()
-    assert not (state_root / "generations" / "stale-generation").exists()
+    assert not (volume_root / "generations" / "stale-generation").exists()
     assert (state_root / "mounts.tsv").read_text(encoding="utf-8") == ""
     docker_state = json.loads(fake_state.read_text(encoding="utf-8"))
     active_values = dict(

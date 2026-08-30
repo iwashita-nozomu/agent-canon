@@ -833,6 +833,22 @@ def main(argv: list[str]) -> int:
                 return 0
             operations = {"install", "update", "start", "stop", "uninstall"}
             operation = next((item for item in command[2:] if item in operations), "")
+            if operation == "install" and runtime_mount is not None:
+                state_path = Path(runtime_mount["Source"]) / "state.json"
+                if state_path.is_file():
+                    lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
+                    lifecycle.update(
+                        {
+                            "targets": {},
+                            "generations": {},
+                            "current_generation": None,
+                            "rollback_generation": None,
+                            "generation_counter": 0,
+                            "active_task_count": 0,
+                            "tasks": {},
+                        }
+                    )
+                    state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
             if operation in {"install", "update"} or (
                 "codex" in command[2:] and "prepare" in command[2:]
             ):

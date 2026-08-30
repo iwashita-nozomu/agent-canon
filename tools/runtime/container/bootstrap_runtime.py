@@ -5790,6 +5790,20 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             if operation in {"install", "update"}:
                 runtime._materialize_skill_view()
             if operation == "install":
+                # A clean install reconstructs controller-owned lifecycle
+                # state, while host-consumed spool/archive/cache/Codex
+                # surfaces remain on their explicitly mounted host roots.
+                state.update(
+                    {
+                        "targets": {},
+                        "generations": {},
+                        "current_generation": None,
+                        "rollback_generation": None,
+                        "generation_counter": 0,
+                        "active_task_count": 0,
+                        "tasks": {},
+                    }
+                )
                 state["state"] = "ready"
                 state["managed_paths"] = [
                     STATE_FILE,
