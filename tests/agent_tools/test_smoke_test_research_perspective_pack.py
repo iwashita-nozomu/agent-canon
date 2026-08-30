@@ -409,10 +409,5 @@ def test_cleanup_runtime_error_is_reported() -> None:
             assert isinstance(raised.exception.__cause__, RuntimeError)
 
 
-def test_run_bundle_can_enable_full_research_perspective_pack() -> None:
-    """The full research perspective pack remains available through the smoke fixture."""
-    ResearchPerspectivePackSmokeTest().test_run_bundle_can_enable_full_research_perspective_pack()
-
-
 if __name__ == "__main__":
     unittest.main()

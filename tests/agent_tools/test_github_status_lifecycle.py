@@ -223,9 +223,6 @@ class StatusLifecycleTest(unittest.TestCase):
             adapter.comments()
         self.assertEqual(context.exception.responsibility_scope, lifecycle.TRANSPORT_SCOPE)
 
-    def test_paginated_nested_response_normalization_named_contract(self) -> None:
-        self.test_paginated_nested_response_normalization()
-
     def test_url_encoded_delete_and_post_commands(self) -> None:
         runner = FakeRunner()
         adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
@@ -239,9 +236,6 @@ class StatusLifecycleTest(unittest.TestCase):
         adapter.remove_label("ready / 進行")
         adapter.create_comment("payload")
         self.assertEqual(runner.commands, [tuple(add), tuple(delete), tuple(comment)])
-
-    def test_url_encoded_delete_and_post_commands_named_contract(self) -> None:
-        self.test_url_encoded_delete_and_post_commands()
 
     def test_pure_lifecycle_three_states(self) -> None:
         self.assertEqual(lifecycle.classify_lifecycle({"work_started": True, "handoff_ready": False, "validation_complete": False}), "active")
@@ -261,9 +255,6 @@ class StatusLifecycleTest(unittest.TestCase):
         self.assertEqual(first, lifecycle.evidence_comment(payload))
         self.assertIn("agent-canon:github-status-lifecycle:v1", first)
         self.assertIn(payload["taxonomy_mapping_digest"], first)
-
-    def test_evidence_retry_identity_and_reuse_named_contract(self) -> None:
-        self.test_evidence_retry_identity_and_reuse()
 
     def test_concurrent_comment_duplicate_is_typed_stop(self) -> None:
         runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
