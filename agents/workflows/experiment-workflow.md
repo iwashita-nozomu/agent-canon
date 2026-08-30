@@ -435,11 +435,6 @@ activate する gate ではありません。
    - 同じ result を使った rewrite、追加検証、または新しい run を行う。
 
 この反復を agent が自律実行する場合は、1 iteration ごとに `Change:`、`Validation Plan:`、`Run Name / Path:`、`Decision:`、`Next Action:` を `templates/agents/experiment_change_loop.md` に記録します。
-   - `extra_validation_required` の場合、同じ比較方針で追加検証を行う。
-   - `rerun_required` の場合、新しい run_name で fresh rerun を行う。
-1. `implementer`
-   - code や protocol の修正が必要な場合だけ修正を入れる。
-1. 4-10 を終了条件まで反復する。
 1. `final_reviewer`（closeout review を選んだ場合）
    - 最終 code と最終 claim を独立にレビューする。
 1. `verifier`（profile が要求する場合）
