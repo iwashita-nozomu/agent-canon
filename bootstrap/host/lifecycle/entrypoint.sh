@@ -24,6 +24,13 @@ AGENT_CANON_HEALTH_ATTEMPTS=120
 AGENT_CANON_PRIVATE_LOG_ROOT=
 AGENT_CANON_TARGET_PRUNE_DIGESTS=
 
+_agent_canon_caller_user() {
+  local caller_uid caller_gid
+  caller_uid=$(id -u)
+  caller_gid=$(id -g)
+  printf '%s:%s' "$caller_uid" "$caller_gid"
+}
+
 _agent_canon_json_error() {
   local code=$1 detail=$2
   printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"error","code":"%s","detail":"%s"}\n' \
@@ -1710,8 +1717,11 @@ _agent_canon_ensure_container() {
     local validate_rc=$?
     ((validate_rc == 0)) || return "$validate_rc"
   else
+    local caller_user
+    caller_user=$(_agent_canon_caller_user)
     if ! "$AGENT_CANON_DOCKER_CMD" create \
       --name "$container" \
+      --user "$caller_user" \
       --read-only \
       --cap-drop ALL \
       --security-opt no-new-privileges \

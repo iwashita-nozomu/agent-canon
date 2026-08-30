@@ -81,6 +81,8 @@ def _formatted_container(record: dict, fmt: str) -> str | None:
         return str(record["Id"])
     if fmt == "{{.Config.Image}}":
         return str(record.get("Config", {}).get("Image", ""))
+    if fmt == "{{.Config.User}}":
+        return str(record.get("Config", {}).get("User", ""))
     if fmt == '{{index .Config.Labels "io.agent-canon.runtime"}}':
         return str(record.get("Config", {}).get("Labels", {}).get("io.agent-canon.runtime", ""))
     if fmt == '{{index .Config.Labels "io.agent-canon.control-root-digest"}}':
@@ -310,6 +312,7 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:1] == ["create"]:
         name = argv[argv.index("--name") + 1]
+        user = argv[argv.index("--user") + 1] if "--user" in argv else ""
         parsed_mounts = []
         mount_snapshots = {}
         for index, item in enumerate(argv):
@@ -344,6 +347,7 @@ def main(argv: list[str]) -> int:
                     (item for item in reversed(argv) if item and not item.startswith("--")),
                     "",
                 ),
+                "User": user,
                 "Labels": labels(argv),
             },
             "State": {"Running": False, "Health": {"Status": "starting"}},

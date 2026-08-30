@@ -1348,6 +1348,23 @@ def test_host_configuration_is_fixed_and_not_a_toml_parser() -> None:
     assert "source \"$AGENT_CANON_REPOSITORY_ROOT/bootstrap/" not in text
 
 
+def test_container_create_maps_caller_without_fixed_user_policy() -> None:
+    """Resident creation inherits the invoking host UID/GID without policy overrides."""
+    text = ADAPTER.read_text(encoding="utf-8")
+    create = text.split('"$AGENT_CANON_DOCKER_CMD" create', 1)[1].split(
+        '"$AGENT_CANON_IMAGE_REF"', 1
+    )[0]
+    assert "_agent_canon_caller_user" in text
+    assert "caller_uid=$(id -u)" in text
+    assert "caller_gid=$(id -g)" in text
+    assert "local caller_user" in text
+    assert '--user "$caller_user"' in create
+    assert "AGENT_CANON_FIXED_UID" not in text
+    assert "AGENT_CANON_USER" not in text
+    dockerfile = (ROOT / "bootstrap/container/image/Dockerfile").read_text(encoding="utf-8")
+    assert not any(line.lstrip().startswith("USER ") for line in dockerfile.splitlines())
+
+
 def test_help_does_not_require_python_or_docker(tmp_path: Path) -> None:
     """Help is a shell-only route and is usable before image installation."""
     python_sentinel = tmp_path / "python3"

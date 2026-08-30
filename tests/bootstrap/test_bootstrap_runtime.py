@@ -326,7 +326,7 @@ def test_install_start_status_readback_and_single_container(
     assert "--build-arg" not in build
     assert not any(command[1:3] == ["container", "ls"] for command in install_commands)
     create = next(command for command in fake_docker.commands if command[1] == "create")
-    assert "--user" not in create
+    assert create[create.index("--user") + 1] == f"{os.getuid()}:{os.getgid()}"
     assert (
         sum(
             command[1:3] == ["container", "inspect"] for command in fake_docker.commands

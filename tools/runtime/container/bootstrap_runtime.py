@@ -1124,6 +1124,8 @@ class DockerAdapter:
             "create",
             "--name",
             name,
+            "--user",
+            f"{os.getuid()}:{os.getgid()}",
             "--read-only",
             "--cap-drop",
             "ALL",
