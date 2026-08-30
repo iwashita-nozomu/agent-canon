@@ -1441,6 +1441,26 @@ def main() -> int:
     active_diff_ref = current_diff_ref(workspace)
     changed_markdown = changed_markdown_paths(workspace)
     changed_all = changed_file_paths(workspace)
+    diff_check_route_unselected = (
+        closeout.get("required_reviews_complete", "").strip() == "not_applicable"
+        or diff_check.get("diff_check_agent_role", "").strip() == "not_applicable"
+    ) and all(
+        diff_check.get(field, "").strip() in {"", "not_applicable"}
+        for field in (
+            "diff_check_agent_role",
+            "diff_check_agent_decision",
+            "diff_check_latest_diff_ref",
+            "diff_check_artifact",
+        )
+    )
+    diff_check_not_applicable_valid = (
+        not diff_check_not_applicable
+        or (
+            diff_check_route_unselected
+            and not changed_all
+            and active_diff_ref == current_git_head(workspace)
+        )
+    )
     requires_canon_parent_sync = agent_canon_parent_sync_gate_required(
         changed_all,
         workspace=workspace,
@@ -1628,6 +1648,7 @@ def main() -> int:
         == "none",
         "close_agent_evidence": subagent_lifecycle.get("close_agent_evidence", "")
         not in {"", "none", "missing"},
+        "diff_check_not_applicable_route": diff_check_not_applicable_valid,
         "diff_check_agent_complete": diff_check_not_applicable
         or closeout.get("diff_check_agent_complete") == "yes",
         "diff_check_agent_role": diff_check_not_applicable
