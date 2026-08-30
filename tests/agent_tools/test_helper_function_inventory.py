@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests helper function inventory and role inference.
-# upstream implementation ../../tools/agent_tools/helper_function_inventory.py inventories helper roles
+# upstream implementation ../../tools/analysis/code/helper_function_inventory.py inventories helper roles
 # upstream design ../../documents/tools/README.md documents tool entrypoints
 # @dependency-end
 
@@ -18,7 +18,7 @@ from pathlib import Path
 from textwrap import dedent
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-INVENTORY = PROJECT_ROOT / "tools" / "agent_tools" / "helper_function_inventory.py"
+INVENTORY = PROJECT_ROOT / "tools" / "analysis" / "code" / "helper_function_inventory.py"
 
 
 class HelperFunctionInventoryTest(unittest.TestCase):

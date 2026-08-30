@@ -20,7 +20,8 @@ research workflow, and adaptive backlog tuning.
 
 ## Purpose
 
-実験結果を根拠に 1 change ずつ改造し、review で `approved` になるまで loop を自律的に回すための運用を定めます。
+実験結果を根拠に 1 change ずつ改造し、実行後の review decision に応じて loop を回すための運用を定めます。
+ここでの `approved` は post-run の iteration outcome であり、実験計画の記入や run 開始の前提ではありません。
 
 ## Use When
 
@@ -107,6 +108,10 @@ research workflow, and adaptive backlog tuning.
 - `templates/agents/decision_log.md`
 
 ## Boundary
+
+計画は question、comparison、protocol、operational stop condition を宣言するだけで開始できます。
+結果の support / reject / inconclusive や `approved` は run 後の owner decision として記録し、
+experiment runner の completion gate へ戻しません。
 
 - 外部調査そのものは `literature-survey` を使います。
 - 単一 run の設計と出力整理は `experiment-workflow` を使います。

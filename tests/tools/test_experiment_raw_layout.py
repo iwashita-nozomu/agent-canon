@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests canonical result/raw path derivation and managed raw-directory handoff.
-# upstream implementation ../../tools/experiments/experiment_identity.py owns identity paths.
-# upstream implementation ../../tools/experiments/run_managed_experiment.py owns managed reservation and child environment.
+# upstream implementation ../../tools/experiments/lifecycle/experiment_identity.py owns identity paths.
+# upstream implementation ../../tools/experiments/execution/run_managed_experiment.py owns managed reservation and child environment.
 # @dependency-end
 
 """Focused tests for the split experiment result/raw layout."""
@@ -11,12 +11,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tools.experiments.experiment_identity import (
+from tools.experiments.lifecycle.experiment_identity import (
     ExperimentIdentity,
     raw_relative_path,
     result_relative_path,
 )
-from tools.experiments.run_managed_experiment import (
+from tools.experiments.execution.run_managed_experiment import (
     CommandSelection,
     GitSnapshot,
     RegistryContext,

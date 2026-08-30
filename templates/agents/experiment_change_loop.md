@@ -19,7 +19,7 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 - Question: <!-- 一文で記録します。 -->
 - Comparison Target: <!-- baseline、main、external reference。 -->
-- Exit Criteria: <!-- loop を閉じる前に何が成立している必要があるか。 -->
+- Operational Stop Conditions: <!-- run を止める条件。研究上の結論ではない。 -->
 - Stop Budget: <!-- iteration count、runtime budget、stop condition。 -->
 - Scope: <!-- 対象となる file、experiment topic、report。 -->
 
@@ -45,7 +45,7 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 - Active Extension ID: <!-- 現在実行中の backlog ID。 -->
 - Active Waterfall Run ID: <!-- current extension の reports/agents/<run-id>。 -->
-- Active Decision: <!-- report_rewrite_required / extra_validation_required / rerun_required / direction_rethink_required / approved / backlog_continue / stop_without_merge -->
+- Active Decision: <!-- run 後の report_rewrite_required / extra_validation_required / rerun_required / direction_rethink_required / approved / backlog_continue / stop_without_merge -->
 - Best Current Evidence: <!-- 短い事実要約だけ。 -->
 - Remaining Risk: <!-- closure を妨げるもの。 -->
 
@@ -57,4 +57,4 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - quantitative summary を更新します。
 - critical review outcome を記録します。
 - report review outcome を記録します。
-- next action または approved state を記録します。
+- run 後の next action または approved state を記録します。これらは experiment runner の開始・完了条件ではありません。

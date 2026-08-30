@@ -2,8 +2,8 @@
 # contract reference
 # responsibility Defines AgentCanon update TODOs for parent repository agents.
 # upstream design agent-canon-parent-repo-latest-checklist.md parent repo latest-state workflow
-# downstream implementation ../../tools/agent_tools/agent_canon_update_todos.py reads and routes these tasks
-# downstream implementation ../../tools/agent_tools/agent_canon_preflight.py exposes task-start routing status
+# downstream implementation ../../tools/agent/orchestration/agent_canon_update_todos.py reads and routes these tasks
+# downstream implementation ../../tools/runtime/source/agent_canon_preflight.py exposes task-start routing status
 # @dependency-end
 
 manifest_kind = "agent_canon_update_tasks"
@@ -17,10 +17,10 @@ severity = "S1"
 applies_to = ["parent_repo"]
 summary = "Parent repositories that vendor AgentCanon must track which AgentCanon update TODOs their local agent has already applied."
 actions = [
-  "Run `python3 tools/agent_tools/agent_canon_update_todos.py init` once in the parent repository.",
+  "Run `python3 tools/agent/orchestration/agent_canon_update_todos.py init` once in the parent repository.",
   "Commit `.agent-canon/.gitignore` and `.agent-canon/update-state.toml` as parent-repo state.",
   "Keep generated `.agent-canon/update-todos.generated.md` and `.agent-canon/update-todos.pending.json` ignored.",
-  "After each AgentCanon pin update, run `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` and have the parent-repo agent resolve or defer each pending task before starting unrelated work.",
+  "After each AgentCanon pin update, run `python3 tools/agent/orchestration/agent_canon_update_todos.py plan --write` and have the parent-repo agent resolve or defer each pending task before starting unrelated work.",
 ]
 acceptance = [
   ".agent-canon/update-state.toml exists in the parent repository and names the AgentCanon commit through which update TODOs are applied.",
@@ -40,7 +40,7 @@ severity = "S1"
 applies_to = ["parent_repo"]
 summary = "Parent repositories should consume detailed TODO metadata instead of treating pending AgentCanon update TODOs as opaque IDs."
 actions = [
-  "Run `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` after updating the AgentCanon pin.",
+  "Run `python3 tools/agent/orchestration/agent_canon_update_todos.py plan --write` after updating the AgentCanon pin.",
   "Read `.agent-canon/update-todos.pending.json` and apply, defer, or mark not applicable each `pending_task_details[]` entry before unrelated repo work.",
   "Preserve `AGENT_CANON_UPDATE_TODO_FIRST_*` and `AGENT_CANON_UPDATE_TODO_PENDING_JSON` lines in task-start logs or PR evidence.",
 ]

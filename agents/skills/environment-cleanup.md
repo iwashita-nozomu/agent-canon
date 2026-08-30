@@ -8,7 +8,7 @@ upstream design ../../documents/design/responsibility-cleanup.md responsibility-
 upstream design ./dependency-design.md dependency placement owner
 upstream design ./environment-maintenance.md expected environment structure owner
 upstream design ./responsibility-cleanup.md responsibility-unit dispatch owner
-downstream implementation ../../.agents/skills/environment-cleanup/SKILL.md runtime discovery shim
+downstream implementation ../../.codex/personal/skills/environment-cleanup/SKILL.md runtime discovery shim
 downstream implementation ./catalog.yaml public skill registry
 downstream implementation ./skill-dependencies.yaml public skill dependency DAG
 downstream implementation ../../.codex/config.toml host skill configuration
@@ -44,7 +44,7 @@ Dockerfile -> canonical image -> docker run <canonical-full-test-command> -> pas
 ## Tool Commands
 
 ```bash
-bash tools/docker_dependency_validator.sh
+bash tools/validation/dependencies/docker_dependency_validator.sh
 docker build -f <Dockerfile> --target <canonical-target> -t <image> .
 docker run --rm <runtime-wiring> <image> <canonical-full-test-command>
 ```

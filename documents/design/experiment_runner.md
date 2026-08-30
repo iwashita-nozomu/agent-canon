@@ -138,7 +138,7 @@ Make target の両方を持ちます。
 
 Python entrypoint は、debug のために直接 1 case を回せる程度にしてよいです。
 ただし、正式な smoke / formal / server-side run は `Makefile` の target から
-`tools/experiments/run_managed_experiment.py` を通して起動します。
+`tools/experiments/execution/run_managed_experiment.py` を通して起動します。
 
 topic README には、少なくとも次を書きます。
 

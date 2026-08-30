@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests AgentCanon improvement guide generation.
-# upstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py generates guide reports
+# upstream implementation ../../eval/producers/generate_agent_improvement_guide.py generates guide reports
 # @dependency-end
 
 """Tests for generated AgentCanon improvement guides."""
@@ -17,9 +17,9 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_improvement_guide.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "generate_agent_improvement_guide.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import mounted_log_archive_root  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 class GenerateAgentImprovementGuideTest(unittest.TestCase):
@@ -71,8 +71,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_IMPROVEMENT_GUIDE=", result.stdout)
-        self.assertIn("open_issues: `1`", guide)
-        self.assertIn("closed_issues: `1`", guide)
+        self.assertIn("github_issue_refs: `1`", guide)
         self.assertIn("failed_skill_eval_reports: `1`", guide)
         self.assertIn("skill_usage_counts:", guide)
         self.assertIn("agent-orchestration", guide)
@@ -104,7 +103,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("human_feedback_action_counts:", guide)
         self.assertIn("prompt_repair", guide)
         self.assertIn("Top Failure Repair Targets", guide)
-        self.assertIn("tools/agent_tools/bootstrap_agent_run.py", guide)
+        self.assertIn("tools/runtime/lifecycle/bootstrap_agent_run.py", guide)
         self.assertIn("hook_quality_counts:", guide)
         self.assertIn("unknown_event", guide)
         self.assertIn("Hook Quality Findings", guide)
@@ -181,29 +180,38 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
         root.mkdir(parents=True, exist_ok=True)
-        evals_root = root / "agents" / "evals"
+        evals_root = root / "eval" / "definitions"
         evals_root.mkdir(parents=True, exist_ok=True)
         (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
-        (root / "issues" / "open").mkdir(parents=True)
-        (root / "issues" / "closed").mkdir(parents=True)
         archive_root = mounted_log_archive_root(root)
         skill_results = archive_root / "eval-results" / "skill-workflow-prompt"
         hook_results = archive_root / "hook-runs" / "legacy-import" / "test-container"
         skill_results.mkdir(parents=True)
         hook_results.mkdir(parents=True)
-        (root / "issues" / "open" / "AC-20260513-open.md").write_text(
-            "issue_id: AC-20260513-open\nstatus: open\n",
-            encoding="utf-8",
+        issue_packets = (
+            self.runtime_root
+            / "agent-canon-log"
+            / "feedback"
+            / "issue-packets"
+            / "pending"
         )
-        (root / "issues" / "closed" / "AC-20260513-closed.md").write_text(
-            "issue_id: AC-20260513-closed\nstatus: resolved\n",
+        issue_packets.mkdir(parents=True)
+        (issue_packets / "AC-20260513-open.json").write_text(
+            json.dumps(
+                {
+                    "issue_url": "https://github.com/iwashita-nozomu/agent-canon/issues/20260513",
+                    "repository": "iwashita-nozomu/agent-canon",
+                    "number": "20260513",
+                }
+            )
+            + "\n",
             encoding="utf-8",
         )
         knowledge = self.runtime_root / "agent-canon-log" / "knowledge" / "topics" / "durable-learning"
         knowledge.mkdir(parents=True)
         (knowledge / "candidate.md").write_text("# Durable learning\n", encoding="utf-8")
         for skill in ("agent-orchestration", "codex-task-workflow", "result-artifact-writeout"):
-            skill_path = root / ".agents" / "skills" / skill / "SKILL.md"
+            skill_path = root / ".codex" / "personal" / "skills" / skill / "SKILL.md"
             skill_path.parent.mkdir(parents=True, exist_ok=True)
             skill_path.write_text(
                 f"---\nname: {skill}\ndescription: test skill\n---\n\n# {skill}\n",
@@ -227,10 +235,10 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                         {
                             "command": [
                                 "python3",
-                                "tools/oop/python/readability.py",
+                                "tools/validation/code/oop/python/readability.py",
                                 "--root",
                                 str(root),
-                                "tools/agent_tools/bootstrap_agent_run.py",
+                                "tools/runtime/lifecycle/bootstrap_agent_run.py",
                             ],
                             "returncode": 0,
                             "output_snippet": (
@@ -330,7 +338,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         evals_root = root / "agents" / "evals"
         evals_root.mkdir(parents=True, exist_ok=True)
         (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
-        skill_path = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+        skill_path = root / ".codex" / "personal" / "skills" / "agent-orchestration" / "SKILL.md"
         skill_path.parent.mkdir(parents=True, exist_ok=True)
         skill_path.write_text(
             "---\nname: agent-orchestration\ndescription: test skill\n---\n",
@@ -338,7 +346,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         )
         subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
         subprocess.run(
-            ["git", "add", ".agents/skills/agent-orchestration/SKILL.md"],
+            ["git", "add", ".codex/personal/skills/agent-orchestration/SKILL.md"],
             cwd=root,
             check=True,
             capture_output=True,

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests bounded and redacted prompt capture.
-# upstream implementation ../../tools/agent_tools/prompt_capture.py owns prompt capture.
+# upstream implementation ../../tools/agent/orchestration/prompt_capture.py owns prompt capture.
 # @dependency-end
 """Focused tests for pure, redacted prompt capture."""
 from __future__ import annotations
@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from prompt_capture import capture_prompt  # noqa: E402
+from tools.agent.orchestration.prompt_capture import capture_prompt  # noqa: E402
 
 
 class PromptCaptureTest(unittest.TestCase):

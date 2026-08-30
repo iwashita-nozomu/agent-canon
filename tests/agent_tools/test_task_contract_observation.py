@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies task contract observation schema, identity, and state transitions.
-# upstream implementation ../../tools/agent_tools/task_contract_observation.py owns collection and evaluation
-# upstream implementation ../../tools/agent_tools/task_contract_observation_core.py owns schema and transitions
+# upstream implementation ../../tools/runtime/lifecycle/task_contract_observation.py owns collection and evaluation
+# upstream implementation ../../tools/runtime/lifecycle/task_contract_observation_core.py owns schema and transitions
 # upstream design ../../documents/runtime/task-contract-observation.md defines the state machine
 # @dependency-end
 
@@ -17,8 +17,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from task_contract_observation import run_self_check, summary_event  # noqa: E402
-from task_contract_observation_core import (  # noqa: E402
+from tools.runtime.lifecycle.task_contract_observation import run_self_check, summary_event  # noqa: E402
+from tools.runtime.lifecycle.task_contract_observation_core import (  # noqa: E402
     ARCHIVE_ROUTE,
     KIND_KEY,
     OBSERVED_KIND,

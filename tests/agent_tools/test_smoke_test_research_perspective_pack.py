@@ -19,9 +19,9 @@ from typing import Iterator
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
+BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import smoke_test_research_perspective_pack as smoke  # noqa: E402
+import eval.checkers.smoke_test_research_perspective_pack as smoke  # noqa: E402
 
 
 @contextmanager

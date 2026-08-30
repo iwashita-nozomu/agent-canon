@@ -4,21 +4,21 @@ contract reference
 responsibility Documents the dedicated wiki publication tool.
 upstream design ../agent-canon/agent-canon-github-remote.md defines canonical GitHub wiki remote policy.
 upstream design ../../agents/skills/wiki-publication.md owns workflow and source/projection boundary.
-upstream implementation ../../tools/agent_tools/wiki_publish.py owns deterministic publish gates.
+upstream implementation ../../tools/repository/github/wiki_publish.py owns deterministic publish gates.
 downstream implementation ../../tests/agent_tools/test_wiki_publish.py validates the CLI and blocker transitions.
 @dependency-end
 -->
 
 # Wiki Publication Tool
 
-`tools/agent_tools/wiki_publish.py` publishes AgentCanon wiki pages to a separate
+`tools/repository/github/wiki_publish.py` publishes AgentCanon wiki pages to a separate
 `owner/repo.wiki.git` sidecar, binds the entire top-level page set to exact source
 commit identity, and performs deterministic gates before publication.
 
 ## Command
 
 ```bash
-python3 tools/agent_tools/wiki_publish.py \
+python3 tools/repository/github/wiki_publish.py \
   --wiki-root /path/to/agent-canon.wiki \
   --source-root . \
   --source-commit <40-char-sha1> \
@@ -31,7 +31,7 @@ python3 tools/agent_tools/wiki_publish.py \
 To publish, add the reviewed digest:
 
 ```bash
-python3 tools/agent_tools/wiki_publish.py \
+python3 tools/repository/github/wiki_publish.py \
   --wiki-root /path/to/agent-canon.wiki \
   --source-root . \
   --source-commit <40-char-sha1> \

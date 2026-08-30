@@ -2,8 +2,8 @@
 # contract test
 # responsibility Tests test evaluate agent run behavior.
 # upstream design ../../agents/workflows/agent-learning-workflow.md agent feedback workflow
-# upstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates run bundles
-# downstream implementation ../../tools/agent_tools/task_close.py consumes agent evaluation status
+# upstream implementation ../../eval/producers/evaluate_agent_run.py evaluates run bundles
+# downstream implementation ../../tools/runtime/lifecycle/task_close.py consumes agent evaluation status
 # @dependency-end
 
 """Tests for agent run evaluation."""
@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_agent_run.py"
-MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_agent_run.py"
+MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )
@@ -194,7 +194,7 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             ),
             (
                 "- runtime_feedback=observed source=user "
-                "target=.agents/skills/agent-learning/SKILL.md "
+                "target=.codex/personal/skills/agent-learning/SKILL.md "
                 "action=prompt_repair evidence=unit-test"
             ),
             "- review_decision=approve feedback_actions_resolved=yes",
@@ -843,7 +843,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
                 monitoring.replace(
                     (
                         "- runtime_feedback=observed source=user "
-                        "target=.agents/skills/agent-learning/SKILL.md "
+                        "target=.codex/personal/skills/agent-learning/SKILL.md "
                         "action=prompt_repair evidence=unit-test\n"
                     ),
                     "",

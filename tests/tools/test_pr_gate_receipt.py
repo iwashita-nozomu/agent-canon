@@ -3,10 +3,10 @@
 # @dependency-start
 # contract test
 # responsibility Verifies the source/skipped receipt schema and identity bindings.
-# upstream implementation ../../tools/ci/pr_gate_receipt.py owns receipt parsing and serialization
+# upstream implementation ../../tools/validation/ci/receipts/pr_gate_receipt.py owns receipt parsing and serialization
 # upstream design ../../documents/design/source-owned-dependency-validation.md owns receipt meaning
-# downstream implementation ../../tools/ci/check_agent_canon_pr.sh writes receipts
-# downstream implementation ../../tools/ci/run_all_checks.sh consumes receipts
+# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh writes receipts
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh consumes receipts
 # @dependency-end
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.ci.pr_gate_receipt import (
+from tools.validation.ci.receipts.pr_gate_receipt import (
     ReceiptError,
     parse_receipt,
     serialize_receipt,

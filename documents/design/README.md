@@ -4,7 +4,7 @@ contract design
 responsibility Documents 設計ドキュメント for this repository.
 upstream design ../rule/README.md document rule canon
 upstream design dependency-manifest-design.md dependency evidence contract
-downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-doc claim evidence
+downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design-doc claim evidence
 @dependency-end
 -->
 
@@ -28,10 +28,11 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 - [devcontainer/parent-devcontainer-policy.md](devcontainer/parent-devcontainer-policy.md)
   - 親root と AgentCanon source の devcontainer 境界、wrapper 順序、compose 出力、
     親 hook 契約を定義します。
-  - `tools/agent_tools/devcontainer_dependencies.py` が `pyproject.toml` の
+  - `tools/runtime/container/devcontainer_dependencies.py` が `pyproject.toml` の
     optional-dependencies extras の名前・順序・重複と存在を検証し、標準 editable
-    install / `pip check` を所有します。`container_config.py` は pack/env の typed
-    extras を Compose 境界へ projection します。
+    install / `pip check` を所有します。pack/env の typed extras は
+    `tools/runtime/container/devcontainer_dependencies.py` から Compose 境界へ
+    projection されます。
 - [experiment_runner.md](experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
 - [experiment-topic-template.md](experiment-topic-template.md)

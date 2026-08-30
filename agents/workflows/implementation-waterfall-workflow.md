@@ -6,9 +6,9 @@ upstream design ../canonical/CODEX_WORKFLOW.md defines canonical Codex task gate
 upstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest gates
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
 downstream design ../../templates/agents/closeout_gate.md records closeout evidence required by this workflow
-downstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
+downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py verifies design-doc evidence claims
 upstream design ../skills/code-visualization.md sole public visualization owner and canonical projection gate
-upstream implementation ../../tools/agent_tools/visualization_contract.py typed visualization coverage checker
+upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py typed visualization coverage checker
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py validates workflow gate dependency edges
 @dependency-end
 -->
@@ -20,7 +20,7 @@ producer adapter, renderer, or formatter, Gate 5-6 design approval must exist
 before the first contract edit. After the edit, route through the sole public
 `code-visualization` owner and run its canonical ToolCall, projection coverage,
 post-format readback, formatter, route, and producer-checker gates. Reference
-the typed contract owned by `tools/agent_tools/visualization_contract.py`;
+the typed contract owned by `tools/validation/semantic/tools/visualization_contract.py`;
 workflow prose must not copy its schema or omission/granularity policy.
 
 Any failed gate returns the existing typed validation failure packet with
@@ -199,7 +199,7 @@ decision が `approve` の場合に approval evidence になります。
 - `Abstract Design Frame`、`Implementation Source Packet`、`Design-To-Implementation Trace` が揃っている
 - `Evidence And Assumption Ledger` が current code、dependency header evidence、parent documents、初出 DSL / standard-form terms を設計 claim に接続している
 - 新規または変更された design document は、詳細設計レビュー前に次の gate を通している
-  `python3 tools/agent_tools/check_design_doc_claims.py --root . <design-doc>`
+  `python3 tools/validation/semantic/documents/check_design_doc_claims.py --root . <design-doc>`
 - `Canonical Tree-Head Plan` が、正本として残す設計文書 path / 実装 path と削除対象の non-canonical path を明示している
 - reuse-first、style-following、reader path が blocker なしで揃っている
 
@@ -474,7 +474,7 @@ exit 条件:
 - refactor pass では semantic delta を feature 追加として混ぜません
 - refactor pass では path mapping と remove list を実装前に固定します
 - structure refactor では recursive directory README graph と dependency / responsibility-scope evidence から path mapping を作り、README 更新だけで構造矛盾を隠しません
-- 包括 refactor では、必要に応じて `tools/agent_tools/analyze_refactor_surface.py` または task 固有解析 tool の structured finding を design gate に入れます。tool finding は behavior evidence の代替ではなく、責務境界の補助 evidence として扱います
+- 包括 refactor では、必要に応じて `tools/analysis/code/analyze_refactor_surface.py` または task 固有解析 tool の structured finding を design gate に入れます。tool finding は behavior evidence の代替ではなく、責務境界の補助 evidence として扱います
 - Gate 6 または Gate 7 の accepted finding が design / reader-facing decision を
   変える場合だけ Gate 5 へ戻ります。rejected finding は `reason_code` と
   `evidence_ref` を残し、wave / rollback を起こしません
@@ -899,10 +899,10 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 - 実行した validation
 - 未実行 validation と理由
-- `python3 tools/agent_tools/check_dependency_headers.py --changed`
-- `bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing`
-- `bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header`
-- dependency edge を追加・変更した場合は `bash tools/agent_tools/check_dependency_graph.sh --print-edges` の結果、または移行中 baseline failure と今回差分で新規 graph error を増やしていない evidence
+- `python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed`
+- `bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing`
+- `bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header`
+- dependency edge を追加・変更した場合は `bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges` の結果、または移行中 baseline failure と今回差分で新規 graph error を増やしていない evidence
 - 更新した repo 正本
 - commit hash
 - push の成否
@@ -918,4 +918,4 @@ pilot は本実装の抜け道ではなく、requirements/design の凍結精度
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

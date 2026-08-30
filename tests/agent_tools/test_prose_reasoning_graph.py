@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests prose reasoning graph CLI behavior.
-# upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py graph CLI
+# upstream implementation ../../tools/analysis/documents/prose_reasoning_graph.py graph CLI
 # upstream design ../../documents/prose-reasoning-graph/dsl-spec.md graph DSL contract
 # upstream design ../../documents/tools/prose_reasoning_graph.md tool contract
 # @dependency-end
@@ -23,10 +23,10 @@ from typing import Iterator, cast
 
 import yaml
 
-from tools.agent_tools import prose_reasoning_graph as prose_graph
+from tools.analysis.documents import prose_reasoning_graph as prose_graph
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "prose_reasoning_graph.py"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "documents" / "prose_reasoning_graph.py"
 
 
 def _runtime_root_from_args(args: tuple[str, ...]) -> Path:
@@ -1094,7 +1094,7 @@ class ProseReasoningGraphTest(unittest.TestCase):
                     <!--
                     @dependency-start
                     responsibility Documents prose graph usage and contract.
-                    upstream implementation tools/agent_tools/prose_reasoning_graph.py builds prose graph usage.
+                    upstream implementation tools/analysis/documents/prose_reasoning_graph.py builds prose graph usage.
                     @dependency-end
                     -->
 

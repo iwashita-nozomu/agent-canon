@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests the total single-owner relation for tracked repository paths.
-# upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope manifest
+# upstream implementation ../../tools/validation/semantic/responsibility/responsibility_scope.py validates scope manifest
 # upstream design ../../responsibility-scope.toml scope fixture contract
 # @dependency-end
 
@@ -21,14 +21,14 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "responsibility_scope.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "responsibility" / "responsibility_scope.py"
 STARTER_MANIFEST = (
     PROJECT_ROOT / "templates" / "documents" / "responsibility-scope.template.toml"
 )
 
 sys.path.insert(0, str(SCRIPT.parent))
 
-from responsibility_scope import scope_covers, scope_from_mapping
+from tools.validation.semantic.responsibility.responsibility_scope import scope_covers, scope_from_mapping
 
 
 class ResponsibilityScopeTest(unittest.TestCase):
@@ -51,7 +51,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             manifest = root / "responsibility-scope.toml"
             manifest.write_text(
                 manifest.read_text(encoding="utf-8").replace(
-                    "tools/agent_tools/responsibility_scope.py",
+                    "tools/validation/semantic/responsibility/responsibility_scope.py",
                     "tools/agent_tools/missing_scope_tool.py",
                 ),
                 encoding="utf-8",
@@ -120,18 +120,19 @@ class ResponsibilityScopeTest(unittest.TestCase):
         paths = set(scopes["eval-and-hook-evidence"]["paths"])
         runtime_paths = set(scopes["runtime-entrypoints"]["paths"])
 
-        self.assertIn("evidence", paths)
-        self.assertIn("evidence/**", paths)
+        self.assertIn("eval", paths)
+        self.assertIn("eval/**", paths)
+        self.assertIn("reports/**", paths)
         self.assertIn("documents/runtime/runtime-log-archive.md", paths)
         self.assertIn("documents/runtime/runtime-log-archive-migration.md", paths)
-        self.assertIn("tools/agent_tools/runtime_log_paths.py", paths)
-        self.assertIn("tools/agent_tools/runtime_log_archive_git.py", paths)
+        self.assertIn("tools/runtime/archive/runtime_log_paths.py", paths)
+        self.assertIn("tools/runtime/archive/runtime_log_archive_git.py", paths)
         self.assertNotIn(
             "evidence/agent-evals/**",
             scopes["runtime-entrypoints"].get("exclude_paths", []),
         )
         self.assertIn(
-            "tools/agent_tools/runtime_log_paths.py",
+            "eval/**",
             scopes["shared-tooling"]["exclude_paths"],
         )
         self.assertIn(
@@ -149,7 +150,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             manifest = root / "responsibility-scope.toml"
             manifest.write_text(
                 manifest.read_text(encoding="utf-8")
-                + '\n[[scope]]\nid = "evidence"\nowner = "agent-canon"\nclass = "tooling"\ndescription = "Fixture evidence."\npaths = ["tools/evidence.py"]\nprotecting_tools = ["tools/agent_tools/responsibility_scope.py"]\nissues = []\n',
+                + '\n[[scope]]\nid = "evidence"\nowner = "agent-canon"\nclass = "tooling"\ndescription = "Fixture evidence."\npaths = ["tools/evidence.py"]\nprotecting_tools = ["tools/validation/semantic/responsibility/responsibility_scope.py"]\nissues = []\n',
                 encoding="utf-8",
             )
 
@@ -184,7 +185,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
                 ".codex/config.toml",
                 ".codex/agents/local.toml",
                 "agents/skills/local.md",
-                ".agents/skills/local.md",
+                ".codex/personal/skills/local.md",
                 ".devcontainer/devcontainer.json",
                 ".vscode/settings.json",
                 "evidence/run.json",
@@ -205,7 +206,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             ".codex/config.toml",
             ".codex/agents/local.toml",
             "agents/skills/local.md",
-            ".agents/skills/local.md",
+            ".codex/personal/skills/local.md",
             ".devcontainer/devcontainer.json",
             ".vscode/settings.json",
         ):
@@ -214,17 +215,17 @@ class ResponsibilityScopeTest(unittest.TestCase):
 
     def write_fixture(self, root: Path) -> None:
         """Write a bounded responsibility-scope fixture repository."""
-        self.write_file(root, "tools/agent_tools/responsibility_scope.py", "# tool\n")
+        self.write_file(root, "tools/validation/semantic/responsibility/responsibility_scope.py", "# tool\n")
         self.write_file(root, "tests/agent_tools/test_responsibility_scope.py", "# test\n")
         self.write_file(
             root,
             "tools/catalog.yaml",
-            "version: 1\nentries:\n  - id: responsibility-scope\n    path: tools/agent_tools/responsibility_scope.py\n",
+            "version: 1\nentries:\n  - id: responsibility-scope\n    path: tools/validation/semantic/responsibility/responsibility_scope.py\n",
         )
         self.write_file(
             root,
             "responsibility-scope.toml",
-            'catalog_kind = "agent_canon_responsibility_scope"\nversion = 1\nowner_values = ["agent-canon"]\nclass_values = ["tooling"]\n[[scope]]\nid = "fixture"\nowner = "agent-canon"\nclass = "tooling"\ndescription = "Fixture paths."\npaths = ["tools/**", "tests/**", "responsibility-scope.toml"]\nprotecting_tools = ["tools/agent_tools/responsibility_scope.py"]\nissues = []\n',
+            'catalog_kind = "agent_canon_responsibility_scope"\nversion = 1\nowner_values = ["agent-canon"]\nclass_values = ["tooling"]\n[[scope]]\nid = "fixture"\nowner = "agent-canon"\nclass = "tooling"\ndescription = "Fixture paths."\npaths = ["tools/**", "tests/**", "responsibility-scope.toml"]\nprotecting_tools = ["tools/validation/semantic/responsibility/responsibility_scope.py"]\nissues = []\n',
         )
 
     def write_file(self, root: Path, relative: str, text: str) -> None:

@@ -4,7 +4,7 @@ contract policy
 responsibility Defines dependency-module identity, pin, and projection policy over the generic repository topic clone lifecycle.
 upstream design ./repository-topic-clone.md generic repository topic clone lifecycle
 upstream design ../design/dependency-manifest-design.md dependency ownership and header graph model
-downstream implementation ../../tools/agent_tools/dependency_module_change.py applies the dependency policy decorator
+downstream implementation ../../tools/repository/workspace/dependency_module_change.py applies the dependency policy decorator
 downstream design ../agent-canon/agent-canon-update-route.md routes standalone AgentCanon source updates
 downstream design ../../agents/skills/dependency-module-change.md exposes the short skill route
 @dependency-end
@@ -81,9 +81,9 @@ cleanup hold を返します。plan detail は stage-0、remote、tracking、mat
 ### Prepare
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file>
+  --owner-evidence <file> [--allowed-path <relative-path> ...]
 ```
 
 manifest identity を generic request へ写像し、exact clone/branch を再利用するか、不在
@@ -97,9 +97,9 @@ operation-level の追加承認なしで実行できます。この扱いは rep
 ### Merge main
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> merge-main \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> merge-main \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file>
+  --owner-evidence <file> [--allowed-path <relative-path> ...]
 ```
 
 generic owner が `fetch origin main` と通常の `git merge --no-edit origin/main` を実行し、
@@ -109,9 +109,9 @@ dirty state と conflict は破棄せず typed evidence として保持します
 ### Cleanup
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file> \
+  --owner-evidence <file> [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
@@ -141,7 +141,7 @@ caller は generic URL/repo identity を補って同じ requested operation を�
 ```bash
 python3 -m pytest tests/agent_tools/test_dependency_module_change.py -q
 python3 -m pytest tests/agent_tools/test_repository_topic_clone.py -q
-python3 tools/agent_tools/check_agent_runtime_alignment.py
+python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 ```
 
 dependency source publication 後は親 repository で exact gitlink pin と必要 projection を更新し、

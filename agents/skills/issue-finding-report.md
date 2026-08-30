@@ -11,10 +11,10 @@ upstream design responsibility-cleanup.md complete owning responsibility-unit an
 upstream design subagent-bootstrap.md multi-agent partition and handoff workflow
 upstream design pr-processing.md repository-qualified Issue identity and publication boundary
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet route
-upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py emits structured log evidence
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves accumulated log archive state
-upstream implementation ../../tools/agent_tools/issue_sync.py resolves GitHub Issues and private packets
-downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes this workflow as a runtime skill
+upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py emits structured log evidence
+upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py resolves accumulated log archive state
+upstream implementation ../../tools/repository/github/issue_sync.py resolves GitHub Issues and private packets
+downstream design ../../.codex/personal/skills/issue-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 
@@ -56,8 +56,8 @@ structured evidence and returns one of:
 - a new durable Issue candidate,
 - a merge into an already cohesive Issue,
 - a responsibility reorganization of existing Issues, or
-- an investigation/defer result when owner, cause, occurrence, or clause
-  destination is not yet sufficiently supported.
+- an investigation/defer result when repository identity, mechanism, or
+  clause destination is unavailable to the host publisher.
 
 It also owns direct upstream escalation when a current repository task supports
 that the failing invariant belongs to AgentCanon rather than the consumer
@@ -141,12 +141,17 @@ to implement it.
 Use structured artifacts as the normal evidence input:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
-python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
+python3 tools/runtime/archive/runtime_log_archive_git.py status --porcelain
+./bootstrap.sh --control-parent-root <control-parent-root> \
+  --runtime-root <runtime-root> \
+  tool run --root <registered-source-root> generate-agent-runtime-dashboard -- \
   --root . \
   --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
   --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
 ```
+
+Dashboard generation is a shared tool-container invocation. Its relative
+report paths resolve under the external runtime root, not the source checkout.
 
 Required dashboard fields when that producer is used:
 
@@ -367,8 +372,9 @@ Build a mutation plan before writes and route GitHub publication through
 1. Only then close duplicate/superseded Issues, reopen closed-but-incomplete
    parents when authorized, or change completion labels.
 1. When the implementation is handoff-ready, remove `in progress` and add
-   `ready for review`. Add `need verification` when cause, owner, occurrence,
-   relation, or validation remains unverified.
+   `ready for review`. Add `need verification` when the owner, mechanism,
+   relation, or validation remains unresolved. Missing optional occurrence
+   detail is carried as a follow-up clause, not used as a qualification gate.
 
 Do not mutate an Issue in a repository for which the current actor lacks
 explicit authority. Produce the same plan and receipt as a handoff instead.
@@ -393,8 +399,8 @@ outputs, locators, and decisions as evidence.
 
 ## Grouping And Dispatch Boundary
 
-Use `tools/agent_tools/issue_sync.py` as the host-side GitHub adapter for tool
-and Issue findings. Its `(owner, root_cause, fix)` key produces
+Use the host publisher's configured GitHub adapter (`gh issue view` for online
+Issue lookup/read) for tool and Issue findings. Its `(owner, root_cause, fix)` key produces
 an initial candidate group. Before publication, apply Cause Investigation and
 Issue Responsibility Unit contracts:
 
@@ -406,6 +412,63 @@ Issue Responsibility Unit contracts:
 
 Warnings add a closeout obligation only when actionable or blocking.
 
+Online GitHub Issue lookup/read stays on the host publisher's GitHub route
+(`gh issue view` or the configured GitHub connector). It must not be routed
+through the resident `issue-sync` tool or a host-side Python fallback.
+The verified resident `issue-sync` route is limited to body-free offline
+receipt preflight, staging, and readback inputs after the publisher has its
+GitHub result.
+
+Runtime dashboard evidence enters this route only through an explicit
+`issue_worker_candidate` or `issue_worker_candidates` field. Counts, status
+rows, and selection misses are observations and never synthesize candidates.
+`read_issue_worker_handoffs()` emits a typed, read-only handoff using the
+`checkout_identity.remote` value from the #938 readback. The same repository
+may proceed to the logical IssueWorker route, which is executed by the host
+`publisher`; another repository receives a qualified no-mutation handoff.
+Missing owner or mechanism evidence remains in that publisher investigation
+and may become `need verification`; it is not silently discarded.
+`IssueWorker.plan_publication()` reads the related open/closed set and returns
+`create`, `update`, `reopen`, `reorganize`, or `noop`. The publisher performs
+the required GitHub mutation through the existing adapter and reads back the
+URL, number, body, and state. The dashboard, resident runtime, and parent
+Python remain read-only and do not receive GitHub credentials. Orchestration
+materializes a publisher ToolCall with the checkout identity and typed handoff;
+the ToolCall carries `agentcanon_source_root` (the standalone AgentCanon
+checkout owning `bootstrap.sh` and the tool image) separately from
+`target_root` (the registered candidate checkout from
+`checkout_identity.git_root`). The generated route is
+`<agentcanon_source_root>/bootstrap.sh ... tool run --root <target_root>
+issue-sync ...`; a missing or mismatched target remains investigation/defer
+state and cannot reach GitHub mutation.
+publication failure writes only the existing metadata-only pending packet
+(repository, reason, private locator, and digest) and retries through this
+same IssueWorker route.
+
+After a successful GitHub readback, the publisher records and reads back one
+body-free metadata receipt in the private archive's
+`feedback/issue-packets/published/<owner>/<repository>/<number>.json` path
+before consuming a pending packet. The receipt carries only repository,
+number, URL, state, action, responsibility/occurrence locators, source finding
+kind, and timestamp. Receipt/archive failure retains the pending packet and
+must not be reported as successful publication; non-qualified and foreign
+handoffs do not create receipts. The publisher ToolCall invokes the resident
+AgentCanon `issue_sync.py --stage-publication-receipt` subcommand through the
+canonical `bootstrap.sh ... tool run/exec issue-sync -- ...` route after a
+receipt-route preflight, and the host shell archive sync owns the subsequent
+Git commit/push; the dashboard only reads the published namespace. If the
+external runtime/spool route is unavailable, defer before invoking GitHub.
+
+The publisher filters every related Issue against both the candidate repository
+and the current checkout identity before editing. Foreign Issues are retained
+as handoff relations only. `noop` requires the same responsibility tuple and a
+candidate fix/mechanism clause in the structured required-fix section; an old
+or missing clause is an update/reorganization case. Clause transfer removes
+only the matching lines inside the owning Markdown section and preserves the
+same text in Evidence or other sections. Pending retries must receive a fresh
+#938 checkout identity; the packet's repository is checked against it but is
+never treated as authentication authority.
+
 ## Multi-Agent Partition
 
 Use a parent-created `Issue Finding Packet` before spawning. Each packet fixes:
@@ -416,7 +479,7 @@ evidence_cells: <structured dashboard headings, source locators, or API JSON pat
 instance_partition: <repo_key|hook_family|skill_name|workflow_name|tool_name|issue_id|path_scope>
 candidate_issue_slug: <lowercase-ascii-slug>
 affected_surfaces: <candidate edit or verification paths>
-occurrence_locations: <confirmed records from the contract below>
+occurrence_locations: <observed records when available>
 related_issue_set: <repository-qualified open/closed identities>
 cause_hypothesis_scope: <alternatives this reviewer may evaluate>
 duplicate_search: <bounded query and snapshot>
@@ -425,8 +488,10 @@ expected_output: <new_candidate|merge_existing|reorganize_existing|defer_with_re
 
 `affected_surfaces` is planning scope. It may include files that need edits or
 verification, but it is not evidence that the defect occurred there.
-`occurrence_locations` names observed sites and cannot be inferred from a
-repository name, directory, or broad affected surface.
+`occurrence_locations` names observed sites when available and cannot be
+inferred from a repository name, directory, or broad affected surface. The
+IssueWorker route does not require a separate `*_confirmed` flag: the explicit
+candidate record and the checkout identity readback are the authorities.
 
 Recommended review partition:
 
@@ -446,9 +511,9 @@ writing files or mutating Issues.
 
 ## Confirmed Occurrence Location Contract
 
-Before an Issue candidate or reorganization cause claim is complete, record at
-least one confirmed occurrence location tied to the source or artifact snapshot
-where the behavior was observed. Use one record per distinct site:
+When available, record each observed occurrence location tied to the source or
+artifact snapshot where the behavior was observed. Use one record per distinct
+site:
 
 ```text
 repository: <owner/name or local repository identity>
@@ -476,9 +541,9 @@ Apply these rules:
   field result with `locator_type: absence-query`.
 - For generated or runtime evidence, name both the producer surface when known
   and the immutable artifact/run field where the bad state was observed.
-- When no occurrence location can yet be confirmed, return
-  `defer_with_reason`, keep the Issue in investigation with
-  `need verification`, and do not present a cause or required fix as confirmed.
+- When no occurrence location is available, retain the explicit candidate and
+  let the IssueWorker publisher carry the missing-location follow-up. Do not
+  synthesize a location from a repository name, directory, or broad surface.
 
 ## Issue Candidate Contract
 
@@ -499,13 +564,14 @@ Before writing a new Issue:
    review.
 
    ```bash
-   bash tools/agent_tools/run_repo_dependency_review.sh \
+   bash tools/analysis/dependencies/run_repo_dependency_review.sh \
      --report-dir reports/agents/<run-id>/dependency-review/<slug> \
      --search-hits-file reports/agents/<run-id>/<slug>-search-hits.txt
    ```
 
-1. Confirm occurrence locations. Keep observed sites separate from proposed
-   edit scope.
+1. Record occurrence locations when the candidate carries observed sites. Keep
+   observed sites separate from proposed edit scope; an absent optional
+   occurrence locator does not disqualify an explicit IssueWorker candidate.
 1. Resolve or create one repository-qualified GitHub Issue through the host
    adapter when online.
 1. When offline, write only metadata under the private
@@ -513,7 +579,8 @@ Before writing a new Issue:
    private body locator and digest; it never stores the body or a pending
    marker in AgentCanon source.
 1. Online publication reads back the GitHub URL, repository, number, title,
-   body digest, and state before removing the pending packet.
+   body, and state, then records and reads back the body-free private
+   publication receipt before removing the pending packet.
 
 Issue body sections:
 
@@ -533,9 +600,10 @@ Issue body sections:
 - `## Done`: only this Issue's owner-scoped completion criteria
 - `## Non-goals`: adjacent work explicitly excluded from completion
 
-Do not call an Issue complete when occurrence locations are missing or broad,
-when a material cause alternative remains hidden, when clauses lack a canonical
-destination, or when completion requires unrelated Issue responsibilities.
+Do not call an Issue complete when the owner/mechanism remains unresolved,
+when clauses lack a canonical destination, or when completion requires
+unrelated Issue responsibilities. Missing optional occurrence detail is a
+follow-up clause, not a second qualification gate.
 
 ## Distributed Clause Routing
 
@@ -604,14 +672,16 @@ Issue and evidence classification rather than creating another registry entry.
 
 ## Validation
 
-Run focused GitHub adapter and skill wiring checks after changing this route:
+Run the focused resident-container receipt route and skill wiring checks after changing this route:
 
 ```bash
-python3 tools/agent_tools/issue_sync.py --issue-url https://github.com/iwashita-nozomu/agent-canon/issues/<number>
-python3 tools/agent_tools/check_skill_frontmatter.py --root .
-python3 tools/agent_tools/skill_tool_commands.py check
-python3 tools/agent_tools/skill_shim_materializer.py check --root .
-python3 tools/agent_tools/check_dependency_headers.py --changed
-bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
-bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> \
+  tool run --root <registered-target-root> issue-sync -- --receipt-preflight \
+  --checkout-head <target-commit> --checkout-repository <owner/repository>
+python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
+python3 tools/agent/skills/skill_tool_commands.py check
+python3 tools/agent/skills/skill_shim_materializer.py check --root .
+python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
+bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing
+bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header
 ```

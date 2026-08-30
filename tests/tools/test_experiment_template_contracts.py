@@ -3,7 +3,7 @@
 # responsibility Tests experiment completion, terminal case invariants, and nested manifest readback.
 # upstream implementation ../../templates/experiments/_template/run.py owns schemas and artifact publication.
 # upstream implementation ../../templates/experiments/_template/cases.py owns case invariants.
-# upstream implementation ../../tools/experiments/create_experiment_topic.py owns topic materialization.
+# upstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py owns topic materialization.
 # @dependency-end
 
 """experiment template の completion、state、manifest contract を検証します."""
@@ -11,6 +11,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
+import shutil
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -22,7 +25,7 @@ TEMPLATE_ROOT = (
     Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template"
 )
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CREATE_TOPIC = PROJECT_ROOT / "tools" / "experiments" / "create_experiment_topic.py"
+CREATE_TOPIC = PROJECT_ROOT / "tools" / "experiments" / "lifecycle" / "create_experiment_topic.py"
 sys.path.insert(0, str(TEMPLATE_ROOT))
 
 from run import (  # noqa: E402
@@ -89,7 +92,7 @@ def test_created_topic_readme_keeps_research_acceptance_topic_owned(
     ):
         assert forbidden not in readme
     for required in (
-        "## 評価と lifecycle の境界",
+        "## 計画・実行・結果解釈の境界",
         "topic / research owner",
         "run identity",
         "result/<run-id>/",
@@ -98,6 +101,36 @@ def test_created_topic_readme_keeps_research_acceptance_topic_owned(
         "provenance / readback",
     ):
         assert required in readme
+
+
+def test_provenance_template_keeps_plan_inputs_separate_from_verdicts() -> None:
+    """Canonical provenance template has no plan-time research verdict fields."""
+    provenance = (TEMPLATE_ROOT / "provenance.toml").read_text(encoding="utf-8")
+
+    for required in (
+        "observables",
+        "evidence_targets",
+        "variables",
+        "comparison",
+        "calculation",
+        "expected_mechanism",
+        "protocol",
+        "impossibility_conditions",
+        "input_conditions",
+        "environment_conditions",
+        "execution_evidence",
+    ):
+        assert required in provenance
+    for forbidden in (
+        "acceptance_oracle",
+        "sufficient_observations",
+        "[[plan.options]]",
+        "[plan.selection]",
+        "review_decision",
+        "validation_oracle",
+        "accepted_failure",
+    ):
+        assert forbidden not in provenance
 
 
 def _result(**overrides: object) -> CaseResult:
@@ -142,7 +175,7 @@ def _summary() -> RunSummary:
             "summary/visualization-status.json",
         ),
         close_condition="not_applicable",
-        validation_oracle="pass: complete provenance",
+        execution_evidence="complete provenance and artifact readback",
         visualization_status="not_requested",
         template_complete=True,
         completion_provenance={
@@ -206,11 +239,10 @@ def test_completion_gate_rejects_malformed_yaml(tmp_path: Path) -> None:
     assert "config.yaml.parseable" in completion.missing_fields
 
 
-def test_completion_gate_recursively_rejects_nested_reviewer_placeholder(
-    tmp_path: Path,
-) -> None:
-    """Completion gate が nested reviewer placeholder を再帰的に拒否します."""
-    (tmp_path / "config.yaml").write_text(
+def _write_minimal_topic(topic_dir: Path) -> str:
+    """最小の計画と operational config を topic directory へ書きます."""
+    topic_dir.mkdir(parents=True, exist_ok=True)
+    (topic_dir / "config.yaml").write_text(
         "\n".join(
             (
                 "template_complete: true",
@@ -218,7 +250,7 @@ def test_completion_gate_recursively_rejects_nested_reviewer_placeholder(
                 "metric: {name: sum}",
                 "runtime: {entrypoint: run.py}",
                 "algorithm_contract: {entrypoint: run_case_worker}",
-                "oracle: {necessary: [record]}",
+                "observables: {record: {type: scalar}}",
                 "provenance: {owner: checker}",
                 "failure: {classification: expected_contract}",
                 "lifecycle: {cleanup: temporary}",
@@ -227,159 +259,217 @@ def test_completion_gate_recursively_rejects_nested_reviewer_placeholder(
         ),
         encoding="utf-8",
     )
-    (tmp_path / "provenance.toml").write_text(
-        "\n".join(
-            (
-                "template_complete = true",
-                'completion_status = "complete"',
-                "[review]",
-                'reviewer = { identity = "<nested-reviewer>" }',
-                "",
-            )
-        ),
-        encoding="utf-8",
-    )
-
-    completion = load_completion_provenance(tmp_path)
-
-    assert not completion.is_complete
-    assert "provenance.review.reviewer.identity unresolved" in completion.missing_fields
-
-
-def test_completion_gate_requires_alternatives_selection_and_review_fields(
-    tmp_path: Path,
-) -> None:
-    """Completion gate が複数案、selection、review の構造を要求します."""
-    (tmp_path / "config.yaml").write_text(
-        "\n".join(
-            (
-                "template_complete: true",
-                "cases: {example: true}",
-                "metric: {name: sum}",
-                "runtime: {entrypoint: run.py}",
-                "algorithm_contract: {entrypoint: run_case_worker}",
-                "oracle: {necessary: [record]}",
-                "provenance: {owner: checker}",
-                "failure: {classification: expected_contract}",
-                "lifecycle: {cleanup: temporary}",
-                "",
-            )
-        ),
-        encoding="utf-8",
-    )
-    (tmp_path / "provenance.toml").write_text(
-        "\n".join(
-            (
-                "template_complete = true",
-                'completion_status = "complete"',
-                "[plan]",
-                'options = [{ id = "option-a", mechanism = "m", status = "rejected", rejected_rationale = "r", selection_evidence = "e" }]',
-                "[plan.selection]",
-                'selected_option = "option-a"',
-                "[review]",
-                'independent_reviewer = ""',
-                "",
-            )
-        ),
-        encoding="utf-8",
-    )
-
-    completion = load_completion_provenance(tmp_path)
-
-    assert (
-        "provenance.plan.options requires at least 2 records"
-        in completion.missing_fields
-    )
-    assert "provenance.plan.selection.rejected_rationale" in completion.missing_fields
-    assert "provenance.review.independent_reviewer" in completion.missing_fields
-
-
-@pytest.mark.parametrize(
-    ("options", "selected_option", "expected_field"),
-    (
+    provenance_text = "\n".join(
         (
-            (("option-a", "selected"), ("option-b", "rejected")),
-            "missing-option",
-            "provenance.plan.selection.selected_option must reference an option id",
-        ),
-        (
-            (("option-a", "selected"), ("option-a", "rejected")),
-            "option-a",
-            "provenance.plan.options.id must be unique",
-        ),
-        (
-            (("option-a", "rejected"), ("option-b", "rejected")),
-            "option-a",
-            "provenance.plan.options must contain exactly one selected option",
-        ),
-        (
-            (("option-a", "selected"), ("option-b", "selected")),
-            "option-a",
-            "provenance.plan.options must contain exactly one selected option",
-        ),
-    ),
-    ids=("invalid-selected-id", "duplicate-id", "no-selected", "multiple-selected"),
-)
-def test_completion_gate_rejects_option_selection_invariants(
-    tmp_path: Path,
-    options: tuple[tuple[str, str], ...],
-    selected_option: str,
-    expected_field: str,
-) -> None:
-    """Completion gate が options と selection の相互整合性を拒否します."""
-    option_records = ", ".join(
-        (
-            '{ id = "'
-            + option_id
-            + '", mechanism = "m", status = "'
-            + status
-            + '", rejected_rationale = "r", selection_evidence = "e" }'
+            "template_complete = true",
+            'completion_status = "complete"',
+            "[experiment]",
+            'topic = "topic"',
+            'owner = "owner"',
+            'question = "question"',
+            'hypothesis = "hypothesis"',
+            'plan_digest = "digest"',
+            "[plan]",
+            'baseline = "baseline"',
+            'candidate = "candidate"',
+            'variables = ["variable"]',
+            'cases = ["case"]',
+            'observables = ["observation"]',
+            'evidence_targets = ["summary/cases.jsonl", "summary/summary.json"]',
+            'metrics = ["metric"]',
+            'comparison = "compare and calculate"',
+            'calculation = "calculate"',
+            'expected_mechanism = "mechanism"',
+            'protocol = "protocol"',
+            'stopping_rule = "stop"',
+            'impossibility_conditions = ["impossible"]',
+            'input_conditions = ["input"]',
+            'environment_conditions = ["environment"]',
+            "[plan.algorithm_contract]",
+            'public_entrypoint = "entrypoint"',
+            'input_schema = "schema"',
+            'state_transition = "transition"',
+            'invariants = ["invariant"]',
+            'stopping_rule = "stop"',
+            'failure_semantics = "failure"',
+            "[source]",
+            'repository = "repo"',
+            'branch = "main"',
+            'commit = "commit"',
+            'dirty_state = "clean"',
+            "[resource]",
+            'admission_owner = "caller"',
+            'request = "cpu"',
+            'selection_reason = "capability"',
+            'gpu_visibility = "caller"',
+            'parallelism_policy = "caller"',
+            'environment_limit = "none"',
+            'allocation_evidence = "record"',
+            "[reproducibility]",
+            'readback_command = "readback"',
+            'required_artifacts = ["summary.json"]',
+            'required_case_artifact = "cases.jsonl"',
+            'environment_snapshot = "environment.json"',
+            'retention_owner = "owner"',
+            'cleanup_policy = "temporary"',
+            'cleanup_command = "cleanup"',
+            'reconstructibility_readback = "readback"',
+            "",
         )
-        for option_id, status in options
     )
-    (tmp_path / "config.yaml").write_text(
-        "\n".join(
-            (
-                "template_complete: true",
-                "cases: {example: true}",
-                "metric: {name: sum}",
-                "runtime: {entrypoint: run.py}",
-                "algorithm_contract: {entrypoint: run_case_worker}",
-                "oracle: {necessary: [record]}",
-                "provenance: {owner: checker}",
-                "failure: {classification: expected_contract}",
-                "lifecycle: {cleanup: temporary}",
-                "",
-            )
-        ),
-        encoding="utf-8",
+    (topic_dir / "provenance.toml").write_text(provenance_text, encoding="utf-8")
+    return provenance_text
+
+
+def _run_topic(
+    topic_dir: Path,
+) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
+    """Run one copied topic and read its operational summary."""
+    run_dir = topic_dir / "result" / "run"
+    environment = {
+        **os.environ,
+        "EXPERIMENT_RUN_DIR": str(run_dir),
+        "EXPERIMENT_RUN_MANIFEST": str(run_dir / "run-manifest.json"),
+        "EXPERIMENT_VARIANT": "default",
+    }
+    result = subprocess.run(
+        [sys.executable, str(topic_dir / "run.py")],
+        cwd=topic_dir,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
     )
-    (tmp_path / "provenance.toml").write_text(
-        "\n".join(
-            (
-                "template_complete = true",
-                'completion_status = "complete"',
-                "[plan]",
-                f"options = [{option_records}]",
-                "[plan.selection]",
-                f'selected_option = "{selected_option}"',
-                'rejected_rationale = "r"',
-                'selection_evidence = "e"',
-                "[review]",
-                'independent_reviewer = "reviewer"',
-                'source_snapshot = "source"',
-                'selection_evidence = "e"',
-                'review_decision = "pass"',
-                "",
-            )
-        ),
-        encoding="utf-8",
+    summary = json.loads(
+        (run_dir / "summary" / "summary.json").read_text(encoding="utf-8")
     )
+    return result, summary
+
+
+def test_completion_gate_accepts_minimal_plan_without_verdict_or_review(
+    tmp_path: Path,
+) -> None:
+    """最小の計画は研究上の合否・選択・レビューなしで実行可能です."""
+    _write_minimal_topic(tmp_path)
 
     completion = load_completion_provenance(tmp_path)
 
-    assert not completion.is_complete
-    assert expected_field in completion.missing_fields
+    assert completion.is_complete
+    assert completion.missing_fields == ()
+
+    provenance_text = (tmp_path / "provenance.toml").read_text(encoding="utf-8")
+    for forbidden in (
+        "acceptance_oracle",
+        "sufficient_observations",
+        "plan.options",
+        "plan.selection",
+        "review_decision",
+        "validation_oracle",
+        "accepted_failure",
+    ):
+        assert forbidden not in provenance_text
+
+    (tmp_path / "provenance.toml").write_text(
+        provenance_text.replace('protocol = "protocol"', 'protocol = "<protocol>"'),
+        encoding="utf-8",
+    )
+    incomplete = load_completion_provenance(tmp_path)
+    assert not incomplete.is_complete
+    assert "plan.protocol" in incomplete.missing_fields
+
+
+def test_minimal_plan_runs_without_research_verdict_or_review(tmp_path: Path) -> None:
+    """Generated topic run は計画時の研究判定なしで完走します."""
+    topic_dir = tmp_path / "topic"
+    shutil.copytree(TEMPLATE_ROOT, topic_dir)
+    _write_minimal_topic(topic_dir)
+    result, summary = _run_topic(topic_dir)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert summary["state"] == "success"
+    assert "execution_evidence" in summary
+    assert "validation_oracle" not in summary
+
+
+def test_failed_case_preserves_failure_evidence_and_artifact_readback(
+    tmp_path: Path,
+) -> None:
+    """Failed case は非 zero exit、failure evidence、manifest readback を残します."""
+    topic_dir = tmp_path / "failed-topic"
+    shutil.copytree(TEMPLATE_ROOT, topic_dir)
+    _write_minimal_topic(topic_dir)
+    cases_path = topic_dir / "cases.py"
+    cases_path.write_text(
+        cases_path.read_text(encoding="utf-8").replace(
+            '"values": [1.0, 2.0, 3.0]', '"values": []'
+        ),
+        encoding="utf-8",
+    )
+
+    result, summary = _run_topic(topic_dir)
+    run_dir = topic_dir / "result" / "run"
+    failure_path = run_dir / "summary" / "failure-evidence.json"
+    manifest_path = run_dir / "summary" / "artifact-manifest.json"
+
+    assert result.returncode == 1
+    assert summary["state"] == "failed"
+    assert summary["exit_status"] == 1
+    assert summary["failure_evidence"] == "summary/failure-evidence.json"
+    assert failure_path.is_file()
+    assert json.loads(failure_path.read_text(encoding="utf-8"))["state"] == "failed"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert any(
+        entry["path"] == "summary/failure-evidence.json"
+        for entry in manifest["artifacts"]
+    )
+    assert "summary/artifact-manifest.json" in summary["preserved_artifacts"]
+
+
+def test_blocked_and_incomplete_states_remain_distinct_without_verdicts(
+    tmp_path: Path,
+) -> None:
+    """Blocked と incomplete は別の operational state として保持されます."""
+    blocked_topic = tmp_path / "blocked-topic"
+    shutil.copytree(TEMPLATE_ROOT, blocked_topic)
+    _write_minimal_topic(blocked_topic)
+    cases_path = blocked_topic / "cases.py"
+    cases_text = cases_path.read_text(encoding="utf-8")
+    cases_path.write_text(
+        cases_text[: cases_text.index("CASES: tuple[CaseSpec, ...] = (")]
+        + "CASES: tuple[CaseSpec, ...] = ()\n",
+        encoding="utf-8",
+    )
+    blocked_result, blocked_summary = _run_topic(blocked_topic)
+
+    incomplete_topic = tmp_path / "incomplete-topic"
+    shutil.copytree(TEMPLATE_ROOT, incomplete_topic)
+    incomplete_result, incomplete_summary = _run_topic(incomplete_topic)
+
+    assert blocked_result.returncode == 1
+    assert blocked_summary["state"] == "blocked"
+    assert blocked_summary["exit_status"] == 1
+    assert blocked_summary["failure_evidence"] == "summary/failure-evidence.json"
+    assert incomplete_result.returncode == 1
+    assert incomplete_summary["state"] == "incomplete"
+    assert incomplete_summary["exit_status"] == 1
+    assert incomplete_summary["failure_evidence"] == "summary/failure-evidence.json"
+    assert blocked_summary["state"] != incomplete_summary["state"]
+    for summary in (blocked_summary, incomplete_summary):
+        assert "validation_oracle" not in summary
+        assert "accepted_failure" not in summary
+
+
+def test_summary_exposes_operational_evidence_without_research_verdict() -> None:
+    """Run summary は operational evidence だけを research verdict なしで公開します."""
+    payload = _summary().to_dict()
+
+    assert payload["execution_evidence"] == "complete provenance and artifact readback"
+    for forbidden in (
+        "validation_oracle",
+        "accepted_failure",
+        "accepted_failure_reason",
+    ):
+        assert forbidden not in payload
 
 
 def test_summary_requires_run_state_enum_and_completion_readback() -> None:

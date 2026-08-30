@@ -22,8 +22,8 @@ upstream design ../canonical/skills.md skill canon registry
 - `make ci-quick`
 - `make ci`
 - `tools/bin/agent-canon docs check`
-- `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
-- `python3 tools/agent_tools/check_convention_compliance.py`
+- `python3 tools/validation/semantic/code/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
+- `python3 tools/validation/semantic/convention/check_convention_compliance.py`
 
 ## Numeric Literal Gate
 

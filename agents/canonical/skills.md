@@ -7,7 +7,7 @@ responsibility Points readers to the public skill registry and internal routine 
 upstream design README.md canonical workflow index
 upstream design ../skills/README.md public skill surface contract
 upstream design ../internal-routines/README.md internal routine registry
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates official system skill delegation
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates official system skill delegation
 @dependency-end
 -->
 
@@ -19,9 +19,9 @@ Workflow-routed review, validation, and compatibility routines live in
 [`../internal-routines/README.md`](../internal-routines/README.md).
 
 Runtime alignment enforces that public skill docs, catalog IDs, and
-`.agents/skills/*/SKILL.md` shims stay in parity.
-Codex discovers repository skills from `.agents/skills/` automatically.
-Repository-specific skills use an official `.agents/skills/<skill>/SKILL.md`
+`.codex/personal/skills/*/SKILL.md` shims stay in parity.
+Codex discovers repository skills from `.codex/personal/skills/` automatically.
+Repository-specific skills use an official `.codex/personal/skills/<skill>/SKILL.md`
 surface owned by that repository or subtree; custom config filenames and
 parallel skill directories are not discovery mechanisms.
 
@@ -30,7 +30,7 @@ Naming carries the visibility boundary:
 - Public, user-facing skills use plain hyphen-case and appear in the public
   catalog.
 - Runtime-internal skill shims use a leading underscore in
-  `.agents/skills/_<name>/SKILL.md` and are owned by the workflow, role, routine,
+  `.codex/personal/skills/_<name>/SKILL.md` and are owned by the workflow, role, routine,
   or public skill that calls them.
 - Workflow-only routines live in `../internal-routines/` as Markdown routines
   rather than Codex skill shims.

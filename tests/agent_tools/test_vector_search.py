@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests vector search indexing exclusions and context expansion.
-# upstream implementation ../../tools/agent_tools/vector_search.py searches text surfaces
-# upstream implementation ../../tools/agent_tools/graph_client.py supplies canonical dependency context
+# upstream implementation ../../tools/analysis/search/vector_search.py searches text surfaces
+# upstream implementation ../../tools/analysis/dependencies/graph_client.py supplies canonical dependency context
 # upstream design ../../tools/README.md documents vector search usage
 # @dependency-end
 
@@ -20,11 +20,11 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from tools.agent_tools import vector_search as vector_tool
-from tools.agent_tools.graph_client import GraphResponse
+from tools.analysis.search import vector_search as vector_tool
+from tools.analysis.dependencies.graph_client import GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-VECTOR_SEARCH = PROJECT_ROOT / "tools" / "agent_tools" / "vector_search.py"
+VECTOR_SEARCH = PROJECT_ROOT / "tools" / "analysis" / "search" / "vector_search.py"
 
 
 def run_search(root: Path, *args: str) -> subprocess.CompletedProcess[str]:

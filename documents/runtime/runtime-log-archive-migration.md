@@ -4,9 +4,9 @@ contract reference
 responsibility Documents how to move AgentCanon in-tree hook and eval logs into the external runtime log archive.
 upstream design runtime-log-archive.md runtime log archive ownership and branch policy
 upstream design ../conventions/coding-conventions-logging.md JSONL logging convention
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py imports and pushes legacy hook JSONL and eval reports
-downstream design ../../evidence/agent-evals/README.md points readers away from in-tree result paths
-downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates mounted archive JSONL and eval reports
+upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py imports and pushes legacy hook JSONL and eval reports
+downstream design ../../eval/definitions/README.md points readers away from in-tree result paths
+downstream implementation ../../eval/checkers/eval_accumulation_check.py validates mounted archive JSONL and eval reports
 @dependency-end
 -->
 
@@ -122,5 +122,5 @@ runtime hook archive.
   resolution. The log archive uses `*.jsonl merge=union` to reduce append-only
   conflicts, but manual conflict repair must still preserve every line.
 - If the archive clone has unrelated local changes, run
-  `python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain` and
+  `python3 tools/runtime/archive/runtime_log_archive_git.py status --porcelain` and
   commit, push, or move those changes before importing more logs.

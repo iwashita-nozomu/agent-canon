@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests provider mapping, candidate binding, and null rules.
-# upstream implementation ../../tools/agent_tools/external_artifact_binding.py materializes and verifies external acknowledgements
+# upstream implementation ../../tools/runtime/artifacts/external_artifact_binding.py materializes and verifies external acknowledgements
 # @dependency-end
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from external_artifact_binding import (  # noqa: E402
+from tools.runtime.artifacts.external_artifact_binding import (  # noqa: E402
     LOCAL_EVENT_SCHEMA,
     ExternalProjectionError,
     materialize_external_projection_acknowledgement,

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from tools.agent_tools.direct_luna_dispatch import (
+from tools.agent.orchestration.direct_luna_dispatch import (
     LUNA_MODEL,
     DirectLunaBlocker,
     build_direct_luna_packet,

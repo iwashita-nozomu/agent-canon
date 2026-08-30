@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies stable wrapper requests and bootstrap-owned runtime boundaries.
 # upstream implementation ../../tools/bin/agent-canon stable wrapper
-# upstream implementation ../../tools/agent_tools/tool_dispatch.py typed dispatcher
+# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py typed dispatcher
 # downstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 # @dependency-end
 
@@ -31,7 +31,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     dispatcher = source / "tools" / "agent_tools"
     dispatcher.mkdir(parents=True)
     (dispatcher / "tool_dispatch.py").write_bytes(
-        (PROJECT_ROOT / "tools/agent_tools/tool_dispatch.py").read_bytes()
+        (PROJECT_ROOT / "tools/runtime/dispatch/tool_dispatch.py").read_bytes()
     )
     control = tmp_path / "control"
     runtime = control / "runtime"
@@ -76,7 +76,7 @@ def test_wrapper_submits_rust_request_to_bootstrap(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     request = json.loads((tmp_path / "request.json").read_text(encoding="utf-8"))
-    assert request[-7:] == [
+    assert request[request.index("exec") :] == [
         "exec",
         "--root",
         str(source.resolve()),
@@ -88,20 +88,70 @@ def test_wrapper_submits_rust_request_to_bootstrap(tmp_path: Path) -> None:
     assert not (source / ".agent-canon").exists()
 
 
-def test_wrapper_rejects_missing_runtime_before_bootstrap(tmp_path: Path) -> None:
-    """No source-local fallback is available without bootstrap roots."""
-    source, _control, _runtime, _bootstrap = _fixture(tmp_path)
+def test_wrapper_leaves_missing_runtime_to_bootstrap(tmp_path: Path) -> None:
+    """Rust requests let bootstrap create or migrate the runtime root."""
+    source, control, _runtime, bootstrap = _fixture(tmp_path)
+    legacy_runtime = tmp_path / "home" / "workspace" / "agent-canon-runtime" / "host"
     result = subprocess.run(
         [str(source / "tools/bin/agent-canon"), "--version"],
         cwd=source,
-        env={"PATH": os.environ["PATH"]},
+        env={
+            "PATH": os.environ["PATH"],
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
+            "AGENT_CANON_RUNTIME_ROOT": str(legacy_runtime),
+        },
         check=False,
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 2
-    assert "CONTROL_PARENT_ROOT" in result.stderr
+    assert result.returncode == 0, result.stderr
+    request = json.loads((tmp_path / "request.json").read_text(encoding="utf-8"))
+    assert request[request.index("--runtime-root") + 1] == str(legacy_runtime)
+    assert request[-5:] == [
+        "--root",
+        str(source.resolve()),
+        "--",
+        "agent-canon",
+        "--version",
+    ]
     assert not (source / ".agent-canon").exists()
+
+
+def test_symlinked_dotfiles_wrapper_uses_source_root_and_legacy_runtime(
+    tmp_path: Path,
+) -> None:
+    """A dotfiles symlink submits the source-root request without host checks."""
+    source, control, _runtime, _bootstrap = _fixture(tmp_path)
+    home = tmp_path / "home"
+    dotfiles = home / ".dotfiles"
+    dotfiles.mkdir(parents=True)
+    link = dotfiles / "agent-canon"
+    link.symlink_to(source / "tools/bin/agent-canon")
+    legacy_runtime = home / "workspace" / "agent-canon-runtime" / "host"
+    result = subprocess.run(
+        [str(link), "--version"],
+        cwd=source,
+        env={
+            "PATH": os.environ["PATH"],
+            "HOME": str(home),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(home),
+            "AGENT_CANON_RUNTIME_ROOT": str(legacy_runtime),
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    request = json.loads((tmp_path / "request.json").read_text(encoding="utf-8"))
+    assert request[request.index("--repository-root") + 1] == str(source.resolve())
+    assert request[request.index("--runtime-root") + 1] == str(legacy_runtime)
+    assert request[-5:] == [
+        "--root",
+        str(source.resolve()),
+        "--",
+        "agent-canon",
+        "--version",
+    ]
 
 
 def test_wrapper_has_no_host_build_or_source_cache_fallback() -> None:

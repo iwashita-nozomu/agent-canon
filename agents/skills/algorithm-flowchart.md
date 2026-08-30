@@ -5,10 +5,10 @@ responsibility Documents JIT-canonical algorithm Mermaid flowcharts for proof re
 upstream design algorithm-proof-exploration.md JIT-canonical IR and theorem graph workflow.
 upstream design formal-proof-workflow.md checker-backed proof workflow.
 upstream design code-visualization.md sole public visualization owner and typed projection contract.
-upstream implementation ../../tools/agent_tools/visualization_contract.py owns ToolCall, identity, manifest, readback, and coverage serialization.
-upstream implementation ../../tools/agent_tools/jit_canonical_ir.py builds StableHLO-derived JIT-canonical IR and backend traces.
-upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
-downstream implementation ../../.agents/skills/algorithm-flowchart/SKILL.md exposes the skill to Codex.
+upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns ToolCall, identity, manifest, readback, and coverage serialization.
+upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py builds StableHLO-derived JIT-canonical IR and backend traces.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
+downstream implementation ../../.codex/personal/skills/algorithm-flowchart/SKILL.md exposes the skill to Codex.
 downstream implementation ../../tests/tools/test_fix_mermaid.py checks syntax-only Mermaid formatting.
 @dependency-end
 -->
@@ -81,7 +81,7 @@ readback owner.
 1. まだ IR がない場合は StableHLO lowering から生成します。
 
    ```bash
-   python3 tools/agent_tools/jit_canonical_ir.py \
+   python3 tools/analysis/proof/jit_canonical_ir.py \
      --python-symbol lean/<topic>/main.py::main \
      --input-factory lean/<topic>/main.py::example_inputs \
      --out lean/<topic>/<root>_jit_canonical_ir.json \

@@ -5,9 +5,9 @@
 # responsibility Tests source-owned changed-file dependency header detection.
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
-# upstream implementation ../../tools/agent_tools/check_dependency_headers.py changed-file checks
-# upstream implementation ../../tools/agent_tools/visualization_contract.py canonical visualization contract dependency target
-# downstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh runs this source regression
+# upstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py changed-file checks
+# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py canonical visualization contract dependency target
+# downstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh runs this source regression
 # @dependency-end
 
 from __future__ import annotations
@@ -21,44 +21,44 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.agent_tools import check_dependency_headers as header_checker
+from tools.validation.semantic.dependencies import check_dependency_headers as header_checker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_headers.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_headers.py"
 VISUALIZATION_QUEUE_PATHS = (
     "agents/skills/algorithm-flowchart.md",
     "agents/skills/catalog.yaml",
-    ".agents/skills/algorithm-flowchart/SKILL.md",
-    ".agents/skills/dependency-analysis/SKILL.md",
-    ".agents/skills/prose-reasoning-graph/SKILL.md",
+    ".codex/personal/skills/algorithm-flowchart/SKILL.md",
+    ".codex/personal/skills/dependency-analysis/SKILL.md",
+    ".codex/personal/skills/prose-reasoning-graph/SKILL.md",
     "agents/skills/structure-refactor.md",
-    ".agents/skills/structure-refactor/SKILL.md",
+    ".codex/personal/skills/structure-refactor/SKILL.md",
     "agents/skills/structure-planning.md",
-    ".agents/skills/structure-planning/SKILL.md",
+    ".codex/personal/skills/structure-planning/SKILL.md",
     "agents/skills/report-writing.md",
-    ".agents/skills/report-writing/SKILL.md",
+    ".codex/personal/skills/report-writing/SKILL.md",
     "agents/skills/long-form-writing.md",
-    ".agents/skills/long-form-writing/SKILL.md",
+    ".codex/personal/skills/long-form-writing/SKILL.md",
     "agents/skills/html-output.md",
-    ".agents/skills/html-output/SKILL.md",
+    ".codex/personal/skills/html-output/SKILL.md",
     "agents/skills/formal-proof-workflow.md",
-    ".agents/skills/formal-proof-workflow/SKILL.md",
+    ".codex/personal/skills/formal-proof-workflow/SKILL.md",
     "agents/skills/md-style-check.md",
-    ".agents/skills/md-style-check/SKILL.md",
+    ".codex/personal/skills/md-style-check/SKILL.md",
     "agents/skills/README.md",
-    "tools/agent_tools/skill_route_catalog.py",
-    "tools/agent_tools/capability_route.py",
+    "tools/agent/skills/skill_route_catalog.py",
+    "tools/agent/orchestration/capability_route.py",
     "tests/agent_tools/test_render_dependency_manifest_graph.py",
     "tools/catalog.yaml",
-    "tools/agent_tools/tool_catalog.py",
+    "tools/runtime/manifest/tool_catalog.py",
     "tools/README.md",
     "documents/tools/README.md",
     "documents/tools/tool-docs.toml",
     "tests/agent_tools/test_tool_catalog.py",
     "tests/agent_tools/test_dependency_manifest_tools.py",
     "tests/agent_tools/test_check_dependency_headers.py",
-    "rust/agent-canon/src/docs.rs",
-    "rust/agent-canon/src/main.rs",
+    "tools/runtime/dispatch/agent-canon/src/docs.rs",
+    "tools/runtime/dispatch/agent-canon/src/main.rs",
     "tests/tools/test_fix_mermaid.py",
     "agents/workflows/implementation-waterfall-workflow.md",
     "agents/workflows/agent-canon-pr-workflow.md",

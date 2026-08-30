@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests focused semantic responsibility contract validation.
-# upstream implementation ../../tools/agent_tools/check_semantic_responsibility_contract.py validates schema, identity, and references
+# upstream implementation ../../tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py validates schema, identity, and references
 # upstream design ../../documents/design/semantic-responsibility-contract.md canonical semantic responsibility contract
 # downstream design ../../templates/documents/semantic-responsibility-contract.template.toml reusable instance shape
 # @dependency-end
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECKER = ROOT / "tools/agent_tools/check_semantic_responsibility_contract.py"
+CHECKER = ROOT / "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"
 TEMPLATE = ROOT / "templates/documents/semantic-responsibility-contract.template.toml"
 
 
@@ -54,7 +54,7 @@ def materialize_task_instance(
         'claim = ""': 'claim = "tmp contract claim"',
         'verification_owner_kind = ""': 'verification_owner_kind = "static_checker"',
         'verification_owner = ""': 'verification_owner = "checker"',
-        'primary_verification_ref = ""': 'primary_verification_ref = "repo:tools/agent_tools/check_semantic_responsibility_contract.py#symbol:validate_document"',
+        'primary_verification_ref = ""': 'primary_verification_ref = "repo:tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py#symbol:validate_document"',
     }
     for before, after in replacements.items():
         if before not in text:
@@ -66,9 +66,9 @@ def materialize_task_instance(
         existing_replacements = {
             'verification_owner_kind = "static_checker"': 'verification_owner_kind = "existing_test"',
             'verification_owner = "checker"': 'verification_owner = "tests"',
-            'primary_verification_ref = "repo:tools/agent_tools/check_semantic_responsibility_contract.py#symbol:validate_document"': 'primary_verification_ref = "repo:tests/agent_tools/test_check_semantic_responsibility_contract.py#symbol:test_accepts_single_obligation"',
+            'primary_verification_ref = "repo:tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py#symbol:validate_document"': 'primary_verification_ref = "repo:tests/agent_tools/test_check_semantic_responsibility_contract.py#symbol:test_accepts_single_obligation"',
             'contract_ref = ""': 'contract_ref = "repo:documents/design/semantic-responsibility-contract.md#section:既存-test-の証跡"',
-            'changed_mechanism_ref = ""': 'changed_mechanism_ref = "repo:tools/agent_tools/check_semantic_responsibility_contract.py#symbol:validate_document"',
+            'changed_mechanism_ref = ""': 'changed_mechanism_ref = "repo:tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py#symbol:validate_document"',
             'observable_assertion = ""': 'observable_assertion = "valid task instance passes"',
             'decidable_oracle = ""': 'decidable_oracle = "pytest return code"',
             'removal_witness = ""': 'removal_witness = "repo:tests/agent_tools/test_check_semantic_responsibility_contract.py#symbol:test_rejects_existing_test_without_removal_witness"',
@@ -104,7 +104,7 @@ def test_rejects_invalid_reference(tmp_path: Path) -> None:
     invalid = tmp_path / "invalid.toml"
     invalid.write_text(
         instance.read_text(encoding="utf-8").replace(
-            "repo:tools/agent_tools/check_semantic_responsibility_contract.py#symbol:validate_document",
+            "repo:tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py#symbol:validate_document",
             "repo:../outside.py#symbol:missing",
             1,
         ),

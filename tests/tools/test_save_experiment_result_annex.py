@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests deterministic one-run git-annex raw retention and compact evidence binding.
 # upstream design ../../documents/experiments/result-log-retention-and-visualization.md raw retention policy
-# upstream implementation ../../tools/experiments/save_experiment_result_annex.py helper under test
+# upstream implementation ../../tools/experiments/artifacts/save_experiment_result_annex.py helper under test
 # @dependency-end
 
 """Tests for one-run git-annex experiment raw retention."""
@@ -22,14 +22,12 @@ from pathlib import Path
 
 import pytest
 
-from tools.experiments import save_experiment_result_annex as retention
-from tools.experiments.experiment_identity import ExperimentIdentity
+from tools.experiments.artifacts import save_experiment_result_annex as retention
+from tools.experiments.lifecycle.experiment_identity import ExperimentIdentity
 
 SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "tools"
-    / "experiments"
-    / "save_experiment_result_annex.py"
+    / "tools" / "experiments" / "artifacts" / "save_experiment_result_annex.py"
 )
 GIT_ANNEX = shutil.which("git-annex")
 requires_git_annex = pytest.mark.skipif(

@@ -20,7 +20,7 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
 role profile/instruction authority は `agents/model_profiles.toml` と
-`tools/agent_tools/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
+`tools/agent/orchestration/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
 は closed generated readback view です。
 project-level subagent registration と runtime budget は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
@@ -218,10 +218,18 @@ structured handoff または、coordination/resumption が必要な場合の dur
 
 - `role_scope`: その role が判断する subdomain、stage、risk class。
 - `allowed_paths`: 対象 file / directory / glob の bounded list。repo root や `/workspace` は workspace identity として扱い、編集候補、検索 hit、checker finding、changed path を seed にし、responsibility search、reuse survey、stale-surface scan、dependency header graph の再帰展開結果である `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。
-- `required_artifacts`: checker output、structured dashboard、dependency-expanded scope、design / implementation packet、または review packet。context artifact を先に渡します。dependency-expanded scope が必要な場合は `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file <hits>` または changed-path 相当の dependency review output を handoff に含めます。
+- `required_artifacts`: checker output、structured dashboard、dependency-expanded scope、design / implementation packet、または review packet。context artifact を先に渡します。dependency-expanded scope が必要な場合は `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file <hits>` または changed-path 相当の dependency review output を handoff に含めます。
 - `canon_refs`: 必要な AgentCanon / project canon の節。
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
+- `conflict_or_rework_packet`: merge conflict resolution または validation
+  finding の repair を行う handoff は、repository-qualified base/head/merge-base、
+  affected path、base/ours/theirs の immutable blob reference と hunk inventory、
+  staged/unmerged state、unaffected user/unknown content、selected cause、expected
+  mechanism、exact owning edit delta、disposition (`keep`/`replace`/`manual`)、
+  rationale、focused preservation readback を含めます。preserved changed/context
+  lines は captured source hunk から導出し、caller-supplied content は許可しません。
+  path list や clean merge だけでは十分な handoff としません。
 - `implementation_surface_route`: implementation handoff では `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にします。router が unavailable なら、その blocker または deterministic router recovery output を local provisional route evidence として渡し、path selection を packet output に基づけます。
 - `decision_sufficiency_packet_ref`: coordination/resumption が必要な場合だけ使う
   durable decision-sufficiency record の参照。意味上は owner、replaceable unit、
@@ -256,6 +264,13 @@ list. Implementation bugs, test-oracle/spec mismatches, fixture or environment
 issues, stale generated artifacts, unrelated failures, and approved-design /
 user-request conflicts follow the owner routes named by the runtime profile
 taxonomy.
+
+For conflict/rework handoffs, the integration executor or repair worker must
+preserve the packet's unaffected paths and hunks. Whole-file checkout, reset,
+reclone, overwrite, or regeneration is not a resolution shortcut: it requires
+the captured stage/hunk inventory and an explicit reconstruction map. A failed
+preservation readback returns work to the owning path/hunk; it does not permit
+deleting the candidate or reopening broad review.
 
 ## Wave Plan Contract
 
@@ -322,7 +337,7 @@ bootstrap stdout field for executable dynamic expansion is
 `team_manifest.yaml` `role_instances` is the authoritative manifest ledger.
 After a parent or delegated stage owner actually spawns, skips, or replaces a
 wave, record the actual result with
-`python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...`; this
+`python3 tools/runtime/lifecycle/workflow_monitor.py --subagent-wave ...`; this
 updates `schedule.md` and `workflow_monitoring.md` by `wave_id` and replaces the
 bootstrap authority blocker for `WAVE-1`. Delegated child waves must include
 `remaining_spawn_budget` so nested launch remains bounded by
@@ -584,7 +599,7 @@ Activation Conditions:
 - これらは session-level setting で、per-agent TOML には書きません
 - runtime が `/agent` を提供する場合は inventory 確認に使います
 - `/agent` が使えない runtime では `.codex/agents/*.toml` を直接見ます
-- run bundle は `python3 tools/agent_tools/bootstrap_agent_run.py ...` で、
+- run bundle は `python3 tools/runtime/lifecycle/bootstrap_agent_run.py ...` で、
   coordination、resumption、または selected workflow が durable lifecycle
   evidence を必要とするときだけ先に作ります
 - `--task-id` の task-default specialist と default review pack は候補として
@@ -618,6 +633,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | `research_reviewer` | `reviewer` |
 | `experimenter` | `experiment_runner` for runs; `worker` only for scoped runtime-output handling |
 | `experiment_reviewer` | `reviewer` |
+| `mathematical_correctness_reviewer` | existing Luna/high `reviewer` executable with a dedicated math-intent packet and scope contract |
 | `scheduler` | `execution_planner` |
 | `schedule_reviewer` | `plan_reviewer` |
 | `citation_evidence_reviewer` | `citation_evidence_reviewer` |
@@ -659,6 +675,8 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
   - 論文主張が citation、figure、table、derivation、appendix、result に辿れるかを確認する
 - `notation_definition_reviewer`
   - 記号、略語、technical term、unit、index、assumption の definition-before-use と一貫性を確認する
+- `mathematical_correctness_reviewer`
+  - 既存の Luna/high `reviewer` executable を使う専用 logical role として、math-intent packet の `math_object` / `problem`、`variables` / `domains` / `units`、`objective` / `residual`、`constraints`、`equations` / `definitions`、`assumptions` / `approximations`、`derivation`、`iteration_map` / `update_map`、`invariants` / `limits` / `stopping_scalar` / `failure_semantics`、`equation_to_code_map`、`math_oracle` / `counterexample`、および mapped changed-path scope を確認する。数学対応の finding だけを返し、architecture、framework、JIT、compiler、backend、runtime、container、routing、environment、common infrastructure、proof-tool / IR infrastructure の編集を承認しない
 - `logic_gap_reviewer`
   - claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認する
 - `long_form_writer`
@@ -733,6 +751,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | テストケース設計 | 実装後に owning mechanism と具体的な未解決 risk が記録された場合だけ、専用の `test_designer` instance を条件付きで起動する。まず activation decision を返し、checker-owned property は static validation へ戻し、具体的な behavior regression oracle だけを test plan に落とす |
 | 記号定義レビュー | 専用の `notation_definition_reviewer` instance。記号、略語、technical term、unit、index、assumption の定義順と一貫性を見る |
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
+| 数理修正の intent / scope review | `computational-optimization` の math-intent packet を先に作り、専用の `mathematical_correctness_reviewer` instance が equations、変数 / 単位、仮定、導出、更新則、停止 / failure、equation-to-code map、math oracle、changed-path scope を確認する。generic designer、benchmark、scientific-computing reviewer より前に行い、非数理 surface は sibling handoff に分ける |
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
 | OOP readability report documentation | 専用の `oop_readability_reviewer` instance。機械判定 report の status / count / path / line を保持し、tool fact と reviewer judgment を分けて OOP 原則別に文書化する |
 | 実装 | `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、既定は `worker`。`spark_worker` は `--select-agent-type implementer=spark_worker:<evidence>` の parent packet selection が stdout / manifest に記録された bounded slice だけに使う |
@@ -746,30 +765,66 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
 - subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは `agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
 - context が増えたら capsule artifact を更新して再配送します
+- math-intent route の write-capable handoff には、protocol の Target Binding Packet に加えて
+  `mathematical_intent_packet` を必ず添えます。packet は `math_object` / `problem`, `variables` /
+  `domains` / `units`, `objective` / `residual`, `constraints`, `equations` / `definitions`,
+  `assumptions` / `approximations`, `derivation`, `iteration_map` / `update_map`, `invariants` /
+  `limits` / `stopping_scalar` / `failure_semantics`, `equation_to_code_map`, `math_oracle` /
+  `counterexample`, `mathematical_definition_paths`, `mathematical_oracle_paths`,
+  `mathematical_documentation_paths`, mapped `allowed_paths`, default
+  `forbidden_surfaces`、`separate_handoff_targets` を含みます。必須欄、map、oracle が欠けた
+  handoff は `math_packet_missing` として停止し、worker は推測で scope を補いません
+- 通常 bootstrap は `--math-intent-packet '<JSON>'` を受け取り、run manifest と canonical
+  `spawn_agent` ToolCall の両方へ同じ正規化済み packet を渡します。math writer の
+  `writer_target.allowed_paths` は packet の `allowed_write_paths` の部分集合でなければならず、
+  architecture / JIT / backend / runtime / routing / environment / proof / IR infrastructure
+  は `separate_handoff_targets` に残し、math packet の厳密な `allowed_write_paths` にない
+  path は spawn 前に拒否します。packet が明示的に数理実装として mapped した `src/runtime`
+  のような path は許可します。非数理 route では packet を要求せず、math reviewer も起動しません
 - workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - 一般説明 prose adapter を使う文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します
 - 論文 draft では `citation_evidence_reviewer` も追加します
 - research-driven change では `report_reviewer` と perspective reviewers を default にします
 
+## Checkout Identity at Git Boundaries
+
+各 agent / work unit は、Git 状態に関係する作業単位の開始時に、既存の
+`checkout_identity` readback を一度 handoff context に含めます。cwd または
+checkout が変わった後、conflict 解消前、commit / push / PR 前、cleanup または
+destructive Git 前、subagent handoff と final handback でも同じ block を更新します。
+通常のコマンドごとには繰り返しません。
+
+readback は `python3 tools/runtime/authority/checkout_identity.py --format lines` で取得し、
+絶対 `cwd`、Git root、branch（detached を含む）、HEAD、normalized remote
+`owner/repository` を運びます。これは観測情報だけであり、branch / worktree authority、
+approval、merge、cleanup、Issue、publication の権限を追加しません。Git root または
+remote を解決できない場合は `unknown` をそのまま伝え、対象操作が identity を必要と
+するときだけ既存の owner route で停止します。
+
 ## Parallel Write Safety
 
 - parent が `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を管理します
-- repository write は `worker` または `spark_worker` に限定します。reviewer と artifact-only role は read-only とし、artifact role に write capability が必要な場合も manifest で明示した artifact path と理由に限定します
+- write-capable handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必須とし、branch は handoff 前に `repository-topic-clone.prepare` で用意します
+- 同一 wave の writer target が同じ `checkout_root` を持つ場合、agent team は spawn callback 前に typed collision として拒否します。reader は `writer_target` を持たず同じ checkout を共有できます
+- `repository-topic-clone.prepare` は dedicated clone の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。PreToolUse はこの packet を正本として読み、環境変数は readback 一致確認に限って使い、modified path が `allowed_paths` の外なら拒否します。packet が無い checkout や packet 自身の変更は拒否し、read-only command はこの writer path gate の対象外です
+- repository write は `worker`、`spark_worker`、`integration_executor` の各 write-capable route に限定します。IssueWorker の `publisher` は外部 GitHub publication 専用で target を持たず、reviewer と artifact-only role は read-only とします
 - 同一 path、同一 directory ownership、同一 public API surface、shared Git index/HEAD、generated output、formatter output は順序制約つきの writer に割り当てます
-- 同一 worktree の write-capable subagent instance は既定 1 人から始めますが、parent が dependency order、wave plan、dependency-expanded disjoint write scope、integration order、review gate を handoff packet に載せた場合は同じ role type を含む複数 writer instance を同一 wave で使えます
+- 同一 worktree の write-capable subagent instance は、writer target が distinct である場合だけ同じ role type を含む複数 writer instance を同一 wave で使えます
 - same directory / same file / same canonical surface を同時に触る writer は先行 / 後続 wave に分けます
 - 衝突する target は順序制約として扱い、先行 wave の validation と tool rerun 後に後続 wave で統合します
 - writer は current checkout 内の wave plan で分離し、追加判断が要る writer は後続 wave へ直列化します
 - isolated worktree は通常の衝突回避には使わず、明示 workflow が要求する genuinely independent alternative implementation experiment に限定します
 - review role は常に read-only とし、parent-managed write-scope discipline と writer-instance separation の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
+writer target は短命な handoff 値であり、claim file、PID、expiry、daemon、または別の writer registry を作りません。worker と integration_executor の生成 prompt は target の checkout で開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しないことを明示します。外部 GitHub publication 専用の publisher は target 不要です。
+
 ## Codex Model Settings
 
 `agents/model_profiles.toml` が canonical typed profile authority です。
 `agents/execution_topology.json` は logical role と physical execution profile の
 分離、および direct-Luna default を所有します。
-`tools/agent_tools/model_profile_registry.py` は closed generated views として
+`tools/agent/orchestration/model_profile_registry.py` は closed generated views として
 `.codex/agents/*.toml` と `agents/agents_config.json` を materialize します。
 generated views は projection digest / readback surfaces であり、手動で編集しては
 なりません。model / reasoning の変更は registry / team / runtime source から始め、
@@ -810,7 +865,7 @@ runtime は再生成後に restart し、readback で反映を確認します。
 
 - human routing and inventory canon: `agents/`
 - permanent team ownership and write policy: `agents/agents_config.json`
-- skill shim: `.agents/skills/`
+- skill shim: `.codex/personal/skills/`
 - Codex project config: `.codex/config.toml`
 - generated Codex subagent readback views: `.codex/agents/*.toml`
 
@@ -830,8 +885,8 @@ runtime は再生成後に restart し、readback で反映を確認します。
 
 runtime inventory や review pack を変えたら、まず次を実行します。
 
-    python3 tools/agent_tools/check_agent_runtime_alignment.py
-    python3 tools/agent_tools/smoke_test_research_perspective_pack.py
+    python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+    python3 eval/checkers/smoke_test_research_perspective_pack.py
 
 この smoke test は次を確認します。
 

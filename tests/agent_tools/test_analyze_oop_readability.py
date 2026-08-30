@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests OOP readability analyzer behavior.
-# upstream implementation ../../tools/oop/python/readability.py Python analyzer
-# upstream implementation ../../tools/oop/cpp/readability.py C++ analyzer
-# upstream implementation ../../tools/oop/shared/readability_core.py shared analyzer report fields
+# upstream implementation ../../tools/validation/code/oop/python/readability.py Python analyzer
+# upstream implementation ../../tools/validation/code/oop/cpp/readability.py C++ analyzer
+# upstream implementation ../../tools/validation/code/oop/shared/readability_core.py shared analyzer report fields
 # upstream design ../../documents/conventions/object-oriented-design.md OOP boundary policy
 # upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md OOP gate
 # @dependency-end
@@ -23,8 +23,8 @@ from pathlib import Path
 from types import MappingProxyType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PYTHON_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "python" / "readability.py"
-CPP_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "cpp" / "readability.py"
+PYTHON_ANALYZER = PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "readability.py"
+CPP_ANALYZER = PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "cpp" / "readability.py"
 EMPTY_ENV: Mapping[str, str] = MappingProxyType({})
 
 
@@ -1746,7 +1746,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             report_dir = root / "reports" / "agents" / "run-1"
-            monitor = root / "tools" / "agent_tools" / "workflow_monitor.py"
+            monitor = root / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
             monitor.parent.mkdir(parents=True)
             monitor.write_text(
                 "\n".join(

@@ -3,9 +3,9 @@
 # responsibility Selects and runs standalone AgentCanon validation in one shared tool runtime and one required check.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
-# upstream implementation ../../tools/agent_tools/classify_path_risk.py canonical changed-path selector and unit mapping
-# upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh executes one selected static-gate unit
-# downstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
+# upstream implementation ../../tools/validation/semantic/path/classify_path_risk.py canonical changed-path selector and unit mapping
+# upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh executes one selected static-gate unit
+# downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates workflow and PR template conventions
 # downstream implementation ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
 # @dependency-end
 
@@ -19,7 +19,7 @@ permissions:
 
 env:
   AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
-  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/../workspace/agent-canon-runtime/static-gates
+  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
 
 concurrency:
   group: agent-canon-static-gates-${{ github.event.pull_request.head.sha || github.sha }}
@@ -44,7 +44,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
-          python3 tools/agent_tools/classify_path_risk.py \
+          python3 tools/validation/semantic/path/classify_path_risk.py \
             --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" \
             --format github-output | tee -a "${GITHUB_OUTPUT}"
 
@@ -81,7 +81,7 @@ jobs:
           for unit in "${units[@]}"; do
             ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
               exec --root "${GITHUB_WORKSPACE}" -- bash \
-              /usr/local/share/agent-canon/runtime/tools/ci/run_standalone_static_gate_unit.sh "${unit}"
+              /usr/local/share/agent-canon/runtime/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}"
           done
 
       - name: Release shared tool runtime

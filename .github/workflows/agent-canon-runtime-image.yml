@@ -1,3 +1,11 @@
+# @dependency-start
+# contract configuration
+# responsibility Builds and publishes the multi-architecture AgentCanon runtime image.
+# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime image contract
+# upstream implementation ../../bootstrap/container/image/Dockerfile builds the runtime image
+# downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates workflow conventions
+# @dependency-end
+
 name: AgentCanon runtime image
 
 on:
@@ -86,7 +94,7 @@ jobs:
           docker buildx build \
             --builder "${BUILDER_NAME}" \
             --network host \
-            --file bootstrap/container/Dockerfile \
+            --file bootstrap/container/image/Dockerfile \
             --platform "${EXPECTED_PLATFORM}" \
             --tag "agent-canon-runtime:pr-${GITHUB_SHA}-${ARCH}" \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
@@ -102,7 +110,7 @@ jobs:
           docker buildx build \
             --builder "${BUILDER_NAME}" \
             --network host \
-            --file bootstrap/container/Dockerfile \
+            --file bootstrap/container/image/Dockerfile \
             --platform "${EXPECTED_PLATFORM}" \
             --tag "${IMAGE_NAME}:sha-${GITHUB_SHA}-${ARCH}" \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \

@@ -10,7 +10,7 @@ upstream design html-output.md reader-facing rendering and viewport constraints
 upstream design structure-planning.md first-figure and section planning
 upstream design result-artifact-writeout.md artifact placement and manifest discipline
 upstream design ../../documents/experiments/experiment-report-style.md reader-facing evidence quality
-downstream implementation ../../.agents/skills/result-visualize/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../.codex/personal/skills/result-visualize/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 

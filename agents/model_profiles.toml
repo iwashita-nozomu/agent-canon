@@ -3,8 +3,8 @@
 # responsibility Declares the closed canonical model-profile registry and explicit role bindings.
 # upstream design ./canonical/CODEX_SUBAGENTS.md defines role/profile responsibilities
 # upstream design ./skills/agent-orchestration.md canonical validation trust boundary owner
-# downstream implementation ../tools/agent_tools/model_profile_registry.py loads and materializes this registry
-# downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates generated views
+# downstream implementation ../tools/agent/orchestration/model_profile_registry.py loads and materializes this registry
+# downstream implementation ../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates generated views
 # downstream implementation ../.codex/agents/spark_worker.toml projects the Spark runtime role
 # downstream implementation ../.codex/agents/terra.toml projects the Terra runtime role
 # @dependency-end
@@ -16,7 +16,7 @@ registry_version = 3
 [writer_isolation_policy]
 current_checkout_mode = "parallel_only_for_disjoint_paths_without_shared_state"
 parallel_requirements = ["disjoint_paths", "no_shared_git_index_or_head", "no_generated_or_formatter_effects"]
-collision_action = "serialize_current_checkout_waves"
+collision_action = "reject_same_checkout_root_before_spawn"
 isolated_worktree_mode = "explicit_alternative_implementation_experiment_only"
 
 [role_profile_bindings]
@@ -48,6 +48,8 @@ report_reviewer = "luna_reasoning_high"
 reproducibility_reviewer = "luna_reasoning_high"
 requirements_organizer = "luna_reasoning_high"
 reviewer = "luna_reasoning_high"
+# The logical mathematical_correctness_reviewer role reuses this dedicated
+# Luna/high executable with a stricter math-intent handoff contract.
 scientific_computing_reviewer = "luna_reasoning_high"
 ship_reviewer = "luna_ship_xhigh"
 skill_evaluator = "mini_skill_evaluator_medium"
@@ -115,6 +117,20 @@ static_obligations = ["validation_owner", "parent_assignment"]
 id = "reviewer_solid_boundary"
 text = "Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete."
 priority = 100
+
+[[role_instruction_templates.integration_executor]]
+id = "integration_executor_conflict_preservation"
+text = "Own candidate branch integration and conflict resolution. On a conflict or validation rework, capture the repository-qualified merge base, base/ours/theirs stages and hunks, staged state, and unaffected user/unknown content before mutation. Record the selected cause, expected mechanism, exact owning edit delta, disposition, rationale, and reconstruction map in the mapped conflict/rework artifacts; validate the resolved hunk identity and readback before accepting the integrated head. Whole-file checkout, restore, reset, clean, reclone, overwrite, or regeneration is not a shortcut. Normal edits emit only their ordinary decision log."
+priority = 1
+consumer_static_text = "Own candidate branch integration and conflict resolution. On a conflict or validation rework, capture merge-base, base/ours/theirs stages and hunks, staged state, and unaffected content before mutation. Record the cause, expected mechanism, owning edit delta, disposition, rationale, and reconstruction map in the mapped artifacts; validate resolved hunk identity and readback before accepting the integrated head. Whole-file replacement is not a shortcut. Normal edits emit only their ordinary decision log."
+static_obligations = ["parent_assignment", "parent_authority", "validation_owner", "stop_handback"]
+
+[[role_instruction_templates.publisher]]
+id = "issue_worker_publication_route"
+text = "When the selected route is IssueWorker, use the existing issue-finding-report and pr-processing responsibilities. Consume only explicit issue_worker_candidate records. The checkout identity readback supplies repository identity: the same user-owned repository routes to this publisher, while another repository is a qualified no-mutation handoff. Read related open and closed Issues, filter every related Issue against the current checkout and candidate repository, narrow mixed responsibility, transfer clauses and backlinks, and create, update, reopen, or leave unchanged only when the responsibility requires it. A noop requires the same responsibility tuple plus the candidate mechanism/fix clause in the structured required-fix section; an old or missing clause is an update/reorganization case. Read back URL, number, body, and state after every mutation. Counts, status observations, selection misses, and explicit current_scope_resolved or durable_follow_up=false records do not synthesize or publish an Issue. Missing owner or mechanism evidence remains publisher investigation and may produce need verification; it is not silently discarded. Do not request extra approval, create a local Issue database, or use body digests, fingerprints, or witness claims. Dashboard and resident runtime remain read-only; this publisher role owns GitHub credentials and mutation."
+priority = 1
+consumer_static_text = "When the selected route is IssueWorker, use the existing Issue finding and publication responsibilities. Consume only explicit IssueWorker candidate records. Use the checkout identity readback for repository routing: the same user-owned repository routes here, while another repository is a qualified no-mutation handoff. Filter related Issues against the current checkout and candidate repository, read open and closed Issues, narrow mixed responsibility, transfer clauses and backlinks, and mutate only when required; read back URL, number, body, and state. A noop requires the same responsibility tuple and the candidate mechanism/fix clause in the structured required-fix section; old or missing clauses require update/reorganization. Counts, status observations, selection misses, current-scope-resolved records, and explicit non-durable records do not publish. Investigate missing owner or mechanism evidence and record need verification when appropriate. Do not request extra approval or create a second Issue database. Dashboard and resident runtime remain read-only; publisher owns GitHub mutation."
+static_obligations = ["parent_assignment", "parent_authority", "validation_owner", "stop_handback"]
 
 [standalone_role_metadata.long_form_writer]
 logical_role_id = "long_form_writer"
@@ -204,7 +220,7 @@ model = "gpt-5.6-luna"
 reasoning_effort = "xhigh"
 owner = "luna"
 capabilities = ["implementation", "causal_repair", "cross_owner_integration"]
-allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence"]
+allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence", "writer_target"]
 forbidden_context = ["unrelated_paths"]
 return_schema_id = "claim_evidence_v1"
 checkpoint_policy = "nonblocking_observation"
@@ -222,7 +238,7 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "luna_impl"
-text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only the assigned child action within authority bounds: worker implements, integration_executor merges/resolves conflicts, and publisher performs authorized Issue/PR publication. ship_reviewer owns final approval; the parent only relays packets, dependency order, status, and external readback."
+text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Preserve conflict/rework packet content: capture base/ours/theirs stages and hunks, selected cause, expected mechanism, exact owning delta, unaffected content, disposition, and rationale before mutation; whole-file checkout/reset/reclone/overwrite/regeneration requires an explicit reconstruction map and preservation readback. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only the assigned child action within authority bounds: worker implements, integration_executor merges/resolves conflicts, and publisher performs authorized Issue/PR publication. ship_reviewer owns final approval; the parent only relays packets, dependency order, status, and external readback."
 priority = 1
 consumer_static_text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback."
 static_obligations = ["validation_owner", "parent_assignment", "parent_authority", "stop_handback"]
@@ -290,7 +306,7 @@ model = "gpt-5.3-codex-spark"
 reasoning_effort = "low"
 owner = "spark"
 capabilities = ["implementation", "fixed_packet"]
-allowed_context = ["objective", "context", "fixed_implementation_packet", "implementation_route_result", "owner_gate"]
+allowed_context = ["objective", "context", "fixed_implementation_packet", "implementation_route_result", "owner_gate", "checkout_identity", "writer_target", "writer_target_environment"]
 forbidden_context = ["broad_history", "unrelated_paths", "alternate_architecture"]
 return_schema_id = "claim_evidence_v1"
 checkpoint_policy = "nonblocking_observation_only"
@@ -308,9 +324,9 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "spark_impl"
-text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback."
+text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Preserve conflict/rework packet content: capture base/ours/theirs stages and hunks, selected cause, expected mechanism, exact owning delta, unaffected content, disposition, and rationale before mutation; whole-file checkout/reset/reclone/overwrite/regeneration requires an explicit reconstruction map and preservation readback. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback."
 priority = 1
-consumer_static_text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback."
+consumer_static_text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Preserve conflict/rework packet content: capture base/ours/theirs stages and hunks, selected cause, expected mechanism, exact owning delta, unaffected content, disposition, and rationale before mutation; whole-file checkout/reset/reclone/overwrite/regeneration requires an explicit reconstruction map and preservation readback. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback."
 static_obligations = ["validation_owner", "parent_assignment", "parent_authority", "stop_handback"]
 
 [[model_profiles]]

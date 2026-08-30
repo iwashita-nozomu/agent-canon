@@ -6,7 +6,7 @@ contract reference
 responsibility Defines the sole Host entrypoint and typed command routes for the standalone AgentCanon runtime.
 upstream implementation ../../bootstrap.sh owns Host lifecycle admission
 upstream design ../../documents/runtime/bootstrap-runtime.md owns runtime, target, eval, and cleanup semantics
-downstream implementation ../../tools/agent_tools/bootstrap_runtime.py implements the command family
+downstream implementation ../../tools/runtime/container/bootstrap_runtime.py implements the command family
 downstream design ./CODEX_WORKFLOW.md consumes task and closeout routes
 @dependency-end
 -->
@@ -20,17 +20,18 @@ the global Host environment.
 ```bash
 BOOTSTRAP=/path/to/agent-canon/bootstrap.sh
 CONTROL=<authorized-parent-root>
-RUNTIME="$CONTROL/workspace/agent-canon-runtime/<installation>"
 TARGET=<selected-source-or-project-root>
-COMMON=(--control-parent-root "$CONTROL" --runtime-root "$RUNTIME")
+COMMON=(--control-parent-root "$CONTROL")
 
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" start
 "$BOOTSTRAP" "${COMMON[@]}" target add --root "$TARGET" --mode read-only
 ```
 
-The control root and runtime root are explicit on every call. A target is not
-discovered by scanning the parent workspace.
+The control root is explicit on every call. Unless `--runtime-root` is
+provided, bootstrap stores its reconstructible state in the install root's
+ignored `.runtime/`. A target is not discovered by scanning the parent
+workspace.
 
 ## Tool commands
 

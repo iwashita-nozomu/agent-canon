@@ -8,8 +8,8 @@ upstream design ../../documents/parent-repository-audit/README.md owns the canon
 upstream design ../../responsibility-scope.toml owns the tracked-path owner/class relation
 upstream design ../skills/catalog.yaml owns public capability and command metadata
 upstream design ../skills/skill-dependencies.yaml owns prerequisite and routing relations
-upstream implementation ../../tools/agent_tools/parent_repository_audit.py owns deterministic unit selection and evidence receipts
-downstream implementation ../../.agents/skills/parent-repository-audit/SKILL.md exposes this source skill as a generated runtime adapter
+upstream implementation ../../tools/analysis/code/parent_repository_audit.py owns deterministic unit selection and evidence receipts
+downstream implementation ../../.codex/personal/skills/parent-repository-audit/SKILL.md exposes this source skill as a generated runtime adapter
 @dependency-end
 -->
 
@@ -56,9 +56,9 @@ summary、inventory、runtime shim は再生成可能な projection であり un
 親 root から resolver が返す owner command を実行します。
 
 ```bash
-python3 tools/agent_tools/parent_repository_audit.py list \
+python3 tools/analysis/code/parent_repository_audit.py list \
   --root <parent-root> --format text
-python3 tools/agent_tools/parent_repository_audit.py list \
+python3 tools/analysis/code/parent_repository_audit.py list \
   --root <parent-root> --surface <stable-surface> \
   --scope <tracked-evidence-path> --format text
 ```
@@ -75,7 +75,7 @@ unknown surface、invalid unit、source/root path escape、missing evidence scop
 check packet は unit receipt の全体状態を集約します。
 
 ```bash
-python3 tools/agent_tools/parent_repository_audit.py check \
+python3 tools/analysis/code/parent_repository_audit.py check \
   --root <parent-root> \
   --unit-status <pass|closed|failed|deferred|blocked> \
   --format text
@@ -134,5 +134,5 @@ decision-owning reviewer へ typed next action を返します。
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-`python3 tools/agent_tools/skill_tool_commands.py show --skill parent-repository-audit --format text`
+`python3 tools/agent/skills/skill_tool_commands.py show --skill parent-repository-audit --format text`
 <!-- skill-tool-commands:end -->

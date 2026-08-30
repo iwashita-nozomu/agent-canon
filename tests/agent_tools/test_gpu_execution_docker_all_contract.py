@@ -7,7 +7,7 @@
 # upstream design ../../agents/skills/environment-maintenance.md canonical image validation boundary
 # upstream design ../../documents/experiments/gpu-direct-command.md injection selection contract
 # upstream design ../../tools/README.md public Docker GPU invocation documentation
-# upstream implementation ../../tools/ci/run_gpu_container.sh route-selecting shell adapter
+# upstream implementation ../../tools/validation/ci/runners/run_gpu_container.sh route-selecting shell adapter
 # @dependency-end
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ GPU_SKILL = PROJECT_ROOT / "agents" / "skills" / "gpu-execution.md"
 ENVIRONMENT_SKILL = PROJECT_ROOT / "agents" / "skills" / "environment-maintenance.md"
 DESIGN = PROJECT_ROOT / "documents" / "experiments" / "gpu-direct-command.md"
 TOOLS_README = PROJECT_ROOT / "tools" / "README.md"
-WRAPPER = PROJECT_ROOT / "tools" / "ci" / "run_gpu_container.sh"
+WRAPPER = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_gpu_container.sh"
 GPU_ENVIRONMENT_NAMES = (
     "CUDA_VISIBLE_DEVICES",
     "NVIDIA_VISIBLE_DEVICES",

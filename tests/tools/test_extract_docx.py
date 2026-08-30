@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests the standard-library DOCX reference bundle extractor.
-# upstream implementation ../../tools/docs/extract_docx.py owns DOCX decomposition and bundle output
+# upstream implementation ../../tools/analysis/documents/extraction/extract_docx.py owns DOCX decomposition and bundle output
 # downstream design ../../documents/tools/extract_docx.md documents the bundle contract
 # @dependency-end
 
@@ -21,7 +21,7 @@ from unittest import mock
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "docs" / "extract_docx.py"
+SCRIPT_PATH = PROJECT_ROOT / "tools" / "analysis" / "documents" / "extraction" / "extract_docx.py"
 
 
 def load_extractor():

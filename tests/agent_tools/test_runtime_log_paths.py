@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests AgentCanon runtime log archive path resolution.
-# upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves active and legacy log archive paths
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves active and legacy log archive paths
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
 # @dependency-end
 
@@ -22,8 +22,8 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.agent_tools.runtime_artifacts import RuntimePathEscape
-from tools.agent_tools.runtime_log_paths import (
+from tools.runtime.artifacts.runtime_artifacts import RuntimePathEscape, SourceLocalArtifact
+from tools.runtime.archive.runtime_log_paths import (
     agent_report_archive_dir,
     codex_runtime_index_path,
     codex_runtime_summary_path,
@@ -251,6 +251,27 @@ class RuntimeLogPathsTest(unittest.TestCase):
         self.assertEqual(spool_b, runtime / "spool" / "hook-events" / repo_log_key(caller_b))
         self.assertEqual(outcome_a, outcome_b)
 
+    def test_bootstrap_source_runtime_is_spool_only(self) -> None:
+        """The canonical source runtime serves spool paths, never archive output."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            source.mkdir()
+            runtime = source / ".runtime"
+            runtime.mkdir()
+
+            self.assertEqual(
+                hook_event_spool_root(source, runtime),
+                runtime / "spool" / "hook-events" / repo_log_key(source),
+            )
+            self.assertEqual(
+                runtime_event_publication_outcome_spool_root(source, runtime),
+                runtime / "spool" / "publication-outcome",
+            )
+            with self.assertRaises(SourceLocalArtifact):
+                mounted_log_archive_root(source, runtime)
+            self.assertFalse((runtime / "archive").exists())
+
     def test_explicit_runtime_root_rejects_external_spool_override(self) -> None:
         """A spool override outside the declared runtime root fails closed."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -264,6 +285,71 @@ class RuntimeLogPathsTest(unittest.TestCase):
             with patch.dict(os.environ, {"AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(external)}):
                 with self.assertRaises(RuntimePathEscape):
                     hook_event_spool_root(source, runtime)
+
+    def test_explicit_archive_override_reads_external_private_log_mount(self) -> None:
+        """Dashboard readers may use the already-mounted private archive checkout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            runtime = root / "runtime"
+            private_log = root / "private-log"
+            source.mkdir()
+            runtime.mkdir()
+            private_log.mkdir()
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log),
+                    "AGENT_CANON_LOG_ROOT": str(private_log),
+                },
+            ):
+                dirs = hook_result_search_dirs(source, source, runtime)
+
+        self.assertEqual(dirs[0], private_log / "hook-runs" / repo_log_key(source))
+
+    def test_absolute_archive_override_rejects_unowned_path(self) -> None:
+        """An absolute archive override cannot select an arbitrary external tree."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            runtime = root / "runtime"
+            private_log = root / "private-log"
+            external = root / "external"
+            source.mkdir()
+            runtime.mkdir()
+            private_log.mkdir()
+            external.mkdir()
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(external),
+                    "AGENT_CANON_LOG_ROOT": str(private_log),
+                },
+            ):
+                with self.assertRaises(RuntimePathEscape):
+                    hook_result_search_dirs(source, source, runtime)
+
+    def test_absolute_archive_override_rejects_symlinked_private_mount(self) -> None:
+        """A private-log alias cannot redirect the archive reader."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            runtime = root / "runtime"
+            private_log = root / "private-log"
+            private_alias = root / "private-log-alias"
+            source.mkdir()
+            runtime.mkdir()
+            private_log.mkdir()
+            private_alias.symlink_to(private_log, target_is_directory=True)
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_alias),
+                    "AGENT_CANON_LOG_ROOT": str(private_alias),
+                },
+            ):
+                with self.assertRaises(RuntimePathEscape):
+                    hook_result_search_dirs(source, source, runtime)
 
 
 if __name__ == "__main__":

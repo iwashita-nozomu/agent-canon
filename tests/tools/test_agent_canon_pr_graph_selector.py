@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies canonical selection, trusted diff bases, changed-responsibility reachability, and typed graph failures.
-# upstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating
-# upstream implementation ../../tools/ci/check_agent_canon_pr.sh prepares and passes the trusted GitHub base
+# upstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects parent strict graph gating
+# upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh prepares and passes the trusted GitHub base
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json owns canonical validation profile IDs and graph requirements
 # upstream design ../../documents/design/dependency-manifest-design.md owns canonical dependency surfaces
 # @dependency-end
@@ -26,8 +26,8 @@ from typing import cast
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SELECTOR_PATH = PROJECT_ROOT / "tools" / "ci" / "agent_canon_pr_graph_selector.py"
-CHECKER_PATH = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
+SELECTOR_PATH = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "agent_canon_pr_graph_selector.py"
+CHECKER_PATH = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
 SPEC = importlib.util.spec_from_file_location(
     "agent_canon_pr_graph_selector", SELECTOR_PATH
 )
@@ -161,7 +161,7 @@ def graph_builder_exit_fixture(
         encoding="utf-8",
     )
     executable.chmod(0o755)
-    producer = source_root / "tools" / "agent_tools" / "surface_manifest.py"
+    producer = source_root / "tools" / "runtime" / "manifest" / "surface_manifest.py"
     producer.parent.mkdir(parents=True)
     producer.write_text("# current producer fixture\n", encoding="utf-8")
     manifest = source_root / "documents" / "runtime" / "shared-runtime-surfaces.toml"
@@ -860,7 +860,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 selector, "selector_source_root", return_value=source_root
             ):
                 identity = selector.current_producer_identity(source_root)
-                (source_root / "tools/agent_tools/surface_manifest.py").write_text(
+                (source_root / "tools/runtime/manifest/surface_manifest.py").write_text(
                     "# replaced producer\n",
                     encoding="utf-8",
                 )
@@ -1029,12 +1029,12 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
         self.assertTrue(
             {
-                "tools/agent_tools/scan_dependency_headers.sh",
-                "tools/agent_tools/check_dependency_headers.py",
-                "tools/agent_tools/render_dependency_manifest_graph.py",
-                "tools/agent_tools/graph_client.py",
-                "tools/ci/check_agent_canon_pr.sh",
-                "tools/ci/run_all_checks.sh",
+                "tools/analysis/dependencies/scan_dependency_headers.sh",
+                "tools/validation/semantic/dependencies/check_dependency_headers.py",
+                "tools/analysis/dependencies/render_dependency_manifest_graph.py",
+                "tools/analysis/dependencies/graph_client.py",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
+                "tools/validation/ci/runners/run_all_checks.sh",
             }.issubset(surfaces)
         )
 
@@ -1042,7 +1042,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         """A manifest-owned dependency surface selects strict graph completeness."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            base = commit_change(root, "tools/agent_tools/graph_client.py")
+            base = commit_change(root, "tools/analysis/dependencies/graph_client.py")
 
             selection = selector.select(
                 root,
@@ -1053,13 +1053,13 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
         self.assertEqual(selection.status, "required")
         self.assertIn("canonical_dependency_surface_touched", selection.reason)
-        self.assertIn("tools/agent_tools/graph_client.py", selection.evidence)
+        self.assertIn("tools/analysis/dependencies/graph_client.py", selection.evidence)
 
     def test_graph_storage_dispatch_and_bootstrap_surfaces_require_graph(self) -> None:
         """Every reviewed graph storage/dispatch/bootstrap surface selects strict graph."""
         reviewed_surfaces = (
-            "rust/agent-canon/src/structured_analysis.rs",
-            "rust/agent-canon/src/main.rs",
+            "tools/runtime/dispatch/agent-canon/src/structured_analysis.rs",
+            "tools/runtime/dispatch/agent-canon/src/main.rs",
             "tools/bin/agent-canon",
         )
         for relative in reviewed_surfaces:
@@ -1474,7 +1474,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
     def test_pr_entrypoint_keeps_graph_analysis_outside_source_receipt(self) -> None:
         """The selector supplies scope; the source receipt owns two statuses."""
         entrypoint = CHECKER_PATH.read_text(encoding="utf-8")
-        quick_ci = (PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh").read_text(
+        quick_ci = (PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh").read_text(
             encoding="utf-8"
         )
 

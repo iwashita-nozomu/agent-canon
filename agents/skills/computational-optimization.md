@@ -8,7 +8,7 @@ upstream design research-workflow.md research-backed change boundary
 upstream design experiment-lifecycle.md experiment execution and rerun boundary
 upstream design test-design.md adversarial test design boundary
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic obligation and verification-owner contract
-downstream implementation ../../.agents/skills/computational-optimization/SKILL.md Codex discovery shim
+downstream implementation ../../.codex/personal/skills/computational-optimization/SKILL.md Codex discovery shim
 @dependency-end
 -->
 
@@ -46,6 +46,63 @@ downstream implementation ../../.agents/skills/computational-optimization/SKILL.
 - 実装前は semantic responsibility contract に数値検証の obligation と一次 owner を割り当てます。`$test-design` は実装 mechanism 確立後の未解決 test-owned runtime risk に限ります。
 - Python / C++ 差分 review は `$python-review` / `$cpp-review` を併用します。
 - この skill は数値最適化の数学契約と検証契約を固定する責務を持ち、汎用 research workflow や実験 runner の代替ではありません。
+
+## Mathematical Intent Packet
+
+数学または数値の挙動を修正する write-capable route は、実装者へ渡す
+`mathematical_intent_packet` を先に埋めます。この packet は説明用の設計案ではなく、
+数学担当者の書込範囲を決める source packet です。次のフィールドを省略せず、該当しない
+場合は `not_applicable` と理由を書きます。
+
+- `math_object`: 対象の数理オブジェクト、入力・出力、対象の主張
+- `problem`: 問題設定、適用範囲、求める性質
+- `variables`: 変数と固定 parameter、shape、dtype
+- `domains`: 変数・parameter の domain と dimension
+- `units`: 物理単位、scale、dimensionless 化
+- `objective`: objective、正規化、符号規約、評価点（該当時）
+- `residual`: residual、norm、符号規約、評価点（該当時）
+- `constraints`: equality、inequality、box、feasibility、projection、barrier / penalty
+- `equations`: 数式、境界条件、記号の対応
+- `definitions`: 定義と意味（該当時）
+- `assumptions`: 仮定、適用範囲、適用外条件
+- `approximations`: 近似、許容範囲、誤差の扱い（該当時）
+- `derivation`: 期待する導出、変形、gradient / Jacobian / Hessian の根拠
+- `iteration_map`: 実装対象の反復写像、状態、受理条件、`z_next` の対応
+- `update_map`: 反復ごとの更新則と実装状態の対応（反復写像と別の場合）
+- `invariants`: 不変量、保存量、有限性、対称性、単調性
+- `limits`: 期待する極限、漸近条件、極限の適用範囲
+- `stopping_scalar`: 停止量、停止条件、tolerance、max iteration
+- `failure_semantics`: infeasible、singular、non-finite、max-iter、not-converged の意味
+- `equation_to_code_map`: 各 equation / definition / update と、実装の file、symbol、call path
+- `math_oracle`: 最小の数学 oracle、期待値、検証可能な性質
+- `counterexample`: 反例、失敗ケース、または反例が無いことの根拠
+- `mathematical_definition_paths`: 数式・定義・更新則を実装する明示的な相対 path
+- `mathematical_oracle_paths`: math oracle / counterexample を実装する明示的な相対 path
+- `mathematical_documentation_paths`: 数理責務を説明する owner document の明示的な相対 path
+- `allowed_write_paths`: 上記 map から直接導ける定義、導出、algorithm implementation、
+  numerical oracle、およびそれらを所有する docs / tests の相対 path
+- `forbidden_surfaces`: math route では既定で書き込まない architecture、framework、JIT、
+  compiler、backend、runtime、container、routing、environment、Docker、common infra、
+  proof-tool / IR infrastructure の surface
+- `separate_handoff_targets`: 明示された非数理要求、または forbidden surface の原因候補を
+  別 owner へ渡す対象と理由
+
+`allowed_write_paths` は見えているファイル一覧やエラー発生箇所から推測せず、
+`mathematical_definition_paths`、`mathematical_oracle_paths`、
+`mathematical_documentation_paths`、および `equation_to_code_map` の code path の集合と
+完全一致させます。共通 infrastructure、JIT / backend、
+runtime、routing、environment、Docker、証明ツールを変更しないと math oracle が閉じない場合は、
+数学 writer を停止し、該当 surface の separate handoff を返します。数学 packet が無い、
+または map / oracle が未接続な状態では write-capable dispatch を開始しません。
+
+通常の run は `bootstrap_agent_run.py --math-intent-packet '<JSON>'` で packet を渡します。
+bootstrap は選択された math-intent route の run manifest と spawn handoff に同じ正規化済み
+packet を投影し、packet が無い場合は `math_packet_missing` で停止します。
+
+数学 packet は数学的な依頼にだけ要求します。Docker、JIT、backend、runtime、routing、
+environment、CI、container などを明示的に修正する非数理要求には適用せず、その owner route
+へ渡します。両方が一つの依頼に含まれる場合は clause ごとに sibling handoff を作り、数学
+writer の scope に非数理 path を混ぜません。
 
 ## Optimization Contract
 
@@ -166,6 +223,73 @@ surfaces when the route packet makes them part of the product contract.
 - Linear solver / preconditioner では residual norm、reference norm、preconditioner summary、breakdown status を分けます。
 - Randomized or stochastic optimization では seed、sample budget、variance / confidence、rerun policy を保存します。
 - Performance claim は correctness evidence と分け、同じ run を両方の根拠にしません。
+
+## Convergence-First Numerical Performance Diagnosis
+
+数値 solver または反復 algorithm の速度差を扱うときは、run 後の観測を
+収束・反復の変化と実行基盤の cost に分けてから、次の owner へ handoff
+します。これは数値 performance observation にだけ適用し、非数値の C++
+performance へ compile/JIT 指標を要求する規則ではありません。run 前の
+pass / fail や experiment acceptance を作らず、実行結果の解釈として記録します。
+
+### Required post-run record
+
+before / after は、同じ mathematical problem、initial state、stopping policy、
+dtype / device contract、workload で比較します。少なくとも次の decomposition を
+同じ record に残します。
+
+\[
+T_{total} = T_{compile/JIT} + N_{iter} \times
+(T_{iter\_eval} + T_{linear\_solve} + T_{communication}) + T_{other}.
+\]
+
+`T_iter_eval`、`T_linear_solve`、`T_communication` を可能な範囲で分離し、cold
+compile/JIT、warm execution、transfer / synchronization、algorithmic iteration
+cost を合計時間だけで代用しません。`total_seconds` は summary であり、帰属可能な
+component ではありません。数値側の evidence は residual / objective /
+KKT trajectory、iteration count、step acceptance / size、termination status、
+conditioning、inner-solver work、finite / non-finite event、および per-iteration
+cost を含めます。正規化と分類は
+`python3 tools/analysis/numerical/numeric_performance.py --input <post-run-observations.json> --format json`
+で行い、prose だけで JIT handoff を決めません。
+
+入力は `agent-canon.numeric-performance-observation.v1` の closed JSON です。
+`scope` は `numeric_solver` または `non_numeric`、数値 solver では
+`trajectory_tolerance` と task-provided `math_oracle` を必須にします。各
+`before` / `after` record は `total_seconds` を必須とし、完全な数値比較には
+`compile_jit_seconds`、`iterations`、`per_iteration_seconds`、`eval_seconds`、
+`linear_solve_seconds`、`communication_seconds`、`transfer_seconds`、
+`synchronization_seconds`、`other_seconds`、`residual_trajectory`、
+`objective_trajectory`、`kkt_trajectory`、`step_acceptance`、`step_sizes`、
+`termination`、`conditioning`、`inner_solver`、`inner_solver_work`、
+`finite_nonfinite_events`、および `work_counters` を使用します。さらに
+`mathematical_problem`、`initial_state`、`stopping_policy`、`dtype`、`workload`、
+`run_mode`（`cold` / `warm`）、`compile_cache_state`、`backend`、`device`、
+`compiler` は before / after の両方に必要な比較 context です。
+未知の field は受け付けず、欠落した完全比較項目は `evidence_missing` として扱います。
+結果 JSON の `category`、`reason_code`、`owner_route`、`next_action`、`forbidden_writes`、
+`separate_handoff` をそのまま handoff に渡し、agent が prose から別の owner や
+JIT 編集を推測しません。
+
+### Classification and handoff
+
+| classification | required evidence | first owner and write boundary |
+| --- | --- | --- |
+| `convergence_changed` | trajectory、iteration count、residual / objective / KKT、step acceptance / size、termination、conditioning、または inner-solver work のいずれかが変化 | `computational-optimization` の数学 / algorithm owner。JIT、architecture、backend、compiler、runtime writer はこの math route から起動しない |
+| `systems_cost_isolated` | 数値 trajectory、KKT / finite state、iteration / work counters、termination、conditioning、inner-solver work、比較 context が同値で、compile/JIT、per-iteration、eval / linear-solve、transfer / synchronization、または total cost の少なくとも一つに after 側の正の回帰がある | JIT / backend / systems performance の sibling handoff。math writer はその surface を編集しない |
+| `evidence_missing` | total time だけ、分解・trajectory・KKT / finite state・work counters・比較 context の一部が欠落、context が不一致、数値 work が同じで正の component 回帰がない、または total だけが増加（`reason_code=unattributed_total`） | 未解決または no-action。JIT / architecture の修正へ進まず、必要な run evidence を集める |
+| `non_numeric` | solver / iterative numerical semantics を含まない native performance | 既存の `cpp-review` performance route。数値 decomposition を追加要求しない |
+
+iteration count の増加、residual / objective trajectory の悪化、rejected step、
+conditioning の悪化、または inner solver work の増加は、JIT 境界の変更ではなく
+数学 / algorithm の原因候補です。逆に `systems_cost_isolated` は数値 trajectory
+が保たれ、比較 context が一致し、かつ measured cost の正の回帰がある場合だけ成立
+します。compile/JIT の印象、total-time-only、context mismatch、同一時間、または
+component が変わらず `total_seconds` だけ増えた観測では
+成立しません。`trajectory_tolerance` は residual / objective / KKT trajectory に
+だけ適用し、work counters、termination、context、cost の差を許容する根拠にしません。
+どの classification でも tolerance、stopping rule、case mix、数値
+semantics を変えて速度差を作らないでください。
 
 ## Review Route
 

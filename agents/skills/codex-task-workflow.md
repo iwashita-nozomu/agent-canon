@@ -13,7 +13,8 @@ upstream design ../internal-routines/design-implementation-correspondence.md des
 upstream design ../../documents/design/request-intent-and-update-relation.md compact task-packet request and update projection
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
 upstream design ./agent-orchestration.md owner-first read trace and implementation admission
-downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
+upstream implementation ../../tools/agent/skills/skill_document_reader.py bounded Skill read and EOF admission
+downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 
@@ -80,13 +81,22 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 ## Owner-First Readback
 
 Before the implementation stage, consume
-`agents/skills/agent-orchestration.md#Owner-First-Read-Trace`. The current task
-update must name the active root Reader Map row, selected canonical Skill,
-operational owner and route, then show
-`docs_first_status=resolved` and `implementation_read=ready`. If the trace is
-unresolved, implementation remains locked and the existing coordinated-search
-route owns the bounded lookup. Do not replace this readback with an
-implementation-path list, a repository sweep, or a new durable packet.
+`agents/skills/agent-orchestration.md#Owner-First-Read-Trace`. Read the
+generated discovered `SKILL.md` in bounded chunks with
+`bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`
+until `file_eof=true`; it is the
+complete compact Skill. When that Skill delegates a decision, read only the
+indexed canonical owner sections needed for the task until
+`section_eof=true`. The current task update must name the active root Reader
+Map row, selected canonical Skill, operational owner and route, then show
+`docs_first_status=resolved` and `implementation_read=ready` only after those
+EOF conditions hold. If the trace is unresolved, implementation remains locked
+and the existing coordinated-search route owns the bounded lookup. A
+partial response, known path, or whole-file canonical read is not a substitute;
+do not create a per-read receipt, identifier, approval gate, or duplicate Skill
+body.
+Do not replace this readback with an implementation-path list, a repository
+sweep, or a new durable packet.
 
 ## CompletionCoverage Reader Projection
 
@@ -141,7 +151,7 @@ route are ready.
   file-backed run-local packet は coordination または resumption のために
   必要な場合だけ作る
 - Shared canon / Large delivery / high-risk / multi-step task でも、
-  `python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>` は
+  `python3 tools/runtime/lifecycle/bootstrap_agent_run.py ... --task-id <T*>` は
   coordination、resumption、または選択された launchable wave が必要と
   する場合にだけ実行する。作業が repo を変更することだけでは bundle の
   根拠にならない
@@ -189,7 +199,7 @@ route are ready.
   静的解析・読み取りで何が未確認として残ったかを記録します。
 - 詳細設計が編集対象 path に絞る前に、責務 model、概念 graph または layer model、非対象、将来拡張 layer、評価軸、canonical surface 関係を含む `Abstract Design Frame` を書くか引用する。実装 scope、file list、validation は nearest editable path や current finding ではなく、この frame から導く
 - semantic responsibility contract の run-local instance を active design packet から参照し、実装前に obligation と一次検証 owner を割り当てる。各 delta は `reuse|extend|replace|introduce` のいずれか一つの action を持ち、hard-edge closure は semantic grouping だけを決める。
-- 実装 path を選ぶ前に、owner、replaceable unit、implementation mechanism、validation route のいずれかが未確定な場合だけ、`python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` を走らせるか引用する。明示された owner/path、canonical README、または approved design packet が edit surface を固定している bounded route は provider sweep を追加しない。deterministic search が失敗した場合は diagnostic evidence を残し、owner/path ambiguity が残るときだけ `router_unavailable_blocker` とする。
+- 実装 path を選ぶ前に、owner、replaceable unit、implementation mechanism、validation route のいずれかが未確定な場合だけ、`python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` を走らせるか引用する。明示された owner/path、canonical README、または approved design packet が edit surface を固定している bounded route は provider sweep を追加しない。deterministic search が失敗した場合は diagnostic evidence を残し、owner/path ambiguity が残るときだけ `router_unavailable_blocker` とする。
 - 編集前の repo 調査は `agents/COMMUNICATION_PROTOCOL.md` が所有する `Pre-Edit Repository Investigation Packet` として固定する。既存 repo 調査が甘いまま実装へ進んだ場合は、差分を広げる前にこの packet を作り直す
 - `Pre-Edit Repository Investigation Packet` は、次に進む具体的な作業と担当者を 1 つ書いて閉じます。別の探索へ広げる前に、その作業を実装、検証、Issue 処理のいずれかへ進めます。
 - 検証経路は、primary validation evidence として使った静的解析・読み取り、
@@ -211,12 +221,12 @@ route are ready.
   selected design/handoff packet and transports its stages and closeout readback; it does not restate
   those routing or design decisions.
 - 同じ implementation pass で直せるのは、承認済み design、局所 precedent、既存責務境界から一意に導ける typo、format、import、狭い機械的追従だけです。判断が必要なら設計問題として扱う
-- class、dataclass、`Protocol`、継承、public API、型境界、依存方向を触る implementation slice は `$oop-readability-check` を validation route に入れ、SOLID principle signal、OOP dimension、finding kind、`tools/oop/shared/readability_core.py` の mapping を design artifact に結びます。
-- SOLID-sensitive な Python slice は `python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>` で、OOP readability report の `scanned_paths` が changed path を覆うことを確認します。
+- class、dataclass、`Protocol`、継承、public API、型境界、依存方向を触る implementation slice は `$oop-readability-check` を validation route に入れ、SOLID principle signal、OOP dimension、finding kind、`tools/validation/code/oop/shared/readability_core.py` の mapping を design artifact に結びます。
+- SOLID-sensitive な Python slice は `python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>` で、OOP readability report の `scanned_paths` が changed path を覆うことを確認します。
 - 実装前に `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認します。`worker` が既定で、`spark_worker` は Abstract Design Frame と design trace から導かれた bounded slice に対し、parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします
 - 変更対象の `Dependency Manifest Plan` を設計で固定し、編集前に upstream、編集後に downstream を読む
 - write-capable child route では、実装前に cause investigation child が artifact を固定し、`Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残してから code edit に入る
-- parent 直編集でも write-capable subagent でも、実装前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、予測された cause investigation / OOP / helper / dependency / responsibility_scope / hook runtime / skill mirror / tool catalog / protocol / log-surface gate と repair plan を handoff または work log に残す。実装ディレクトリを選ぶ前に owner scope と protecting tools を記録する
+- parent 直編集でも write-capable subagent でも、実装前に `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、予測された cause investigation / OOP / helper / dependency / responsibility_scope / hook runtime / skill mirror / tool catalog / protocol / log-surface gate と repair plan を handoff または work log に残す。実装ディレクトリを選ぶ前に owner scope と protecting tools を記録する
 - fresh subagent に渡す prompt は chat history 依存にしない。`agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、full transcript、raw logs、full dashboard、repo root 全体を context として渡さない
 - runtime/tool gate が write-capable spawn を阻害する場合は `WRITE_SUBAGENT_AUTHORIZATION=required` または該当 gate blocker を local/tool evidence として記録し、`selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を明示する。継続する際は `canonical_rerun_pass`、`durable_blocker_or_issue`、`router_unavailable_blocker`、`explicit revised route` 付きの approved route に限定する。The parent does not write as a recovery path.
 - 既存的な `status=blocked` の timeout 回復では、同一内容での再待機は行わず、`new state evidence` または `revised parent packet` がある場合のみ再 wait/再評価し、ユーザー向けの fallback message は出さない
@@ -225,7 +235,7 @@ route are ready.
 - nontrivial document creation / revision では `prose-reasoning-graph` と `structure-planning` を構造先行 gate として通し、その後に `long-form-writing` / `paper-writing` / `academic-writing` へ渡す。typo / link / format-only では `md-style-check` と `structure_contract=skipped` の理由を evidence に残す
 - closeout 前に `check_dependency_headers.py --changed`、`scan_dependency_headers.sh --changed --fail-missing`、`check_dependency_header_format.sh --changed --require-header` を通す
 - dependency edge を変更した場合は `check_dependency_graph.sh --print-edges` の結果、または移行中 baseline と今回差分で新規 graph error を増やしていない evidence を残す
-- Shared canon / Large delivery / high-risk / workflow-tooling change では closeout 前に `python3 tools/agent_tools/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を tool で検出する
+- Shared canon / Large delivery / high-risk / workflow-tooling change では closeout 前に `python3 tools/validation/semantic/convention/check_convention_compliance.py` を通し、workflow prohibition、convention tool gate、skill-routing hook の欠落を tool で検出する
 - 検証は該当する範囲で静的解析・読み取り route から始めます。広い実行は
   実行前の確認記録を使い、静的解析・読み取りで残った未確認点を記録します。
 
@@ -255,11 +265,13 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When skills are explicitly named in the task or handoff, use `$skill-name` notation and preserve it in `skills=<...>`.
 1. Treat `run.repo_tool_routing_policy` from `bootstrap_agent_run.py` as the selected repo-owned tool route. Carry `tool_route`, `tool_commands`, and `tool_evidence` into subagent handoff packets, and run each selected skill packet in the manifest order before replacing it with prose review.
 1. For repo-changing edits, existing tool execution and bounded owner patching
-   proceed from tool-owned evidence. Runtime `SKILL.md` reading is optional
-   follow-up context after the existing tool or selected command packet runs for
-   the covered property. Read only the owner surface needed to interpret or
-   repair the tool result. Route bounded edits through the normal owner route
-   and record owner, existing-tool route, and targeted-validation evidence.
+   proceed from tool-owned evidence. Existing tools may run before the Skill
+   read for the covered property, but interpretation or repair remains locked
+   until the generated compact `SKILL.md` reaches `file_eof=true` and any
+   delegated canonical section reaches `section_eof=true`. Read only the owner
+   surface needed to interpret or repair the tool result. Route bounded edits
+   through the normal owner route and record owner, existing-tool route, and
+   targeted-validation evidence.
 1. For research-backed implementation, benchmark, external-research change,
    prior-art adoption, official-docs method claims, or literature-derived design
    decisions, the emitted `skills=...` / run-bundle skill call sequence calls
@@ -307,21 +319,21 @@ The runtime discovery adapter delegates these required operating clauses to this
    decision selected by `$agent-orchestration` / `CODEX_WORKFLOW`; this transport adapter does not
    create a second design policy or reinterpret implementation shortcuts.
 1. Only typo, formatting, import, and bounded mechanical follow-through that is uniquely determined by the approved design, local precedent, and existing responsibility boundary may be fixed in the same implementation pass. Anything requiring judgment is a design issue.
-1. For implementation slices that touch classes, dataclasses, `Protocol`, inheritance, public API, type boundaries, or dependency direction, route `$oop-readability-check` into validation and carry SOLID principle signal counts, OOP dimension, finding kind, and the `tools/oop/shared/readability_core.py` mapping into the design artifact.
-1. For SOLID-sensitive Python slices, validate evidence coverage with `python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>` so the OOP readability report covers the changed path through `scanned_paths`.
+1. For implementation slices that touch classes, dataclasses, `Protocol`, inheritance, public API, type boundaries, or dependency direction, route `$oop-readability-check` into validation and carry SOLID principle signal counts, OOP dimension, finding kind, and the `tools/validation/code/oop/shared/readability_core.py` mapping into the design artifact.
+1. For SOLID-sensitive Python slices, validate evidence coverage with `python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>` so the OOP readability report covers the changed path through `scanned_paths`.
 1. Before implementation, read the approved `Dependency Manifest Plan`; load upstream dependency targets before editing and downstream targets after editing.
 1. For new or edited human-authored text files, use the current `@dependency-start` / `@dependency-end` manifest format.
 1. If the design trace is missing or conflicts with repo docs or code, return to detailed design review instead of editing from chat context.
-1. Before any write-capable subagent edit, run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and put predicted OOP, helper, dependency, responsibility_scope, hook runtime, skill mirror, tool catalog, protocol, and log-surface gates plus repair commands into the work log or handoff. Record the owner scope and protecting tools before selecting the implementation directory.
+1. Before any write-capable subagent edit, run or cite `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and put predicted OOP, helper, dependency, responsibility_scope, hook runtime, skill mirror, tool catalog, protocol, and log-surface gates plus repair commands into the work log or handoff. Record the owner scope and protecting tools before selecting the implementation directory.
 1. For fresh subagent launches, include the protocol-owned `Fresh Subagent Context Capsule` from `agents/COMMUNICATION_PROTOCOL.md` instead of chat history, full transcripts, raw logs, full dashboards, or repo-root scope.
 1. If runtime/tool gates block write-capable spawn, record local/tool evidence with `WRITE_SUBAGENT_AUTHORIZATION=required` or the specific gate blocker, `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; a different implementation route requires an explicit revised parent packet.
 1. When implementation is driven by tool/checker/hook/reviewer/subagent findings, use `$tool-finding-report` first and pass the finding packet path, structured findings, impact, and prompt feedback decision into the parent or write-capable subagent handoff.
 1. If `$tool-finding-report` classifies feedback as `handoff_prompt_gap` or `shared_skill_or_workflow_gap`, repair the handoff prompt, skill, workflow, or task catalog prompt before launching the next write-capable subagent.
 1. Require `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker`; `worker` is the default. Use `spark_worker` only for a low-risk slice selected through `--select-agent-type implementer=spark_worker:<evidence>` and recorded in stdout / manifest. If the selected candidate is blocked, record `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; changing candidates requires a revised parent packet and wave.
 1. Treat chunks, slices, checkpoints, and subpasses as internal progress only; continue until all planned work units, active clauses, selected review gates, validation, closeout gate, commit, and push are complete. A final review is included only when activated by the touched contract.
-1. Validate dependency manifests with `python3 tools/agent_tools/check_dependency_headers.py --changed`, `bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing`, and `bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header` before closeout.
-1. If dependency edges changed, run `bash tools/agent_tools/check_dependency_graph.sh --print-edges` or record the migration baseline and evidence that the current diff introduced no new graph error.
-1. Run `python3 tools/agent_tools/check_convention_compliance.py` before closeout for Shared canon, Large delivery, high-risk, or workflow/tooling changes so workflow readiness, convention tool gates, and skill-routing hooks are verified by the tool instead of repeated in prompt prose.
+1. Validate dependency manifests with `python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed`, `bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing`, and `bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header` before closeout.
+1. If dependency edges changed, run `bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges` or record the migration baseline and evidence that the current diff introduced no new graph error.
+1. Run `python3 tools/validation/semantic/convention/check_convention_compliance.py` before closeout for Shared canon, Large delivery, high-risk, or workflow/tooling changes so workflow readiness, convention tool gates, and skill-routing hooks are verified by the tool instead of repeated in prompt prose.
 1. Validate with the static/read route first. Broader execution uses the
    task-linked approval note and records the static or reading signal that
    remained unresolved.

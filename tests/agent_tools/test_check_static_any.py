@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests explicit Any static-analysis checker behavior.
-# upstream implementation ../../tools/agent_tools/check_static_any.py checker
+# upstream implementation ../../tools/validation/semantic/code/check_static_any.py checker
 # upstream design ../../documents/conventions/python/04_type_annotations.md type annotation policy
 # @dependency-end
 
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_static_any.py"
+CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "code" / "check_static_any.py"
 
 
 class CheckStaticAnyTest(unittest.TestCase):

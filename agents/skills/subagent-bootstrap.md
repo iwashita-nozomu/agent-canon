@@ -57,7 +57,7 @@ config policy の第二の正本にはしません。
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/direct-luna-communication.md`
 - `agents/internal-routines/subagent-startup.md`
-- `tools/agent_tools/bootstrap_agent_run.py`
+- `tools/runtime/lifecycle/bootstrap_agent_run.py`
 
 Runtime collaboration capability and coordination receipts are defined only by
 `agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake`.
@@ -76,7 +76,7 @@ one; a complete structured handoff message or tool result can satisfy the
 handoff contract.
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "repo-changing task" \
   --task-id T1 \
   --owner "codex" \
@@ -86,7 +86,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 研究・実験つき変更:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -96,7 +96,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 環境変更:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "platform or environment change" \
   --task-id T8 \
   --owner "codex" \
@@ -106,7 +106,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 学術文章:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "academic writing task" \
   --task-id T10 \
   --owner "codex" \
@@ -116,7 +116,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 包括的開発:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \
@@ -127,6 +127,10 @@ repo-changing task では、`--task-id` は catalog の候補を参照するだ�
 specialist と review pack は owner-critical decision、artifact operation、
 または selected review gate が必要な場合だけ有効化します。
 handoff / capsule fields の正本は `agents/COMMUNICATION_PROTOCOL.md` です。この skill は launch timing、role selection、wave ledger、authorization、closeout mechanics を所有し、capsule field list を第二の正本にしません。
+Git 状態に関係する handoff は `python3 tools/runtime/authority/checkout_identity.py --format lines` の
+`checkout_identity` block（絶対 cwd、Git root、branch または detached、HEAD、normalized
+remote owner/repository）を開始、checkout 遷移、Git mutation 境界、handoff、final handback
+で一度だけ渡します。通常の各コマンドで繰り返さず、これは authority や承認を追加しません。
 subagent-only startup / internal skill routes are owned by `agents/internal-routines/subagent-startup.md`. Bootstrap cites that routine and carries `run.subagent_prompt_packet.subagent_startup_route` into handoff routing when present; it does not add `_...` labels to public skill routing or duplicate the capsule schema.
 prompt / routing / subagent-config drift を直す task では、shared policy prose を
 直接広く書き換える前に `prompt_config_reviewer` を prompt/config audit wave として起動し、
@@ -155,7 +159,7 @@ review と edit の handoff では `team_manifest.yaml` の
 `run.default_quality_check_policy` を含めます。
 handoff prompt には repo root や `/workspace` 全体ではなく、dependency-expanded `allowed_paths`、該当 canon 節、`do_not_read` surface、expected output schema を含め、context artifact は `agents/COMMUNICATION_PROTOCOL.md` が定義する capsule で参照します。implementation handoff では implementation-surface router の `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にし、router が unavailable なら deterministic router recovery output を local provisional source-packet evidence として保持するか `router_unavailable_blocker` を記録します。この evidence は新しい candidate や public route を自動選択せず、responsibility search と dependency scope で handoff path を確定するための local/tool context に限定します。`allowed_paths` は手書き対象だけで閉じず、編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。full tree search、raw accumulated logs、unrelated module scan が必要になった場合は、parent へ escalation して input packet を拡張してから進めます。
 theorem-driven、algorithm、implementation handoff では、protocol-owned `Target Binding Packet` を Fresh Subagent Context Capsule に必ず入れます。packet が不完全な場合は subagent を起動せず、packet owner が capsule または source packet を補完します。subagent から返った unchecked theorem sketch、型が合っていない式、public root への到達が示されていない local counterexample、または code suggestion は、verifier または owning reviewer が同じ public root に対する checker / validation route を通すまで採用しません。
-write-capable subagent へ渡す前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせるか明示引用し、`TOOL_REJECTION_PREDICTED_GATE`、`rejection_preflight_command`、gate-specific repair plan を handoff に含めます。Hook / Tool / SKILL / workflow / protocol surface では、予測 gate が `agentcanon_new_tool_source_route`、`codex_hook_runtime_alignment`、`tool_catalog`、`agent_protocol_convention`、`log_surface_inventory_guard` を出す場合があるため、対応 command を実装前の必須 evidence として渡します。既存 AgentCanon tool source はこの新規 source route gate では止めません。
+write-capable subagent へ渡す前に `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせるか明示引用し、`TOOL_REJECTION_PREDICTED_GATE`、`rejection_preflight_command`、gate-specific repair plan を handoff に含めます。Hook / Tool / SKILL / workflow / protocol surface では、予測 gate が `agentcanon_new_tool_source_route`、`codex_hook_runtime_alignment`、`tool_catalog`、`agent_protocol_convention`、`log_surface_inventory_guard` を出す場合があるため、対応 command を実装前の必須 evidence として渡します。既存 AgentCanon tool source はこの新規 source route gate では止めません。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
 write-capable coding / docs-edit subagent を authorization または tool gate で起動できない場合は、`WRITE_SUBAGENT_AUTHORIZATION=required` または gate-specific blocker を run bundle に残し、その slice について read-only 分析を増やし続けません。親は直接編集せず、typed blocked/retry/user-report packet を返します。
 独立 workstream が複数ある場合は、workstream ごとに stage owner を置き、`run.delegated_spawn_policy` の下で vertical dynamic wave を起こします。同じ parent wave へ全 role を flat に詰め込むのは避け、入力 packet、write scope、validation route、review gate が交差しない sibling wave だけを同時に走らせます。
@@ -168,7 +172,7 @@ parent は launch mechanics、budget、fresh lifecycle、wave ledger の整合�
 `repo_key`、`hook_family`、`skill_name`、`workflow_name`、`issue_id`、
 または path scope で分けます。instance id は
 `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` を推奨形にします。
-parent または delegated stage owner が実際に spawn / skip / replacement を行ったら、`python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...` で `schedule.md` と `workflow_monitoring.md` を同じ `wave_id` で更新します。delegated child wave は `remaining_spawn_budget` を必ず含めます。
+parent または delegated stage owner が実際に spawn / skip / replacement を行ったら、`python3 tools/runtime/lifecycle/workflow_monitor.py --subagent-wave ...` で `schedule.md` と `workflow_monitoring.md` を同じ `wave_id` で更新します。delegated child wave は `remaining_spawn_budget` を必ず含めます。
 Wave は「最初に決めた agent 数を一度だけ走らせる」運用ではありません。
 parent は各 wave の出力を frontier queue に戻し、次に必要な bounded handoff を
 作ります。compatible な active agent には revised scope を渡し、fresh subagent は
@@ -205,7 +209,7 @@ runtime が `/agent` を提供する場合は subagent inventory の確認に使
 claims が同じ owner、responsibility、context、write authority、validation route を
 共有する場合は active instance を再利用し、独立 review や distinct unresolved
 claim/risk のために分ける場合だけ fresh instance を使います。
-包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
+包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。write-capable handoff には `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必ず付け、branch は handoff 前に `repository-topic-clone.prepare` で用意し、dedicated clone の ignored `.agent-canon/writer-target.json` に検証済み identity とともに保存します。同じ `checkout_root` を持つ writer handoff は agent team の materializer が spawn 前に拒否し、packet がない shared checkout も workspace write を拒否し、reader は target なしで共有できます。
 各 user input は `same_active_task_delta`、`scope_or_contract_change`、または
 `new_task` として分類しますが、新しい turn や名前を変えた packet だけでは
 fresh agent の理由になりません。owner、responsibility、context、write authority、
@@ -214,6 +218,7 @@ validation route が互換なら active agent を再利用し、revision scope �
 failed context integrity の場合だけ fresh agent / wave を起こします。coordination または
 resumption が必要な場合は checkpoint と updated packet path を durable に残し、それ以外
 は structured handoff message/tool result を使います。
+workspace を変更する writer の生成 prompt は target の `cwd` / `git_root` / `branch` / `remote` と一致する状態から開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しません。外部 GitHub publication 専用の publisher は target を持ちません。target は handoff の値としてのみ扱い、claim、PID、expiry、daemon、writer registry は作成しません。
 subagent handoff prompt には lifecycle decision と fresh-agent 条件を含めますが、
 `fresh_subagents_required: true` や `reuse_for_new_task: forbidden` を一律の機械契約には
 しません。
@@ -350,7 +355,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. For multiple independent workstreams, schedule a stage owner per workstream and let that owner create a vertical dynamic wave under `run.delegated_spawn_policy` instead of flattening every role into one parent wave. Only sibling waves with disjoint input packets, write scopes, validation routes, and review gates may run together.
 1. For log-analysis-driven launches, require the `Finding Route Packet` from `agents/skills/agent-log-analysis.md`. Use `finding_class` to choose the destination owner and `instance_partition` to shard same-role instances by `repo_key`, `hook_family`, `skill_name`, `workflow_name`, `issue_id`, or path scope.
 1. For same-role log-analysis instances, use an id shaped like `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` and give each instance its own structured evidence cell, allowed paths, expected output, validation route, and review gate.
-1. After the parent or delegated stage owner actually spawns, skips, or replaces a wave, record it with `python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...`; delegated child waves must include `remaining_spawn_budget`.
+1. After the parent or delegated stage owner actually spawns, skips, or replaces a wave, record it with `python3 tools/runtime/lifecycle/workflow_monitor.py --subagent-wave ...`; delegated child waves must include `remaining_spawn_budget`.
 1. Treat a wave as an adaptive loop, not a fixed one-shot fan-out. The owning reviewer, verifier, or integration executor processes each wave result and turns remaining frontier rows into the next bounded handoff queue; parent only relays packets and manages dependency order/status. Do not return `unverified_with_next_witness`, `connection_unconnected`, or bridge gaps as user-facing stopping points while the next frontier can still be worked.
 1. When returning a validation failure to the next writer, include
    `failing_contract`, `observation_level`, `cause_classification`,
@@ -371,7 +376,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    universal values.
 1. For every nonterminal subagent, treat a `wait_agent` timeout as a polling boundary rather than a lifecycle deadline. Each blocking poll must use `timeout_ms <= 60000`; an overall completion wait may span repeated bounded polls, with required user-facing progress updates and the existing new-state or revised-packet gate between polls. A timeout, empty update, or slow response alone never authorizes interruption or cancellation. Resolve the active runtime's status, message, interrupt, and close capabilities before acting: in this runtime, use `list_agents` for noninterrupting status inspection, `send_message` for same-task packet delivery, and `interrupt_agent` only after explicit user cancellation. Do not invent unavailable `send_input(interrupt=...)` or `close_agent` operations.
 1. If a bounded poll times out, returns empty status, or a run-local subagent has no final response at a wave decision point, record `subagent_no_return_investigation` with agent id, wave id, wait command and timeout, last known status, last workflow-monitor event, runtime or tool error, log / dashboard pointers, and cause hypothesis. Record the current status and recovered evidence, then return control to the parent decision point. Another wait or status probe requires `new state evidence` or `explicit revised packet`; scope, owner, allowed-path, or review-gate changes require a fresh follow-up wave from that packet. Map timeout, empty status, and absent final response to `termination_action=preserve_running_instance`, `resolution_decision=await_new_state|continue_disjoint_parent_work`, `write_scope=reserved`, and `overlapping_writer=blocked`.
-1. Before assigning write-capable work, run or cite `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and include `TOOL_REJECTION_PREDICTED_GATE` lines, `rejection_preflight_command`, and the gate-specific repair plan in the handoff. Treat hook runtime, skill mirror sync, tool catalog, agent protocol convention, and log-surface inventory gates as implementation blockers until the repair command is run or explicitly scheduled in the same handoff.
+1. Before assigning write-capable work, run or cite `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and include `TOOL_REJECTION_PREDICTED_GATE` lines, `rejection_preflight_command`, and the gate-specific repair plan in the handoff. Treat hook runtime, skill mirror sync, tool catalog, agent protocol convention, and log-surface inventory gates as implementation blockers until the repair command is run or explicitly scheduled in the same handoff.
 1. Use an active runtime close operation only when that capability exists and the runtime reports `completed|errored|shutdown`, or after explicit user cancellation. When the active runtime provides no close operation, preserve the instance until a terminal status is observed and record `runtime_no_close_operation:terminal_status_observed` as `Subagent Lifecycle Evidence` in `closeout_gate.md`. A nonterminal no-return instance records `subagents_closed=no` and `lifecycle_gate=pending`.
 
 - Purpose: runtime skill for preparing specialist delegation, run-bundle

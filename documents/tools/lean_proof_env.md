@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents lean_proof_env.py operator usage and environment boundary.
-upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
+upstream implementation ../../tools/analysis/proof/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../agents/skills/formal-proof-workflow.md routes Lean proofs through checked environments.
 upstream design lean_capability_matrix.md documents Lean/Mathlib/Aesop tactic and environment selection.
 downstream implementation ../../tests/agent_tools/test_lean_proof_env.py tests generated files and dry-run commands.
@@ -45,15 +45,15 @@ is runtime state and must be below the explicit external AgentCanon runtime
 root; a checkout-local `reports/` or package directory is not a valid target.
 
 ```bash
-RUNTIME_ROOT=/abs/path/to/workspace/agent-canon-runtime/<run>
-python3 tools/agent_tools/lean_proof_env.py init \
+RUNTIME_ROOT=/abs/path/to/external/agent-canon-runtime/<run>
+python3 tools/analysis/proof/lean_proof_env.py init \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env"
 ```
 
 Smoke-check local proof-search tactics when network/cache access is available:
 
 ```bash
-python3 tools/agent_tools/lean_proof_env.py smoke \
+python3 tools/analysis/proof/lean_proof_env.py smoke \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --execute
 ```
@@ -62,7 +62,7 @@ Smoke-check agent-facing theorem-search imports without making a live external
 search request:
 
 ```bash
-python3 tools/agent_tools/lean_proof_env.py agent-smoke \
+python3 tools/analysis/proof/lean_proof_env.py agent-smoke \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --execute
 ```
@@ -71,7 +71,7 @@ Smoke-check counterexample discovery. This action intentionally runs a false
 property; it succeeds only when Plausible finds a concrete counterexample:
 
 ```bash
-python3 tools/agent_tools/lean_proof_env.py counterexample-smoke \
+python3 tools/analysis/proof/lean_proof_env.py counterexample-smoke \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --execute
 ```
@@ -79,7 +79,7 @@ python3 tools/agent_tools/lean_proof_env.py counterexample-smoke \
 Run all reusable proof-tooling checks:
 
 ```bash
-python3 tools/agent_tools/lean_proof_env.py all-smoke \
+python3 tools/analysis/proof/lean_proof_env.py all-smoke \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --execute
 ```
@@ -87,7 +87,7 @@ python3 tools/agent_tools/lean_proof_env.py all-smoke \
 Check a generated Lean proof stub through the same environment:
 
 ```bash
-python3 tools/agent_tools/lean_proof_env.py check-file \
+python3 tools/analysis/proof/lean_proof_env.py check-file \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --lean-file "$RUNTIME_ROOT/tasks/formal-proof/example/example.lean" \
   --execute

@@ -6,8 +6,8 @@ contract agent-runtime
 responsibility Defines the standalone shared AgentCanon tool container and its host boundary.
 upstream design documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream design documents/runtime/bootstrap-runtime.md user lifecycle contract
-upstream implementation bootstrap/container/Dockerfile shared tool image
-upstream implementation tools/agent_tools/bootstrap_runtime.py Host lifecycle owner
+upstream implementation bootstrap/container/image/Dockerfile shared tool image
+upstream implementation tools/runtime/container/bootstrap_runtime.py container controller
 downstream implementation tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 @dependency-end
 -->
@@ -24,13 +24,16 @@ The only supported lifecycle entrypoint is top-level `bootstrap.sh`:
 ```bash
 ./bootstrap.sh \
   --control-parent-root <authorized-parent-root> \
-  --runtime-root <authorized-parent-root>/workspace/agent-canon-runtime/<id> \
   <operation>
 ```
 
-The control root is an authorized parent repository. The runtime root must be
-inside that root after realpath resolution, with no symlink escape. Do not use
-the AgentCanon source tree, an implicit current-directory state directory,
+The control root is an authorized parent repository. The effective runtime is
+always the bootstrap-owned `<install-root>/.runtime/` directory and is ignored
+by Git. The historical `--runtime-root` option is migration-compatible input
+only and never changes new runtime placement. The private log checkout is the
+install root's sibling `<install-root-parent>/agent-canon-log`; it is not
+derived from the control root. Do not use
+an arbitrary AgentCanon source directory, an implicit current-directory state directory,
 `$HOME/.cache`, `$HOME/.local`, global `$CODEX_HOME`, or a whole workspace/home
 mount as a runtime fallback.
 
@@ -40,6 +43,23 @@ and language-server tools. It receives exact allowlisted target mounts and a
 task-scoped exchange directory; it does not receive a Docker socket, SSH agent,
 GitHub token, host home, arbitrary Git state, or a general network.
 
+`bootstrap.sh` is usable on a host with Docker and Git but without AgentCanon's
+Python dependencies. Its shell adapter uses only fixed bootstrap constants in
+`bootstrap/host/lifecycle/entrypoint.sh`, builds or adopts the image, and starts the
+resident container. The controller and all structured TOML/JSON, state, tool,
+check, and eval work run through `docker exec` in that container; the
+controller has no Docker lifecycle or Docker RPC path. The writable mount is
+the credential-free `<install-root>/.runtime/container-state/`. Container-side
+target state is exported as a strict `mounts.tsv`; host Docker validates and
+applies each target row at resident replacement. Systemd and credentialed
+source/archive Git remain host operations.
+
+When the control root is the real home, host install/update records every
+managed Codex config, agent, and skill link in
+`<install-root>/.runtime/container-state/global-links.tsv`. Uninstall verifies
+the exact recorded target/source pair before removing or restoring it, so a
+foreign link with a similar source prefix remains untouched.
+
 Bootstrap treats the Docker CLI/daemon as available. It does not run Docker
 version, daemon, buildx, context, architecture, rootless, rootful, or UID/GID
 preflights. Docker command failures are returned with Docker's exit code and
@@ -48,7 +68,7 @@ AgentCanon does not create a user or pass `--user`.
 
 ## Shared image and resident container
 
-`bootstrap/container/Dockerfile` is the sole AgentCanon tool image definition.
+`bootstrap/container/image/Dockerfile` is the sole AgentCanon tool image definition.
 It reuses dependency planning and installs the configured Python, Rust, and
 LSP tools once. It does not contain editor post-create behavior, project
 dependencies, project tests, GPU setup, or a Compose workspace lifecycle.
@@ -60,6 +80,11 @@ per effective owner and control-root digest. Docker labels and manifest
 readback prevent a second bootstrap installation from adopting or deleting
 another installation. A matching pre-existing image tag is adopted by exact ID
 without overwrite; an unowned pre-existing image remains outside uninstall.
+After install/update/rollback readback, the exact resident `Config.Image`
+reference and immutable ID are stored in
+`<runtime-root>/host-state/active-image.tsv`. Start, status,
+target, tool, and Codex routes consume that state; only install/update/sync
+select a new candidate image reference.
 The runtime uses one image/container across registered projects; task
 separation is provided by exact target mounts and runtime-root task directories.
 
@@ -80,7 +105,7 @@ The default limits are:
 | privilege escalation | `no-new-privileges` |
 
 `/tmp` is a task-local writable tmpfs. Runtime, cache, task-state, log, and
-archive-lease quotas are recorded in `bootstrap/manifest.toml`. At 80% of a
+archive-lease quotas are recorded in `bootstrap/host/manifest.toml`. At 80% of a
 quota, `gc` may remove completed and unpinned owned state using LRU order.
 Active tasks, current and rollback generations, unpublished spool, and
 pre-existing Docker resources are retained.
@@ -109,7 +134,6 @@ Register each exact project root before execution:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> \
-  --runtime-root <root>/workspace/agent-canon-runtime/<id> \
   target add --root <project-root> --mode read-only
 ```
 
@@ -151,7 +175,7 @@ the typed host operation when appropriate:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> \
-  --runtime-root <runtime> exec --root <registered-project> -- <existing-command> <args...>
+  exec --root <registered-project> -- <existing-command> <args...>
 ```
 
 There is no compatibility alias that silently changes a command's plane or

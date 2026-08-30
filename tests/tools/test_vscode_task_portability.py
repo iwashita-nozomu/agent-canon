@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies VS Code commands resolve the canonical AgentCanon tool root in both layouts.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared VS Code surface policy
-# upstream implementation ../../tools/agent_tools/tool_dispatch.py shared AgentCanon tool root
+# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py shared AgentCanon tool root
 # downstream implementation ../../.vscode/tasks.json shared validation task commands
 # @dependency-end
 
@@ -55,7 +55,7 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
         commands = self.task_commands()
         for label, command in commands.items():
             self.assertIn("${workspaceFolder}", command, label)
-            self.assertNotIn("tools/lib/repo_paths.sh", command, label)
+            self.assertNotIn("tools/repository/support/repo_paths.sh", command, label)
             self.assertNotIn("tools/agent-canon", command, label)
             self.assertNotIn("CANON_TOOLS_ROOT", command, label)
         settings = json.loads(SETTINGS_JSON.read_text(encoding="utf-8"))
@@ -74,19 +74,19 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
                 '#!/usr/bin/env bash\necho DOCS_BIN=standalone',
             )
             self.write_py(
-                workspace / "tools" / "agent_tools" / "check_convention_compliance.py",
+                workspace / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py",
                 'print("CONVENTION=standalone")',
             )
             self.write_py(
-                workspace / "tools" / "agent_tools" / "check_dependency_headers.py",
+                workspace / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_headers.py",
                 'print("DEP_HEADERS=standalone")',
             )
             self.write_exec(
-                workspace / "tools" / "agent_tools" / "scan_dependency_headers.sh",
+                workspace / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh",
                 "echo SCAN_HEADERS=standalone",
             )
             self.write_exec(
-                workspace / "tools" / "agent_tools" / "check_dependency_header_format.sh",
+                workspace / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_header_format.sh",
                 "echo CHECK_HEADER_FORMAT=standalone",
             )
 
@@ -113,19 +113,19 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
             self.write_exec(workspace / "tools" / "agent-canon" / "bin" / "agent-canon", "echo BAD_PARENT_VIEW")
             self.write_exec(workspace / "tools" / "bin" / "agent-canon", "echo DOCS_BIN=standalone")
             self.write_py(
-                workspace / "tools" / "agent_tools" / "check_convention_compliance.py",
+                workspace / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py",
                 'print("CONVENTION=standalone")',
             )
             self.write_py(
-                workspace / "tools" / "agent_tools" / "check_dependency_headers.py",
+                workspace / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_headers.py",
                 'print("DEP_HEADERS=standalone")',
             )
             self.write_exec(
-                workspace / "tools" / "agent_tools" / "scan_dependency_headers.sh",
+                workspace / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh",
                 "echo SCAN_HEADERS=standalone",
             )
             self.write_exec(
-                workspace / "tools" / "agent_tools" / "check_dependency_header_format.sh",
+                workspace / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_header_format.sh",
                 "echo CHECK_HEADER_FORMAT=standalone",
             )
 

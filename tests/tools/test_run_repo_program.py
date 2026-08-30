@@ -30,10 +30,10 @@ def resolve_project_root() -> Path:
 
 
 PROJECT_ROOT = resolve_project_root()
-SCRIPT = SOURCE_ROOT / "tools" / "ci" / "run_repo_program.py"
-RUN_CONTAINER_SCRIPT = SOURCE_ROOT / "tools" / "ci" / "run_in_repo_container.py"
-RUN_PYTHON_SCRIPT = SOURCE_ROOT / "tools" / "ci" / "run_python_in_dockerfile.py"
-RUN_PACK_SCRIPT = SOURCE_ROOT / "tools" / "ci" / "run_container_pack.py"
+SCRIPT = SOURCE_ROOT / "tools" / "validation" / "ci" / "runners" / "run_repo_program.py"
+RUN_CONTAINER_SCRIPT = SOURCE_ROOT / "tools" / "validation" / "ci" / "runners" / "run_in_repo_container.py"
+RUN_PYTHON_SCRIPT = SOURCE_ROOT / "tools" / "validation" / "ci" / "runners" / "run_python_in_dockerfile.py"
+RUN_PACK_SCRIPT = SOURCE_ROOT / "tools" / "validation" / "ci" / "runners" / "run_container_pack.py"
 GENERIC_PYTHON_FIXTURE = "tools/agent-canon/__init__.py"
 GENERIC_SHELL_FIXTURE = "tools/agent-canon/ci/check_docker_build.sh"
 

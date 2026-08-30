@@ -6,8 +6,8 @@ contract agent-runtime
 responsibility Provides the common, source-free base for a consumer repository's generated root AGENTS.md.
 upstream design documents/design/entrypoint-owner-map.md root entrypoint grammar and consumer composition boundary
 upstream design documents/conventions/software-engineering-principles.md contract-complete engineering decision policy
-downstream implementation tools/agent_tools/entrypoint_composer.py composes the regular consumer root file
-downstream implementation tools/agent_tools/check_entrypoint_owner_map.py validates the base grammar
+downstream implementation tools/agent/templates/entrypoint_composer.py composes the regular consumer root file
+downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py validates the base grammar
 @dependency-end
 -->
 

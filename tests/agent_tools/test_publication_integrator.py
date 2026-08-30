@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests publication eligibility refuses CAS ingress without current approval.
-# upstream implementation ../../tools/agent_tools/publication_integrator.py resolves publication authority and CAS eligibility
+# upstream implementation ../../tools/repository/github/publication_integrator.py resolves publication authority and CAS eligibility
 # @dependency-end
 
 from __future__ import annotations
@@ -16,8 +16,10 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from publication_integrator import (  # noqa: E402
+from tools.repository.github.publication_integrator import (  # noqa: E402
+    CANONICAL_INTERFACE_PATH,
     _construct_result_commit,
+    _interface_entry,
     _review_approval,
     _publication_gate,
     PublicationError,
@@ -98,10 +100,38 @@ def publication_readback_receipt(
 class PublicationIntegratorTest(unittest.TestCase):
     """Verify review state remains a prerequisite for publication CAS."""
 
+    def test_ordered_integration_uses_durable_interface_path(self) -> None:
+        """The ordered integration gate accepts only the durable contract path."""
+        self.assertEqual(
+            CANONICAL_INTERFACE_PATH,
+            "documents/contracts/ordered_integration_interface.json",
+        )
+        entry = {"path": CANONICAL_INTERFACE_PATH, "new_blob": "a" * 40}
+        self.assertEqual(_interface_entry({"entries": [entry]}), entry)
+        with self.assertRaisesRegex(
+            PublicationError,
+            "ordered_integration:path_set_mismatch",
+        ):
+            retired_path = (
+                "reports" + "/agents/"
+                + "convergence-w2-gates-completion-20260716/"
+                + "ordered_integration_interface.json"
+            )
+            _interface_entry(
+                {
+                    "entries": [
+                        {
+                            "path": retired_path,
+                            "new_blob": "a" * 40,
+                        }
+                    ]
+                }
+            )
+
     def test_ineligible_review_never_produces_publication_authority(self) -> None:
         """A non-eligible review fails closed before authority derivation."""
         with patch(
-            "publication_integrator.resolve_review_eligibility",
+            "tools.repository.github.publication_integrator.resolve_review_eligibility",
             return_value={"outcome": "ineligible"},
         ):
             projection = resolve_publication_eligibility(PROJECT_ROOT)
@@ -117,11 +147,11 @@ class PublicationIntegratorTest(unittest.TestCase):
         """Template aliases must be canonicalized before this exact boundary."""
         with (
             patch(
-                "publication_integrator.resolve_review_eligibility",
+                "tools.repository.github.publication_integrator.resolve_review_eligibility",
                 return_value={"outcome": "eligible"},
             ),
             patch(
-                "publication_integrator.resolve_current_review_state",
+                "tools.repository.github.publication_integrator.resolve_current_review_state",
                 return_value={
                     "candidate": {"candidate_id": "candidate-1"},
                     "decision": {
@@ -188,13 +218,13 @@ class PublicationIntegratorTest(unittest.TestCase):
 
         with (
             patch(
-                "publication_integrator.resolve_publication_authority",
+                "tools.repository.github.publication_integrator.resolve_publication_authority",
                 side_effect=[authority, authority],
             ),
-            patch("publication_integrator._git_text", side_effect=read_git),
-            patch("publication_integrator._worktree_status", return_value=""),
+            patch("tools.repository.github.publication_integrator._git_text", side_effect=read_git),
+            patch("tools.repository.github.publication_integrator._worktree_status", return_value=""),
             patch(
-                "publication_integrator._construct_result_commit",
+                "tools.repository.github.publication_integrator._construct_result_commit",
                 return_value=candidate,
             ) as result_builder,
         ):
@@ -289,10 +319,10 @@ class PublicationIntegratorTest(unittest.TestCase):
             return expected_tree if command[-1].endswith("^{tree}") else expected_base
 
         with (
-            patch("publication_integrator.resolve_publication_authority", return_value=authority),
-            patch("publication_integrator._git_text", side_effect=read_git),
-            patch("publication_integrator._worktree_status", return_value=""),
-            patch("publication_integrator._construct_result_commit", return_value=candidate),
+            patch("tools.repository.github.publication_integrator.resolve_publication_authority", return_value=authority),
+            patch("tools.repository.github.publication_integrator._git_text", side_effect=read_git),
+            patch("tools.repository.github.publication_integrator._worktree_status", return_value=""),
+            patch("tools.repository.github.publication_integrator._construct_result_commit", return_value=candidate),
             self.assertRaises(PublicationError) as raised,
         ):
             integrate_publication(

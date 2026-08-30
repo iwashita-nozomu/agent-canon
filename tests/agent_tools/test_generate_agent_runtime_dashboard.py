@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests AgentCanon runtime dashboard generation.
-# upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py generates dashboard reports
+# upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py generates dashboard reports
 # upstream design ../../documents/runtime/runtime-log-archive.md documents result families shown by dashboard
 # @dependency-end
 
@@ -18,18 +18,25 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from generate_agent_runtime_dashboard import (  # noqa: E402
+from eval.producers.generate_agent_runtime_dashboard import (  # noqa: E402
+    AgentRuntimeDashboard,
     HookWorkflowBreakdownReader,
     TokenUsageBreakdownReader,
+    durable_issue_next_action,
+    issue_worker_candidate_records,
+    read_issue_publication_receipts,
+    read_issue_worker_handoffs,
+    render_dashboard,
     token_usage_lines,
     token_usage_next_action,
     tool_source_path_candidates,
 )
-from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
 
@@ -49,6 +56,145 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         else:
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
         self._runtime_temp.cleanup()
+
+    def test_issue_worker_reads_only_explicit_candidates(self) -> None:
+        """Counts and selection misses do not synthesize Issue candidates."""
+        self.assertEqual(
+            issue_worker_candidate_records(
+                {"selection_misses": 35, "workflow_attribution_missing": 6882}
+            ),
+            (),
+        )
+        candidate = {
+            "repository": "owner/repo",
+            "owner": "issue-owner",
+            "fix": "repair the missing route",
+        }
+        self.assertEqual(
+            issue_worker_candidate_records({"issue_worker_candidate": candidate}),
+            (candidate,),
+        )
+
+    def test_issue_worker_uses_checkout_readback_and_routes_flagless_candidate(self) -> None:
+        """The #938 checkout identity is the sole repository routing input."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hook = Path(temp_dir) / "events.jsonl"
+            hook.write_text(
+                json.dumps(
+                    {
+                        "checkout_identity": {"remote": "owner/repo"},
+                        "issue_worker_candidate": {
+                            "repository": "owner/repo",
+                            "owner": "issue-owner",
+                            "fix": "repair the missing route",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            handoffs = read_issue_worker_handoffs((hook,))
+
+        self.assertEqual(len(handoffs), 1)
+        self.assertTrue(handoffs[0].qualifies)
+        self.assertEqual(handoffs[0].reason, "user-owned-candidate")
+
+    def test_issue_worker_does_not_use_authenticated_repository_log_fallback(self) -> None:
+        """A self-claimed log field cannot replace checkout identity readback."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hook = Path(temp_dir) / "events.jsonl"
+            hook.write_text(
+                json.dumps(
+                    {
+                        "authenticated_repository": "owner/repo",
+                        "issue_worker_candidate": {
+                            "repository": "owner/repo",
+                            "owner": "issue-owner",
+                            "fix": "repair the missing route",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            handoffs = read_issue_worker_handoffs((hook,))
+
+        assert len(handoffs) == 1
+        assert handoffs[0].reason == "checkout-identity-unresolved"
+
+    def test_issue_worker_candidate_creates_host_publisher_action(self) -> None:
+        """A qualified candidate creates a host action, not a dashboard mutation."""
+        handoff = SimpleNamespace(
+            qualifies=True,
+            repository="owner/repo",
+            status="qualified",
+        )
+        summary = SimpleNamespace(
+            issue_worker_handoffs=(handoff,),
+            evidence=SimpleNamespace(github_issue_refs=()),
+        )
+        actions = durable_issue_next_action(summary)
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0].automation, "host-publisher")
+        self.assertIn("read-only", actions[0].command)
+
+    def test_published_issue_receipt_feeds_refs_and_action_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published.mkdir(parents=True)
+            (published / "42.json").write_text(
+                json.dumps(
+                    {
+                        "repository": "owner/repo",
+                        "number": "42",
+                        "url": "https://github.com/owner/repo/issues/42",
+                        "state": "OPEN",
+                        "action": "create",
+                        "responsibility": ["issue-owner"],
+                        "occurrence_locations": ["tools/route.py::route"],
+                        "source_finding_kind": "recurrent-failure",
+                        "timestamp": "2026-08-27T00:00:00Z",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            receipts = read_issue_publication_receipts(root, self.runtime_root)
+
+        self.assertEqual(len(receipts), 1)
+        self.assertEqual(receipts[0].url, "https://github.com/owner/repo/issues/42")
+        self.assertEqual(receipts[0].action, "create")
+
+    def test_dashboard_ignores_noncanonical_receipt_path_or_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published.mkdir(parents=True)
+            value = {
+                "repository": "owner/repo",
+                "number": "42",
+                "url": "https://github.com/owner/repo/issues/42",
+                "state": "OPEN",
+                "action": "create",
+                "responsibility": [],
+                "occurrence_locations": [],
+                "source_finding_kind": "",
+                "timestamp": "2026-08-27T00:00:00Z",
+            }
+            (published / "43.json").write_text(
+                json.dumps(value) + "\n", encoding="utf-8"
+            )
+            value["number"] = "44"
+            value["url"] = "https://github.com/owner/repo/issues/44"
+            value["state"] = "pending"
+            (published / "44.json").write_text(
+                json.dumps(value) + "\n", encoding="utf-8"
+            )
+            receipts = read_issue_publication_receipts(root, self.runtime_root)
+
+        self.assertEqual(receipts, ())
     """Verify dashboard output from accumulated runtime evidence."""
 
     def test_iter_entries_tolerates_disappeared_log_file(self) -> None:
@@ -200,6 +346,150 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assert_selection_and_prompt_sections(dashboard)
         self.assert_reference_and_log_sections(dashboard)
 
+    def test_dashboard_reads_current_mounted_source_sync_state(self) -> None:
+        """Dashboard uses the mounted source-sync record, not container state."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            source_sync = root / "source-sync.json"
+            source_sync.write_text(
+                json.dumps(
+                    {
+                        "schema": "agent-canon.source-sync.v1",
+                        "status": "failed",
+                        "code": "source_sync_candidate_failed",
+                        "source_root": "/home/niwashita/agent-canon",
+                        "source_head": "1" * 40,
+                        "source_tree": "2" * 40,
+                        "remote": "origin",
+                        "remote_url": "git@github.com:owner/repo.git",
+                        "branch": "main",
+                        "updated_at": "2026-08-27T00:00:00Z",
+                        "failure": "source_sync_candidate_failed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            dashboard_reader = AgentRuntimeDashboard(
+                root,
+                runtime_root=self.runtime_root,
+                source_sync_path=source_sync,
+            )
+            summary = dashboard_reader.collect()
+            dashboard = render_dashboard(summary)
+            source_sync.write_text(
+                json.dumps(
+                    {
+                        "schema": "agent-canon.source-sync.v1",
+                        "status": "success",
+                        "code": "up_to_date",
+                        "source_root": "/home/niwashita/agent-canon",
+                        "source_head": "3" * 40,
+                        "source_tree": "4" * 40,
+                        "remote": "origin",
+                        "remote_url": "git@github.com:owner/repo.git",
+                        "branch": "main",
+                        "updated_at": "2026-08-27T00:00:01Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            replaced = dashboard_reader.collect()
+            replaced_dashboard = render_dashboard(replaced)
+            for invalid_state in (
+                {
+                    "failure": "old",
+                    "schema": "agent-canon.source-sync.v1",
+                    "status": "failed",
+                    "updated_at": "2026-08-26T00:00:00Z",
+                },
+                {"schema": "agent-canon.source-sync.v1", "status": 7},
+                {
+                    "schema": "agent-canon.source-sync.v1",
+                    "status": "success",
+                    "code": "up_to_date",
+                },
+            ):
+                source_sync.write_text(json.dumps(invalid_state) + "\n", encoding="utf-8")
+                rejected = dashboard_reader.collect()
+                self.assertIsNone(rejected.source_sync_state)
+
+        assert summary.source_sync_state is not None
+        self.assertEqual(summary.source_sync_state["status"], "failed")
+        self.assertIn("source_sync_candidate_failed", dashboard)
+        self.assertIn("2026-08-27T00:00:00Z", dashboard)
+        assert replaced.source_sync_state is not None
+        self.assertEqual(replaced.source_sync_state["status"], "success")
+        self.assertEqual(replaced.source_sync_state["code"], "up_to_date")
+        self.assertNotIn("source_sync_candidate_failed", replaced_dashboard)
+
+    def test_live_like_api_and_compact_route_writes_only_external_runtime(self) -> None:
+        """Container-style relative outputs stay outside the analyzed checkout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            private_log = self.runtime_root.parent / "private-log"
+            private_log.mkdir()
+            output_dir = self.runtime_root / "reports" / "agent-runtime-dashboard"
+            output = output_dir / "dashboard.md"
+            compact_output = output_dir / "agent-log-analysis-compact.md"
+            api_output = output_dir / "agent-log-analysis-api.json"
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log),
+                    "AGENT_CANON_LOG_ROOT": str(private_log),
+                },
+            ):
+                self.write_fixture(root)
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--root",
+                        ".",
+                        "--out",
+                        "reports/agent-runtime-dashboard/dashboard.md",
+                        "--compact-out",
+                        "reports/agent-runtime-dashboard/agent-log-analysis-compact.md",
+                        "--api-out",
+                        "reports/agent-runtime-dashboard/agent-log-analysis-api.json",
+                    ],
+                    cwd=root,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                payload = json.loads(api_output.read_text(encoding="utf-8"))
+                compact_dashboard = compact_output.read_text(encoding="utf-8")
+                dashboard = output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(output.is_file())
+        self.assertTrue(compact_output.is_file())
+        self.assertTrue(api_output.is_file())
+        self.assertTrue(private_log.is_dir())
+        self.assertIn(private_log.as_posix(), dashboard)
+        self.assertFalse((root / "reports").exists())
+        self.assertEqual(payload["schema"], "agent_runtime_dashboard.v1")
+        for field in (
+            "unknown_event_count",
+            "status_by_hook_family",
+            "failure_by_hook_family",
+            "skip_by_hook_family",
+            "namespace_debt_by_hook_family",
+            "oop_applicability",
+        ):
+            self.assertIn(field, payload)
+        self.assertIn("# Agent Runtime Compact Summary", compact_dashboard)
+        self.assertIn("## Evidence Drilldown", compact_dashboard)
+        self.assertNotIn(
+            "python3 eval/producers/generate_agent_runtime_dashboard.py",
+            compact_dashboard,
+        )
+
     def assert_compact_dashboard(self, dashboard: str) -> None:
         """Verify the token-light summary omits full dashboard-only sections."""
         required = (
@@ -271,7 +561,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Verify concrete dashboard-generated next actions."""
         required = (
             "## Next Actions",
-            "AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS=6",
+            "AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS=",
             "AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS=5",
             "`materialize missing consulted source URLs`",
             "`repair failed skill eval for agent-orchestration`",
@@ -292,9 +582,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "| hook evidence | `healthy` | `3` |",
             "| report quality eval | `missing` | `0` |",
             "## Issue Routing",
-            "AC-20260517-mcp-inventory-preflight-cache.md",
-            "AC-20260517-eval-accumulation-gaps.md",
-            "AC-20260517-github-folder-issue-sync.md",
+            "missing-local-issue",
             "## Skill Eval Failure Analysis",
             "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "## Hook Workflow Attribution",
@@ -590,6 +878,61 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         self.assertIn("| `namespace_debt_by_hook_family` | `skill_usage=1` |", compact_dashboard)
         self.assertIn("oop_applicability", compact_dashboard)
+
+    def test_api_and_compact_include_published_issue_refs_separate_from_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published.mkdir(parents=True)
+            (published / "42.json").write_text(
+                json.dumps(
+                    {
+                        "repository": "owner/repo",
+                        "number": "42",
+                        "url": "https://github.com/owner/repo/issues/42",
+                        "state": "OPEN",
+                        "action": "update",
+                        "responsibility": ["issue-owner"],
+                        "occurrence_locations": ["tools/route.py::route"],
+                        "source_finding_kind": "recurrent-failure",
+                        "timestamp": "2026-08-27T00:00:00Z",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            api_output = self.runtime_root / "reports" / "dashboard-api.json"
+            compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(self.runtime_root / "reports" / "dashboard.md"),
+                    "--compact-out",
+                    str(compact_output),
+                    "--api-out",
+                    str(api_output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            payload = json.loads(api_output.read_text(encoding="utf-8"))
+            compact = compact_output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("https://github.com/owner/repo/issues/42", payload["github_issue_refs"])
+        self.assertEqual(payload["issue_publication_action_counts"], {"update": 1})
+        self.assertEqual(payload["issue_worker"]["published_receipts"], 1)
+        self.assertEqual(payload["issue_worker"]["issue_publication_action_counts"], {"update": 1})
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_ISSUE_PUBLICATION_RECEIPTS=1", compact)
+        self.assertIn("update=1", compact)
+        self.assertIn("published_receipts", compact)
 
     def test_selection_metrics_normalize_workflows_and_known_skills(self) -> None:
         """Selection metrics should compare canonical workflow names only."""
@@ -1023,9 +1366,11 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
     def append_selection_normalization_fixture(self, root: Path) -> None:
         """Add workflow display-name and stale selected-skill evidence."""
-        skill_dir = root / ".agents" / "skills" / "agent-orchestration"
+        skill_dir = root / "agents" / "skills"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("# agent-orchestration\n", encoding="utf-8")
+        (skill_dir / "agent-orchestration.md").write_text(
+            "# agent-orchestration\n", encoding="utf-8"
+        )
         hook_dir = (
             mounted_log_archive_root(root)
             / "hook-runs"

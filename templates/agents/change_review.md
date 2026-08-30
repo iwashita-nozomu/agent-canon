@@ -59,7 +59,7 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Repo-Wide Dependency Review（repo-wide dependency レビュー）
 
-<!-- 最初に static と targeted check を実行します。selected final candidate contract が要求する場合だけ全 repository に `bash tools/agent_tools/run_repo_dependency_review.sh` を実行し、それ以外は targeted route と broad check を選ばなかった理由を記録します。 -->
+<!-- 最初に static と targeted check を実行します。selected final candidate contract が要求する場合だけ全 repository に `bash tools/analysis/dependencies/run_repo_dependency_review.sh` を実行し、それ以外は targeted route と broad check を選ばなかった理由を記録します。 -->
 
 ## Revision Loop（改訂ループ）
 

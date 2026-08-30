@@ -2,8 +2,8 @@
 @dependency-start
 contract reference
 responsibility Documents deterministic static-seed export and source-free consumer validation commands.
-upstream implementation ../../tools/agent_tools/export_static_seed.py owns producer export.
-upstream implementation ../../tools/docs/check_bootstrap_docs.py owns source-free consumer validation.
+upstream implementation ../../tools/runtime/source/export_static_seed.py owns producer export.
+upstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py owns source-free consumer validation.
 upstream design ../contracts/static-seed-export.md owns seed content and consumer boundaries.
 upstream design ../contracts/static-seed-allowlist.toml owns the sole exact-path allowlist.
 downstream implementation ../../tests/agent_tools/test_export_static_seed.py exercises producer export.
@@ -19,7 +19,7 @@ downstream implementation ../../tests/tools/test_check_bootstrap_docs.py exercis
 存在していない directory を指定します。
 
 ```bash
-python3 tools/agent_tools/export_static_seed.py \
+python3 tools/runtime/source/export_static_seed.py \
   --source-root . \
   --source-ref "$(git rev-parse HEAD)" \
   --output /tmp/agent-canon-static-seed
@@ -32,7 +32,7 @@ allowlist と payload は同じ commit から読みます。worktree file を直
 role view は export 前に canonical materializer の static mode で生成します。
 
 ```bash
-python3 tools/agent_tools/model_profile_registry.py \
+python3 tools/agent/orchestration/model_profile_registry.py \
   --root . --generate-role-views --projection consumer-static
 ```
 
@@ -49,7 +49,7 @@ runtime/updater surface、network/secret marker、未解決 Codex role reference
 export 結果または consumer migration fixture から AgentCanon source を隠した状態で実行します。
 
 ```bash
-python3 tools/docs/check_bootstrap_docs.py \
+python3 tools/validation/documentation/checks/check_bootstrap_docs.py \
   --root /tmp/agent-canon-static-seed \
   --static-seed-consumer
 ```

@@ -6,22 +6,22 @@ upstream design README.md design index and evidence-ledger policy
 upstream design dependency-manifest-design.md dependency graph and claim-evidence contract
 upstream design rust-agent-tool-migration.md Rust CLI ownership and migration order
 upstream design ../tools/semantic_index.md semantic-index command and generated-cache contract
-downstream implementation ../../rust/agent-canon/src/semantic_index/mod.rs crate-facing semantic-index entrypoint
-downstream implementation ../../rust/agent-canon/src/semantic_index/cli.rs CLI parse/dispatch/output/exit owner
-downstream implementation ../../rust/agent-canon/src/semantic_index/args.rs argument DTO/default/validation owner
-downstream implementation ../../rust/agent-canon/src/semantic_index/storage.rs SQLite schema/transaction/atomic publish owner
-downstream implementation ../../rust/agent-canon/src/semantic_index/pipeline.rs build/embed orchestration owner
-downstream implementation ../../rust/agent-canon/src/semantic_index/query.rs read-side result owner
-downstream implementation ../../rust/agent-canon/src/semantic_index/relations.rs relation analysis owner
-downstream implementation ../../rust/agent-canon/src/semantic_index/report.rs JSON/JSONL/text/report-write owner
-downstream implementation ../../rust/agent-canon/src/semantic_index/eval.rs Eval semantics owner
-downstream implementation ../../rust/agent-canon/src/main.rs canonical Rust CLI dispatch caller
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs crate-facing semantic-index entrypoint
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/cli.rs CLI parse/dispatch/output/exit owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/args.rs argument DTO/default/validation owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/storage.rs SQLite schema/transaction/atomic publish owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/pipeline.rs build/embed orchestration owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/query.rs read-side result owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/relations.rs relation analysis owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/report.rs JSON/JSONL/text/report-write owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/eval.rs Eval semantics owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs canonical Rust CLI dispatch caller
 downstream implementation ../../tools/catalog.yaml command catalog and public command source
-downstream implementation ../../tools/agent_tools/review_backlog_scan.sh semantic-index command runner
+downstream implementation ../../tools/repository/github/review_backlog_scan.sh semantic-index command runner
 downstream implementation ../../tests/agent_tools/test_review_backlog_scan.py command/report behavior oracle
 downstream implementation ../../tests/agent_tools/test_tool_catalog.py command catalog oracle
-downstream implementation ../../tools/agent_tools/semantic_provider_html_report.py provider-report consumer
-downstream implementation ../../tools/agent_tools/check_design_doc_claims.py changed design claim checker
+downstream implementation ../../tools/analysis/search/reporting/semantic_provider_html_report.py provider-report consumer
+downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py changed design claim checker
 downstream design README.md AgentCanon design reader index
 @dependency-end
 -->
@@ -76,29 +76,29 @@ flowchart TD
 | audience | Rust CLI 実装者、cache/schema owner、CLI/report reviewer |
 | decision context | semantic-index の command、pipeline、cache、分析、出力を十一の responsibility module と `mod.rs` entrypoint に分ける |
 | first artifact | 上記の Mermaid acyclic DAG |
-| source-to-structure map | `rust/agent-canon/src/semantic_index/mod.rs` と owner modules、caller は 2–3 節、schema は 4 節、target/DAG は 5 節、検証は 8 節 |
+| source-to-structure map | `tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs` と owner modules、caller は 2–3 節、schema は 4 節、target/DAG は 5 節、検証は 8 節 |
 | document unit | semantic-index の Rust module、CLI contract、SQLite/JSON schema、transaction boundary |
 | document split decision | `split:agent-team-module-boundaries.md` と分離。Python runtime と Rust CLI の owner/compiler/oracle が異なる |
 | invalid split boundaries | line count、token budget、chunking convenience、テスト件数、近い function |
 | validation gate | fresh graph、`agent-canon docs check`、changed design claim checker、`cargo fmt`/`cargo check`/behavior oracle |
 
 関数の行数やテストの行数は split 根拠にしません。module 間の data contract、
-依存方向、side effect、schema ownership、validation route が future owner `rust/agent-canon/src/semantic_index/mod.rs` ごとに独立していることを `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
+依存方向、side effect、schema ownership、validation route が future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs` ごとに独立していることを `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
 replaceable unit の根拠にします。
 
 ## 2. Evidence And Assumption Ledger
 
-- Evidence source は `rust/agent-canon/src/semantic_index/mod.rs` と owner modules、
-  `rust/agent-canon/src/main.rs`、
+- Evidence source は `tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs` と owner modules、
+  `tools/runtime/dispatch/agent-canon/src/main.rs`、
   `tools/catalog.yaml` です。対象は AgentCanon origin/main source snapshot
   `ebba9ea058ec61abad6cdaf96f22badf2784c8b3` です。
 - Approved target-state contract は
   `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
   です。この token を持つ claim は reviewer が確定した未実装 target であり、current
   source behavior の evidence とは分類しません。
-- direct caller は `rust/agent-canon/src/main.rs` の
+- direct caller は `tools/runtime/dispatch/agent-canon/src/main.rs` の
   `mod semantic_index` と `semantic_index::run` です。command runner は
-  `tools/agent_tools/review_backlog_scan.sh`、catalog consumer は
+  `tools/repository/github/review_backlog_scan.sh`、catalog consumer は
   `tools/catalog.yaml`、behavior tests は
   `tests/agent_tools/test_review_backlog_scan.py` と
   `tests/agent_tools/test_tool_catalog.py` です。
@@ -121,7 +121,7 @@ replaceable unit の根拠にします。
 ### 3.1 対象 tree
 
 ```text
-rust/agent-canon/
+tools/runtime/dispatch/agent-canon/
 ├── Cargo.toml
 ├── src/
 │   ├── main.rs
@@ -155,10 +155,10 @@ SQLite、embedding、report、utility、tests は、現在それぞれの owner 
 
 | caller/consumer | exact surface | target での扱い |
 | --- | --- | --- |
-| `rust/agent-canon/src/main.rs` | `mod semantic_index`; `semantic_index::run(&args[2..])`; `std::process::exit` | `main.rs` → `semantic_index/mod.rs::pub(crate) fn run` → `semantic_index/cli.rs::pub(super) fn run` の一経路にする |
+| `tools/runtime/dispatch/agent-canon/src/main.rs` | `mod semantic_index`; `semantic_index::run(&args[2..])`; `std::process::exit` | `main.rs` → `semantic_index/mod.rs::pub(crate) fn run` → `semantic_index/cli.rs::pub(super) fn run` の一経路にする |
 | `tools/catalog.yaml` | `tools/bin/agent-canon semantic-index build --include documents --include agents`; command metadata | `cli.rs` の command/option contract と同じ source map を持つ |
-| `tools/agent_tools/review_backlog_scan.sh` | `build`, `embed-provider`, `merge-candidates`, `thin-docs`, `search`, `eval-output`, `compare-providers` | shell runner は CLI process boundary のまま、Rust internals を import しない |
-| `tools/agent_tools/semantic_provider_html_report.py` | `semantic_index_provider_compare` JSON を読む report consumer | `report.rs` の JSON schema を読む下流 consumer |
+| `tools/repository/github/review_backlog_scan.sh` | `build`, `embed-provider`, `merge-candidates`, `thin-docs`, `search`, `eval-output`, `compare-providers` | shell runner は CLI process boundary のまま、Rust internals を import しない |
+| `tools/analysis/search/reporting/semantic_provider_html_report.py` | `semantic_index_provider_compare` JSON を読む report consumer | `report.rs` の JSON schema を読む下流 consumer |
 | `tests/agent_tools/test_review_backlog_scan.py` | sqlite/jsonl/json output path、summary marker、output Eval | command process の behavior oracle |
 | `tests/agent_tools/test_tool_catalog.py` | catalog command string と build-before-report | catalog/CLI compatibility oracle |
 | `tests/fixtures/semantic-index/basic` | Eval fixture の dependency header と input docs | `eval.rs` の fixture contract oracle |
@@ -258,7 +258,7 @@ algorithm/input constants として移動時に保持します。値の変更は
 
 `semantic_index/mod.rs::run` は `semantic_index/cli.rs::run` の integer return をそのまま
 返し、`main.rs` が `std::process::exit` へ渡します。`cli.rs` は parse、dispatch、usage、
-stdout/stderr、exit-status mapping を future owner `rust/agent-canon/src/semantic_index/cli.rs` が所有します `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。report file の write failure は stdout success
+stdout/stderr、exit-status mapping を future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/cli.rs` が所有します `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。report file の write failure は stdout success
 marker の前に error として扱います。`jsonl` は bounded summary と result object を
 stdout に順に出し、long query text を echo する current behavior を保持します。
 
@@ -310,18 +310,18 @@ provider metadata は report と cache identity の両方で同じ値を使い�
 
 | target path | owner | current function/type cluster |
 | --- | --- | --- |
-| `rust/agent-canon/src/semantic_index/mod.rs` | crate-facing `run` entrypoint | `pub(crate) fn run`、module declarations、`cli::run` への一段 delegation |
-| `rust/agent-canon/src/semantic_index/model.rs` | cross-owner domain/result identities | 複数 capability owner が共有する `TextNode`, `IndexedNode`, `ScoredNode` 等だけ。CLI/storage/report/Eval 固有 DTO の集約先にはしない |
-| `rust/agent-canon/src/semantic_index/args.rs` | parser input DTO、aliases、defaults、validation | all `*Args`、`SemanticCommand`、`ParsedArgs`、`OutputFormat`、`SimilarKind`、default/value/validation helpers。token parse と dispatch は持たない |
-| `rust/agent-canon/src/semantic_index/source.rs` | file discovery/segmentation | `discover_files`, `collect_files`, `should_exclude`, `is_indexable`, `segment_text`, markdown/block segmentation、path/line metadata |
-| `rust/agent-canon/src/semantic_index/storage.rs` | SQLite schema/read/write/atomic publish | `init_schema`, `open_cache_connection`, `clear_index`, insert/load、`prepare_*_db`, `finish_write_db`, DB path helpers、relation persistence |
-| `rust/agent-canon/src/semantic_index/embedding.rs` | deterministic/remote embedding and vector math | `embed_text`, provider embedding, remote response parsing、token/char-gram/vector helpers、provider dimension resolution |
-| `rust/agent-canon/src/semantic_index/pipeline.rs` | build orchestration | `build_index`, `embed_existing_nodes`、source→model→embedding→storage ordering |
-| `rust/agent-canon/src/semantic_index/query.rs` | search/context/tree read operations | `search_index`, `context_pack`, `responsibility_tree`, tree coverage、score/load/read-side helpers |
-| `rust/agent-canon/src/semantic_index/relations.rs` | pair/thin/natural/discourse analysis | `similar_pairs`, `thin_docs`, `natural_relations`, `discourse_relations`、candidate/scoring/classification/sort helpers |
-| `rust/agent-canon/src/semantic_index/report.rs` | text/JSON/JSONL schema、serialization、direct file write | `print_*`, `*_json`, `write_report`, `write_pretty_report`, result sorting/serialization helpers、report parent creation/file write |
-| `rust/agent-canon/src/semantic_index/eval.rs` | fixture and generated-artifact evaluation | `run_eval`, query/pair checks、`compare_providers`, `eval_output`、artifact readers/finding summaries |
-| `rust/agent-canon/src/semantic_index/cli.rs` | CLI parse/dispatch/usage/output/exit mapping | `pub(super) fn run`、`parse_*_args`、command dispatch、`print_usage`、`fail`、stdout/stderr と integer exit-status mapping |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs` | crate-facing `run` entrypoint | `pub(crate) fn run`、module declarations、`cli::run` への一段 delegation |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/model.rs` | cross-owner domain/result identities | 複数 capability owner が共有する `TextNode`, `IndexedNode`, `ScoredNode` 等だけ。CLI/storage/report/Eval 固有 DTO の集約先にはしない |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/args.rs` | parser input DTO、aliases、defaults、validation | all `*Args`、`SemanticCommand`、`ParsedArgs`、`OutputFormat`、`SimilarKind`、default/value/validation helpers。token parse と dispatch は持たない |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/source.rs` | file discovery/segmentation | `discover_files`, `collect_files`, `should_exclude`, `is_indexable`, `segment_text`, markdown/block segmentation、path/line metadata |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/storage.rs` | SQLite schema/read/write/atomic publish | `init_schema`, `open_cache_connection`, `clear_index`, insert/load、`prepare_*_db`, `finish_write_db`, DB path helpers、relation persistence |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/embedding.rs` | deterministic/remote embedding and vector math | `embed_text`, provider embedding, remote response parsing、token/char-gram/vector helpers、provider dimension resolution |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/pipeline.rs` | build orchestration | `build_index`, `embed_existing_nodes`、source→model→embedding→storage ordering |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/query.rs` | search/context/tree read operations | `search_index`, `context_pack`, `responsibility_tree`, tree coverage、score/load/read-side helpers |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/relations.rs` | pair/thin/natural/discourse analysis | `similar_pairs`, `thin_docs`, `natural_relations`, `discourse_relations`、candidate/scoring/classification/sort helpers |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/report.rs` | text/JSON/JSONL schema、serialization、direct file write | `print_*`, `*_json`, `write_report`, `write_pretty_report`, result sorting/serialization helpers、report parent creation/file write |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/eval.rs` | fixture and generated-artifact evaluation | `run_eval`, query/pair checks、`compare_providers`, `eval_output`、artifact readers/finding summaries |
+| `tools/runtime/dispatch/agent-canon/src/semantic_index/cli.rs` | CLI parse/dispatch/usage/output/exit mapping | `pub(super) fn run`、`parse_*_args`、command dispatch、`print_usage`、`fail`、stdout/stderr と integer exit-status mapping |
 
 target `mod.rs` の crate-facing API は `pub(crate) fn run(args: &[String]) -> i32` だけです。
 `cli::run` と sibling module 間で渡す DTO/type/function は `pub(super)` に限定します。
@@ -371,14 +371,14 @@ insert、embedding、stats を一つの transaction boundary で実行します�
   `analysis_runs` を書き終えてから同じ atomic publish を行います。
 - 途中 error は target DB を変更せず、temp/publish file を回収します。回収失敗は
   error evidence に残し、成功扱いにしません。
-- local temp path の current exception（target 自体へ write）は current owner `rust/agent-canon/src/semantic_index/storage.rs` の behavior として保持します。
+- local temp path の current exception（target 自体へ write）は current owner `tools/runtime/dispatch/agent-canon/src/semantic_index/storage.rs` の behavior として保持します。
   transaction/atomic publish の変更は network-backed worktree compatibility を壊す
   ため、別 design decision です。
 - `report.rs` は JSON/JSONL schema、serialization、parent directory 作成、report path
   への direct file write を所有します。`storage.rs` を report write に介在させず、
-  partial report または write failure を `rust/agent-canon/src/semantic_index/report.rs` の success output として宣言しません `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。
+  partial report または write failure を `tools/runtime/dispatch/agent-canon/src/semantic_index/report.rs` の success output として宣言しません `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。
 - `storage.rs` は SQLite schema、transaction、temp/copy/rename による atomic DB publish
-  だけを future owner `rust/agent-canon/src/semantic_index/storage.rs` が所有し、JSON schema、serializer、report file write を持ちません `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。
+  だけを future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/storage.rs` が所有し、JSON schema、serializer、report file write を持ちません `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。
 - `source.rs` の filesystem read、`args.rs` の query-file/stdin read、
   `embedding.rs` の remote provider call、`storage.rs`/`report.rs` の file write は
   明示 command invocation の side effect です。module import は I/O を行いません。
@@ -389,7 +389,7 @@ insert、embedding、stats を一つの transaction boundary で実行します�
 | --- | --- | --- |
 | structure | `.rs` split、`mod.rs` → `cli.rs` delegation、sibling `pub(super)`、test module relocation | line-count split、namespace stuffing、cycle、run 以外の crate-facing item、`pub(crate)` field |
 | CLI | parser function の移動、owner enum の移動 | command/alias、option alias、default、usage、exit、stdout/stderr の変更 |
-| storage | schema code の移動、transaction helper の抽出 `rust/agent-canon/src/semantic_index/storage.rs` | SQLite table/column/key/version、cache path、atomic publish、partial write semantics の変更 `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8` |
+| storage | schema code の移動、transaction helper の抽出 `tools/runtime/dispatch/agent-canon/src/semantic_index/storage.rs` | SQLite table/column/key/version、cache path、atomic publish、partial write semantics の変更 `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8` |
 | report | serializer の owner 移動、typed internal result | JSON/JSONL key、text format、rank/score order、query echo、marker の変更 |
 | algorithm | function placement、explicit input/output type | embedding、segmentation、threshold、relation classification、Eval oracle の意味変更 |
 | tests | owner module の explicit import、reachable bad input の追加 | `use super::*`、private implementation detail の固定、impossible-input test、oracle weakening |
@@ -397,7 +397,7 @@ insert、embedding、stats を一つの transaction boundary で実行します�
 ### compiler/static trust と behavior oracle
 
 Rust compiler、`cargo fmt --check`、`cargo check`、module visibility check は型、
-borrow、`rust/agent-canon/src/semantic_index/mod.rs` の `pub(crate) fn run`、defining owner 内の sibling `pub(super)`、0 件の `pub(crate)` field、未解決 `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
+borrow、`tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs` の `pub(crate) fn run`、defining owner 内の sibling `pub(super)`、0 件の `pub(crate)` field、未解決 `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
 import、DAG の構造を信頼できる static evidence です。
 それらは CLI output、SQLite atomicity、JSON schema、remote provider error、semantic
 ranking の behavior を証明しません。
@@ -429,41 +429,41 @@ bad input」「実在する filesystem/provider error」「schema mismatch」「
 3. **Wave 2: storage/embedding** — schema、DB path、provider vectors、transaction/
    atomic publish の definition、owner-local DTO、tests を `storage.rs`/`embedding.rs` へ
    移し、移した definition を同じ wave で `mod.rs` から削除します。
-4. **Wave 3: pipeline/query/relations** — build orchestration と pipeline-local DTO/tests は future owner `rust/agent-canon/src/semantic_index/pipeline.rs` へ移します。
-   search/context/tree の read operations と query-local DTO/tests は future owner `rust/agent-canon/src/semantic_index/query.rs` へ移します。
-   pair/thin/natural/discourse relation analysis と relations-local DTO/tests は future owner `rust/agent-canon/src/semantic_index/relations.rs` へ移します。
+4. **Wave 3: pipeline/query/relations** — build orchestration と pipeline-local DTO/tests は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/pipeline.rs` へ移します。
+   search/context/tree の read operations と query-local DTO/tests は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/query.rs` へ移します。
+   pair/thin/natural/discourse relation analysis と relations-local DTO/tests は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/relations.rs` へ移します。
    各 owner へ移した definition は同じ wave で `mod.rs` から削除します。`query.rs` と `relations.rs` は互いの private
    implementation を import しません。
-5. **Wave 4: report/eval/cli/mod** — JSON/text/JSONL schema、serializer、direct report file write、report-local DTO は future owner `rust/agent-canon/src/semantic_index/report.rs` へ移します。
-   Eval semantics、fixture/artifact reader、finding summary、Eval-local DTO は future owner `rust/agent-canon/src/semantic_index/eval.rs` へ移します。
-   parse、dispatch、usage、stdout/stderr、integer exit-status mapping、CLI-local DTO は future owner `rust/agent-canon/src/semantic_index/cli.rs` へ移します。各 owner へ移した definition
+5. **Wave 4: report/eval/cli/mod** — JSON/text/JSONL schema、serializer、direct report file write、report-local DTO は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/report.rs` へ移します。
+   Eval semantics、fixture/artifact reader、finding summary、Eval-local DTO は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/eval.rs` へ移します。
+   parse、dispatch、usage、stdout/stderr、integer exit-status mapping、CLI-local DTO は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/cli.rs` へ移します。各 owner へ移した definition
    は同じ wave で `mod.rs` から削除します。`mod.rs` には `pub(crate) fn run` と module
    declarations だけを残し、`main.rs` → `mod.rs::run` → `cli.rs::run` を接続します。
 
 各 migration wave は definition move、explicit test import、old definition delete、
 compiler/behavior readback を一つの commit に含めます。old/new 二重 authority、alias、
 forwarder、wrapper、compatibility wiring は置きません。failure 時は wave 全体を最後の
-成功 commit へ戻します。temp SQLite と publish file は rollback authority ではなく、future owner `rust/agent-canon/src/semantic_index/storage.rs` が保持する read-only failure evidence として扱います。
-report artifact は rollback authority ではなく、future owner `rust/agent-canon/src/semantic_index/report.rs` が保持する read-only failure evidence として扱います。この確定順序は `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
+成功 commit へ戻します。temp SQLite と publish file は rollback authority ではなく、future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/storage.rs` が保持する read-only failure evidence として扱います。
+report artifact は rollback authority ではなく、future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/report.rs` が保持する read-only failure evidence として扱います。この確定順序は `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
 `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8` に属します。
 
 ## 9. Design-To-Implementation Trace
 
 | clause | current evidence | target mechanism | completion evidence |
 | --- | --- | --- | --- |
-| `RC-01` | `rust/agent-canon/src/main.rs` の `semantic_index::run` | `main.rs` → `mod.rs::pub(crate) fn run` → `cli.rs::pub(super) fn run` | `cargo check` と main caller readback |
+| `RC-01` | `tools/runtime/dispatch/agent-canon/src/main.rs` の `semantic_index::run` | `main.rs` → `mod.rs::pub(crate) fn run` → `cli.rs::pub(super) fn run` | `cargo check` と main caller readback |
 | `RC-02` | `semantic_index/cli.rs` の usage/`fail` と `args.rs` の `parse_args` | `cli.rs` が parse/dispatch/usage/stdout/stderr/exit mapping、`args.rs` が DTO/default/validation を所有 | command matrix の stdout/stderr/exit comparison |
 | `RC-03` | `init_schema` と `clear_index` の current SQLite tables | `storage.rs` が schema/version/transaction/atomic publish を所有 | schema inventory と failure preservation |
 | `RC-04` | `build_index` と `embed_existing_nodes` | `pipeline.rs` が source→embedding→storage ordering を所有 | build/embed DB readback |
 | `RC-05` | `search_index`、`context_pack`、`responsibility_tree` | `query.rs` が read-side result contract を所有 | text/json/jsonl result oracle |
 | `RC-06` | `similar_pairs`、`thin_docs`、`natural_relations`、`discourse_relations` | `relations.rs` が analysis domain を所有 | relation JSON/SQLite/Eval oracle |
 | `RC-07` | `*_json`、`print_*`、`run_eval`、`eval_output` | `report.rs` が JSON schema/serialization/direct file write/report DTO、`eval.rs` が Eval semantics/Eval DTO を各 defining owner として所有 | report schema と fixture/output Eval |
-| `RC-08` | `tools/agent_tools/review_backlog_scan.sh` と catalog | `cli.rs` が process-facing contract、`mod.rs` が crate-facing delegation を所有 | shell/catalog compatibility |
+| `RC-08` | `tools/repository/github/review_backlog_scan.sh` と catalog | `cli.rs` が process-facing contract、`mod.rs` が crate-facing delegation を所有 | shell/catalog compatibility |
 | `RC-09` | current `mod tests` の `use super::*` | owner module test の explicit imports | no glob import、reachable-input tests、compiler pass |
 
 `RC-01`–`RC-09` はこの design pass の request clauses です。implementation commit は
 各 wave で clause と current source token を再掲し、future module path を実装後の
-fresh graph source identity `rust/agent-canon/src/semantic_index/mod.rs` に接続します `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。
+fresh graph source identity `tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs` に接続します `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。
 
 ## 10. 確定した設計判断
 
@@ -480,4 +480,4 @@ fresh graph source identity `rust/agent-canon/src/semantic_index/mod.rs` に接�
 
 これらは approved target-state contract
 `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
-の確定判断であり、DAG、owner `rust/agent-canon/src/semantic_index/cli.rs`、implementation mechanism、validation route に未解決分岐はありません `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。
+の確定判断であり、DAG、owner `tools/runtime/dispatch/agent-canon/src/semantic_index/cli.rs`、implementation mechanism、validation route に未解決分岐はありません `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`。

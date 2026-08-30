@@ -34,9 +34,9 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 
 - project-native configure / build / test evidence
 - When native static analysis is relevant and a CMake-generated database exists, use:
-  `python3 tools/static_analysis/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
-  `python3 tools/static_analysis/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`;
-  and `python3 tools/static_analysis/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`.
+  `python3 tools/validation/code/static/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
+  `python3 tools/validation/code/static/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`;
+  and `python3 tools/validation/code/static/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`.
   The build directory is explicit per module; the tool does not enumerate or add include paths,
   compiler flags, or provider-specific diagnostics.
 - `ctest` があるならその結果
@@ -114,6 +114,35 @@ analytical cost change を性能実測の代用として合格扱いにしませ
 workload、compiler、thread / device 条件を明記して handoff します。
 
 ## Performance review order
+
+### Numerical solver handoff boundary
+
+対象が C / C++ の数値 solver または反復 algorithm である場合、性能差の
+最初の判定は `computational-optimization` の convergence-first numerical
+performance diagnosis に委譲します。cpp review はその post-run record を
+受け取り、数学 / algorithm の観測と native implementation evidence を混ぜません。
+record は `python3 tools/analysis/numerical/numeric_performance.py --input
+<post-run-observations.json> --format json` の分類結果を使います。
+
+- iteration count、residual / objective / KKT trajectory、KKT / finite state、step
+  acceptance / size、termination、conditioning、inner-solver work、または objective /
+  gradient / eval / linear-solve / matvec work counter が変わった場合は、math /
+  algorithm owner へ返します。JIT、backend、
+  compiler、architecture の編集を cpp review の第一手段にしません。
+- 数値 trajectory、work counters、termination、conditioning、inner-solver work、
+  mathematical problem、initial state、stopping policy、dtype、workload、run mode、
+  cache、backend、device、compiler が同じで、compile/JIT、per-iteration、eval /
+  linear-solve、transfer / synchronization、または total cost の after 側に正の
+  回帰がある場合に限り、該当 systems / JIT sibling handoff を受けます。
+- 比較 context が違う、finite / non-finite event が欠ける、または work counter が
+  変わる場合は `evidence_missing` または math route とし、systems attribution を
+  行いません。
+- total time しかない場合、または total だけが増えて decomposed component が増えて
+  いない場合は `evidence_missing`（`unattributed_total`）として追加 metrics を要求し、
+  JIT 境界の変更を提案しません。
+- 数値 solver ではない C++ performance は、既存のこの文書の workload、data
+  movement、native benchmark の順序をそのまま使います。数値 solver 用の
+  convergence record や compile/JIT 分解を一律に要求しません。
 
 ### 1. Contract、workload、metric
 

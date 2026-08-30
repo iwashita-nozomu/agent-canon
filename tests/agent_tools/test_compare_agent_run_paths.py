@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests agent run path comparison behavior.
-# upstream implementation ../../tools/agent_tools/compare_agent_run_paths.py compares runs  # noqa: E501
+# upstream implementation ../../eval/checkers/compare_agent_run_paths.py compares runs  # noqa: E501
 # upstream design ../../agents/workflows/adaptive-improvement-workflow.md compares reruns  # noqa: E501
 # @dependency-end
 """Tests for two-run execution path comparison."""
@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "compare_agent_run_paths.py"
+SCRIPT = PROJECT_ROOT / "eval" / "checkers" / "compare_agent_run_paths.py"
 
 
 def write_run(

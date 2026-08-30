@@ -5,7 +5,7 @@
 # responsibility Tests contract and protocol checks for the LSP 3.17 code-analysis adapter.
 # upstream design ../../documents/structured-analysis/code-analysis.md LSP 3.17 protocol contract and evidence policy
 # upstream design ../../documents/tools/lsp_code_analysis.md tests for tool-owned implementation evidence
-# upstream implementation ../../tools/agent_tools/lsp_code_analysis.py code-analysis protocol implementation
+# upstream implementation ../../tools/analysis/code/lsp_code_analysis.py code-analysis protocol implementation
 # @dependency-end
 
 from __future__ import annotations
@@ -21,12 +21,12 @@ from pathlib import Path
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "lsp_code_analysis.py"
+TOOL = PROJECT_ROOT / "tools" / "analysis" / "code" / "lsp_code_analysis.py"
 
 if str(TOOL.parent) not in sys.path:
     sys.path.insert(0, str(TOOL.parent))
 
-import lsp_code_analysis as lsp  # noqa: E402
+import tools.analysis.code.lsp_code_analysis as lsp  # noqa: E402
 
 
 def write_fake_server(
@@ -300,7 +300,7 @@ class LspCodeAnalysisTest(unittest.TestCase):
 
     def test_manifest_receipt_resolution_prefers_override_then_image_then_external_runtime(self) -> None:
         """LSP resolution never falls back to source-local workspace state."""
-        from tools.agent_tools import dependency_plan as dependencies
+        from tools.analysis.dependencies import dependency_plan as dependencies
 
         verified = dependencies.VerifiedExecutable(
             record_id="rust-toolchain",

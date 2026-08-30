@@ -2,7 +2,7 @@
 # contract configuration
 # responsibility Defines the sole exact-path allowlist for the template-consumer static seed.
 # upstream design ./static-seed-export.md static seed ownership and exclusion contract
-# downstream implementation ../../tools/agent_tools/export_static_seed.py reads this manifest from one committed Git tree
+# downstream implementation ../../tools/runtime/source/export_static_seed.py reads this manifest from one committed Git tree
 # downstream implementation ../../tests/agent_tools/test_export_static_seed.py verifies exact-file and forbidden-surface behavior
 # @dependency-end
 
@@ -22,6 +22,7 @@ files = [
   ".codex/agents/experiment_runner.toml",
   ".codex/agents/explorer.toml",
   ".codex/agents/fair_data_reviewer.toml",
+  ".codex/agents/integration_executor.toml",
   ".codex/agents/literature_researcher.toml",
   ".codex/agents/logic_gap_reviewer.toml",
   ".codex/agents/long_form_writer.toml",
@@ -32,6 +33,7 @@ files = [
   ".codex/agents/plan_reviewer.toml",
   ".codex/agents/project_reviewer.toml",
   ".codex/agents/prompt_config_reviewer.toml",
+  ".codex/agents/publisher.toml",
   ".codex/agents/python_reviewer.toml",
   ".codex/agents/report_reviewer.toml",
   ".codex/agents/reproducibility_reviewer.toml",

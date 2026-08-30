@@ -3,10 +3,10 @@
 # @dependency-start
 # contract test
 # responsibility Tests integrated CI shell wiring that is too expensive to execute wholesale.
-# upstream implementation ../../tools/ci/run_all_checks.sh runs repository and AgentCanon CI gates
-# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py writes accumulated eval reports
-# upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated eval reports
-# upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves mounted log archive paths
+# upstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs repository and AgentCanon CI gates
+# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py writes accumulated eval reports
+# upstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated eval reports
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted log archive paths
 # @dependency-end
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh"
-PR_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
-PR_SELECTOR = PROJECT_ROOT / "tools" / "ci" / "agent_canon_pr_graph_selector.py"
-PRE_REVIEW_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "pre_review.sh"
-PYTHON_QUALITY_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_python_quality_checks.sh"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh"
+PR_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+PR_SELECTOR = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "agent_canon_pr_graph_selector.py"
+PRE_REVIEW_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "pre_review.sh"
+PYTHON_QUALITY_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "run_python_quality_checks.sh"
 
 
 class RunAllChecksScriptTest(unittest.TestCase):
@@ -207,9 +207,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
         quality_text = PYTHON_QUALITY_SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn('bash "${CANON_CI_ROOT}/run_python_quality_checks.sh"', ci_text)
-        self.assertIn("tools/ci/run_python_quality_checks.sh", pre_review_text)
+        self.assertIn("tools/validation/ci/checks/run_python_quality_checks.sh", pre_review_text)
         self.assertIn(
-            "python_quality_runner=tools/ci/run_python_quality_checks.sh",
+            "python_quality_runner=tools/validation/ci/checks/run_python_quality_checks.sh",
             pre_review_text,
         )
         self.assertNotIn("exec-parent-bound", pre_review_text)

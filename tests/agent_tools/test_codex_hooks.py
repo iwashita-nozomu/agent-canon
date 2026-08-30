@@ -5,7 +5,7 @@
 # responsibility Tests active codex hook behavior and retired-route contract.
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares the three active hooks
-# upstream implementation ../../tools/agent_tools/hook_safety.py owns active safety leaves
+# upstream implementation ../../tools/runtime/authority/hook_safety.py owns active safety leaves
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py owns the typed event contract
 # downstream implementation ../../tests/agent_tools/test_hook_event_log.py validates hook telemetry
 # @dependency-end
@@ -32,7 +32,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
-from prompt_classifier import (  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
 )
@@ -530,6 +530,24 @@ class CodexHooksTest(unittest.TestCase):
         target = report_dir / "runtime" / "agent_identity.json"
         target.parent.mkdir(parents=True)
         target.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
+        packet_root = report_dir.parent
+        packet = {
+            "schema": "agent-canon.writer-target-packet.v1",
+            "checkout_root": str(packet_root),
+            "branch": "test",
+            "remote": "local/repo",
+            "allowed_paths": ["src/"],
+            "checkout_identity": {
+                "cwd": str(packet_root),
+                "git_root": str(packet_root),
+                "branch": "test",
+                "head": "a" * 40,
+                "remote": "local/repo",
+            },
+        }
+        packet_path = packet_root / ".agent-canon" / "writer-target.json"
+        packet_path.parent.mkdir(parents=True, exist_ok=True)
+        packet_path.write_text(json.dumps(packet, sort_keys=True), encoding="utf-8")
 
     def test_pretooluse_rejects_parent_mutation_and_allows_child_scope(self) -> None:
         """The active hook enforces runtime identity and child write scope."""
@@ -916,6 +934,66 @@ class CodexHooksTest(unittest.TestCase):
                     "DESTRUCTIVE_GIT_GUARD=block",
                     cast("str", cast("dict[str, object]", payload)["reason"]),
                 )
+
+    def test_conflict_inventory_blocks_unbound_whole_file_operations(self) -> None:
+        """An existing conflict inventory binds destructive Git to a preservation plan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            conflict_dir = root / ".agent-canon"
+            conflict_dir.mkdir()
+            (conflict_dir / "conflict-preservation.json").write_text("{}\n", encoding="utf-8")
+            command = (
+                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON=conflict-resolution "
+                "git --no-pager checkout --ours -- file.py"
+            )
+            payload = self._run_hook_in_root(
+                root,
+                "PreToolUse",
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": command},
+                },
+            )
+            body = cast("dict[str, object]", json.loads(payload.stdout))
+            self.assertIn("CONFLICT_PRESERVATION_GUARD=block", body["reason"])
+
+            attached = (
+                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON=conflict-resolution "
+                "AGENT_CANON_CONFLICT_PRESERVATION_INVENTORY=inventory.json "
+                "AGENT_CANON_CONFLICT_PRESERVATION_PLAN=plan.json "
+                "git --no-pager checkout --ours -- file.py"
+            )
+            attached_result = self._run_hook_in_root(
+                root,
+                "PreToolUse",
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": attached},
+                },
+            )
+            if attached_result.stdout:
+                attached_body = cast("dict[str, object]", json.loads(attached_result.stdout))
+                self.assertIn(
+                    "CONFLICT_PRESERVATION_GUARD=block",
+                    attached_body.get("reason", ""),
+                )
+
+            commit_result = self._run_hook_in_root(
+                root,
+                "PreToolUse",
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": "git commit --no-edit"},
+                },
+            )
+            commit_body = cast("dict[str, object]", json.loads(commit_result.stdout))
+            self.assertIn("CONFLICT_PRESERVATION_GUARD=block", commit_body["reason"])
 
     def test_shared_checkout_guard_authority_is_same_segment_and_one_shot(self) -> None:
         """Ambient, incomplete, and earlier-segment authority never leaks to Git."""

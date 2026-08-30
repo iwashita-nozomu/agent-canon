@@ -4,8 +4,8 @@
 # contract test
 # responsibility Verifies the complete typed skill/tool invocation graph and its generated projections.
 # upstream design ../../documents/design/skill-tool-invocation-graph.md owns graph clauses SG-001..SG-015 and artifact readback
-# upstream implementation ../../tools/agent_tools/skill_dependency_map.py materializes identities, phases, commands, tools, edges, and Mermaid
-# upstream implementation ../../tools/agent_tools/check_skill_tool_invocation_graph.py validates generated JSON/Mermaid equality and stale artifacts
+# upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes identities, phases, commands, tools, edges, and Mermaid
+# upstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py validates generated JSON/Mermaid equality and stale artifacts
 # downstream implementation ../../documents/runtime/skill-dependency-graph.json is the generated machine-readable graph projection
 # downstream implementation ../../documents/runtime/skill-dependency-graph.md is the generated Mermaid reader projection
 # @dependency-end
@@ -21,11 +21,11 @@ from pathlib import Path
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
-sys.path.insert(0, str(TOOLS_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from agent_canon_source_root import resolve_agent_canon_source_root  # noqa: E402
-from skill_dependency_map import (  # noqa: E402
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root  # noqa: E402
+from tools.agent.skills import skill_dependency_map  # noqa: E402
+from tools.agent.skills.skill_dependency_map import (  # noqa: E402
     GraphDigestMismatchError,
     GraphSourceMutationError,
     GraphIdentityCollisionError,
@@ -44,11 +44,11 @@ from skill_dependency_map import (  # noqa: E402
     render_graph_mermaid,
     write_artifacts,
 )
-from skill_route_catalog import (  # noqa: E402
+from tools.agent.skills.skill_route_catalog import (  # noqa: E402
     derive_skill_invocation_order,
     load_skill_route_rules,
 )
-from skill_tool_commands import packet_for_skill  # noqa: E402
+from tools.agent.skills.skill_tool_commands import packet_for_skill  # noqa: E402
 
 
 class SkillToolInvocationGraphTests(unittest.TestCase):
@@ -108,11 +108,11 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             )
             graph = {"skill_count": 1, "commands": [], "tools": [], "edges": []}
             with (
-                mock.patch("skill_dependency_map.build_graph", return_value=graph),
+                mock.patch.object(skill_dependency_map, "build_graph", return_value=graph),
                 mock.patch(
-                    "skill_dependency_map.render_graph_mermaid", return_value="graph\n"
+                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid", return_value="graph\n"
                 ),
-                mock.patch("skill_dependency_map._json_text", return_value="{}\n"),
+                mock.patch.object(skill_dependency_map, "_json_text", return_value="{}\n"),
             ):
                 write_artifacts(
                     source,
@@ -149,11 +149,11 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             )
             graph = {"skill_count": 1, "commands": [], "tools": [], "edges": []}
             with (
-                mock.patch("skill_dependency_map.build_graph", return_value=graph),
+                mock.patch.object(skill_dependency_map, "build_graph", return_value=graph),
                 mock.patch(
-                    "skill_dependency_map.render_graph_mermaid", return_value="graph\n"
+                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid", return_value="graph\n"
                 ),
-                mock.patch("skill_dependency_map._json_text", return_value="{}\n"),
+                mock.patch.object(skill_dependency_map, "_json_text", return_value="{}\n"),
             ):
                 with self.assertRaisesRegex(GraphSourceMutationError, "target_mismatch"):
                     write_artifacts(
@@ -406,7 +406,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             markdown,
         )
         self.assertIn(
-            "downstream implementation ../../tools/agent_tools/check_skill_tool_invocation_graph.py",
+            "downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py",
             markdown,
         )
         self.assertNotIn("base64", markdown.lower())

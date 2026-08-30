@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests Rust Mermaid fenced-block formatter behavior.
-# upstream implementation ../../rust/agent-canon/src/docs.rs implements docs format and fix-mermaid.
-# upstream implementation ../../tools/agent_tools/visualization_contract.py owns projection manifest and final coverage semantics.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs format and fix-mermaid.
+# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns projection manifest and final coverage semantics.
 # @dependency-end
 """Tests for Mermaid fenced-block formatting."""
 

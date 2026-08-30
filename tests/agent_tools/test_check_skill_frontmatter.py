@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests runtime skill frontmatter validation.
-# upstream implementation ../../tools/agent_tools/check_skill_frontmatter.py validates SKILL.md frontmatter
+# upstream implementation ../../tools/validation/semantic/skills/check_skill_frontmatter.py validates SKILL.md frontmatter
 # upstream design ../../agents/canonical/skills.md skill runtime registry contract
 # @dependency-end
 """Tests for runtime skill frontmatter validation."""
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_skill_frontmatter.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "skills" / "check_skill_frontmatter.py"
 
 
 def skill_text(name: str, description: str) -> str:
@@ -49,7 +49,7 @@ class CheckSkillFrontmatterTest(unittest.TestCase):
 
     def write_skill(self, root: Path, name: str, body: str) -> None:
         """Write one SKILL.md file below the runtime skill directory."""
-        path = root / ".agents" / "skills" / name / "SKILL.md"
+        path = root / ".codex" / "personal" / "skills" / name / "SKILL.md"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body, encoding="utf-8")
 
@@ -67,7 +67,7 @@ class CheckSkillFrontmatterTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("SKILL_FRONTMATTER=fail", result.stdout)
-            self.assertIn(".agents/skills/broken-skill/SKILL.md", result.stdout)
+            self.assertIn(".codex/personal/skills/broken-skill/SKILL.md", result.stdout)
             self.assertIn("invalid-yaml", result.stdout)
 
     def test_quoted_description_colon_passes(self) -> None:

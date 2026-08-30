@@ -6,9 +6,9 @@ upstream design README.md structured analysis package index
 upstream design graph-dsl.md Graph DSL Core storage contract
 upstream design ../prose-reasoning-graph/dsl-spec.md prose graph DSL and projection contract
 upstream design ../design/dependency-manifest-design.md dependency manifest DSL and validation model
-upstream implementation ../../tools/agent_tools/prose_reasoning_graph.py current prose graph SQLite implementation
-upstream implementation ../../rust/agent-canon/src/structured_analysis.rs Rust structured-analysis CLI implementation
-upstream implementation ../../tools/agent_tools/check_dependency_graph.sh emits dependency manifest graph artifacts
+upstream implementation ../../tools/analysis/documents/prose_reasoning_graph.py current prose graph SQLite implementation
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs Rust structured-analysis CLI implementation
+upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh emits dependency manifest graph artifacts
 downstream design dependency-header-analysis.md maps dependency header graph data into this DB model
 downstream design code-analysis.md maps code dependency evidence into this DB model
 downstream design document-canon-analysis.md maps duplicate and non-canonical document evidence into this DB model
@@ -18,7 +18,7 @@ downstream design document-canon-analysis.md maps duplicate and non-canonical do
 # Structured Analysis Database Design
 
 This document is the SQLite materialization contract implemented by
-`../../rust/agent-canon/src/structured_analysis.rs`. Broader prose, dependency,
+`../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`. Broader prose, dependency,
 report, and corpus adapters keep their contracts through `prose_reasoning_graph.py`.
 This file records the shared Graph DSL Core storage created and validated by
 `initialize_graph_schema` and
@@ -40,7 +40,7 @@ This file records the shared Graph DSL Core storage created and validated by
 - Evidence sources:
   `graph-dsl.md`, `../prose-reasoning-graph/dsl-spec.md`,
   `../dependency-manifest-design.md`, and
-  `../../rust/agent-canon/src/structured_analysis.rs`.
+  `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - Assumption:
   `agent-canon structured-analysis build` keeps regenerated SQLite DB files in
   the structured-analysis cache. `--out-dir` names a durable report export

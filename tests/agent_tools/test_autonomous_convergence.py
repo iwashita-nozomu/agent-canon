@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests autonomous convergence transitions, cycle stops, and closeout projection.
 # upstream design ../../agents/skills/agent-orchestration.execution-contract.toml machine-readable owner
-# upstream implementation ../../tools/agent_tools/autonomous_convergence.py transition validator
+# upstream implementation ../../tools/agent/orchestration/autonomous_convergence.py transition validator
 # @dependency-end
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from autonomous_convergence import (
+from tools.agent.orchestration.autonomous_convergence import (
     CONVERGENCE_CLOSEOUT_SCHEMA,
     ConvergenceAction,
     ConvergenceContractError,

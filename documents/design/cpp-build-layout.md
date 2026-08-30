@@ -459,13 +459,13 @@ snapshot, and `EXPERIMENT_RUN_DIR`/result root, while the executable writes only
 native domain artifacts. The canonical managed route is (`D-EXPERIMENT-LIFECYCLE`):
 
 ```bash
-python3 -m tools.experiments.run_managed_experiment --topic "$TOPIC" --variant formal --use-registered-command formal # evidence: `D-EXPERIMENT-LIFECYCLE`
+python3 -m tools.experiments.execution.run_managed_experiment --topic "$TOPIC" --variant formal --use-registered-command formal # evidence: `D-EXPERIMENT-LIFECYCLE`
 ```
 
 After a run, the save owner validates and retains the same result directory (`RDC-RESULT-PERSISTENCE`):
 
 ```bash
-python3 -m tools.experiments.save_experiment_result_annex \
+python3 -m tools.experiments.artifacts.save_experiment_result_annex \
   --result-dir "$ROOT/experiments/$TOPIC/result/$VARIANT/$RUN_NAME" \
   --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
 ```
@@ -582,7 +582,7 @@ the projection section and an exact reverse edge from that projection to its evi
 
 | exact changed path | forward: design clause → projection section/ref | reverse: projection section/ref → evidence/readback and design ref |
 | --- | --- | --- |
-| `.agents/skills/cpp-review/SKILL.md` | `D-COMMANDS`, `D-TEST-GRAPH` → `#Activation readback`, `#C++ Review` CMake command step | route path set and CMake command → `tools/bin/agent-canon docs check`, `RDC-CPP-REVIEW`, `D-VALIDATION` |
+| `.codex/personal/skills/cpp-review/SKILL.md` | `D-COMMANDS`, `D-TEST-GRAPH` → `#Activation readback`, `#C++ Review` CMake command step | route path set and CMake command → `tools/bin/agent-canon docs check`, `RDC-CPP-REVIEW`, `D-VALIDATION` |
 | `agents/skills/cpp-review.md` | `D-PROJECT-ROOT`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-COMMANDS`, `D-EXPERIMENT-LIFECYCLE` → `#Use When`, `#Required Checks`, `#Target graph readback`, `#Docstring projection route` | `cpp_reviewer` route markers, target graph, and commands → route check, C++ profile checks, `RDC-CPP-REVIEW` |
 | `agents/skills/oop-type-design.md` | `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-RELATED-DOCUMENT-CLOSURE` → `#Static delegation and test boundary`, `#Downstream handoff and evaluation boundary` | `$cpp-review` delegation and C++ target responsibility readback → `cpp-review`, OOP/readability evidence, `D-RELATED-DOCUMENT-CLOSURE` |
 | `agents/skills/refactor-loop.md` | `D-SOURCE-OWNERS`, `D-COMMANDS`, `D-PARENT-MIGRATION` → `#C++ project migration projection` | path map, consumer/provider graph, and root-anchored commands → refactor trace/readback, `D-SOURCE-BOUNDARIES`, `D-PARENT-MIGRATION` |
@@ -599,14 +599,14 @@ the projection section and an exact reverse edge from that projection to its evi
 | `documents/structure/repo-structure-contract.toml` | `D-PARENT-MIGRATION`, `D-SOURCE-BOUNDARIES` → `profile.id=template_or_derived_repo` `allowed_top_level`, `profile.optional[path=cpp]` | positive top-level/path ownership → `repo_structure_contract.py`, `responsibility_scope.py`, `RDC-STRUCTURE` |
 | `documents/tools/README.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#Tool Detail Notes` C++ OOP command block | `cpp/include cpp/src tests/cpp cpp/experiments` command → tool inventory/readability evidence, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
 | `documents/tools/oop/cpp/readability.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#実行例` | C++ OOP scan paths and build-evidence boundary → readability command/readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
-| `tools/docs/render_runtime_profile_inventory.py` | `D-VALIDATION` → `DEPENDENCY_HEADER`, `render_validation_failure_response`, `bridge_inventory_to_markdown` | JSON-to-Markdown generator output → `render_runtime_profile_inventory.py --check`, `RDC-RUNTIME-MATRIX` |
-| `tools/static_analysis/cpp/README.md` | `D-PROJECT-ROOT`, `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-VALIDATION` → `#Default command` and native project evidence paragraph | readability plus configure/build/CTest/install/target evidence → static-analysis readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
+| `tools/validation/documentation/formatting/render_runtime_profile_inventory.py` | `D-VALIDATION` → `DEPENDENCY_HEADER`, `render_validation_failure_response`, `bridge_inventory_to_markdown` | JSON-to-Markdown generator output → `render_runtime_profile_inventory.py --check`, `RDC-RUNTIME-MATRIX` |
+| `tools/validation/code/static/cpp/README.md` | `D-PROJECT-ROOT`, `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-VALIDATION` → `#Default command` and native project evidence paragraph | readability plus configure/build/CTest/install/target evidence → static-analysis readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
 
 The review repair adds two route-owner rows without replacing any of the 19 baseline rows:
 
 | exact repair path | forward: design/runtime clause → route owner section/ref | reverse: route owner section/ref → evidence/readback |
 | --- | --- | --- |
-| `tools/agent_tools/agent_team.py` | `D-VALIDATION`, `D-PROJECT-ROOT`, runtime C++ activation set → `CPP_PATH_MARKERS`, `language_review_candidates` | `language_review_candidates(..., ("tests/cpp/...",))` returns `cpp_reviewer` → route check and `RDC-RUNTIME-MATRIX` |
+| `tools/agent/orchestration/agent_team.py` | `D-VALIDATION`, `D-PROJECT-ROOT`, runtime C++ activation set → `CPP_PATH_MARKERS`, `language_review_candidates` | `language_review_candidates(..., ("tests/cpp/...",))` returns `cpp_reviewer` → route check and `RDC-RUNTIME-MATRIX` |
 | `agents/skills/catalog.yaml` | `D-VALIDATION` and public skill projection contract → `skill_families[id=cpp-review].routing.triggers` | `route.py --prompt "tests/cpp ..."` returns `cpp-review` → catalog/runtime alignment and `D-VALIDATION` |
 
 The catalog route repair also refreshes these generated projections from the
@@ -615,8 +615,8 @@ coverage/graph/JSON digests, and final Mermaid readback as one evidence chain.
 
 | exact generated path | forward: design/runtime clause → generated projection section/ref | reverse: generated projection section/ref → evidence/readback |
 | --- | --- | --- |
-| `documents/runtime/skill-dependency-graph.md` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-003`, `SG-009..SG-011`, `SG-015` → generated `# Public Skill/Tool Invocation Graph`, `graph_digest`/`coverage_digest` header, source markers, and terminal digest lines | `tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` materializes the normal external Mermaid projection; an explicit source-mutation capability is required to refresh this tracked reader pair; `tools/agent_tools/check_skill_tool_invocation_graph.py --root .` performs exact syntax/readback and digest equality; `tools/bin/agent-canon docs check` validates the Markdown projection |
-| `documents/runtime/skill-dependency-graph.json` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-008`, `SG-013..SG-015` → generated `agent_canon.skill_tool_invocation_graph.v2` envelope, source snapshot/counts, coverage digests, and `readback` envelope | `tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` materializes the normal external JSON projection from the catalog/dependency source; an explicit source-mutation capability is required to refresh the tracked pair; `tools/agent_tools/check_skill_tool_invocation_graph.py --root .` validates JSON self-digest, source counts, readback counts, and byte equality |
+| `documents/runtime/skill-dependency-graph.md` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-003`, `SG-009..SG-011`, `SG-015` → generated `# Public Skill/Tool Invocation Graph`, `graph_digest`/`coverage_digest` header, source markers, and terminal digest lines | `tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` materializes the normal external Mermaid projection; an explicit source-mutation capability is required to refresh this tracked reader pair; `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py --root .` performs exact syntax/readback and digest equality; `tools/bin/agent-canon docs check` validates the Markdown projection |
+| `documents/runtime/skill-dependency-graph.json` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-008`, `SG-013..SG-015` → generated `agent_canon.skill_tool_invocation_graph.v2` envelope, source snapshot/counts, coverage digests, and `readback` envelope | `tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` materializes the normal external JSON projection from the catalog/dependency source; an explicit source-mutation capability is required to refresh the tracked pair; `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py --root .` validates JSON self-digest, source counts, readback counts, and byte equality |
 
 ## Positive migration sequence
 

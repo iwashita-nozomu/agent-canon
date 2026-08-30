@@ -6,7 +6,7 @@ upstream design README.md structured analysis package index
 upstream design database-design.md defines document-canon DB layer placement
 upstream design ../design/rust-agent-tool-migration.md Rust tool migration policy
 upstream design ../../agents/skills/document-canon-cleanup.md document cleanup workflow
-upstream implementation ../../rust/agent-canon/src/structured_analysis.rs Rust structured-analysis CLI
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs Rust structured-analysis CLI
 @dependency-end
 -->
 
@@ -30,7 +30,7 @@ stale name、duplicate heading を structured analysis に取り込む adapter c
 
 - Evidence sources:
   `database-design.md`, `README.md`, and
-  `../../rust/agent-canon/src/structured_analysis.rs`.
+  `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - Assumptions:
   Document canon inventory JSON uses the implemented keys `documents`,
   `findings`, and `historical_records`; graph storage uses the implemented

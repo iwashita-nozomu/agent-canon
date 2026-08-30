@@ -8,9 +8,9 @@ upstream design ../../documents/runtime/runtime-log-archive.md accumulated eval 
 upstream design ../../documents/tools/search-coordination.md coordinated search policy
 upstream design ../../documents/runtime/runtime-log-archive.md defines the external log archive mount
 downstream design issue-finding-report.md converts compact log findings into durable issues
-upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py owns structured dashboard API fields
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
-downstream implementation ../../.agents/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill
+upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py owns structured dashboard API fields
+upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py resolves the mounted log archive
+downstream implementation ../../.codex/personal/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill
 downstream design agent-eval-accumulation.md repairs missing accumulated eval family evidence
 @dependency-end
 -->
@@ -60,10 +60,10 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
    `~/.codex/sessions`; an absent root is a fail-closed source absence.
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py ensure
-python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
-python3 tools/agent_tools/runtime_log_archive_git.py sync
-python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
+python3 tools/runtime/archive/runtime_log_archive_git.py ensure
+python3 tools/runtime/archive/runtime_log_archive_git.py status --porcelain
+python3 tools/runtime/archive/runtime_log_archive_git.py sync
+python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain
 ```
 
 1. archive hygiene は `sync`、`check-clean`、dashboard 生成、final `sync`
@@ -80,11 +80,18 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
    解析対象 repo の root とします。
 
 ```bash
-python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
-  --root <source-root> \
+./bootstrap.sh --control-parent-root <control-parent-root> \
+  --runtime-root <runtime-root> \
+  tool run --root <registered-source-root> generate-agent-runtime-dashboard -- \
+  --root . \
   --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
   --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
 ```
+
+The outer `--root` selects the registered read-only target for the shared
+container. The dashboard arguments are evaluated inside that container, and
+the relative report paths are resolved below the external runtime root; the
+source checkout is never used as an output directory.
 
 1. `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` を
    既定入力として読みます。log archive repo は append-only evidence を所有し、
@@ -93,7 +100,8 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
 1. structured summary で足りない観点がある場合は、AgentCanon source
    dashboard API owner に `dashboard_api_contract_gap` として修復を route してから
    API / report profile を拡張します。
-1. API JSON では、少なくとも次の field を normal analysis contract として確認します: `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, `oop_applicability`。
+1. API JSON では、少なくとも次の field を normal analysis contract として確認します: `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, `oop_applicability`。IssueWorker の公開結果を扱う場合は、`github_issue_refs` と `issue_publication_action_counts` を private archive の published receipt から読み、`issue_worker.qualified` などの candidate counts と混ぜません。receipt に Issue/private body、digest、fingerprint、認証情報がないことも確認します。
+1. IssueWorker の publisher は GitHub mutation 前に external runtime/spool の receipt route を確認します。成功後は canonical `bootstrap.sh ... tool run/exec issue-sync -- --stage-publication-receipt` で resident container の body-free receipt を spool へ書き、host shell の private-log sync 後に dashboard が published namespace を読みます。route がない成功や pending 消失から公開済みとは推定しません。
 1. eval family gap を見るときは、dashboard の推測ではなく
    `eval_accumulation_check.py --compact-out ...` を走らせます。missing / stale / fail
    があれば `$agent-eval-accumulation` に移り、`run_accumulated_agent_evals.py`、
@@ -115,7 +123,7 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   作成に必要な structured evidence と finding route packet を渡します。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
 - Full dashboard は human review 用です。agent の通常分析入力は
-  `generate_agent_runtime_dashboard.py --api-out` の JSON、structured summary、
+   `generate-agent-runtime-dashboard` の API output、structured summary、
   generated evidence cell を既定にします。
 - Normal analysis reads structured API fields first. `unknown_event_count` routes missing event taxonomy, `status_by_hook_family` routes status distribution, `failure_by_hook_family` routes failure ownership, `skip_by_hook_family` routes skipped hook ownership, `namespace_debt_by_hook_family` routes legacy namespace debt, and `oop_applicability` routes OOP hook applicability findings.
 
@@ -205,7 +213,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When `generate_agent_runtime_dashboard.py` lacks a needed compact field,
    record `dashboard_api_contract_gap`, route that finding to the dashboard API owner,
    and rerun it after the source tool is repaired.
-1. For eval family gaps, run `python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
+1. For eval family gaps, run `python3 eval/checkers/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
 1. Event-file drilldown is for tool development, schema debugging, corruption audit, or an API-named drilldown path; record an explicit rationale before reading it.
 1. Answer token-use questions from the API token coverage/moving-average fields. If token status is missing, say token claims are unsupported.
 1. Report observations separately from interpretation, repair target, and unknowns.

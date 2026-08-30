@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_scope_lint.py"
+SCRIPT = PROJECT_ROOT / "tools" / "repository" / "workspace" / "worktree_scope_lint.py"
 
 
 def write_scope(

@@ -10,9 +10,9 @@ downstream design skills/codex-task-workflow.md consumes pre-edit investigation 
 downstream design skills/subagent-bootstrap.md consumes fresh subagent context capsules
 downstream design TASK_WORKFLOWS.md routes active design packet ownership
 downstream design workflows/implementation-waterfall-workflow.md consumes the active design packet contract
-downstream implementation ../tools/agent_tools/agent_team.py normalizes and materializes active design packets
-downstream implementation ../tools/agent_tools/waterfall_gate_check.py validates persisted active design packets
-downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
+downstream implementation ../tools/agent/orchestration/agent_team.py normalizes and materializes active design packets
+downstream implementation ../tools/validation/semantic/lifecycle/waterfall_gate_check.py validates persisted active design packets
+downstream implementation ../tools/validation/semantic/tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
 @dependency-end
 -->
 
@@ -263,11 +263,11 @@ next_decision_changed=<routing|edit-location|validation|review|handoff|deferral>
 Canonical tool commands:
 
 ```bash
-python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json
-python3 tools/agent_tools/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json
-python3 tools/agent_tools/file_surface_inventory.py --root <root> --submodule-aware --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
+python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json
+python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json
+python3 tools/analysis/code/file_surface_inventory.py --root <root> --submodule-aware --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
 agent-canon structured-analysis document-inventory --root <root> > <run>/document_inventory.txt
-python3 tools/agent_tools/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json
+python3 tools/analysis/code/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json
 ```
 
 Run `document-inventory` when document, README, generated report, stale-doc,
@@ -429,6 +429,27 @@ Raw search hits, chat memory, and a list of nearest files are not sufficient.
 If the packet is missing, implementation returns to investigation instead of
 guessing an edit path.
 
+## Checkout Identity Readback
+
+Every agent and work unit that can inspect or change repository state carries
+one observational `checkout_identity` block at bounded lifecycle transitions.
+The block is produced by
+`python3 tools/runtime/authority/checkout_identity.py --format lines` and contains
+exactly these fields:
+
+- `cwd`: absolute directory in which the operation is acting
+- `git_root`: absolute Git toplevel, or `unknown`
+- `branch`: the current branch name, or `detached` for a detached `HEAD`
+- `head`: the resolved `HEAD` commit, or `unknown`
+- `remote`: normalized remote `owner/repository`, or `unknown`
+
+Read it once at agent/work-unit start, after a cwd or checkout change, before
+conflict resolution, before commit/push/PR, before cleanup or destructive Git,
+and in subagent handoff/final handback. Reuse the same block while checkout
+state is unchanged; ordinary commands do not trigger another read. The block
+describes where an operation runs and does not grant authority or replace any
+branch, worktree, merge, cleanup, or publication policy.
+
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
@@ -437,8 +458,8 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
 
 - `objective`: one sentence with active non-goals
 - `request_clause_ids`: clauses the subagent owns
-- `state_snapshot`: branch, relevant commit or run-id, current stage, and
-  integration executor owner
+- `state_snapshot`: one `checkout_identity` block, relevant commit or run-id,
+  current stage, and integration executor owner
 - `read_before_work`: exact files or sections to read within role-owned
   surfaces
 - `context_artifacts`: router output, dashboard summary, checker finding
@@ -451,8 +472,16 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
 - `allowed_paths` / `do_not_read`: role-specific path boundaries
 - `expected_output_schema`: artifact name, findings format, or patch summary
 - `validation_route`: commands or review gate the parent will use
+- `conflict_or_rework_preservation`: when merge or repair work is in scope,
+  carry the repository-qualified base/head/merge-base, affected paths,
+  base/ours/theirs blob and hunk inventory, staged/unmerged state, unaffected
+  user/unknown content, selected cause, expected mechanism, exact owning edit
+  delta, disposition, rationale, and preservation readback. Omit this field
+  only when the handoff cannot mutate or rework repository content.
 - `return_contract`: what changed, what evidence supports it, unresolved
   blockers, and whether more context is needed
+- `checkout_identity`: repeat the same block in final handback, or provide the
+  new block after the checkout transition that changed it
 - `design_issue_policy`: if the role finds an API shape, responsibility
   boundary, path layout, naming, algorithm, theorem target, test oracle,
   dependency direction, runtime contract, or config-surface gap, it records
@@ -497,7 +526,7 @@ Before the parent edits directly or a write-capable subagent starts repository
 edits, the parent runs or cites:
 
 ```bash
-python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
+python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>
 ```
 
 The handoff work log includes the resulting
@@ -570,6 +599,9 @@ this schema.
 - `revert_or_discard_authority`: rollback、revert、または slice discard を求める
   場合だけ、撤回 / 置換 / owner 外 / unsafe replacement / escalation の根拠を書く
 - `evidence`
+- `preservation_readback`: for conflict/rework findings, the inventory,
+  disposition/reconstruction map, and post-resolution proof that unaffected
+  content remains; a clean path list is not sufficient
 - `status`
 
 ## Write Scope Packet

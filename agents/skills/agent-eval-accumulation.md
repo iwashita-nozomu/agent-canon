@@ -5,11 +5,11 @@
 contract skill
 responsibility Documents accumulated AgentCanon eval evidence repair and validation.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../../evidence/agent-evals/README.md accumulated eval family contract
+upstream design ../../eval/definitions/README.md accumulated eval family contract
 upstream design ../../documents/runtime/runtime-log-archive.md external log archive boundary
-upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py runs registered eval producers
-upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated eval families
-downstream implementation ../../.agents/skills/agent-eval-accumulation/SKILL.md exposes this workflow as a runtime skill
+upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs registered eval producers
+upstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated eval families
+downstream implementation ../../.codex/personal/skills/agent-eval-accumulation/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 
@@ -54,7 +54,7 @@ checker output と archive 側 accumulated report に残します。
 1. 先に compact checker を走らせ、欠けている family と blocking finding を固定します。
 
 ```bash
-python3 tools/agent_tools/eval_accumulation_check.py \
+python3 eval/checkers/eval_accumulation_check.py \
   --root . \
   --compact-out reports/agents/<run-id>/eval-accumulation-before.json \
   --format text
@@ -65,7 +65,7 @@ python3 tools/agent_tools/eval_accumulation_check.py \
    渡します。
 
 ```bash
-python3 tools/agent_tools/run_accumulated_agent_evals.py \
+python3 eval/producers/run_accumulated_agent_evals.py \
   --root . \
   --run-id <run-id> \
   --report-dir reports/agents/<run-id> \
@@ -81,7 +81,7 @@ python3 tools/agent_tools/run_accumulated_agent_evals.py \
    `EVAL_ACCUMULATION_BLOCKING_FINDINGS=0` を closeout evidence にします。
 
 ```bash
-python3 tools/agent_tools/eval_accumulation_check.py \
+python3 eval/checkers/eval_accumulation_check.py \
   --root . \
   --compact-out reports/agents/<run-id>/eval-accumulation-after.json \
   --format text
@@ -102,7 +102,7 @@ python3 tools/agent_tools/eval_accumulation_check.py \
 1. eval report が archive に積まれたら、`runtime_log_archive_git.py sync` または
    `push` で append-only log branch に保存します。source tree に runtime eval result
    を戻してはいけません。
-1. closeout 前に `python3 tools/agent_tools/generated_artifact_guard.py --root .` を走らせ、
+1. closeout 前に `python3 tools/runtime/artifacts/generated_artifact_guard.py --root .` を走らせ、
    `GENERATED_ARTIFACT_GUARD=pass` を確認します。
 
 ## Boundaries
@@ -120,8 +120,8 @@ python3 tools/agent_tools/eval_accumulation_check.py \
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
 1. Read `agents/skills/agent-eval-accumulation.md`.
-1. Start with `python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; use the compact JSON and stdout counters as the first evidence.
-1. If the checker reports missing eval family reports or stale accumulation gaps, run `python3 tools/agent_tools/run_accumulated_agent_evals.py --root . --run-id <run-id> --report-dir reports/agents/<run-id>` and pass every used skill with repeated `--skill-used <skill>`.
+1. Start with `python3 eval/checkers/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; use the compact JSON and stdout counters as the first evidence.
+1. If the checker reports missing eval family reports or stale accumulation gaps, run `python3 eval/producers/run_accumulated_agent_evals.py --root . --run-id <run-id> --report-dir reports/agents/<run-id>` and pass every used skill with repeated `--skill-used <skill>`.
 1. Do not hand-generate eval reports under `.agent-canon/log-archive/**` or `agents/evals/results/**`; registered producers own accumulated reports.
 1. Read producer stdout / stderr summaries from `reports/agent-eval-runs/<run-id>/`; avoid broad raw archive searches. Treat those stdout / stderr files as transient, summarize the needed lines into the run bundle, then remove them before closeout.
 1. Rerun `eval_accumulation_check.py` with `--compact-out reports/agents/<run-id>/eval-accumulation-after.json` and require `EVAL_ACCUMULATION=pass` plus `EVAL_ACCUMULATION_BLOCKING_FINDINGS=0` before using the accumulated evidence as green closeout evidence.
@@ -135,5 +135,5 @@ The runtime discovery adapter delegates these required operating clauses to this
    Route producer bugs, oracle/spec mismatches, fixture/environment/stale
    generated artifacts, unrelated failures, and approved-design/user-request
    conflicts to owner repair, residual, or escalation.
-1. After producer runs create archive artifacts, use `python3 tools/agent_tools/runtime_log_archive_git.py sync` or `push` so append-only eval evidence is saved on the log archive branch.
-1. Run `python3 tools/agent_tools/generated_artifact_guard.py --root .` and require `GENERATED_ARTIFACT_GUARD=pass`; do not leave regeneratable `reports/agent-eval-runs/<run-id>/*.stdout.txt` or `*.stderr.txt` files in the source tree.
+1. After producer runs create archive artifacts, use `python3 tools/runtime/archive/runtime_log_archive_git.py sync` or `push` so append-only eval evidence is saved on the log archive branch.
+1. Run `python3 tools/runtime/artifacts/generated_artifact_guard.py --root .` and require `GENERATED_ARTIFACT_GUARD=pass`; do not leave regeneratable `reports/agent-eval-runs/<run-id>/*.stdout.txt` or `*.stderr.txt` files in the source tree.

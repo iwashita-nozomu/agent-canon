@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies fixed 42-row read-only policy inventory validation without network access.
 # upstream design ../../documents/design/runtime-log-repository-lifecycle.md RL-009..RL-012 policy evidence
-# upstream implementation ../../tools/agent_tools/check_agent_canon_log_policy.py separates retrieval from validation
+# upstream implementation ../../tools/validation/semantic/archive/check_agent_canon_log_policy.py separates retrieval from validation
 # @dependency-end
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from tools.agent_tools.check_agent_canon_log_policy import (
+from tools.validation.semantic.archive.check_agent_canon_log_policy import (
     EXPECTED_BLOCKERS,
     PolicyInventoryError,
     validate_inventory_bytes,

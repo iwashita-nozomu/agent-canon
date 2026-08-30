@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Git diff and dependency summary aggregation tool behavior.
-# upstream implementation ../../tools/agent_tools/git_dependency_diff_summary.py summarizes Git diffs with dependency expansion.
+# upstream implementation ../../tools/analysis/dependencies/git_dependency_diff_summary.py summarizes Git diffs with dependency expansion.
 # @dependency-end
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "git_dependency_diff_summary.py"
+TOOL = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "git_dependency_diff_summary.py"
 
 
 def runtime_root_for(root: Path) -> Path:
@@ -29,7 +29,7 @@ def runtime_root_for(root: Path) -> Path:
 if str(TOOL.parent) not in sys.path:
     sys.path.insert(0, str(TOOL.parent))
 
-import git_dependency_diff_summary as summary_tool  # noqa: E402
+import tools.analysis.dependencies.git_dependency_diff_summary as summary_tool  # noqa: E402
 
 
 class GitDependencyDiffSummaryTest(unittest.TestCase):

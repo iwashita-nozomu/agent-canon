@@ -2,13 +2,13 @@
 # contract design
 # responsibility Defines the machine-readable execution-time-aware orchestration and autonomous convergence contract owned by agent-orchestration.
 # upstream design agent-orchestration.md sole owner policy prose and invariants
-# downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py production contract checker
-# downstream implementation ../../tools/agent_tools/autonomous_convergence.py transition and closeout validator
-# downstream implementation ../../tools/agent_tools/skill_tool_commands.py required selected-skill command route
+# downstream implementation ../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py production contract checker
+# downstream implementation ../../tools/agent/orchestration/autonomous_convergence.py transition and closeout validator
+# downstream implementation ../../tools/agent/skills/skill_tool_commands.py required selected-skill command route
 # downstream design pr-processing.md PR queue specialization consumer
 # downstream design ../../templates/agents/schedule.md schedule projection consumer
 # downstream implementation ../task_catalog.yaml task routing projection consumer
-# downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery consumer
+# downstream implementation ../../.codex/personal/skills/agent-orchestration/SKILL.md runtime discovery consumer
 # @dependency-end
 
 schema = "agent-canon.execution-time-aware-orchestration.v3"
@@ -16,9 +16,9 @@ owner_skill = "agent-orchestration"
 owner_doc = "agents/skills/agent-orchestration.md"
 owner_heading = "Execution-Time-Aware Work-Conservation Contract"
 owner_ref = "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
-checker = "tools/agent_tools/check_execution_time_aware_orchestration.py"
-checker_command = "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
-required_skill_command = "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
+checker = "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py"
+checker_command = "python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root ."
+required_skill_command = "python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root ."
 
 required_fields = [
   "dependency_dag",
@@ -213,7 +213,7 @@ required_markers = [
 
 [[consumers]]
 id = "runtime-shim"
-path = ".agents/skills/agent-orchestration/SKILL.md"
+path = ".codex/personal/skills/agent-orchestration/SKILL.md"
 kind = "runtime_reference"
 reference_mode = "reference"
 required_markers = [

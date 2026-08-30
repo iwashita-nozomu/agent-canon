@@ -10,8 +10,8 @@ downstream design code-analysis.md defines code dependency graph adapter scope
 downstream design document-canon-analysis.md defines document duplicate and non-canonical document adapter scope
 downstream design ../prose-reasoning-graph/dsl-spec.md defines prose reasoning graph DSL
 downstream design ../design/dependency-manifest-design.md defines dependency manifest DSL and validation model
-downstream design ../../tools/agent_tools/prose_reasoning_graph.py documents prose graph CLI usage
-downstream design ../../tools/agent_tools/render_dependency_manifest_graph.py documents dependency graph report rendering
+downstream design ../../tools/analysis/documents/prose_reasoning_graph.py documents prose graph CLI usage
+downstream design ../../tools/analysis/dependencies/render_dependency_manifest_graph.py documents dependency graph report rendering
 @dependency-end
 -->
 
@@ -38,7 +38,7 @@ AgentCanon から将来切り離す場合の集約先である。既存の正本
   `graph-dsl.md`, `database-design.md`, `document-canon-analysis.md`,
   `../prose-reasoning-graph/dsl-spec.md`,
   `../dependency-manifest-design.md`, and
-  `../../rust/agent-canon/src/structured_analysis.rs`.
+  `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - Assumptions:
   `DSL` in this index refers to the Graph DSL Core contract and its adapter
   profiles. Adapter-specific meanings stay in the linked adapter documents.

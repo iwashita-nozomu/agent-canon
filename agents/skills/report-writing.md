@@ -7,9 +7,9 @@ upstream design ../../documents/design/responsibility-rationale.md report semant
 upstream design structure-planning.md optional structural-decision owner
 upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design code-visualization.md sole public visualization owner and typed projection contract
-downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report prompt surfaces
-downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../.codex/personal/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../eval/producers/evaluate_report_quality.py validates report prompt surfaces
+downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
 

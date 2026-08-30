@@ -28,19 +28,30 @@ vendor するものではなく、必要な作業時に明示的な development 
 
 Codex の source-tree instruction entrypoint は `AGENTS.md` です。skill、workflow、
 subagent の canonical owner は `agents/`、設計と runtime contract の owner は
-`documents/`、実行可能な tool と checker の owner は `tools/` と `rust/` です。
+`documents/`、実行可能な tool と checker の owner は `tools/` と
+`tools/runtime/dispatch/agent-canon/` です。
 
-## Standalone runtime
+## Quick install
+
+`bootstrap.sh` は `BASH_SOURCE` の script location から repository root を解決するため、
+どの current working directory から呼び出しても同じ install root を使います。
+`ROOT` には認可された親 repository root を指定してください。
 
 通常の利用では、source checkout の中で依存を直接実行せず、top-level
-[`bootstrap.sh`](bootstrap.sh) から共有 tool runtime を起動します。control root と
-runtime root は必須です。
+[`bootstrap.sh`](bootstrap.sh) から共有 tool runtime を起動します。control root は
+必須で、runtime は既定で install root の ignored `.runtime/` を使います。
+
+`bootstrap.sh` が解決した install root、明示した control root、install root 配下の
+`.runtime/` の順に状態をたどります。`install` は image と resident を構築し、
+`update` は同じ resident を検証済み checkout で置き換え、`status` はその状態を
+読み取ります。`gc --dry-run` はこの経路を読み取り専用で確認し、`gc` は lock の下で
+host Docker の stale owned resource と resident の state/cache/lease GC を同じ receipt
+にまとめます。
 
 ```bash
 ROOT=<authorized-parent-root>
-RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
 BOOTSTRAP=./bootstrap.sh
-COMMON=(--control-parent-root "$ROOT" --runtime-root "$RUNTIME")
+COMMON=(--control-parent-root "$ROOT")
 
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" update
@@ -93,10 +104,14 @@ When the explicit control root is `$HOME`, `install` and `update` also converge
 these user-facing links:
 
 ```text
-~/.agents/skills/<skill>       -> ~/agent-canon/.agents/skills/<skill>
+~/.agents/skills/<skill>       -> ~/agent-canon/.codex/personal/skills/<skill>
 ~/.codex/agents/<role>.toml   -> ~/agent-canon/.codex/agents/<role>.toml
 ~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
 ```
+
+Before building or linking, `install` and `update` materialize the catalog-owned
+skill adapters under the ignored `~/agent-canon/.codex/personal/skills/` view.
+Edit the canonical `agents/skills/<skill>.md` and catalog instead of this view.
 
 An existing regular `~/.codex/config.toml` is migrated byte-for-byte to the
 ignored personal source before the link is created. Update preserves it;
@@ -144,17 +159,18 @@ and [the tool catalog](tools/catalog.yaml).
 | `agents/` | Skills, workflows, roles, communication, and task contracts |
 | `documents/` | Design, runtime, tool, and responsibility contracts |
 | `tools/` | Host adapters, checkers, Python tools, and CLI wrappers |
-| `rust/` | Compiled AgentCanon tools |
+| `tools/runtime/dispatch/agent-canon/` | Compiled AgentCanon tools |
 | `tests/` | AgentCanon mechanism tests |
 | `bootstrap/` | Shared image and lifecycle manifest used by `bootstrap.sh` |
 
-The runtime root is intentionally separate:
+The default runtime root is intentionally limited to the bootstrap-owned
+ignored directory below the install checkout:
 
 ```text
-<authorized-parent-root>/workspace/agent-canon-runtime/<installation>/
+<install-root>/.runtime/
   current-generation  rollback-generation  lifecycle.lock  mounts.toml
   codex-home/  tasks/  spool/  archive/  container-runtime/
-  cache/       # bounded external cache, never source-local
+  cache/       # bounded bootstrap cache; other artifacts remain external
 ```
 
 For an AgentCanon edit from Template or another parent repository, use that
@@ -180,8 +196,8 @@ artifact build/distribution only. Do not use #821 as the lifecycle issue.
 The minimum focused checks for documentation changes are:
 
 ```bash
-python3 tools/docs/check_bootstrap_docs.py --root .
-bash tools/agent_tools/check_dependency_header_format.sh --root . --changed
+python3 tools/validation/documentation/checks/check_bootstrap_docs.py --root .
+bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --root . --changed
 git diff --check
 ```
 

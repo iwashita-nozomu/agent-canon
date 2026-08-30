@@ -26,7 +26,7 @@ read-only inventory で分類します。経過日数、最終更新日時、sta
 
 - `main` と対象 branch が `origin` と同期しているか確認します。
 - `git fetch --prune origin main` 後の exact `refs/remotes/origin/main` を固定し、
-  `python3 tools/agent_tools/orphan_lifecycle.py inventory ...` の digest と candidate identity を残します。
+  `python3 tools/repository/git/orphan_lifecycle.py inventory ...` の digest と candidate identity を残します。
 - `orphan_safe_to_remove` 以外、または cleanup blocker が一つでもある candidate は削除しません。
 - 新しい worktree は切りません。
 - current checkout で続けられる作業は current checkout の後続 wave に直列化します。
@@ -38,12 +38,12 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 
 - `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` が current checkout と違う場合、その scope は作業 authority ではありません。
 - [WORKTREE_LOG_TEMPLATE.md](../../documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md) 由来の action log は legacy evidence として読み、current checkout の run-local `work_log.md` へ carry-over 判断だけを残します。
-- 継続ログは current checkout の `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
+- 継続ログは current checkout の `python3 tools/runtime/archive/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にします。
 - experiment topic を持つ古い worktree を見つけた場合は、`experiments/registry.toml` の stale `active_worktree` / `scope_file` を cleanup 対象として扱います。
 - branch が複数 session 続いた場合でも、作業再開は current checkout の branch / wave で行い、`documents/notes/branches/` は summary evidence としてだけ使います。
 - `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を見て、今回の task で踏みやすい avoid pattern と既知 failure を確認します。
-- `python3 tools/agent_tools/worktree_scope_lint.py --current` で stale scope の placeholder と kickoff 欄を確認します。`bash tools/worktree_start.sh --current` は cleanup diagnostic 以外では使いません。
-- `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash tools/docs/check_worktree_scopes.sh` を実行します。
+- `python3 tools/repository/workspace/worktree_scope_lint.py --current` で stale scope の placeholder と kickoff 欄を確認します。`bash tools/repository/worktree/worktree_start.sh --current` は cleanup diagnostic 以外では使いません。
+- `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash tools/validation/documentation/checks/check_worktree_scopes.sh` を実行します。
 - dirty state、conflict risk、scope drift の兆候があれば、編集前に action log に残します。
 - `main` へ戻す場合も integration worktree は切らず、`agents/workflows/main-integration-workflow.md` の current-checkout branch 手順を使います。
 
@@ -63,7 +63,7 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 - editable path は current checkout の dependency-expanded write scope と handoff packet で管理します。
 - runtime output は current checkout の run bundle または task 固有 output directory へ限定します。
 - closeout 前に `documents/operations/notes-lifecycle.md` を見て、action log から knowledge/theme/failure へ昇格させる項目を決めます。
-- file 構成変更を含む branch を閉じる前には、current checkout 上で `python3 tools/ci/check_merge_structure.py ...` を通します。
+- file 構成変更を含む branch を閉じる前には、current checkout 上で `python3 tools/validation/ci/checks/check_merge_structure.py ...` を通します。
 - cleanup 前には digest-bound `authorize-cleanup` receipt、cleanup 後には exact command、result、
   ref/path readback、保存先 main/successor、関連 Issue/PR comment locator を同じ trace に残します。
 - local branch に linked worktree がある場合、worktree を独立 resource として先に処理し、再 inventory するまで branch を削除しません。

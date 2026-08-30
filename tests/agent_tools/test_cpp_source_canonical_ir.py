@@ -1,9 +1,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests C++ source-canonical IR extraction into the shared thin operational IR.
-# upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source IR.
+# upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ source IR.
 # upstream design ../../documents/tools/cpp_source_canonical_ir.md documents the wrapper schema.
-# upstream implementation ../../tools/agent_tools/jit_canonical_ir.py defines the inner IR shape.
+# upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py defines the inner IR shape.
 # @dependency-end
 """Tests for C++ source-canonical IR extraction."""
 
@@ -16,7 +16,7 @@ import textwrap
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "cpp_source_canonical_ir.py"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "code" / "cpp_source_canonical_ir.py"
 
 
 def run_tool(root: Path, *args: str) -> subprocess.CompletedProcess[str]:

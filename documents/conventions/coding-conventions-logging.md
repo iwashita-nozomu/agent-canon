@@ -90,13 +90,13 @@ downstream design ../experiments/result-log-retention-and-visualization.md defin
 ## 8. 検証
 
 ```bash
-python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports
+python3 tools/validation/semantic/logging/check_log_helper_names.py --changed --exclude vendor --exclude reports
 ```
 
 結果ログと可視化 helper:
 
 ```bash
-python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
-python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
+python3 tools/analysis/documents/formatting/jsonl_to_md.py <input.jsonl> <output.md>
+python3 tools/analysis/hlo/summarization/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
 dot -V
 ```

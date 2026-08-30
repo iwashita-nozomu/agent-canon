@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests one Docker GPU entrypoint, internal CDI/all selection, and exact admitted environment projection.
 # upstream design ../../documents/experiments/gpu-direct-command.md Docker injection contract
-# upstream implementation ../../tools/ci/run_gpu_container.sh shell adapter under test
+# upstream implementation ../../tools/validation/ci/runners/run_gpu_container.sh shell adapter under test
 # @dependency-end
 
 """Focused tests for the Docker GPU shell adapter."""
@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-WRAPPER = PROJECT_ROOT / "tools" / "ci" / "run_gpu_container.sh"
+WRAPPER = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_gpu_container.sh"
 GPU_ENV = {
     "CUDA_VISIBLE_DEVICES": "GPU-aaaa,MIG-bbbb",
     "NVIDIA_VISIBLE_DEVICES": "GPU-aaaa,MIG-bbbb",

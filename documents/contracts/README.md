@@ -17,6 +17,7 @@ bootstrap・実行契約を置きます。AgentCanon の一般的な構造規約
 
 - `derived-repo-bootstrap-runbook.md`: 派生レポの導入手順。
 - `github-first-module-and-devcontainer-policy.md`: module と devcontainer の所有境界。
+- `ordered_integration_interface.json`: ordered integration の canonical interface contract。
 - `linux-wsl-host-requirements.md`: host 環境の前提。
 - `remote-execution-repo-contract.md`: remote 実行レポの契約。
 - `server-host-contract.md`: server host の契約。

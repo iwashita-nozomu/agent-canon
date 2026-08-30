@@ -45,7 +45,7 @@ remote execution contract が「repo が外部 server から実行される条�
 - path / mount / builder 前提を
   `vendor/agent-canon/templates/documents/server_runtime_layout.template.toml`
   で明文化する
-- `AGENT_CANON_HOST_WORKSPACE_ROOT=/path/to/workspace python3 tools/ci/check_server_readiness.py`
+- `AGENT_CANON_HOST_WORKSPACE_ROOT=/path/to/workspace python3 tools/validation/ci/checks/check_server_readiness.py`
   または `--layout <layout.toml>` で、対象workspaceを明示して readiness を確認する
 
 ## Storage Rule
@@ -66,7 +66,7 @@ remote execution contract が「repo が外部 server から実行される条�
 
 - local PC から SSH で HPC host に入り、その上の container で HTML report を生成する場合、local browser は container 内の `127.0.0.1` を直接見られません
 - HTML artifact は、ファイルが見えている shell で `python3 -m http.server` を立て、local PC から HPC host への SSH tunnel で見る導線を既定にします
-- canonical command generator は `python3 tools/experiments/html_artifact_access.py <report.html>` です。`AGENT_CANON_SSH_HOST` または `SSH_CONNECTION` から SSH target を推定し、推定できない場合だけ tunnel command 内の `<ssh-host>` を置き換えます
+- canonical command generator は `python3 tools/experiments/artifacts/html_artifact_access.py <report.html>` です。`AGENT_CANON_SSH_HOST` または `SSH_CONNECTION` から SSH target を推定し、推定できない場合だけ tunnel command 内の `<ssh-host>` を置き換えます
 - container 内だけにある report では `--use-container-ip` を使い、出力された server、tunnel、local URL を closeout evidence に残します
 - default bind は `127.0.0.1` です。container-direct mode では container IP へ tunnel するため、container 内の server は `0.0.0.0` bind を使います
 
@@ -80,27 +80,27 @@ remote execution contract が「repo が外部 server から実行される条�
 ## Git Rule
 
 - GitHub canonical remote と authentication state を記録します
-- GitHub publish / PR 作業は `python3 tools/agent_tools/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` を canonical 入口にします
+- GitHub publish / PR 作業は `python3 tools/repository/github/github_publish.py ... --user-task "<current user task>" --repo <owner/name>` を canonical 入口にします
 
 ## Validation
 
 AgentCanon standalone source root では source-root の template を指定します。
 
 ```bash
-python3 tools/ci/check_server_readiness.py
+python3 tools/validation/ci/checks/check_server_readiness.py
 AGENT_CANON_HOST_WORKSPACE_ROOT=/path/to/workspace \
-  python3 tools/ci/check_server_readiness.py
-python3 tools/ci/check_server_readiness.py \
+  python3 tools/validation/ci/checks/check_server_readiness.py
+python3 tools/validation/ci/checks/check_server_readiness.py \
   --layout templates/documents/server_runtime_layout.template.toml
 ```
 
 Template / derived parent root では vendored AgentCanon の template を指定します。
 
 ```bash
-python3 vendor/agent-canon/tools/ci/check_server_readiness.py
+python3 vendor/agent-canon/tools/validation/ci/checks/check_server_readiness.py
 AGENT_CANON_HOST_WORKSPACE_ROOT=/path/to/workspace \
-  python3 vendor/agent-canon/tools/ci/check_server_readiness.py
-python3 vendor/agent-canon/tools/ci/check_server_readiness.py \
+  python3 vendor/agent-canon/tools/validation/ci/checks/check_server_readiness.py
+python3 vendor/agent-canon/tools/validation/ci/checks/check_server_readiness.py \
   --layout vendor/agent-canon/templates/documents/server_runtime_layout.template.toml
 ```
 

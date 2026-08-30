@@ -5,7 +5,7 @@ responsibility Defines the single-source experiment topic template, materializat
 upstream design ../experiments/experiment-registry.md owns topic identity and registered execution
 upstream design ../experiments/result-log-retention-and-visualization.md owns result retention classes
 upstream design ./experiment_runner.md owns runner and experiment-side execution responsibilities
-downstream implementation ../../tools/experiments/create_experiment_topic.py materializes one topic and registry entry
+downstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py materializes one topic and registry entry
 downstream implementation ../../templates/experiments/_template/run.py owns run aggregation and summary publication
 downstream implementation ../../templates/experiments/_template/cases.py owns case models and execution
 downstream implementation ../../templates/experiments/_template/visualization.py owns visualization status
@@ -73,7 +73,7 @@ case codeはrun-level summary、atomic file publication、visualizationを所有
 - config/provenance completion readback
 - run-level state/summary/manifest type
 - atomic text/JSON/JSONL publication
-- case orchestrationとrun acceptance
+- case orchestrationとrun-level operational state
 - summary artifact digest readback
 
 独立`artifact_schema.py`と`artifact_io.py`は作らない。統合後もatomic replacement、typed terminal state、
@@ -113,12 +113,17 @@ artifactをrun rootへ追加しない。
 registry/runnerのrequired eval artifactは`summary/summary.json`と`summary/cases.jsonl`を参照する。
 旧root-level `summary.json` / `cases.jsonl`はfallbackにしない。
 
+plan の completion は question、observables、evidence targets、protocol、resource、入力・環境条件、
+operational stop condition など実行に必要な宣言だけを対象にする。研究上の結果解釈、
+案の採否、レビュー判断は topic / research owner の post-run artifact であり、runner の
+開始・完了条件ではない。
+
 ## Materialization
 
 canonical commandは次である。
 
 ```bash
-python3 tools/experiments/create_experiment_topic.py <topic>
+python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 ```
 
 creatorはregistry `defaults.topic_template_dir`またはcanonical defaultを解決し、single `copytree`でtopicを
@@ -131,10 +136,10 @@ creatorはregistry `defaults.topic_template_dir`またはcanonical defaultを解
 ## Skill route
 
 ```text
-.agents/skills/experiment-lifecycle/SKILL.md
+.codex/personal/skills/experiment-lifecycle/SKILL.md
   -> agents/skills/experiment-lifecycle.md#Topic Preparation
-  -> python3 tools/experiments/create_experiment_topic.py <topic>
-  -> tools/experiments/create_experiment_topic.py
+  -> python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+  -> tools/experiments/lifecycle/create_experiment_topic.py
   -> templates/experiments/_template/
   -> experiments/registry.toml
 ```
@@ -179,8 +184,8 @@ Targeted commands:
 ```bash
 python3 -m pytest -q tests/tools/test_experiment_template_contracts.py
 python3 -m pytest -q tests/tools/test_run_managed_experiment.py
-python3 tools/agent_tools/check_agent_runtime_alignment.py
-python3 tools/agent_tools/check_dependency_headers.py --changed
+python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
 ```
 
 ## Design-to-Implementation Trace

@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests generated report artifact guard behavior.
-# upstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated reports left in tree
-# upstream implementation ../../tools/agent_tools/report_artifact_checks.py classifies report artifact paths
+# upstream implementation ../../tools/runtime/artifacts/generated_artifact_guard.py rejects regenerated reports left in tree
+# upstream implementation ../../tools/runtime/artifacts/report_artifact_checks.py classifies report artifact paths
 # upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md canonical artifact placement policy
 # @dependency-end
 
@@ -19,9 +19,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from report_artifact_checks import generated_eval_transient_blockers  # noqa: E402
+from tools.runtime.artifacts.report_artifact_checks import generated_eval_transient_blockers  # noqa: E402
 
-GUARD_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generated_artifact_guard.py"
+GUARD_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "artifacts" / "generated_artifact_guard.py"
 
 
 class GeneratedArtifactGuardTest(unittest.TestCase):

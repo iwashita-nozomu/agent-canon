@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Lean Mathlib/Aesop/Plausible/LeanSearchClient proof environment setup commands.
-# upstream implementation ../../tools/agent_tools/lean_proof_env.py creates reusable proof and counterexample environments.
+# upstream implementation ../../tools/analysis/proof/lean_proof_env.py creates reusable proof and counterexample environments.
 # upstream design ../../documents/tools/lean_proof_env.md documents the CLI contract.
 # upstream design ../../agents/skills/formal-proof-workflow.md routes Lean proofs through Mathlib/Aesop/Plausible/LeanSearchClient.
 # @dependency-end
@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "lean_proof_env.py"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "proof" / "lean_proof_env.py"
 
 
 class LeanProofEnvToolTest(unittest.TestCase):

@@ -2,8 +2,8 @@
 @dependency-start
 contract reference
 responsibility Documents route tool usage.
-upstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
-upstream implementation ../../tools/agent_tools/visualization_contract.py owns the exact typed visualization ToolCall contract
+upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
+upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns the exact typed visualization ToolCall contract
 upstream design ../../agents/skills/code-visualization.md owns sole-public-owner and coverage/readback policy
 upstream design ../design/tool-skill-routing-refactor.md defines short naming policy
 upstream design ../../agents/skills/structure-refactor.md defines repo-refactor and personal runtime routing boundary
@@ -19,11 +19,11 @@ such as `profile_surface_resolver.py` or `$runtime-capability-routing` to one
 small command surface:
 
 ```bash
-python3 tools/agent_tools/route.py --area checks --changed README.md
-python3 tools/agent_tools/route.py --name profile_surface_resolver.py
-python3 tools/agent_tools/route.py --name repo_refactor_skill.py
-python3 tools/agent_tools/route.py --prompt "fix skill routing with multi-agent evidence" --format json
-python3 tools/agent_tools/route.py --list --format markdown
+python3 tools/agent/orchestration/route.py --area checks --changed README.md
+python3 tools/agent/orchestration/route.py --name profile_surface_resolver.py
+python3 tools/agent/orchestration/route.py --name repo_refactor_skill.py
+python3 tools/agent/orchestration/route.py --prompt "fix skill routing with multi-agent evidence" --format json
+python3 tools/agent/orchestration/route.py --list --format markdown
 ```
 
 Text output is machine-readable and compact:
@@ -91,13 +91,13 @@ Capability mode is the explicit, fail-closed route for a single catalog
 capability. The success command is:
 
 ```bash
-python3 tools/agent_tools/route.py --capability oop_type_design --format json
+python3 tools/agent/orchestration/route.py --capability oop_type_design --format json
 ```
 
 An unknown capability is also explicit and fail-closed:
 
 ```bash
-python3 tools/agent_tools/route.py --capability unknown_capability --format json
+python3 tools/agent/orchestration/route.py --capability unknown_capability --format json
 ```
 
 This command returns exit status 2. Capability mode accepts one exact catalog

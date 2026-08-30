@@ -6,8 +6,8 @@ responsibility Documents Wiki Publication Workflow for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md skill and workflow registry
 upstream design ../canonical/CODEX_WORKFLOW.md tool/skill composition contract
 upstream design ./README.md runtime and repository separation contract
-upstream implementation ../../tools/agent_tools/wiki_publish.py wiki publication gate tool
-downstream implementation ../../.agents/skills/wiki-publication/SKILL.md exposes the runtime skill shim
+upstream implementation ../../tools/repository/github/wiki_publish.py wiki publication gate tool
+downstream implementation ../../.codex/personal/skills/wiki-publication/SKILL.md exposes the runtime skill shim
 @dependency-end
 -->
 
@@ -47,7 +47,7 @@ repo responsibilities.
 
 ## Output Contract
 
-`tools/agent_tools/wiki_publish.py` emits compact JSON including:
+`tools/repository/github/wiki_publish.py` emits compact JSON including:
 
 - action (`publish`)
 - wiki remote URL

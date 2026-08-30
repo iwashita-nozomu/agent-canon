@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests notebook quality validation for readable runnable demo notebooks.
-# upstream implementation ../../tools/validation/notebook_quality.py validates notebook structure and content
+# upstream implementation ../../tools/validation/notebooks/notebook_quality.py validates notebook structure and content
 # @dependency-end
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "validation" / "notebook_quality.py"
+CHECKER = PROJECT_ROOT / "tools" / "validation" / "notebooks" / "notebook_quality.py"
 
 
 def notebook(cells: list[dict[str, object]]) -> str:

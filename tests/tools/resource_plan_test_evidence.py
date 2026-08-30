@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Provides deterministic injected observations for public contract selectors.
-# upstream implementation ../../tools/experiments/execution_resource_plan.py owns production discovery and planning.
+# upstream implementation ../../tools/experiments/execution/execution_resource_plan.py owns production discovery and planning.
 # downstream implementation ./test_execution_resource_plan.py public resource-plan observables.
 # downstream implementation ./test_run_managed_experiment.py public managed-run observables.
 # @dependency-end
@@ -13,7 +13,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
-from tools.experiments.execution_resource_plan import (
+from tools.experiments.execution.execution_resource_plan import (
     DiscoveredResources,
     GPUDevice,
     ProcessIdentity,

@@ -1,17 +1,17 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents tools/agent_tools/cpp_source_canonical_ir.py usage and output contract.
-upstream implementation ../../tools/agent_tools/jit_canonical_ir.py defines the shared thin operational IR shape.
-downstream implementation ../../tools/agent_tools/cpp_template_to_lean.py owns the canonical C++ to Lean route.
-downstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR.
+responsibility Documents tools/analysis/code/cpp_source_canonical_ir.py usage and output contract.
+upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py defines the shared thin operational IR shape.
+downstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py owns the canonical C++ to Lean route.
+downstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ source-canonical IR.
 downstream implementation ../../tests/agent_tools/test_cpp_source_canonical_ir.py validates C++ source extraction.
 @dependency-end
 -->
 
 # cpp_source_canonical_ir.py
 
-`tools/agent_tools/cpp_source_canonical_ir.py` extracts a source-only C++ slice
+`tools/analysis/code/cpp_source_canonical_ir.py` extracts a source-only C++ slice
 and emits the same nested thin operational IR used by the JIT-canonical Python
 frontend. It is the internal source envelope producer and diagnostic record
 tool behind `cpp_template_to_lean.py`; it is not the canonical user-facing C++
@@ -29,7 +29,7 @@ to Lean route.
 ## Command
 
 ```bash
-python3 tools/agent_tools/cpp_source_canonical_ir.py \
+python3 tools/analysis/code/cpp_source_canonical_ir.py \
   --root . \
   --cpp-symbol include/algorithm.hpp::solve \
   --format json \
@@ -85,7 +85,7 @@ idea and joins the current operational IR surface.
 For C++ template algorithm roots, use the single full-expansion route:
 
 ```bash
-python3 tools/agent_tools/cpp_template_to_lean.py \
+python3 tools/analysis/proof/cpp_template_to_lean.py \
   --root . \
   --cpp-symbol include/algorithm.hpp::solve \
   --namespace Generated.CppSolve \

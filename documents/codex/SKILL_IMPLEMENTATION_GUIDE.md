@@ -21,7 +21,7 @@ upstream design README.md durable document index
 - artifact placement canon: `agents/canonical/ARTIFACT_PLACEMENT.md`
 - CLI entrypoint canon: `agents/canonical/CLI_ENTRYPOINTS.md`
 - Codex workflow canon: `agents/canonical/CODEX_WORKFLOW.md`
-- Codex discovery path: `.agents/skills/`
+- Codex discovery path: `.codex/personal/skills/`
 
 ## 方針
 
@@ -29,7 +29,7 @@ upstream design README.md durable document index
 - numbered skill catalog は増やしません。
 - skill ごとの instructions は `SKILL.md` に集約します。
 - 再利用可能な workflow は skill にし、repo 全体の恒久ルールは `documents/` または `agents/` に置きます。
-- shared discovery shim は `.agents/skills/` を正本にし、互換 path は同期スクリプトで更新します。
+- shared discovery shim は `.codex/personal/skills/` を正本にし、互換 path は同期スクリプトで更新します。
 
 ## 推奨 skill directory
 
@@ -58,5 +58,5 @@ upstream design README.md durable document index
 ## 整理ルール
 
 - 新しい skill を追加するときは `agents/canonical/skills.md` を更新します。
-- Skill の `SKILL.md` や `agents/skills/*.md` を編集する前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を実行し、`log_surface_inventory_guard` が予測された場合は log-surface baseline check を同じ変更内で通します。
-- Skill 内の code fence に `KEY=value` 形式の機械出力例を追加・削除した場合は `python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json` を通し、意図した field change なら `documents/runtime/log-surface-inventory.json` を再生成します。
+- Skill の `SKILL.md` や `agents/skills/*.md` を編集する前に `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を実行し、`log_surface_inventory_guard` が予測された場合は log-surface baseline check を同じ変更内で通します。
+- Skill 内の code fence に `KEY=value` 形式の機械出力例を追加・削除した場合は `python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json` を通し、意図した field change なら `documents/runtime/log-surface-inventory.json` を再生成します。

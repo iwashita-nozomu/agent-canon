@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents tool and skill routing refactor policy.
 upstream design README.md AgentCanon documentation index
-downstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
+downstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
 downstream design ../../agents/skills/task-routing.md public skill for route decisions
 downstream design ../tools/route.md route tool reader documentation
 @dependency-end
@@ -39,7 +39,7 @@ evidence, not an AgentCanon product dependency.
 - Long candidate names are compatibility aliases, not new files.
 - Repeated routing decisions go through `route.py --area <area>`.
 - Prompt-derived public skill selection goes through
-  `python3 tools/agent_tools/route.py --prompt <text>` so candidate evidence,
+  `python3 tools/agent/orchestration/route.py --prompt <text>` so candidate evidence,
   current-wave `ACTIVE_SKILLS`, and later-wave `DEFERRED_SKILLS` are produced
   by the fast deterministic harness. Routing rules and stage policy live in
   `agents/skills/catalog.yaml` under `skill_families[].routing`.
@@ -87,7 +87,7 @@ tokens.
 ## Ownership Layout
 
 - Deterministic prompt-to-skill routing lives in
-  `tools/agent_tools/route.py --prompt` and reads
+  `tools/agent/orchestration/route.py --prompt` and reads
   `agents/skills/catalog.yaml`.
 - `agents/skills/catalog.yaml` remains the skill registry for id, purpose,
   doc/shim paths, prompt trigger groups, and stage policy. Routing metadata
@@ -97,7 +97,7 @@ tokens.
   capability belongs in a probe or route output, and skill routing should name
   only the current task's core AgentCanon functions.
 
-For broad user prompts, `python3 tools/agent_tools/route.py --prompt "<request>"`
+For broad user prompts, `python3 tools/agent/orchestration/route.py --prompt "<request>"`
 prints `ROUTE=skill-selection`, `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
 `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `REASONS`, and `EVIDENCE`. The returned
 `SKILLS` is the full selected set, while `ACTIVE_SKILLS` is the current-stage

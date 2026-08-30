@@ -8,8 +8,8 @@ upstream design ../canonical/skills.md shared skill canon registry
 upstream design ../../documents/rule/dependency-module-changes.md detailed dependency module policy
 upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 upstream design ../../documents/design/request-intent-and-update-relation.md immediate dependency-clone cleanup projection
-downstream implementation ../../tools/agent_tools/dependency_module_change.py lifecycle tool
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates skill registration
+downstream implementation ../../tools/repository/workspace/dependency_module_change.py lifecycle tool
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates skill registration
 @dependency-end
 -->
 
@@ -49,9 +49,9 @@ generic lifecycle または operation-level approval carve-out には含めま�
 などは従来どおり protected Git route として明示 authority を必要とします。
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <path> --branch <branch> \
-  --owner-evidence <file>
+  --owner-evidence <file> [--allowed-path <relative-path> ...]
 ```
 
 通常の closeout cleanup は canonical lifecycle artifact を materialize せず、manifest から
@@ -60,9 +60,9 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepa
 同じ call に渡します。dry-run も同じ選択された proof を検証し、pass 後だけ `--apply` します。
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <path> --branch <branch> \
-  --owner-evidence <file> \
+  --owner-evidence <file> [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
@@ -70,6 +70,11 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> clean
 completion evidence は generic prepare/merge receipt、dependency identity readback、
 pin/projection validation、および必要に応じた canonical publication evidence と `CleanupProof`
 です。
+
+`prepare`、`merge-main`、`cleanup` は write-capable generic lifecycle に `allowed_paths` を
+明示的に渡します。`--allowed-path` を省略した canonical dependency operation は clone 全体を
+所有するため `.` を明示値として使い、狭い責務を持つ caller は repeated option で範囲を
+指定します。adapter や generic lifecycle 側で scope を暗黙補完しません。
 
 completion ではこの skill が canonical `cleanup` を dispatch し、computed clone path、owner
 evidence/marker、clean branch、および fetch した `origin/<branch>` の head/tree 一致を検証

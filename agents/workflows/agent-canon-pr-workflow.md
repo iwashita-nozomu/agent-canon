@@ -47,8 +47,7 @@ For bootstrap/runtime changes, use one explicit installation:
 
 ```bash
 ROOT=<authorized-parent-root>
-RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
-COMMON=(--control-parent-root "$ROOT" --runtime-root "$RUNTIME")
+COMMON=(--control-parent-root "$ROOT")
 
 ./bootstrap.sh "${COMMON[@]}" install
 ./bootstrap.sh "${COMMON[@]}" start

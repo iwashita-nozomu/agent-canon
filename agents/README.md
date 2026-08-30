@@ -53,12 +53,15 @@ Target-State-First と Decision Sufficiency は
 
 ## Skills And Subagents
 
-- Public Codex skill discovery: `.agents/skills/`
+- Public Codex skill discovery: `.codex/personal/skills/`
 - Human-readable public skill docs: `agents/skills/`
 - Workflow-routed internal and compatibility routines: `agents/internal-routines/`
 - Codex runtime config and subagent registry: `.codex/config.toml`
 - Codex role behavior: `.codex/agents/*.toml`
-- Eval manifest source contracts: `evidence/agent-evals/`
+- Eval implementation and source contracts: `eval/` (definitions, producers,
+  checkers, and static fixtures)
+- Eval output and run evidence: external runtime spool, then the
+  `agent-canon-log` archive; no generated result is stored under `agents/`
 
 ## Team Shape
 
@@ -112,7 +115,7 @@ $paper-writing
 repo-changing task の基本 bundle:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "scoped repo change" \
   --task-id T1 \
   --owner "codex" \
@@ -122,7 +125,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 調査つき変更:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -132,7 +135,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 学術文章:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "academic writing task" \
   --task-id T10 \
   --owner "codex" \
@@ -142,7 +145,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 環境・Docker・CI 変更:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "platform or environment change" \
   --task-id T8 \
   --owner "codex" \
@@ -152,7 +155,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 包括的開発:
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \

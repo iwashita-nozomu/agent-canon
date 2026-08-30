@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests tool/convention drift checker behavior.
-# upstream implementation ../../tools/agent_tools/tool_drift.py checker
+# upstream implementation ../../tools/validation/semantic/tools/tool_drift.py checker
 # upstream design ../../documents/design/dependency-manifest-design.md manifest trace map
 # @dependency-end
 
@@ -18,11 +18,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.agent_tools import tool_drift as drift_checker
-from tools.agent_tools.graph_client import GraphDependencyFact, GraphResponse
+from tools.validation.semantic.tools import tool_drift as drift_checker
+from tools.analysis.dependencies.graph_client import GraphDependencyFact, GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "tool_drift.py"
+CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "tools" / "tool_drift.py"
 
 
 class FakeToolGraphClient:
@@ -168,11 +168,11 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             id="fact:projection",
             direction="upstream",
             kind="design",
-            source="tools/agent-canon/agent_tools/tool_drift.py",
+            source="tools/agent-canon/validation/semantic/tools/tool_drift.py",
             target="vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md",
             reason="projection fixture",
             producer="test-fixture-projection",
-            source_path="tools/agent-canon/agent_tools/tool_drift.py",
+            source_path="tools/agent-canon/validation/semantic/tools/tool_drift.py",
             source_span=None,
             evidence_ref="projection:1",
             authority="test-fixture-projection",
@@ -181,7 +181,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.assertEqual(
             drift_checker.matching_direct_edges(
                 (fact,),
-                "tools/agent_tools/tool_drift.py",
+                "tools/validation/semantic/tools/tool_drift.py",
                 "agents/canonical/CODEX_SUBAGENTS.md",
             ),
             (fact,),
@@ -192,14 +192,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_convention_contract(root)
-            tool = root / "tools" / "agent_tools" / "check_convention_compliance.py"
+            tool = root / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py"
             tool.write_text(
                 "\n".join(
                     [
                         "# @dependency-start",
                         "# responsibility Checks convention compliance.",
                         "# upstream design ../../documents/conventions/README.md conventions",
-                        "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
+                        "# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml evals",
                         "# upstream design ../../templates/agents/closeout_gate.md closeout",
                         "# upstream implementation ../ci/run_all_checks.sh ci",
                         "# upstream implementation ./tool_drift.py drift gate",
@@ -216,12 +216,12 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertIn("TOOL_CONVENTION_DRIFT=fail", result.stdout)
             self.assertIn(
                 "missing-manifest-link:convention_compliance:"
-                "tools/agent_tools/check_convention_compliance.py:"
+                "tools/validation/semantic/convention/check_convention_compliance.py:"
                 "agents/canonical/CODEX_WORKFLOW.md",
                 result.stdout,
             )
             self.assertNotIn(
-                ".agents/skills/agent-orchestration/SKILL.md", result.stdout
+                ".codex/personal/skills/agent-orchestration/SKILL.md", result.stdout
             )
 
     def test_tool_rejection_preflight_checks_canonical_owner_skills(self) -> None:
@@ -248,7 +248,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertNotIn(
-                ".agents/skills/codex-task-workflow/SKILL.md", result.stdout
+                ".codex/personal/skills/codex-task-workflow/SKILL.md", result.stdout
             )
 
     def test_kind_mismatch_is_reported(self) -> None:
@@ -263,7 +263,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                         "<!--",
                         "@dependency-start",
                         "responsibility Defines convention index.",
-                        "downstream environment ../../tools/agent_tools/check_convention_compliance.py checker",
+                        "downstream environment ../../tools/validation/semantic/convention/check_convention_compliance.py checker",
                         "@dependency-end",
                         "-->",
                         "",
@@ -305,7 +305,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "missing-reverse-manifest-link:tool_catalog:"
-                "tools/agent_tools/tool_catalog.py:tools/catalog.yaml",
+                "tools/runtime/manifest/tool_catalog.py:tools/catalog.yaml",
                 result.stdout,
             )
 
@@ -314,7 +314,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
                 "if agentcanon_pr_dependency_graph_required; then\n", "if true; then\n"
             )
@@ -325,7 +325,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "missing-required-text:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:"
+                "tools/validation/ci/checks/check_agent_canon_pr.sh:"
                 "missing-conditional-dependency-graph-gate",
                 result.stdout,
             )
@@ -335,7 +335,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
                 "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped\n", ""
             )
@@ -346,7 +346,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "missing-required-text:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:"
+                "tools/validation/ci/checks/check_agent_canon_pr.sh:"
                 "missing-optional-dependency-source-receipt-status",
                 result.stdout,
             )
@@ -364,7 +364,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 with tempfile.TemporaryDirectory() as tmp_dir:
                     root = Path(tmp_dir)
                     self.write_agent_canon_pr_contract(root)
-                    script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+                    script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
                     script.write_text(
                         script.read_text(encoding="utf-8").replace(
                             marker, "removed", 1
@@ -379,7 +379,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn(
                     "missing-required-text:agent_canon_pr_check:"
-                    f"tools/ci/check_agent_canon_pr.sh:{detail}",
+                    f"tools/validation/ci/checks/check_agent_canon_pr.sh:{detail}",
                     result.stdout,
                 )
 
@@ -410,7 +410,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     with tempfile.TemporaryDirectory() as tmp_dir:
                         root = Path(tmp_dir)
                         self.write_agent_canon_pr_contract(root)
-                        script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+                        script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
                         malformed = script.read_text(encoding="utf-8").replace(
                             canonical_command,
                             command_prefix + suffix + f"  {command_tail}",
@@ -424,7 +424,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                         )
                         self.assertIn(
                             f"missing-required-command:{contract}:"
-                            "tools/ci/check_agent_canon_pr.sh:"
+                            "tools/validation/ci/checks/check_agent_canon_pr.sh:"
                             f"{detail}",
                             result.stdout,
                         )
@@ -434,7 +434,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
                 'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\\n',
                 "",
@@ -446,7 +446,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "missing-required-text:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:"
+                "tools/validation/ci/checks/check_agent_canon_pr.sh:"
                 "missing-agent-canon-pr-hook-archive-env",
                 result.stdout,
             )
@@ -456,7 +456,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"\n',
                 "",
@@ -468,7 +468,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "missing-required-command:generated_artifact_guard:"
-                "tools/ci/check_agent_canon_pr.sh:"
+                "tools/validation/ci/checks/check_agent_canon_pr.sh:"
                 "missing-generated-artifact-pr-guard",
                 result.stdout,
             )
@@ -481,7 +481,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             catalog = root / "tools" / "catalog.yaml"
             catalog.write_text(
                 catalog.read_text(encoding="utf-8").replace(
-                    "tools/agent_tools/tool_catalog.py",
+                    "tools/runtime/manifest/tool_catalog.py",
                     "tools/agent_tools/missing_tool.py",
                 ),
                 encoding="utf-8",
@@ -632,7 +632,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertNotIn(
-                ".agents/skills/agent-orchestration/SKILL.md", result.stdout
+                ".codex/personal/skills/agent-orchestration/SKILL.md", result.stdout
             )
 
     def write_file(self, root: Path, relative: str, text: str) -> None:
@@ -664,20 +664,20 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.write_file(root, "README.md", "# Fixture\n")
         self.write_file(
             root,
-            "tools/agent_tools/check_convention_compliance.py",
+            "tools/validation/semantic/convention/check_convention_compliance.py",
             "\n".join(
                 [
                     "# @dependency-start",
                     "# responsibility Checks convention compliance.",
-                    "# upstream design ../../documents/conventions/README.md conventions",
-                    "# upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow",
-                    "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
-                    "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
-                    "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
-                    "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
-                    "# upstream design ../../templates/agents/closeout_gate.md closeout",
-                    "# upstream implementation ../ci/run_all_checks.sh ci",
-                    "# upstream implementation ./tool_drift.py drift gate",
+                    "# upstream design ../../../../documents/conventions/README.md conventions",
+                    "# upstream design ../../../../agents/canonical/CODEX_WORKFLOW.md workflow",
+                    "# upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagents",
+                    "# upstream design ../../../../agents/TASK_WORKFLOWS.md workflows",
+                    "# upstream design ../../../../agents/skills/agent-orchestration.md orchestration",
+                    "# upstream design ../../../../eval/definitions/skill_workflow_prompt_eval.toml evals",
+                    "# upstream design ../../../../templates/agents/closeout_gate.md closeout",
+                    "# upstream implementation ../../../ci/run_all_checks.sh ci",
+                    "# upstream implementation ../tools/tool_drift.py drift gate",
                     "# @dependency-end",
                     "",
                 ]
@@ -689,10 +689,10 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "agents/canonical/CODEX_SUBAGENTS.md",
             "agents/TASK_WORKFLOWS.md",
             "agents/skills/agent-orchestration.md",
-            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+            "eval/definitions/skill_workflow_prompt_eval.toml",
             "templates/agents/closeout_gate.md",
-            "tools/ci/run_all_checks.sh",
-            "tools/agent_tools/tool_drift.py",
+            "tools/validation/ci/runners/run_all_checks.sh",
+            "tools/validation/semantic/tools/tool_drift.py",
         ]:
             self.write_plain_manifest(root, relative)
 
@@ -701,7 +701,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.write_file(root, "README.md", "# Fixture\n")
         self.write_file(
             root,
-            "tools/agent_tools/tool_drift.py",
+            "tools/validation/semantic/tools/tool_drift.py",
             "\n".join(
                 [
                     "# @dependency-start",
@@ -709,7 +709,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
                     "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
                     "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
-                    "# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml evals",
+                    "# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml evals",
                     "# upstream implementation ./check_convention_compliance.py convention gate",
                     "# downstream implementation ../../tests/agent_tools/test_tool_drift.py tests",
                     "# @dependency-end",
@@ -721,7 +721,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "agents/canonical/CODEX_SUBAGENTS.md",
             "agents/TASK_WORKFLOWS.md",
             "agents/skills/agent-orchestration.md",
-            "tools/agent_tools/check_convention_compliance.py",
+            "tools/validation/semantic/convention/check_convention_compliance.py",
         ]:
             self.write_file(
                 root,
@@ -745,7 +745,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             )
         self.write_file(
             root,
-            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+            "eval/definitions/skill_workflow_prompt_eval.toml",
             "VERTICAL-WAVE-POLICY ORCH-SHIM-POINTER-1 ORCH-SHIM-TOOLCALL-1\n",
         )
         self.write_file(
@@ -758,14 +758,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         """Write fixtures for the tool rejection preflight contract."""
         self.write_file(
             root,
-            "tools/agent_tools/tool_rejection_preflight.py",
+            "tools/validation/semantic/tools/tool_rejection_preflight.py",
             "\n".join(
                 [
                     "# @dependency-start",
                     "# responsibility Prechecks edit-time risk class.",
                     "# upstream design ../../agents/COMMUNICATION_PROTOCOL.md protocol",
                     "# upstream design ../../agents/skills/codex-task-workflow.md workflow",
-                    "# upstream design ../../tools/agent_tools/responsibility_scope.py scope",
+                    "# upstream design ../../tools/validation/semantic/responsibility/responsibility_scope.py scope",
                     "# upstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
                     "# @dependency-end",
                     "",
@@ -775,7 +775,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         for relative in [
             "agents/COMMUNICATION_PROTOCOL.md",
             "agents/skills/codex-task-workflow.md",
-            "tools/agent_tools/responsibility_scope.py",
+            "tools/validation/semantic/responsibility/responsibility_scope.py",
             "tools/README.md",
             "documents/tools/README.md",
             "tests/agent_tools/test_tool_rejection_preflight.py",
@@ -813,7 +813,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.write_file(root, "README.md", "# Fixture\n")
         self.write_file(
             root,
-            "tools/ci/check_agent_canon_pr.sh",
+            "tools/validation/ci/checks/check_agent_canon_pr.sh",
             "\n".join(
                 [
                     "# @dependency-start",
@@ -844,7 +844,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
-                    "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                    "python3 eval/producers/evaluate_skill_workflow_prompts.py --manifest eval/definitions/skill_workflow_prompt_eval.toml",
                     "SHARED_SURFACE_STATUS=not_applicable_standalone_source",
                     "",
                 ]
@@ -852,7 +852,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         )
         self.write_file(
             root,
-            "tools/ci/agent_canon_pr_graph_selector.py",
+            "tools/validation/ci/checks/agent_canon_pr_graph_selector.py",
             "\n".join(
                 [
                     "# @dependency-start",
@@ -865,7 +865,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         )
         self.write_file(
             root,
-            "tools/ci/pr_gate_receipt.py",
+            "tools/validation/ci/receipts/pr_gate_receipt.py",
             "# @dependency-start\n"
             "# responsibility Owns source/skipped receipt schema.\n"
             "# @dependency-end\n",
@@ -875,13 +875,13 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "templates/documents/github/pull-request/agent_canon.md",
-            "tools/agent_tools/run_repo_dependency_review.sh",
-            "tools/agent_tools/run_accumulated_agent_evals.py",
-            "tools/agent_tools/generated_artifact_guard.py",
-            "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-            "tools/agent_tools/check_agent_runtime_alignment.py",
-            "tools/agent_tools/check_convention_compliance.py",
-            "tools/ci/check_github_workflows.py",
+            "tools/analysis/dependencies/run_repo_dependency_review.sh",
+            "eval/producers/run_accumulated_agent_evals.py",
+            "tools/runtime/artifacts/generated_artifact_guard.py",
+            "eval/producers/evaluate_skill_workflow_prompts.py",
+            "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+            "tools/validation/semantic/convention/check_convention_compliance.py",
+            "tools/validation/ci/checks/check_github_workflows.py",
         ]:
             self.write_plain_manifest(root, relative)
 
@@ -890,18 +890,18 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.write_file(root, "README.md", "# Fixture\n")
         self.write_file(
             root,
-            "tools/agent_tools/tool_catalog.py",
+            "tools/runtime/manifest/tool_catalog.py",
             "\n".join(
                 [
                     "# @dependency-start",
                     "# responsibility Validates tool catalog.",
-                    "# upstream design ../../tools/catalog.yaml catalog",
-                    "# upstream design ../../tools/README.md tool docs",
-                    "# upstream design ../../documents/tools/README.md root docs",
-                    "# upstream design ../../documents/tools/tool-docs.toml docs map",
-                    "# upstream design ../../documents/tools/repo-local-tool-imports.md imports",
-                    "# downstream implementation ../../tools/ci/run_all_checks.sh ci",
-                    "# downstream implementation ../../tests/agent_tools/test_tool_catalog.py tests",
+                    "# upstream design ../../catalog.yaml catalog",
+                    "# upstream design ../../README.md tool docs",
+                    "# upstream design ../../../documents/tools/README.md root docs",
+                    "# upstream design ../../../documents/tools/tool-docs.toml docs map",
+                    "# upstream design ../../../documents/tools/repo-local-tool-imports.md imports",
+                    "# downstream implementation ../../validation/ci/runners/run_all_checks.sh ci",
+                    "# downstream implementation ../../../tests/agent_tools/test_tool_catalog.py tests",
                     "# @dependency-end",
                     "",
                 ]
@@ -914,13 +914,13 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 [
                     "# @dependency-start",
                     "# responsibility Defines fixture tool catalog.",
-                    "# downstream implementation agent_tools/tool_catalog.py checker",
+                    "# downstream implementation runtime/manifest/tool_catalog.py checker",
                     "# @dependency-end",
                     "",
                     "version: 1",
                     "entries:",
                     "  - id: tool-catalog",
-                    "    path: tools/agent_tools/tool_catalog.py",
+                    "    path: tools/runtime/manifest/tool_catalog.py",
                     "    status: canonical",
                     "",
                 ]
@@ -931,7 +931,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "documents/tools/README.md",
             "documents/tools/tool-docs.toml",
             "documents/tools/repo-local-tool-imports.md",
-            "tools/ci/run_all_checks.sh",
+            "tools/validation/ci/runners/run_all_checks.sh",
             "tests/agent_tools/test_tool_catalog.py",
         ]:
             self.write_file(
@@ -943,7 +943,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                         "@dependency-start",
                         "responsibility Provides tool catalog fixture.",
                         "upstream design README.md fixture anchor",
-                        "downstream implementation tools/agent_tools/tool_catalog.py checker",
+                        "downstream implementation tools/runtime/manifest/tool_catalog.py checker",
                         "@dependency-end",
                         "-->",
                         "tools/catalog.yaml",

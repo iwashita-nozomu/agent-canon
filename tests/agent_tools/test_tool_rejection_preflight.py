@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests tool rejection preflight gate prediction.
-# upstream implementation ../../tools/agent_tools/tool_rejection_preflight.py predicts hook/tool rejection gates
+# upstream implementation ../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts hook/tool rejection gates
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # @dependency-end
 """Tests for predicted tool rejection handoff gates."""
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "tool_rejection_preflight.py"
+TOOL = PROJECT_ROOT / "tools" / "validation" / "semantic" / "tools" / "tool_rejection_preflight.py"
 
 
 class ToolRejectionPreflightTest(unittest.TestCase):
@@ -90,13 +90,13 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         )
         self.assertTrue(
             any(
-                "tools/agent_tools/log_surface_inventory.py" in command
+                "tools/runtime/archive/log_surface_inventory.py" in command
                 for command in commands_by_gate["log_surface_inventory_guard"]
             )
         )
         self.assertTrue(
             any(
-                "tools/agent_tools/tool_catalog.py" in command
+                "tools/runtime/manifest/tool_catalog.py" in command
                 for command in commands_by_gate["tool_catalog"]
             )
         )
@@ -245,7 +245,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
                 str(PROJECT_ROOT),
                 "--format",
                 "json",
-                ".agents/skills/subagent-bootstrap/SKILL.md",
+                ".codex/personal/skills/subagent-bootstrap/SKILL.md",
             ],
             check=True,
             capture_output=True,
@@ -289,8 +289,8 @@ class ToolRejectionPreflightTest(unittest.TestCase):
                 str(PROJECT_ROOT),
                 "--format",
                 "json",
-                "tools/experiments/run_managed_experiment.py",
-                "tools/ci/check_experiment_registry.py",
+                "tools/experiments/execution/run_managed_experiment.py",
+                "tools/validation/ci/checks/check_experiment_registry.py",
                 "documents/experiments/experiment-registry.md",
                 "experiments/registry.toml",
             ],
@@ -308,8 +308,8 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertEqual(
             guarded_paths,
             {
-                "tools/experiments/run_managed_experiment.py",
-                "tools/ci/check_experiment_registry.py",
+                "tools/experiments/execution/run_managed_experiment.py",
+                "tools/validation/ci/checks/check_experiment_registry.py",
                 "documents/experiments/experiment-registry.md",
                 "experiments/registry.toml",
             },
@@ -319,7 +319,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             for gate in payload["predicted_gates"]
             if gate["gate"] == "experiment_execution_surface_guard"
         )
-        self.assertIn("tools.ci.check_experiment_registry", guarded_gate["command"])
+        self.assertIn("tools.validation.ci.checks.check_experiment_registry", guarded_gate["command"])
         self.assertIn("test_run_managed_experiment.py", guarded_gate["command"])
         self.assertIn("$experiment-lifecycle", guarded_gate["handoff"])
         self.assertIn("$test-design", guarded_gate["handoff"])

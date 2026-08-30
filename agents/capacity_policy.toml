@@ -2,9 +2,9 @@
 # contract configuration
 # responsibility Declares topology-derived capacity, queue, reservation, and lifecycle policy.
 # upstream design ./task_catalog.yaml declares the direct and nested workflow topology
-# downstream implementation ../tools/agent_tools/capacity_handshake.py loads and projects this policy
-# downstream implementation ../tools/agent_tools/agent_team.py supplies workflow and write-scope inputs
-# downstream implementation ../tools/agent_tools/task_close.py validates lifecycle closeout
+# downstream implementation ../tools/agent/orchestration/capacity_handshake.py loads and projects this policy
+# downstream implementation ../tools/agent/orchestration/agent_team.py supplies workflow and write-scope inputs
+# downstream implementation ../tools/runtime/lifecycle/task_close.py validates lifecycle closeout
 # @dependency-end
 
 policy_version = 2

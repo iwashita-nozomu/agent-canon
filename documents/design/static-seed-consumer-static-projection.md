@@ -5,10 +5,10 @@ responsibility Defines the typed consumer-static role projection for Issue #715.
 upstream design ../contracts/static-seed-export.md static-seed boundary
 upstream design ../../agents/internal-routines/design-implementation-correspondence.md DIC route
 upstream implementation ../../agents/model_profiles.toml canonical role/profile registry
-upstream implementation ../../tools/agent_tools/model_profile_registry.py role materializer
-downstream implementation ../../tools/agent_tools/export_static_seed.py exact-byte exporter
-downstream implementation ../../tools/docs/check_bootstrap_docs.py source-free checker
-downstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py committed-role evaluator
+upstream implementation ../../tools/agent/orchestration/model_profile_registry.py role materializer
+downstream implementation ../../tools/runtime/source/export_static_seed.py exact-byte exporter
+downstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py source-free checker
+downstream implementation ../../eval/producers/evaluate_codex_agent_roles.py committed-role evaluator
 @dependency-end
 -->
 
@@ -37,7 +37,7 @@ live-role text byte-for-byte. A clause containing a producer path must provide a
 nonempty, source-neutral `consumer_static_text`; a clause without one may inherit
 `text` only after the static prefix gate passes.
 
-The exact typed obligation owner in `tools/agent_tools/model_profile_registry.py` is:
+The exact typed obligation owner in `tools/agent/orchestration/model_profile_registry.py` is:
 
 ```text
 StaticObligation(schema_id="consumer_static_obligation_v1",
@@ -119,7 +119,7 @@ allowing the digest to bind both live and static clause variants.
 
 ## Committed-role evaluator contract
 
-`tools/agent_tools/evaluate_codex_agent_roles.py#evaluate_generated_role_projection` is
+`eval/producers/evaluate_codex_agent_roles.py#evaluate_generated_role_projection` is
 also a downstream consumer of the committed projection. It must request
 `generate_role_views(..., projection="consumer-static")`, because `agents_config.json`
 and `.codex/agents/*.toml` are the consumer-static committed tree. The evaluator keeps
@@ -175,10 +175,10 @@ no-updater/no-import/no-secret behavior.
 - `documents/contracts/static-seed-export.md#生成規則`, `#Source-free Consumer Validation`, `#禁止 Surface`
 - `documents/contracts/static-seed-allowlist.toml#files`
 - `agents/model_profiles.toml#role_instruction_templates`, `#model_profiles`
-- `tools/agent_tools/model_profile_registry.py#RoleInstructionClause`, `#ConsumerStaticClauseProjection`, `#StaticObligation`, `#STATIC_OBLIGATION_TABLE`, `#generate_role_views`, `#_render_role_view`, `#write_role_views`
-- `tools/agent_tools/export_static_seed.py#_validate_content`, `#load_export_plan`, `#_validate_codex_config`
-- `tools/docs/check_bootstrap_docs.py#iter_static_seed_consumer_findings`
-- `tools/agent_tools/evaluate_codex_agent_roles.py#evaluate_generated_role_projection`, `#evaluate_static_agent_configs`
+- `tools/agent/orchestration/model_profile_registry.py#RoleInstructionClause`, `#ConsumerStaticClauseProjection`, `#StaticObligation`, `#STATIC_OBLIGATION_TABLE`, `#generate_role_views`, `#_render_role_view`, `#write_role_views`
+- `tools/runtime/source/export_static_seed.py#_validate_content`, `#load_export_plan`, `#_validate_codex_config`
+- `tools/validation/documentation/checks/check_bootstrap_docs.py#iter_static_seed_consumer_findings`
+- `eval/producers/evaluate_codex_agent_roles.py#evaluate_generated_role_projection`, `#evaluate_static_agent_configs`
 - `tests/agent_tools/test_model_profile_registry.py#typed obligation projection`
 - `tests/agent_tools/test_evaluate_codex_agent_roles.py#committed consumer-static evaluator`, `#pre-change live golden for all 35 roles`
 - `tests/agent_tools/test_export_static_seed.py#canonical 35-role source-hidden export`

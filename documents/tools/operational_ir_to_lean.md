@@ -1,18 +1,18 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents tools/agent_tools/operational_ir_to_lean.py usage and output contract.
-upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders Lean evidence definitions.
+responsibility Documents tools/analysis/proof/operational_ir_to_lean.py usage and output contract.
+upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders Lean evidence definitions.
 upstream design cpp_source_canonical_ir.md defines the C++ source envelope.
 upstream design jit_canonical_ir.md defines the shared thin operational IR shape.
-downstream implementation ../../tools/agent_tools/cpp_template_to_lean.py owns the canonical C++ template source route.
+downstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py owns the canonical C++ template source route.
 downstream implementation ../../tests/agent_tools/test_operational_ir_to_lean.py validates the renderer.
 @dependency-end
 -->
 
 # operational_ir_to_lean.py
 
-`tools/agent_tools/operational_ir_to_lean.py` renders shared
+`tools/analysis/proof/operational_ir_to_lean.py` renders shared
 `agent-canon.thin-operational-ir.v2` records into dependency-free Lean evidence
 definitions. It is the generic renderer for already-expanded operational
 records. For C++ template source roots, use `cpp_template_to_lean.py`, which
@@ -31,7 +31,7 @@ canonical tool operation.
 ## Command
 
 ```bash
-python3 tools/agent_tools/operational_ir_to_lean.py \
+python3 tools/analysis/proof/operational_ir_to_lean.py \
   --ir reports/cpp-source-ir/solve.json \
   --namespace Generated.CppSolve \
   --module-name SolveOperationalIr \

@@ -51,7 +51,7 @@ Codex の設定は 1 ファイルではなく、複数の runtime surface で構
 | `.codex/config.toml` | repo | project runtime policy |
 | `-c key=value` | run | 一時 override |
 | `.codex/agents/*.toml` | repo/user | custom subagent |
-| `.agents/skills` | dir/repo/user | workflow package |
+| `.codex/personal/skills` | dir/repo/user | workflow package |
 | `AGENTS.md` | repo tree | 作業規律 |
 | hooks | repo/user | 起動・tool 実行時の強制処理 |
 
@@ -100,7 +100,7 @@ job_max_runtime_seconds = 3600
   `agents/model_profiles.toml` が所有し、role TOML は generated view
 - 1 tool output の context 取り込みは 4096 token まで
 - stable runtime feature は Codex の既定を使う
-- repo-owned skill は `.agents/skills/` から自動探索し、child-agent registry だけを config に置く
+- repo-owned skill は `.codex/personal/skills/` から自動探索し、child-agent registry だけを config に置く
 - topology-derived request は direct `21` + nested `6` = `27`。platform-effective
   / current-available capacity は別入力で、27 を platform cap とは主張しない
 - AgentCanon の repo-local deterministic checks は Rust CLI / Python tool が所有する
@@ -148,7 +148,7 @@ job_max_runtime_seconds = 3600
 - user config に置くべきもの: model、provider、profile
 - machine-local なもの: TUI、history、audio、notice、Windows onboarding
 - secret を含み得るもの: provider auth、headers、OAuth、credential stores
-- repo では別 surface のもの: hooks は `hooks.json`、skills は `.agents/skills`
+- repo では別 surface のもの: hooks は `hooks.json`、skills は `.codex/personal/skills`
 - 危険・不安定なもの: `experimental_*`
 
 ---
@@ -386,12 +386,12 @@ Codex は skill metadata で候補を選び、選択後に該当 `SKILL.md` を�
 # Skills discovery
 
 ```text
-.agents/skills/
+.codex/personal/skills/
   dependency-analysis/
     SKILL.md
 ```
 
-Codex は repository の `.agents/skills/` を自動探索します。project config に
+Codex は repository の `.codex/personal/skills/` を自動探索します。project config に
 同じ inventory を列挙せず、命名と説明を簡潔に保ちます。
 
 ---
@@ -514,7 +514,7 @@ credential は committed config に直書きしません。
 - `.codex/config.toml`: 責務を追える形に保つ
 - `AGENTS.md`: workflow gate と closeout policy
 - `.codex/agents/*.toml`: role behavior
-- `.agents/skills`: reusable workflow
+- `.codex/personal/skills`: reusable workflow
 - hooks: deterministic startup
 - MCP: repo tool inventory
 - `reports/agents`: task evidence

@@ -6,6 +6,7 @@ upstream design ../../ROOT_AGENTS.md common consumer root instruction base
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract
 upstream design ../workflows/agent-canon-pr-workflow.md standalone source PR workflow
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet route
+upstream implementation ../../tools/agent/skills/skill_document_reader.py bounded Skill read and EOF admission
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../../templates/agents/closeout_gate.md closeout gate contract
 upstream design ../../documents/design/dependency-manifest-design.md dependency manifest design
@@ -13,7 +14,7 @@ upstream design ../../documents/design/semantic-responsibility-contract.md seman
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md runtime profile and risk-based validation routing
 upstream design ../../documents/operations/BRANCH_SCOPE.md commit correctness and push contract
 upstream design ../skills/tool-finding-report.md tool finding packet and prompt feedback workflow
-downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
+downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces closeout keys
 @dependency-end
 -->
 
@@ -41,7 +42,7 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
-1. 必要なら `.agents/skills/` から該当 skill を読む
+1. 必要なら `.codex/personal/skills/` から該当 skill を読む
 
 Base Runtime Packet:
 
@@ -81,7 +82,7 @@ task 開始時は read-only worktree check で、現在の AgentCanon source clo
 
 - 同じ checkout は複数 chat/session が同時に使う場合があります。unknown dirty/staged/untracked state と branch/worktree state は user または別 chat 所有として保存します。`git restore`、`git reset`、forced `git clean`、mutating `git stash`、checkout/switch、branch/worktree create/delete/move/rename/prune は protected Git mutation として扱います。proven exact task ownership は approval request に含める path を限定し、explicit destructive approval は引き続き必須です。
 - Git authority は操作リスクで分けます。通常の branch create / worktree add は同じ command segment の creation authority/reason のみを要求し、force-create または ref overwrite は creation と destructive authority/reason の両方を要求します。既存 branch の checkout/switch、branch/worktree の delete/rename/prune、reset、restore、forced clean、mutating stash、およびその他の履歴/参照破壊操作は destructive authority/reason を要求します。`latest` / `apply` / merge update wrapper は実際に branch/worktree を作成する owner route でない限り destructive authority/reason のみを要求します。`branch --set-upstream-to`、`branch --unset-upstream`、`branch --edit-description` などの tracking/description metadata 操作と、reversible な `worktree lock/unlock` は ref、履歴、worktree を変更しないため protected destructive Git mutation ではありません。worktree の remove/move/repair/prune/force-add は protected operation です。ambient 変数や prior segment は authority になりません。
-- destructive Git safety は `tools/agent_tools/hook_safety.py` の pure owner を dispatcher が呼び出します。session 開始時に dispatcher registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
+- destructive Git safety は `tools/runtime/authority/hook_safety.py` の pure owner を dispatcher が呼び出します。session 開始時に dispatcher registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
 - 衝突時は current branch/worktree を維持し、status を保存して user の指示を待ちます。
 
 - `repository_topic_clone.py` と `dependency_module_change.py` の canonical
@@ -104,8 +105,8 @@ task 開始時は read-only worktree check で、現在の AgentCanon source clo
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に、通常作成なら creation authority/reason、force-create/ref overwrite なら creation と destructive の両 authority pair を置いた場合だけ実行できます。
 - AgentCanon source 変更は standalone source clone を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。親で作業する場合は ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` clone を再利用します。親の pin や root projection は作成しません。
-- standalone source の変更は非並列 single-stream の既定です。独立 stream の workspace placement は、replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定して選択します。parent は ready な全 stream を launch し、全 descendant を monitor し、同一責任・同一 worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
-- repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 clone と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent、dependency、standalone の区別は prepare 後の policy decorator です。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が状態を保持して意図的に解消します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。
+- standalone source の変更は非並列 single-stream の既定です。write-capable handoff を並列化する場合は、各 handoff に repository-topic-clone で準備済みの `writer_target`（絶対 checkout_root、固定 branch、正規化済み remote、allowed_paths）を付け、同じ checkout_root は spawn 前に拒否します。独立 stream の workspace placement は、replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定して選択します。parent は ready な全 stream を launch し、全 descendant を monitor し、同一責任・同一 worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
+- repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 clone と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent、dependency、standalone の区別は prepare 後の policy decorator です。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が状態を保持して意図的に解消します。競合を検出したら `conflict_preservation.py` で merge-base、base/ours/theirs の stage/blob、hunk、unaffected user/unknown content、disposition、原因、期待機構、正確な edit delta を記録し、解消後の保存 readback を通します。whole-file checkout/reset/reclone/overwrite/regeneration は reconstruction map なしでは不許可です。`origin/main` の read/CAS だけでは merge 済みの代替になりません。writer target は短命な handoff 値であり、claim、PID、expiry、daemon、writer registry は作成しません。
 
 ### Runtime Profile And Risk Selection
 
@@ -156,12 +157,36 @@ logへ on-demand に検索します。stable preference は対象 owner への�
 
 raw text search の hit だけで編集対象を決めません。
 検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を write-capable child handoff へ materialize します。空の unresolved-decision set は即時に one-pass handoff へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request も同じ child route で進めます。
-bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。runtime `SKILL.md` 読了は、対象 property を正本として持つ existing tool の実行後に必要な場合だけ使う follow-up context です。結果の解釈や修正に必要な owner surface だけを開きます。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。#335 の既存 tool 先行実行は維持しますが、結果の解釈や修正に入る前に、生成された compact `SKILL.md` を `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` で `file_eof=true` まで読みます。Skill が委譲する場合だけ、canonical owner document の必要な見出しを `section_eof=true` まで読みます。canonical ファイル全体の EOF は要求しません。`implementation_read=ready` はこの条件を満たしたときだけ使い、可視 prefix や既知 path だけでは unlock しません。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+
+### Skill read admission
+
+Generated discovery `SKILL.md` is the complete compact Skill, so its whole
+file is read in bounded UTF-8-safe chunks. The reader returns the path,
+heading, one-based line range, half-open byte range, `next_offset`,
+`section_eof`, and `file_eof`; callers continue with `next_offset` until the
+required EOF flag is true. Canonical `agents/skills/<skill>.md` remains the
+owner prose and is read only by indexed, task-relevant heading sections.
+
+```bash
+bootstrap.sh --control-parent-root <root> tool run --root <registered-project> \
+  skill-document-reader -- index --path <skill.md>
+bootstrap.sh --control-parent-root <root> tool run --root <registered-project> \
+  skill-document-reader -- chunk --path <skill.md> \
+    --heading "## <section>" --offset <next_offset>
+```
+
+The transient owner-first update sets `implementation_read=ready` only when
+the compact Skill reaches `file_eof=true` and every explicitly delegated
+canonical section reaches `section_eof=true`. A truncated response, a section
+prefix, an unverified delegated path, or a missing heading remains locked.
+This readback creates no per-read receipt, identifier, approval gate, or
+duplicate Skill body.
 
 ```bash
 git grep -l "topic keywords" -- <responsibility-scoped dirs> \
   | sed -n '1,200p' > reports/search_hits.txt
-bash tools/agent_tools/run_repo_dependency_review.sh \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
 ```
@@ -357,15 +382,15 @@ dependency surface は task に応じて次を見ます。
 closeout 前に、少なくとも次を実行します。
 
 ```bash
-python3 tools/agent_tools/check_dependency_headers.py --changed
-bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
-bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
+bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing
+bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header
 ```
 
 dependency edge を追加・変更した場合は次も実行します。
 
 ```bash
-bash tools/agent_tools/check_dependency_graph.sh --print-edges
+bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
 ```
 
 `check_dependency_graph.sh` は upstream graph と downstream graph を別々に扱い、自己参照、reverse edge、kind mismatch、cycle を検証します。
@@ -444,7 +469,7 @@ canonical formatter/dispatcher、validation-response、review integration が
 Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/README.md` から current stage と contract に必要な skill を選びます。
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/conventions/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
-repo-changing task では `python3 tools/agent_tools/route.py --prompt "<request>" --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は implementation / patch / doc-edit handoff が current stage に入った時点で active にします。
+repo-changing task では `python3 tools/agent/orchestration/route.py --prompt "<request>" --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は implementation / patch / doc-edit handoff が current stage に入った時点で active にします。
 `bootstrap_agent_run.py` は `--task` 文面から prompt-derived
 skill を追加し、選択済み skill ごとの repo tool route を
 `run.repo_tool_routing_policy` に出します。repo tool route は skill ごとに
@@ -594,7 +619,7 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 標準コマンド:
 
-    python3 tools/agent_tools/bootstrap_agent_run.py \
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
       --task "short task summary" \
       --task-id T1 \
       --owner "codex" \
@@ -618,7 +643,7 @@ handoff には `allowed_paths`、`do_not_read`、context artifact path、expecte
 
 研究・実験つき変更:
 
-    python3 tools/agent_tools/bootstrap_agent_run.py \
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
       --task "research-backed change" \
       --task-id T4 \
       --owner "codex" \
@@ -626,7 +651,7 @@ handoff には `allowed_paths`、`do_not_read`、context artifact path、expecte
 
 環境変更:
 
-    python3 tools/agent_tools/bootstrap_agent_run.py \
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
       --task "platform or environment change" \
       --task-id T8 \
       --owner "codex" \
@@ -634,7 +659,7 @@ handoff には `allowed_paths`、`do_not_read`、context artifact path、expecte
 
 学術文章:
 
-    python3 tools/agent_tools/bootstrap_agent_run.py \
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
       --task "academic writing task" \
       --task-id T10 \
       --owner "codex" \
@@ -642,7 +667,7 @@ handoff には `allowed_paths`、`do_not_read`、context artifact path、expecte
 
 包括的開発:
 
-    python3 tools/agent_tools/bootstrap_agent_run.py \
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
       --task "comprehensive development pass" \
       --task-id T12 \
       --owner "codex" \
@@ -650,7 +675,7 @@ handoff には `allowed_paths`、`do_not_read`、context artifact path、expecte
 
 反復改善:
 
-    python3 tools/agent_tools/bootstrap_agent_run.py \
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
       --task "adaptive improvement loop" \
       --task-id T13 \
       --owner "codex" \
@@ -799,11 +824,11 @@ environment, produce resources, or duplicate tests/gates.
   `documents/runtime/runtime-profiles-and-check-matrix.md`; this workflow only points
   to that taxonomy. Completion advances after response resolution through the
   owning repair route or recorded escalation.
-- Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
+- Shared canon、Large delivery、高 risk 変更では差分限定ではなく全 repo 対象で `bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing` を通し、dependency graph、header 欠落、header format を確認する。Routine docs / Focused code は changed-file dependency checks と relevant downstream review を evidence にできる
 - Source freeze 後は canonical formatter/check path と選択した非 Python static
   evidence を一度記録する。別 CI、別 formatter、別 checker、checker-retest
   は W2 completion gate にならない。
-- Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を write-capable subagent handoff に渡す。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
+- Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を write-capable subagent handoff に渡す。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
 - tool / checker / hook / reviewer / subagent feedback から実装へ進む場合は `$tool-finding-report` で finding packet を作り、raw artifact、structured artifact、impact、prompt feedback decision を handoff に渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` は次の write-capable subagent 起動前に prompt を修正し、`workflow_monitor.py --runtime-feedback ... action=prompt_repair` で記録する
 - agent runtime / skill 変更では active profile に応じて `make agent-checks` または relevant subchecks を使う
 - 文書変更では canonical formatter/check path が Markdown、math、Mermaid の
@@ -824,7 +849,7 @@ environment, produce resources, or duplicate tests/gates.
 - `closeout_gate.md` の `unfinished_tasks_absent=yes` で、予定作業、review 対応、validation、commit / push、shared canon sync、follow-up 判断の完了状態を示す
 - `closeout_gate.md` の `dependency_headers_complete=yes` で、作成・編集した text file の依存 file header coverage を示す
 - Full owner validation の static evidence とともに、`closeout_gate.md` の `repo_wide_static_analysis_complete=profile_selected` と canonical command evidence を記録します。
-- Shared canon、Large delivery、高 risk 変更で、最終候補の touched contract が要求した場合だけ、`closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` とともに一度だけ全 repo 対象の `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` と header 修正 evidence を残す。Routine docs / Focused code は targeted dependency evidence を残す
+- Shared canon、Large delivery、高 risk 変更で、最終候補の touched contract が要求した場合だけ、`closeout_gate.md` の `repo_wide_dependency_tools_complete=yes` とともに一度だけ全 repo 対象の `bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing` と header 修正 evidence を残す。Routine docs / Focused code は targeted dependency evidence を残す
 - `closeout_gate.md` の `canonical_format_check_status=pass` と選択した非 Python
   static evidence で、canonical validation を示す。別 CI は W2 gate ではない。
 - `closeout_gate.md` の `completion_coverage_consumer=yes`、
@@ -840,8 +865,8 @@ environment, produce resources, or duplicate tests/gates.
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` で、設計文書、implementation surface、snapshot tree、backup path の正本状態を示す
 - `workflow_monitoring.md` の signals / behavior events / interventions / improvement decisions を埋め、skill / config / workflow / memory の改善判断を `applied`、`recorded`、`not_applicable` のいずれかにする
 - hook、code checker、static analysis、CI、review tool の結果が parent protocol または subagent protocol を変えるべきかは protocol reviewer が確認し、`workflow_monitoring.md` に `hook_tool_feedback=reviewed`、`parent_protocol_update=<applied|recorded|not_required>`、`subagent_protocol_update=<applied|recorded|not_required>`、`protocol_feedback_reason=...` を残す
-- evidence を確認済みの closeout では、`python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --closeout-token-preset` で `evaluate_agent_run.py` が消費する standard behavior tokens を記録できます。この preset は記録 shortcut であり、canonical formatter/check、dependency review、diff-check approval、review finding resolution は個別 evidence として残します。
-- evaluation reviewer が `tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` を pass し、`closeout_gate.md` の `agent_evaluation_complete=yes` と `agent_evaluation.md` の `feedback_actions_resolved: yes` が揃ったら、agent behavior evaluation と feedback resolution を complete にする
+- evidence を確認済みの closeout では、`python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir reports/agents/<run-id> --closeout-token-preset` で `evaluate_agent_run.py` が消費する standard behavior tokens を記録できます。この preset は記録 shortcut であり、canonical formatter/check、dependency review、diff-check approval、review finding resolution は個別 evidence として残します。
+- evaluation reviewer が `eval/producers/evaluate_agent_run.py --report-dir reports/agents/<run-id> --behavior-manifest eval/definitions/agent_behavior_eval.toml --write` を pass し、`closeout_gate.md` の `agent_evaluation_complete=yes` と `agent_evaluation.md` の `feedback_actions_resolved: yes` が揃ったら、agent behavior evaluation と feedback resolution を complete にする
 - `schedule.md` を TODO 正本として埋め、`work_log.md` に execution trail を残す
 - `documents/notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更は、修正または reviewer escalation の対象にする
 - user request が generic path の usable smoke を求める場合、generic path の producer / consumer evidence を completion evidence にする
@@ -864,7 +889,7 @@ environment, produce resources, or duplicate tests/gates.
 ## Codex-Specific Rules
 
 - `AGENTS.md` は Codex のruntime 入口として保つ
-- `.agents/skills/` を正規 skill path とする
+- `.codex/personal/skills/` を正規 skill path とする
 - repo-changing task では、selected stage の subagent / specialist だけを明示し、候補 stage や未選択 reviewer を work にしない
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は active な
   distinct unresolved claim/risk がそれぞれ必要とした場合だけ選択し、選択した別 gate

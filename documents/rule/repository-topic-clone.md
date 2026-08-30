@@ -4,7 +4,7 @@ contract policy
 responsibility Defines the repository-topic clone lifecycle contract for generic topic/workspace clones.
 upstream design ../design/dependency-manifest-design.md repository-topic clone intent
 upstream design ../../agents/skills/repository-topic-clone.md operator-facing route
-downstream implementation ../../tools/agent_tools/repository_topic_clone.py lifecycle implementation
+downstream implementation ../../tools/repository/workspace/repository_topic_clone.py lifecycle implementation
 downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates lifecycle and cleanup gates
 @dependency-end
 -->
@@ -18,7 +18,7 @@ downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py
 
 ## 適用範囲
 
-`tools/agent_tools/repository_topic_clone.py` が扱う repository clone の
+`tools/repository/workspace/repository_topic_clone.py` が扱う repository clone の
 一意復元と cleanup はこの規約の対象です。`dependency-module-change` 系統は
 gitlink/pin/projection の共有責務を担い、この文書の clone 実装責務を重複して
 所有しません。
@@ -46,7 +46,12 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
   computed path の occupant、URL、owner evidence、branch upstream が不一致なら typed
   collision として状態を保持する。
 - requested branch が local/remote のどちらにも無い場合だけ、最新 `origin/main` から作る。
+- write-capable clone の `writer-target.json` は handoff の repeated `--allowed-path` を
+  materialize する。既存 packet の `allowed_paths` は検証して引き継ぎ、別の値で上書きしない。
+  新規 prepare に allowed path がない場合は packet を作らない。
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
+- raw `git merge` / `git rebase` は writer route では使わず、integration executor が
+  `repository_topic_clone.py merge-main`、`finalize-merge`、`resume-merge` を通す。
 - task owner の非空 `--owner-evidence` と computed path、remote、branch identity が一致
   する限り、canonical `prepare` と `merge-main` は operation-level の追加承認なしで
   実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
@@ -56,11 +61,12 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
   lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
 
 ```bash
-python3 tools/agent_tools/repository_topic_clone.py prepare \
+python3 tools/repository/workspace/repository_topic_clone.py prepare \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file>
+  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
+  --allowed-path <relative-path>
 
-python3 tools/agent_tools/repository_topic_clone.py merge-main \
+python3 tools/repository/workspace/repository_topic_clone.py merge-main \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file>
 ```
@@ -91,7 +97,7 @@ python3 tools/agent_tools/repository_topic_clone.py merge-main \
   state は typed hold として保持し、manual deletion へ迂回しません。
 
 ```bash
-python3 tools/agent_tools/repository_topic_clone.py cleanup \
+python3 tools/repository/workspace/repository_topic_clone.py cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
@@ -118,5 +124,5 @@ repository-topic clone は依存モジュールの branch 特化パスを使わ�
 
 | kind | statement | evidence / owner | status |
 | --- | --- | --- | --- |
-| assumption | `workspace/` は selected repository root の regular/tracked `.gitignore` が所有する repository-owned boundary です。 | `tools/agent_tools/repository_topic_clone.py` の root/ignore gate、`tests/agent_tools/test_repository_topic_clone.py` の invalid-root regression | explicit |
+| assumption | `workspace/` は selected repository root の regular/tracked `.gitignore` が所有する repository-owned boundary です。 | `tools/repository/workspace/repository_topic_clone.py` の root/ignore gate、`tests/agent_tools/test_repository_topic_clone.py` の invalid-root regression | explicit |
 | evidence | `git check-ignore -v --no-index -- workspace/.agent-canon-workspace-probe` の source path が root `.gitignore` と一致します。 | create/merge precondition; global/info exclude source は拒否 | required |

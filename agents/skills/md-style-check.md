@@ -66,7 +66,7 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 - `documents/conventions/coding-conventions-project.md`
 - `documents/conventions/common/05_docs.md`
 - `.markdownlint.json`
-- `rust/agent-canon/src/docs.rs`
+- `tools/runtime/dispatch/agent-canon/src/docs.rs`
 
 ## Expected Outcome
 

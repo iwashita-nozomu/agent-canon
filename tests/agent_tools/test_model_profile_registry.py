@@ -2,8 +2,8 @@
 # contract test
 # responsibility Tests the closed model-profile registry, prompt/token materializers, and generated projections.
 # upstream implementation ../../agents/model_profiles.toml declares the canonical profile schema
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py implements registry behavior
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py consumes generated projections
+# upstream implementation ../../tools/agent/orchestration/model_profile_registry.py implements registry behavior
+# downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py consumes generated projections
 # @dependency-end
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.agent_tools import model_profile_registry as registry_module
-from tools.agent_tools.model_profile_registry import (
+from tools.agent.orchestration import model_profile_registry as registry_module
+from tools.agent.orchestration.model_profile_registry import (
     REQUIRED_STATIC_OBLIGATION_SETS,
     STATIC_OBLIGATION_TABLE,
     ContextItem,
@@ -225,7 +225,7 @@ def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant
         view.role_id: view
         for view in generate_role_views(registry, root, projection="consumer-static")
     }
-    assert len(live) == len(static) == 35
+    assert len(live) == len(static) == len(registry.role_profile_bindings)
     assert set(live) == set(registry.role_profile_bindings)
     assert [item.obligation_id for item in STATIC_OBLIGATION_TABLE] == [
         "validation_owner",
@@ -274,7 +274,7 @@ def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant
         assert generated_config["agent_views"][role_id]["developer_instructions"] == (
             view.rendered_instructions
         )
-    assert len(generated_config["agent_views"]) == len(generated_config["roles"]) == 35
+    assert len(generated_config["agent_views"]) == len(generated_config["roles"]) == len(registry.role_profile_bindings)
 
 
 def test_missing_projection_for_path_bearing_clause_is_rejected(workspace: Path) -> None:

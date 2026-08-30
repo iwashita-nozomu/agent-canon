@@ -12,9 +12,10 @@ upstream design ./skill-dependencies.yaml typed public-skill prerequisites, succ
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
 upstream design ../../documents/design/request-intent-and-update-relation.md compact question, write-clause, and update-overlay flow
 upstream design ../../documents/tools/search-coordination.md unresolved owner/path search fallback
-downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
-downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives canonical invocation order
-downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the dependency graph
+upstream implementation ../../tools/agent/skills/skill_document_reader.py bounded Skill read and EOF admission
+downstream implementation ../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py execution contract checker
+downstream implementation ../../tools/agent/skills/skill_route_catalog.py derives canonical invocation order
+downstream implementation ../../tools/agent/skills/skill_dependency_map.py validates and projects the dependency graph
 downstream design ./direct-luna-communication.md owns bounded direct-Luna packet exchange and runtime acknowledgement
 @dependency-end
 -->
@@ -107,13 +108,21 @@ fixed route:
    The root row only needs to identify the routing owner; it does not need one
    row per public Skill. Record the bridge as `Reader Map row -> routing owner
    -> selected Skill` when `task-routing` performs the final selection.
-2. Read that canonical Skill completely. The Skill body is the first
-   operational owner. If its body resolves the responsibility, operation, and
-   validation route, record the owning section and do not follow a registry or
-   rationale edge merely to fill the trace. Follow a task-relevant `upstream
-   design` edge from its `@dependency-start` header only when the Skill body
-   delegates a decision there or one of those three items remains unresolved.
-   Never open a `downstream implementation` edge first.
+2. Read the generated discovered `SKILL.md` completely in bounded chunks. It is
+   the complete compact Skill used for discovery, not a prefix of the canonical
+   prose. Continue the same path from `next_offset` until `file_eof=true` using
+   `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`.
+   The compact Skill is the first
+   operational owner. The Skill body is the first operational owner; here that
+   body is the complete compact discovery text. If it resolves responsibility,
+   operation, and validation,
+   do not follow a registry or rationale edge merely to fill the trace. Follow a
+   task-relevant `upstream design` edge from its `@dependency-start` header only
+   when the Skill delegates a decision there or one of those three items remains
+   unresolved. Never open a `downstream implementation` edge first.
+   Canonical `agents/skills/<skill>.md` is a referenced owner document: use the
+   reader's heading index and bounded section chunks, and read only the sections
+   needed to resolve that delegated responsibility, operation, or validation.
 3. Present the following short working update before implementation reading.
    It is a transient readback in the existing task update, not a new packet,
    schema, artifact, or closeout gate.
@@ -127,14 +136,21 @@ fixed route:
    implementation_read=locked|ready
    ```
 
-4. Set `implementation_read=ready` only when the Skill body and any owner it
-   explicitly delegates to have been read and resolve the responsibility,
-   intended operation, and validation route. Merely naming a delegated path
-   leaves `docs_first_status=unresolved` and `implementation_read=locked` until
-   that owner is read. A known source path is not sufficient by itself.
-   `ready` is an admission state, not a claim that source was already opened;
-   a read-only planner or evaluator can report `ready` while leaving the
-   implementation unread.
+4. Set `implementation_read=ready` only when the generated compact Skill has
+   `file_eof=true` and every explicitly delegated canonical owner section has
+   `section_eof=true`, with each read continuing from its returned
+   `next_offset`. The canonical file itself need not reach `file_eof` when only
+   a task-relevant section is delegated. A truncated compact response, a
+   section prefix, or merely naming a delegated path leaves
+   `docs_first_status=unresolved` and `implementation_read=locked`. A known
+   source path is not sufficient by itself. This is transient readback; do not
+   create a per-read receipt, identifier, approval gate, or duplicate canonical
+   Skill body.
+   `ready` is an admission state, not a claim that source was already opened.
+   Merely naming a delegated path does not unlock implementation.
+   The existing-tool-before-read exception remains available for the tool
+   action itself; it does not satisfy the read needed to interpret or repair
+   that tool's result.
 5. If the Skill body and its task-relevant delegated edge do not resolve one
    operational owner, report the unresolved item and use the bounded purpose search in
    `documents/tools/search-coordination.md`. Search results nominate an owner;
@@ -167,7 +183,7 @@ that decision.
    minimum decision fields. A structured handoff message or tool result is
    sufficient; create a durable packet only when coordination or resumption
    needs one.
-1. repo-changing execution では、owner、責務単位、実装機構、validation route が未確定のときだけ deterministic search を使う。明示された owner/README/user path が一つの編集先を選ぶ場合は provider 全体を走査せず、その owner evidence を source packet に記録する。`python3 tools/agent_tools/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` が利用できない場合は診断を残し、実際に owner/path の曖昧さが残るときだけ `router_unavailable_blocker` とする
+1. repo-changing execution では、owner、責務単位、実装機構、validation route が未確定のときだけ deterministic search を使う。明示された owner/README/user path が一つの編集先を選ぶ場合は provider 全体を走査せず、その owner evidence を source packet に記録する。`python3 tools/analysis/search/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` が利用できない場合は診断を残し、実際に owner/path の曖昧さが残るときだけ `router_unavailable_blocker` とする
 1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の structured output を信頼する。ただし tool が返した path は作業 packet であり、`requested_scope` を縮める許可ではありません。owner、依存、downstream、意図的に外す surface を確認し、packet が user request を覆うことを証明してから編集に入ります
 1. Structure Intake Packet と構造 checker は、directory/path ownership、root view、stale surface、document responsibility などの構造変更、または owner/path の曖昧さが実際に次の編集判断を変える場合だけ作る。通常の bounded edit、直接 owner path、README/user path の変更ではこれを必須化しない。必要な場合は `repo_structure_contract.py`、`responsibility_scope.py`、`file_surface_inventory.py --submodule-aware`、`import_responsibility.py` のうち判断に必要なものだけを使い、選択した構造要約を context に残す
 1. LLM-visible context に material を追加する前に Context Input Discipline を通す。各 material は routing、編集場所、validation、review、保留判断のどれを変えるのかを持つ必要があります。既読の owner surface、tool output、artifact は path、line、artifact reference で再利用し、runtime view と canonical owner、同じ log の再出力、同じ checker 結果の全文貼り直しは重複 input として扱います。exact wording が対象でない長い raw output は durable artifact と構造要約へ移し、request coverage と design evidence を落とさずに LLM-visible context を作ります
@@ -182,13 +198,13 @@ that decision.
 1. multi-agent にする場合でも、分割境界は `差し替え可能な単位` に限る。別実装、別証明、別文書責務、別 validation oracle、別 review decision に置き換え得る境界だけを slice / wave / worker scope にする。数理的に差し替えが発生しない境界、単なる記法・読解補助・固定 context・同じ oracle を共有する連続導出は分割せず、同じ packet と同じ owner scope に残す
 1. subagent scheduling は `CODEX_SUBAGENTS.md` が所有する typed capacity handshake と lifecycle ledger を消費し、ready dependency-DAG frontier の stage owner ごとに `vertical dynamic wave` を組みます。requested / configured / platform-effective / workflow-demand / write-cap / nested-reserved / available を分離し、既知制約の最小値を startup で read back してから reservation 成功時だけ spawn します。capacity が足りない ready work は失敗させず queue し、durable handback、全 descendant close readback、reservation release を終えた slot から再開します。固定 active/write 数、disposable capacity probe、または generated role view は scheduling authority になりません
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
-1. prompt-derived skill routing が必要なら `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
+1. prompt-derived skill routing が必要なら `python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
 1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。依存 source clone / module lifecycle が scope の場合は `$dependency-module-change` を一般 route として先に選び、AgentCanon update はその具体例として後続に置く。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
 1. repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。
 1. owner boundary、差し替え可能な単位、validation route が閉じた bounded edit も、write-capable child の通常 routeとして実行する。parent は既存 tool と targeted validation を child packet に指定するだけで、実行結果を自ら解釈しない。public API/behavior/schema の追加、縮小、削除、rename、restriction、deprecation、意味変更だけは `scoped_change` または broader route に進め、必要な dependency/consumer/migration/docs closure を形成する
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
-1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
+1. repo-changing execution では `python3 tools/validation/semantic/convention/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
 1. implementation が scope に入るときだけ Codex routing を出す
 1. tool が既に check した property を `explorer` や read-only reviewer に再読解させない。subagent へ渡すのは structured tool artifact と owned finding scope で、tool output が必要な抽象を欠く場合は tool contract の不足として扱う
 
@@ -319,6 +335,18 @@ format成功を、完成形の十分条件や全責務の証明へ自動昇格�
 変わる判断をrouting packetまたはtool artifactで示します。判断が変わらない
 確認は重複確認として削除し、warningだけの確認はcompletion gateに昇格させません。
 
+### Checkout Identity Readback
+
+Git 状態に関係する agent / work unit は、`checkout_identity` を一つの観測ブロック
+として扱います。`python3 tools/runtime/authority/checkout_identity.py --format lines` が
+絶対 `cwd`、Git root、branch または `detached`、HEAD、normalized remote
+`owner/repository` を出力します。開始時、cwd / checkout 変更後、conflict 解消前、
+commit / push / PR 前、cleanup または destructive Git 前、handoff / final handback
+で一度だけ読み、状態が変わらない通常コマンドでは再実行しません。これは場所の
+readback であり、権限、承認、branch 操作、Issue / PR 操作を追加しません。
+
+write-capable handoff は、この観測ブロックとは別に task-scoped `writer_target` を持ちます。target は絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths` で構成し、`repository-topic-clone.prepare` 後に ignored な `.agent-canon/writer-target.json` として materialize します。同じ `checkout_root` を持つ writer packet、または target のない writer packet は spawn 前に拒否します。reader packet は target を省略できます。PreToolUse は current Git root の静的 packet を正本として読み、`AGENT_CANON_CHECKOUT_ROOT`、`AGENT_CANON_CHECKOUT_BRANCH`、JSON 配列の `AGENT_CANON_WRITER_ALLOWED_PATHS` は readback 一致確認に限って使い、変更 path を allowed set 内に限定します。packet が無い checkout や packet 自身の変更は拒否します。target は短命な handoff 値であり、claim/PID/expiry/daemon/registry は作りません。
+
 mode の意味:
 
 - `repo-changing execution`
@@ -342,7 +370,7 @@ repository workflows. Consumers may project its state fields, but they must
 not create a second scheduling policy or reduce the requested responsibility.
 The machine-readable contract is
 `agents/skills/agent-orchestration.execution-contract.toml`; its production
-checker is `tools/agent_tools/check_execution_time_aware_orchestration.py`.
+checker is `tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py`.
 The selected-skill command catalog owns the required checker invocation; this
 owner and its runtime shim do not duplicate that command.
 Validation command scope is governed by the preceding write-capable handoff
@@ -561,7 +589,7 @@ requirement.
 
 `H`、`possible_branches`、`route_verdict`、`value_of_information`、evidence
 digest、または threshold は generic routing fields ではありません。必要な場合に
-限り、固定 Spark implementation route (`tools/agent_tools/implementation_route.py`)
+限り、固定 Spark implementation route (`tools/agent/orchestration/implementation_route.py`)
 の transport detail として scoped されます。Decision sufficiency is determined by
 the semantic owner, replaceable unit, implementation mechanism, validation route, and
 unresolved branches that can change them; no hypothesis-space or read-count form is
@@ -600,7 +628,7 @@ a new mandatory gate.
   design、document-flow、implementation、review の段階は、各 surface の未解決
   decision と validation need が実際に要求する場合だけ起動する
 - 着手時の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
-- PR を作る task では、同じ routing 宣言と `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
+- PR を作る task では、同じ routing 宣言と `python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
 - coordination/resumption が必要な場合だけ run bundle command と specialist
   activation を materialize する
 - `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` と typed parent-packet selection による implementer routing
@@ -654,6 +682,51 @@ contract requires them. Do not materialize empty reviewer or template artifacts.
 
 task id が分かる場合は、task catalog 側の family を正本にします。
 
+### Mathematical intent route
+
+数理・数値挙動の修正は、一般の実装候補を先に広げず、task catalog の canonical route ID
+`mathematical_correction` を解決して `mathematical_intent_packet` を作る math-intent route
+に入れます。handoff が持つのは route ID だけで、owner / reviewer / ordering は catalog
+record（`requires_math_intent=true`）から解決します。数学 route を有効にするのは、
+orchestration が数学 owner として選択した `computational-optimization`、または正規化済み
+packet がある場合に限ります。`algorithm-proof-exploration`、`lean-algorithm-design`、
+`formal-proof-workflow` など proof / theorem skill、reviewer role、full-team materialization
+だけでは route を有効にしません。対象が数学的・数値的な修正であることは、
+依頼の対象に数式・定義・変数 / domain / unit、objective / residual、制約、仮定、導出、
+反復 / 更新則、停止量、failure semantics、収束、勾配 / Jacobian / Hessian、KKT、または
+数値 oracle / counterexample が含まれ、かつ修正・診断対象であることが読める場合です。
+単に Docker、JIT、backend、runtime、routing、environment、CI、container、build、
+architecture を扱う依頼は math-intent にはしません。
+
+math-intent route の実装 handoff は、次を一つの packet として渡します。
+
+- `math_object`, `problem`, `variables`, `domains`, `units`, `objective`, `residual`,
+  `constraints`, `equations`, `definitions`
+- `assumptions`, `approximations`, `derivation`, `iteration_map`, `update_map`,
+  `invariants`, `limits`, `stopping_scalar`, `failure_semantics`
+- `equation_to_code_map`, `mathematical_definition_paths`, `mathematical_oracle_paths`,
+  `mathematical_documentation_paths`, `math_oracle`, `counterexample`
+- `allowed_write_paths`, `forbidden_surfaces`, `separate_handoff_targets`
+
+`allowed_write_paths` は `mathematical_definition_paths`、`mathematical_oracle_paths`、
+`mathematical_documentation_paths`、および `equation_to_code_map` の code path の union
+と完全一致させ、そこから直接導ける数学定義、algorithm implementation、numerical
+oracle、その owner docs / tests に限定します。
+architecture / framework / JIT / compiler / backend / runtime / container / Docker / routing /
+environment / common infrastructure / proof-tool / IR infrastructure は既定の forbidden
+surface です。そこが必要に見える原因は separate handoff にし、数学 writer の write scope
+へ混ぜません。通常の `bootstrap_agent_run.py` は `--math-intent-packet JSON` でこの packet
+を受け取り、selected task/workflow route（T4/T5 に限定しない）の
+`run.mathematical_intent_packet` と
+spawn handoff へそのまま投影します。packet の必須欄、map、oracle が未接続なら
+`math_packet_missing` として run の write-capable dispatch を停止します。writer target は
+packet の `allowed_write_paths` の厳密な部分集合に狭め、`separate_handoff_targets` と
+重なる path または packet にない path を `math_writer_target` として拒否します。
+
+明示された非数理 clause はこの route の対象外であり、同じ依頼に math clause と併記された
+場合も sibling handoff へ分けます。非数理 route を止める根拠に math packet を使わず、math
+route を止める根拠に非数理エラーだけを使いません。
+
 ## Public Skill Selection
 
 - user が明示した `$skill-name` は preserve します
@@ -681,6 +754,10 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - directory layout、directory README responsibility、root view、path mapping、responsibility-scope map、source-tree ownership の refactor では `structure-refactor` と `refactor-loop` を併用します
 - task 開始前に standalone AgentCanon source、`bootstrap.sh`、外部 runtime root、または canonical path の欠落 / 移動 / stale state が疑われる場合は、通常 task の前に `structure-refactor` の pre-task structure repair route を使います。AgentCanon source/runtime drift なら `agent-canon-update` も併用します
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark、数値 test 診断が scope にある場合は `computational-optimization` を使います
+- 数理 / 数値の修正 evidence がある場合は `computational-optimization` を active owner とし、
+  `mathematical_correctness_reviewer` を generic designer、benchmark、scientific-computing
+  reviewer より前の math-intent stage で選びます。数学 evidence のない infrastructure-only
+  request はこの route を選びません
 - GPU / CUDA / JAX / XLA / IREE 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、ExperimentRunner Python 実行、JAX preallocation 無効化、GPU validation blocker が scope にある場合は `gpu-execution` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因仮説を扱う場合は `agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します。substantive な文書変更は `prose-reasoning-graph` と `structure-planning` も併用します
@@ -699,6 +776,11 @@ task id が分かる場合は、task catalog 側の family を正本にします
 ## Review And Specialist Expectations
 
 - family に応じた reviewer / specialist stack まで出します
+- math-intent route では `mathematical_correctness_reviewer` が equations、variables、units、
+  assumptions、derivation、update / stopping map、equation-to-code correspondence、math
+  oracle、changed-path scope を検証します。この reviewer の finding は数学 correspondence
+  と scope の判定だけを行い、architecture / JIT / backend / runtime / routing / environment /
+  proof-tool の編集を承認しません。必要なら別 owner の sibling handoff を返します
 - `Research-Driven Change` では research / report / reproducibility / benchmark / artifact 系 reviewer を落としません
 - `Research-Driven Change` のどの分岐でも、文献・一次資料に基づく実装 claim は
   `literature-survey` の source packet から design、implementation、benchmark、

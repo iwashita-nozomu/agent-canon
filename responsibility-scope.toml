@@ -4,9 +4,9 @@
 # upstream design documents/design/responsibility-scope-management.md scope ownership policy
 # upstream design documents/structure/repo-structure-contract.toml separate path existence and kind contract
 # upstream design tools/catalog.yaml protecting tool ownership
-# downstream implementation tools/agent_tools/responsibility_scope.py validates this manifest
-# downstream implementation tools/agent_tools/import_responsibility.py checks import boundaries
-# downstream implementation tools/agent_tools/tool_drift.py checks scope/tool trace links
+# downstream implementation tools/validation/semantic/responsibility/responsibility_scope.py validates this manifest
+# downstream implementation tools/analysis/code/import_responsibility.py checks import boundaries
+# downstream implementation tools/validation/semantic/tools/tool_drift.py checks scope/tool trace links
 # @dependency-end
 
 catalog_kind = "agent_canon_responsibility_scope"
@@ -140,7 +140,7 @@ paths = [
   "templates/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/check_agent_runtime_alignment.py",
+  "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
 ]
 issues = []
 
@@ -150,24 +150,15 @@ owner = "agent-canon"
 class = "evidence"
 description = "Append-only hook, skill, eval, runtime-log, and learning evidence plus its dedicated readers and tests."
 paths = [
-  "evidence",
-  "evidence/**",
+  "eval",
+  "eval/**",
   "documents/evals/**",
   "documents/runtime/runtime-log-archive.md",
   "documents/runtime/runtime-log-archive-migration.md",
   "reports/**",
-  "tools/agent_tools/eval_accumulation_check.py",
-  "tools/agent_tools/eval_learning.py",
-  "tools/agent_tools/eval_trend.py",
-  "tools/agent_tools/evidence_split.py",
-  "tools/agent_tools/goal_evidence.py",
-  "tools/agent_tools/hook_outcome_review.py",
-  "tools/agent_tools/hook_outcomes.py",
-  "tools/agent_tools/pre_task_outcome_capture.py",
-  "tools/agent_tools/runtime_log_archive_git.py",
-  "tools/agent_tools/runtime_log_paths.py",
-  "tools/agent_tools/skill_evaluation.py",
-  "tools/agent_tools/skill_eval_report.py",
+  "eval/checkers/eval_accumulation_check.py",
+  "tools/runtime/archive/runtime_log_archive_git.py",
+  "tools/runtime/archive/runtime_log_paths.py",
   "tests/agent_tools/test_eval_accumulation_check.py",
   "tests/agent_tools/test_eval_learning.py",
   "tests/agent_tools/test_eval_trend.py",
@@ -182,8 +173,8 @@ paths = [
   "tests/agent_tools/test_skill_eval_report.py",
 ]
 protecting_tools = [
-  "tools/agent_tools/eval_accumulation_check.py",
-  "tools/agent_tools/runtime_log_archive_git.py",
+  "eval/checkers/eval_accumulation_check.py",
+  "tools/runtime/archive/runtime_log_archive_git.py",
 ]
 issues = []
 
@@ -194,26 +185,14 @@ class = "tooling"
 description = "Shared tool implementations, tool catalog, compiled tooling, and helper policy."
 paths = [
   "tools/**",
-  "rust/**",
   "helper_inventory_guard_policy.json",
 ]
 exclude_paths = [
-  "tools/agent_tools/eval_accumulation_check.py",
-  "tools/agent_tools/eval_learning.py",
-  "tools/agent_tools/eval_trend.py",
-  "tools/agent_tools/evidence_split.py",
-  "tools/agent_tools/goal_evidence.py",
-  "tools/agent_tools/hook_outcome_review.py",
-  "tools/agent_tools/hook_outcomes.py",
-  "tools/agent_tools/pre_task_outcome_capture.py",
-  "tools/agent_tools/runtime_log_archive_git.py",
-  "tools/agent_tools/runtime_log_paths.py",
-  "tools/agent_tools/skill_evaluation.py",
-  "tools/agent_tools/skill_eval_report.py",
+  "eval/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/responsibility_scope.py",
-  "tools/agent_tools/tool_drift.py",
+  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/validation/semantic/tools/tool_drift.py",
 ]
 issues = []
 
@@ -226,22 +205,11 @@ paths = [
   "tests/**",
 ]
 exclude_paths = [
-  "tests/agent_tools/test_eval_accumulation_check.py",
-  "tests/agent_tools/test_eval_learning.py",
-  "tests/agent_tools/test_eval_trend.py",
-  "tests/agent_tools/test_evidence_split.py",
-  "tests/agent_tools/test_goal_evidence.py",
-  "tests/agent_tools/test_hook_outcome_review.py",
-  "tests/agent_tools/test_hook_outcomes.py",
-  "tests/agent_tools/test_pre_task_outcome_capture.py",
-  "tests/agent_tools/test_runtime_log_archive_git.py",
-  "tests/agent_tools/test_runtime_log_paths.py",
-  "tests/agent_tools/test_skill_evaluation.py",
-  "tests/agent_tools/test_skill_eval_report.py",
+  "eval/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/responsibility_scope.py",
-  "tools/ci/run_all_checks.sh",
+  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/validation/ci/runners/run_all_checks.sh",
 ]
 issues = []
 
@@ -260,7 +228,6 @@ paths = [
   "README.md",
   "responsibility-scope.toml",
   "codex-cli-guide/**",
-  "completion-first-review/**",
   "documents/**",
   "memory/**",
   "references/**",
@@ -271,9 +238,9 @@ exclude_paths = [
   "documents/runtime/runtime-log-archive-migration.md",
 ]
 protecting_tools = [
-  "tools/agent_tools/check_dependency_headers.py",
-  "tools/agent_tools/check_design_doc_claims.py",
-  "tools/agent_tools/responsibility_scope.py",
+  "tools/validation/semantic/dependencies/check_dependency_headers.py",
+  "tools/validation/semantic/documents/check_design_doc_claims.py",
+  "tools/validation/semantic/responsibility/responsibility_scope.py",
 ]
 issues = []
 
@@ -286,7 +253,7 @@ paths = [
   ".github/**",
 ]
 protecting_tools = [
-  "tools/ci/check_github_workflows.py",
+  "tools/validation/ci/checks/check_github_workflows.py",
 ]
 issues = []
 
@@ -299,8 +266,7 @@ paths = [
   "vendor/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/vendor_skill_adapters.py",
-  "tools/agent_tools/responsibility_scope.py",
+  "tools/validation/semantic/responsibility/responsibility_scope.py",
 ]
 issues = []
 
@@ -313,6 +279,6 @@ paths = [
   "experiments/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/responsibility_scope.py",
+  "tools/validation/semantic/responsibility/responsibility_scope.py",
 ]
 issues = []

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests workflow-context storage and fail-open readback.
-# upstream implementation ../../tools/agent_tools/workflow_context.py owns workflow context.
+# upstream implementation ../../tools/agent/orchestration/workflow_context.py owns workflow context.
 # @dependency-end
 """Focused tests for workflow context fail-open storage."""
 from __future__ import annotations
@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from workflow_context import WorkflowContext, load_workflow_context, store_workflow_context  # noqa: E402
+from tools.agent.orchestration.workflow_context import WorkflowContext, load_workflow_context, store_workflow_context  # noqa: E402
 
 
 class WorkflowContextTest(unittest.TestCase):

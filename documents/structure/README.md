@@ -3,7 +3,7 @@
 contract reference
 responsibility repository structure と ownership の機械可読契約入口。
 upstream design ../README.md documents 索引と正本境界。
-downstream implementation ../../tools/agent_tools/repo_structure_contract.py structure checker。
+downstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py structure checker。
 @dependency-end
 -->
 

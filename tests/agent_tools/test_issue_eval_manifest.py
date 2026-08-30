@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests issue-derived eval manifest coverage for AgentCanon closeout issues.
-# upstream implementation ../../evidence/agent-evals/issue_eval_manifest.toml registers issue-derived eval rows.
+# upstream implementation ../../eval/definitions/issue_eval_manifest.toml registers issue-derived eval rows.
 # upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md defines eval closeout expectations.
-# downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval accumulation surfaces.
+# downstream implementation ../../eval/checkers/eval_accumulation_check.py validates eval accumulation surfaces.
 # @dependency-end
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-MANIFEST = PROJECT_ROOT / "evidence" / "agent-evals" / "issue_eval_manifest.toml"
+MANIFEST = PROJECT_ROOT / "eval" / "definitions" / "issue_eval_manifest.toml"
 REQUIRED_CLOSEOUT_ISSUES = {
     83,
     97,

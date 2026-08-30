@@ -5,7 +5,7 @@ responsibility Documents local-browser access for remote HTML artifacts.
 upstream design ../experiments/result-log-retention-and-visualization.md defines visual artifact retention.
 upstream design ../experiments/experiment-report-style.md defines experiment report artifact layout.
 upstream design ../contracts/server-host-contract.md defines SSH/HPC/container host assumptions.
-upstream implementation ../../tools/experiments/html_artifact_access.py prints access commands.
+upstream implementation ../../tools/experiments/artifacts/html_artifact_access.py prints access commands.
 upstream design ../../tools/catalog.yaml catalogs the helper.
 downstream implementation ../../tests/tools/test_html_artifact_access.py covers command rendering.
 @dependency-end
@@ -13,7 +13,7 @@ downstream implementation ../../tests/tools/test_html_artifact_access.py covers 
 
 # HTML Artifact Access
 
-`tools/experiments/html_artifact_access.py` prints the `python3 -m http.server`
+`tools/experiments/artifacts/html_artifact_access.py` prints the `python3 -m http.server`
 and SSH tunnel commands needed to view a remote HTML report in the browser on
 the local PC. It is intended for the common chain:
 
@@ -30,7 +30,7 @@ container so the SSH host can reach the container IP.
 Use this when the HTML file is visible from the shell where the helper runs.
 
 ```bash
-python3 tools/experiments/html_artifact_access.py \
+python3 tools/experiments/artifacts/html_artifact_access.py \
   experiments/<topic>/result/<run-id>/summary/report.html
 ```
 
@@ -47,7 +47,7 @@ helper uses the current runtime's non-loopback IPv4 address as the SSH tunnel
 target and binds the Python server to `0.0.0.0` inside the container.
 
 ```bash
-python3 tools/experiments/html_artifact_access.py \
+python3 tools/experiments/artifacts/html_artifact_access.py \
   /workspace/experiments/<topic>/result/<run-id>/summary/report.html \
   --use-container-ip
 ```
@@ -62,7 +62,7 @@ If the container IP must be supplied manually, pass it as the tunnel target and
 bind the server to all container interfaces.
 
 ```bash
-python3 tools/experiments/html_artifact_access.py \
+python3 tools/experiments/artifacts/html_artifact_access.py \
   /workspace/experiments/<topic>/result/<run-id>/summary/report.html \
   --bind 0.0.0.0 \
   --tunnel-target <container-ip>

@@ -4,11 +4,11 @@
 # responsibility Dispatches the bounded active hook contract in-process without child processes, Git, or network access.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ../hooks.json invokes this dispatcher once per active event.
-# upstream implementation ../../tools/agent_tools/hook_safety.py owns pure secret and destructive Git safety leaves.
-# upstream implementation ../../tools/agent_tools/execution_resource_projection.py validates producer projection bytes.
+# upstream implementation ../../tools/runtime/authority/hook_safety.py owns pure secret and destructive Git safety leaves.
+# upstream implementation ../../tools/runtime/container/execution_resource_projection.py validates producer projection bytes.
 # upstream implementation ./hook_event_log.py provides one bounded local spool context per event.
-# downstream implementation ../../tools/agent_tools/behavior_event_assembly.py records one behavior snapshot.
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates the active/inactive contract.
+# downstream implementation ../../tools/runtime/archive/behavior_event_assembly.py records one behavior snapshot.
+# downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates the active/inactive contract.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch, redaction, malformed input, and no-subprocess behavior.
 # @dependency-end
 
@@ -26,59 +26,62 @@ from enum import Enum
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
-TOOLS_ROOT = SOURCE_ROOT / "tools" / "agent_tools"
-if str(TOOLS_ROOT) not in sys.path:
-    sys.path.insert(0, str(TOOLS_ROOT))
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
-from agent_canon_source_root import (  # noqa: E402
+from tools.runtime.source.agent_canon_source_root import (  # noqa: E402
     LAYOUT_STANDALONE,
     resolve_agent_canon_source_root,
 )
-from behavior_event_assembly import (  # noqa: E402
+from tools.runtime.archive.behavior_event_assembly import (  # noqa: E402
     FinalHandlerResult,
     HookInvocationParts,
     record_hook_invocation,
 )
-from execution_resource_projection import (  # noqa: E402
+from tools.runtime.container.execution_resource_projection import (  # noqa: E402
     ProjectionError,
     validate_normalized_input,
     validate_projection_bytes,
 )
 from hook_event_log import HookLogContext, utc_now  # noqa: E402
-from hook_retirement import (  # noqa: E402
+from tools.runtime.authority.hook_retirement import (  # noqa: E402
     MOVED_SOURCE_ABSENCES,
     RETIRED_CHILD_TOMBSTONES,
     source_digest,
 )
-from hook_safety import (  # noqa: E402
+from tools.runtime.authority.hook_safety import (  # noqa: E402
     SHELL_TOOL_NAMES,
     branch_block_payload,
     first_block,
+    preservation_authorized,
+    preservation_block_payload,
+    preservation_command_roots,
+    preservation_intent,
     payload_prompt,
     payload_tool_command,
     payload_tool_name,
     secret_block_payload,
     secret_kind,
 )
-from parent_root_side_effects import (  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
     attest_parent_root,
 )
-from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
-from mutation_authority import (  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
+from tools.runtime.authority.mutation_authority import (  # noqa: E402
     evaluate_mutation_authority,
     mutation_block_payload,
 )
-from subagent_selection import (  # noqa: E402
+from tools.agent.orchestration.subagent_selection import (  # noqa: E402
     SubagentSelection,
     build_coordination_receipt,
     select_subagents,
 )
-from tool_selection import select_tools  # noqa: E402
-from workflow_context import WorkflowContext, load_workflow_context  # noqa: E402
-from workflow_monitor import emit_behavior_projection  # noqa: E402
+from tools.agent.orchestration.tool_selection import select_tools  # noqa: E402
+from tools.agent.orchestration.workflow_context import WorkflowContext, load_workflow_context  # noqa: E402
+from tools.runtime.lifecycle.workflow_monitor import emit_behavior_projection  # noqa: E402
 
 OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
 HOOK_CONTRACT_SCHEMA = "agent-canon.hook-contract.v1"
@@ -149,7 +152,7 @@ HOOK_EVENT_CONTRACTS: dict[str, HookEventContract] = {
     "PreToolUse": HookEventContract(
         active=True,
         matchers=("Bash|apply_patch|python|python3",),
-        failure="unauthorized_destructive_git=block; malformed_payload=fail_open; spool_failure=fail_open",
+        failure="unauthorized_destructive_git=block; raw_git_merge_or_rebase=block; writer_target_packet_missing=block; writer_target_mismatch=block; malformed_payload=fail_open; spool_failure=fail_open",
         telemetry="one bounded fingerprint-only local spool event",
     ),
     "PostToolUse": HookEventContract(
@@ -365,6 +368,26 @@ def resolve_report_target(state: HookRootState) -> Path | None:
     return None
 
 
+def conflict_inventory_present(active_root: Path, command: str = "") -> bool:
+    """Detect the ignored conflict inventory for the current checkout only."""
+    configured = os.environ.get("AGENT_CANON_CONFLICT_PRESERVATION_INVENTORY", "").strip()
+    candidates = [Path(configured)] if configured else []
+    candidates.extend(
+        (
+            Path.cwd() / ".agent-canon" / "conflict-preservation.json",
+            active_root / ".agent-canon" / "conflict-preservation.json",
+        )
+    )
+    candidates.extend(
+        (root / ".agent-canon" / "conflict-preservation.json")
+        for root in preservation_command_roots(command)
+    )
+    try:
+        return any(candidate.is_file() for candidate in candidates)
+    except OSError:
+        return False
+
+
 def spool_event(
     event: str,
     raw_payload: bytes,
@@ -449,6 +472,7 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
     output: dict[str, object] | None = None
     status = "malformed_payload" if payload is None else "pass"
     telemetry: dict[str, str] = {}
+    root_state = hook_root()
     if payload is not None:
         if event == "UserPromptSubmit":
             matched_kind = secret_kind(payload_prompt(payload))
@@ -466,6 +490,20 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
                     status = "blocked_destructive_git"
                     telemetry["safety_decision"] = "block"
                     telemetry["operation"] = str(safety["operation"])
+                elif conflict_inventory_present(root_state.active_root, command):
+                    preservation = preservation_intent(command)
+                    if preservation is not None and (
+                        preservation.subcommand == "commit"
+                        or not preservation_authorized(
+                            command, active_root=root_state.active_root
+                        )
+                    ):
+                        output = official_payload(
+                            event, preservation_block_payload(command, preservation)
+                        )
+                        status = "blocked_conflict_preservation"
+                        telemetry["safety_decision"] = "block"
+                        telemetry["operation"] = str(output["operation"])
         elif event == "PostToolUse":
             try:
                 normalized = normalize_post_tool_use_input(payload)
@@ -482,7 +520,6 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
                         status = "unsuccessful_tool_response"
             except (ProjectionError, TypeError, ValueError, AssertionError):
                 status = "invalid_projection"
-    root_state = hook_root()
     report_dir = resolve_report_target(root_state)
     spool_entry, context = spool_event(
         event,
@@ -499,9 +536,10 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         hook_spool_root=context.spool_root(),
     ) if event == "PreToolUse" else None
     if mutation_decision is not None and mutation_decision.status == "blocked":
-        if output is None:
+        target_blocked = mutation_decision.reason.startswith("writer_target")
+        if output is None or target_blocked:
             output = official_payload(event, mutation_block_payload(mutation_decision))
-            status = "blocked_parent_mutation"
+            status = "blocked_writer_target" if target_blocked else "blocked_parent_mutation"
     if mutation_decision is not None:
         spool_entry["mutation_control"] = mutation_decision.as_dict()
         spool_entry["status"] = status

@@ -4,10 +4,10 @@
 contract skill
 responsibility Documents oop-readability-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream implementation ../../tools/oop/python/readability.py OOP readability CLI
-upstream implementation ../../tools/oop/shared/readability_core.py defines mechanical finding categories
-upstream implementation ../../tools/agent_tools/workflow_monitor.py optional timing recorder
-downstream design ../../.agents/skills/oop-readability-check/SKILL.md Codex discovery shim
+upstream implementation ../../tools/validation/code/oop/python/readability.py OOP readability CLI
+upstream implementation ../../tools/validation/code/oop/shared/readability_core.py defines mechanical finding categories
+upstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py optional timing recorder
+downstream design ../../.codex/personal/skills/oop-readability-check/SKILL.md Codex discovery shim
 @dependency-end
 -->
 
@@ -58,7 +58,7 @@ when their changed diff already owns that language surface.
 ## Default Command
 
 ```bash
-python3 tools/oop/python/readability.py \
+python3 tools/validation/code/oop/python/readability.py \
   --root . \
   --language all \
   --format json \
@@ -103,7 +103,7 @@ Use one tool result as the source of truth. Prefer a single Markdown run when a
 report file is needed:
 
 ```bash
-python3 tools/oop/python/readability.py \
+python3 tools/validation/code/oop/python/readability.py \
   --root . \
   --language all \
   --format markdown \
@@ -134,7 +134,7 @@ The Markdown report must include mechanical tables for:
 
 SOLID principle signal counts are mechanical projections from finding kind to
 review heading. The source mapping lives in
-`tools/oop/shared/readability_core.py`; keep the skill as routing and report
+`tools/validation/code/oop/shared/readability_core.py`; keep the skill as routing and report
 usage guidance.
 Reports should preserve all five headings when present: Single responsibility,
 Open/closed, Liskov substitution, Interface segregation, and Dependency inversion.

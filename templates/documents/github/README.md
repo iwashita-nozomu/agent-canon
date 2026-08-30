@@ -10,7 +10,7 @@ downstream implementation ./issue/config.yml GitHub Issue configuration source.
 downstream implementation ./issue/agentcanon-maintenance.yml maintenance Issue Form source.
 downstream implementation ./issue/eval-capture.yml eval Issue Form source.
 downstream implementation ./pull-request/agent_canon.md AgentCanon PR template source.
-downstream implementation ../../../tools/ci/check_github_workflows.py validates GitHub workflow and PR template conventions.
+downstream implementation ../../../tools/validation/ci/checks/check_github_workflows.py validates GitHub workflow and PR template conventions.
 @dependency-end
 -->
 
@@ -35,7 +35,7 @@ risk/follow-up の順で記録します。Alternatives / independent review は�
 - intended reader and decision: issue author、PR author/reviewer、maintainer、親repo integrator。
 - what this directory contains: Issue Form YAML、config、AgentCanon PR Markdown source。
 - checked-in surface: standalone AgentCanon の `.github/ISSUE_TEMPLATE/` と `.github/PULL_REQUEST_TEMPLATE/`。
-- validation: YAML parse、`agent-canon docs check`、`python3 tools/ci/check_github_workflows.py --root .`。
+- validation: YAML parse、`agent-canon docs check`、`python3 tools/validation/ci/checks/check_github_workflows.py --root .`。
 - lifecycle: checked-in targets、temporary clone、run-local evidence の retention/cleanup owner。
 
 ## 責務
@@ -83,7 +83,7 @@ duplicate owner を作らず、source と checked-in standalone targets を同�
   などの internal subcommand は `check_agent_canon_pr.sh` の実行責務であり、checklist
   authority として重複掲載しない。
 - GitHub YAML parse、Markdown/docs format/check、および gate が呼び出す
-  `python3 tools/ci/check_github_workflows.py --root .` を実行する。
+  `python3 tools/validation/ci/checks/check_github_workflows.py --root .` を実行する。
 - Maintenance Issue Form は canonical source と checked-in standalone target の
   `name:` 以下を read back し、operational field ID、required flag、表示順の一致を確認する。
 

@@ -4,8 +4,8 @@ contract policy
 responsibility Documents プロジェクト全体の運用規約 for this repository.
 upstream design ../contracts/github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates legacy forwarder warning policy
-downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml declares convention marker contracts
+downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py validates legacy forwarder warning policy
+downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml declares convention marker contracts
 @dependency-end
 -->
 
@@ -140,7 +140,7 @@ cmake --install "$ROOT/build/cpp/<profile>"
   `add_subdirectory` に渡し、production subtree の test fallback は作成しません。
 - 仕上げ前に `make ci-quick`、必要に応じて `make ci` を流します。
 - 文書変更ではリンク切れと記述の入口整合を確認します。
-- legacy forwarder / migration wrapper の warning policy は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
+- legacy forwarder / migration wrapper の warning policy は `python3 tools/validation/semantic/convention/check_convention_compliance.py` で確認します。
 
 ## 6. 実験運用
 
@@ -169,7 +169,7 @@ cmake --install "$ROOT/build/cpp/<profile>"
 ## 9. Checker Contract Surface
 
 - checker が文書、skill、workflow の marker contract を検査する場合、marker
-  一覧は `tools/agent_tools/convention_compliance_contracts.toml` に置きます。
+  一覧は `tools/validation/semantic/convention/convention_compliance_contracts.toml` に置きます。
 - Python checker 本体は contract manifest の読み込み、path 解決、finding
   出力を担当します。
 - tool、hook、checker の warning は、free-form note ではなく

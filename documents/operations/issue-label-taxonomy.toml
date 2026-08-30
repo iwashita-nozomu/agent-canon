@@ -2,7 +2,7 @@
 # contract configuration
 # responsibility Owns canonical GitHub status lifecycle labels for this repository.
 # upstream design ../../agents/internal-routines/github-status-lifecycle.md consumes this mapping.
-# downstream implementation ../../tools/agent_tools/github_status_lifecycle.py validates and uses it.
+# downstream implementation ../../tools/repository/github/github_status_lifecycle.py validates and uses it.
 # downstream design ./issue-label-taxonomy.md explains this machine-readable owner.
 # @dependency-end
 

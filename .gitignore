@@ -16,7 +16,8 @@ __pycache__/
 .agent-canon/semantic-index/
 .agent-canon/log-archive/
 .agent-canon/knowledge-graph/
-rust/agent-canon/target/
+.agent-canon/writer-target.json
+tools/runtime/dispatch/agent-canon/target/
 
 # Local run artifacts
 reports/agents/
@@ -35,6 +36,7 @@ reports/*.patch
 .venv/
 venv/
 workspace/
+.runtime/
 
 # Personal Codex config is migrated here and linked from the user's Codex home.
 .codex/personal/

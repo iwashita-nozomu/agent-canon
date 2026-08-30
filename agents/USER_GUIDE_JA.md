@@ -17,30 +17,31 @@ project / host workflow の責務であり、AgentCanon の tool container に�
 ## 最初の一回
 
 `<authorized-parent-root>` は明示的に許可された親レポの root、`<project-root>` は
-解析対象の project root とします。runtime は AgentCanon source の外に置きます。
+解析対象の project root とします。既定 runtime は install root の
+`.runtime/` です。これは bootstrap だけが所有する ignored directory で、一般の
+eval/report/log output を source tree に置く許可ではありません。
 
 ```bash
 ROOT=<authorized-parent-root>
-RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
 BOOTSTRAP=/path/to/agent-canon/bootstrap.sh
 
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" install
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" update
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" start
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+"$BOOTSTRAP" --control-parent-root "$ROOT" install
+"$BOOTSTRAP" --control-parent-root "$ROOT" update
+"$BOOTSTRAP" --control-parent-root "$ROOT" start
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
   target add --root <project-root> --mode read-only
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" status
+"$BOOTSTRAP" --control-parent-root "$ROOT" status
 ```
 
-control root と runtime root は必須です。runtime root は control root の下でなければ
+control root は必須です。runtime root を指定した場合も control root の下でなければ
 ならず、symlink を通した脱出も拒否されます。`$HOME/.cache`、`$HOME/.local`、global
-`CODEX_HOME`、source tree を暗黙の保存先にしません。
+`CODEX_HOME`、source tree の一般ディレクトリを暗黙の保存先にしません。
 
 ## Codex を起動する
 
 ```bash
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" codex prepare
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+"$BOOTSTRAP" --control-parent-root "$ROOT" codex prepare
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
   codex launch --project-root <project-root>
 ```
 
@@ -51,10 +52,15 @@ hook、設定リンクを作ります。これは global link とは別の実行
 control root に `$HOME` を明示した場合、install / update は次の分割リンクも管理します。
 
 ```text
-~/.agents/skills/<skill>       -> ~/agent-canon/.agents/skills/<skill>
+~/.agents/skills/<skill>       -> ~/agent-canon/.codex/personal/skills/<skill>
 ~/.codex/agents/<role>.toml   -> ~/agent-canon/.codex/agents/<role>.toml
 ~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
 ```
+
+install / update は先に catalog から ignored な
+`~/agent-canon/.codex/personal/skills/<skill>/SKILL.md` view を生成し、その
+directory を `~/.agents/skills/<skill>` へ個別リンクします。この generated view と
+link は編集せず、変更は `agents/skills/<skill>.md` と catalog に加えます。
 
 既存の regular な `~/.codex/config.toml` は内容と mode を保持したまま ignored な
 personal source に移してからリンクします。update はその内容を保持し、uninstall は
@@ -76,7 +82,7 @@ Python tool は flat な global executable にしません。schema-v2 parity fi
 の catalog entry だけを使います。
 
 ```bash
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
   tool run --root <project-root> <verified-catalog-id> -- <args...>
 ```
 
@@ -88,9 +94,9 @@ shell string、未知の catalog id、internal Python file の自動公開は許
 ## Eval と agent-canon-log
 
 ```bash
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
   eval collect --root <project-root> --run-id <run-id>
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+"$BOOTSTRAP" --control-parent-root "$ROOT" \
   eval sync --run-id <run-id>
 ```
 
@@ -126,9 +132,9 @@ quarantine と旧 generation 維持、旧 generation も復旧できなければ
 を確認し、必要なら active task がない状態で `rollback` します。
 
 ```bash
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" stop
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" gc
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" uninstall
+"$BOOTSTRAP" --control-parent-root "$ROOT" stop
+"$BOOTSTRAP" --control-parent-root "$ROOT" gc
+"$BOOTSTRAP" --control-parent-root "$ROOT" uninstall
 ```
 
 `stop` は container を消して state と未同期 spool を残します。`gc` は完了かつ pin の

@@ -6,8 +6,8 @@ contract agent-runtime
 responsibility Defines task-local contract observation, terminal coverage, and durable archive routing.
 upstream design runtime-log-archive.md external AgentCanon log archive ownership
 upstream design ../../templates/agents/workflow_monitoring.md run-local behavior evidence
-upstream design ../../evidence/agent-evals/agent_behavior_eval.toml behavior scoring contract
-downstream implementation ../../tools/agent_tools/task_contract_observation.py records and evaluates observations
+upstream design ../../eval/definitions/agent_behavior_eval.toml behavior scoring contract
+downstream implementation ../../tools/runtime/lifecycle/task_contract_observation.py records and evaluates observations
 downstream implementation ../../tests/agent_tools/test_task_contract_observation.py verifies schema and transition invariants
 @dependency-end
 -->
@@ -154,7 +154,7 @@ operational. Values are token slugs; point to the owning artifact rather than
 copying its content.
 
 ```bash
-python3 tools/agent_tools/task_contract_observation.py \
+python3 tools/runtime/lifecycle/task_contract_observation.py \
   --report-dir reports/agents/<run-id> \
   --record \
   "contract_id=documents/runtime/runtime-log-archive.md#Branch-Policy \
@@ -168,7 +168,7 @@ The tool derives `observation_id` and `sequence`. Resolve the same observation
 by repeating the immutable identity fields with a terminal outcome:
 
 ```bash
-python3 tools/agent_tools/task_contract_observation.py \
+python3 tools/runtime/lifecycle/task_contract_observation.py \
   --report-dir reports/agents/<run-id> \
   --record \
   "contract_id=documents/runtime/runtime-log-archive.md#Branch-Policy \
@@ -181,7 +181,7 @@ response=archive-readback-confirmed"
 For a run with no activated boundary:
 
 ```bash
-python3 tools/agent_tools/task_contract_observation.py \
+python3 tools/runtime/lifecycle/task_contract_observation.py \
   --report-dir reports/agents/<run-id> \
   --record \
   "contract_observation=none owner=manager reason=no-contract-triggered"
@@ -201,12 +201,12 @@ contract_archive_route=agent-canon-log:agent-reports
 The built-in deterministic conformance suite is available without a run bundle:
 
 ```bash
-python3 tools/agent_tools/task_contract_observation.py --self-check
+python3 tools/runtime/lifecycle/task_contract_observation.py --self-check
 ```
 
 ## Eval Integration
 
-`evidence/agent-evals/agent_behavior_eval.toml` owns two independent checks:
+`eval/definitions/agent_behavior_eval.toml` owns two independent checks:
 
 1. observation coverage requires a schema-marked `observed` or `none` event and
    a passing current-run evaluator result;
@@ -229,8 +229,8 @@ the current run bundle while work is active. Existing archive synchronization
 then publishes the complete run bundle:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py sync
-python3 tools/agent_tools/runtime_log_archive_git.py push
+python3 tools/runtime/archive/runtime_log_archive_git.py sync
+python3 tools/runtime/archive/runtime_log_archive_git.py push
 ```
 
 The durable location is:

@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests skill and workflow prompt eval automation.
-# upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py helper  # noqa: E501
-# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml eval manifest
+# upstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py helper  # noqa: E501
+# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml eval manifest
 # @dependency-end
 """Tests for skill and workflow prompt evals."""
 
@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 import unittest
 from decimal import Decimal
 from pathlib import Path
@@ -29,11 +30,11 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_skill_workflow_prompts.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import evaluate_skill_workflow_prompts as evaluator  # noqa: E402
-from eval_manifest_paths import resolve_eval_manifest  # noqa: E402
-from runtime_log_paths import mounted_log_archive_root  # noqa: E402
+import eval.producers.evaluate_skill_workflow_prompts as evaluator  # noqa: E402
+from eval.checkers.eval_manifest_paths import resolve_eval_manifest  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProcess[str]:
@@ -79,7 +80,7 @@ def t14_report_text(
     return textwrap.dedent(
         f"""\
         Output:
-        command=python3 tools/agent_tools/route.py --capability oop_type_design
+        command=python3 tools/agent/orchestration/route.py --capability oop_type_design
         artifacts=none
         authority=parent
         route=explicit capability
@@ -129,7 +130,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
     def test_default_manifest_passes(self) -> None:
         """The canonical prompt eval manifest passes on current prompts."""
-        result = run_eval("--manifest", "evidence/agent-evals/skill_workflow_prompt_eval.toml")
+        result = run_eval("--manifest", "eval/definitions/skill_workflow_prompt_eval.toml")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("EVAL_STATUS=pass", result.stdout)
@@ -142,7 +143,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         """Old manifest paths warn and resolve canonical even when stale files exist."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            canonical = root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+            canonical = root / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
             legacy = root / "agents" / "evals" / "skill_workflow_prompt_eval.toml"
             canonical.parent.mkdir(parents=True)
             legacy.parent.mkdir(parents=True)
@@ -157,17 +158,17 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         warning = stderr.getvalue()
         self.assertIn("EVAL_MANIFEST_FORWARDER=deprecated", warning)
         self.assertIn("old=agents/evals/skill_workflow_prompt_eval.toml", warning)
-        self.assertIn("new=evidence/agent-evals/skill_workflow_prompt_eval.toml", warning)
+        self.assertIn("new=eval/definitions/skill_workflow_prompt_eval.toml", warning)
 
     def test_default_manifest_includes_required_global_target_globs(self) -> None:
         """The canonical manifest covers every skill and workflow prompt family."""
-        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        manifest = PROJECT_ROOT / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
 
         target_globs = {entry.get("target_glob") for entry in evals}
         for required_glob in (
-            ".agents/skills/*/SKILL.md",
+            ".codex/personal/skills/*/SKILL.md",
             "agents/skills/*.md",
             "agents/internal-routines/*.md",
             "agents/workflows/*.md",
@@ -178,7 +179,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
     def test_codex_agent_generic_provenance_is_consumer_static_and_path_free(self) -> None:
         """The generic Codex prompt check owns only static marker/digest provenance."""
-        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        manifest = PROJECT_ROOT / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
         role_eval = next(entry for entry in evals if entry.get("id") == "all-codex-subagent-prompts")
@@ -210,7 +211,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self,
     ) -> None:
         """Generic workflows stay structural while owner shims test tool routing."""
-        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        manifest = PROJECT_ROOT / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
         by_id = {str(entry["id"]): entry for entry in evals}
@@ -226,11 +227,11 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         )
         self.assertEqual(
             by_id["agent-orchestration-skill-call-routing"]["target"],
-            ".agents/skills/agent-orchestration/SKILL.md",
+            ".codex/personal/skills/agent-orchestration/SKILL.md",
         )
         self.assertEqual(
             by_id["codex-task-workflow-convention-gate"]["target"],
-            ".agents/skills/codex-task-workflow/SKILL.md",
+            ".codex/personal/skills/codex-task-workflow/SKILL.md",
         )
         orchestration_check_ids = {
             str(item["id"])
@@ -284,7 +285,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self,
     ) -> None:
         """The canonical DSV owner carries the six semantic contract evals."""
-        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        manifest = PROJECT_ROOT / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
         owner_eval = next(
@@ -361,7 +362,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self,
     ) -> None:
         """The canonical manifest covers test-design validation failure response."""
-        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        manifest = PROJECT_ROOT / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
         by_id = {str(entry["id"]): entry for entry in evals}
@@ -369,7 +370,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         for eval_id, target_glob in (
             (
                 "test-design-validation-failure-response-shim",
-                ".agents/skills/test-design/SKILL.md",
+                ".codex/personal/skills/test-design/SKILL.md",
             ),
             (
                 "test-design-validation-failure-response-doc",
@@ -385,7 +386,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self,
     ) -> None:
         """The manifest requires canonical typed omission/readback semantics."""
-        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        manifest = PROJECT_ROOT / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
         by_id = {str(entry["id"]): entry for entry in evals}
@@ -509,7 +510,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
             result = run_eval(
                 "--manifest",
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "--report-out",
                 str(report),
                 "--runtime-root",
@@ -532,7 +533,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
             result = run_eval(
                 "--manifest",
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "--compact-out",
                 str(compact),
                 "--runtime-root",
@@ -557,7 +558,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
             result = run_eval(
                 "--manifest",
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "--report-out",
                 str(report),
                 "--skill-used",
@@ -583,7 +584,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "--root",
                 str(PROJECT_ROOT),
                 "--manifest",
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "--accumulate",
                 "--results-dir",
                 str(runtime / "results"),
@@ -602,7 +603,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             text = reports[0].read_text(encoding="utf-8")
             self.assertIn("run_id: `run-123`", text)
             self.assertIn("used_skills: `agent-orchestration`", text)
-            self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", text)
+            self.assertIn("eval/producers/evaluate_skill_workflow_prompts.py", text)
             self.assertIn("skill_workflow_prompt_eval.toml", text)
             self.assertIn("## Run Manifest", text)
 
@@ -618,7 +619,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "--root",
                 str(PROJECT_ROOT),
                 "--manifest",
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "--accumulate",
                 "--results-dir",
                 str(runtime / "results"),
@@ -642,6 +643,100 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("EVAL_ACCUMULATED_REPORT=", text)
             self.assertIn("EVAL_GIT_COMMIT=", text)
 
+    def test_prompt_eval_monitoring_preserves_concurrent_monitor_append(self) -> None:
+        """Concurrent canonical monitor writers retain both behavior events."""
+        import tools.runtime.lifecycle.workflow_monitor as workflow_monitor
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            runtime = external_runtime(root)
+            report_dir = runtime / "reports" / "agents" / "run-concurrent"
+            bundle = evaluator.EvalRunBundle(
+                manifest=Path("eval.toml"),
+                evals=(),
+                results=(),
+                audit=evaluator.ManifestAudit((), (), ()),
+                metadata=evaluator.EvalRunMetadata(
+                    created_at="2026-08-31T00:00:00+00:00",
+                    eval_run_id="skill-eval-concurrent",
+                    used_skills=("agent-orchestration",),
+                    run_id="run-concurrent",
+                    argv=(),
+                    cwd=str(root),
+                    root=str(root),
+                    manifest="eval.toml",
+                    git_branch="main",
+                    git_commit="head",
+                    git_dirty="no",
+                ),
+            )
+            actual_append = evaluator.append_monitoring
+            original_lock = workflow_monitor.locked_monitoring_artifact
+            first_writer_entered = threading.Event()
+            release_first_writer = threading.Event()
+            writer_errors: list[BaseException] = []
+
+            @contextlib.contextmanager
+            def controlled_lock(path: Path, runtime_root: Path | str | None = None):
+                with original_lock(path, runtime_root) as handle:
+                    first_writer_entered.set()
+                    if not release_first_writer.wait(timeout=5):
+                        raise AssertionError("concurrent writer did not release")
+                    yield handle
+
+            def append_with_concurrent_writer(
+                target: Path,
+                entries: evaluator.MonitoringEntries,
+                *,
+                runtime_root: Path | str | None = None,
+            ) -> Path:
+                def append_other_monitor_event() -> None:
+                    try:
+                        actual_append(
+                            target,
+                            evaluator.MonitoringEntries(
+                                behavior_events=("concurrent_writer=retained",)
+                            ),
+                            runtime_root=runtime_root,
+                        )
+                    except BaseException as exc:  # pragma: no cover - assertion below
+                        writer_errors.append(exc)
+
+                writer = threading.Thread(target=append_other_monitor_event)
+                writer.start()
+                self.assertTrue(first_writer_entered.wait(timeout=5))
+                release_first_writer.set()
+                result = actual_append(target, entries, runtime_root=runtime_root)
+                writer.join(timeout=5)
+                self.assertFalse(writer.is_alive())
+                self.assertEqual(writer_errors, [])
+                return result
+
+            with mock.patch.object(
+                workflow_monitor,
+                "locked_monitoring_artifact",
+                controlled_lock,
+            ), mock.patch.object(
+                evaluator,
+                "append_monitoring",
+                side_effect=append_with_concurrent_writer,
+            ):
+                evaluator.append_prompt_eval_monitoring(
+                    report_dir,
+                    bundle,
+                    runtime / "results" / "eval.md",
+                    runtime,
+                )
+
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            self.assertIn("concurrent_writer=retained", text)
+            self.assertIn("tool_call=evaluate_skill_workflow_prompts.py", text)
+            self.assertLess(
+                text.index("concurrent_writer=retained"),
+                text.index("tool_call=evaluate_skill_workflow_prompts.py"),
+            )
+
     def test_accumulated_report_dependencies_resolve_through_root_symlinks(
         self,
     ) -> None:
@@ -650,8 +745,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             tmp_root = Path(tmp_dir)
             canon_root = tmp_root / "canon"
             wrapper_root = tmp_root / "wrapper"
-            eval_dir = canon_root / "evidence" / "agent-evals"
-            tools_dir = canon_root / "tools" / "agent_tools"
+            eval_dir = canon_root / "eval" / "definitions"
+            tools_dir = canon_root / "tools" / "agent" / "orchestration"
             eval_dir.mkdir(parents=True)
             tools_dir.mkdir(parents=True)
             runtime = external_runtime(canon_root)
@@ -660,6 +755,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             wrapper_root.mkdir()
             (wrapper_root / "agents").symlink_to(canon_root / "agents")
             (wrapper_root / "evidence").symlink_to(canon_root / "evidence")
+            (wrapper_root / "eval").symlink_to(canon_root / "eval")
             (wrapper_root / "tools").symlink_to(canon_root / "tools")
             (tools_dir / "evaluate_skill_workflow_prompts.py").write_text(
                 "# placeholder for dependency header validation\n",
@@ -677,7 +773,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
                     [[evals]]
                     id = "sample"
-                    target = "evidence/agent-evals/prompt.md"
+                    target = "eval/definitions/prompt.md"
                     kind = "workflow"
                     description = "sample"
 
@@ -696,7 +792,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "--root",
                 str(wrapper_root),
                 "--manifest",
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "--accumulate",
                 "--run-id",
                 "run-symlink",
@@ -715,8 +811,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertEqual(len(reports), 1)
             text = reports[0].read_text(encoding="utf-8")
             header = text.split("-->", 1)[0]
-            self.assertIn("tools/agent_tools/evaluate_skill_workflow_prompts.py", header)
-            self.assertIn("evidence/agent-evals/skill_workflow_prompt_eval.toml", header)
+            self.assertIn("eval/producers/evaluate_skill_workflow_prompts.py", header)
+            self.assertIn("eval/definitions/skill_workflow_prompt_eval.toml", header)
             self.assertNotIn("wrapper", header)
 
     def test_target_glob_expands_to_each_matching_file(self) -> None:
@@ -1070,8 +1166,8 @@ class T14EvaluatorContractTest(unittest.TestCase):
 
     def test_parse_skill_evaluator_report_rejects_field_order(self) -> None:
         text = t14_report_text().replace(
-            "command=python3 tools/agent_tools/route.py --capability oop_type_design\nartifacts=none",
-            "artifacts=none\ncommand=python3 tools/agent_tools/route.py --capability oop_type_design",
+            "command=python3 tools/agent/orchestration/route.py --capability oop_type_design\nartifacts=none",
+            "artifacts=none\ncommand=python3 tools/agent/orchestration/route.py --capability oop_type_design",
         )
         tmp, raw, expected = t14_parser_fixture(text)
         with tmp:

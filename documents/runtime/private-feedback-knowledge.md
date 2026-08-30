@@ -1,11 +1,10 @@
 <!--
 @dependency-start
-contract runtime
+contract agent-runtime
 responsibility Defines the private feedback/knowledge command boundary and its external agent-canon-log storage route.
-upstream external-schema git@github.com:iwashita-nozomu/agent-canon-log.git@db3722b817be8574c682949db733df0fb5c2674a docs/FEEDBACK_KNOWLEDGE_SCHEMA.md
-downstream implementation ../../tools/agent_tools/private_feedback.py
-downstream implementation ../../rust/agent-canon/src/private_feedback.rs
-downstream implementation ../../tools/agent_tools/workflow_monitor.py structured feedback capture
+downstream implementation ../../tools/runtime/archive/private_feedback.py owns private storage and sync semantics
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs exposes the Rust command boundary
+downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py structured feedback capture
 @dependency-end
 -->
 
@@ -15,13 +14,14 @@ AgentCanon records reusable private feedback outside the source checkout. The
 private remote is `iwashita-nozomu/agent-canon-log`; at this revision its
 schema is read from `db3722b817be8574c682949db733df0fb5c2674a`.
 
-The operational checkout is selected by the explicit bootstrap control root:
+The operational checkout is the private sibling of the AgentCanon install:
 
 ```text
-<control-parent-root>/agent-canon-log
+<install-root-parent>/agent-canon-log
 ```
 
-For the live installation this is normally `~/agent-canon-log`. The checkout
+The control root authorizes access but never selects this storage location.
+For the live installation this is `~/agent-canon-log`. The checkout
 is a private (`0700`) normal Git clone on the source-qualified stable branch
 resolved by `runtime_log_archive_git.py repo-key`, with the exact private
 remote. The log repository's `main` branch is schema/configuration content and
@@ -34,13 +34,17 @@ Runtime data is first written below the external runtime root:
 
 The tool container sees this same directory as
 `/var/lib/agent-canon/runtime/spool/private-feedback/` through the existing
-`container-runtime/` bind mount. `k/f sync` writes a typed, body-free request
-below that spool. Bootstrap invokes the host archive adapter after the
-container command, passing the bind-mounted host path to the adapter. The
-adapter performs fetch, non-force publication, compare/readback and spool
-retention on conflict. The operational checkout is mounted into the container
-read-only for search/read/status; the container has no Git credentials and
-never publishes or mutates that checkout.
+`container-runtime/` bind mount. A successful `k/f add`, `k capture`, or
+structured runtime-feedback capture creates or reuses one typed, body-free
+request below that spool; explicit `k/f sync` remains available for retry and
+readback. Bootstrap invokes the host archive adapter after every successful
+managed tool or Codex command, passing the bind-mounted host path to the
+adapter implemented in `bootstrap/host/lifecycle/entrypoint.sh`; this crossing uses only
+the host shell's Git/Git-annex commands and never imports AgentCanon Python.
+The adapter performs fetch, non-force publication, compare/readback and
+spool/request retention on conflict. The operational checkout is mounted into
+the container read-only for search/read/status; the container has no Git
+credentials and never publishes or mutates that checkout.
 
 ## Commands
 

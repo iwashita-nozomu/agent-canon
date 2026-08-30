@@ -6,8 +6,8 @@ upstream design ../../README.md AgentCanon source tree and consumer distribution
 upstream design ./README.md parent-repository contract index
 upstream design ./static-seed-allowlist.toml sole exact-path allowlist for default consumers
 downstream design ./template-bootstrap.md default source-free bootstrap contract
-downstream implementation ../../tools/agent_tools/export_static_seed.py committed-tree exporter
-downstream implementation ../../tools/docs/check_bootstrap_docs.py source-free consumer structure checker
+downstream implementation ../../tools/runtime/source/export_static_seed.py committed-tree exporter
+downstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py source-free consumer structure checker
 downstream design ../tools/export_static_seed.md maintainer commands and failure semantics
 downstream implementation ../../tests/agent_tools/test_export_static_seed.py producer determinism and exclusion tests
 downstream implementation ../../tests/tools/test_check_bootstrap_docs.py source-hidden consumer and bootstrap regression tests
@@ -33,7 +33,7 @@ producer export と default bootstrap の境界は次の通りです。
 
 静的 seed の file set は
 [`static-seed-allowlist.toml`](static-seed-allowlist.toml) の exact path 列だけです。生成入口は
-[`export_static_seed.py`](../../tools/agent_tools/export_static_seed.py) だけです。allowlist の path は
+[`export_static_seed.py`](../../tools/runtime/source/export_static_seed.py) だけです。allowlist の path は
 source と出力で同一とし、glob、directory copy、fallback、暗黙追加を使用しません。
 
 allowlist は現在、次の consumer-owned regular file だけを含みます。
@@ -66,7 +66,7 @@ case-normalize して、`agents/skills/`、`agents/model_profiles.toml`、
 maintainer は source commit を明示して export します。
 
 ```bash
-python3 tools/agent_tools/export_static_seed.py \
+python3 tools/runtime/source/export_static_seed.py \
   --source-root . \
   --source-ref <agent-canon-commit> \
   --output <fresh-output-directory>
@@ -101,7 +101,7 @@ worktree dirty state、remote state、environment-specific path、乱数は出�
 export 後または consumer migration fixture では、AgentCanon source を不可視化して次を実行します。
 
 ```bash
-python3 tools/docs/check_bootstrap_docs.py \
+python3 tools/validation/documentation/checks/check_bootstrap_docs.py \
   --root <export-or-consumer-root> \
   --static-seed-consumer
 ```

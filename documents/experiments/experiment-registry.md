@@ -5,8 +5,8 @@ contract reference
 responsibility Documents Experiment Registry for this repository.
 upstream design README.md durable document index
 upstream design ./gpu-admission-r5-source-packet.md exact registry closure and frozen topic adapter contract
-downstream implementation ../../tools/ci/check_experiment_registry.py validates registry schema
-downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py predicts managed execution surface guardrails
+downstream implementation ../../tools/validation/ci/checks/check_experiment_registry.py validates registry schema
+downstream implementation ../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts managed execution surface guardrails
 @dependency-end
 -->
 
@@ -132,21 +132,21 @@ registry entry を一つの route で配置します。`templates/experiments/_t
 利用者向けの作成手順にしません。
 
 ```bash
-python3 tools/experiments/create_experiment_topic.py <topic>
+python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 ```
 
 実行、publication、LATEST 更新には variant を必ず明示します。
 
 ```bash
-python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
-python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
-python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>
+python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
+python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/result --variant <variant>
 ```
 
 ## server 実行ルール
 
 - project `Makefile` は registry の smoke / formal command へ到達する target を持ちます。標準名は `make experiment-smoke TOPIC=<topic>` と `make experiment-formal TOPIC=<topic>` です。
-- formal run は `tools/experiments/run_managed_experiment.py` を使います。
+- formal run は `tools/experiments/execution/run_managed_experiment.py` を使います。
 - 可能なら Make target の内側で `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
 - GPU run では full physical/MIG UUID admission environment が generic runner
   construction 前に確定します。CPU/index/prefix/direct/compatibility fallback は
@@ -163,7 +163,7 @@ python3 -m tools.experiments.update_latest_result experiments/<topic>/result --v
 ## validation
 
 ```bash
-python3 -m tools.ci.check_experiment_registry
+python3 -m tools.validation.ci.checks.check_experiment_registry
 make experiment-check
 ```
 
@@ -175,7 +175,7 @@ registered command から `{config_path}` が欠ける場合も fail します�
 対象は managed runner、registry checker、この registry contract、experiment
 workflow、project `experiments/registry.toml` です。検証は
 project `experiments/registry.toml` がある checkout では
-`python3 -m tools.ci.check_experiment_registry` を実行し、
+`python3 -m tools.validation.ci.checks.check_experiment_registry` を実行し、
 runner / registry checker behavior は
 `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` を標準にし、
 formal run は実験計画の実行段階で扱います。

@@ -6,7 +6,7 @@ upstream design ../../../documents/experiments/README.md experiment directory an
 upstream design ../../../documents/design/experiment-topic-template.md single-source topic scaffold and result layout.
 downstream implementation ./provenance.toml records machine-readable plan and provenance.
 downstream implementation ./run.py provides the runnable topic scaffold and atomic summary publication.
-downstream implementation ../../../tools/experiments/create_experiment_topic.py materializes this topic pair.
+downstream implementation ../../../tools/experiments/lifecycle/create_experiment_topic.py materializes this topic pair.
 @dependency-end
 -->
 
@@ -20,7 +20,7 @@ topic record に整理します。評価指標、比較方法、研究上の成�
 
 ## Reader Map
 
-実験開始前に question → hypothesis → cases/oracle → resource/env → managed run → result/failure
+実験開始前に question → hypothesis → cases/observables → resource/env → managed run → result/failure
 の順で確認します。実験毎の計画と machine-readable な値は `provenance.toml` に記録します。
 
 - `README.md`: 人間向けの計画、判断、再現手順。
@@ -50,7 +50,7 @@ experiments/<topic>/
 
 ## 実行契約
 
-topic は `tools/experiments/run_managed_experiment.py` から呼び出します。topic の `run.py` を
+topic は `tools/experiments/execution/run_managed_experiment.py` から呼び出します。topic の `run.py` を
 直接起動せず、caller が `EXPERIMENT_RUN_DIR`、`EXPERIMENT_RUN_MANIFEST`、
 `EXPERIMENT_VARIANT` を設定した managed route を使います。
 
@@ -75,14 +75,21 @@ fallback を作成しません。case worker へ渡す出力先は `EXPERIMENT_R
 解決した `raw/` です。summary の各 file は atomic replacement と readback digest を通して
 公開します。
 
-## 評価と lifecycle の境界
+## 計画・実行・結果解釈の境界
 
-- metric、比較対象、observation、stopping rule、研究上の成功判断は topic / research owner が
+- `provenance.toml` の plan は question、hypothesis、cases、observables、evidence targets、metrics、
+  比較・計算方法、expected mechanism、protocol、resource、operational stop/impossibility/input/
+  environment conditions を宣言する。evidence targets は後で読み返す observation / artifact の
+  記録先を示すだけで、閾値や研究上の判定を含めない。計画時点の研究上の結論、案の採否、
+  レビュー判断は実行開始条件にしない。
+- metric、比較対象、observation、stopping rule、研究上の結果解釈は topic / research owner が
   必要な範囲で `README.md`、`provenance.toml`、`config.yaml` に定義する。
 - `success`、`failed`、`blocked`、`incomplete` は実行の terminal / failure state であり、
   研究上の結論を表さない。
 - exit status と artifact readback は実行・証跡の observation として記録し、それだけから
   研究上の成功を判定しない。
+- 実行後の support / reject / inconclusive、threshold interpretation、review は topic / research
+  owner の任意の結果解釈として report 等へ記録し、run の開始・完了をブロックしない。
 - 共通 lifecycle は run identity、`result/<run-id>/raw/` / `summary/` の path、
   source/config/environment provenance、実在する artifact の role/checksum/readback、
   failure evidence を記録する。

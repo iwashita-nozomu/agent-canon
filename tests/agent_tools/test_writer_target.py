@@ -1,0 +1,765 @@
+# @dependency-start
+# contract test
+# responsibility Reproduces shared-checkout writer collisions before spawn and target-bound mutation rejection.
+# upstream implementation ../../tools/runtime/authority/writer_target.py owns writer-target validation.
+# upstream implementation ../../tools/agent/orchestration/implementation_dispatch.py materializes writer waves.
+# upstream implementation ../../tools/runtime/authority/mutation_authority.py owns active mutation admission.
+# @dependency-end
+"""Focused tests for task-scoped writer targets."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+import tempfile
+from pathlib import Path
+import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
+from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
+    dispatch_subagent_wave,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
+    validate_writer_handoff_waves,
+    workflow_spawn_budget,
+)
+from tools.runtime.authority.mutation_authority import evaluate_mutation_authority  # noqa: E402
+from tools.agent.orchestration.team_config import (  # noqa: E402
+    SubagentWaveSlot,
+    load_task_catalog,
+    load_team_config,
+    select_roles,
+)
+from tools.runtime.authority.writer_target import (  # noqa: E402
+    WriterTarget,
+    WriterTargetError,
+    materialize_writer_target_packet,
+    validate_writer_target_allocations,
+    validate_writer_target_identity,
+)
+from tools.agent.orchestration.tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
+
+
+def target(root: str, branch: str = "fix/942") -> WriterTarget:
+    return WriterTarget(root, branch, "iwashita-nozomu/agent-canon", ("tools/",))
+
+
+def write_identity(root: Path, role_id: str = "implementer") -> None:
+    value: dict[str, object] = {
+        "schema": "agent-canon.runtime-agent-identity.v1",
+        "run_id": "run-942",
+        "agent_id": "writer-942",
+        "role_id": role_id,
+        "parent_agent_id": "parent-942",
+        "authority": "write_capable_child",
+        "allowed_files": ["src/owned.py"],
+        "allowed_directories": [],
+        "scope_digest": "",
+        "status": "active",
+        "receipt_sha256": "",
+    }
+    value["scope_digest"] = hashlib.sha256(
+        json.dumps(
+            {"allowed_files": value["allowed_files"], "allowed_directories": []},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    unsigned = dict(value)
+    unsigned.pop("receipt_sha256")
+    value["receipt_sha256"] = hashlib.sha256(
+        json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    target_path = root / "runtime" / "agent_identity.json"
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
+    (root / "spawn.json").write_text(
+        json.dumps(
+            {
+                "subagent_event_kind": "spawn",
+                "subagent_target": "writer-942",
+                "subagent_agent_type": "worker",
+                "mutation_scope_digest": value["scope_digest"],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    packet = {
+        "schema": "agent-canon.writer-target-packet.v1",
+        "checkout_root": str(root),
+        "branch": "fix/942",
+        "remote": "iwashita-nozomu/agent-canon",
+        "allowed_paths": ["src/owned.py"],
+        "checkout_identity": {
+            "cwd": str(root),
+            "git_root": str(root),
+            "branch": "fix/942",
+            "head": "a" * 40,
+            "remote": "iwashita-nozomu/agent-canon",
+        },
+    }
+    packet_path = root / ".agent-canon" / "writer-target.json"
+    packet_path.parent.mkdir(parents=True, exist_ok=True)
+    packet_path.write_text(json.dumps(packet, sort_keys=True), encoding="utf-8")
+
+
+def test_shared_checkout_writer_targets_are_rejected_before_spawn() -> None:
+    shared = target("/tmp/agent-canon-shared")
+    with pytest.raises(WriterTargetError, match="checkout_root_collision"):
+        validate_writer_target_allocations(
+            (
+                {"owner": "#927:worker", "write_capable": True, "writer_target": shared},
+                {"owner": "#928:publisher", "write_capable": True, "writer_target": shared},
+            )
+        )
+
+
+def test_distinct_topic_clones_and_readers_remain_admissible() -> None:
+    admitted = validate_writer_target_allocations(
+        (
+            {"owner": "#927:worker", "write_capable": True, "writer_target": target("/tmp/a")},
+            {"owner": "#928:publisher", "write_capable": True, "writer_target": target("/tmp/b")},
+            {"owner": "#929:reviewer", "write_capable": False, "writer_target": None},
+        )
+    )
+    assert [item.normalized_root for item in admitted] == ["/tmp/a", "/tmp/b"]
+
+
+def test_writer_target_is_required_for_writer_and_not_for_reader() -> None:
+    with pytest.raises(ValueError, match="required_before_spawn"):
+        validate_writer_target_allocations(
+            ({"owner": "worker", "write_capable": True, "writer_target": None},)
+        )
+    assert validate_writer_target_allocations(
+        ({"owner": "reader", "write_capable": False, "writer_target": None},)
+    ) == ()
+
+
+def test_wave_materializer_rejects_colliding_writer_slots() -> None:
+    waves = (
+        (
+            SubagentWaveSlot("implementer", "worker-1", "worker", True),
+            SubagentWaveSlot("integration_executor", "integration-1", "integration_executor", True),
+        ),
+    )
+    shared = target("/tmp/one")
+    with pytest.raises(WriterTargetError, match="checkout_root_collision"):
+        validate_writer_handoff_waves(
+            waves,
+            {
+                waves[0][0].executable_identity: shared,
+                waves[0][1].executable_identity: shared,
+            },
+        )
+
+
+def test_wave_materializer_allows_distinct_writer_slots() -> None:
+    waves = ((SubagentWaveSlot("implementer", "worker-1", "worker", True),),)
+    assert validate_writer_handoff_waves(
+        waves,
+        {waves[0][0].executable_identity: target("/tmp/one")},
+    )[0].branch == "fix/942"
+
+
+def test_spawn_tool_call_validates_writer_target_before_materialization() -> None:
+    identity = {
+        "cwd": "/tmp/spawn",
+        "git_root": "/tmp/spawn",
+        "branch": "fix/942",
+        "head": "c" * 40,
+        "remote": "local/repo",
+    }
+    writer = WriterTarget("/tmp/spawn", "fix/942", "local/repo", ("tools/",))
+    call = materialize_subagent_spawn_tool_call(
+        role="worker",
+        agent_type="worker",
+        input="write the assigned files",
+        checkout_identity=identity,
+        writer_target=writer,
+    )
+    assert call["arguments"]["writer_target"] == writer.as_dict()
+    for mismatch, expected in (
+        (
+            WriterTarget("/tmp/other", "fix/942", "local/repo", ("tools/",)),
+            "checkout_root_identity_mismatch",
+        ),
+        (
+            WriterTarget("/tmp/spawn", "main", "local/repo", ("tools/",)),
+            "branch_identity_mismatch",
+        ),
+        (
+            WriterTarget("/tmp/spawn", "fix/942", "other/repo", ("tools/",)),
+            "remote_identity_mismatch",
+        ),
+    ):
+        with pytest.raises(ValueError, match=expected):
+            materialize_subagent_spawn_tool_call(
+                role="worker",
+                agent_type="worker",
+                input="write the assigned files",
+                checkout_identity=identity,
+                writer_target=mismatch,
+            )
+    with pytest.raises(ValueError, match="required_before_spawn"):
+        materialize_subagent_spawn_tool_call(
+            role="worker",
+            agent_type="worker",
+            input="write the assigned files",
+            checkout_identity=identity,
+        )
+    publisher_call = materialize_subagent_spawn_tool_call(
+        role="publisher",
+        agent_type="worker",
+        input="publish the assigned Issue",
+        checkout_identity=identity,
+        workspace_write_capable=False,
+    )
+    assert "writer_target" not in publisher_call["arguments"]
+
+
+def test_normal_wave_dispatch_rejects_duplicate_targets_before_callback() -> None:
+    slots = (
+        SubagentWaveSlot("implementer", "worker-1", "worker", True),
+        SubagentWaveSlot("integration_executor", "integration-1", "worker", True),
+    )
+    shared = target("/tmp/wave-shared")
+    prompts = {slot.executable_identity: "bounded work" for slot in slots}
+    calls: list[str] = []
+    with pytest.raises(WriterTargetError, match="checkout_root_collision"):
+        dispatch_subagent_wave(
+            slots,
+            prompts,
+            lambda role, prompt: calls.append(role) or role,
+            {
+                slots[0].executable_identity: shared,
+                slots[1].executable_identity: shared,
+            },
+        )
+    assert calls == []
+
+
+def test_normal_wave_dispatch_calls_callback_for_distinct_targets() -> None:
+    slots = (
+        SubagentWaveSlot("implementer", "worker-1", "worker", True),
+        SubagentWaveSlot("integration_executor", "integration-1", "worker", True),
+    )
+    prompts = {slot.executable_identity: "bounded work" for slot in slots}
+    calls: list[str] = []
+    spawned = dispatch_subagent_wave(
+        slots,
+        prompts,
+        lambda role, prompt: calls.append(role) or f"{role}-id",
+        {
+            slots[0].executable_identity: target("/tmp/wave-a"),
+            slots[1].executable_identity: target("/tmp/wave-b"),
+        },
+    )
+    assert spawned == ("worker-id", "worker-id")
+    assert calls == ["worker", "worker"]
+
+
+def test_normal_stage_materializer_carries_targets_into_writer_slots() -> None:
+    config = load_team_config()
+    catalog = load_task_catalog(config)
+    roles = select_roles(
+        config,
+        ["implementer", "integration_executor"],
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id="comprehensive_development",
+    )
+    active, _ = workflow_spawn_budget(catalog, "comprehensive_development")
+    initial = recommended_initial_subagent_wave(roles, active, catalog)
+    writer_targets = {
+        "implementer": target("/tmp/implementer"),
+        "integration_executor": target("/tmp/integration"),
+    }
+    waves = recommended_dynamic_expansion_wave_slots(
+        roles,
+        active,
+        initial,
+        catalog,
+        writer_targets=writer_targets,
+    )
+    writer_slots = [slot for wave in waves for slot in wave if slot.write_capable]
+    assert {slot.role_id for slot in writer_slots} == {
+        "implementer",
+        "integration_executor",
+    }
+    assert all(slot.writer_target is not None for slot in writer_slots)
+
+
+def test_identity_must_match_prepared_target() -> None:
+    writer = target("/tmp/prepared")
+    identity = {
+        "cwd": "/tmp/prepared",
+        "git_root": "/tmp/prepared",
+        "branch": "fix/942",
+        "head": "a" * 40,
+        "remote": "iwashita-nozomu/agent-canon",
+    }
+    assert validate_writer_target_identity(writer, identity) == writer
+    with pytest.raises(WriterTargetError, match="branch_identity_mismatch"):
+        validate_writer_target_identity(writer, {**identity, "branch": "main"})
+
+
+def test_hook_target_blocks_foreign_checkout_and_branch_switch() -> None:
+    env = {
+        "AGENT_CANON_CHECKOUT_ROOT": "/tmp/target",
+        "AGENT_CANON_CHECKOUT_BRANCH": "fix/942",
+    }
+    foreign = evaluate_mutation_authority(
+        {"tool_name": "Bash", "tool_input": {"command": "touch src/x.py"}},
+        report_dir=None,
+        active_root=Path("/tmp/foreign"),
+        environment=env,
+    )
+    assert foreign.reason == "blocked_authority_required"
+    switch = evaluate_mutation_authority(
+        {"tool_name": "Bash", "tool_input": {"command": "git switch fix/942"}},
+        report_dir=None,
+        active_root=Path("/tmp/target"),
+        environment=env,
+    )
+    assert switch.reason == "blocked_authority_required"
+
+
+def test_writer_target_rejects_relative_root() -> None:
+    with pytest.raises(WriterTargetError, match="checkout_root_must_be_absolute"):
+        target("relative/path")
+
+
+def test_materialized_packet_contains_validated_identity(tmp_path: Path) -> None:
+    writer = WriterTarget(str(tmp_path), "fix/942", "local/repo", ("src/",))
+    identity = {
+        "cwd": str(tmp_path),
+        "git_root": str(tmp_path),
+        "branch": "fix/942",
+        "head": "b" * 40,
+        "remote": "local/repo",
+    }
+    packet_path = materialize_writer_target_packet(writer, identity)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    assert packet["checkout_root"] == str(tmp_path)
+    assert packet["checkout_identity"] == identity
+
+
+def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        environment = {
+            **WriterTarget(
+                str(root),
+                "fix/942",
+                "iwashita-nozomu/agent-canon",
+                ("src/owned.py",),
+            ).environment(),
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        allowed = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": "touch src/owned.py"}},
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert allowed.status == "allowed"
+        escaped = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": "touch README.md"}},
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert escaped.reason == "mutation_scope_outside_child_receipt"
+        commit = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git commit -qm update"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert commit.status == "allowed"
+        switch = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git switch fix/other"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert switch.reason == "writer_target_branch_switch_forbidden"
+        rename = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git branch -m fix/renamed"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert rename.reason == "writer_target_branch_switch_forbidden"
+        packet_mutation = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "touch .agent-canon/writer-target.json"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert packet_mutation.reason == "writer_target_packet_mutation_forbidden"
+
+
+def test_raw_merge_and_rebase_are_rejected_even_inside_target() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        for command in ("git merge origin/main", "git rebase origin/main"):
+            decision = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                report_dir=root,
+                active_root=root,
+                environment=environment,
+                hook_spool_root=root,
+            )
+            assert decision.reason == "raw_git_merge_or_rebase_forbidden"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git --work-tree=/tmp/foreign status",
+        "git --work-tree /tmp/foreign status",
+        "git --git-dir=/tmp/foreign/.git status",
+        "git --git-dir /tmp/foreign/.git status",
+    ),
+)
+def test_writer_rejects_git_repository_redirection_forms(command: str) -> None:
+    """A normal writer cannot redirect Git's tree or metadata root."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        decision = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.status == "blocked"
+        assert decision.reason == "writer_target_git_repository_redirect_forbidden"
+
+
+def test_writer_aggregates_all_shell_segments_and_preserves_effective_cwd() -> None:
+    """Later mutations and nested shell cwd changes cannot escape the packet."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        outside = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "touch src/owned.py && rm outside.py"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert outside.status == "blocked"
+        assert outside.reason == "mutation_scope_outside_child_receipt"
+        nested_outside = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "bash -c 'cd /tmp && touch src/owned.py'"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert nested_outside.status == "blocked"
+        assert nested_outside.reason == "writer_target_checkout_root_mismatch"
+        all_allowed = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "bash -c 'cd src && touch owned.py'"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert all_allowed.status == "allowed"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "touch $OUTSIDE",
+        'touch "$PWD/../outside.py"',
+        "OUTSIDE=/tmp/foreign touch $OUTSIDE",
+        "touch generated-*",
+        "touch <(printf x)",
+        "bash -c 'touch $OUTSIDE'",
+    ),
+)
+def test_writer_rejects_unresolved_shell_path_tokens(command: str) -> None:
+    """Path scope must not resolve shell variables, globs, or nested expansions."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        decision = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.status == "blocked"
+
+
+def test_writer_does_not_treat_git_commit_message_as_a_path() -> None:
+    """Shell expansion in a non-path Git option value is not scope evidence."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        decision = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git commit -m '$MESSAGE'"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.status == "allowed"
+        assert decision.mutation_paths == ()
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git diff --output outside.diff HEAD",
+        "git diff --output=outside.diff HEAD",
+        "git show --output outside.patch HEAD",
+        "git show --output=outside.patch HEAD",
+        "git log --output outside.log HEAD",
+        "git log --output=outside.log HEAD",
+        "git archive -o outside.tar HEAD",
+        "git archive --output outside.tar HEAD",
+        "git archive --output=outside.tar HEAD",
+        "git status && git diff --output outside.diff HEAD",
+        "bash -c 'git diff --output outside.diff HEAD'",
+    ),
+)
+def test_writer_rejects_git_output_files_outside_scope(command: str) -> None:
+    """File-producing Git flags are mutation targets, including nested commands."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        decision = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.status == "blocked"
+        assert decision.reason == "mutation_scope_outside_child_receipt"
+
+
+def test_writer_allows_scoped_git_output_and_preserves_tree_reads() -> None:
+    """An explicit allowed output file passes while normal reads stay read-only."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        allowed = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git diff --output src/owned.py HEAD"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert allowed.status == "allowed"
+        assert allowed.mutation_paths == ("src/owned.py",)
+        for command in ("git diff HEAD", "git show HEAD", "git log HEAD", "git archive HEAD"):
+            read = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                report_dir=None,
+                active_root=root,
+                environment={},
+            )
+            assert read.status == "not_applicable"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git diff --output - HEAD",
+        "git diff --output=- HEAD",
+        "git show --output - HEAD",
+        "git show --output=- HEAD",
+        "git log --output - HEAD",
+        "git log --output=- HEAD",
+        "git archive -o - HEAD",
+        "git archive -o- HEAD",
+        "git archive --output - HEAD",
+        "git archive --output=- HEAD",
+    ),
+)
+def test_git_output_dash_is_stdout_not_a_writer_target(command: str) -> None:
+    """The exact Git dash sentinel does not create a filesystem mutation."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        read = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=None,
+            active_root=root,
+            environment={},
+        )
+        assert read.status == "not_applicable"
+
+
+def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root, role_id="integration_executor")
+        runtime_environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "integration_executor",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        command = (
+            "python3 tools/repository/workspace/repository_topic_clone.py merge-main "
+            "--url git@github.com:iwashita-nozomu/agent-canon.git "
+            "--repo-name agent-canon --workspace-root /tmp --topic issue-942 "
+            "--branch fix/942 --owner-evidence evidence.txt"
+        )
+        allowed = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment=runtime_environment,
+            hook_spool_root=root,
+        )
+        assert allowed.status == "allowed"
+        missing_inputs = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": command.replace("merge-main", "finalize-merge")
+                },
+            },
+            report_dir=root,
+            active_root=root,
+            environment=runtime_environment,
+            hook_spool_root=root,
+        )
+        assert missing_inputs.reason == "repository_topic_clone_preservation_inputs_missing"
+        finalized = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": command.replace("merge-main", "finalize-merge")
+                    + " --inventory inventory.json --plan plan.json"
+                },
+            },
+            report_dir=root,
+            active_root=root,
+            environment=runtime_environment,
+            hook_spool_root=root,
+        )
+        assert finalized.status == "allowed"
+        write_identity(root, role_id="implementer")
+        ordinary = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                **runtime_environment,
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            },
+            hook_spool_root=root,
+        )
+        assert ordinary.reason == "repository_topic_clone_lifecycle_requires_integration_executor"
+        for compound in (
+            "touch README.md && " + command,
+            command + " && rm README.md",
+        ):
+            blocked = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": compound}},
+                report_dir=root,
+                active_root=root,
+                environment=runtime_environment,
+                hook_spool_root=root,
+            )
+            assert blocked.status == "blocked"
+
+
+def test_workspace_writer_without_static_packet_is_blocked() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        (root / ".agent-canon" / "writer-target.json").unlink()
+        decision = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": "touch src/owned.py"}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.reason == "writer_target_packet_missing"

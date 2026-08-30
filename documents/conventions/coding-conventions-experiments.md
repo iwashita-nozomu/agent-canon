@@ -39,7 +39,7 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 - native C++ experiment source と target wiring は `cpp/experiments/` に置きます。
 - topic ごとに `README.md`、`run.py`、`cases.py`、`config.yaml`、`visualization.py`、`result/` を基準にします。
 - `experiments/<topic>/README.md` は、その topic の実験内容、問い、比較対象、標準コマンド、設定正本、可視化 renderer、出力 schema、run_name 規則を持つ正本 entrypoint です。
-- 新規 topic は実験名を固定し、`python3 tools/experiments/create_experiment_topic.py <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualization.py`、`README.md` の順で編集します。
+- 新規 topic は実験名を固定し、`python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualization.py`、`README.md` の順で編集します。
 - 可視化は `experiments/<topic>/visualization.py` の renderer に置きます。renderer は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
 - native target の project entrypoint は `cpp/CMakeLists.txt`、aggregate target は
@@ -70,7 +70,7 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 - 巨大な生成物や raw ログを `main` の入口文書へ混ぜません。
 - main server host で実行する run は、topic README に exact command と wrapper の使い方を明記します。
 - 実験実行コマンドは project `Makefile` に用意します。長い `python3 ...` command を README や chat だけに残して正式手順にしません。
-- formal / server-side run は `tools/experiments/run_managed_experiment.py` から起動します。標準 runner は `run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、exit status を保存します。
+- formal / server-side run は `tools/experiments/execution/run_managed_experiment.py` から起動します。標準 runner は `run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、exit status を保存します。
 - managed runner は canonical `experiments/<topic>/run.py` と argv を fd-bound
   source snapshot に束縛し、その snapshot の `main()` だけを fixed ff97 generic
   lifecycle で実行します。topic が live callable、task/cases、scheduler、Context、
@@ -87,7 +87,7 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 
 - 実験 script は `--config <path>` 引数で、runner が生成した `config.json` を読めるようにします。
 - `experiments/<topic>/config.yaml` は human-authored な設定正本です。default 値は `config.yaml`、`config.json`、`config_source.yaml`、`run_manifest.json` から辿れる形にします。
-- `tools/experiments/run_managed_experiment.py` を使う run では、runner が `result/<run-id>/config.json` と `result/<run-id>/config_source.yaml` を生成し、`EXPERIMENT_CONFIG_PATH` と `{config_path}` placeholder で inner command に渡します。
+- `tools/experiments/execution/run_managed_experiment.py` を使う run では、runner が `result/<run-id>/config.json` と `result/<run-id>/config_source.yaml` を生成し、`EXPERIMENT_CONFIG_PATH` と `{config_path}` placeholder で inner command に渡します。
 - YAML を正本にする topic では、`experiments/<topic>/config.yaml` を編集し、runner が run 用 snapshot を保存します。`run_manifest.json` から設定正本と run 用 snapshot を辿れるようにします。
 - `experiments/registry.toml` の `smoke_inner_command` と `formal_inner_command` は `{config_path}` を含めます。
 - `summary/summary.json` には、少なくとも `config_path` または config digest / config key list を残します。
@@ -101,16 +101,16 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 .PHONY: experiment-check experiment-smoke experiment-formal
 
 experiment-check:
-  python3 -m tools.ci.check_experiment_registry
+  python3 -m tools.validation.ci.checks.check_experiment_registry
 
 experiment-smoke:
-  python3 -m tools.experiments.run_managed_experiment \
+  python3 -m tools.experiments.execution.run_managed_experiment \
     --topic $(TOPIC) \
     --variant smoke \
     --use-registered-command smoke
 
 experiment-formal:
-  python3 -m tools.experiments.run_managed_experiment \
+  python3 -m tools.experiments.execution.run_managed_experiment \
     --topic $(TOPIC) \
     --variant formal \
     --use-registered-command formal

@@ -5,7 +5,7 @@ contract design
 responsibility Audits dependency headers, graph direction, manifests, and full-tree dependency evidence.
 upstream design ../README.md owns unit closure and evidence separation
 upstream design ../../../agents/internal-routines/README.md owns internal dependency route
-upstream implementation ../../../tools/agent_tools/check_dependency_headers.py owns header validation
+upstream implementation ../../../tools/validation/semantic/dependencies/check_dependency_headers.py owns header validation
 downstream implementation ../../../agents/skills/dependency-analysis.md repairs dependency evidence
 @dependency-end
 -->
@@ -30,9 +30,9 @@ self-reference、cycle、孤立 manifest、古い header 形式がない。depen
 ## Evidence Sources
 
 - `@dependency-start` / `@dependency-end` headers
-- `tools/agent_tools/check_dependency_headers.py`
-- `tools/agent_tools/check_dependency_graph.sh`
-- `tools/agent_tools/run_repo_dependency_review.sh`
+- `tools/validation/semantic/dependencies/check_dependency_headers.py`
+- `tools/analysis/dependencies/check_dependency_graph.sh`
+- `tools/analysis/dependencies/run_repo_dependency_review.sh`
 - `documents/design/parent-repository-audit.md` の dependency edge
 
 ## Repair Route

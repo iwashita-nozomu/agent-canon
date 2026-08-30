@@ -1,0 +1,2483 @@
+# @dependency-start
+# contract data
+# responsibility Defines deterministic evals for skill and workflow prompt drift.
+# upstream design README.md prompt eval directory contract
+# upstream design ../../agents/skills/md-style-check.md Markdown style skill human document contract
+# upstream design ../../.codex/personal/skills/md-style-check/SKILL.md md-style-check skill shim contract
+# upstream design ../../agents/skills/adaptive-improvement-loop.md adaptive improvement skill contract
+# upstream design ../../agents/skills/academic-writing.md Academic Writing TeX routing contract
+# upstream design ../../agents/skills/structure-planning.md reusable structure planning skill contract
+# upstream design ../../agents/skills/html-output.md explicit HTML output and browser publication skill contract
+# upstream design ../../agents/skills/experiment-lifecycle.md experiment run identity and publication decision contract
+# upstream design ../../agents/skills/result-artifact-writeout.md concrete artifact persistence contract
+# upstream design ../../agents/internal-routines/README.md internal routine document owner surface
+# downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py runs these evals
+# @dependency-end
+
+version = 1
+
+[[evals]]
+id = "all-discoverable-skill-shims"
+target_glob = ".codex/personal/skills/*/SKILL.md"
+kind = "skill"
+description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
+
+[[evals.checklist]]
+id = "SKILL-SHIM-GENERIC-1"
+critical = true
+description = "Starts with YAML frontmatter and includes required name/description fields."
+required_regex = ["\\A---\\n", "\\nname:\\s*_?[a-z0-9]+(?:-[a-z0-9]+)*", "\\ndescription:\\s*\\S"]
+
+[[evals.checklist]]
+id = "SKILL-SHIM-GENERIC-2"
+critical = true
+description = "Includes dependency manifest markers near the top of the file."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "SKILL-SHIM-GENERIC-3"
+critical = true
+description = "Provides an executable numbered instruction list."
+required_regex = ["(?m)^1\\.\\s+"]
+
+[[evals]]
+id = "all-human-skill-docs"
+target_glob = "agents/skills/*.md"
+kind = "skill"
+description = "Every human-facing skill document must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "SKILL-DOC-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "SKILL-DOC-GENERIC-2"
+critical = true
+description = "Includes a top-level Markdown title."
+required_regex = ["(?m)^#\\s+"]
+
+[[evals]]
+id = "oop-type-design-runtime-contract"
+target = ".codex/personal/skills/oop-type-design/SKILL.md"
+canonical_target = "agents/skills/oop-type-design.md"
+kind = "skill"
+description = "The runtime shim exposes the pre-implementation OOP/type-design contract and forbids post-hoc/static duplication."
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-1"
+critical = true
+required_regex = ["oop-type-design", "@dependency-start", "@dependency-end", "^1\\."]
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-2"
+critical = true
+required_regex = ["Protocol|interface", "value object", "aggregate", "constructor", "state transition", "composition", "dependency direction", "responsibility", "semantic responsibility contract|semantic grouping"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-RUNTIME-3"
+critical = true
+required_regex = ["statically decidable|static type|static checker", "runtime guard|runtime validation", "test-first|test first", "oop-readability-check", "python-review", "cpp-review"]
+forbidden_regex = ["keyword routing|keyword trigger"]
+
+[[evals]]
+id = "oop-type-design-human-contract"
+target = "agents/skills/oop-type-design.md"
+kind = "skill"
+description = "The human-facing skill doc fixes the packet order, boundary matrix, and delegated validation owners."
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-1"
+critical = true
+required_regex = ["Abstract Design Frame|Responsibility model", "Implementation Source Packet", "Design Side-Effect Map", "Design-To-Implementation Trace"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-2"
+critical = true
+required_regex = ["API", "serialization", "external input", "constructor invariant", "legal state transition", "Protocol|interface", "invariant", "change reason", "external effect", "substitutability", "dependency direction", "atomic_transition|transaction|consistency|lifecycle", "semantic grouping", "one or more obligations"]
+
+[[evals.checklist]]
+id = "OOP-TYPE-HUMAN-3"
+critical = true
+required_regex = ["check_static_any.py", "pyright", "ruff", "oop-readability-check", "gpt-5.4-mini", "T14", "primary verification owner|obligations", "hard-edge", "test_designer", "composition root"]
+forbidden_regex = ["keyword routing", "keyword trigger", "coordination[_ ]cost", "connected-components", "line/function count|function count", "exhaustive partition|partition threshold|cohesion threshold", "compatibility-preservation drift|compatibility (path|route)"]
+
+[[evals]]
+id = "all-internal-routine-docs"
+target_glob = "agents/internal-routines/*.md"
+kind = "skill"
+description = "Every workflow-owned internal routine document must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "INTERNAL-ROUTINE-DOC-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "INTERNAL-ROUTINE-DOC-GENERIC-2"
+critical = true
+description = "Includes a top-level Markdown title."
+required_regex = ["(?m)^#\\s+"]
+
+[[evals]]
+id = "all-workflow-docs"
+target_glob = "agents/workflows/*.md"
+kind = "workflow"
+description = "Every workflow document must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "WORKFLOW-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "WORKFLOW-GENERIC-2"
+critical = true
+description = "Includes a top-level Markdown title."
+required_regex = ["(?m)^#\\s+"]
+
+[[evals]]
+id = "tool-finding-report-skill"
+target = ".codex/personal/skills/tool-finding-report/SKILL.md"
+canonical_target = "agents/skills/tool-finding-report.md"
+kind = "skill"
+description = "Tool finding reports must preserve raw and structured artifacts, route narrative reports separately, and feed prompt repair decisions into implementation loops."
+
+[[evals.checklist]]
+id = "TOOL-FINDING-1"
+critical = true
+description = "Requires raw result preservation, structured artifacts, and before/after impact when available."
+required_regex = ["raw", "structured", "impact", "python-structure-hash-report", "python-structure-hash-impact"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-2"
+critical = true
+description = "Separates writeout, reader report, and refactor implementation responsibilities."
+required_regex = ["\\$result-artifact-writeout", "\\$report-writing", "\\$refactor-loop"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-3"
+critical = true
+description = "Requires prompt feedback classification and prompt repair before the next write-capable subagent."
+required_regex = ["handoff_prompt_gap", "shared_skill_or_workflow_gap", "workflow_monitor\\.py --runtime-feedback", "prompt_repair", "next write-capable subagent"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-4"
+critical = true
+description = "Routes Python structural finding packets through scope planning before implementation."
+required_regex = ["python-structure-hash-scope-plan", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-5"
+critical = true
+description = "Defaults tool finding runs to full repository scope and records any bounded-scope exception."
+required_regex = ["full repository", "scope_exception", "requested_scope", "omitted_surfaces"]
+
+[[evals]]
+id = "md-style-check-unified-rust-docs"
+target = ".codex/personal/skills/md-style-check/SKILL.md"
+canonical_target = "agents/skills/md-style-check.md"
+kind = "skill"
+description = "Markdown style skill shim must route formatter-adjacent work through the unified Rust docs tool."
+
+[[evals.checklist]]
+id = "MD-STYLE-RUST-1"
+critical = true
+description = "Uses agent-canon docs as the canonical check and formatter entrypoint."
+required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "Rust", "DOCS_CHECK_REPORT_BEGIN"]
+
+[[evals.checklist]]
+id = "MD-STYLE-RUST-2"
+critical = true
+description = "Requires adjacent checks after formatter or fixer execution."
+required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
+
+[[evals.checklist]]
+id = "MD-STYLE-MATH-FENCE-1"
+critical = true
+description = "Runtime md-style-check skill must forbid text/plaintext/txt/plain/math/latex/tex fenced blocks and require standalone double-dollar guidance."
+required_regex = [
+  "\\btext\\b",
+  "\\bplaintext\\b",
+  "\\btxt\\b",
+  "\\bplain\\b",
+  "\\bmath\\b",
+  "\\blatex\\b",
+  "\\btex\\b",
+  "fenced block",
+  "must not be placed",
+  "standalone double-dollar",
+  "case-insensitively",
+]
+
+[[evals.checklist]]
+id = "MD-STYLE-STRUCTURE-GATE-1"
+critical = true
+description = "Routes substantive Markdown document edits through prose graph and structure planning, with format-only skip evidence."
+required_regex = ["\\$prose-reasoning-graph", "\\$structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
+
+[[evals]]
+id = "subagent-bootstrap-tool-first-gate"
+target = ".codex/personal/skills/subagent-bootstrap/SKILL.md"
+canonical_target = "agents/skills/subagent-bootstrap.md"
+kind = "skill"
+description = "Subagent bootstrap must not spend subagent tokens on deterministic checks already owned by tools."
+
+[[evals.checklist]]
+id = "SUBAGENT-TOOL-FIRST-1"
+critical = true
+description = "Requires canonical checker/router/dashboard before read-only exploration."
+required_regex = ["Before assigning read-only exploration", "canonical checker", "structured tool artifacts", "not to repeat deterministic tool checks"]
+
+[[evals.checklist]]
+id = "SUBAGENT-FRESH-CAPSULE-1"
+critical = true
+description = "Requires compatible-context reuse and limits fresh launches to independent or incompatible responsibility."
+required_regex = [
+  "Compatible active agents may\\s+be reused for revised scope",
+  "Reuse an active agent when owner, responsibility, context, write authority,\\s+and validation route remain compatible",
+  "independent\\s+review, disjoint authority, incompatible\\s+owner/context",
+  "New turns or\\s+renamed packets alone do not require fresh launch",
+  "Fresh Subagent Context Capsule",
+  "Context Visibility Contract",
+  "protocol-owned",
+]
+
+[[evals]]
+id = "md-style-check-human-doc-unified-rust-docs"
+target = "agents/skills/md-style-check.md"
+kind = "skill"
+description = "Human Markdown style skill doc must expose the unified Rust docs command and formatter-adjacent check contract."
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-RUST-1"
+critical = true
+description = "Documents the unified check, format, math, and Mermaid commands."
+required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "tools/bin/agent-canon docs fix-math", "tools/bin/agent-canon docs fix-mermaid", "DOCS_CHECK_REPORT_BEGIN"]
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-RUST-2"
+critical = true
+description = "Defines formatter completion as adjacent Markdown checks, not formatting alone."
+required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-MATH-FENCE-1"
+critical = true
+description = "Canonical md-style-check doc skill must forbid text/plaintext/txt/plain/math/latex/tex fenced blocks and require standalone double-dollar guidance."
+required_regex = [
+  "\\btext\\b",
+  "\\bplaintext\\b",
+  "\\btxt\\b",
+  "\\bplain\\b",
+  "\\bmath\\b",
+  "\\blatex\\b",
+  "\\btex\\b",
+  "fenced block",
+  "数式を\\s+入れず",
+  "standalone double-dollar",
+  "大文字小文字を区別せず",
+]
+
+[[evals.checklist]]
+id = "MD-STYLE-DOC-STRUCTURE-GATE-1"
+critical = true
+description = "Separates format-only Markdown checks from substantive document structure changes."
+required_regex = ["prose-reasoning-graph", "structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
+
+[[evals]]
+id = "report-writing-semantic-contract"
+target = "agents/skills/report-writing.md"
+description = "Report correctness is semantic rather than a fixed presentation schema."
+
+[[evals.checklist]]
+id = "REPORT-SEMANTIC-1"
+critical = true
+required_regex = ["material factual or recommendation claim", "source support", "inference", "observations and interpretations", "limitations", "next action"]
+
+[[evals.checklist]]
+id = "REPORT-SEMANTIC-2"
+critical = true
+required_regex = ["No fixed heading count", "finding_count == 0", "advisory checker", "Markdown is the default", "explicitly requested"]
+
+[[evals]]
+id = "structure-planning-semantic-activation"
+target = "agents/skills/structure-planning.md"
+description = "Structure planning activates only for genuine structural decisions."
+
+[[evals.checklist]]
+id = "STRUCTURE-SEMANTIC-1"
+critical = true
+required_regex = ["owner", "canonical source", "reader entry", "validation topology", "real structural decision"]
+
+[[evals.checklist]]
+id = "STRUCTURE-SEMANTIC-2"
+critical = true
+required_regex = ["Mermaid", "optional diagnostics", "information gain"]
+
+[[evals]]
+id = "test-design-semantic-admission"
+target = "agents/skills/test-design.md"
+description = "Regression admission depends on contract, reachability, and a stable oracle."
+
+[[evals.checklist]]
+id = "TEST-SEMANTIC-1"
+critical = true
+required_regex = ["contract", "reachable", "counterexample", "oracle"]
+
+[[evals.checklist]]
+id = "TEST-SEMANTIC-2"
+critical = true
+required_regex = ["reproduction", "reachability evidence", "null-hypothesis"]
+
+[[evals]]
+id = "code-visualization-skill"
+target = ".codex/personal/skills/code-visualization/SKILL.md"
+canonical_target = "agents/skills/code-visualization.md"
+kind = "skill"
+description = "Code visualization must select diagram kind, source evidence, owner skill or tool, and renderer before drawing."
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-1"
+critical = true
+description = "Requires a selection record before rendering."
+required_regex = ["Visualization Selection", "context_question", "embedding_context", "precision_need", "visualization_kind", "source_evidence", "owner_skill_or_tool", "renderer", "output_path"]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-2"
+critical = true
+description = "Covers the major code visualization forms."
+required_regex = [
+  "flowchart",
+  "call graph",
+  "control-flow graph",
+  "sequence diagram",
+  "state-transition diagram",
+  "data-flow diagram",
+  "dependency graph",
+  "timing diagram",
+  "concurrency sequence diagram",
+]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-3"
+critical = true
+description = "Delegates fact authority to existing owners and tools."
+required_regex = [
+  "\\$structure-planning",
+  "\\$md-style-check",
+  "\\$algorithm-flowchart",
+  "skill_tool_commands\\.py show --skill code-visualization",
+  "render_dependency_manifest_graph\\.py --root \\. --scope full --bundle-dir reports/dependency-graph --format json",
+  "canonical graph owns dependency status and facts",
+  "typed dependency query",
+  "supplied-input",
+  "raw-checker",
+  "Mermaid fallback",
+  "agent_canon\\.visualization\\.coverage",
+  "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
+]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-4"
+critical = true
+description = "Requires canonical typed omission prevention and post-format coverage/readback oracle evidence."
+required_regex = [
+  "literal user scope",
+  "source-owner and dependency\\s+closure",
+  "VisualizationSourceUniverse",
+  "ProjectionCoverageManifest",
+  "canonical owner ToolCall",
+  "agent_canon\\.visualization\\.coverage",
+  "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
+  "mandatory format",
+  "final-artifact readback|post-format readback",
+  "source_counts",
+  "rendered_counts",
+  "readback_counts",
+  "coverage_digest",
+  "final_token_readback",
+  "clustering",
+  "zoom",
+  "filtering",
+  "view[- ]only|reversible view[- ]state",
+  "typed renderer-capacity blocker|typed renderer-capacity rejection",
+]
+
+[[evals.checklist]]
+id = "CODE-VISUALIZATION-5"
+critical = true
+description = "Routes document-embedded diagrams through context and visual-plan selection."
+required_regex = ["Document Embedded Diagrams", "visual_plan", "section claim", "reader", "Mermaid"]
+
+[[evals]]
+id = "literature-survey-source-record-shim"
+target = ".codex/personal/skills/literature-survey/SKILL.md"
+canonical_target = "agents/skills/literature-survey.md"
+kind = "skill"
+description = "Literature survey runtime skill must inspect existing references before external lookup and leave durable source records."
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-SHIM-1"
+critical = true
+description = "Requires an existing-reference sweep before web search, PDF download, or citation lookup."
+required_regex = ["Before web search", "existing `references/`", "same source or claim"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-SHIM-2"
+critical = true
+description = "Requires durable source notes or source packets with provenance fields."
+required_regex = ["durable tracked reference note", "URL/DOI", "access date", "artifact location"]
+
+[[evals]]
+id = "literature-survey-source-record-doc"
+target = "agents/skills/literature-survey.md"
+kind = "skill"
+description = "Human literature survey skill must define existing-reference sweep and durable source packet deliverables."
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-1"
+critical = true
+description = "Requires checking existing references, notes, documents, and topic reports before external lookup."
+required_regex = ["web search", "既存の `references/`", "topic report"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-2"
+critical = true
+description = "Requires tracked artifacts and durable source record fields."
+required_regex = ["tracked artifact", "durable source record", "URL / DOI", "download artifact"]
+
+[[evals.checklist]]
+id = "LITERATURE-SOURCE-DOC-3"
+critical = true
+description = "Defines reader-facing source sweep and adoption/exclusion sections."
+required_regex = ["Existing Reference Sweep", "Adopted Source Claims", "Excluded Sources"]
+
+[[evals]]
+id = "formal-proof-workflow-shim"
+target = ".codex/personal/skills/formal-proof-workflow/SKILL.md"
+canonical_target = "agents/skills/formal-proof-workflow.md"
+kind = "skill"
+description = "Formal proof runtime skill must route natural-language claims through scaffold, existing-proof search, literature survey, and checker-gated proof status."
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-1"
+critical = true
+description = "Requires formal_proof.py scaffold generation and existing formal proof search."
+required_regex = ["formal_proof\\.py", "existing formal proofs", "literature queries"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-2"
+critical = true
+description = "Requires literature-survey handoff and durable source decisions."
+required_regex = ["\\$literature-survey", "official docs", "adoption/exclusion"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-SHIM-3"
+critical = true
+description = "Forbids verification claims without checker execution and proof-status evidence."
+required_regex = ["Do not mark a claim verified", "proof assistant or solver", "proof_status=not_run"]
+
+[[evals]]
+id = "formal-proof-workflow-doc"
+target = "agents/skills/formal-proof-workflow.md"
+kind = "skill"
+description = "Human formal proof skill must define claim decomposition, existing-proof search, literature handoff, and checker authority."
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-1"
+critical = true
+description = "Defines natural-language claim decomposition and proof obligations."
+required_regex = ["assumptions", "definitions", "target theorem", "proof obligations"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-2"
+critical = true
+description = "Connects existing-proof web/library search to literature-survey."
+required_regex = ["existing proof search", "\\$literature-survey", "formal library docs"]
+
+[[evals.checklist]]
+id = "FORMAL-PROOF-DOC-3"
+critical = true
+description = "Keeps proof authority with checker logs and placeholders unverified."
+required_regex = ["proof_status=unverified", "checker log", "placeholder"]
+
+[[evals]]
+id = "academic-writing-tex-routing-shim"
+target = ".codex/personal/skills/academic-writing/SKILL.md"
+canonical_target = "agents/skills/academic-writing.md"
+kind = "skill"
+description = "Academic Writing runtime skill must be the default TeX route for academic documents and figures."
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-SHIM-1"
+critical = true
+description = "Requires a TeX output plan and devcontainer TeX commands."
+required_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-SHIM-2"
+critical = true
+description = "Prevents TeX from becoming the default route for ordinary docs."
+required_regex = ["Do not route general README", "default-wired only for Academic Writing"]
+
+[[evals.checklist]]
+id = "ACADEMIC-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before drafting when section, figure/table, or claim/evidence layout is nontrivial."
+required_regex = ["\\$structure-planning", "section order", "figure/table placement", "claim/evidence layout", "invalid interpretations"]
+
+[[evals.checklist]]
+id = "ACADEMIC-PROJECTION-ORDER-SHIM-1"
+critical = true
+description = "Requires academic prose projection to consume whole-document selected ordering from prose graph handoff."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "ACADEMIC-POSITIVE-RESPONSIBILITY-SHIM-1"
+critical = true
+description = "Requires academic projection prose to use positive responsibility contracts and classify ad hoc labels."
+required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
+
+[[evals]]
+id = "academic-writing-tex-routing-doc"
+target = "agents/skills/academic-writing.md"
+kind = "skill"
+description = "Human Academic Writing skill must define the TeX output boundary."
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-DOC-1"
+critical = true
+description = "Defines the TeX output boundary and validation commands."
+required_regex = ["TeX Output Boundary", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-DOC-2"
+critical = true
+description = "Limits default TeX routing to Academic Writing rather than general writing skills."
+required_regex = ["TeX を使う既定配線はこの skill に限る", "一般の `\\$long-form-writing`"]
+
+[[evals.checklist]]
+id = "ACADEMIC-PROJECTION-ORDER-DOC-1"
+critical = true
+description = "Human academic writing skill requires selected ordering as the prose projection sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "ACADEMIC-POSITIVE-RESPONSIBILITY-DOC-1"
+critical = true
+description = "Human academic writing skill requires positive responsibility contracts and ad hoc replacement."
+required_regex = ["肯定形", "Boundary / Limitation / Non-Goal", "ad hoc", "prompt-defect classification"]
+
+[[evals]]
+id = "academic-writing-workflow-tex-output"
+target = "agents/workflows/academic-writing-workflow.md"
+kind = "workflow"
+description = "Academic writing workflow must include TeX validation only when TeX output is active."
+
+[[evals.checklist]]
+id = "ACADEMIC-TEX-WORKFLOW-1"
+critical = true
+description = "Routes active TeX output plans through document and figure validation commands."
+required_regex = ["TeX output plan", "latexmk -pdf", "dvisvgm", "pdfcrop"]
+
+[[evals]]
+id = "long-form-writing-avoids-tex-default"
+target = "agents/skills/long-form-writing.md"
+kind = "skill"
+description = "Long-form writing must not gain Academic Writing's default TeX route."
+
+[[evals.checklist]]
+id = "NON-ACADEMIC-TEX-1"
+critical = true
+description = "Forbid Academic Writing's default TeX route from leaking into long-form writing."
+forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals.checklist]]
+id = "LONG-FORM-PROJECTION-ORDER-DOC-1"
+critical = true
+description = "Human long-form writing skill requires selected ordering as the prose projection sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "LONG-FORM-POSITIVE-RESPONSIBILITY-DOC-1"
+critical = true
+description = "Human long-form writing skill requires positive responsibility contracts and ad hoc replacement."
+required_regex = ["肯定形", "Boundary / Limitation / Non-Goal", "ad hoc", "prompt-defect classification"]
+
+[[evals]]
+id = "paper-writing-avoids-tex-default"
+target = "agents/skills/paper-writing.md"
+kind = "skill"
+description = "Paper Writing remains a section-discipline overlay and must not own the default TeX route."
+
+[[evals.checklist]]
+id = "NON-ACADEMIC-TEX-2"
+critical = true
+description = "Forbid Academic Writing's default TeX route from leaking into paper writing."
+forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
+
+[[evals.checklist]]
+id = "PAPER-PROJECTION-ORDER-DOC-1"
+critical = true
+description = "Human paper writing skill requires selected ordering as the prose projection sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "PAPER-POSITIVE-RESPONSIBILITY-DOC-1"
+critical = true
+description = "Human paper writing skill requires positive responsibility contracts and ad hoc replacement."
+required_regex = ["肯定形", "Boundary / Limitation / Non-Goal", "ad hoc", "prompt-defect classification"]
+
+[[evals]]
+id = "research-workflow-source-record"
+target = "agents/workflows/research-workflow.md"
+kind = "workflow"
+description = "Research workflow must check existing source notes and persist external-source provenance."
+
+[[evals.checklist]]
+id = "RESEARCH-SOURCE-1"
+critical = true
+description = "Requires checking existing source notes before external research."
+required_regex = ["既存 source note", "外部調査", "durable source packet"]
+
+[[evals.checklist]]
+id = "RESEARCH-SOURCE-2"
+critical = true
+description = "Requires durable provenance for external sources and rejects transient browser/download context."
+required_regex = ["URL / DOI", "access date", "browser tab", "download cache"]
+
+[[evals]]
+id = "test-design-numerical-admission-gate-shim"
+target = ".codex/personal/skills/test-design/SKILL.md"
+canonical_target = "agents/skills/test-design.md"
+kind = "skill"
+description = "The discoverable test-design skill must gate numerical, randomized, tolerance, solver, convergence, residual, benchmark, and experiment-style tests before proposing them."
+
+[[evals.checklist]]
+id = "TEST-DESIGN-NUMERICAL-GATE-SHIM-1"
+critical = true
+description = "Requires numerical test admission before recommending numerical tests."
+required_regex = ["Numerical Test Admission Gate", "numerical trigger", "non-numerical alternative", "oracle", "budget", "omit"]
+
+[[evals]]
+id = "test-design-validation-failure-response-shim"
+target_glob = ".codex/personal/skills/test-design/SKILL.md"
+expected_count = 1
+canonical_target = "agents/skills/test-design.md"
+kind = "skill"
+description = "The discoverable test-design skill must classify validation failures before simplification, deletion, revert, or oracle weakening, then route implementation bugs to owning repair."
+
+[[evals.checklist]]
+id = "TEST-DESIGN-VALIDATION-FAILURE-SHIM-1"
+critical = true
+description = "Requires validation/check failure response evidence before weakening intended behavior and avoids blocking implementation bugs behind extra test planning."
+required_regex = ["failing contract", "observation level", "failure cause", "approved intent", "owning code", "extra test-design pass", "oracle weakening"]
+
+[[evals]]
+id = "test-design-numerical-admission-gate-doc"
+target_glob = "agents/skills/test-design.md"
+expected_count = 1
+kind = "skill-doc"
+description = "The human test-design skill must require numerical trigger, alternative, oracle, and budget evidence."
+
+[[evals.checklist]]
+id = "TEST-DESIGN-NUMERICAL-GATE-DOC-1"
+critical = true
+description = "Routes numerical test admission to the canonical testing convention after activation."
+required_regex = ["activation=required", "documents/conventions/coding-conventions-testing\\.md", "Numerical Test Admission Gate", "数値 trigger", "non-numerical alternative", "oracle", "budget"]
+
+[[evals]]
+id = "test-design-validation-failure-response-doc"
+target_glob = "agents/skills/test-design.md"
+expected_count = 1
+kind = "skill-doc"
+description = "The human test-design skill must classify validation failures before simplification, deletion, revert, or oracle weakening, then route implementation bugs to owning repair."
+
+[[evals.checklist]]
+id = "TEST-DESIGN-VALIDATION-FAILURE-DOC-1"
+critical = true
+description = "Requires validation/check failure response evidence before weakening intended behavior and avoids blocking implementation bugs behind extra test planning."
+required_regex = ["failing_contract", "observation_level", "cause_classification", "intent_preservation", "documents/runtime/runtime-profiles-and-check-matrix\\.json", "owning code", "intent を弱めません"]
+
+[[evals]]
+id = "testing-conventions-numerical-admission-gate"
+target = "documents/conventions/coding-conventions-testing.md"
+kind = "document"
+description = "The common testing convention must forbid numerical tests without a numerical behavior contract."
+
+[[evals.checklist]]
+id = "TESTING-CONVENTIONS-NUMERICAL-GATE-1"
+critical = true
+description = "Defines triggers, alternatives, oracles, and budget for numerical tests."
+required_regex = ["数値テスト採用ゲート", "Numerical Trigger", "Non-Numerical Alternative", "Oracle", "Budget", "Numerical Trigger` がない場合"]
+
+[[evals]]
+id = "computational-optimization-shim"
+target = ".codex/personal/skills/computational-optimization/SKILL.md"
+canonical_target = "agents/skills/computational-optimization.md"
+kind = "skill"
+description = "Computational optimization skill must fix numerical contracts and route validation before code or experiment changes."
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-1"
+critical = true
+description = "Requires the optimization contract before implementation or experiment runs."
+required_regex = ["optimization contract", "objective", "constraints", "derivatives", "stopping policy", "failure semantics"]
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-2"
+critical = true
+description = "Forbids numerical test greenwashing."
+required_regex = ["relaxing tolerances", "deleting assertions", "skipping cases", "changing expected values", "using CPU"]
+
+[[evals.checklist]]
+id = "COMP-OPT-SHIM-3"
+critical = true
+description = "Requires first-bad-iteration diagnosis and separates correctness from performance."
+required_regex = ["first bad iteration", "residual components", "status flag", "correctness evidence", "performance evidence"]
+
+[[evals]]
+id = "computational-optimization-doc"
+target = "agents/skills/computational-optimization.md"
+kind = "skill"
+description = "Human computational optimization skill must define boundary, contract, workflow, validation, review, and outputs."
+
+[[evals.checklist]]
+id = "COMP-OPT-DOC-1"
+critical = true
+description = "Defines boundary with research, experiment, adaptive loop, test design, and language review skills."
+required_regex = ["\\$research-workflow", "\\$experiment-lifecycle", "\\$adaptive-improvement-loop", "\\$test-design", "\\$python-review", "\\$cpp-review"]
+
+[[evals.checklist]]
+id = "COMP-OPT-DOC-2"
+critical = true
+description = "Requires numerical failure/status review beyond final values."
+required_regex = ["first bad iteration", "converged=false", "KKT", "preconditioner", "Performance claim"]
+
+[[evals]]
+id = "document-writing-structure-planning"
+target = ".codex/personal/skills/long-form-writing/SKILL.md"
+canonical_target = "agents/skills/long-form-writing.md"
+kind = "skill"
+description = "Long-form writing skill must use structure-planning for nontrivial document structure."
+
+[[evals.checklist]]
+id = "DOCUMENT-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning when reader path, source mapping, first section, or invalid interpretations are nontrivial."
+required_regex = ["\\$structure-planning", "section order", "reader path", "source mapping", "first section", "invalid interpretations"]
+
+[[evals.checklist]]
+id = "DOCUMENT-STRUCTURE-2"
+critical = true
+description = "Connects long-form paragraph flow to discourse-relations when transition evidence matters."
+required_regex = ["discourse-relations", "paragraph flow", "transition choice", "structure-planning"]
+
+[[evals.checklist]]
+id = "DOCUMENT-STRUCTURE-3"
+critical = true
+description = "Routes nontrivial long-form workflow/dependency/ownership/routing/state/review-gate explanations to Mermaid through structure-planning visual_plan."
+required_regex = ["Mermaid", "visual_plan", "workflow", "dependency", "ownership", "routing", "state transition", "review gate", "fenced `mermaid`"]
+
+[[evals.checklist]]
+id = "DOCUMENT-PROJECTION-ORDER-1"
+critical = true
+description = "Requires long-form prose projection to consume whole-document selected ordering from prose graph handoff."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "DOCUMENT-POSITIVE-RESPONSIBILITY-1"
+critical = true
+description = "Requires long-form projection prose to use positive responsibility contracts and classify ad hoc labels."
+required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
+
+[[evals]]
+id = "prose-reasoning-graph-selected-ordering-shim"
+target = ".codex/personal/skills/prose-reasoning-graph/SKILL.md"
+canonical_target = "agents/skills/prose-reasoning-graph.md"
+kind = "skill"
+description = "Runtime prose graph skill must hand whole-document selected ordering to writing adapters."
+
+[[evals.checklist]]
+id = "PROSE-GRAPH-ORDER-SHIM-1"
+critical = true
+description = "Requires selected ordering to be passed as the whole-document sentence sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document sentence sequence", "priority topological sort", "deterministic reader-order contract"]
+
+[[evals]]
+id = "prose-reasoning-graph-selected-ordering-doc"
+target = "agents/skills/prose-reasoning-graph.md"
+kind = "skill"
+description = "Human prose graph skill must define selected ordering as the DSL-to-prose input sequence."
+
+[[evals.checklist]]
+id = "PROSE-GRAPH-ORDER-DOC-1"
+critical = true
+description = "Requires selected ordering to be passed as the whole-document sentence sequence."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document sentence sequence", "priority topological sort", "deterministic reader-order contract"]
+
+[[evals]]
+id = "paper-writing-structure-planning"
+target = ".codex/personal/skills/paper-writing/SKILL.md"
+canonical_target = "agents/skills/paper-writing.md"
+kind = "skill"
+description = "Paper writing skill must use structure-planning for nontrivial paper section and evidence layout."
+
+[[evals.checklist]]
+id = "PAPER-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before drafting when paper section, figure/table, or evidence layout is nontrivial."
+required_regex = ["\\$structure-planning", "section order", "first figure/table", "claim/evidence layout", "source-to-structure map"]
+
+[[evals.checklist]]
+id = "PAPER-STRUCTURE-2"
+critical = true
+description = "Connects paper paragraph claim flow and transition pairs to discourse-relations."
+required_regex = ["discourse-relations", "academic-argument", "transition pairs", "logic-gap"]
+
+[[evals.checklist]]
+id = "PAPER-PROJECTION-ORDER-SHIM-1"
+critical = true
+description = "Requires paper prose projection to consume whole-document selected ordering from prose graph handoff."
+required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+
+[[evals.checklist]]
+id = "PAPER-POSITIVE-RESPONSIBILITY-SHIM-1"
+critical = true
+description = "Requires paper projection prose to use positive responsibility contracts and classify ad hoc labels."
+required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
+
+[[evals]]
+id = "refactor-loop-structure-planning"
+target = ".codex/personal/skills/refactor-loop/SKILL.md"
+canonical_target = "agents/skills/refactor-loop.md"
+kind = "skill"
+description = "Refactor loop skill must use structure-planning for nontrivial refactor structure."
+
+[[evals.checklist]]
+id = "REFACTOR-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before refactor edits when module, path, responsibility, or delta structure is nontrivial."
+required_regex = ["\\$structure-planning", "file moves", "module boundaries", "repair slices", "path mapping", "responsibility maps", "forbidden semantic delta"]
+
+[[evals]]
+id = "references-readme-existing-source-policy"
+target = "references/README.md"
+kind = "reference"
+description = "References index must require checking existing source notes and writing durable source records."
+
+[[evals.checklist]]
+id = "REFERENCES-README-1"
+critical = true
+description = "Requires searching existing durable reference surfaces before adding a source note."
+required_regex = ["Before adding a new source note", "existing `references/`", "same title, DOI, URL, or claim"]
+
+[[evals.checklist]]
+id = "REFERENCES-README-2"
+critical = true
+description = "Requires durable source records with provenance and artifact-retention fields."
+required_regex = ["leave a durable source record", "URL or DOI", "access date", "downloaded artifact"]
+
+[[evals]]
+id = "all-canonical-routing-docs"
+target_glob = "agents/canonical/*.md"
+kind = "workflow"
+description = "Every canonical routing document must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "CANONICAL-GENERIC-1"
+critical = true
+description = "Includes dependency manifest markers."
+required_regex = ["@dependency-start", "@dependency-end"]
+
+[[evals.checklist]]
+id = "CANONICAL-GENERIC-2"
+critical = true
+description = "Includes a top-level Markdown title."
+required_regex = ["(?m)^#\\s+"]
+
+[[evals]]
+id = "all-codex-subagent-prompts"
+target_glob = ".codex/agents/*.toml"
+kind = "subagent"
+description = "Every Codex subagent prompt must be dependency-linked and declare a model."
+
+[[evals.checklist]]
+id = "CODEX-AGENT-GENERIC-1"
+critical = true
+description = "Includes path-free consumer-static generated-view provenance with the exact canonical source digest."
+required_regex = ["generated role view: generated_role_view_v1", "(?m)^# source canonical digest: [0-9a-f]{64}$"]
+forbidden_regex = ["agents/skills/", "agents/model_profiles\\.toml", "tools/agent_tools/", "\\.\\./\\.\\./agents/", "\\.\\./\\.\\./tools/"]
+
+[[evals.checklist]]
+id = "CODEX-AGENT-GENERIC-2"
+critical = true
+description = "Declares an agent model."
+required_regex = ["(?m)^model\\s*="]
+
+[[evals]]
+id = "root-agent-entrypoint"
+target = "AGENTS.md"
+kind = "workflow"
+description = "The runtime root agent entrypoint must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-1"
+critical = true
+description = "Includes dependency manifest markers and a title."
+required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals]]
+id = "shared-root-agent-entrypoint"
+target = "ROOT_AGENTS.md"
+canonical_target = "agents/skills/agent-canon-update.md"
+kind = "workflow"
+description = "The shared root agent entrypoint must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-SHARED-1"
+critical = true
+description = "Includes dependency manifest markers and a title."
+required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-SHARED-SEARCH-1"
+critical = true
+description = "Routes implementation, runtime, and validation reading through canonical owner surfaces."
+required_regex = ["Reader Map", "product implementation and behavior", "build, tests, and runtime environment", "Validation / reader route"]
+
+[[evals.checklist]]
+id = "ROOT-AGENTS-SHARED-PUBLISH-1"
+critical = true
+description = "Routes standalone source publication and eval evidence through explicit owner surfaces."
+required_regex = ["source repository", "eval producers and archive owner", "agent-canon-log", "source tree unchanged"]
+
+[[evals]]
+id = "agent-canon-pr-gh-publish-workflow"
+target = "agents/workflows/agent-canon-pr-workflow.md"
+kind = "workflow"
+description = "The AgentCanon PR workflow binds standalone source ownership to qualified PR and main readback."
+
+[[evals.checklist]]
+id = "AGENT-CANON-PR-GH-PUBLISH-1"
+critical = true
+description = "Requires a qualified standalone source clone, Issue, branch, PR, merge, and main readback."
+required_regex = ["standalone source repository", "workspace/agent-canondevelop/<qualified-task>/agent-canon", "iwashita-nozomu/agent-canon#<number>", "source branch, PR, merge, and main readback"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-PR-GH-PUBLISH-2"
+critical = true
+description = "Requires runtime/source evidence and exact cleanup without a parent projection."
+required_regex = ["source status/content is unchanged", "task-owned containers/images/runtime paths are absent", "no AgentCanon vendor/submodule/root projection"]
+
+[[evals]]
+id = "agents-readme-routing-entrypoint"
+target = "agents/README.md"
+kind = "workflow"
+description = "The agents README routing entrypoint must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "AGENTS-README-1"
+critical = true
+description = "Includes dependency manifest markers and a title."
+required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals]]
+id = "task-workflows-routing-entrypoint"
+target = "agents/TASK_WORKFLOWS.md"
+kind = "workflow"
+description = "The task workflow routing entrypoint must be dependency-linked and reader-addressable."
+
+[[evals.checklist]]
+id = "TASK-WORKFLOWS-1"
+critical = true
+description = "Includes dependency manifest markers and a title."
+required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
+
+[[evals.checklist]]
+id = "CONVENTION-SKILL-ROUTING-1"
+critical = true
+description = "Routes skill selection through the catalog, runtime shims, and deterministic router owner row."
+required_regex = ["Workflow Contract Owners", "skill selection", "agents/skills/catalog\\.yaml", "python3 tools/agent/orchestration/route\\.py --prompt"]
+
+[[evals.checklist]]
+id = "VERTICAL-WAVE-POLICY-1"
+critical = true
+description = "Routes dynamic wave evidence to generated run-bundle and lifecycle owner surfaces."
+required_regex = ["Dynamic Wave Evidence", "schedule\\.md", "workflow_monitoring\\.md", "run\\.delegated_spawn_policy", "run\\.subagent_lifecycle_policy"]
+
+[[evals.checklist]]
+id = "TASK-WF-PRE-EDIT-PACKET-1"
+critical = true
+description = "Keeps pre-edit investigation in the generated common evidence packet and source-packet owner surfaces."
+required_regex = ["Common Evidence Packet", "document packets", "validation route", "Design Artifact Shape", "run bundle paths"]
+
+[[evals.checklist]]
+id = "TASK-WF-FRESH-CAPSULE-1"
+critical = true
+description = "Routes fresh subagent context through run-bundle packets and dynamic wave evidence."
+required_regex = ["Common Evidence Packet", "Subagent handoffs", "run bundle paths", "Dynamic Wave Evidence"]
+
+[[evals]]
+id = "agent-orchestration-skill-call-routing"
+target = ".codex/personal/skills/agent-orchestration/SKILL.md"
+canonical_target = "agents/skills/agent-orchestration.md"
+kind = "skill"
+description = "The discoverable orchestration shim points to the sole policy owner and consumes machine ToolCall tokens."
+
+[[evals.checklist]]
+id = "ORCH-SHIM-POINTER-1"
+critical = true
+description = "Points to the canonical policy and consumes semantic sufficiency through conditional structured transport."
+required_regex = [
+  "agents/skills/agent-orchestration\\.md",
+  "sole policy owner",
+  "semantic decision-sufficiency record",
+  "structured handoff or tool result is sufficient",
+  "durable packet reference only for coordination or resumption",
+]
+forbidden_regex = ["(?m)^## Decision Sufficiency Packet$", "agent-canon\\.decision-sufficiency\\.v1"]
+
+[[evals.checklist]]
+id = "ORCH-SHIM-TOOLCALL-1"
+critical = true
+description = "Consumes machine-readable ToolCall tokens and returns typed failures without prose command reconstruction."
+required_regex = ["machine-readable ToolCall tokens", "typed failure semantics", "without translating them into prose commands"]
+
+[[evals.checklist]]
+id = "ORCH-SHIM-DISCOVERY-1"
+critical = true
+description = "Keeps the generated skill-tool command block as discovery while route execution stays token-owned."
+required_regex = ["## Tool Commands", "skill-tool-commands:start", "skill_tool_commands\\.py show --skill agent-orchestration"]
+
+[[evals.checklist]]
+id = "ORCH-DOCS-FIRST-BOUNDED-1"
+critical = true
+description = "A bounded request uses the selected Skill body as the first operational owner and follows delegated owners only when needed."
+required_regex = ["Owner-First Read Trace", "agents/skills/catalog\\.yaml", "Reader Map row -> routing owner", "does not need one", "Skill body is the first", "do not follow a registry or", "operational_owner=", "owner_route=", "docs_first_status=resolved\\|unresolved", "implementation_read=locked\\|ready", "ready` is an admission state", "do not build a semantic index"]
+
+[[evals.checklist]]
+id = "ORCH-DOCS-FIRST-AMBIGUOUS-1"
+critical = true
+description = "A delegated path remains unresolved until read; an unresolved owner stays locked and uses bounded coordinated search."
+required_regex = ["Merely naming a delegated path", "docs_first_status=unresolved", "implementation_read=locked", "documents/tools/search-coordination\\.md", "Search results nominate an owner", "do not unlock implementation"]
+
+[[evals]]
+id = "codex-task-workflow-convention-gate"
+target = ".codex/personal/skills/codex-task-workflow/SKILL.md"
+canonical_target = "agents/skills/codex-task-workflow.md"
+kind = "skill"
+description = "The discoverable Codex task workflow skill must call convention compliance before closeout."
+
+[[evals.checklist]]
+id = "CONVENTION-SKILL-2"
+critical = true
+description = "Requires convention compliance verifier during repo task closeout and owner-bounded tool route evidence."
+required_regex = ["check_convention_compliance\\.py", "before closeout", "existing-tool route", "targeted-validation evidence"]
+
+[[evals.checklist]]
+id = "CODEX-TASK-PRE-EDIT-PACKET-1"
+critical = true
+description = "Requires the communication-protocol pre-edit packet before edits."
+required_regex = ["protocol-owned", "Pre-Edit Repository Investigation Packet", "agents/COMMUNICATION_PROTOCOL.md", "missing or shallow"]
+
+[[evals.checklist]]
+id = "CODEX-TASK-FRESH-CAPSULE-1"
+critical = true
+description = "Requires fresh subagent context capsules instead of chat history."
+required_regex = ["protocol-owned", "Fresh Subagent Context Capsule", "agents/COMMUNICATION_PROTOCOL.md", "chat history", "repo-root scope"]
+
+[[evals.checklist]]
+id = "CODEX-TASK-LITERATURE-FIRST-1"
+critical = true
+description = "Requires literature survey source packets in the skill call order before research workflow, design, and implementation for source-backed claims."
+required_regex = ["\\$literature-survey", "\\$research-workflow", "before design", "Implementation Source Packet", "adoption/exclusion"]
+
+[[evals.checklist]]
+id = "CODEX-TASK-OWNER-FIRST-1"
+critical = true
+description = "Transports the selected Skill and upstream-owner readback before the implementation stage."
+required_regex = ["Owner-First Readback", "agent-orchestration\\.md#Owner-First-Read-Trace", "docs_first_status=resolved", "implementation_read=ready", "implementation remains locked", "new durable packet"]
+
+[[evals]]
+id = "adaptive-improvement-loop-skill-shim"
+target = ".codex/personal/skills/adaptive-improvement-loop/SKILL.md"
+canonical_target = "agents/skills/adaptive-improvement-loop.md"
+kind = "skill"
+description = "The discoverable Codex skill must route durable iterative state through run-bundle evidence and prompt evals."
+
+[[evals.checklist]]
+id = "AIL-SHIM-1"
+critical = true
+description = "Uses run-bundle schedule, work log, and validation evidence when durable lifecycle state is required."
+required_regex = ["schedule\\.md", "work_log\\.md", "validation evidence"]
+
+[[evals.checklist]]
+id = "AIL-SHIM-2"
+critical = true
+description = "Requires frozen eval definitions before prompt or workflow tuning."
+required_regex = ["eval/definitions/skill_workflow_prompt_eval\\.toml", "evaluate_skill_workflow_prompts\\.py"]
+
+[[evals.checklist]]
+id = "AIL-SHIM-3"
+critical = true
+description = "Blocks loop closeout while eval drift remains."
+required_regex = ["Do not close", "eval"]
+
+[[evals.checklist]]
+id = "AIL-SHIM-4"
+critical = true
+description = "Requires behavior-event monitoring and agent behavior eval before closeout."
+required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eval\\.toml", "evaluate_agent_run\\.py"]
+
+[[evals.checklist]]
+id = "AIL-SHIM-6"
+critical = true
+description = "Routes runtime user/reviewer feedback into prompt, eval, or memory updates."
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair"]
+
+[[evals.checklist]]
+id = "AIL-SHIM-5"
+critical = true
+description = "Uses open work, next action, and validation evidence as the iteration gate."
+required_regex = ["open work", "next action", "validation evidence"]
+
+[[evals]]
+id = "adaptive-improvement-loop-human-skill"
+target = "agents/skills/adaptive-improvement-loop.md"
+kind = "skill"
+description = "The human skill canon must explain eval-driven prompt repair for iterative loops."
+
+[[evals.checklist]]
+id = "AIL-HUMAN-1"
+critical = true
+description = "Requires run-bundle schedule and work log for durable repo-level loops."
+required_regex = ["schedule\\.md", "work_log\\.md", "validation evidence"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-2"
+critical = true
+description = "Requires an eval per tested skill and workflow."
+required_regex = ["skill/workflow", "eval"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-3"
+critical = true
+description = "Requires prompt repair and rerun until no eval deviation remains."
+required_regex = ["prompt", "rerun", "no eval deviation"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-4"
+critical = true
+description = "Requires behavior-event capture and behavior eval repair for agent behavior tuning."
+required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-8"
+critical = true
+description = "Routes runtime feedback to a concrete prompt, eval, memory, or no-op decision."
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "eval_update", "knowledge_record"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-5"
+critical = true
+description = "Requires explicit iteration-state readback to keep iterations mechanical."
+required_regex = ["open backlog", "next action", "Iteration State Readback"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-6"
+critical = true
+description = "Requires static-analysis feedback and two-run path comparison to feed back into prompts."
+required_regex = ["static_analysis_feedback", "compare_agent_run_paths\\.py", "route_efficiency=inefficient", "selected_inefficient_route=yes"]
+
+[[evals.checklist]]
+id = "AIL-HUMAN-7"
+critical = true
+description = "Requires code-improvement iterations to carry hypothesis validation evidence."
+required_regex = ["hypothesis-validation-workflow\\.md", "Expected Mechanism", "Candidate Comparison", "Disconfirming Evidence", "Support Evidence", "Hypothesis Decision"]
+
+[[evals]]
+id = "adaptive-improvement-workflow"
+target = "agents/workflows/adaptive-improvement-workflow.md"
+kind = "workflow"
+description = "The workflow must make eval definition, measurement, prompt repair, and rerun a first-class loop stage."
+
+[[evals.checklist]]
+id = "AIL-WF-1"
+critical = true
+description = "Defines evals before choosing or changing an iteration."
+required_regex = ["skill/workflow eval", "eval/definitions/skill_workflow_prompt_eval\\.toml"]
+
+[[evals.checklist]]
+id = "AIL-WF-2"
+critical = true
+description = "Runs the mechanical eval tool, audit status, and growth-candidate gate as evidence."
+required_regex = ["evaluate_skill_workflow_prompts\\.py", "EVAL_STATUS=pass", "EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0"]
+
+[[evals.checklist]]
+id = "AIL-WF-3"
+critical = true
+description = "Repairs prompts and reruns the same eval until drift is gone."
+required_regex = ["prompt repair", "rerun", "eval drift"]
+
+[[evals.checklist]]
+id = "AIL-WF-4"
+critical = true
+description = "Repairs behavior eval feedback and reruns until agent behavior monitoring passes."
+required_regex = ["agent_behavior_eval\\.toml", "workflow_monitor\\.py --behavior-event", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals.checklist]]
+id = "AIL-WF-9"
+critical = true
+description = "Turns observed runtime feedback into structured monitoring plus prompt/eval/memory repair."
+required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-feedback", "target=...", "action=..."]
+
+[[evals.checklist]]
+id = "AIL-WF-5"
+critical = true
+description = "Uses schedule, work log, and validation evidence to decide whether to continue or close."
+required_regex = ["schedule\\.md", "work_log\\.md", "validation evidence", "次 iteration"]
+
+[[evals.checklist]]
+id = "AIL-WF-7"
+critical = true
+description = "Requires duplicate eval coverage to be consolidated instead of leaving parallel entries."
+required_regex = ["duplicate eval IDs", "duplicate explicit targets", "same target"]
+
+[[evals.checklist]]
+id = "AIL-WF-6"
+critical = true
+description = "Treats Codex goal state as session runtime state rather than a repository mirror."
+required_regex = ["session runtime state", "repository", "mirror"]
+
+[[evals.checklist]]
+id = "AIL-WF-8"
+critical = true
+description = "Requires two-run execution path comparison and static-analysis feedback repair."
+required_regex = ["compare_agent_run_paths\\.py", "execution_path", "route_efficiency", "static_analysis_feedback", "selected_inefficient_route"]
+
+[[evals]]
+id = "hypothesis-validation-workflow"
+target = "agents/workflows/hypothesis-validation-workflow.md"
+kind = "workflow"
+description = "The analysis-first overlay must force explicit code-improvement hypotheses before implementation."
+
+[[evals.checklist]]
+id = "HV-WF-1"
+critical = true
+description = "Requires separate code and header dependency evidence before hypothesis selection."
+required_regex = ["Code Dependency Evidence", "Header Dependency Evidence", "code dependency", "header dependency"]
+
+[[evals.checklist]]
+id = "HV-WF-2"
+critical = true
+description = "Requires the core hypothesis lifecycle fields before editing."
+required_regex = ["Observation", "Hypothesis", "Expected Mechanism", "Disconfirming Evidence", "Support Evidence", "Validation Before Edit"]
+
+[[evals.checklist]]
+id = "HV-WF-3"
+critical = true
+description = "Requires alternative fix-surface comparison instead of first-candidate edits."
+required_regex = ["Candidate Surfaces", "Candidate Comparison", "Selected Surface", "Rejected Surfaces"]
+
+[[evals.checklist]]
+id = "HV-WF-4"
+critical = true
+description = "Blocks implementation until the fix surface is validated."
+required_regex = ["fix_surface_validated=yes", "Expected Non-Surface", "Fix Surface Justification"]
+
+[[evals.checklist]]
+id = "HV-WF-5"
+critical = true
+description = "Requires post-change support/reject/inconclusive decisions and a next-hypothesis path."
+required_regex = ["Post-Change Evidence", "Hypothesis Decision", "supported", "rejected", "inconclusive", "Next Hypothesis"]
+
+[[evals.checklist]]
+id = "HV-WF-6"
+critical = true
+description = "Requires conditional cause investigation when causality is unresolved or alternatives can change owner, fix, or validation."
+required_regex = ["Gate H0\\.5", "causal ambiguity", "alternative", "owner", "fix surface", "validation route", "Cause Investigation Receipt", "Incoming Callers/Entrypoints", "Owning Mechanism/State/Guards", "Downstream Consumers/Side Effects/Cleanup", "Sibling Implementations/Tests/Docs/Config", "Reachability and Overcheck Analysis", "Alternative Disposition", "Selected Cause", "Action Derivation", "required_action", "cause_hypothesis_selected", "action_derived_from_cause", "validation_route_bound", "arbitrary full-repository scan|fixed candidate count"]
+
+[[evals.checklist]]
+id = "HV-WF-7"
+critical = true
+description = "Allows direct cause proof for straightforward findings and no receipt for rejected or already-covered findings."
+required_regex = ["straightforward finding", "direct cause proof", "rejected", "duplicate", "already-covered", "unreachable", "no named receipt|receipt は不要|receipt を要求しません"]
+
+[[evals.checklist]]
+id = "HV-WF-8"
+critical = true
+description = "Forbids unconditional receipt activation and fixed receipt schema enforcement."
+required_regex = ["fixed schema", "fixed candidate count", "conditional|該当する場合だけ"]
+forbidden_regex = ["every required_action.*receipt", "all findings.*receipt", "unconditional.*receipt", "receipt.*required.*every"]
+
+[[evals.checklist]]
+id = "HV-WF-9"
+critical = true
+description = "Negative scenario: a smallest-patch or symptom-only proposal fails after cause selection."
+required_regex = [
+  "Gate H0\\.75|根本原因に対する修正スコープ",
+  "root-cause[\\s\\S]*closure|root mechanism[\\s\\S]*(closure|closed)|根本原因[\\s\\S]*(closure|閉じ)",
+  "minimum-diff|smallest-local-patch|smallest patch|最小差分|最小パッチ",
+  "explicitly[\\s\\S]*prohibited|明示的に禁止|禁止します",
+  "[Ss]ymptom[\\s\\S]*suppression|症状抑制|症状だけから",
+  "wrapper|compatibility shim|wrapper / compatibility shim|ラッパー",
+  "test-only relaxation|oracle weakening|test-only relaxation / oracle weakening|テストだけの緩和",
+  "nearby local[\\s\\S]*patch|近傍行だけ|近傍.*修正",
+  "root mechanism[\\s\\S]*(closure|closed)|root mechanism[\\s\\S]*閉じ|根本機構[\\s\\S]*閉じ",
+]
+
+[[evals.checklist]]
+id = "HV-WF-10"
+critical = true
+description = "Positive scenario: the selected complete owning unit closes mechanism, effects, and contract surfaces."
+required_regex = [
+  "complete[\\s\\S]*replaceable[\\s\\S]*owning[\\s\\S]*responsibility[\\s\\S]*unit|complete[\\s\\S]*owning[\\s\\S]*unit|完全な差し替え可能な責務単位",
+  "root mechanism[\\s\\S]*(closed|closure)|root mechanism|根本機構",
+  "reachable[\\s\\S]*(consumer|effect)|到達可能な.*(consumer|影響)",
+  "side[\\s\\S]*effect|副作用",
+  "failure[\\s\\S]*(handling|path)|失敗処理|failure",
+  "rollback|ロールバック",
+  "cleanup|クリーンアップ",
+  "contract|契約",
+  "docs|documentation|文書",
+  "tests?|テスト",
+  "validation|検証",
+  "evidence[\\s\\S]*bounded|evidence-bounded|証拠.*bounded|証拠.*限定",
+  "complete_owning_unit_selected[\\s\\S]*root_mechanism_closed[\\s\\S]*reachable_effects_closed[\\s\\S]*contract_docs_tests_validation_closed|complete[\\s\\S]*unit[\\s\\S]*closed",
+]
+
+[[evals]]
+id = "change-review-cause-investigation"
+target = ".codex/personal/skills/change-review/SKILL.md"
+canonical_target = "agents/skills/change-review.md"
+kind = "skill"
+description = "Change review investigates cause and reachability when causality is unresolved before proposing action."
+
+[[evals.checklist]]
+id = "CR-CAUSE-1"
+critical = true
+description = "Requires evidence-linked incoming/outgoing cause traversal and selected-cause action derivation."
+required_regex = ["Cause Investigation Receipt", "Incoming Callers/Entrypoints", "Owning Mechanism/State/Guards", "Downstream Consumers/Side Effects/Cleanup", "Sibling Implementations/Tests/Docs/Config", "Reachability and Overcheck Analysis", "Alternative Disposition", "Selected Cause", "Expected Mechanism", "Action Derivation", "required_action", "cause_unproven"]
+
+[[evals.checklist]]
+id = "CR-CAUSE-2"
+critical = true
+description = "Requires bounded evidence-driven scope and a conditional temporal search."
+required_regex = ["evidence-linked", "arbitrary\\s+full-repository\\s+scan", "fixed number of candidates|fixed candidate count", "disconfirmed or bounded", "static[\\s\\S]*invariant", "latest remote/default branch|latest remote/Issue/branch history"]
+forbidden_regex = ["always.*full-repository scan", "exactly [0-9]+ candidates"]
+
+[[evals.checklist]]
+id = "CR-CAUSE-3"
+critical = true
+description = "Forbids making every action-bearing, rejected, duplicate, or unreachable finding carry a receipt."
+required_regex = ["conditional", "straightforward finding", "direct cause proof", "rejected", "duplicate", "already-covered", "unreachable", "no named receipt|receipt は不要|receipt を要求しません"]
+forbidden_regex = ["every required_action.*receipt", "all findings.*receipt", "unconditional.*receipt"]
+
+[[evals.checklist]]
+id = "CR-CAUSE-4"
+critical = true
+description = "Negative scenario: change review rejects a smallest-patch or symptom-only repair after cause selection."
+required_regex = [
+  "minimum-diff|smallest-local-patch|smallest patch|最小差分|最小パッチ",
+  "explicitly[\\s\\S]*prohibited|明示的に禁止|禁止します",
+  "[Ss]ymptom[\\s\\S]*suppression|症状抑制|症状だけから",
+  "wrapper|compatibility shim|wrapper / compatibility shim|ラッパー",
+  "test-only relaxation|oracle weakening|test-only relaxation / oracle weakening|テストだけの緩和",
+  "nearby local[\\s\\S]*patch|近傍行だけ|近傍.*修正",
+  "root mechanism[\\s\\S]*(closure|closed)|root mechanism[\\s\\S]*閉じ|根本機構[\\s\\S]*閉じ",
+]
+
+[[evals.checklist]]
+id = "CR-CAUSE-5"
+critical = true
+description = "Positive scenario: change review accepts only complete owning-unit closure across reachable effects and validation."
+required_regex = [
+  "complete[\\s\\S]*replaceable[\\s\\S]*owning[\\s\\S]*responsibility[\\s\\S]*unit|complete[\\s\\S]*owning[\\s\\S]*unit|完全な差し替え可能な責務単位",
+  "root mechanism[\\s\\S]*(closed|closure)|root mechanism|根本機構",
+  "reachable[\\s\\S]*(consumer|effect)|到達可能な.*(consumer|影響)",
+  "side[\\s\\S]*effect|副作用",
+  "failure[\\s\\S]*(handling|path)|失敗処理|failure",
+  "rollback|ロールバック",
+  "cleanup|クリーンアップ",
+  "contract|契約",
+  "docs|documentation|文書",
+  "tests?|テスト",
+  "validation|検証",
+  "evidence[\\s\\S]*bounded|evidence-bounded|証拠.*bounded|証拠.*限定",
+  "complete_owning_unit_selected[\\s\\S]*root_mechanism_closed[\\s\\S]*reachable_effects_closed[\\s\\S]*contract_docs_tests_validation_closed|complete[\\s\\S]*unit[\\s\\S]*closed",
+]
+
+[[evals]]
+id = "dependency-analysis-code-improvement-skill"
+target = ".codex/personal/skills/dependency-analysis/SKILL.md"
+canonical_target = "agents/skills/dependency-analysis.md"
+kind = "skill"
+description = "Dependency analysis routes ambiguous fix-surface selection through hypothesis validation."
+
+[[evals.checklist]]
+id = "DA-SKILL-HV-1"
+critical = true
+description = "Requires hypothesis-validation artifacts for code-improvement fix-surface selection."
+required_regex = ["hypothesis-validation-workflow\\.md", "Expected Mechanism", "Candidate Comparison", "Disconfirming Evidence", "Support Evidence", "fix_surface_validated=yes", "Hypothesis Decision"]
+
+[[evals.checklist]]
+id = "DA-SKILL-CAUSE-1"
+critical = true
+description = "Requires cause investigation breadth and action derivation before dependency-based fix selection."
+required_regex = ["Cause Investigation Receipt", "Incoming Callers/Entrypoints", "Owning Mechanism/State/Guards", "Downstream Consumers/Side Effects/Cleanup", "Sibling Implementations/Tests/Docs/Config", "Reachability/Overcheck|Reachability and Overcheck Analysis", "Alternative Disposition", "Selected Cause", "Expected Mechanism", "Action Derivation", "required_action", "arbitrary full-repository scan|fixed candidate count"]
+
+[[evals.checklist]]
+id = "DA-SKILL-CAUSE-2"
+critical = true
+description = "Requires conditional activation and direct proof for straightforward dependency findings."
+required_regex = ["causal ambiguity", "alternative", "owner", "fix surface", "validation route", "straightforward finding", "direct cause proof", "rejected", "duplicate", "already-covered", "unreachable", "no named receipt|receipt は不要|receipt を要求しません"]
+forbidden_regex = ["every required_action.*receipt", "all findings.*receipt", "unconditional.*receipt"]
+
+[[evals.checklist]]
+id = "DA-SKILL-CAUSE-3"
+critical = true
+description = "Negative scenario: dependency analysis rejects a smallest-patch or symptom-only repair after cause selection."
+required_regex = [
+  "minimum-diff|smallest-local-patch|smallest patch|最小差分|最小パッチ",
+  "explicitly[\\s\\S]*prohibited|明示的に禁止|禁止します",
+  "[Ss]ymptom[\\s\\S]*suppression|症状抑制|症状だけから",
+  "wrapper|compatibility shim|wrapper / compatibility shim|ラッパー",
+  "test-only relaxation|oracle weakening|test-only relaxation / oracle weakening|テストだけの緩和",
+  "nearby local[\\s\\S]*patch|近傍行だけ|近傍.*修正",
+  "root mechanism[\\s\\S]*(closure|closed)|root mechanism[\\s\\S]*閉じ|根本機構[\\s\\S]*閉じ",
+]
+
+[[evals.checklist]]
+id = "DA-SKILL-CAUSE-4"
+critical = true
+description = "Positive scenario: dependency analysis binds the complete owning unit and its downstream contract closure."
+required_regex = [
+  "complete[\\s\\S]*replaceable[\\s\\S]*owning[\\s\\S]*responsibility[\\s\\S]*unit|complete[\\s\\S]*owning[\\s\\S]*unit|完全な差し替え可能な責務単位",
+  "root mechanism[\\s\\S]*(closed|closure)|root mechanism|根本機構",
+  "reachable[\\s\\S]*(consumer|effect)|到達可能な.*(consumer|影響)",
+  "side[\\s\\S]*effect|副作用",
+  "failure[\\s\\S]*(handling|path)|失敗処理|failure",
+  "rollback|ロールバック",
+  "cleanup[\\s\\S]*(path)?|クリーンアップ",
+  "contract|契約",
+  "docs|documentation|文書",
+  "tests?|テスト",
+  "validation[\\s\\S]*(route)?|検証",
+  "evidence[\\s\\S]*bounded|evidence-bounded|証拠.*bounded|証拠.*限定",
+  "complete_owning_unit_selected[\\s\\S]*root_mechanism_closed[\\s\\S]*reachable_effects_closed[\\s\\S]*contract_docs_tests_validation_closed|complete[\\s\\S]*unit[\\s\\S]*closed",
+]
+
+[[evals]]
+id = "dependency-analysis-shim-code-improvement"
+target = "agents/skills/dependency-analysis.md"
+kind = "skill"
+description = "Discoverable dependency-analysis skill must validate ambiguous causes before implementation."
+
+[[evals.checklist]]
+id = "DA-SHIM-HV-1"
+critical = true
+description = "Requires implementation to wait for hypothesis fields and fix-surface validation."
+required_regex = ["code-improvement", "Expected Mechanism", "Candidate Comparison", "Disconfirming Evidence", "Support Evidence", "fix_surface_validated=yes", "Hypothesis Decision"]
+
+[[evals.checklist]]
+id = "DA-SHIM-CAUSE-1"
+critical = true
+description = "Requires dependency-analysis action proposals to derive from a selected cause rather than a symptom."
+required_regex = ["Cause Investigation Receipt", "required_action", "Selected Cause", "Expected Mechanism", "Action Derivation", "cause_unproven", "unreachable_branch", "overcheck"]
+
+[[evals.checklist]]
+id = "DA-SHIM-CAUSE-2"
+critical = true
+description = "Allows direct cause proof and exempts rejected or already-covered findings from receipt activation."
+required_regex = ["straightforward", "direct cause proof", "rejected", "duplicate", "already-covered", "unreachable", "no named receipt|receipt は不要|receipt を要求しません"]
+forbidden_regex = ["every required_action.*receipt", "all findings.*receipt", "unconditional.*receipt"]
+
+[[evals.checklist]]
+id = "DA-CHANGE-IMPACT-1"
+critical = true
+description = "Requires the structural scope-plan command and output fields."
+required_regex = ["python-structure-hash-scope-plan", "Change Impact Packet", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
+
+[[evals]]
+id = "token-efficient-codex-workflow"
+target = "agents/workflows/token-efficient-codex-workflow.md"
+kind = "workflow"
+description = "The token-efficient workflow must use observed runtime evidence, adaptive role materialization, and equivalent behavior comparison."
+
+[[evals.checklist]]
+id = "TOKEN-WF-1"
+critical = true
+description = "Rejects task-size profile selection and materializes roles from the active decision."
+required_regex = ["Adaptive Execution", "task-size estimate", "active decision", "stays inactive"]
+
+[[evals.checklist]]
+id = "TOKEN-WF-2"
+critical = true
+description = "Keeps parent, worker, Spark, and reviewer routing tied to explicit evidence."
+required_regex = ["gpt-5\\.6-sol/high", "review_focus", "worker", "spark_worker", "typed parent\\s+packet"]
+
+[[evals.checklist]]
+id = "TOKEN-WF-3"
+critical = true
+description = "Preserves owner-selected validation and normal closeout evidence."
+required_regex = ["normal closeout evidence", "dependency review", "validation selected", "changed responsibility unit"]
+
+[[evals.checklist]]
+id = "TOKEN-WF-4"
+critical = true
+description = "Requires equivalent measured token comparison without a hard ratio threshold."
+required_regex = [
+  "measured runtime claim",
+  "compare_codex_token_footprints\\.py",
+  "equivalent baseline\\s+and candidate session comparison",
+  "does\\s+not\\s+regress",
+  "hard acceptance\\s+threshold",
+  "unmeasured",
+]
+
+[[evals.checklist]]
+id = "TOKEN-TOOL-FIRST-1"
+critical = true
+description = "Calls tools first and treats pass/finding output as authority for covered properties."
+required_regex = ["For tool-covered questions", "call the canonical checker", "pass/finding output as the authority", "Hand structured tool artifacts to subagents"]
+
+[[evals]]
+id = "communication-protocol-pre-edit-context"
+target = "agents/COMMUNICATION_PROTOCOL.md"
+kind = "workflow"
+description = "Agent communication must define pre-edit investigation packets and fresh subagent context capsules."
+
+[[evals.checklist]]
+id = "COMM-PRE-EDIT-PACKET-1"
+critical = true
+description = "Defines the minimum evidence packet for pre-edit repository investigation."
+required_regex = ["Pre-Edit Repository Investigation Packet", "implementation_surface_route", "responsibility_search", "reuse_survey", "stale_surface_scan", "dependency_scope"]
+
+[[evals.checklist]]
+id = "COMM-FRESH-CAPSULE-1"
+critical = true
+description = "Defines fresh subagent context capsules without chat-history or raw-log dependence."
+required_regex = ["Fresh Subagent Context Capsule", "Subagents are fresh per launch", "context_artifacts", "allowed_paths", "do_not_read", "return_contract"]
+
+[[evals]]
+id = "codex-subagents-fresh-context"
+target = "agents/canonical/CODEX_SUBAGENTS.md"
+kind = "workflow"
+description = "Codex subagent canon must require structured context capsules for fresh launches."
+
+[[evals.checklist]]
+id = "CODEX-SUBAGENTS-FRESH-CAPSULE-1"
+critical = true
+description = "Keeps the context schema protocol-owned while reusing compatible agents and limiting fresh launches to independent or incompatible responsibility."
+required_regex = [
+  "fresh subagent は必要な launch ごとに",
+  "active agent を再利用",
+  "compatible な revised scope",
+  "独立 review",
+  "disjoint write authority",
+  "incompatible\\s+owner/context",
+  "context_artifacts",
+  "allowed_paths",
+  "do_not_read",
+  "return_contract",
+  "protocol-owned",
+  "schema の定義は\\s+同文書だけ",
+]
+
+[[evals]]
+id = "slide-production-workflow"
+target = "agents/workflows/slide-production-workflow.md"
+kind = "workflow"
+description = "The slide workflow must lock a template and preserve layout review for text, equations, images, and references."
+
+[[evals.checklist]]
+id = "SLIDE-WF-1"
+critical = true
+description = "Requires a fixed PPT template and a recorded template path."
+required_regex = ["fixed PPT template", "template path", "lock the template"]
+
+[[evals.checklist]]
+id = "SLIDE-WF-2"
+critical = true
+description = "Requires slots for text, equations, generated images, and references."
+required_regex = ["Title", "Body text", "Equation", "Generated image", "Reference block"]
+
+[[evals.checklist]]
+id = "SLIDE-WF-3"
+critical = true
+description = "Requires a layout review before closeout."
+required_regex = ["layout drift", "layout review", "reference visibility", "closeout checklist"]
+
+[[evals]]
+id = "codex-workflow-runtime-preflight"
+target = "agents/canonical/CODEX_WORKFLOW.md"
+kind = "workflow"
+description = "The Codex workflow must route token-saving and goal-driven requests."
+
+[[evals.checklist]]
+id = "CODEX-WF-TOKEN-1"
+critical = true
+description = "Routes token work through observation, adaptive materialization, and existing metric owners."
+required_regex = ["Token Observation And Adaptive Materialization", "Runtime evidence", "current decision", "typed parent packet", "Missing post-change runtime evidence", "active gates"]
+
+[[evals.checklist]]
+id = "CODEX-WF-GOALS-1"
+critical = true
+description = "Keeps goal state in the session and routes durable progress to run-bundle evidence."
+required_regex = ["Codex Goal Session State", "session runtime state", "schedule\\.md", "work_log\\.md", "validation evidence"]
+
+[[evals.checklist]]
+id = "CODEX-WF-GOALS-2"
+critical = true
+description = "Requires goal-driven plans to share objective, acceptance criteria, and work breakdown with execution evidence."
+required_regex = ["objective", "acceptance criteria", "work breakdown", "semantic handoff"]
+
+[[evals]]
+id = "oop-readability-external-repo-route"
+target = "agents/workflows/comprehensive-refactoring-workflow.md"
+kind = "workflow"
+description = "The comprehensive refactoring workflow must define the external-repo OOP analyzer route."
+
+[[evals.checklist]]
+id = "OOP-ROUTE-1"
+critical = true
+description = "Requires read-only snapshot analysis for external and bare repositories."
+required_regex = ["外部 repo", "bare repo", "git archive", "読み取り専用"]
+
+[[evals.checklist]]
+id = "OOP-ROUTE-2"
+critical = true
+description = "Requires explicit analyzer scope, excludes, reports, and reviewer prompt evidence."
+required_regex = ["OOP Analysis Scope", "Paths", "Excludes", "Markdown report", "JSON report", "oop_readability_reviewer"]
+
+[[evals.checklist]]
+id = "OOP-ROUTE-3"
+critical = true
+description = "Separates survey execution from closeout signal-class and human-review execution."
+required_regex = ["typed_boundary_evidence", "signal class outcome", "human review gate"]
+
+[[evals]]
+id = "oop-readability-skill-artifact"
+target = ".codex/personal/skills/oop-readability-check/SKILL.md"
+canonical_target = "agents/skills/oop-readability-check.md"
+kind = "skill"
+description = "The OOP readability runtime skill must create Markdown report artifacts by default."
+
+[[evals.checklist]]
+id = "OOP-RUNTIME-SKILL-1"
+critical = true
+description = "Requires tool-running modes to create a Markdown artifact by default and reject chat-only tables unless explicitly requested."
+required_regex = ["tool-running mode", "Markdown report artifact", "Chat-only tables", "no file / chat only"]
+
+[[evals.checklist]]
+id = "OOP-RUNTIME-SKILL-2"
+critical = true
+description = "Requires the final response to include the artifact path."
+required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "Include the artifact path in the final response"]
+
+[[evals]]
+id = "oop-readability-canonical-artifact"
+target = "agents/skills/oop-readability-check.md"
+kind = "skill"
+description = "The canonical OOP readability skill must define durable Markdown report artifacts."
+
+[[evals.checklist]]
+id = "OOP-CANONICAL-SKILL-1"
+critical = true
+description = "Requires Markdown artifacts by default and a single tool result as the source of truth."
+required_regex = ["Markdown report artifact by default", "Chat-only tables are insufficient", "Use one tool result as the source of truth"]
+
+[[evals.checklist]]
+id = "OOP-CANONICAL-SKILL-2"
+critical = true
+description = "Requires the durable report path and user-facing artifact path evidence."
+required_regex = ["reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>\\.md", "user-facing response must include the artifact path"]
+
+[[evals]]
+id = "oop-readability-tool-docs"
+target = "documents/conventions/object-oriented-design.md"
+kind = "docs"
+description = "The OOP design document must explain analyzer reports and external snapshot exclusions."
+
+[[evals.checklist]]
+id = "OOP-DOC-1"
+critical = true
+description = "Documents exclude usage for vendored snapshots and generated reports."
+required_regex = ["--exclude vendor", "--exclude reports", "commit SHA", "run bundle"]
+
+[[evals]]
+id = "oop-refactor-routing-scope"
+target = "agents/skills/refactor-loop.md"
+kind = "skill"
+description = "The refactor-loop skill must preserve OOP analyzer scope evidence."
+
+[[evals.checklist]]
+id = "OOP-SKILL-1"
+critical = true
+description = "Requires external OOP surveys to record commit, paths, excludes, and reports."
+required_regex = ["外部 repo", "commit SHA", "--exclude vendor --exclude reports", "Markdown / JSON report"]
+
+[[evals.checklist]]
+id = "REFACTOR-TOOL-FINDING-1"
+critical = true
+description = "Requires refactor-loop to consume tool-finding-report packets and repair prompt gaps before launching more write-capable subagents."
+required_regex = ["tool-finding-report", "finding packet", "impact", "handoff_prompt_gap", "write-capable subagent"]
+
+[[evals.checklist]]
+id = "REFACTOR-SCOPE-PLAN-1"
+critical = true
+description = "Requires refactor-loop to use the mechanical scope-plan output instead of manual block partitioning."
+required_regex = ["python-structure-hash-scope-plan", "Change Impact Packet", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
+
+[[evals]]
+id = "agent-learning-workflow-behavior-eval"
+target = "agents/workflows/agent-learning-workflow.md"
+kind = "workflow"
+description = "The agent learning workflow must grade observable behavior, not only final output."
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-1"
+critical = true
+description = "Defines behavior eval rubric ownership."
+required_regex = ["agent_behavior_eval\\.toml", "behavior eval"]
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-2"
+critical = true
+description = "Requires behavior events in workflow monitoring."
+required_regex = ["workflow_monitor\\.py --behavior-event", "## Behavior Events"]
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-3"
+critical = true
+description = "Lists observable agent behavior families."
+required_regex = ["skill invocation", "subagent lifecycle", "diff-check"]
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-4"
+critical = true
+description = "Requires runtime feedback capture and routing to prompt/eval/memory updates."
+required_regex = ["tools/runtime/lifecycle/workflow_monitor\\.py", "--runtime-feedback", "runtime_feedback=observed", "prompt_repair", "knowledge_record"]
+
+[[evals]]
+id = "workflow-monitoring-template-behavior-events"
+target = "templates/agents/workflow_monitoring.md"
+kind = "workflow"
+description = "The monitoring template must expose a behavior-event section for trace-like evals."
+
+[[evals.checklist]]
+id = "WMT-BEHAVIOR-1"
+critical = true
+description = "Includes a Behavior Events section and mechanical accumulation command."
+required_regex = ["## Behavior Events", "workflow_monitor\\.py --behavior-event"]
+
+[[evals.checklist]]
+id = "WMT-BEHAVIOR-2"
+critical = true
+description = "Mentions observable event families required by the behavior eval."
+required_regex = ["skill invocation", "subagent lifecycle", "diff-check"]
+
+[[evals.checklist]]
+id = "WMT-BEHAVIOR-3"
+critical = true
+description = "Exposes runtime feedback as a structured behavior event."
+required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-feedback", "target=<skill-or-workflow>"]
+
+[[evals]]
+id = "agent-behavior-eval-manifest"
+target = "eval/definitions/agent_behavior_eval.toml"
+kind = "eval"
+description = "The behavior eval manifest must cover observable run behavior families."
+
+[[evals.checklist]]
+id = "ABEM-1"
+critical = true
+description = "Defines criteria tables for behavior scoring."
+required_regex = ["\\[\\[criteria\\]\\]", "skill_invocation_recorded"]
+
+[[evals.checklist]]
+id = "ABEM-2"
+critical = true
+description = "Covers prompt eval, review feedback, subagent lifecycle, and diff-check behavior."
+required_regex = ["prompt_eval_behavior_recorded", "review_feedback_behavior_recorded", "subagent_lifecycle_behavior_recorded", "diff_check_behavior_recorded"]
+
+[[evals.checklist]]
+id = "ABEM-3"
+critical = true
+description = "Covers runtime feedback capture for prompt/eval/memory update loops."
+required_regex = ["runtime_feedback_prompt_update_recorded", "runtime_feedback=observed", "runtime_feedback_not_observed"]
+
+[[evals]]
+id = "agent-learning-skill-shim-behavior-eval"
+target = ".codex/personal/skills/agent-learning/SKILL.md"
+canonical_target = "agents/skills/agent-learning.md"
+kind = "skill"
+description = "The discoverable agent-learning skill must route behavior monitoring and behavior eval."
+
+[[evals.checklist]]
+id = "ALS-BEHAVIOR-1"
+critical = true
+description = "Requires behavior-event recording before closeout."
+required_regex = ["workflow_monitor\\.py", "behavior-event", "skill invocation"]
+
+[[evals.checklist]]
+id = "ALS-BEHAVIOR-2"
+critical = true
+description = "Requires behavior-manifest based run evaluation."
+required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml", "feedback action"]
+
+[[evals.checklist]]
+id = "ALS-BEHAVIOR-3"
+critical = true
+description = "Requires runtime feedback to be routed to update surfaces."
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "active-skill calibration", "calibration"]
+
+[[evals]]
+id = "agent-learning-human-skill-behavior-eval"
+target = "agents/skills/agent-learning.md"
+kind = "skill"
+description = "The human agent-learning skill must document behavior eval management."
+
+[[evals.checklist]]
+id = "ALH-BEHAVIOR-1"
+critical = true
+description = "Names workflow monitor behavior-event recording."
+required_regex = ["workflow_monitor\\.py --behavior-event", "subagent lifecycle", "diff-check"]
+
+[[evals.checklist]]
+id = "ALH-BEHAVIOR-2"
+critical = true
+description = "Names behavior manifest and pass status."
+required_regex = ["agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
+
+[[evals.checklist]]
+id = "ALH-BEHAVIOR-3"
+critical = true
+description = "Documents runtime feedback capture and prompt/eval/memory routing."
+required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "knowledge_record", "active-skill calibration", "first repair candidate", "hard rule"]
+
+[[evals.checklist]]
+id = "ALW-BEHAVIOR-6"
+critical = true
+description = "Requires active-skill feedback to calibrate prompt repair strength before private-knowledge-only closure."
+required_regex = ["active-skill calibration", "first repair candidate", "hard rule", "skill_improvement_decision=applied"]
+
+[[evals]]
+id = "evals-readme-behavior-eval"
+target = "eval/definitions/README.md"
+kind = "eval"
+description = "The eval directory README must document prompt and behavior eval management."
+
+[[evals.checklist]]
+id = "EVALS-README-BEHAVIOR-1"
+critical = true
+description = "Documents behavior eval command and manifest."
+required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml"]
+
+[[evals.checklist]]
+id = "EVALS-README-BEHAVIOR-2"
+critical = true
+description = "Requires behavior events to be recorded during the run."
+required_regex = ["workflow_monitor\\.py --behavior-event", "Record these events during the run"]
+
+[[evals.checklist]]
+id = "EVALS-README-AUDIT-1"
+critical = true
+description = "Documents prompt eval manifest duplicate and growth-candidate audit gates."
+required_regex = ["duplicate eval IDs", "duplicate explicit targets", "duplicate checklist IDs", "EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0"]
+
+[[evals.checklist]]
+id = "EVALS-README-ACCUMULATE-1"
+critical = true
+description = "Documents accumulated prompt eval results for skill use."
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/"]
+
+[[evals.checklist]]
+id = "EVALS-README-HOOK-GUIDE-1"
+critical = true
+description = "Documents hook result accumulation and PR/push improvement guide generation."
+required_regex = [".agent-canon/log-archive", "hook_run_id", "Agent Improvement Guide", "PRs and branch pushes"]
+
+[[evals.checklist]]
+id = "EVALS-README-PROMPT-FEEDBACK-1"
+critical = true
+description = "Documents prompt-derived candidate routing and human feedback evidence."
+required_regex = ["candidate skill / workflow / tool", "human feedback", "skill usage entries"]
+
+[[evals.checklist]]
+id = "EVALS-README-HOOK-PROMPT-FEEDBACK-1"
+critical = true
+description = "Requires skill_usage prompt candidate routing and human feedback fields."
+required_regex = ["candidate skill", "workflow / tool", "human feedback labels", "raw prompt text"]
+
+[[evals]]
+id = "tools-readme-prompt-eval-audit"
+target = "tools/README.md"
+canonical_target = "eval/definitions/README.md"
+kind = "tool-doc"
+description = "The tool index must document prompt eval manifest audit closeout gates."
+
+[[evals.checklist]]
+id = "TOOLS-README-EVAL-AUDIT-1"
+critical = true
+description = "Requires prompt eval audit status and growth-candidate zero closeout condition."
+required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplicate explicit targets"]
+
+[[evals.checklist]]
+id = "TOOLS-README-EVAL-ACCUMULATE-1"
+critical = true
+description = "Requires unique accumulated prompt eval report naming."
+required_regex = ["--accumulate", "EVAL_RUN_ID", "EVAL_ACCUMULATED_REPORT", "<eval_run_id>-<status>-<skill-slug>\\.md"]
+
+[[evals.checklist]]
+id = "TOOLS-README-IMPROVEMENT-GUIDE-1"
+critical = true
+description = "Documents the PR and branch-push improvement guide tool."
+required_regex = ["generate_agent_improvement_guide\\.py", "mounted runtime hook archive", "issues/open\\|closed/", "read-only evidence"]
+
+[[evals]]
+id = "agent-log-analysis-canonical-dashboard-api-skill"
+target = ".codex/personal/skills/agent-log-analysis/SKILL.md"
+canonical_target = "agents/skills/agent-log-analysis.md"
+kind = "skill"
+description = "The runtime agent-log-analysis skill must call the AgentCanon source dashboard API before reading evidence."
+
+[[evals.checklist]]
+id = "AGENT-LOG-API-SHIM-1"
+critical = true
+description = "Requires archive resolution plus the source dashboard API command."
+required_regex = ["runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-API-SHIM-2"
+critical = true
+description = "Keeps event-file drilldown exceptional and routes missing compact fields to the dashboard API owner."
+required_regex = ["dashboard_api_contract_gap", "dashboard API owner", "Event-file drilldown", "schema debugging", "corruption audit"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-SELECTION-ROUTE-SHIM-1"
+critical = true
+description = "Routes selection evidence by skill, tool, and workflow responsibility."
+required_regex = ["skill selection findings", "tool selection findings", "workflow selection findings", "tools/catalog\\.yaml", "agents/TASK_WORKFLOWS\\.md"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-EVAL-ACCUMULATION-SHIM-1"
+critical = true
+description = "Routes eval family gaps to the accumulated eval producer/checker skill instead of raw dashboard guessing."
+required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "producer/checker/archive loop"]
+
+[[evals]]
+id = "agent-log-analysis-canonical-dashboard-api-doc"
+target = "agents/skills/agent-log-analysis.md"
+kind = "skill-doc"
+description = "The human agent-log-analysis skill must define AgentCanon as source dashboard owner over the mounted log archive evidence."
+
+[[evals.checklist]]
+id = "AGENT-LOG-API-DOC-1"
+critical = true
+description = "Documents archive resolution and source dashboard API output."
+required_regex = ["external log archive", "runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-API-DOC-2"
+critical = true
+description = "Keeps raw JSONL inspection exceptional and routes missing compact fields to the dashboard API owner."
+required_regex = ["dashboard_api_contract_gap", "dashboard API owner", "event file drilldown", "schema debugging", "破損 audit"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-SELECTION-ROUTE-DOC-1"
+critical = true
+description = "Documents skill, tool, and workflow selection route classes."
+required_regex = ["skill_selection", "tool_selection", "workflow_selection", "tools/catalog\\.yaml", "agents/TASK_WORKFLOWS\\.md"]
+
+[[evals.checklist]]
+id = "AGENT-LOG-EVAL-ACCUMULATION-DOC-1"
+critical = true
+description = "Routes missing or stale accumulated eval families to the dedicated producer/checker loop."
+required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "run_accumulated_agent_evals\\.py"]
+
+[[evals]]
+id = "runtime-log-repair-skill"
+target = ".codex/personal/skills/runtime-log-repair/SKILL.md"
+canonical_target = "agents/skills/runtime-log-repair.md"
+kind = "skill"
+description = "Runtime log repair must turn dashboard evidence into owner-routed repair packets without taking over raw analysis or owner internals."
+
+[[evals.checklist]]
+id = "RUNTIME-LOG-REPAIR-SHIM-1"
+critical = true
+description = "Starts from agent-log-analysis dashboard artifacts and builds a Runtime Log Repair Packet."
+required_regex = ["agent-log-analysis-api\\.json", "agent-log-analysis-compact\\.md", "Runtime Log Repair Packet", "repair_class", "dashboard_evidence", "owner_surface", "closeout_gate"]
+
+[[evals.checklist]]
+id = "RUNTIME-LOG-REPAIR-SHIM-2"
+critical = true
+description = "Routes repairs to existing owners instead of owning raw analysis, evals, artifacts, issues, subagent launch, or prompt/config review."
+required_regex = ["\\$agent-eval-accumulation", "\\$result-artifact-writeout", "\\$issue-finding-report", "\\$subagent-bootstrap", "\\$task-routing", "\\$agent-learning", "does not own raw log analysis"]
+
+[[evals]]
+id = "runtime-log-repair-doc"
+target = "agents/skills/runtime-log-repair.md"
+kind = "skill-doc"
+description = "Human runtime-log-repair skill must define owner-routed dashboard repair boundaries."
+
+[[evals.checklist]]
+id = "RUNTIME-LOG-REPAIR-DOC-1"
+critical = true
+description = "Defines dashboard evidence inputs, repair packet fields, owner route, non-goals, and closeout gate."
+required_regex = ["agent-log-analysis", "Runtime Log Repair Packet", "repair_class", "dashboard_evidence", "owner_surface", "non_goals", "closeout_gate"]
+
+[[evals.checklist]]
+id = "RUNTIME-LOG-REPAIR-DOC-2"
+critical = true
+description = "Keeps dashboard schema, raw analysis, eval loops, artifacts, durable issues, subagent mechanics, prompt/config review, hooks, and reference extraction with existing owners."
+required_regex = ["Raw log compaction", "dashboard API schema", "agent-eval-accumulation", "result-artifact-writeout", "issue-finding-report", "subagent-bootstrap", "reference extraction internals"]
+
+[[evals]]
+id = "agent-eval-accumulation-skill"
+target = ".codex/personal/skills/agent-eval-accumulation/SKILL.md"
+canonical_target = "agents/skills/agent-eval-accumulation.md"
+kind = "skill"
+description = "Accumulated eval repair must use registered producers, compact checker output, and archive sync instead of hand-generated reports."
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-SHIM-1"
+critical = true
+description = "Starts with the compact accumulation checker."
+required_regex = ["eval_accumulation_check\\.py", "--compact-out", "eval-accumulation-before\\.json"]
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-SHIM-2"
+critical = true
+description = "Runs the registered producer, records used skills, and treats captured stdout/stderr as transient."
+required_regex = ["run_accumulated_agent_evals\\.py", "--skill-used", "reports/agent-eval-runs/<run-id>", "transient"]
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-SHIM-3"
+critical = true
+description = "Forbids hand-generated eval reports, requires archive persistence, and blocks regeneratable stdout/stderr leftovers."
+required_regex = ["Do not hand-generate eval reports", "runtime_log_archive_git\\.py", "sync", "generated_artifact_guard\\.py"]
+
+[[evals]]
+id = "agent-eval-accumulation-doc"
+target = "agents/skills/agent-eval-accumulation.md"
+kind = "skill-doc"
+description = "The human accumulated eval skill must define producer/checker/archive responsibilities and boundaries."
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-DOC-1"
+critical = true
+description = "Defines the compact checker and registered producer loop."
+required_regex = ["eval_accumulation_check\\.py", "run_accumulated_agent_evals\\.py", "registered producer"]
+
+[[evals.checklist]]
+id = "AGENT-EVAL-ACCUMULATION-DOC-2"
+critical = true
+description = "Keeps generated evidence append-only in the archive and separates reader-facing reporting."
+required_regex = ["append-only", "runtime_log_archive_git\\.py", "\\$report-writing", "generated_artifact_guard\\.py"]
+
+[[evals]]
+id = "agent-canon-update-routing"
+target = ".codex/personal/skills/agent-canon-update/SKILL.md"
+canonical_target = "agents/skills/agent-canon-update.md"
+kind = "skill"
+description = "The runtime AgentCanon update skill routes standalone source work through the shared bootstrap and qualified PR lifecycle."
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-SHIM-1"
+critical = true
+description = "Requires explicit shared bootstrap roots and target registration."
+required_regex = ["bootstrap\\.sh", "--control-parent-root", "<install-root>/.runtime/", "target add", "tool run --root <project-root> <verified-catalog-id>"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-SHIM-2"
+critical = true
+description = "Keeps AgentCanon standalone and uses a qualified disposable development clone without restoring vendor state."
+required_regex = ["workspace/agent-canondevelop/<qualified-task>/agent-canon", "Do not restore a", "submodule", "source branch", "AgentCanon PR", "iwashita-nozomu/agent-canon#"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-SHIM-3"
+critical = true
+description = "Requires external eval/archive evidence and exact resource cleanup."
+required_regex = ["eval collect", "eval sync", "iwashita-nozomu/agent-canon-log", "source tree unchanged", "docker system prune", "exact task-owned resources"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-PARENT-SCOPE-1"
+critical = true
+description = "A source-free parent migration freezes only exact AgentCanon management edges and hands parent semantics back to their owner."
+required_regex = ["Source-Free Parent Migration Boundary", "management_write_set=", "immutable_parent_surfaces=", "mixed_file_limit=", "migration_status=unresolved\\|ready\\|parent_owner_handoff_required", "Placeholders, directory-wide globs", "Do not place an unresolved candidate", "perform no parent mutation", "docker/\\*\\*", "numerical tests", "UID/GID", "safe\\.directory", "bind mounts", "GPU behavior", "source_free_boundary", "parent_product_validation"]
+
+[[evals]]
+id = "agent-canon-update-route-doc"
+target = "agents/skills/agent-canon-update.md"
+kind = "skill-doc"
+description = "The AgentCanon update owner documents the standalone source, bootstrap, archive, and publication frontier."
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-DOC-1"
+critical = true
+description = "Consumes the standalone bootstrap and runtime/archive owners."
+required_regex = ["documents/runtime/bootstrap-runtime\\.md", "CONTAINER_OPERATIONS\\.md", "runtime-log-archive\\.md", "agent-canon-pr-workflow\\.md"]
+
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-DOC-2"
+critical = true
+description = "Publishes the owning source PR before any parent consumption and keeps Issue identities qualified."
+required_regex = ["Commit with the owning Issue reference", "push the topic branch", "open/update", "After merge", "Only then update a parent revision", "iwashita-nozomu/agent-canon#"]
+
+[[evals]]
+id = "source-free-parent-migration-scope"
+target = "documents/contracts/derived-repo-bootstrap-runbook.md"
+kind = "workflow"
+description = "The source-free migration runbook limits writes to AgentCanon management edges and preserves parent product/environment ownership."
+
+[[evals.checklist]]
+id = "SOURCE-FREE-PARENT-SCOPE-1"
+critical = true
+description = "Defines the exact allowed migration set and default immutable parent surfaces."
+required_regex = ["Migration write boundary", "management_write_set", "placeholders and directory globs", "reported outside", "migration_status=unresolved", "gitlink/submodule", "exact AgentCanon dispatch/reference spans", "docker/\\*\\*", "product/numerical code and tests", "UID/GID", "safe\\.directory", "bind-mount", "GPU behavior", "parent_owner_handoff_required"]
+
+[[evals.checklist]]
+id = "SOURCE-FREE-PARENT-RECEIPT-1"
+critical = true
+description = "Keeps source-free boundary evidence separate from parent product validation."
+required_regex = ["source_free_boundary", "parent_product_validation", "neither receipt substitutes"]
+
+[[evals]]
+id = "p5-generated-runtime-profile-projection"
+target = "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
+kind = "workflow"
+description = "The runtime profile projection gate is generated, topology-derived, and preserves typed capacity-domain separation."
+
+[[evals.checklist]]
+id = "P5-RUNTIME-PROJECTION-1"
+critical = true
+description = "Requires the closed generated role view and registry materializer parity gate."
+required_regex = ["generated_role_view_v1", "generate_role_views", "closed eight-field projection", "agents_config projection diverges"]
+
+[[evals.checklist]]
+id = "P5-RUNTIME-PROJECTION-2"
+critical = true
+description = "Requires declared topology derivation, exact 21+6 proof, and typed capacity requests."
+required_regex = ["declared_team_peak_plus_nested_reservations_v1", "requested_max_threads.*27", "direct_frontier_count == 21", "nested_reservation_count == 6", "task_catalog_capacity_request_v1", "team_manifest.run.write_scopes"]
+
+[[evals]]
+id = "p5-role-profile-attribution"
+target = "eval/producers/evaluate_codex_agent_roles.py"
+kind = "workflow"
+description = "The role evaluator attributes profile and capacity evidence without becoming policy truth."
+
+[[evals.checklist]]
+id = "P5-ROLE-ATTRIBUTION-1"
+critical = true
+description = "Requires profile attribution and numeric-spawn duplicate rejection."
+required_regex = ["profile-attribution", "numeric-spawn-budget-duplicate", "declared-21-plus-6-does-not-derive-27"]
+
+[[evals]]
+id = "pr-processing-dependency-activation"
+target = "agents/skills/pr-processing.md"
+kind = "skill"
+description = "Queue planning activates only for actual inter-candidate dependency or conflict evidence."
+
+[[evals.checklist]]
+id = "PR-OPS-SEMANTIC-1"
+critical = true
+required_regex = ["single-candidate fast path", "base/head/diff/check/authority", "dependency evidence"]
+
+[[evals.checklist]]
+id = "PR-OPS-ISSUE-IDENTITY-1"
+critical = true
+description = "Requires repository-qualified Issue identity across progress, handoff, publication, and readback."
+required_regex = ["Repository-qualified Issue identity", "owner/repository#number", "issue_repository", "issue_number", "issue_ref", "issue_url", "consumer_issue_ref", "upstream_issue_ref", "Do not emit a bare"]
+
+[[evals]]
+id = "task-routing-canonical-state"
+target = "agents/skills/task-routing.md"
+kind = "skill"
+description = "Routing has one selected set plus evidence-backed deferred candidates."
+
+[[evals.checklist]]
+id = "ROUTE-OPS-SEMANTIC-1"
+critical = true
+required_regex = ["SELECTED_SKILLS", "DEFERRED_CANDIDATES", "one source of truth", "compatibility", "not independent state owners"]
+
+[[evals]]
+id = "structure-refactor-bounded-repair"
+target = "agents/skills/structure-refactor.md"
+kind = "skill"
+description = "Known drift uses direct reconciliation; review scope expands only on concrete evidence."
+
+[[evals.checklist]]
+id = "STRUCTURE-OPS-SEMANTIC-1"
+critical = true
+required_regex = ["detect the drift", "canonical repair", "read back", "resume"]
+
+[[evals.checklist]]
+id = "STRUCTURE-OPS-SEMANTIC-2"
+critical = true
+required_regex = ["changed subtree", "reverse edges", "owner boundary", "full-tree", "concrete evidence"]
+
+[[evals]]
+id = "report-writing-conditional-provenance-and-reader-guide"
+target = ".codex/personal/skills/report-writing/SKILL.md"
+canonical_target = "agents/skills/report-writing.md"
+description = "External provenance and evaluation reader guidance activate when those report claims are in scope."
+
+[[evals.checklist]]
+id = "REPORT-PROVENANCE-READER-GUIDE-1"
+critical = true
+required_regex = ["external references", "URL/DOI", "access date", "adoption/exclusion decision", "browser tab", "temporary download", "chat-only"]
+
+[[evals.checklist]]
+id = "REPORT-PROVENANCE-READER-GUIDE-2"
+critical = true
+required_regex = ["reader guide", "denominator", "directionality", "valid and invalid", "what result would change the next action"]
+
+[[evals]]
+id = "agent-orchestration-canonical-report-routing"
+target = "agents/skills/agent-orchestration.md"
+kind = "skill"
+description = "The canonical agent-orchestration skill must route reader-facing result reports to report-writing."
+
+[[evals.checklist]]
+id = "REPORT-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and adds result-artifact-writeout when raw machine results are stored."
+required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / JSONL", "result-artifact-writeout", "evidence-backed"]
+
+[[evals.checklist]]
+id = "DSV-ZERO-VALUE-1"
+critical = true
+description = "Rejects zero-value reads, searches, reviews, and checks when they cannot change the next decision."
+required_regex = [
+  "same owner, unit, mechanism, and validation\\s+route",
+  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
+  "otherwise return to the selected work",
+  "do not manufacture a zero-value investigation, packet, or review stage",
+]
+
+[[evals.checklist]]
+id = "OWNER-BOUNDED-PUBLIC-SURFACE-HUMAN-1"
+critical = true
+description = "The canonical owner-bounded route requires public-surface invariance and escalates every public delta with full consumer closure."
+required_regex = [
+  "design / OOP boundary と ownership clarity",
+  "owner boundary",
+  "public API/behavior/schema の追加、縮小、\\s*削除、rename、restriction、deprecation、意味変更",
+  "`scoped_change` または broader route",
+  "dependency/consumer/migration/docs closure",
+]
+
+[[evals.checklist]]
+id = "DSV-BRANCH-NAMING-1"
+critical = true
+description = "Requires only unresolved branches that can change the owner, unit, mechanism, or validation route."
+required_regex = [
+  "each unresolved branch that could change the owner, unit, mechanism, or route",
+  "changes_next_decision",
+  "unresolved owner/edit/validation\\s+branch",
+]
+
+[[evals.checklist]]
+id = "DSV-SPARK-FAST-PATH-1"
+critical = true
+description = "Keeps Spark scoped to explicit typed selection and routes one owner gate without broad review or test stages."
+required_regex = [
+  "固定 Spark implementation route",
+  "parent packet が.*--select-agent-type implementer=spark_worker:<evidence>",
+  "one owning review gate",
+  "Do not materialize empty reviewer or template artifacts",
+  "Validation is static/targeted first",
+  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
+]
+
+[[evals.checklist]]
+id = "DSV-IRRELEVANT-UNKNOWN-POSITIVE-1"
+critical = true
+description = "An irrelevant unknown may be serialized while remaining non-blocking and non-decision-changing."
+required_regex = [
+  "affects_owner_edit_validation",
+  "\\\"blocking\\\": false",
+  "\\\"serialized_in_decision_packet\\\": true",
+  "Unknowns that cannot change the next decision are non-blocking\\s+and may remain in local context",
+]
+
+[[evals.checklist]]
+id = "DSV-IRRELEVANT-UNKNOWN-NEGATIVE-1"
+critical = true
+description = "The owner prevents irrelevant unknowns and missing evidence fields from becoming blocking gates."
+required_regex = [
+  "Unknowns that cannot change the next decision are non-blocking",
+  "Do not convert missing artifact fields, counts, or digests into\\s+a new mandatory gate",
+  "affects_owner_edit_validation",
+]
+
+[[evals.checklist]]
+id = "DSV-NO-THRESHOLD-1"
+critical = true
+description = "Rejects fixed thresholds and zero-value repeat reads when they cannot change the owner decision."
+required_regex = [
+  "\\\"threshold_policy\\\": \\\"none\\\"",
+  "No artifact shape, digest, count, or fixed stage sequence is a substitute",
+  "no hypothesis-space or read-count form is\\s+required",
+  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
+]
+
+[[evals.checklist]]
+id = "VERTICAL-WAVE-POLICY-3"
+critical = true
+description = "Requires launchable owner-bounded waves, one owning gate, and targeted-final validation without default review or test waves."
+required_regex = [
+  "ready dependency-DAG frontier",
+  "stage owner",
+  "vertical dynamic wave",
+  "Select one owning review gate for the claims in one replaceable responsibility",
+  "Activate a specialist only when a distinct unresolved claim or risk cannot be\\s+judged by that gate",
+  "Validation is static/targeted first",
+  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
+  "Do not materialize empty reviewer or template artifacts",
+]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes explicit HTML/browser output to html-output while keeping report output Markdown by default."
+required_regex = ["html-output", "Markdown", "HTML", "external browser publication", "experiment / Eval artifact"]
+
+[[evals.checklist]]
+id = "STRUCTURE-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
+required_regex = ["structure-planning", "prose-reasoning-graph", "experiment plan / report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
+required_regex = ["tool、checker、hook、static analysis", "tool-finding-report", "before / after impact"]
+
+[[evals]]
+id = "experiment-lifecycle-owner-contract"
+target = ".codex/personal/skills/experiment-lifecycle/SKILL.md"
+canonical_target = "agents/skills/experiment-lifecycle.md"
+kind = "skill"
+description = "Experiment lifecycle is the sole run-state owner; artifact, report, HTML, and annex retention work remain explicit owners."
+
+[[evals.checklist]]
+id = "EXPERIMENT-LIFECYCLE-OWNER-1"
+critical = true
+required_regex = ["Own one experiment run", "Run identity/state", "reproducibility core", "terminal status"]
+
+[[evals.checklist]]
+id = "EXPERIMENT-LIFECYCLE-OWNER-2"
+critical = true
+required_regex = ["result-artifact-writeout", "report-writing", "html-output", "save_experiment_result_annex.py", "explicit"]
+forbidden_regex = ["html-experiment-report", "save-experiment-results"]
+
+[[evals.checklist]]
+id = "EXPERIMENT-LIFECYCLE-OWNER-3"
+critical = true
+required_regex = ["No universal filename inventory", "actually exist", "producer-specific"]
+forbidden_regex = ["requires a synthetic missing-artifact limitation"]
+
+
+[[evals.checklist]]
+id = "EXPERIMENT-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before nontrivial experiment planning or report generation."
+required_regex = ["structure-planning", "experiment planning", "rerun planning", "result report generation", "HTML view generation", "validation gate"]
+
+[[evals.checklist]]
+id = "EXPERIMENT-STRUCTURE-2"
+critical = true
+description = "Connects experiment planning/reporting to discourse-relations profiles when causal or evidence transitions are nontrivial."
+required_regex = ["discourse-relations", "experiment-report", "methods-protocol", "advisory edge evidence"]
+
+[[evals]]
+id = "result-artifact-writeout-owner-contract"
+target = ".codex/personal/skills/result-artifact-writeout/SKILL.md"
+canonical_target = "agents/skills/result-artifact-writeout.md"
+kind = "skill"
+description = "Result artifact writeout owns only concrete file identity, role, checksum, durable readback, and no-overwrite behavior."
+
+[[evals.checklist]]
+id = "RESULT-ARTIFACT-OWNER-1"
+critical = true
+required_regex = ["Persist concrete outputs", "semantic role", "content checksum", "Do not overwrite", "readback"]
+
+[[evals.checklist]]
+id = "RESULT-ARTIFACT-OWNER-2"
+critical = true
+required_regex = ["No fixed artifact inventory", "actually generated", "does not imply a Git branch", "explicit operation"]
+forbidden_regex = ["save-experiment-results"]
+
+[[evals.checklist]]
+id = "RESULT-ARTIFACT-OWNER-3"
+critical = true
+required_regex = ["report-writing only when", "html-output", "experiment-lifecycle"]
+forbidden_regex = ["requires a fixed number of manifest entries"]
+
+
+[[evals.checklist]]
+id = "RESULT-ARTIFACT-OWNER-4"
+critical = true
+description = "Retains failed and partial run evidence with status and exit-code identity."
+required_regex = ["failed", "partial", "status", "exit code"]
+
+[[evals]]
+id = "html-output-owner-contract"
+target = ".codex/personal/skills/html-output/SKILL.md"
+canonical_target = "agents/skills/html-output.md"
+kind = "skill"
+description = "HTML output owns artifact generation and validation; preview, serving, and publication are explicit delivery operations."
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-OWNER-1"
+critical = true
+required_regex = ["generation and validation", "A listen socket is not required", "only.*explicitly requests"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-OWNER-2"
+critical = true
+required_regex = ["artifact identity/path", "source/provenance", "validation actually selected"]
+forbidden_regex = ["html-experiment-report"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-OWNER-3"
+critical = true
+required_regex = ["Do not emit `not_requested`", "fixed token count/field presence"]
+
+
+[[evals.checklist]]
+id = "HTML-OPS-SEMANTIC-1"
+critical = true
+description = "HTML artifact correctness remains distinct from optional serving and publication."
+required_regex = ["generation and validation", "explicitly requested", "separate delivery operations", "only.*explicitly requests", "source/provenance"]
+
+[[evals]]
+id = "experiment-wrapper-public-surface-removal"
+target = "agents/skills/catalog.yaml"
+kind = "skill"
+description = "Removed experiment wrapper identities cannot re-enter the public catalog."
+
+[[evals.checklist]]
+id = "EXPERIMENT-WRAPPER-CATALOG-1"
+critical = true
+forbidden_regex = ["html-experiment-report", "save-experiment-results"]
+
+[[evals]]
+id = "experiment-wrapper-classifier-removal"
+target = "tools/agent/orchestration/prompt_classifier.py"
+kind = "skill"
+description = "Prompt classification composes direct owners instead of selecting a removed wrapper."
+
+[[evals.checklist]]
+id = "EXPERIMENT-WRAPPER-CLASSIFIER-1"
+critical = true
+required_regex = ["experiment-lifecycle", "html-output", "result-artifact-writeout"]
+forbidden_regex = ["html-experiment-report", "save-experiment-results"]

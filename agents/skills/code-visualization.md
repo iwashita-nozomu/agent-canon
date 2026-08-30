@@ -8,9 +8,9 @@ upstream design algorithm-flowchart.md JIT-canonical algorithm and proof-state c
 upstream design structure-refactor.md architecture and responsibility-map evidence
 upstream design prose-reasoning-graph.md shared graph projection contract
 upstream design html-output.md browser-readable rendering route
-upstream implementation ../../tools/agent_tools/visualization_contract.py owns the exact D2.4 seven-function API and ToolCall validation
-upstream implementation ../../tools/agent_tools/route.py emits the singular canonical owner route
-downstream implementation ../../.agents/skills/code-visualization/SKILL.md exposes the skill to Codex.
+upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns the exact D2.4 seven-function API and ToolCall validation
+upstream implementation ../../tools/agent/orchestration/route.py emits the singular canonical owner route
+downstream implementation ../../.codex/personal/skills/code-visualization/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
 
@@ -48,7 +48,7 @@ source fact の抽出は
 ## Canonical Contract And Ownership
 
 `code-visualization` is the sole public entrypoint and policy owner for every
-visualization. `tools/agent_tools/visualization_contract.py` is the single exact
+visualization. `tools/validation/semantic/tools/visualization_contract.py` is the single exact
 typed implementation module for `VisualizationSourceUniverse`,
 `ProjectionCoverageManifest`, canonical `ToolCall` validation, deterministic
 coverage/readback digests, and typed rejection statuses. Skills and renderers
@@ -209,13 +209,13 @@ owner skill or renderer. For repository/code-space dependency visualization,
 the small-model direct route is self-sufficient after that gate:
 
 ```bash
-python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
+python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
 ```
 
 Use this exact changed-scope command only when changed scope is explicit:
 
 ```bash
-python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json
+python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json
 ```
 
 Treat these two commands as immutable flag templates. Copy the selected

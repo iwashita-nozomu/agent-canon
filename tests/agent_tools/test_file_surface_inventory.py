@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests file-surface inventory scope classification.
-# upstream implementation ../../tools/agent_tools/file_surface_inventory.py builds inventory reports
+# upstream implementation ../../tools/analysis/code/file_surface_inventory.py builds inventory reports
 # @dependency-end
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-INVENTORY = PROJECT_ROOT / "tools" / "agent_tools" / "file_surface_inventory.py"
+INVENTORY = PROJECT_ROOT / "tools" / "analysis" / "code" / "file_surface_inventory.py"
 
 
 class FileSurfaceInventoryTest(unittest.TestCase):

@@ -75,12 +75,12 @@ does not prove a token reduction.
 
 ## Existing Metric Owners
 
-- `tools/agent_tools/compare_codex_token_footprints.py` owns equivalent baseline
+- `eval/checkers/compare_codex_token_footprints.py` owns equivalent baseline
   and candidate session comparison.
-- `tools/agent_tools/evaluate_codex_agent_roles.py` owns observed per-role calls,
+- `eval/producers/evaluate_codex_agent_roles.py` owns observed per-role calls,
   tokens, latency, retries, parent interventions, format compliance, and output
   use.
-- `tools/agent_tools/generate_agent_runtime_dashboard.py` owns accumulated
+- `eval/producers/generate_agent_runtime_dashboard.py` owns accumulated
   trends.
 - Record the compared envelope, source sessions, totals, ratio, and behavior
   eval result. Do not introduce another per-wave token schema or hard acceptance
@@ -113,4 +113,4 @@ candidate token evidence explicit.
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

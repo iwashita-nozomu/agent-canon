@@ -4,9 +4,9 @@ contract reference
 responsibility Defines checklist and manifest format for skill, prompt, and workflow behavior evals.
 upstream design ../../agents/canonical/skills.md defines skill registry.
 upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines subagent routing.
-upstream design ../../.agents/skills/code-visualization/SKILL.md defines the runtime route under evaluation.
+upstream design ../../.codex/personal/skills/code-visualization/SKILL.md defines the runtime route under evaluation.
 upstream design ../../agents/skills/code-visualization.md defines the canonical route contract under evaluation.
-downstream implementation ../../evidence/agent-evals/issue_eval_manifest.toml registers issue-derived eval cases.
+downstream implementation ../../eval/definitions/issue_eval_manifest.toml registers issue-derived eval cases.
 downstream implementation ../../.github/ISSUE_TEMPLATE/eval-capture.yml captures new eval candidates.
 downstream implementation ../../.github/PULL_REQUEST_TEMPLATE.md requires eval evidence.
 @dependency-end
@@ -48,7 +48,7 @@ messages, task routing, or closeout rules.
 ## Manifest Format
 
 Issue-derived evals are registered in
-`evidence/agent-evals/issue_eval_manifest.toml`. Each row records category, source
+`eval/definitions/issue_eval_manifest.toml`. Each row records category, source
 issue, protected behavior, expected route, forbidden route, oracle type, and
 linked rule/tool/workflow.
 
@@ -127,8 +127,8 @@ fields are derived by the parent and cannot be supplied as parent decisions by
 the evaluator. The parent also owns iteration convergence and final completion;
 neither is implied by `evaluation_status=pass`. The route requirements are:
 
-- `full` uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json`.
-- `changed` uses exactly `python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json`, and only when changed scope is explicit.
+- `full` uses exactly `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json`.
+- `changed` uses exactly `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json`, and only when changed scope is explicit.
 - `--json` is invalid. The canonical graph owns dependency status and facts.
   The renderer performs one typed query and owns the six projections; no
   supplied-input or parser fallback exists.

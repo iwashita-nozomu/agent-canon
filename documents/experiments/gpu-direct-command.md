@@ -6,11 +6,11 @@ contract design
 responsibility Defines the provider-independent GPU admission state machine, direct-command adapter, exact environment, lifecycle evidence, and direct-versus-managed selection boundary.
 upstream design ./gpu-admission-r5-source-packet.md canonical GPU discovery, occupancy, reservation, and plan ownership
 upstream design ./gpu-admission-r5-nvidia-visibility.md strict NVIDIA topology and full UUID evidence boundary
-downstream implementation ../../tools/experiments/execution_resource_plan.py canonical NVIDIA evidence, BUSY/UNKNOWN/FREE classification, UUID lock, and admission receipt owners
-downstream implementation ../../tools/experiments/gpu_command_admission.py direct admission composition, immutable plan, exact environment, execution lifecycle, and release owner
-downstream implementation ../../tools/experiments/run_gpu_command.py shell-free direct-command CLI adapter
-downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
-downstream implementation ../../tools/ci/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
+downstream implementation ../../tools/experiments/execution/execution_resource_plan.py canonical NVIDIA evidence, BUSY/UNKNOWN/FREE classification, UUID lock, and admission receipt owners
+downstream implementation ../../tools/experiments/execution/gpu_command_admission.py direct admission composition, immutable plan, exact environment, execution lifecycle, and release owner
+downstream implementation ../../tools/experiments/execution/run_gpu_command.py shell-free direct-command CLI adapter
+downstream implementation ../../tools/experiments/execution/run_managed_experiment.py optional managed provider adapter
+downstream implementation ../../tools/validation/ci/runners/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
 downstream implementation ../../tests/tools/test_run_gpu_command.py fake NVIDIA, race, environment, lifecycle, and provider-independence acceptance tests
 downstream implementation ../../tests/tools/test_run_gpu_container.py Docker argv, route selection, and exact environment acceptance tests
 downstream design ../../agents/skills/gpu-execution.md route selection and operator workflow
@@ -34,7 +34,7 @@ Use the direct route by default when the requested unit is an argv and success i
 exit status plus stdout/stderr:
 
 ```text
-python3 tools/experiments/run_gpu_command.py \
+python3 tools/experiments/execution/run_gpu_command.py \
   --gpu-count 1 \
   --min-free-memory <bytes> \
   -- <argv...>
@@ -132,7 +132,7 @@ selects and locks full physical/MIG UUIDs and materializes the six exact environ
 above. Docker GPU execution exposes one public invocation shape:
 
 ```text
-bash tools/ci/run_gpu_container.sh \
+bash tools/validation/ci/runners/run_gpu_container.sh \
   --image <image> [--name <name>] -- <argv...>
 ```
 
@@ -212,7 +212,7 @@ python3 -m pytest tests/tools/test_run_gpu_container.py -q
 A real GPU JAX smoke must import JAX only inside the admitted child:
 
 ```text
-python3 tools/experiments/run_gpu_command.py \
+python3 tools/experiments/execution/run_gpu_command.py \
   --gpu-count 1 \
   --min-free-memory 2147483648 \
   -- python3 -c \
@@ -223,10 +223,10 @@ A real Docker GPU smoke uses the same public wrapper invocation on both CDI-capa
 hosts:
 
 ```text
-python3 tools/experiments/run_gpu_command.py \
+python3 tools/experiments/execution/run_gpu_command.py \
   --gpu-count 1 \
   --min-free-memory 2147483648 \
-  -- bash tools/ci/run_gpu_container.sh \
+  -- bash tools/validation/ci/runners/run_gpu_container.sh \
   --image <canonical-image> -- python3 -c \
   'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
 ```
@@ -234,7 +234,7 @@ python3 tools/experiments/run_gpu_command.py \
 A GPU-heavy test or benchmark uses the same adapter, for example:
 
 ```text
-python3 tools/experiments/run_gpu_command.py \
+python3 tools/experiments/execution/run_gpu_command.py \
   --gpu-count 1 \
   --min-free-memory 8589934592 \
   -- python3 -m pytest tests/gpu/test_heavy_backend.py -q

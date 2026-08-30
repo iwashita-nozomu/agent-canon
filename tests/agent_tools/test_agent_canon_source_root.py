@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies CLI command execution anchored to the resolved source root.
-# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves source roots.
-# downstream implementation ../../tools/agent_tools/skill_tool_commands.py handles delegated commands.
+# upstream implementation ../../tools/runtime/source/agent_canon_source_root.py resolves source roots.
+# downstream implementation ../../tools/agent/skills/skill_tool_commands.py handles delegated commands.
 # @dependency-end
 
 from __future__ import annotations
@@ -21,10 +21,10 @@ from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
-PUBLIC_RESOLVER = "tools/agent_tools/agent_canon_source_root.py"
+PUBLIC_RESOLVER = "tools/runtime/source/agent_canon_source_root.py"
 sys.path.insert(0, str(TOOLS_ROOT))
 
-from agent_canon_source_root import (  # noqa: E402
+from tools.runtime.source.agent_canon_source_root import (  # noqa: E402
     LAYOUT_EXTERNAL,
     LAYOUT_STANDALONE,
     RootResolution,
@@ -122,9 +122,9 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
     def test_exec_parser_accepts_command(self) -> None:
         """Accept an exact source-relative command and its arguments."""
         parser = build_parser()
-        parsed = parser.parse_args(["exec", "tools/agent_tools/route.py", "--list"])
+        parsed = parser.parse_args(["exec", "tools/agent/orchestration/route.py", "--list"])
         self.assertEqual(parsed.mode, "exec")
-        self.assertEqual(parsed.command, "tools/agent_tools/route.py")
+        self.assertEqual(parsed.command, "tools/agent/orchestration/route.py")
         self.assertEqual(parsed.args, ["--list"])
 
     def test_public_entrypoints_are_executable_for_source_root_dispatch(self) -> None:
@@ -138,15 +138,24 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         """Run a source-owned route from an isolated development clone."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
-            copy_ignore = shutil.ignore_patterns(
-                ".git",
-                ".agent-canon",
-                "reports",
-                "workspace",
-                "__pycache__",
-                ".pytest_cache",
-                ".ruff_cache",
-            )
+            def copy_ignore(directory: str, names: list[str]) -> set[str]:
+                """Ignore clone-local state while retaining canonical packages."""
+                ignored = set(
+                    shutil.ignore_patterns(
+                        ".git",
+                        ".agent-canon",
+                        "reports",
+                        "workspace",
+                        "__pycache__",
+                        ".pytest_cache",
+                        ".ruff_cache",
+                    )(directory, names)
+                )
+                if Path(directory).resolve() == (
+                    PROJECT_ROOT / "tools" / "repository"
+                ).resolve():
+                    ignored.discard("workspace")
+                return ignored
 
             shutil.copytree(
                 PROJECT_ROOT,
@@ -161,7 +170,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                     PUBLIC_RESOLVER,
                     "exec",
                     "python3",
-                    "tools/agent_tools/route.py",
+                    "tools/agent/orchestration/route.py",
                     "--list",
                 ],
                 cwd=clone,
@@ -186,6 +195,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         ".git", ".agent-canon", "reports", "workspace"
                     )(directory, names)
                 )
+                if Path(directory).resolve() == (
+                    PROJECT_ROOT / "tools" / "repository"
+                ).resolve():
+                    ignored.discard("workspace")
                 return ignored
 
             shutil.copytree(
@@ -201,7 +214,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                     PUBLIC_RESOLVER,
                     "exec",
                     "python3",
-                    "tools/agent_tools/repo_structure_contract.py",
+                    "tools/validation/semantic/structure/repo_structure_contract.py",
                     "--root",
                     ".",
                     "--contract",

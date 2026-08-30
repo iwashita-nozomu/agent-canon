@@ -105,8 +105,8 @@ receipt、workflow をこの note から直接追加しません。current requi
 
 ## Practical Commands Or Paths
 
-- `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --task-id T1 --owner codex --workspace-root "$PWD"`
-- `python3 tools/agent_tools/task_close.py --report-dir <reports/agents/run-id>`
+- `python3 tools/runtime/lifecycle/bootstrap_agent_run.py --task "<task>" --task-id T1 --owner codex --workspace-root "$PWD"`
+- `python3 tools/runtime/lifecycle/task_close.py --report-dir <reports/agents/run-id>`
 - `documents/conventions/software-engineering-principles.md`
 - `documents/notes/knowledge/`
 - `reports/agents/<run-id>/user_request_contract.md`

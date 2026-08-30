@@ -6,8 +6,8 @@ upstream design README.md workflow catalog
 upstream design ../TASK_WORKFLOWS.md workflow family routing contract
 upstream design implementation-waterfall-workflow.md staged implementation gate
 upstream design ../../documents/design/dependency-manifest-design.md manifest dependency model
-downstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency edges
-downstream implementation ../../tools/agent_tools/check_dependency_graph.sh validates header dependency graph
+downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency edges
+downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates header dependency graph
 @dependency-end
 -->
 
@@ -56,13 +56,13 @@ code dependency は import、include、source など、実行時または build 
 標準入口は次です。
 
 ```bash
-bash tools/agent_tools/scan_code_dependencies.sh --changed
+bash tools/analysis/dependencies/scan_code_dependencies.sh --changed
 ```
 
 必要に応じて対象 path を明示します。
 
 ```bash
-bash tools/agent_tools/scan_code_dependencies.sh python/jax_util/solvers/kkt.py python/jax_util/solvers/pcg.py
+bash tools/analysis/dependencies/scan_code_dependencies.sh python/jax_util/solvers/kkt.py python/jax_util/solvers/pcg.py
 ```
 
 記録すること:
@@ -77,13 +77,13 @@ header dependency は `@dependency-start` manifest に書かれた設計・実�
 標準入口は次です。
 
 ```bash
-bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
+bash tools/analysis/dependencies/check_dependency_graph.sh --changed --print-edges
 ```
 
 repo-wide baseline を見たい場合は次を使います。
 
 ```bash
-bash tools/agent_tools/run_repo_dependency_review.sh
+bash tools/analysis/dependencies/run_repo_dependency_review.sh
 ```
 
 記録すること:
@@ -243,6 +243,9 @@ cause/scope analysis に戻し、symptom-level repair を開始しません。
 ## Gate H4. 実装後の仮説判定
 
 実装後は「変更した」ではなく、仮説が支持されたかを判定します。
+この判定は実行後の結果解釈です。実験 plan の作成、run の開始、または operational
+completion を `supported`、`rejected`、`inconclusive` や reviewer decision で事前に
+ブロックしません。
 
 Validation test/check が失敗した場合は、通すために仮説、intended behavior/test、oracle、
 または required validation を縮めません。先に `failing_contract`、
@@ -288,4 +291,4 @@ closeout 前に、実装後 diff が仮説と一致しているか確認しま�
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

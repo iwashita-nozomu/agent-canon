@@ -3,21 +3,32 @@
 contract agent-runtime
 responsibility Defines external AgentCanon hook, eval, runtime-summary, and report archive publication.
 upstream design bootstrap-runtime.md shared runtime boundary
-upstream implementation ../../tools/agent_tools/runtime_log_paths.py external path resolver
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py canonical archive publisher
-upstream implementation ../../tools/agent_tools/eval_accumulation_check.py eval completeness gate
+upstream implementation ../../tools/runtime/archive/runtime_log_paths.py external path resolver
+upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py canonical archive publisher
+upstream implementation ../../eval/checkers/eval_accumulation_check.py eval completeness gate
 downstream design runtime-log-archive-migration.md archive migration route
 @dependency-end
 -->
 
 # Runtime Log Archive
 
-AgentCanon runtime evidence is external state. Hook events, accumulated evals,
-Codex runtime summaries, and archived task bundles are collected under the
-explicit runtime root selected by `bootstrap.sh` and published to the separate
+AgentCanon runtime evidence is runtime state. Hook events and pending
+collection inputs use the bootstrap-owned ignored `<install-root>/.runtime/`
+spool/control paths; accumulated evals, Codex runtime summaries, and archived
+task bundles are published to the separate
 [`iwashita-nozomu/agent-canon-log`](https://github.com/iwashita-nozomu/agent-canon-log)
-repository. They are not written to the AgentCanon source checkout, a parent
-repository, a vendor directory, or a source-local `.agent-canon` fallback.
+repository. Outside that exact `.runtime/` directory, they are not written to
+the AgentCanon source checkout, a parent repository, a vendor directory, or a
+source-local `.agent-canon` fallback.
+
+The general `RuntimeArtifactBoundary` remains source-local-output-safe. The
+archive transaction has one explicitly named `runtime_spool_boundary` for the
+bootstrap-owned exact `<source-root>/.runtime` path or an external runtime
+root; it admits only `locks/` and `spool/` descendants for transaction control
+and pending inputs. Archive and report output always uses the explicit external
+`context.archive_root`.
+In particular, the transaction never creates `.runtime/archive/`, and another
+source child, runtime root, or symlink cannot use this exception.
 
 The log repository owns its branch, append-only layout, retention, and legacy
 import policy. AgentCanon owns only the local spool, archive checkout lease,
@@ -36,7 +47,8 @@ Given:
 
 ```text
 ROOT=<authorized-parent-root>
-RUNTIME=$ROOT/workspace/agent-canon-runtime/<installation>
+INSTALL_ROOT=/path/to/agent-canon
+RUNTIME=$INSTALL_ROOT/.runtime
 ```
 
 the runtime-local layout is:
@@ -44,15 +56,45 @@ the runtime-local layout is:
 ```text
 $RUNTIME/
   spool/<run-id>/                 # pending eval/event/archive inputs
-  archive/agent-canon-log/        # leased archive checkout, if used
   tasks/<task-id>/                # logs, reports, locks, receipts
   codex-home/                     # managed isolated Codex surfaces
+
+$INSTALL_ROOT_PARENT/agent-canon-log/  # host-owned operational archive checkout
 ```
 
-The durable archive layout is owned by `agent-canon-log`; consumers should use
-its current branch contract rather than hard-code a second local layout. The
-archive lease is ignored by AgentCanon source Git and is never a submodule or
-symlink.
+IssueWorker publication receipts use the same private archive checkout and
+host shell sync route. They are written under
+`feedback/issue-packets/published/<owner>/<repository>/<number>.json`; the
+stable path contains only the repository, Issue number/URL/state, operation,
+responsibility and occurrence locators, source finding kind, and timestamp.
+Issue/private bodies, digests, fingerprints, credentials, and generated IDs do
+not enter the receipt. A publisher reads the GitHub result back first, writes
+and reads back this receipt, and only then removes a pending packet. Failed or
+uncertain publication retains the pending packet. `runtime_log_archive_git.py
+sync` stages this published namespace with the existing private archive
+families so the host shell remains the Git publisher. The publisher injects a
+resident writer and invokes `bootstrap.sh ... tool run/exec issue-sync --
+--stage-publication-receipt`; its runtime/spool route is a precondition for
+GitHub mutation and its sync request is consumed by the existing
+private-feedback host synchronization path.
+
+The receipt ToolCall keeps the AgentCanon source root (the owner of
+`bootstrap.sh` and the resident image) separate from the registered product
+target root taken from `checkout_identity.git_root`; the generated command uses
+`<agentcanon_source_root>/bootstrap.sh ... tool run --root <target_root>
+issue-sync ...`.
+Online Issue reads remain on the host publisher's GitHub route; the resident
+`issue-sync` entry accepts only body-free receipt preflight, stage, and
+readback inputs.
+
+The durable archive layout and its operational checkout are owned by
+`agent-canon-log`; consumers should use its current branch contract rather
+than hard-code a second local layout. Bootstrap eval publication passes this
+checkout explicitly to the host archive adapter. The resident container sees
+only the external spool and never creates an archive clone under `$RUNTIME`.
+All report manifests and snapshots use paths relative to that same explicit
+archive checkout (`agent-reports/<repo-key>/...`); `$RUNTIME` is only the
+producer spool and staging boundary.
 
 ## Collection contract
 
@@ -85,9 +127,9 @@ The supported user route is:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> \
-  --runtime-root <runtime> eval collect --root <project-root> --run-id <run-id>
+  eval collect --root <project-root> --run-id <run-id>
 ./bootstrap.sh --control-parent-root <root> \
-  --runtime-root <runtime> eval sync --run-id <run-id>
+  eval sync --run-id <run-id>
 ```
 
 The typed host Git adapter performs the following bounded sequence:
@@ -132,6 +174,22 @@ Existing tracked or ignored report files are classified before removal:
    source SHA, archive commit, and remote blob readback;
 3. only after that evidence is durable may an owning change remove the old
    generated source path.
+
+Prepared sanitized historical bundles use the existing
+`agent-canon-log-report-provenance.v1` index contract. The task-local
+sanitizer supplies a prepared tree and one provenance object per run to
+`runtime_log_archive_git.py archive-agent-report --provenance <file> --publish`.
+The archive owner verifies the source commit/tree listing, every source blob
+hash, every prepared archive hash, redaction rule IDs/counts, and the absence
+of forbidden path or credential-shaped bytes before copying. Each provenance
+record links to `agent-report-snapshot.v1` through `archive_schema` and
+`snapshot_schema`. A `supersession` record (also projected as `supersedes` and
+`quarantines`) names the prior remote ref, commit, tree, index blob, and
+snapshot, with `quarantine_status=quarantined`; the old snapshot remains
+immutable and is not rewritten or deleted. Publication
+readback checks the new remote ref/tree, the exact provenance index record,
+and every archived blob. A validation or push failure retains the prepared
+tree and source bytes for retry; this route does not delete source files.
 
 The source tree must not regain generated `reports/agent-eval-runs/`, dashboard,
 improvement-guide, hook spool, or runtime-summary outputs. CI and PR wrappers

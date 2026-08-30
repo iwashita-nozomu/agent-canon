@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests eval accumulation validation.
-# upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result evidence
+# upstream implementation ../../eval/checkers/eval_accumulation_check.py validates eval result evidence
 # upstream design ../../documents/runtime/runtime-log-archive.md eval result storage contract
 # @dependency-end
 
@@ -18,9 +18,9 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "eval_accumulation_check.py"
+SCRIPT = PROJECT_ROOT / "eval" / "checkers" / "eval_accumulation_check.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 
 class EvalAccumulationCheckTest(unittest.TestCase):
@@ -45,7 +45,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             "--root",
             str(root),
             "--family-registry",
-            str(PROJECT_ROOT / "evidence" / "agent-evals" / "eval_result_families.toml"),
+            str(PROJECT_ROOT / "eval" / "definitions" / "eval_result_families.toml"),
         ]
         if with_runtime:
             command.extend(["--runtime-root", str(self.runtime_root(root))])
@@ -608,10 +608,10 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            registry_path = root / "evidence" / "agent-evals" / "eval_result_families.toml"
+            registry_path = root / "eval" / "definitions" / "eval_result_families.toml"
             registry_path.parent.mkdir(parents=True, exist_ok=True)
             registry_path.write_text(
-                (PROJECT_ROOT / "evidence" / "agent-evals" / "eval_result_families.toml").read_text(
+                (PROJECT_ROOT / "eval" / "definitions" / "eval_result_families.toml").read_text(
                     encoding="utf-8"
                 )
                 + """

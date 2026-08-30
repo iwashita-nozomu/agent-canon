@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests JIT-canonical IR extraction and backend trace capture.
-# upstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived IR.
-# upstream implementation ../../tools/experiments/execution_resource_plan.py owns GPU discovery/reservation.
-# upstream implementation ../../tools/experiments/run_managed_experiment.py owns the only managed GPU launch route.
+# upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived IR.
+# upstream implementation ../../tools/experiments/execution/execution_resource_plan.py owns GPU discovery/reservation.
+# upstream implementation ../../tools/experiments/execution/run_managed_experiment.py owns the only managed GPU launch route.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines the extraction contract.
 # upstream design ../../documents/tools/jit_ir_to_lean.md defines the Lean evidence boundary.
 # @dependency-end
@@ -37,6 +37,92 @@ class _JitToolModule(Protocol):
     def resolve_cuda_visible_devices(self, requested: str | None) -> str: ...
 
 
+PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
+    "target_theorem": "finite_stop_for_public_solve",
+    "public_root": "solver.py::main -> out.answer",
+    "iteration_map": "Step_impl(problem, config, state)",
+    "stopping_scalar": "residual_norm(state)",
+    "mathematical_evidence": {
+        "status": "absent",
+        "paths": [],
+    },
+    "failure": {
+        "kind": "ir_extractor_or_lowering",
+        "producer_surface": "tools/analysis/proof/jit_canonical_ir.py",
+        "consumer_surface": "generated Lean return projection",
+    },
+    "math_writer": {
+        "owner": "algorithm-proof-exploration",
+        "allowed_paths": [
+            "math/definitions",
+            "math/derivations",
+            "tests/numerical_oracle.py",
+        ],
+        "forbidden_paths": [
+            "tools/analysis/proof/jit_canonical_ir.py",
+            "tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs",
+            "lean/",
+            "JIT/backend/runtime architecture",
+            "production main",
+            "public API",
+            "algorithm return schema",
+            "algorithm implementation",
+            "JIT boundary",
+            "backend runtime",
+        ],
+        "evidence": {
+            "status": "absent",
+            "paths": [],
+        },
+        "reason": "No independent mathematical evidence; hold algorithm edits",
+    },
+    "proof_tool_worker": {
+        "owner": "IR extractor and generated-proof mechanism owner",
+        "allowed_paths": [
+            "tools/analysis/proof/jit_canonical_ir.py",
+            "tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs",
+            "lean/",
+        ],
+        "forbidden_paths": [
+            "math/definitions",
+            "math/derivations",
+            "production main",
+            "public API",
+            "algorithm return schema",
+            "algorithm implementation",
+            "JIT boundary",
+            "backend runtime",
+        ],
+        "evidence": {
+            "status": "awaiting_native_receipt",
+            "paths": [
+                "tools/analysis/proof/jit_canonical_ir.py",
+                "generated Lean return projection",
+            ],
+        },
+        "reason": "Repair the IR producer/consumer gap without changing math",
+    },
+    "return_status": "route_infrastructure",
+}
+
+PROOF_TOOL_HANDOFF_TOP_LEVEL_FIELDS = frozenset(
+    {
+        "target_theorem",
+        "public_root",
+        "iteration_map",
+        "stopping_scalar",
+        "mathematical_evidence",
+        "failure",
+        "math_writer",
+        "proof_tool_worker",
+        "return_status",
+    }
+)
+PROOF_TOOL_HANDOFF_ROLE_FIELDS = frozenset(
+    {"owner", "allowed_paths", "forbidden_paths", "evidence", "reason"}
+)
+
+
 def _repo_root() -> Path:
     # This test runs against the standalone AgentCanon checkout.  The old
     # parent-repository root made the subprocess look for a retired
@@ -51,7 +137,7 @@ def _jit_env(**overrides: str) -> dict[str, str]:
 
 
 def _load_jit_tool_module() -> _JitToolModule:
-    tool_path = Path(__file__).resolve().parents[2] / "tools/agent_tools/jit_canonical_ir.py"
+    tool_path = Path(__file__).resolve().parents[2] / "tools/analysis/proof/jit_canonical_ir.py"
     spec = importlib.util.spec_from_file_location("_agent_canon_test_jit_tool", tool_path)
     assert spec is not None
     assert spec.loader is not None
@@ -59,6 +145,19 @@ def _load_jit_tool_module() -> _JitToolModule:
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return cast(_JitToolModule, module)
+
+
+def test_ir_producer_uses_the_consumer_handoff_role_shape() -> None:
+    """The IR producer and formal consumer agree on every handoff role field."""
+    assert set(PROOF_TOOL_HANDOFF_FIXTURE) == PROOF_TOOL_HANDOFF_TOP_LEVEL_FIELDS
+    assert (
+        set(cast(dict[str, object], PROOF_TOOL_HANDOFF_FIXTURE["math_writer"]))
+        == PROOF_TOOL_HANDOFF_ROLE_FIELDS
+    )
+    assert (
+        set(cast(dict[str, object], PROOF_TOOL_HANDOFF_FIXTURE["proof_tool_worker"]))
+        == PROOF_TOOL_HANDOFF_ROLE_FIELDS
+    )
 
 
 def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -> None:
@@ -86,7 +185,7 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
     subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/jit_canonical_ir.py",
+            "tools/analysis/proof/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -186,7 +285,7 @@ def test_jit_canonical_ir_records_recursive_control_regions(tmp_path: Path) -> N
     subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/jit_canonical_ir.py",
+            "tools/analysis/proof/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -281,7 +380,7 @@ def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Pat
     subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/jit_canonical_ir.py",
+            "tools/analysis/proof/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",

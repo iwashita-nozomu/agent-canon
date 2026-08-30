@@ -9,7 +9,7 @@ upstream design ./dependency-analysis.md dependency and reachability owner
 upstream design ./refactor-loop.md behavior-preserving refactor owner
 upstream design ./change-review.md findings-first review owner
 upstream design ./responsibility-cleanup.md responsibility-unit dispatch owner
-downstream implementation ../../.agents/skills/code-cleanup/SKILL.md runtime discovery shim
+downstream implementation ../../.codex/personal/skills/code-cleanup/SKILL.md runtime discovery shim
 downstream implementation ./catalog.yaml public skill registry
 downstream implementation ./skill-dependencies.yaml public skill dependency DAG
 downstream implementation ../../.codex/config.toml host skill configuration
@@ -38,9 +38,9 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 ## Tool Commands
 
 ```bash
-python3 tools/agent_tools/check_dependency_headers.py --changed
-bash tools/agent_tools/scan_code_dependencies.sh --changed
-bash tools/agent_tools/run_repo_dependency_review.sh
+python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
+bash tools/analysis/dependencies/scan_code_dependencies.sh --changed
+bash tools/analysis/dependencies/run_repo_dependency_review.sh
 ```
 
 ## Boundary

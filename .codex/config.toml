@@ -10,7 +10,7 @@
 # upstream design ../agents/canonical/CODEX_SUBAGENTS.md Codex subagent routing
 # upstream design ../documents/runtime/runtime-profiles-and-check-matrix.json canonical validation trust boundary owner
 # downstream implementation ./hooks.json injects lifecycle hook context
-# downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates agent registry and role TOML
+# downstream implementation ../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates agent registry and role TOML
 # downstream design ../agents/workflows/token-efficient-codex-workflow.md token-aware runtime modes
 # @dependency-end
 

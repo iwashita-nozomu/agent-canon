@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Verifies the live source receipt writer and consumer handoff.
-# upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns receipt production
-# upstream implementation ../../tools/ci/pr_gate_receipt.py owns receipt serialization and parsing
-# downstream implementation ../../tools/ci/run_all_checks.sh consumes one validated status
+# upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh owns receipt production
+# upstream implementation ../../tools/validation/ci/receipts/pr_gate_receipt.py owns receipt serialization and parsing
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh consumes one validated status
 # downstream design ../../documents/design/source-owned-dependency-validation.md owns source/runtime separation
 # @dependency-end
 
@@ -20,29 +20,29 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RECEIPT_TOOL = PROJECT_ROOT / "tools" / "ci" / "pr_gate_receipt.py"
-PR_CHECK = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
-RUN_ALL_CHECKS = PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh"
+RECEIPT_TOOL = PROJECT_ROOT / "tools" / "validation" / "ci" / "receipts" / "pr_gate_receipt.py"
+PR_CHECK = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+RUN_ALL_CHECKS = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh"
 
 
 class LiveReceiptFixture:
     """Build a minimal standalone checkout for the production shell scripts."""
 
     COPIED_FILES = (
-        "tools/ci/check_agent_canon_pr.sh",
-        "tools/ci/pr_gate_receipt.py",
-        "tools/ci/run_all_checks.sh",
-        "tools/ci/run_python_quality_checks.sh",
-        "tools/lib/repo_paths.sh",
-        "tools/agent_tools/parent_root_side_effects.py",
-        "tools/agent_tools/runtime_artifacts.py",
-        "tools/agent_tools/review_dispatch.py",
-        "tools/agent_tools/artifact_identity.py",
-        "tools/agent_tools/external_artifact_binding.py",
-        "tools/agent_tools/publication_integrator.py",
-        "tools/agent_tools/report_artifact_checks.py",
-        "tools/agent_tools/work_log.py",
-        "tools/agent_tools/generated_artifact_guard.py",
+        "tools/validation/ci/checks/check_agent_canon_pr.sh",
+        "tools/validation/ci/receipts/pr_gate_receipt.py",
+        "tools/validation/ci/runners/run_all_checks.sh",
+        "tools/validation/ci/checks/run_python_quality_checks.sh",
+        "tools/repository/support/repo_paths.sh",
+        "tools/repository/workspace/parent_root_side_effects.py",
+        "tools/runtime/artifacts/runtime_artifacts.py",
+        "tools/agent/orchestration/review_dispatch.py",
+        "tools/runtime/artifacts/artifact_identity.py",
+        "tools/runtime/artifacts/external_artifact_binding.py",
+        "tools/repository/github/publication_integrator.py",
+        "tools/runtime/artifacts/report_artifact_checks.py",
+        "tools/runtime/archive/work_log.py",
+        "tools/runtime/artifacts/generated_artifact_guard.py",
         "tests/agent_tools/test_artifact_identity.py",
         "tests/agent_tools/test_codex_hooks.py",
         "tests/agent_tools/test_external_artifact_binding.py",
@@ -107,20 +107,24 @@ class LiveReceiptFixture:
         for relative in self.COPIED_FILES:
             self.copy_file(relative)
         self.write_executable(
-            "tools/ci/run_pr_dependency_source_gate.sh",
+            "tools/validation/ci/checks/run_pr_dependency_source_gate.sh",
             "#!/usr/bin/env bash\n"
             "set -eu\n"
             "printf 'source_gate=%s\\n' \"${SOURCE_STATUS:?}\" >> \"${CALL_LOG:?}\"\n"
             "printf 'AGENT_CANON_PR_DEPENDENCY_SOURCE=%s\\n' \"${SOURCE_STATUS}\"\n",
         )
         self.write_executable(
-            "tools/ci/run_standalone_static_gate_unit.sh",
+            "tools/validation/ci/runners/run_standalone_static_gate_unit.sh",
             "#!/usr/bin/env bash\n"
             "set -eu\n"
             "printf 'static_gate_unit=%s\\n' \"$1\" >> \"${CALL_LOG:?}\"\n",
         )
         self.write_executable(
-            "tools/agent_tools/generated_artifact_guard.py",
+            "tools/validation/ci/checks/check_github_workflows.py",
+            "#!/usr/bin/env python3\n",
+        )
+        self.write_executable(
+            "tools/runtime/artifacts/generated_artifact_guard.py",
             "#!/usr/bin/env python3\n"
             "from __future__ import annotations\n",
         )
@@ -131,7 +135,7 @@ class LiveReceiptFixture:
             "printf 'agent-canon=%s\\n' \"$*\" >> \"${CALL_LOG:?}\"\n",
         )
         self.write_executable(
-            "tools/ci/agent_canon_pr_graph_selector.py",
+            "tools/validation/ci/checks/agent_canon_pr_graph_selector.py",
             "#!/usr/bin/env python3\n"
             "import argparse\n"
             "from pathlib import Path\n"
@@ -190,7 +194,7 @@ class LiveReceiptFixture:
     def run_pr_check(self) -> subprocess.CompletedProcess[str]:
         """Run the actual producer, nested consumer, and cleanup lifecycle."""
         return subprocess.run(
-            ["bash", str(self.root / "tools/ci/check_agent_canon_pr.sh")],
+            ["bash", str(self.root / "tools/validation/ci/checks/check_agent_canon_pr.sh")],
             cwd=self.root,
             env=self.environment(),
             check=False,
@@ -277,7 +281,7 @@ class PrGateReceiptRoundTripTest(unittest.TestCase):
                     consumed = subprocess.run(
                         [
                             "bash",
-                            str(fixture.root / "tools/ci/run_all_checks.sh"),
+                            str(fixture.root / "tools/validation/ci/runners/run_all_checks.sh"),
                             "--pr-gate-receipt",
                             str(receipt),
                             "--pr-gate-parent-pid",

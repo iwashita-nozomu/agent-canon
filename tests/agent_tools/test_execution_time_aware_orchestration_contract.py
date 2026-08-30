@@ -8,9 +8,9 @@
 # upstream design ../../agents/skills/pr-processing.md PR queue specialization
 # upstream design ../../agents/task_catalog.yaml task routing projection
 # upstream design ../../templates/agents/schedule.md schedule projection
-# upstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py production contract checker
-# upstream implementation ../../tools/agent_tools/skill_tool_commands.py selected-skill command packet
-# downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery shim
+# upstream implementation ../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py production contract checker
+# upstream implementation ../../tools/agent/skills/skill_tool_commands.py selected-skill command packet
+# downstream implementation ../../.codex/personal/skills/agent-orchestration/SKILL.md runtime discovery shim
 # @dependency-end
 
 from __future__ import annotations
@@ -33,9 +33,7 @@ except ModuleNotFoundError:  # pragma: no cover
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = (
     PROJECT_ROOT
-    / "tools"
-    / "agent_tools"
-    / "check_execution_time_aware_orchestration.py"
+    / "tools" / "validation" / "semantic" / "orchestration" / "check_execution_time_aware_orchestration.py"
 )
 CONTRACT_PATH = (
     PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.execution-contract.toml"
@@ -51,8 +49,8 @@ CONTRACT_FIXTURE_PATHS = (
     "agents/skills/catalog.yaml",
     "agents/task_catalog.yaml",
     "templates/agents/schedule.md",
-    ".agents/skills/agent-orchestration/SKILL.md",
-    "tools/agent_tools/check_execution_time_aware_orchestration.py",
+    ".codex/personal/skills/agent-orchestration/SKILL.md",
+    "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py",
 )
 
 
@@ -171,7 +169,7 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
             root = self.fixture_root(temporary_directory)
             self.append(
                 root,
-                ".agents/skills/agent-orchestration/SKILL.md",
+                ".codex/personal/skills/agent-orchestration/SKILL.md",
                 "\n- Prompt keywords route ready nodes.\n",
             )
             self.assert_rejected(root, "keyword_based_routing")

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests canonical behavior-event assembly and cardinality.
-# upstream implementation ../../tools/agent_tools/behavior_event_assembly.py owns behavior-event assembly.
+# upstream implementation ../../tools/runtime/archive/behavior_event_assembly.py owns behavior-event assembly.
 # @dependency-end
 """Focused tests for pure behavior-record assembly."""
 from __future__ import annotations
@@ -12,15 +12,15 @@ from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from behavior_event_assembly import (  # noqa: E402
+from tools.runtime.archive.behavior_event_assembly import (  # noqa: E402
     FinalHandlerResult,
     HookInvocationParts,
     record_hook_invocation,
 )
-from prompt_classifier import PromptClassifierInputs  # noqa: E402
-from tool_selection import select_tools  # noqa: E402
-from subagent_selection import select_subagents  # noqa: E402
-from workflow_context import WorkflowContext  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import PromptClassifierInputs  # noqa: E402
+from tools.agent.orchestration.tool_selection import select_tools  # noqa: E402
+from tools.agent.orchestration.subagent_selection import select_subagents  # noqa: E402
+from tools.agent.orchestration.workflow_context import WorkflowContext  # noqa: E402
 
 
 class BehaviorEventAssemblyTest(unittest.TestCase):

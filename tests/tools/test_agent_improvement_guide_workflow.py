@@ -31,12 +31,102 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         self.assertEqual(
             triggers["pull_request"]["paths"],
             [
-                "tools/agent_tools/generate_agent_improvement_guide.py",
+                ".github/workflows/agent-improvement-guide.yml",
+                "eval/producers/generate_agent_improvement_guide.py",
                 "tests/agent_tools/test_generate_agent_improvement_guide.py",
             ],
         )
         self.assertIn("workflow_dispatch", triggers)
         self.assertNotIn("push", triggers)
+
+    def test_pr_checkout_selects_local_runtime_image_build(self) -> None:
+        """PR guide runs must not select an unpublished GHCR merge tag."""
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn(
+            "fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}",
+            text,
+        )
+        self.assertNotIn('mkdir -p "${report_dir}"', text)
+        self.assertIn("--output-mode 644", text)
+
+    def test_pr_candidate_clones_main_and_installs_runtime(self) -> None:
+        """PR candidates install from a local main clone before execution."""
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn(
+            'candidate_bare="${RUNNER_TEMP}/agent-canon-pr-candidate.git"',
+            text,
+        )
+        self.assertIn(
+            'candidate_source="${RUNNER_TEMP}/agent-canon-pr-candidate"',
+            text,
+        )
+        self.assertIn(
+            'git -C "${GITHUB_WORKSPACE}" push "${candidate_bare}" "HEAD:refs/heads/main"',
+            text,
+        )
+        self.assertIn(
+            'git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main',
+            text,
+        )
+        self.assertIn(
+            'git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"',
+            text,
+        )
+        self.assertIn(
+            "printf 'AGENT_CANON_CANDIDATE_SOURCE=%s",
+            text,
+        )
+        self.assertIn(
+            '"${candidate_source}" >> "${GITHUB_ENV}"',
+            text,
+        )
+        self.assertIn(
+            'echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=${candidate_source}/.runtime/container-state"',
+            text,
+        )
+        self.assertNotIn("AGENT_CANON_RUNTIME_ROOT", text)
+        self.assertIn(
+            '"${AGENT_CANON_GUIDE_RUNTIME_ROOT}/reports/agent-improvement-guide"',
+            text,
+        )
+        bootstrap_lines = [
+            line.strip() for line in text.splitlines() if "bootstrap.sh" in line
+        ]
+
+        self.assertTrue(bootstrap_lines)
+        self.assertTrue(
+            all(
+                line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
+                for line in bootstrap_lines
+            )
+        )
+        self.assertTrue(
+            all("--runtime-root" not in line for line in bootstrap_lines)
+        )
+        self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines))
+        self.assertFalse(any(line.endswith(" update") for line in bootstrap_lines))
+        self.assertTrue(any(line.endswith(" start") for line in bootstrap_lines))
+        self.assertTrue(any(" target add " in line for line in bootstrap_lines))
+        self.assertIn(
+            'tool run --root "${GITHUB_WORKSPACE}" generate-agent-improvement-guide --',
+            text,
+        )
+        self.assertNotIn("exec --root", text)
+        self.assertIn(
+            "--root . --runtime-root /var/lib/agent-canon/runtime",
+            text,
+        )
+
+    def test_main_only_runtime_workflows_keep_install_contract(self) -> None:
+        """Main-only runtime workflows retain their strict initial install."""
+        for name in ("agent-canon-static-gates.yml", "agent-runtime-dashboard.yml"):
+            text = (WORKFLOW.parent / name).read_text(encoding="utf-8")
+            bootstrap_lines = [
+                line.strip()
+                for line in text.splitlines()
+                if line.strip().startswith("./bootstrap.sh")
+            ]
+            self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines), name)
 
 
 if __name__ == "__main__":

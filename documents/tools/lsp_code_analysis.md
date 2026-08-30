@@ -4,8 +4,8 @@ contract reference
 responsibility Documents the canonical LSP 3.17 code-analysis command and report.
 upstream design ../structured-analysis/code-analysis.md structured-analysis boundary
 upstream design ../design/dependency-manifest-design.md dependency evidence separation
-downstream implementation ../../tools/agent_tools/lsp_code_analysis.py owns protocol and report
-downstream implementation ../../tools/agent_tools/search.py consumes selected in-memory facts
+downstream implementation ../../tools/analysis/code/lsp_code_analysis.py owns protocol and report
+downstream implementation ../../tools/analysis/search/search.py consumes selected in-memory facts
 downstream implementation ../../tests/agent_tools/test_lsp_code_analysis.py verifies golden behavior
 @dependency-end
 -->
@@ -20,9 +20,9 @@ cache、ambient PATH discovery は持ちません。
 ## Commands
 
 ```bash
-python3 tools/agent_tools/lsp_code_analysis.py analyze \
+python3 tools/analysis/code/lsp_code_analysis.py analyze \
   --root . --files python/example.py --format json
-python3 tools/agent_tools/lsp_code_analysis.py scan-legacy \
+python3 tools/analysis/code/lsp_code_analysis.py scan-legacy \
   --root . --files python/example.py --analysis-json reports/code-analysis.json
 ```
 

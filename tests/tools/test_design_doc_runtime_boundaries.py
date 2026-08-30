@@ -1,10 +1,10 @@
 # @dependency-start
 # contract test
 # responsibility Verifies design-document analyzers keep reports external and source mutation explicit.
-# upstream implementation ../../tools/docs/_runtime_output.py shared runtime/mutation boundary
-# upstream implementation ../../tools/docs/find_redundant_designs.py exact duplicate analyzer
-# upstream implementation ../../tools/docs/find_similar_designs.py similarity analyzer
-# upstream implementation ../../tools/docs/organize_designs.py organization planner
+# upstream implementation ../../tools/analysis/documents/formatting/_runtime_output.py shared runtime/mutation boundary
+# upstream implementation ../../tools/analysis/documents/analysis/find_redundant_designs.py exact duplicate analyzer
+# upstream implementation ../../tools/analysis/documents/analysis/find_similar_designs.py similarity analyzer
+# upstream implementation ../../tools/validation/documentation/authoring/organize_designs.py organization planner
 # downstream implementation ../../tests/agent_tools/test_source_runtime_side_effects.py source side-effect regression suite
 # @dependency-end
 """Regression tests for external design-document reports."""
@@ -19,9 +19,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = {
-    "redundant": PROJECT_ROOT / "tools/docs/find_redundant_designs.py",
-    "similar": PROJECT_ROOT / "tools/docs/find_similar_designs.py",
-    "organize": PROJECT_ROOT / "tools/docs/organize_designs.py",
+    "redundant": PROJECT_ROOT / "tools/analysis/documents/analysis/find_redundant_designs.py",
+    "similar": PROJECT_ROOT / "tools/analysis/documents/analysis/find_similar_designs.py",
+    "organize": PROJECT_ROOT / "tools/validation/documentation/authoring/organize_designs.py",
 }
 
 

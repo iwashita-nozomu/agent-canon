@@ -4,8 +4,8 @@
 # contract test
 # responsibility Verifies parent-owned temporary retrieval and race-safe cleanup for the fixed AgentCanon-log policy inventory.
 # upstream design ../../documents/design/runtime-log-repository-lifecycle.md RL-009..RL-012 policy evidence
-# upstream implementation ../../tools/agent_tools/check_agent_canon_log_policy.py owns read-only inventory retrieval
-# upstream implementation ../../tools/agent_tools/parent_root_side_effects.py owns temporary target capabilities and cleanup
+# upstream implementation ../../tools/validation/semantic/archive/check_agent_canon_log_policy.py owns read-only inventory retrieval
+# upstream implementation ../../tools/repository/workspace/parent_root_side_effects.py owns temporary target capabilities and cleanup
 # @dependency-end
 
 from __future__ import annotations
@@ -19,13 +19,13 @@ from unittest import mock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-import check_agent_canon_log_policy as policy  # noqa: E402
+import tools.validation.semantic.archive.check_agent_canon_log_policy as policy  # noqa: E402
 
 
 def test_policy_module_imports_as_package() -> None:
     """The policy tool supports both package and standalone entrypoints."""
     result = subprocess.run(
-        [sys.executable, "-c", "import tools.agent_tools.check_agent_canon_log_policy"],
+        [sys.executable, "-c", "import tools.validation.semantic.archive.check_agent_canon_log_policy"],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,

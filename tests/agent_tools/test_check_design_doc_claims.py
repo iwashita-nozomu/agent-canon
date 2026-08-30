@@ -4,9 +4,9 @@
 # contract test
 # responsibility Tests design-document claim evidence checker behavior.
 # upstream design ../../documents/design/README.md design-document evidence policy
-# upstream implementation ../../tools/agent_tools/check_design_doc_claims.py checks design claims
-# upstream implementation ../../tools/agent_tools/graph_client.py validates persisted graph context
-# upstream implementation ../../tools/agent_tools/check_dependency_graph.sh provides dependency graph semantics
+# upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py checks design claims
+# upstream implementation ../../tools/analysis/dependencies/graph_client.py validates persisted graph context
+# upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh provides dependency graph semantics
 # @dependency-end
 
 from __future__ import annotations
@@ -23,11 +23,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tools.agent_tools import check_design_doc_claims as graph_claim_checker
-from tools.agent_tools.graph_client import GraphResponse
+from tools.validation.semantic.documents import check_design_doc_claims as graph_claim_checker
+from tools.analysis.dependencies.graph_client import GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_design_doc_claims.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "documents" / "check_design_doc_claims.py"
 
 
 def run_checker(*args: str, root: Path) -> subprocess.CompletedProcess[str]:

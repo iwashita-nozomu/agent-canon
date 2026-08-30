@@ -6,7 +6,7 @@
 # upstream design ../../documents/operations/issue-label-taxonomy.md issue labels and template routing.
 # upstream design ../AGENTS.md GitHub subtree instructions.
 # upstream design ../../templates/documents/README.md canonical template owner.
-# downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
+# downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
 
 # Canonical source and checked-in standalone target: update templates/documents/github/issue/eval-capture.yml and .github/ISSUE_TEMPLATE/eval-capture.yml together.

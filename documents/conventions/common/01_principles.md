@@ -35,7 +35,7 @@ Python / C++ の実装変更では、裸の数値リテラルを機械的に検�
 それ以外の値は、名前付き定数、typed configuration、公開 API 引数、または明示的な行コメント許可へ移します。
 
 ```bash
-python3 tools/agent_tools/check_hardcoded_numbers.py \
+python3 tools/validation/semantic/code/check_hardcoded_numbers.py \
   python include src \
   --exclude vendor \
   --exclude reports

@@ -59,7 +59,7 @@ git merge --no-ff work/<topic>-YYYYMMDD
    - AgentCanon source PR が関係する場合、source PR の merge SHA と readback を確認します。親 tree に source gitlink が存在しないことも確認します。
 
 ```bash
-python3 tools/ci/check_merge_structure.py \
+python3 tools/validation/ci/checks/check_merge_structure.py \
   --source work/<topic>-YYYYMMDD \
   --target origin/main \
   --compare-commit HEAD
@@ -96,10 +96,10 @@ fast-forward を行います。
 
 - source branch で structural path として変わった path が integration commit でも同じ state にある
 - AgentCanon source が関係する場合、source branch、PR merge commit、AgentCanon GitHub main の SHA 関係が evidence にある
-- `python3 tools/ci/check_merge_structure.py ...` が pass
+- `python3 tools/validation/ci/checks/check_merge_structure.py ...` が pass
 - `make ci-quick` が pass
 - 必要な note、doc、test が `main` から辿れる
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

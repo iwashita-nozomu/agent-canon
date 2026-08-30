@@ -93,7 +93,7 @@ design fact を再定義しません。
 - C++ source / header を変更した後は、次を実行します。
 
 ```bash
-python3 tools/agent_tools/check_hardcoded_numbers.py \
+python3 tools/validation/semantic/code/check_hardcoded_numbers.py \
   cpp/include cpp/src tests/cpp cpp/experiments \
   --exclude vendor \
   --exclude reports
@@ -103,7 +103,7 @@ python3 tools/agent_tools/check_hardcoded_numbers.py \
 
 - bounded かつ決定的な入力で検証します。
 - 期待結果が分かるケース（対角行列、既知解など）を優先します。
-- `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも `python3 tools/ci/check_jax_export_stack.py` と `cmake --build "$ROOT/build/cpp/<profile>" --target <project-cpp-smoke-target>` を通します。
+- `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも `python3 tools/validation/ci/checks/check_jax_export_stack.py` と `cmake --build "$ROOT/build/cpp/<profile>" --target <project-cpp-smoke-target>` を通します。
 
 ## 6. 再利用
 

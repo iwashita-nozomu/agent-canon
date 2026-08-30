@@ -3,12 +3,12 @@
 # @dependency-start
 # contract test
 # responsibility Tests short task routing helper behavior and explicit capability owner partitions.
-# upstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
-# upstream implementation ../../tools/agent_tools/skill_route_catalog.py owns catalog/rule/index behavior
-# upstream implementation ../../tools/agent_tools/capability_route.py owns capability preflight/decision behavior
-# upstream implementation ../../tools/agent_tools/visualization_contract.py owns exact ToolCall validation
+# upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
+# upstream implementation ../../tools/agent/skills/skill_route_catalog.py owns catalog/rule/index behavior
+# upstream implementation ../../tools/agent/orchestration/capability_route.py owns capability preflight/decision behavior
+# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns exact ToolCall validation
 # upstream design ../../documents/design/tool-skill-routing-refactor.md defines naming policy
-# upstream design ../../.agents/skills/code-visualization/SKILL.md owns the runtime direct-route text
+# upstream design ../../.codex/personal/skills/code-visualization/SKILL.md owns the runtime direct-route text
 # upstream design ../../agents/skills/code-visualization.md owns the canonical direct-route contract
 # @dependency-end
 
@@ -18,17 +18,24 @@ import json
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ROUTE = PROJECT_ROOT / "tools" / "agent_tools" / "route.py"
+ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
 AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import agent_canon_source_root  # noqa: E402
-import capability_route as capability_module  # noqa: E402
-import route as route_module  # noqa: E402
-import skill_route_catalog as catalog_module  # noqa: E402
+sys.path.insert(0, str(PROJECT_ROOT))
+from tools.runtime.source import agent_canon_source_root  # noqa: E402
+import tools.agent.orchestration.capability_route as capability_module  # noqa: E402
+import tools.agent.orchestration.route as route_module  # noqa: E402
+import tools.agent.skills.skill_route_catalog as catalog_module  # noqa: E402
+from tools.agent.orchestration.team_config import (  # noqa: E402
+    default_specialists_for_task,
+    load_task_catalog,
+    load_team_config,
+)
+from tools.agent.orchestration.implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
 
 
 class RouteToolTest(unittest.TestCase):
@@ -243,8 +250,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AREA=search", result.stdout)
         self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
-        self.assertIn("python3 tools/agent_tools/search.py --purpose", result.stdout)
-        self.assertIn("python3 tools/agent_tools/search.py --purpose", result.stdout)
+        self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
+        self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
 
     def test_search_alias_resolves_to_search_area(self) -> None:
         """Legacy vector-search names should route to coordinated search."""
@@ -302,6 +309,188 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
+
+    def test_math_correction_routes_math_owner_before_infrastructure_symptom(self) -> None:
+        """A mathematical correction keeps a JIT-looking symptom in the math route."""
+        result = self.run_route(
+            "--prompt",
+            "修正して。solver の residual が収束しない。更新式と停止条件を確認し、JIT は変更しない。",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("computational-optimization", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("environment-maintenance", decision["active_skills"])
+
+    def test_explicit_math_owner_survives_proof_tool_context(self) -> None:
+        """An explicit computational owner remains authoritative without keywords."""
+        result = self.run_route(
+            "--prompt",
+            "$computational-optimization $algorithm-proof-exploration IR repair",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("computational-optimization", decision["matched_skills"])
+
+    def test_infrastructure_only_request_is_exempt_from_math_route(self) -> None:
+        """An infrastructure-only repair does not acquire mathematical routing."""
+        result = self.run_route(
+            "--prompt",
+            "修正して。Docker build の cache 設定を更新し、コンテナ起動を直す。",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("computational-optimization", decision["matched_skills"])
+
+    def test_residual_log_cleanup_is_not_mathematical_intent(self) -> None:
+        """A residual log/CI cleanup has no numerical correction evidence."""
+        result = self.run_route(
+            "--prompt",
+            "CI の residual ログを整理して cleanup する。",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("computational-optimization", decision["matched_skills"])
+
+    def test_solver_residual_convergence_remains_mathematical_intent(self) -> None:
+        """Solver residual plus convergence still selects numerical ownership."""
+        result = self.run_route(
+            "--prompt",
+            "solver の residual convergence を修正する。",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("computational-optimization", decision["matched_skills"])
+
+    def test_research_tasks_put_math_route_before_generic_specialists(self) -> None:
+        """T4/T5 expose a conditional math route before generic specialists."""
+        config = load_team_config()
+        catalog = load_task_catalog(config)
+        for task_id in ("T4", "T5"):
+            with self.subTest(task_id=task_id):
+                task = next(item for item in catalog.tasks if item["id"] == task_id)
+                route = task["math_intent_route"]
+                self.assertEqual(route, "mathematical_correction")
+                self.assertEqual(
+                    catalog.raw["math_intent_routes"][route],
+                    {
+                        "id": "mathematical_correction",
+                        "requires_math_intent": True,
+                        "activation": "mathematical_or_numerical_correction_evidence",
+                        "owner_skill": "computational-optimization",
+                        "reviewer": "mathematical_correctness_reviewer",
+                        "required_packet": "mathematical_intent_packet",
+                        "precedes": ["design", "benchmark_reviewer"],
+                    },
+                )
+                self.assertIn(
+                    "mathematical_correctness_reviewer",
+                    next(
+                        family
+                        for family in catalog.workflow_families
+                        if family["id"] == "research_driven_change"
+                    )["roles"]["specialists"],
+                )
+                self.assertNotIn(
+                    "mathematical_correctness_reviewer",
+                    default_specialists_for_task(config, catalog, task_id),
+                )
+        waves = {
+            wave["id"]: wave["role_ids"]
+            for wave in catalog.raw["role_topology_defaults"]["stage_waves"]
+        }
+        self.assertIn("benchmark_reviewer", waves["research_review"])
+        self.assertNotIn("benchmark_reviewer", waves["final_review"])
+
+    def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(self) -> None:
+        """The route contract carries the math packet and refuses non-math scope drift."""
+        orchestration = (
+            PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
+        ).read_text(encoding="utf-8")
+        optimization = (
+            PROJECT_ROOT / "agents" / "skills" / "computational-optimization.md"
+        ).read_text(encoding="utf-8")
+        for field in (
+            "math_object",
+            "problem",
+            "variables",
+            "domains",
+            "units",
+            "objective",
+            "residual",
+            "constraints",
+            "equations",
+            "definitions",
+            "assumptions",
+            "approximations",
+            "derivation",
+            "iteration_map",
+            "update_map",
+            "invariants",
+            "limits",
+            "stopping_scalar",
+            "failure_semantics",
+            "equation_to_code_map",
+            "math_oracle",
+            "counterexample",
+            "mathematical_definition_paths",
+            "mathematical_oracle_paths",
+            "mathematical_documentation_paths",
+            "allowed_write_paths",
+            "forbidden_surfaces",
+            "separate_handoff_targets",
+        ):
+            with self.subTest(field=field):
+                self.assertIn(field, optimization)
+                self.assertIn(field, orchestration)
+        for surface in ("architecture", "JIT", "backend", "runtime", "routing", "environment"):
+            with self.subTest(surface=surface):
+                self.assertIn(surface, orchestration)
+                self.assertIn(surface, optimization)
+        self.assertIn("math_packet_missing", orchestration)
+        self.assertIn("writer_target", orchestration)
+
+        team_config = json.loads(
+            (PROJECT_ROOT / "agents" / "agents_config.json").read_text(encoding="utf-8")
+        )
+        math_role = next(
+            role
+            for role in team_config["specialist_roles"]
+            if role["id"] == "mathematical_correctness_reviewer"
+        )
+        self.assertEqual(math_role["codex_agents"], ["reviewer"])
+        self.assertEqual(math_role["write_policy"]["mode"], "artifacts_only")
+        reviewer_view = tomllib.loads(
+            (PROJECT_ROOT / ".codex" / "agents" / "reviewer.toml").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(reviewer_view["model"], "gpt-5.6-luna")
+        self.assertEqual(reviewer_view["model_reasoning_effort"], "high")
+
+    def test_conditional_math_reviewer_enters_capacity_only_when_active(self) -> None:
+        """The dormant conditional stage stays out of baseline capacity."""
+        catalog = load_task_catalog(load_team_config())
+        baseline = declared_team_capacity_derivation(catalog)
+        active = declared_team_capacity_derivation(catalog, include_math_intent=True)
+        self.assertEqual(baseline.requested_max_threads(), 27)
+        self.assertEqual(active.requested_max_threads(), 28)
+        self.assertEqual(active.peak_family.direct_frontier_count, 22)
 
     def test_prompt_routes_subagent_first_implementation_active(self) -> None:
         """Implementation, patch, and doc-edit prompts should activate bootstrap."""
@@ -1004,7 +1193,12 @@ class RouteToolTest(unittest.TestCase):
     def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
         """The canonical owner exposes the exact renderer route."""
         runtime_text = (
-            PROJECT_ROOT / ".agents" / "skills" / "code-visualization" / "SKILL.md"
+            PROJECT_ROOT
+            / ".codex"
+            / "personal"
+            / "skills"
+            / "code-visualization"
+            / "SKILL.md"
         ).read_text(encoding="utf-8")
         self.assertIn("Canonical workflow and policy", runtime_text)
         canonical_text = (
@@ -1015,8 +1209,8 @@ class RouteToolTest(unittest.TestCase):
         direct_text = canonical_text[direct_start:renderer_choice]
         self.assertLess(direct_start, renderer_choice)
         for command in (
-            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
-            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
+            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
         ):
             self.assertIn(command, direct_text)
         self.assertNotIn("<path>", direct_text)
@@ -1038,7 +1232,7 @@ class RouteToolTest(unittest.TestCase):
             "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
         ):
             self.assertIn(boundary, direct_flat)
-        self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", direct_flat)
+        self.assertNotIn("tools/analysis/dependencies/check_dependency_graph.sh", direct_flat)
         self.assertIn(
             "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             direct_flat,
@@ -1046,7 +1240,7 @@ class RouteToolTest(unittest.TestCase):
         packet_result = subprocess.run(
             [
                 sys.executable,
-                str(PROJECT_ROOT / "tools" / "agent_tools" / "skill_tool_commands.py"),
+                str(PROJECT_ROOT / "tools" / "agent" / "skills" / "skill_tool_commands.py"),
                 "show",
                 "--skill",
                 "code-visualization",
@@ -1068,8 +1262,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(
             packet_payload["discovered_commands"],
             [
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
             ],
         )
         for forbidden in (
@@ -1122,7 +1316,7 @@ class RouteToolTest(unittest.TestCase):
             "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
         ):
             self.assertIn(boundary, source_flat)
-        self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", source_flat)
+        self.assertNotIn("tools/analysis/dependencies/check_dependency_graph.sh", source_flat)
         self.assertIn(
             "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             source_flat,
@@ -1253,7 +1447,7 @@ class RouteToolTest(unittest.TestCase):
                         "  - id: _private-skill",
                         "    purpose: Private skill.",
                         "    canonical_doc: agents/skills/_private-skill.md",
-                        "    shim: .agents/skills/_private-skill/SKILL.md",
+                        "    shim: .codex/personal/skills/_private-skill/SKILL.md",
                     ]
                 ),
                 encoding="utf-8",
@@ -1433,7 +1627,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("agent-log-analysis", decision["matched_skills"])
 
     def test_prompt_routes_algorithm_test_first_feedback(self) -> None:
-        """Algorithm repair feedback should route to algorithm owners before test design."""
+        """Proof-oriented algorithm feedback stays with proof owners, not math inference."""
         result = self.run_route(
             "--prompt",
             "アルゴリズム修正時にテストから直し始めるのをやめてください",
@@ -1444,16 +1638,12 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
         for skill in (
-            "computational-optimization",
             "algorithm-proof-exploration",
             "agent-learning",
         ):
             self.assertIn(skill, decision["matched_skills"])
-        for skill in (
-            "computational-optimization",
-            "algorithm-proof-exploration",
-        ):
-            self.assertIn(skill, decision["active_skills"])
+        self.assertIn("algorithm-proof-exploration", decision["active_skills"])
+        self.assertNotIn("computational-optimization", decision["matched_skills"])
         self.assertNotIn("test-design", decision["matched_skills"])
         self.assertNotIn("test-design", decision["active_skills"])
         self.assertIn("agent-learning", decision["deferred_skills"])
@@ -2353,7 +2543,7 @@ class CapabilityRouteTest(unittest.TestCase):
                 f"  - id: {skill}",
                 "    purpose: Capability fixture.",
                 f"    canonical_doc: agents/skills/{skill}.md",
-                f"    shim: .agents/skills/{skill}/SKILL.md",
+                f"    shim: .codex/personal/skills/{skill}/SKILL.md",
                 "    routing:",
                 "      stage_policy: active",
                 "      reason: capability fixture",
@@ -2409,7 +2599,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  - id: task-routing",
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .agents/skills/task-routing/SKILL.md",
+                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
                         "    routing:",
                         "      stage_policy: explicit_only",
                         "      reason: fixture",
@@ -2432,7 +2622,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  - id: task-routing",
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .agents/skills/task-routing/SKILL.md",
+                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
                         "    routing:",
                         "      stage_policy: active",
                         "      reason: 3",
@@ -2455,7 +2645,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  - id: task-routing",
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .agents/skills/task-routing/SKILL.md",
+                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
                     ]
                 ),
             )
@@ -2489,7 +2679,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  - id: task-routing",
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .agents/skills/task-routing/SKILL.md",
+                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
                     ]
                 ),
             )
@@ -2590,7 +2780,7 @@ class CapabilityRouteTest(unittest.TestCase):
             payload["visualization_adapter_tool_call"]["arguments"][
                 "dependency_manifest_locator"
             ],
-            "tools/agent_tools/render_dependency_manifest_graph.py",
+            "tools/analysis/dependencies/render_dependency_manifest_graph.py",
         )
         self.assertIsNone(payload["visualization_rejection"])
 

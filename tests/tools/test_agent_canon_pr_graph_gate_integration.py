@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Verifies the PR gate no longer orchestrates persisted dependency graph runtime state.
-# upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns PR dependency routing
-# upstream implementation ../../tools/ci/run_pr_dependency_source_gate.sh owns source-only dependency validation
-# upstream implementation ../../tools/ci/pr_gate_receipt.py owns source/skipped receipt semantics
+# upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh owns PR dependency routing
+# upstream implementation ../../tools/validation/ci/checks/run_pr_dependency_source_gate.sh owns source-only dependency validation
+# upstream implementation ../../tools/validation/ci/receipts/pr_gate_receipt.py owns source/skipped receipt semantics
 # upstream design ../../documents/design/source-owned-dependency-validation.md owns dependency validation semantics
 # upstream design ../../documents/design/dependency-manifest-design.md projects manifest semantics
 # downstream implementation ./test_agent_canon_pr_dependency_source_gate.py exercises source-only fixture execution
@@ -17,10 +17,10 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PR_CHECK = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
-SOURCE_GATE = PROJECT_ROOT / "tools" / "ci" / "run_pr_dependency_source_gate.sh"
-RECEIPT = PROJECT_ROOT / "tools" / "ci" / "pr_gate_receipt.py"
-RUN_ALL_CHECKS = PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh"
+PR_CHECK = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+SOURCE_GATE = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "run_pr_dependency_source_gate.sh"
+RECEIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "receipts" / "pr_gate_receipt.py"
+RUN_ALL_CHECKS = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh"
 
 
 class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):

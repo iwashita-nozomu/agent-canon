@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Provides the stable AgentCanon CLI through the bootstrap-owned shared tool container.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md typed bootstrap request boundary
-# downstream implementation ../../tools/agent_tools/tool_dispatch.py request builder and catalog route
+# downstream implementation ../../tools/runtime/dispatch/tool_dispatch.py request builder and catalog route
 # downstream implementation ../../bootstrap.sh host lifecycle entrypoint
 # @dependency-end
 
@@ -18,28 +18,27 @@ if [ -n "${AGENT_CANON_SOURCE_ROOT:-}" ]; then
   canon_root="$(cd "${AGENT_CANON_SOURCE_ROOT}" && pwd -P)"
 fi
 
-runtime_root="${AGENT_CANON_RUNTIME_ROOT:-}"
+runtime_root="${AGENT_CANON_RUNTIME_ROOT:-${canon_root}/.runtime}"
 control_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
-if [ -z "$runtime_root" ] || [ -z "$control_root" ]; then
-  echo "agent-canon requires AGENT_CANON_CONTROL_PARENT_ROOT and AGENT_CANON_RUNTIME_ROOT" >&2
-  exit 2
-fi
-if [ ! -d "$runtime_root" ] || [ ! -d "$control_root" ]; then
-  echo "agent-canon control/runtime roots must already exist" >&2
-  exit 2
-fi
-
-# The wrapper is a control-plane adapter only. It never runs cargo, invokes a
-# Python tool, creates a cache directory, or selects a source-tree fallback.
-# The dispatcher submits a typed request to bootstrap, which owns container
-# selection, mounts, resource limits, and child process execution.
-dispatcher="${canon_root}/tools/agent_tools/tool_dispatch.py"
-if [ ! -f "$dispatcher" ]; then
-  echo "agent-canon dispatcher is unavailable" >&2
-  exit 2
-fi
 
 if [ "${1:-}" = "tool" ] && [ "${2:-}" = "run" ]; then
+  if [ -z "$control_root" ]; then
+    echo "agent-canon requires AGENT_CANON_CONTROL_PARENT_ROOT" >&2
+    exit 2
+  fi
+  if [ ! -d "$runtime_root" ] || [ ! -d "$control_root" ]; then
+    echo "agent-canon control/runtime roots must already exist" >&2
+    exit 2
+  fi
+
+  # Catalog tool paths retain the dispatcher contract: they require an
+  # already-registered external runtime and are not source-tree fallbacks.
+  dispatcher="${canon_root}/tools/runtime/dispatch/tool_dispatch.py"
+  if [ ! -f "$dispatcher" ]; then
+    echo "agent-canon dispatcher is unavailable" >&2
+    exit 2
+  fi
+
   shift 2
   exec env \
     AGENT_CANON_CONTROL_PARENT_ROOT="$control_root" \
@@ -49,9 +48,20 @@ if [ "${1:-}" = "tool" ] && [ "${2:-}" = "run" ]; then
     python3 "$dispatcher" run --root "$canon_root" "$@"
 fi
 
+# Rust CLI operations are lifecycle requests, not dispatcher catalog paths.
+# Leave runtime existence, including the historical runtime location, to the
+# bootstrap owner. It canonicalizes legacy input to the source-owned runtime
+# before selecting the resident image and executing the image-owned binary.
+bootstrap="${canon_root}/bootstrap.sh"
+if [ ! -x "$bootstrap" ]; then
+  echo "agent-canon bootstrap is unavailable" >&2
+  exit 2
+fi
+bootstrap_args=("$bootstrap" --repository-root "$canon_root" --runtime-root "$runtime_root")
+if [ -n "$control_root" ]; then
+  bootstrap_args+=(--control-parent-root "$control_root")
+fi
 exec env \
-  AGENT_CANON_CONTROL_PARENT_ROOT="$control_root" \
-  AGENT_CANON_RUNTIME_ROOT="$runtime_root" \
   AGENT_CANON_SOURCE_ROOT="$canon_root" \
   PYTHONDONTWRITEBYTECODE=1 \
-  python3 "$dispatcher" rust-cli --root "$canon_root" -- "$@"
+  "${bootstrap_args[@]}" exec --root "$canon_root" -- agent-canon "$@"

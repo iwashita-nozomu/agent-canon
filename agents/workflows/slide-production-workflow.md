@@ -5,7 +5,7 @@ responsibility Documents slide production workflow for this repository.
 upstream design ../../documents/codex/codex-configuration-slides.md slide deck source reference
 upstream design ../../documents/contracts/template-bootstrap.md repo bootstrap and canonical runtime views
 upstream design ../../documents/experiments/experiment-report-style.md document quality and evidence discipline
-downstream implementation ../../evidence/agent-evals/skill_workflow_prompt_eval.toml workflow prompt eval coverage
+downstream implementation ../../eval/definitions/skill_workflow_prompt_eval.toml workflow prompt eval coverage
 @dependency-end
 -->
 
@@ -97,7 +97,7 @@ goal packet and the run-bundle `goal_work_breakdown.md`.
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py`
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py`
 and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps slide workflow
 rules, prompt routing hooks, and documentation gates mechanically checked
 instead of relying on prompt memory.

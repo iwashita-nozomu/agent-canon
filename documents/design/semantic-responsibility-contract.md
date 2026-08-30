@@ -5,7 +5,7 @@ responsibility Defines the semantic responsibility contract for implementation d
 upstream design ../rule/README.md document filename, placement, and language rules
 upstream design codex-spark-implementation-routing.md implementation owner and validation route
 downstream implementation ../../templates/documents/semantic-responsibility-contract.template.toml reusable empty task instance
-downstream implementation ../../tools/agent_tools/check_semantic_responsibility_contract.py schema, identity, and reference validator
+downstream implementation ../../tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py schema, identity, and reference validator
 downstream design ../../agents/COMMUNICATION_PROTOCOL.md active design packet reference
 @dependency-end
 -->

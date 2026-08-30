@@ -9,8 +9,8 @@ upstream design ../../documents/design/request-intent-and-update-relation.md exp
 downstream design ../../AGENTS.md standalone repository entrypoint consumer
 downstream design ../../ROOT_AGENTS.md live-integration entrypoint consumer
 downstream design ../skills/agent-orchestration.md Codex-side workflow and owner routing consumer
-downstream implementation ../../.agents/skills/_chatgpt-codex-routing/SKILL.md private runtime discovery adapter
-downstream implementation ../../tools/agent_tools/chatgpt_codex_routing.py deterministic decision owner
+downstream implementation ../../.codex/personal/skills/_chatgpt-codex-routing/SKILL.md private runtime discovery adapter
+downstream implementation ../../tools/agent/orchestration/chatgpt_codex_routing.py deterministic decision owner
 downstream implementation ../../tests/agent_tools/test_chatgpt_codex_routing.py finite-relation and monotonicity validation
 @dependency-end
 -->
@@ -29,7 +29,7 @@ requested deliverable の正しさが workspace execution に依存するかだ�
 
 これは public Codex workflow ではなく、root entrypoint から呼ばれる internal routine
 です。runtime activation が必要な場合だけ
-`.agents/skills/_chatgpt-codex-routing/SKILL.md` を使います。先頭 underscore は private
+`.codex/personal/skills/_chatgpt-codex-routing/SKILL.md` を使います。先頭 underscore は private
 surface を表し、public skill catalog と public dependency DAG は増やしません。
 
 request modality は Codex public skill selection より前に決まるため、この gate を
@@ -154,7 +154,7 @@ Chat-only conflict prepends `explicit_chat_only_conflict` to the true execution 
 2. `E, M, R, X, V, D` と `explicit_chat_only` を boolean として抽出します。
 3. Codex fact が一つでも true の場合、具体的な `codex_scope` と
    `validation_oracle` を固定します。
-4. `python3 tools/agent_tools/chatgpt_codex_routing.py --input <packet.json>` で
+4. `python3 tools/agent/orchestration/chatgpt_codex_routing.py --input <packet.json>` で
    deterministic packet を生成します。
 5. `route=chatgpt` は会話内で閉じます。`route=codex` だけを
    `agent-orchestration` へ渡します。

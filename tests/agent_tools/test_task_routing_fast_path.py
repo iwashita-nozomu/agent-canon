@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests task-routing fast path without Decision Sufficiency.
 # upstream design ../../agents/skills/task-routing.md task-routing fast-path contract
-# upstream implementation ../../tools/agent_tools/route.py selects routes
+# upstream implementation ../../tools/agent/orchestration/route.py selects routes
 # @dependency-end
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ROUTE = PROJECT_ROOT / "tools" / "agent_tools" / "route.py"
+ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
 TASK_ROUTING = PROJECT_ROOT / "agents" / "skills" / "task-routing.md"
 DECISION_FIELDS = {
     "decision_sufficiency_packet_ref",

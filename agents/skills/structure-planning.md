@@ -7,9 +7,9 @@ upstream design ../../documents/design/responsibility-rationale.md structure and
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design code-visualization.md sole public visualization owner and typed projection contract
-downstream implementation ../../.agents/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/agent_tools/task_close.py consumes document_split_decision when a structural decision actually occurs
-downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../.codex/personal/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../tools/runtime/lifecycle/task_close.py consumes document_split_decision when a structural decision actually occurs
+downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
 

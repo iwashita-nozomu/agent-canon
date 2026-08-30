@@ -2,9 +2,9 @@
 @dependency-start
 contract reference
 responsibility Documents Git diff dependency summary tool usage.
-upstream implementation ../../tools/agent_tools/git_dependency_diff_summary.py summarizes Git diffs with dependency expansion artifacts.
-upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency edges.
-upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh expands dependency-header graph evidence.
+upstream implementation ../../tools/analysis/dependencies/git_dependency_diff_summary.py summarizes Git diffs with dependency expansion artifacts.
+upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency edges.
+upstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh expands dependency-header graph evidence.
 downstream implementation ../../tests/agent_tools/test_git_dependency_diff_summary.py tests CLI behavior.
 @dependency-end
 -->
@@ -21,7 +21,7 @@ fail authority in the existing dependency tools while providing one JSON or
 Markdown packet for PR review, change review, or subagent handoff.
 
 ```bash
-python3 tools/agent_tools/git_dependency_diff_summary.py \
+python3 tools/analysis/dependencies/git_dependency_diff_summary.py \
   --root . \
   --report-dir reports/dependency-review/git-diff-summary \
   --format text
@@ -30,7 +30,7 @@ python3 tools/agent_tools/git_dependency_diff_summary.py \
 For a PR-style committed comparison:
 
 ```bash
-python3 tools/agent_tools/git_dependency_diff_summary.py \
+python3 tools/analysis/dependencies/git_dependency_diff_summary.py \
   --root . \
   --base origin/main \
   --head HEAD \

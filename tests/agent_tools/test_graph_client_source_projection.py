@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Verifies dependency consumers do not require persisted graph runtime state.
-# upstream implementation ../../tools/agent_tools/source_dependency_graph.py derives source projections
-# upstream implementation ../../tools/agent_tools/graph_client.py routes dependency reads to source
-# downstream implementation ../../tools/ci/check_agent_canon_pr.sh uses source-owned dependency review
+# upstream implementation ../../tools/analysis/dependencies/source_dependency_graph.py derives source projections
+# upstream implementation ../../tools/analysis/dependencies/graph_client.py routes dependency reads to source
+# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh uses source-owned dependency review
 # @dependency-end
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.graph_client import GraphClient, GraphClientError
+from tools.analysis.dependencies.graph_client import GraphClient, GraphClientError
 
 
 def write(path: Path, content: str) -> None:
@@ -177,6 +177,81 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
                     relation="dependency",
                     direction="both",
                     depth=0,
+                )
+
+    def test_generated_skill_view_resolves_to_catalog_owner_without_view(self) -> None:
+        """Ignored generated skill paths use the catalog owner in a clean checkout."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "agents" / "skills" / "catalog.yaml",
+                """
+                skill_families:
+                  - id: example
+                    canonical_doc: agents/skills/example.md
+                    shim: .codex/personal/skills/example/SKILL.md
+                """,
+            )
+            write(
+                root / "agents" / "skills" / "example.md",
+                """
+                # @dependency-start
+                # contract skill
+                # responsibility Owns the example skill.
+                # @dependency-end
+                # Example skill.
+                """,
+            )
+            write(
+                root / "tools" / "consumer.py",
+                """
+                # @dependency-start
+                # contract tool
+                # responsibility References the generated skill view.
+                # downstream implementation ../.codex/personal/skills/example/SKILL.md generated view
+                # @dependency-end
+                """,
+            )
+            projection = GraphClient(
+                root, executable=root / "missing-agent-canon"
+            ).query(all_nodes=True)
+            self.assertEqual(
+                {
+                    (fact.source, fact.target)
+                    for fact in projection.dependency_facts
+                },
+                {("tools/consumer.py", "agents/skills/example.md")},
+            )
+            self.assertFalse(
+                (root / ".codex" / "personal" / "skills" / "example" / "SKILL.md").exists()
+            )
+            context = GraphClient(
+                root, executable=root / "missing-agent-canon"
+            ).context(".codex/personal/skills/example/SKILL.md")
+            assert context.source_identity is not None
+            self.assertEqual(
+                context.source_identity.source_path, "agents/skills/example.md"
+            )
+
+    def test_unknown_generated_skill_view_is_rejected(self) -> None:
+        """A stale generated skill path cannot become an implicit graph node."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "tools" / "consumer.py",
+                """
+                # @dependency-start
+                # contract tool
+                # responsibility References a stale generated skill view.
+                # downstream implementation ../.codex/personal/skills/removed/SKILL.md stale view
+                # @dependency-end
+                """,
+            )
+            with self.assertRaisesRegex(
+                GraphClientError, "source dependency projection failed: unknown generated skill view"
+            ):
+                GraphClient(root, executable=root / "missing-agent-canon").query(
+                    all_nodes=True
                 )
 
 

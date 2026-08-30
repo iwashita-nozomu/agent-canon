@@ -3,15 +3,16 @@
 # @dependency-start
 # contract test
 # responsibility Tests workflow monitor accumulation behavior.
-# upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
-# upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
-# upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns update lifecycle evidence identities
+# upstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py appends evidence
+# upstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py seeds evidence
+# upstream implementation ../../tools/runtime/lifecycle/update_lifecycle_contract.py owns update lifecycle evidence identities
 # @dependency-end
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -21,10 +22,10 @@ from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_artifacts import RuntimeSymlinkEscape  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import RuntimeSymlinkEscape  # noqa: E402
 
-MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
-BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
+MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
+BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT
     / "documents"
@@ -186,7 +187,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                     "skill_invocation=$agent-orchestration status=observed",
                     "--runtime-feedback",
                     (
-                        "source=user target=.agents/skills/agent-learning/SKILL.md "
+                        "source=user target=.codex/personal/skills/agent-learning/SKILL.md "
                         "action=prompt_repair evidence=observed-drift"
                     ),
                     "--intervention",
@@ -213,13 +214,50 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("skill_invocation=$agent-orchestration status=observed", text)
             self.assertIn("runtime_feedback=observed", text)
-            self.assertIn("target=.agents/skills/agent-learning/SKILL.md", text)
+            self.assertIn("target=.codex/personal/skills/agent-learning/SKILL.md", text)
             self.assertIn("action=prompt_repair", text)
             self.assertIn("## Tool Warnings", text)
             self.assertIn("- tool_warnings_status: pending", text)
             self.assertIn("spawned reviewer", text)
             self.assertIn("- workflow_improvement_decision: applied", text)
             self.assertIn("- knowledge_learning_decision: not_applicable", text)
+
+    def test_monitor_uses_runtime_environment_for_feedback_capture(self) -> None:
+        """The environment runtime route also spools structured feedback."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            runtime = Path(tmp_dir) / "runtime"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--run-id",
+                    "env-runtime-run",
+                    "--report-root",
+                    "reports",
+                    "--workspace-root",
+                    str(Path(tmp_dir) / "workspace"),
+                    "--runtime-feedback",
+                    "source=user target=skill action=prompt_repair evidence=env",
+                ],
+                cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_RUNTIME_ROOT": str(runtime)},
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(
+                (
+                    runtime
+                    / "reports"
+                    / "env-runtime-run"
+                    / "workflow_monitoring.md"
+                ).is_file()
+            )
+            request = runtime / "spool" / "private-feedback" / "sync-request.json"
+            self.assertTrue(request.is_file())
+            self.assertNotIn("prompt_repair", request.read_text(encoding="utf-8"))
 
     def test_monitor_appends_structured_tool_warning(self) -> None:
         """Tool warnings should be recorded as closeout-obligating ledger rows."""
@@ -1183,7 +1221,7 @@ def test_monitor_atomic_open_rejects_parent_path_replacement() -> None:
         replaced.symlink_to(outside, target_is_directory=True)
         module = load_monitor_module()
         target = replaced / "workflow_monitoring.md"
-        with unittest.TestCase().assertRaises(RuntimeSymlinkEscape) as rejected:
+        with unittest.TestCase().assertRaises(RuntimeSymlinkEscape):
             with module.locked_monitoring_artifact(target, runtime_root=root):
                 pass
         assert not (outside / "workflow_monitoring.md").exists()

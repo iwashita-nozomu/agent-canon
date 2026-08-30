@@ -12,18 +12,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent_tools.task_authority import (  # noqa: E402
+from tools.runtime.authority.task_authority import (  # noqa: E402
     AUTHORITY_FILE_NAME,
     find_authority_path,
 )
-from tools.agent_tools.workflow_monitor import (  # noqa: E402
+from tools.runtime.lifecycle.workflow_monitor import (  # noqa: E402
     MonitoringEntries,
     append_monitoring,
 )
-from tools.agent_tools.workspace_scope import (  # noqa: E402
+from tools.repository.workspace.workspace_scope import (  # noqa: E402
     resolve_report_root,
 )
-from tools.agent_tools.runtime_artifacts import RuntimeRootRequired  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import RuntimeRootRequired  # noqa: E402
 
 
 class AgentTeamRuntimeBoundaryTest(unittest.TestCase):

@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents formal_proof.py operator usage and proof-status boundary.
-upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts.
+upstream implementation ../../tools/analysis/proof/formal_proof.py builds proof scaffold artifacts.
 upstream design ../../agents/skills/formal-proof-workflow.md defines the natural-language to formal-proof workflow.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant source evidence.
 downstream implementation ../../tests/agent_tools/test_formal_proof.py tests CLI output.
@@ -33,8 +33,8 @@ operation: choose a runtime root outside the checkout and place `--out-dir`
 below that root.  There is no source-local `reports/` fallback.
 
 ```bash
-RUNTIME_ROOT=/abs/path/to/workspace/agent-canon-runtime/<run>
-python3 tools/agent_tools/formal_proof.py \
+RUNTIME_ROOT=/abs/path/to/external/agent-canon-runtime/<run>
+python3 tools/analysis/proof/formal_proof.py \
   --claim-file /path/to/claim.md \
   --target lean \
   --domain "linear algebra" \
@@ -63,7 +63,7 @@ The output directory contains:
 For implementation-derived proof planning, pass a Python source reference:
 
 ```bash
-python3 tools/agent_tools/formal_proof.py \
+python3 tools/analysis/proof/formal_proof.py \
   --python-symbol path/to/algorithm.py::<implementation_symbol> \
   --target lean \
   --domain "<mathematical domain>" \
@@ -110,7 +110,7 @@ new lemmas. Verification authority remains with the target checker command
 reported in the plan, for example:
 
 ```bash
-python3 tools/agent_tools/lean_proof_env.py check-file \
+python3 tools/analysis/proof/lean_proof_env.py check-file \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --lean-file "$RUNTIME_ROOT/tasks/formal-proof/spd/spd_quadratic_form_positive.lean" \
   --execute

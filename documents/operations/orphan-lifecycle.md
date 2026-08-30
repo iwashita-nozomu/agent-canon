@@ -6,7 +6,7 @@ responsibility Defines the canonical semantic orphan inventory, finite classific
 upstream design ../design/request-intent-and-update-relation.md defines lifecycle flow and existing cleanup-executor delegation.
 upstream design worktree-lifecycle.md defines stale worktree handling and user-owned state protection.
 upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines the existing PR lifecycle and publication owner.
-downstream implementation ../../tools/agent_tools/orphan_lifecycle.py produces the canonical read-only inventory and cleanup admission.
+downstream implementation ../../tools/repository/git/orphan_lifecycle.py produces the canonical read-only inventory and cleanup admission.
 downstream implementation ../../tests/agent_tools/test_orphan_lifecycle.py verifies semantic equivalence and refusal behavior.
 @dependency-end
 -->
@@ -18,11 +18,11 @@ branch registry、cleanup database、Issue state machine を作りません。
 
 ## 責務境界
 
-`tools/agent_tools/orphan_lifecycle.py inventory` が canonical read-only inventory を生成し、
+`tools/repository/git/orphan_lifecycle.py inventory` が canonical read-only inventory を生成し、
 同じ tool の `authorize-cleanup` が explicit selection を inventory digest に束縛して認可します。
 どちらも ref、PR、worktree、ファイルを削除しません。
 
-- PR の publication と GitHub mutation は `tools/agent_tools/github_publish.py` および
+- PR の publication と GitHub mutation は `tools/repository/github/github_publish.py` および
   `agents/skills/pr-processing.md` に残ります。
 - worktree の停止・除去・prune は runtime provisioning owner または user owner に残ります。
 - local/remote branch の削除は、現在その resource を所有する既存 cleanup route に残ります。
@@ -87,7 +87,7 @@ caller は先に remote を通常の Git owner で更新し、どの commit を�
 
 ```bash
 git fetch --prune origin main
-python3 tools/agent_tools/orphan_lifecycle.py inventory \
+python3 tools/repository/git/orphan_lifecycle.py inventory \
   --root . \
   --main-ref refs/remotes/origin/main \
   --trace reports/orphan-trace.json \
@@ -135,7 +135,7 @@ PR head commit が local object database にない場合も semantic comparison 
 cleanup 前に、inventory が出した exact digest と candidate identity を明示します。
 
 ```bash
-python3 tools/agent_tools/orphan_lifecycle.py authorize-cleanup \
+python3 tools/repository/git/orphan_lifecycle.py authorize-cleanup \
   --inventory reports/orphan-inventory.json \
   --inventory-digest 'sha256:<inventory-digest>' \
   --root . \
@@ -173,7 +173,7 @@ readback、Issue/PR trace を残した後に元 candidate を再 inventory し�
 ```bash
 python3 -m unittest tests.agent_tools.test_orphan_lifecycle -v
 python3 -m py_compile \
-  tools/agent_tools/orphan_lifecycle.py \
+  tools/repository/git/orphan_lifecycle.py \
   tests/agent_tools/test_orphan_lifecycle.py
 ```
 

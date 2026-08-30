@@ -42,11 +42,12 @@ global Python executable, or Host Cargo fallback.
 
 | Family | Canonical owner |
 | --- | --- |
-| typed dispatch and route selection | `tools/agent_tools/tool_dispatch.py`, `tools/catalog.yaml` |
+| typed dispatch and route selection | `tools/runtime/dispatch/tool_dispatch.py`, `tools/catalog.yaml` |
 | source/dependency analysis | `search.py`, `source_dependency_graph.py`, `lsp_code_analysis.py` |
 | runtime artifact boundary | `runtime_artifacts.py`, `bootstrap_runtime.py` |
 | eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py` |
 | docs and structure | Rust `agent-canon docs`, `repo_structure_contract.py`, `check_design_doc_claims.py` |
+| Skill loading | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` via the persistent AgentCanon tool container (bounded UTF-8 chunks and EOF admission) |
 | review and closeout | `review_dispatch.py`, `task_close.py`, canonical workflow |
 
 Each tool that writes requires an external runtime/output root or an explicit
@@ -58,10 +59,10 @@ fallback when that capability is absent.
 Validate the selected owner rather than every tool family:
 
 ```bash
-python3 tools/agent_tools/tool_catalog.py
-python3 tools/agent_tools/check_convention_compliance.py
-python3 tools/agent_tools/skill_tool_commands.py check
-python3 tools/docs/check_bootstrap_docs.py --root .
+python3 tools/runtime/manifest/tool_catalog.py
+python3 tools/validation/semantic/convention/check_convention_compliance.py
+python3 tools/agent/skills/skill_tool_commands.py check
+python3 tools/validation/documentation/checks/check_bootstrap_docs.py --root .
 ```
 
 Container behavior is validated with `bootstrap.sh install -> start -> target

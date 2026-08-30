@@ -89,6 +89,7 @@ role_topology_defaults: &standard_role_topology
       - python_reviewer
       - cpp_reviewer
       - diff_triage_reviewer
+      - mathematical_correctness_reviewer
       - reviewer
       - ship_reviewer
     perspective_review:
@@ -106,9 +107,9 @@ role_topology_defaults: &standard_role_topology
     status: allowed_with_distinct_packets
     identity_key: role_id+instance_id+agent_type
     read_only: allowed_when_input_packets_or_review_focus_are_distinct
-    write_capable: allowed_only_for_worker_or_spark_worker
+    write_capable: allowed_only_for_worker_spark_worker_integration_executor
     current_checkout_parallel_requirements: disjoint_paths+no_shared_git_index_or_head+no_generated_or_formatter_effects
-    collision_policy: serialize_current_checkout_waves
+    collision_policy: reject_same_checkout_root_before_spawn
     isolated_worktree_policy: explicit_alternative_implementation_experiment_only
     runtime_threads_are_cardinality_source: false
   stage_waves:
@@ -124,6 +125,11 @@ role_topology_defaults: &standard_role_topology
       stage_class: reviewer
       role_ids:
         - manager_reviewer
+    - id: mathematical_intent_review
+      stage_class: reviewer
+      activation: conditional_math_intent_packet
+      role_ids:
+        - mathematical_correctness_reviewer
     - id: research
       stage_class: producer
       role_ids:
@@ -222,6 +228,16 @@ role_topology_defaults: &standard_role_topology
       role_ids:
         - verifier
         - auditor
+
+math_intent_routes:
+  mathematical_correction:
+    id: mathematical_correction
+    requires_math_intent: true
+    activation: mathematical_or_numerical_correction_evidence
+    owner_skill: computational-optimization
+    reviewer: mathematical_correctness_reviewer
+    required_packet: mathematical_intent_packet
+    precedes: [design, benchmark_reviewer]
 
 workflow_families:
   - id: owner_bounded_change
@@ -323,6 +339,7 @@ workflow_families:
         - Emit the skill call sequence with literature-survey before research-workflow when primary sources, prior art, official docs, or source-backed implementation claims are used; carry the source packet and adoption/exclusion decisions into design, implementation, benchmark, and report handoffs.
         - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, research_notes.md, cited sources, and team_manifest.yaml only when the selected research or coordination route requires them.
         - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
+        - When mathematical or numerical correction evidence is present, resolve the canonical math_intent_route ID `mathematical_correction` before generic design, benchmark, or scientific-computing review, then create the computational-optimization math-intent packet. The packet must bind math_object/problem, variables/domains/units, objective/residual, constraints, equations/definitions, assumptions/approximations, derivation, iteration_map/update_map, invariants/limits/stopping_scalar/failure_semantics, equation_to_code_map, mathematical_definition_paths, mathematical_oracle_paths, mathematical_documentation_paths, math_oracle/counterexample, mapped allowed write paths equal to that union, forbidden non-math surfaces, and separate handoff targets.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide hypotheses; owner-local receipts establish correspondence, while the parent owns transport, integration, and remote readback without approval authority.
         - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
@@ -360,6 +377,7 @@ workflow_families:
         - scheduler
         - schedule_reviewer
         - report_reviewer
+        - mathematical_correctness_reviewer
         - citation_evidence_reviewer
         - test_designer
         - python_reviewer
@@ -630,6 +648,39 @@ workflow_families:
     tasks:
       - T14
 
+  - id: issue_worker_publication
+    name: IssueWorker Publication
+    logical_route: issue_worker
+    execution_role: publisher
+    subagent_prompt:
+      purpose: Prompt packet for explicit repository-owned feedback publication and related Issue reorganization.
+      prompt_preamble:
+        - Consume only an explicit IssueWorker candidate and the #938 checkout identity readback; counts, status rows, and selection misses are not candidates.
+        - Route same-repository candidates to the logical IssueWorker path executed by publisher. Route other repositories as qualified no-mutation handoffs.
+        - Keep same-repository evidence gaps in publisher investigation; they may produce need verification and must not be silently discarded.
+      dispatch_route: tools/agent/orchestration/agent_team.py#dispatch_issue_worker
+      execution_role: publisher
+      tool_call_route: tools/agent/orchestration/tool_calls.py#materialize_issue_worker_tool_call
+      workflow_focus:
+        - Read open and closed related Issues, narrow mixed responsibility, transfer clauses and backlinks, and mutate only when the selected responsibility requires it.
+        - Read back every affected Issue URL, number, body, and state. Do not request an extra approval gate or create a local Issue database.
+      reviewer_prompt:
+        - Verify the candidate boundary, repository routing, no-mutation foreign-repository handoff, and idempotent update/no-op behavior.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on: []
+      specialists:
+        - publisher
+    tasks:
+      - T15
+
 tasks:
   - id: T1
     name: local bug fix
@@ -652,6 +703,7 @@ tasks:
   - id: T4
     name: research-backed implementation change
     family: research_driven_change
+    math_intent_route: mathematical_correction
     specialists:
       - researcher
       - research_reviewer
@@ -664,6 +716,7 @@ tasks:
   - id: T5
     name: benchmark or experiment-driven optimization
     family: research_driven_change
+    math_intent_route: mathematical_correction
     specialists:
       - researcher
       - research_reviewer
@@ -764,6 +817,11 @@ tasks:
     family: skill_evaluation
     specialists:
       - skill_evaluator
+  - id: T15
+    name: explicit IssueWorker feedback publication and Issue reorganization (publisher)
+    family: issue_worker_publication
+    specialists:
+      - publisher
 
 review_packs:
   - id: research_perspective_review

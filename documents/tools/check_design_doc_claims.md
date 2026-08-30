@@ -4,9 +4,9 @@ contract design
 responsibility Documents check_design_doc_claims.py operator usage.
 upstream design ../design/dependency-manifest-design.md dependency manifest graph semantics
 upstream design ../design/README.md design-document evidence policy
-upstream implementation ../../tools/agent_tools/graph_client.py provides canonical graph status, query, and context responses
-upstream implementation ../../tools/agent_tools/check_design_doc_claims.py checks design-document claims
-upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh optionally runs this checker
+upstream implementation ../../tools/analysis/dependencies/graph_client.py provides canonical graph status, query, and context responses
+upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py checks design-document claims
+upstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh optionally runs this checker
 downstream implementation ../../tests/agent_tools/test_check_design_doc_claims.py validates checker behavior
 @dependency-end
 -->
@@ -36,7 +36,7 @@ handoff decisions.
 ## Command
 
 ```bash
-python3 tools/agent_tools/check_design_doc_claims.py \
+python3 tools/validation/semantic/documents/check_design_doc_claims.py \
   --root . \
   --recursive-depth 3 \
   documents/design/<topic>.md
@@ -45,7 +45,7 @@ python3 tools/agent_tools/check_design_doc_claims.py \
 The dependency-review wrapper can run the same check after graph validation:
 
 ```bash
-bash tools/agent_tools/run_repo_dependency_review.sh \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --check-design-doc-claims
 ```
@@ -54,7 +54,7 @@ The wrapper's default claim scope is changed design documents. For an explicit
 design document, pass:
 
 ```bash
-bash tools/agent_tools/run_repo_dependency_review.sh \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --check-design-doc-claims \
   --design-doc-claim-path documents/design/<topic>.md

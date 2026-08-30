@@ -6,8 +6,8 @@ contract workflow
 responsibility Routes agent-side recurrence learning to private knowledge/feedback, owners, Issues, failures, or evidence.
 upstream design ../skills/agent-learning.md learning skill contract
 upstream design ../../documents/runtime/private-feedback-knowledge.md external private log contract
-upstream implementation ../../tools/agent_tools/private_feedback.py metadata-only adapter
-downstream implementation ../../tools/agent_tools/workflow_monitor.py runtime observation route
+upstream implementation ../../tools/runtime/archive/private_feedback.py metadata-only adapter
+downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py runtime observation route
 @dependency-end
 -->
 
@@ -70,7 +70,7 @@ eventとして `## Behavior Events` に蓄積します。最低限、skill invoc
 tool gate、prompt eval run、review feedback、subagent lifecycle、diff-check decisionを記録します。
 
 ```bash
-python3 tools/agent_tools/workflow_monitor.py \
+python3 tools/runtime/lifecycle/workflow_monitor.py \
   --report-dir reports/agents/<run-id> \
   --behavior-event "skill_invocation=agent-learning status=observed"
 ```
@@ -81,7 +81,7 @@ user / reviewer / eval feedbackは `runtime_feedback=observed` を含むstructur
 記録します。反映先はprompt、workflow、eval、private knowledge、Issue、またはno-opです。
 
 ```bash
-python3 tools/agent_tools/workflow_monitor.py \
+python3 tools/runtime/lifecycle/workflow_monitor.py \
   --report-dir reports/agents/<run-id> \
   --runtime-feedback "source=user target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op> runtime_feedback=observed evidence=<short-observation>"
 ```
@@ -96,14 +96,14 @@ rerunした場合だけ記録します。private knowledgeへの記録は
 
 ### Agent Run Evaluation
 
-behavior evalのrubricは `evidence/agent-evals/agent_behavior_eval.toml` を正本とします。
+behavior evalのrubricは `eval/definitions/agent_behavior_eval.toml` を正本とします。
 closeout前に `evaluate_agent_run.py` でbehavior manifestを指定して評価し、feedback actionsを
 解決して `AGENT_EVALUATION_STATUS=pass` になるまで閉じません。
 
 ```bash
-python3 tools/agent_tools/evaluate_agent_run.py \
+python3 eval/producers/evaluate_agent_run.py \
   --report-dir reports/agents/<run-id> \
-  --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml \
+  --behavior-manifest eval/definitions/agent_behavior_eval.toml \
   --write
 ```
 

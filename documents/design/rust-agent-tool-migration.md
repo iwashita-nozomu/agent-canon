@@ -4,11 +4,11 @@ contract reference
 responsibility Documents Rust migration policy for AgentCanon tools.
 upstream design README.md AgentCanon documentation index
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream implementation ../../bootstrap/container/dependencies.toml declares Rust toolchain and CLI build records
-downstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
-downstream implementation ../../rust/agent-canon/src/migration_audit.rs validates migration boundaries
-downstream implementation ../../rust/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
-downstream implementation ../../rust/agent-canon/src/structured_analysis.rs implements structured document inventory migration target
+downstream implementation ../../bootstrap/container/image/dependencies.toml declares Rust toolchain and CLI build records
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs Rust CLI entrypoint
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/migration_audit.rs validates migration boundaries
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs implements structured document inventory migration target
 downstream implementation ../../tools/bin/agent-canon stable shell wrapper
 @dependency-end
 -->
@@ -108,7 +108,7 @@ Rust is a development/runtime ergonomics surface owned by `.devcontainer/`.
 ## Canonical Layout
 
 ```text
-rust/
+tools/runtime/dispatch/
   agent-canon/
     Cargo.toml
     src/
@@ -130,11 +130,11 @@ tools/
 
 ## Sequential Migration Policy
 
-Repos that vendor AgentCanon should not invent their own Rust migration order.
-After updating the AgentCanon pin, run:
+Parent repositories should not invent their own Rust migration order. After
+updating the qualified AgentCanon source clone, run:
 
 ```bash
-agent-canon rust-migration-plan --root vendor/agent-canon --limit 12
+agent-canon rust-migration-plan --root <agent-canon-source> --limit 12
 ```
 
 Standalone AgentCanon checkouts use:
@@ -186,7 +186,7 @@ Recommended first migrations:
 - file_surface_inventory.py
 - helper_function_inventory.py
 - log_surface_inventory.py
-- tools/oop/python/readability.py
+- tools/validation/code/oop/python/readability.py
 - dependency graph scanners
 
 ## Keep In Python
@@ -251,8 +251,8 @@ It reports:
 Purpose-based repository search remains an explicit deterministic tool surface:
 
 ```bash
-python3 tools/agent_tools/search_index.py build --root .
-python3 tools/agent_tools/search.py \
+python3 tools/analysis/search/search_index.py build --root .
+python3 tools/analysis/search/search.py \
   --purpose "find responsibility scope tooling" \
   --providers text,semantic,vector,tool,header-deps,code-deps \
   --format json
@@ -266,14 +266,14 @@ review authority; ownership and dependency evidence remain separate gates.
 ## Validation
 
 ```bash
-cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
-cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path rust/agent-canon/Cargo.toml
+cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
+cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
 agent-canon rust-migration-audit --root .
 agent-canon rust-migration-plan --root .
-python3 tools/agent_tools/search.py --help
-python3 tools/agent_tools/search_index.py --help
-python3 tools/agent_tools/tool_catalog.py
-python3 tools/agent_tools/tool_drift.py
-python3 tools/ci/container_config.py
+python3 tools/analysis/search/search.py --help
+python3 tools/analysis/search/search_index.py --help
+python3 tools/runtime/manifest/tool_catalog.py
+python3 tools/validation/semantic/tools/tool_drift.py
+python3 tools/validation/ci/runners/container_runtime.py
 ```
