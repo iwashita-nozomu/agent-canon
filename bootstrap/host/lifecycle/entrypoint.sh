@@ -805,11 +805,7 @@ _agent_canon_drop_legacy_controller_state() {
     "$AGENT_CANON_STATE_ROOT/owner.json" \
     "$AGENT_CANON_STATE_ROOT/receipts" \
     "$AGENT_CANON_STATE_ROOT/generations" \
-    "$AGENT_CANON_STATE_ROOT/tasks" \
-    "$AGENT_CANON_STATE_ROOT/spool" \
-    "$AGENT_CANON_STATE_ROOT/archive" \
-    "$AGENT_CANON_STATE_ROOT/cache" \
-    "$AGENT_CANON_STATE_ROOT/codex-home"; do
+    "$AGENT_CANON_STATE_ROOT/tasks"; do
     [[ ! -L "$path" ]] ||
       _agent_canon_json_error controller_state_projection_invalid \
         "legacy controller state is a symlink: $path"
@@ -823,7 +819,7 @@ _agent_canon_drop_legacy_controller_state() {
 
 _agent_canon_init_state_volume() {
   local volume="$AGENT_CANON_STATE_VOLUME_NAME"
-  local label_runtime label_control volume_id caller_uid caller_gid init_name init_readback
+  local label_runtime label_control label_state volume_id caller_uid caller_gid init_name init_readback
   label_runtime=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
     --format '{{index .Labels "io.agent-canon.runtime"}}' "$volume" 2>/dev/null || true)
   if [[ -z "$label_runtime" ]]; then
@@ -845,8 +841,11 @@ _agent_canon_init_state_volume() {
     --format '{{index .Labels "io.agent-canon.runtime"}}' "$volume" 2>/dev/null || true)
   label_control=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
     --format '{{index .Labels "io.agent-canon.control-root-digest"}}' "$volume" 2>/dev/null || true)
+  label_state=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
+    --format '{{index .Labels "io.agent-canon.state"}}' "$volume" 2>/dev/null || true)
   [[ "$volume_id" == "$volume" && "$label_runtime" == shared-v1 &&
-     "$label_control" == "$(_agent_canon_control_digest)" ]] ||
+     "$label_control" == "$(_agent_canon_control_digest)" &&
+     "$label_state" == controller-v1 ]] ||
     _agent_canon_json_error state_volume_ownership_mismatch \
       "controller state volume has unexpected identity or owner"
 

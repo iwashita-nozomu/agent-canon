@@ -221,6 +221,9 @@ def main(argv: list[str]) -> int:
             if fmt == '{{index .Labels "io.agent-canon.control-root-digest"}}':
                 print(record.get("Labels", {}).get("io.agent-canon.control-root-digest", ""))
                 return 0
+            if fmt == '{{index .Labels "io.agent-canon.state"}}':
+                print(record.get("Labels", {}).get("io.agent-canon.state", ""))
+                return 0
             return 2
         print(json.dumps([record]))
         return 0

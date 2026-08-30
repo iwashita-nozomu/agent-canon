@@ -569,6 +569,59 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     assert active_image()[1] == image_c
 
 
+def test_existing_controller_volume_requires_state_label(tmp_path: Path) -> None:
+    """Volume adoption rejects a record without the controller state label."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    control.mkdir()
+    runtime.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": control_digest,
+                        },
+                        "Mountpoint": str(tmp_path / "volume"),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+                f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "state_volume_ownership_mismatch"
+
+
 @pytest.mark.skipif(
     shutil.which("docker") is None
     or os.environ.get("AGENT_CANON_RUN_REAL_UPDATE_TESTS") != "1",
@@ -2230,12 +2283,17 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         ] == source_head
     expected_mounts = {
         "/var/lib/agent-canon/runtime",
+        "/var/lib/agent-canon/exchange",
+        "/var/lib/agent-canon/spool",
+        "/var/lib/agent-canon/archive",
+        "/var/lib/agent-canon/cache",
+        "/var/lib/agent-canon/codex-home",
         "/var/lib/agent-canon/source-sync.json",
         "/var/lib/agent-canon/private-log",
         "/var/lib/agent-canon/mount-registry.toml",
+        "/var/lib/agent-canon/host-mounts.tsv",
     }
-    if operation == "update":
-        expected_mounts.add(f"/targets/{valid_digest}")
+    expected_mounts.add(f"/targets/{valid_digest}")
     assert {mount["Destination"] for mount in replacement["Mounts"]} == expected_mounts
     assert f"/targets/{stale_digest}" not in {
         mount["Destination"] for mount in replacement["Mounts"]
@@ -2442,6 +2500,11 @@ def test_public_clean_install_materializes_source_view_and_first_target(
         "schema\tagent-canon.rollback-plan.v1\n", encoding="utf-8"
     )
     (volume_root / "generations" / "stale-generation").mkdir()
+    preserved_surfaces = {}
+    for name in ("spool", "archive", "cache", "codex-home"):
+        preserved = state_root / name / "preexisting-host-data.txt"
+        preserved.write_text(f"{name}\n", encoding="utf-8")
+        preserved_surfaces[name] = preserved
 
     repeated_install = subprocess.run(
         [*common, "install"], check=False, capture_output=True, text=True, env=environment
@@ -2450,6 +2513,8 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     assert not (state_root / "rollback-plan.tsv").exists()
     assert not (volume_root / "generations" / "stale-generation").exists()
     assert (state_root / "mounts.tsv").read_text(encoding="utf-8") == ""
+    for name, preserved in preserved_surfaces.items():
+        assert preserved.read_text(encoding="utf-8") == f"{name}\n"
     docker_state = json.loads(fake_state.read_text(encoding="utf-8"))
     active_values = dict(
         line.split("\t", 1)
