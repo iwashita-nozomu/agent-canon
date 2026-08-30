@@ -484,7 +484,7 @@ def coordination_relay_findings(
 def improvement_guide_trigger_findings(
     path: Path, workflow_text: str
 ) -> list[Finding]:
-    """Keep improvement guidance bounded to selected paths or manual dispatch."""
+    """Keep improvement guidance bounded to selected paths and candidate runtime."""
     findings: list[Finding] = []
     if re.search(r"(?m)^  push:\s*$", workflow_text):
         findings.append(Finding("error", path, "improvement_guide_push_trigger_forbidden"))
@@ -492,6 +492,30 @@ def improvement_guide_trigger_findings(
         findings.append(Finding("error", path, "improvement_guide_pull_request_paths_required"))
     if not re.search(r"(?m)^  workflow_dispatch:\s*$", workflow_text):
         findings.append(Finding("error", path, "improvement_guide_manual_dispatch_required"))
+
+    runtime = re.search(
+        r"(?ms)^      - name: Start shared tool runtime\s*\n"
+        r"\s+run:\s+\|\n(?P<run>.*?)(?=\n      - name:|\Z)",
+        workflow_text,
+    )
+    if runtime is None:
+        findings.append(Finding("error", path, "improvement_guide_runtime_step_required"))
+        return findings
+
+    run = runtime.group("run")
+    bootstrap_lines = [
+        line.strip()
+        for line in run.splitlines()
+        if line.strip().startswith("./bootstrap.sh")
+    ]
+    if not any(line.endswith(" update") for line in bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_pr_runtime_update_required"))
+    if any(line.endswith(" install") for line in bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_pr_runtime_install_forbidden"))
+    if not any(line.endswith(" start") for line in bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_runtime_start_required"))
+    if not any(" target add " in line for line in bootstrap_lines):
+        findings.append(Finding("error", path, "improvement_guide_runtime_target_add_required"))
     return findings
 
 

@@ -49,6 +49,31 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         self.assertNotIn('mkdir -p "${report_dir}"', text)
         self.assertIn("--output-mode 644", text)
 
+    def test_pr_candidate_updates_runtime_and_keeps_target_registration(self) -> None:
+        """PR candidates build from the checked-out source before execution."""
+        text = WORKFLOW.read_text(encoding="utf-8")
+        bootstrap_lines = [
+            line.strip()
+            for line in text.splitlines()
+            if line.strip().startswith("./bootstrap.sh")
+        ]
+
+        self.assertTrue(any(line.endswith(" update") for line in bootstrap_lines))
+        self.assertFalse(any(line.endswith(" install") for line in bootstrap_lines))
+        self.assertTrue(any(line.endswith(" start") for line in bootstrap_lines))
+        self.assertTrue(any(" target add " in line for line in bootstrap_lines))
+
+    def test_main_only_runtime_workflows_keep_install_contract(self) -> None:
+        """Main-only runtime workflows retain their strict initial install."""
+        for name in ("agent-canon-static-gates.yml", "agent-runtime-dashboard.yml"):
+            text = (WORKFLOW.parent / name).read_text(encoding="utf-8")
+            bootstrap_lines = [
+                line.strip()
+                for line in text.splitlines()
+                if line.strip().startswith("./bootstrap.sh")
+            ]
+            self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines), name)
+
 
 if __name__ == "__main__":
     unittest.main()
