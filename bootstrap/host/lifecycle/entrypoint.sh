@@ -1167,14 +1167,12 @@ _agent_canon_apply_volume_export() (
           fi
         done | sha256sum | awk '{print $1}'
       )
-      transaction_kind=projection
-      transaction_target=$host_path
       backup_root=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.volume-export-backup.XXXXXX") || {
         _agent_canon_json_error volume_export_failed "controller projection backup could not be created"
         return 2
       }
-      transaction_backup="$backup_root/old"
-      mkdir -p "$transaction_backup"
+      local backup_target="$backup_root/old" backup_presence="$backup_root/presence"
+      mkdir -p "$backup_target"
       for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
         target="$host_path/$name"
         if [[ -e "$target" || -L "$target" ]]; then
@@ -1182,12 +1180,34 @@ _agent_canon_apply_volume_export() (
             _agent_canon_json_error volume_export_destination_invalid "controller projection target is not a regular file"
             return 2
           }
-          cp -a -- "$target" "$transaction_backup/$name" || {
+          printf 'present\t%s\n' "$name" >> "$backup_presence"
+          cp -a -- "$target" "$backup_target/$name" || {
             _agent_canon_json_error volume_export_failed "controller projection backup could not be copied"
             return 2
           }
+          [[ -f "$backup_target/$name" && ! -L "$backup_target/$name" ]] || {
+            _agent_canon_json_error volume_export_failed "controller projection backup readback is invalid"
+            return 2
+          }
+          [[ "$(_agent_canon_sha256 "$target")" == "$(_agent_canon_sha256 "$backup_target/$name")" ]] || {
+            _agent_canon_json_error volume_export_failed "controller projection backup readback differs"
+            return 2
+          }
+        else
+          printf 'absent\t%s\n' "$name" >> "$backup_presence"
+        fi
+        if [[ "${AGENT_CANON_TEST_VOLUME_EXPORT_FAIL_BACKUP:-}" == "$name" ]]; then
+          _agent_canon_json_error volume_export_failed "injected controller projection backup failure"
+          return 2
         fi
       done
+      [[ "$(wc -l < "$backup_presence")" == 4 ]] || {
+        _agent_canon_json_error volume_export_failed "controller projection backup presence readback is incomplete"
+        return 2
+      }
+      transaction_kind=projection
+      transaction_target=$host_path
+      transaction_backup=$backup_target
       for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
         staged="$temporary/$name"
         target="$host_path/$name"
@@ -1309,6 +1329,10 @@ _agent_canon_apply_volume_export() (
         _agent_canon_json_error volume_export_failed "Codex home could not be published"
         return 2
       }
+      if [[ "${AGENT_CANON_TEST_VOLUME_EXPORT_FAIL_AFTER:-}" == codex-home ]]; then
+        _agent_canon_json_error volume_export_failed "injected Codex home publish failure"
+        return 2
+      fi
       ;;
     *)
       rm -rf -- "$temporary"

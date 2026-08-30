@@ -1074,6 +1074,30 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert codex_export.returncode == 0, codex_export.stderr
     assert codex_stage.is_dir()
     assert (codex_stage / "config.toml").read_text(encoding="utf-8") == "codex = true\n"
+    (volume_root / "codex-home" / "agents").mkdir()
+    (volume_root / "codex-home" / "agents" / "current.toml").write_text(
+        "current\n", encoding="utf-8"
+    )
+    (codex_stage / "config.toml").write_text("old\n", encoding="utf-8")
+    (codex_stage / "agents").mkdir()
+    (codex_stage / "agents" / "old.toml").write_text("old\n", encoding="utf-8")
+    codex_failed = subprocess.run(
+        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_VOLUME_NAME": volume_name,
+            "FAKE_VOLUME_ROOT": str(volume_root),
+            "AGENT_CANON_TEST_VOLUME_EXPORT_FAIL_AFTER": "codex-home",
+        },
+    )
+    assert codex_failed.returncode == 2
+    assert json.loads(codex_failed.stderr)["code"] == "volume_export_failed"
+    assert (codex_stage / "config.toml").read_text(encoding="utf-8") == "old\n"
+    assert (codex_stage / "agents" / "old.toml").read_text(encoding="utf-8") == "old\n"
+    assert not (codex_stage / "agents" / "current.toml").exists()
     (volume_root / "codex-home" / "unexpected").symlink_to(tmp_path / "outside")
     rejected = subprocess.run(
         ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
@@ -1338,6 +1362,37 @@ def test_projection_later_move_failure_restores_exact_previous_state(tmp_path: P
     )
     assert result.returncode == 2
     assert json.loads(result.stderr)["code"] == "volume_export_failed"
+    assert (stage / "mounts.toml").read_text(encoding="utf-8") == "old-toml\n"
+    assert (stage / "mounts.tsv").read_text(encoding="utf-8") == "old-tsv\n"
+    assert not (stage / "rollback-plan.tsv").exists()
+    assert not (stage / "rollback-mounts.tsv").exists()
+    backup_failed = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+                f"AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_IMAGE_REF=image; "
+                f"_agent_canon_volume_copy export projection {str(stage)!r}"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "AGENT_CANON_TEST_VOLUME_EXPORT_FAIL_BACKUP": "mounts.tsv",
+        },
+    )
+    assert backup_failed.returncode == 2
+    assert json.loads(backup_failed.stderr)["code"] == "volume_export_failed"
     assert (stage / "mounts.toml").read_text(encoding="utf-8") == "old-toml\n"
     assert (stage / "mounts.tsv").read_text(encoding="utf-8") == "old-tsv\n"
     assert not (stage / "rollback-plan.tsv").exists()
