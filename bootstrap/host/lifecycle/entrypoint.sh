@@ -769,17 +769,7 @@ _agent_canon_validate_private_log_mount() {
   if ((found == 1)); then
     return 0
   fi
-  found=0
-  while IFS=$'\t' read -r source destination writable; do
-    [[ "$destination" == "$AGENT_CANON_PRIVATE_LOG_DESTINATION" ]] || continue
-    ((found == 0)) || _agent_canon_json_error mount_manifest_invalid "private log mount is duplicated"
-    [[ "$writable" == false && "$source" == "$AGENT_CANON_PRIVATE_LOG_ROOT" ]] ||
-      _agent_canon_json_error mount_manifest_invalid "private log mount differs from the declared source"
-    found=1
-  done < <("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{range .Mounts}}{{printf "%s\t%s\t%t\n" .Source .Destination .RW}}{{end}}' \
-    "$container")
-  ((found == 1)) || _agent_canon_json_error mount_manifest_invalid "private log mount is absent"
+  _agent_canon_json_error mount_manifest_invalid "resident volume mount is absent"
 }
 
 _agent_canon_prepare_host_runtime() {
@@ -841,7 +831,7 @@ _agent_canon_path_digest() {
   fi
   [[ -d "$path" ]] || return 1
   [[ -z "$(find "$path" -type l -print -quit)" ]] || return 1
-  find "$path" -type f -exec sha256sum {} + | LC_ALL=C sort | sha256sum | awk '{print $1}'
+  (cd "$path" && find . -type f -exec sha256sum {} + | LC_ALL=C sort | sha256sum | awk '{print $1}')
 }
 
 _agent_canon_init_state_volume() {
@@ -1012,7 +1002,11 @@ _agent_canon_volume_copy() {
   elif [[ "$direction" == export ]]; then
     mounts+=(--mount "type=bind,src=$host_path,dst=/var/lib/agent-canon/output")
   fi
-  if ! "$AGENT_CANON_DOCKER_CMD" run --rm \
+  if [[ "$kind" == codex-home ]]; then
+    mounts+=(--mount "type=bind,src=$AGENT_CANON_REPOSITORY_ROOT,dst=$AGENT_CANON_REPOSITORY_ROOT,readonly")
+  fi
+  local copy_readback
+  if ! copy_readback=$("$AGENT_CANON_DOCKER_CMD" run --rm \
     --name "$copy_name" \
     --user 0:0 \
     --read-only \
@@ -1024,7 +1018,8 @@ _agent_canon_volume_copy() {
     --env "AGENT_CANON_COPY_RELATIVE=$relative" \
     --env "AGENT_CANON_COPY_UID=$(id -u)" \
     --env "AGENT_CANON_COPY_GID=$(id -g)" \
-    --env "AGENT_CANON_COPY_DIGEST=$(_agent_canon_path_digest "$host_path" 2>/dev/null || true)" \
+    --env "AGENT_CANON_COPY_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT" \
+    --env "AGENT_CANON_COPY_DIGEST=$([[ "$direction" == import ]] && _agent_canon_path_digest "$host_path" 2>/dev/null || true)" \
     --entrypoint /bin/sh \
     "$AGENT_CANON_IMAGE_REF" \
     -c 'set -eu
@@ -1035,6 +1030,36 @@ relative="$AGENT_CANON_COPY_RELATIVE"
 uid_value="$AGENT_CANON_COPY_UID"
 gid_value="$AGENT_CANON_COPY_GID"
 digest="$AGENT_CANON_COPY_DIGEST"
+install_root="$AGENT_CANON_COPY_INSTALL_ROOT"
+tree_digest() {
+  (cd "$1" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + | LC_ALL=C sort | sha256sum | awk "{print \$1}")
+}
+projection_digest() {
+  for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+    if [ -f "$1/$name" ] && [ ! -L "$1/$name" ]; then
+      printf "%s\t%s\n" "$name" "$(sha256sum "$1/$name" | awk "{print \$1}")"
+    else
+      printf "%s\\tabsent\\n" "$name"
+    fi
+  done | sha256sum | awk "{print \$1}"
+}
+validate_codex_links() {
+  allowed="$install_root/.codex"
+  [ -d "$allowed" ] && [ ! -L "$allowed" ] || return 1
+  invalid=$(find "$1" -type l -print | while IFS= read -r link; do
+    relative_link=${link#"$1"/}
+    case "$relative_link" in
+      config.toml|agents/*|hooks/*|skills/*) ;;
+      *) printf 'invalid\n'; continue ;;
+    esac
+    target=$(readlink -f "$link" 2>/dev/null || true)
+    case "$target" in
+      "$allowed"/*) [ -e "$target" ] || printf 'invalid\\n' ;;
+      *) printf 'invalid\\n' ;;
+    esac
+  done)
+  [ -z "$invalid" ]
+}
   if [ "$direction" = clear ]; then
   case "$kind" in
     host-mounts) rm -f -- "$root/host-mounts.tsv" ;;
@@ -1044,7 +1069,7 @@ elif [ "$direction" = import ]; then
   input=/var/lib/agent-canon/input
   case "$kind" in
     source-sync) destination="$root/source-sync.json"; mode=600; expected=file ;;
-    mount-registry) destination="$root/mounts.toml"; mode=600; expected=file ;;
+    mount-registry) destination="$root/mount-registry.toml"; mode=600; expected=file ;;
     host-mounts) destination="$root/host-mounts.tsv"; mode=600; expected=file ;;
     private-log) destination="$root/private-log"; mode=700; expected=directory ;;
     codex-home) destination="$root/codex-home"; mode=700; expected=directory ;;
@@ -1054,26 +1079,47 @@ elif [ "$direction" = import ]; then
     [ -f "$input" ] && [ ! -L "$input" ] || exit 65
     temporary="$destination.$$"
     cp -- "$input" "$temporary"
+    [ -n "$digest" ] && [ "$(sha256sum "$temporary" | awk "{print \\$1}")" = "$digest" ] || exit 82
     chmod "$mode" "$temporary"
     chown "$uid_value:$gid_value" "$temporary"
     mv -f -- "$temporary" "$destination"
   else
     [ -d "$input" ] && [ ! -L "$input" ] || exit 66
-    [ -z "$(find "$input" -type l -print -quit)" ] || exit 67
-    if [ -e "$destination" ] || [ -L "$destination" ]; then
+    if [ "$kind" = codex-home ]; then
+      validate_codex_links "$input" || exit 67
+    else
+      [ -z "$(find "$input" -type l -print -quit)" ] || exit 67
+    fi
+    skip_copy=0
+    marker_value=$(printf 'agent-canon-private-log/v1\n%s' "$digest")
+    if [ "$kind" = private-log ] && [ -f "$destination/.agent-canon-private-log-v1" ] &&
+       [ "$(cat "$destination/.agent-canon-private-log-v1")" = "$marker_value" ] &&
+       [ "$(tree_digest "$destination")" = "$digest" ]; then
+      skip_copy=1
+    fi
+    if [ "$skip_copy" = 0 ] && { [ -e "$destination" ] || [ -L "$destination" ]; }; then
       [ -d "$destination" ] && [ ! -L "$destination" ] || exit 68
       find "$destination" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-    else
+    elif [ "$skip_copy" = 0 ]; then
       mkdir -p "$destination"
     fi
-    cp -a "$input/." "$destination/"
-    find "$destination" -type d -exec chmod 700 {} +
-    chown -R "$uid_value:$gid_value" "$destination"
-    if [ "$kind" = private-log ]; then
-      printf "agent-canon-private-log/v1\\n%s\\n" "$digest" > "$destination/.agent-canon-private-log-v1"
+    if [ "$skip_copy" = 0 ]; then
+      cp -a "$input/." "$destination/"
+      if [ "$kind" = codex-home ]; then
+        validate_codex_links "$destination" || exit 85
+      fi
+      [ -n "$digest" ] && [ "$(tree_digest "$destination")" = "$digest" ] || exit 83
+      find "$destination" -type d -exec chmod 700 {} +
+      chown -R "$uid_value:$gid_value" "$destination"
+    fi
+    if [ "$kind" = private-log ] && [ "$skip_copy" = 0 ]; then
+      printf "agent-canon-private-log/v1\n%s\n" "$digest" > "$destination/.agent-canon-private-log-v1"
       chmod 600 "$destination/.agent-canon-private-log-v1"
       chown "$uid_value:$gid_value" "$destination/.agent-canon-private-log-v1"
     fi
+  fi
+  if [ "$direction" = import ]; then
+    printf "volume-copy-digest\t%s\n" "$digest"
   fi
 else
   case "$kind" in
@@ -1106,14 +1152,34 @@ else
       [ -z "$(find /var/lib/agent-canon/output -type l -print -quit)" ] || exit 77 ;;
     codex-home)
       source="$root/codex-home"; [ -d "$source" ] && [ ! -L "$source" ] || exit 78
+      validate_codex_links "$source" || exit 79
       rm -rf -- /var/lib/agent-canon/output
       mkdir -p /var/lib/agent-canon/output
       cp -a "$source/." /var/lib/agent-canon/output/
-      [ -z "$(find /var/lib/agent-canon/output -type l -print -quit)" ] || exit 79 ;;
+      validate_codex_links /var/lib/agent-canon/output || exit 79 ;;
     *) exit 80 ;;
   esac
-fi' ; then
+  if [ "$kind" = projection ]; then
+    source_digest=$(projection_digest "$source")
+    destination_digest=$(projection_digest /var/lib/agent-canon/output)
+  else
+    source_digest=$(tree_digest "$source")
+    if [ "$kind" = eval ]; then
+      destination_digest=$(tree_digest "/var/lib/agent-canon/output/$relative")
+    elif [ "$kind" = skill ]; then
+      destination_digest=$(tree_digest /var/lib/agent-canon/output/skill-projection)
+    else
+      destination_digest=$(tree_digest /var/lib/agent-canon/output)
+    fi
+  fi
+  [ "$source_digest" = "$destination_digest" ] || exit 84
+  printf "volume-copy-digest\t%s\n" "$source_digest"
+fi' ); then
     _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
+  fi
+  if [[ "$direction" == import || "$direction" == export ]]; then
+    [[ "$copy_readback" =~ ^$'volume-copy-digest\t'[0-9a-f]{64}$ ]] ||
+      _agent_canon_json_error volume_copy_readback_failed "volume export digest readback is invalid"
   fi
 }
 
@@ -2087,22 +2153,6 @@ _agent_canon_validate_existing_container() {
   "$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{range .Mounts}}{{if eq .Type "volume"}}{{printf "volume:%s\t%s\t%t\n" .Name .Destination .RW}}{{else}}{{printf "%s\t%s\t%t\n" .Source .Destination .RW}}{{end}}{{end}}' \
     "$container" | sed '/^$/d' | sort > "$observed_mounts"
-  # A resident created before the controller-state volume was introduced has
-  # the legacy bind at the runtime destination.  Accept that exact shape only
-  # for readback/migration; every newly created resident must use the volume
-  # and bounded host-surface mounts above.
-  local legacy_runtime_line
-  legacy_runtime_line=$(printf '%s\t%s\ttrue' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION")
-  if grep -Fqx "$legacy_runtime_line" "$observed_mounts" &&
-     ! grep -q '^volume:' "$observed_mounts"; then
-    : > "$expected_mounts"
-    printf '%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION" >> "$expected_mounts"
-    if [[ "$require_source_sync" == 1 ]]; then
-      printf '%s\t%s\tfalse\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION" >> "$expected_mounts"
-    fi
-    printf '%s\t%s\tfalse\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION" >> "$expected_mounts"
-    printf '%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION" >> "$expected_mounts"
-  fi
   if [[ "$require_source_sync" == 0 ]]; then
     local filtered_mounts
     filtered_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts-filtered.XXXXXX")
