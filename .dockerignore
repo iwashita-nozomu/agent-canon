@@ -31,7 +31,6 @@
 !tools/
 !tools/**
 tools/experiments/**
-tools/validation/review/run_comprehensive_review.sh
 tools/validation/tests/run_pytest_with_logs.sh
 tools/validation/dependencies/docker_dependency_validator.sh
 !tools/repository/workspace/parent_root_side_effects.py

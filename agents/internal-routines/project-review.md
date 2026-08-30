@@ -38,7 +38,7 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 1. `Inventory`
    - 主要ディレクトリ、入口文書、skills、workflow family、automation 入口を洗います。
 1. `Static Health`
-   - `make agent-checks`、`make ci-quick`、必要なら `bash tools/validation/review/run_comprehensive_review.sh` を見ます。
+   - `make agent-checks` と `make ci-quick` を変更リスクに応じて選びます。必要な個別 validator は catalog のコマンドから実行します。
 1. `Workflow Health`
    - `AGENTS.md`、`agents/`、`documents/` の導線が一致しているかを見ます。
 1. `Tooling Health`
@@ -61,7 +61,6 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 
 - `make agent-checks`
 - `make ci-quick`
-- `bash tools/validation/review/run_comprehensive_review.sh`
 - `git worktree list --porcelain`
 - `git grep -n \"<pattern>\" -- agents documents README.md QUICK_START.md AGENTS.md`
 
