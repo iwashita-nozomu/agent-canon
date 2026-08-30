@@ -30,10 +30,7 @@
 !schemas/**
 !tools/
 !tools/**
-tools/ci/**
-!tools/validation/ci/runners/run_standalone_static_gate_unit.sh
 tools/experiments/**
-tools/run_gpu_container.sh
 tools/validation/review/run_comprehensive_review.sh
 tools/validation/tests/run_pytest_with_logs.sh
 tools/validation/dependencies/docker_dependency_validator.sh

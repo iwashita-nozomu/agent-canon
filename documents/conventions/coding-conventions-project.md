@@ -90,7 +90,7 @@ downstream implementation ../../tools/validation/semantic/convention/convention_
 - `docker/Dockerfile` を更新する変更では、依存追加の有無にかかわらず `README.md`、`QUICK_START.md`、関連する `documents/` の command や説明も同じ変更で見直します。
 - Docker 変更で新しい tool を同梱する場合は、その tool の用途、呼び出し入口、不要になったときの削除方針を文書へ残します。
 - Docker 変更で AgentCanon tool が必要になった場合は、`documents/runtime/bootstrap-runtime.md` に従って AgentCanon の `bootstrap/` image manifest と shared runtime を更新します。親 `.devcontainer/` は image-verify/readback 以外の AgentCanon installer になりません。
-- Docker runtime の project 正本は `docker/Dockerfile` とし、`docker/packs/*.toml` と Python execution rules は存在するときだけ project-owned override として使います。nested-Codex の既定 profile は AgentCanon source の `tools/ci/codex-container-profiles.toml` が所有します。
+- Docker runtime の project 正本は `docker/Dockerfile` とし、`docker/packs/*.toml` と Python execution rules は存在するときだけ project-owned override として使います。nested-Codex の profile 選択は `documents/runtime/runtime-profiles-and-check-matrix.md` を参照します。
 - Docker runtime、optional runtime pack、または親 devcontainer 導線を変えた場合は対応 checker を通し、存在する project surface と AgentCanon shared runtime の所有境界を確認します。
 - main server host の path、mount、builder 前提は `documents/contracts/server-host-contract.md` と `templates/documents/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
 - C++ の canonical project entrypoint は `cpp/CMakeLists.txt` です。parent root は
