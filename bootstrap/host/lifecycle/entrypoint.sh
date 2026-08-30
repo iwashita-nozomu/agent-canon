@@ -1244,6 +1244,14 @@ _agent_canon_finish_clean_install() {
   local path rollback_plan rollback_ref rollback_tag_prefix
   rollback_plan="$AGENT_CANON_STATE_ROOT/rollback-plan.tsv"
   rollback_ref=${AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF:-}
+  if [[ -z "$rollback_ref" && -f "$AGENT_CANON_STATE_ROOT/previous-image-id" &&
+        ! -L "$AGENT_CANON_STATE_ROOT/previous-image-id" ]]; then
+    local previous_image_id
+    previous_image_id=$(<"$AGENT_CANON_STATE_ROOT/previous-image-id")
+    if [[ "$previous_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+      rollback_ref="agent-canon-tools:$(_agent_canon_control_digest | cut -c1-16)-rollback-${previous_image_id#sha256:}"
+    fi
+  fi
   if [[ -f "$rollback_plan" && ! -L "$rollback_plan" ]]; then
     rollback_ref=${rollback_ref:-$(awk -F $'\t' '$1 == "image-ref" { print $2 }' "$rollback_plan")}
   fi
