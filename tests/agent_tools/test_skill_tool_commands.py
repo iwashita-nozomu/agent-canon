@@ -155,6 +155,36 @@ class StructuredSkillCommandTest(unittest.TestCase):
         payload = json.loads(json.dumps(packet, default=lambda value: value.__dict__))
         self.assertIn("resolved_required_commands", payload)
 
+    def test_catalog_suffixes_are_dispatch_relative_and_witness_resolves_once(self) -> None:
+        """Catalog suffixes never duplicate their tool dispatch argv prefix."""
+        catalog = yaml.safe_load((ROOT / "agents/skills/catalog.yaml").read_text(encoding="utf-8"))
+        tools = {
+            item["id"]: item
+            for item in yaml.safe_load((ROOT / "tools/catalog.yaml").read_text(encoding="utf-8"))["entries"]
+        }
+        catalog_rows = 0
+        for skill in catalog["skill_families"]:
+            for phase in ("required", "conditional", "maintenance"):
+                for item in skill["tool_commands"].get(phase, []) or []:
+                    if "tool_id" not in item:
+                        continue
+                    catalog_rows += 1
+                    prefix = tools[item["tool_id"]]["dispatch"]["argv"]
+                    suffix = item.get("argv_suffix", [])
+                    self.assertNotEqual(suffix[: len(prefix)], prefix)
+        self.assertEqual(catalog_rows, 279)
+
+        plan = resolve_command(ROOT, "agent-orchestration", "required:0")
+        prefix = tools["check-execution-time-aware-orchestration"]["dispatch"]["argv"]
+        suffix = next(
+            item
+            for item in catalog["skill_families"][0]["tool_commands"]["required"]
+            if item.get("tool_id") == "check-execution-time-aware-orchestration"
+        ).get("argv_suffix", [])
+        expected = list(prefix) + list(suffix)
+        expected[1] = str((ROOT / expected[1]).resolve())
+        self.assertEqual(list(plan.execution_argv), expected)
+
 
 if __name__ == "__main__":
     unittest.main()
