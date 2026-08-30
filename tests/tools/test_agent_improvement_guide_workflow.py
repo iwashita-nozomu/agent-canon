@@ -107,6 +107,15 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         self.assertFalse(any(line.endswith(" update") for line in bootstrap_lines))
         self.assertTrue(any(line.endswith(" start") for line in bootstrap_lines))
         self.assertTrue(any(" target add " in line for line in bootstrap_lines))
+        self.assertIn(
+            'tool run --root "${GITHUB_WORKSPACE}" generate-agent-improvement-guide --',
+            text,
+        )
+        self.assertNotIn("exec --root", text)
+        self.assertIn(
+            "--root . --runtime-root /var/lib/agent-canon/runtime",
+            text,
+        )
 
     def test_main_only_runtime_workflows_keep_install_contract(self) -> None:
         """Main-only runtime workflows retain their strict initial install."""

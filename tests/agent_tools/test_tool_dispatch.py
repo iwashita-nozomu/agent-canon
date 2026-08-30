@@ -69,6 +69,7 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(
             {spec.tool_id for spec in specs.values() if spec.parity == "verified"},
             {
+                "generate-agent-improvement-guide",
                 "generate-agent-runtime-dashboard",
                 "issue-sync",
                 "route",

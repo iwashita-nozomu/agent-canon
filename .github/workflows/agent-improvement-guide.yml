@@ -70,8 +70,7 @@ jobs:
           guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- python3 \
-            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_improvement_guide.py \
+            tool run --root "${GITHUB_WORKSPACE}" generate-agent-improvement-guide -- \
             --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}" \
             --output-mode 644
           cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"

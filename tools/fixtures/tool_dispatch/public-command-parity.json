@@ -3,6 +3,37 @@
   "version": 2,
   "entries": [
     {
+      "id": "generate-agent-improvement-guide",
+      "observed": {
+        "argv": [
+          "python3",
+          "eval/producers/generate_agent_improvement_guide.py"
+        ],
+        "cwd": "target-root",
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "written_paths": []
+      },
+      "probe_args": [
+        "--help"
+      ],
+      "legacy_result": {
+        "exit_code": 0,
+        "stdout_sha256": "b56ab4fd2fd2a679099327ae66d05bdd549ee455c05f805f5cd611135ebeef49",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      },
+      "container_result": {
+        "exit_code": 0,
+        "stdout_sha256": "b56ab4fd2fd2a679099327ae66d05bdd549ee455c05f805f5cd611135ebeef49",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      }
+    },
+    {
       "id": "generate-agent-runtime-dashboard",
       "probe_args": ["--help"],
       "observed": {

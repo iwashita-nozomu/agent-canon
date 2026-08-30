@@ -539,6 +539,24 @@ def improvement_guide_trigger_findings(
     if re.search(r"(?m)\bgit\s+[^\n]*\bpush\s+origin\b", workflow_text):
         findings.append(Finding("error", path, "improvement_guide_origin_push_forbidden"))
 
+    guide = re.search(
+        r"(?ms)^      - name: Generate improvement guide\s*\n"
+        r"\s+id: guide\s*\n\s+run:\s+\|\n(?P<run>.*?)(?=\n      - name:|\Z)",
+        workflow_text,
+    )
+    if guide is None:
+        findings.append(Finding("error", path, "improvement_guide_generation_step_required"))
+    else:
+        guide_run = guide.group("run")
+        if (
+            'tool run --root "${GITHUB_WORKSPACE}" '
+            "generate-agent-improvement-guide --"
+            not in guide_run
+        ):
+            findings.append(Finding("error", path, "improvement_guide_catalog_route_required"))
+        if "exec --root" in guide_run and "generate_agent_improvement_guide.py" in guide_run:
+            findings.append(Finding("error", path, "improvement_guide_internal_exec_forbidden"))
+
     runtime = re.search(
         r"(?ms)^      - name: Start shared tool runtime\s*\n"
         r"\s+run:\s+\|\n(?P<run>.*?)(?=\n      - name:|\Z)",
