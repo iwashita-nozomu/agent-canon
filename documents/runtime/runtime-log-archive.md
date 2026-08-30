@@ -175,6 +175,22 @@ Existing tracked or ignored report files are classified before removal:
 3. only after that evidence is durable may an owning change remove the old
    generated source path.
 
+Prepared sanitized historical bundles use the existing
+`agent-canon-log-report-provenance.v1` index contract. The task-local
+sanitizer supplies a prepared tree and one provenance object per run to
+`runtime_log_archive_git.py archive-agent-report --provenance <file> --publish`.
+The archive owner verifies the source commit/tree listing, every source blob
+hash, every prepared archive hash, redaction rule IDs/counts, and the absence
+of forbidden path or credential-shaped bytes before copying. Each provenance
+record links to `agent-report-snapshot.v1` through `archive_schema` and
+`snapshot_schema`. A `supersession` record (also projected as `supersedes` and
+`quarantines`) names the prior remote ref, commit, tree, index blob, and
+snapshot, with `quarantine_status=quarantined`; the old snapshot remains
+immutable and is not rewritten or deleted. Publication
+readback checks the new remote ref/tree, the exact provenance index record,
+and every archived blob. A validation or push failure retains the prepared
+tree and source bytes for retry; this route does not delete source files.
+
 The source tree must not regain generated `reports/agent-eval-runs/`, dashboard,
 improvement-guide, hook spool, or runtime-summary outputs. CI and PR wrappers
 must pass an explicit external log directory or runtime root and must assert

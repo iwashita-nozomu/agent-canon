@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Manages the ignored Git clone used for AgentCanon runtime log and report archives.
+# responsibility Manages the ignored Git clone used for AgentCanon runtime log and provenance-backed report archives.
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
 # upstream design ../../documents/design/request-intent-and-update-relation.md run-bundle retention receipt projection
 # upstream implementation ./runtime_log_paths.py resolves archive paths and source repo keys
@@ -29,7 +29,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -44,7 +44,11 @@ if __package__ in (None, ""):
     # not from this relocated archive package directory.
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from tools.runtime.archive.log_repository_identity import source_repository_id_for_write  # noqa: E402
+from tools.runtime.archive.log_repository_identity import (  # noqa: E402
+    normalize_remote,
+    source_remote,
+    source_repository_id_for_write,
+)
 from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS,
     check_final_review_artifact,
@@ -77,6 +81,8 @@ from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER  # noqa: E
 DEFAULT_COMMIT_NAME = "AgentCanon Log Archive"
 DEFAULT_COMMIT_EMAIL = "agent-canon-log@example.invalid"
 AGENT_REPORT_ARCHIVE_SCHEMA = "agent-report-snapshot.v1"
+AGENT_REPORT_PROVENANCE_SCHEMA = "agent-canon-log-report-provenance.v1"
+AGENT_REPORT_PROVENANCE_ARCHIVE_SCHEMA = AGENT_REPORT_ARCHIVE_SCHEMA
 DEFAULT_AGENT_REPORT_ROOT = Path("reports") / "agents"
 DEFAULT_AGENT_REPORT_DESTINATION = Path("agent-reports")
 AGENT_REPORT_EXCLUDED_DIRS = frozenset(
@@ -172,6 +178,13 @@ RUNTIME_EVENT_RESULT_FILES = {
     "validation": ("validation_result.json", "validation", "agent_canon.runtime_result_input.v1"),
     "lifecycle": ("closeout_gate.md", "closeout", "CloseoutGateV1"),
 }
+ARCHIVE_FORBIDDEN_CONTENT = re.compile(
+    rb"(?:/(?:home|mnt|Users|workspace|tmp)/|~[/\\\\]|"
+    rb"(?:\$HOME|\$\{HOME\}|%USERPROFILE%|%HOMEDRIVE%%HOMEPATH%)[/\\\\]|"
+    rb"(?<![A-Za-z0-9])[A-Za-z]:[/\\\\]|"
+    rb"-----BEGIN [A-Z ]*PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9_]+|"
+    rb"github_pat_[A-Za-z0-9_]+|AKIA[0-9A-Z]{16}|Authorization:\s*Bearer\s+)"
+)
 HOOK_SPOOL_INDEX_SCHEMA = "agent_canon.hook_spool_index.v1"
 HOOK_SPOOL_CURSOR_SCHEMA = "agent_canon.hook_spool_cursor.v1"
 HOOK_SPOOL_CURSOR_SCHEMA_VERSION = 1
@@ -865,6 +878,25 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="Run bundle directory to archive, normally reports/agents/<run-id>.",
+    )
+    agent_report.add_argument(
+        "--provenance",
+        type=Path,
+        help=(
+            "Prepared sanitized provenance JSON using the existing "
+            "agent-canon-log-report-provenance.v1 contract."
+        ),
+    )
+    agent_report.add_argument(
+        "--publish",
+        action="store_true",
+        help="Commit, non-force push, and verify the prepared report readback.",
+    )
+    agent_report.add_argument("--message", help="Archive commit message for --publish.")
+    agent_report.add_argument(
+        "--no-pull",
+        action="store_true",
+        help="Do not rebase when the remote branch advances during --publish.",
     )
 
     push = subparsers.add_parser("push", help="Commit and push append-only logs for this source repository.")
@@ -5849,6 +5881,543 @@ def report_snapshot_digest(report_dir: Path, files: list[Path]) -> str:
     return digest.hexdigest()[:REPORT_SNAPSHOT_DIGEST_CHARS]
 
 
+def _source_git_bytes(source_root: Path, args: Sequence[str], code: str) -> bytes:
+    """Read exact bytes from one source Git object without using the worktree."""
+    result = subprocess.run(
+        ["git", "-C", str(source_root), *args],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise ArchiveGitError(f"{code}:{result.stderr.decode(errors='replace').strip()}")
+    return result.stdout
+
+
+def _hex64(value: object, field: str) -> str:
+    """Require one lowercase SHA-256 digest."""
+    if (
+        not isinstance(value, str)
+        or not re.fullmatch(r"[0-9a-f]{64}", value)
+    ):
+        raise ArchiveGitError(f"agent_report_provenance:{field}_invalid")
+    return value
+
+
+def _hex40(value: object, field: str) -> str:
+    """Require one lowercase Git object ID."""
+    if (
+        not isinstance(value, str)
+        or not re.fullmatch(r"[0-9a-f]{40}", value)
+    ):
+        raise ArchiveGitError(f"agent_report_provenance:{field}_invalid")
+    return value
+
+
+def _safe_provenance_path(value: object, field: str) -> str:
+    """Require one repository-relative POSIX path."""
+    if not isinstance(value, str) or not value or "\\" in value:
+        raise ArchiveGitError(f"agent_report_provenance:{field}_invalid")
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts or "." in path.parts:
+        raise ArchiveGitError(f"agent_report_provenance:{field}_invalid")
+    return path.as_posix()
+
+
+def _source_tree_digest(
+    source_root: Path,
+    source_commit: str,
+    source_prefix: str,
+) -> str:
+    """Hash the exact Git tree listing used by the existing provenance contract."""
+    return hashlib.sha256(_source_tree_listing(source_root, source_commit, source_prefix)).hexdigest()
+
+
+def _source_tree_listing(
+    source_root: Path,
+    source_commit: str,
+    source_prefix: str,
+) -> bytes:
+    """Return the exact selected-prefix Git tree listing."""
+    return _source_git_bytes(
+        source_root,
+        ["ls-tree", "-r", "-z", source_commit, "--", source_prefix],
+        "agent_report_provenance:source_tree_read_failed",
+    )
+
+
+def _read_provenance_json(path: Path) -> dict[str, object]:
+    """Read one prepared provenance object without following symlinks."""
+    if path.is_symlink() or not path.is_file():
+        raise ArchiveGitError("agent_report_provenance:input_missing")
+    try:
+        value = json.loads(path.read_bytes())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ArchiveGitError("agent_report_provenance:input_invalid") from exc
+    if not isinstance(value, dict):
+        raise ArchiveGitError("agent_report_provenance:input_invalid")
+    return cast(dict[str, object], value)
+
+
+def _validate_redaction_metadata(
+    item: Mapping[str, object],
+    field_prefix: str,
+) -> tuple[list[dict[str, object]], dict[str, int]]:
+    """Validate caller-owned fixed redaction provenance; never transform bytes."""
+    raw_redactions = item.get("redactions")
+    raw_rule_ids = item.get("redaction_rule_ids")
+    raw_rule_counts = item.get("redaction_rule_counts")
+    if (
+        not isinstance(raw_redactions, list)
+        or not isinstance(raw_rule_ids, list)
+        or not isinstance(raw_rule_counts, Mapping)
+    ):
+        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_redactions_invalid")
+    if any(not isinstance(value, str) or not value for value in raw_rule_ids):
+        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_rule_ids_invalid")
+    rule_ids = [cast(str, value) for value in raw_rule_ids]
+    if len(set(rule_ids)) != len(rule_ids):
+        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_rule_ids_invalid")
+    counts: dict[str, int] = {}
+    for key, value in raw_rule_counts.items():
+        if (
+            not isinstance(key, str)
+            or not key
+            or type(value) is not int
+            or value < 0
+        ):
+            raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_rule_counts_invalid")
+        counts[key] = value
+    if set(counts) != set(rule_ids):
+        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_rule_counts_invalid")
+    redactions: list[dict[str, object]] = []
+    for index, raw in enumerate(raw_redactions):
+        if not isinstance(raw, Mapping):
+            raise ArchiveGitError(
+                f"agent_report_provenance:{field_prefix}.redactions[{index}]_invalid"
+            )
+        rule_id = raw.get("rule_id")
+        kind = raw.get("kind")
+        replacement = raw.get("replacement")
+        if not isinstance(rule_id, str) or rule_id not in counts:
+            raise ArchiveGitError(
+                f"agent_report_provenance:{field_prefix}.redactions[{index}]_rule_invalid"
+            )
+        if not isinstance(kind, str) or not kind:
+            raise ArchiveGitError(
+                f"agent_report_provenance:{field_prefix}.redactions[{index}]_kind_invalid"
+            )
+        if not isinstance(replacement, str) or not replacement:
+            raise ArchiveGitError(
+                f"agent_report_provenance:{field_prefix}.redactions[{index}]_replacement_invalid"
+            )
+        redactions.append(
+            {
+                "kind": kind,
+                "original_sha256": _hex64(
+                    raw.get("original_sha256"),
+                    f"{field_prefix}.redactions[{index}].original_sha256",
+                ),
+                "replacement": replacement,
+                "rule_id": rule_id,
+            }
+        )
+    if sum(counts.values()) != len(redactions):
+        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_redaction_count_invalid")
+    if item.get("redaction_count") != len(redactions):
+        raise ArchiveGitError(f"agent_report_provenance:{field_prefix}_redaction_count_invalid")
+    return redactions, counts
+
+
+def _validate_supersession_identity(
+    context: ArchiveContext,
+    supersession: Mapping[str, object],
+) -> dict[str, object]:
+    """Validate an append-only supersession reference before archive writes."""
+    status = supersession.get("status")
+    quarantine_status = supersession.get("quarantine_status")
+    if status != "superseded" or quarantine_status != "quarantined":
+        raise ArchiveGitError("agent_report_provenance:supersession_status_invalid")
+    snapshot_id = supersession.get("superseded_snapshot_id")
+    if not isinstance(snapshot_id, str) or not snapshot_id:
+        raise ArchiveGitError("agent_report_provenance:superseded_snapshot_invalid")
+    archive_ref = supersession.get("superseded_archive_ref")
+    expected_ref = f"refs/heads/{context.branch}"
+    if archive_ref != expected_ref:
+        raise ArchiveGitError("agent_report_provenance:superseded_ref_invalid")
+    old_commit = _hex40(
+        supersession.get("superseded_archive_commit"),
+        "superseded_archive_commit",
+    )
+    old_tree = _hex40(
+        supersession.get("superseded_archive_tree"),
+        "superseded_archive_tree",
+    )
+    old_index_blob = _hex40(
+        supersession.get("superseded_index_blob"),
+        "superseded_index_blob",
+    )
+    destination = _safe_provenance_path(
+        supersession.get("superseded_destination_prefix"),
+        "superseded_destination_prefix",
+    )
+    if not destination.startswith(f"agent-reports/{context.repo_key}/"):
+        raise ArchiveGitError("agent_report_provenance:superseded_destination_invalid")
+    reason = supersession.get("reason")
+    if not isinstance(reason, str) or not reason:
+        raise ArchiveGitError("agent_report_provenance:supersession_reason_invalid")
+    current = _remote_ref_oid(context)
+    if not current:
+        raise ArchiveGitError("agent_report_provenance:superseded_remote_missing")
+    ancestor = git(
+        context.archive_root,
+        ["merge-base", "--is-ancestor", old_commit, current],
+        check=False,
+    )
+    if ancestor.returncode != 0:
+        raise ArchiveGitError("agent_report_provenance:superseded_remote_not_ancestor")
+    observed_tree = _archive_oid(context, f"{old_commit}^{{tree}}")
+    if observed_tree != old_tree:
+        raise ArchiveGitError("agent_report_provenance:superseded_tree_mismatch")
+    index_path = Path("agent-reports") / context.repo_key / "index.jsonl"
+    observed_index_blob = git(
+        context.archive_root,
+        ["rev-parse", f"{old_commit}:{index_path.as_posix()}"],
+        check=False,
+    ).stdout.strip()
+    if observed_index_blob != old_index_blob:
+        raise ArchiveGitError("agent_report_provenance:superseded_index_mismatch")
+    index_bytes = _archive_blob_at(context, old_commit, index_path)
+    try:
+        entries = [
+            cast(dict[str, object], json.loads(line))
+            for line in index_bytes.decode("utf-8").splitlines()
+            if line.strip()
+        ]
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
+        raise ArchiveGitError("agent_report_provenance:superseded_index_invalid") from exc
+    if not any(entry.get("snapshot_id") == snapshot_id for entry in entries):
+        raise ArchiveGitError("agent_report_provenance:superseded_snapshot_not_found")
+    return {
+        "status": "superseded",
+        "quarantine_status": "quarantined",
+        "superseded_snapshot_id": snapshot_id,
+        "superseded_archive_ref": archive_ref,
+        "superseded_archive_commit": old_commit,
+        "superseded_archive_tree": old_tree,
+        "superseded_index_blob": old_index_blob,
+        "superseded_destination_prefix": destination,
+        "reason": reason,
+    }
+
+
+def _validate_prepared_report_provenance(
+    context: ArchiveContext,
+    report_dir: Path,
+    provenance_path: Path,
+) -> dict[str, object]:
+    """Validate a prepared sanitized report tree and its existing v1 provenance."""
+    payload = _read_provenance_json(provenance_path)
+    if payload.get("schema") != AGENT_REPORT_PROVENANCE_SCHEMA:
+        raise ArchiveGitError("agent_report_provenance:schema_invalid")
+    if payload.get("archive_schema") != AGENT_REPORT_PROVENANCE_ARCHIVE_SCHEMA:
+        raise ArchiveGitError("agent_report_provenance:archive_schema_invalid")
+    run_id = safe_run_id(str(payload.get("run_id", "")))
+    source_commit = _hex40(payload.get("source_commit"), "source_commit")
+    source_prefix = _safe_provenance_path(payload.get("source_prefix"), "source_prefix")
+    source_tree = _hex64(
+        payload.get("source_tree_digest_sha256"),
+        "source_tree_digest_sha256",
+    )
+    source_file_count = payload.get("source_file_count")
+    if type(source_file_count) is not int or source_file_count <= 0:
+        raise ArchiveGitError("agent_report_provenance:source_file_count_invalid")
+    redaction_policy = payload.get("redaction_policy")
+    if not isinstance(redaction_policy, Mapping):
+        raise ArchiveGitError("agent_report_provenance:redaction_policy_invalid")
+    try:
+        actual_source_remote = source_remote(context.source_root)
+        actual_normalized_remote = normalize_remote(actual_source_remote)
+    except ValueError as exc:
+        raise ArchiveGitError("agent_report_provenance:source_remote_invalid") from exc
+    if payload.get("source_stable_id") != context.repo_key:
+        raise ArchiveGitError("agent_report_provenance:source_stable_id_mismatch")
+    if payload.get("source_remote") != actual_source_remote:
+        raise ArchiveGitError("agent_report_provenance:source_remote_mismatch")
+    if payload.get("source_normalized_remote") != actual_normalized_remote:
+        raise ArchiveGitError("agent_report_provenance:source_normalized_remote_mismatch")
+    if not isinstance(payload.get("source_branch"), str) or not payload["source_branch"]:
+        raise ArchiveGitError("agent_report_provenance:source_branch_invalid")
+    tree_listing = _source_tree_listing(context.source_root, source_commit, source_prefix)
+    if hashlib.sha256(tree_listing).hexdigest() != source_tree:
+        raise ArchiveGitError("agent_report_provenance:source_tree_mismatch")
+    source_tree_paths: set[str] = set()
+    for record in tree_listing.split(b"\0"):
+        if not record:
+            continue
+        try:
+            _metadata, path_bytes = record.split(b"\t", 1)
+            source_tree_paths.add(path_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ArchiveGitError("agent_report_provenance:source_tree_invalid") from exc
+    files_value = payload.get("files")
+    if not isinstance(files_value, list) or not files_value:
+        raise ArchiveGitError("agent_report_provenance:files_invalid")
+    files = [cast(Mapping[str, object], item) for item in files_value if isinstance(item, Mapping)]
+    if len(files) != len(files_value) or len(files) != source_file_count:
+        raise ArchiveGitError("agent_report_provenance:file_count_invalid")
+    prepared_files = iter_report_files(report_dir)
+    prepared_by_path = {
+        path.relative_to(report_dir).as_posix(): path for path in prepared_files
+    }
+    if set(prepared_by_path) != {
+        _safe_provenance_path(item.get("relative_path"), "relative_path") for item in files
+    }:
+        raise ArchiveGitError("agent_report_provenance:prepared_tree_mismatch")
+    declared_source_paths = {
+        _safe_provenance_path(item.get("source_path"), "source_path") for item in files
+    }
+    if declared_source_paths != source_tree_paths:
+        raise ArchiveGitError("agent_report_provenance:source_tree_files_mismatch")
+    normalized_files: list[dict[str, object]] = []
+    aggregate_rule_counts: dict[str, int] = {}
+    for index, item in enumerate(files):
+        relative = _safe_provenance_path(item.get("relative_path"), f"files[{index}].relative_path")
+        source_path = _safe_provenance_path(item.get("source_path"), f"files[{index}].source_path")
+        if not (source_path == source_prefix or source_path.startswith(source_prefix + "/")):
+            raise ArchiveGitError("agent_report_provenance:source_path_outside_prefix")
+        prepared = prepared_by_path[relative]
+        archived_bytes = prepared.read_bytes()
+        archived_sha = hashlib.sha256(archived_bytes).hexdigest()
+        if item.get("archive_sha256") != archived_sha:
+            raise ArchiveGitError("agent_report_provenance:archive_sha256_mismatch")
+        if item.get("size") != len(archived_bytes):
+            raise ArchiveGitError("agent_report_provenance:file_size_mismatch")
+        if ARCHIVE_FORBIDDEN_CONTENT.search(archived_bytes):
+            raise ArchiveGitError("agent_report_provenance:prepared_content_not_sanitized")
+        source_bytes = _source_git_bytes(
+            context.source_root,
+            ["show", f"{source_commit}:{source_path}"],
+            "agent_report_provenance:source_blob_read_failed",
+        )
+        source_sha = hashlib.sha256(source_bytes).hexdigest()
+        if item.get("source_sha256") != source_sha:
+            raise ArchiveGitError("agent_report_provenance:source_sha256_mismatch")
+        redactions, rule_counts = _validate_redaction_metadata(item, f"files[{index}]")
+        for rule_id, count in rule_counts.items():
+            aggregate_rule_counts[rule_id] = aggregate_rule_counts.get(rule_id, 0) + count
+        normalized_files.append(
+            {
+                "relative_path": relative,
+                "source_path": source_path,
+                "source_sha256": source_sha,
+                "archive_sha256": archived_sha,
+                "size": len(archived_bytes),
+                "redactions": redactions,
+                "redaction_count": len(redactions),
+                "redaction_rule_ids": [str(value) for value in item["redaction_rule_ids"]],
+                "redaction_rule_counts": rule_counts,
+            }
+        )
+    if [item["relative_path"] for item in normalized_files] != sorted(
+        (item["relative_path"] for item in normalized_files),
+        key=lambda value: cast(str, value).encode("utf-8"),
+    ):
+        raise ArchiveGitError("agent_report_provenance:files_not_sorted")
+    total_redactions = sum(item["redaction_count"] for item in normalized_files)
+    if payload.get("redaction_count") != total_redactions:
+        raise ArchiveGitError("agent_report_provenance:redaction_count_invalid")
+    top_rule_counts = payload.get("redaction_rule_counts")
+    if not isinstance(top_rule_counts, Mapping):
+        raise ArchiveGitError("agent_report_provenance:redaction_rule_counts_invalid")
+    if {str(key): value for key, value in top_rule_counts.items()} != aggregate_rule_counts:
+        raise ArchiveGitError("agent_report_provenance:redaction_rule_counts_invalid")
+    snapshot_payload = {
+        "source_commit": source_commit,
+        "source_tree_digest_sha256": source_tree,
+        "files": [
+            {
+                "archive_sha256": item["archive_sha256"],
+                "relative_path": item["relative_path"],
+                "size": item["size"],
+            }
+            for item in normalized_files
+        ],
+        "redaction_count": total_redactions,
+    }
+    snapshot_id = hashlib.sha256(
+        json.dumps(snapshot_payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    supplied_snapshot = payload.get("snapshot_id")
+    if supplied_snapshot is not None and supplied_snapshot != snapshot_id:
+        raise ArchiveGitError("agent_report_provenance:snapshot_id_mismatch")
+    supersession = payload.get("supersession")
+    if not isinstance(supersession, Mapping):
+        raise ArchiveGitError("agent_report_provenance:supersession_invalid")
+    validated_supersession = _validate_supersession_identity(context, supersession)
+    return {
+        "run_id": run_id,
+        "source_commit": source_commit,
+        "source_prefix": source_prefix,
+        "source_tree_digest_sha256": source_tree,
+        "source_file_count": source_file_count,
+        "source_remote": actual_source_remote,
+        "source_normalized_remote": actual_normalized_remote,
+        "source_stable_id": context.repo_key,
+        "source_branch": str(payload["source_branch"]),
+        "redaction_count": total_redactions,
+        "redaction_rule_counts": aggregate_rule_counts,
+        "redaction_policy": dict(redaction_policy),
+        "files": normalized_files,
+        "snapshot_id": snapshot_id,
+        "supersession": validated_supersession,
+    }
+
+
+def _write_provenance_once(
+    path: Path,
+    payload: dict[str, object],
+    archive_id: str,
+) -> bool:
+    """Append one provenance record without replacing an existing identity."""
+    if path.exists():
+        try:
+            existing_lines = [
+                cast(dict[str, object], json.loads(line))
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
+            raise ArchiveGitError("agent_report_provenance:index_invalid") from exc
+        for existing in existing_lines:
+            if existing.get("archive_id") == archive_id:
+                expected = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+                observed = json.dumps(existing, sort_keys=True, separators=(",", ":"))
+                if expected != observed:
+                    if existing.get("snapshot_id") != payload.get("snapshot_id"):
+                        raise ArchiveGitError("agent_report_provenance:index_conflict")
+                    payload.clear()
+                    payload.update(existing)
+                return False
+    return write_jsonl_once(path, payload, archive_id)
+
+
+def _archive_agent_report_provenance_prepared(
+    transaction: PreparedArchiveTransaction,
+    args: argparse.Namespace,
+) -> int:
+    """Archive a prepared sanitized tree with existing v1 provenance metadata."""
+    context = _require_prepared(transaction)
+    report_dir = args.report_dir.resolve()
+    if not report_dir.is_dir() or report_dir.is_symlink():
+        raise ArchiveGitError("agent_report_provenance:prepared_tree_missing")
+    provenance_path = args.provenance.resolve()
+    validated = _validate_prepared_report_provenance(context, report_dir, provenance_path)
+    run_id = cast(str, validated["run_id"])
+    snapshot_id = cast(str, validated["snapshot_id"])
+    destination = _agent_report_archive_root(context) / run_id / snapshot_id
+    destination_relative = destination.relative_to(context.archive_root).as_posix()
+    _parent_ensure_directory(destination, "agent-report-archive")
+    output_files: list[dict[str, object]] = []
+    copied = 0
+    existing = 0
+    for item in cast(list[dict[str, object]], validated["files"]):
+        relative = cast(str, item["relative_path"])
+        source = report_dir / relative
+        target = destination / relative
+        _parent_ensure_directory(target.parent, "agent-report-file")
+        source_bytes = source.read_bytes()
+        if target.exists():
+            if target.is_symlink() or not target.is_file() or target.read_bytes() != source_bytes:
+                raise ArchiveGitError(f"agent_report_provenance:destination_conflict:{relative}")
+            existing += 1
+        else:
+            _parent_copy_file(source, target, "agent-report-file")
+            copied += 1
+        output_files.append(
+            {
+                "archive_sha256": item["archive_sha256"],
+                "destination_path": f"{destination_relative}/{relative}",
+                "redactions": item["redactions"],
+                "redaction_count": item["redaction_count"],
+                "redaction_rule_ids": item["redaction_rule_ids"],
+                "redaction_rule_counts": item["redaction_rule_counts"],
+                "relative_path": relative,
+                "size": item["size"],
+                "source_path": item["source_path"],
+                "source_sha256": item["source_sha256"],
+            }
+        )
+    output: dict[str, object] = {
+        "archive_id": f"{run_id}-{snapshot_id}",
+        "archive_repository": context.remote,
+        "archive_schema": AGENT_REPORT_PROVENANCE_ARCHIVE_SCHEMA,
+        "archived_at": datetime.now(UTC).isoformat(),
+        "destination_prefix": destination_relative,
+        "files": output_files,
+        "redaction_count": validated["redaction_count"],
+        "redaction_policy": validated["redaction_policy"],
+        "redaction_rule_counts": validated["redaction_rule_counts"],
+        "run_id": run_id,
+        "schema": AGENT_REPORT_PROVENANCE_SCHEMA,
+        "snapshot_id": snapshot_id,
+        "source_branch": validated["source_branch"],
+        "source_commit": validated["source_commit"],
+        "source_file_count": validated["source_file_count"],
+        "source_normalized_remote": validated["source_normalized_remote"],
+        "source_prefix": validated["source_prefix"],
+        "source_remote": validated["source_remote"],
+        "source_stable_id": validated["source_stable_id"],
+        "source_tree_digest_sha256": validated["source_tree_digest_sha256"],
+        "snapshot_schema": AGENT_REPORT_ARCHIVE_SCHEMA,
+        "supersedes": validated["supersession"],
+        "quarantines": validated["supersession"],
+        "supersession": validated["supersession"],
+    }
+    index_path = _agent_report_archive_root(context) / "index.jsonl"
+    index_appended = _write_provenance_once(
+        index_path,
+        output,
+        cast(str, output["archive_id"]),
+    )
+    git(context.archive_root, ["add", "--", Path("agent-reports").as_posix()])
+    print_context(context)
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_RUN_ID={run_id}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT={snapshot_id}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_DESTINATION={destination_relative}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES={len(output_files)}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_NEW_FILES={copied}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING_FILES={existing}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED={'yes' if index_appended else 'no'}")
+    print("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_PROVENANCE=pass")
+    if not getattr(args, "publish", False):
+        print("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass")
+        return 0
+    receipt = publish_prepared_archive(transaction, args)
+    if receipt.status != "committed" or not receipt.pushed:
+        print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_PUBLICATION={receipt.status}")
+        print("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=fail")
+        return 1
+    required_paths = (
+        index_path,
+        *(destination / cast(str, item["relative_path"]) for item in output_files),
+    )
+    blobs = _verify_remote_agent_report_readback(
+        context,
+        receipt,
+        output,
+        required_paths,
+    )
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_COMMIT={receipt.archive_commit_oid}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_TREE={receipt.archive_tree_oid}")
+    print(f"RUNTIME_LOG_ARCHIVE_AGENT_REPORT_REMOTE_REF=refs/heads/{context.branch}")
+    print(
+        "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_BLOBS="
+        + json.dumps(blobs, sort_keys=True, separators=(",", ":"))
+    )
+    print("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass")
+    return 0
+
+
 def write_jsonl_once(path: Path, payload: dict[str, object], key: str) -> bool:
     """Append a JSON object unless a line with the same key already exists."""
     bound = _parent_boundary()
@@ -5905,6 +6474,10 @@ def _archive_agent_report_prepared(
     args: argparse.Namespace,
 ) -> int:
     """Snapshot one run bundle into the archive clone."""
+    if getattr(args, "provenance", None) is not None:
+        return _archive_agent_report_provenance_prepared(transaction, args)
+    if getattr(args, "publish", False):
+        raise ArchiveGitError("agent_report:publish_requires_provenance")
     context = _require_prepared(transaction)
     report_dir = args.report_dir.resolve()
     if not report_dir.is_dir():
@@ -6223,6 +6796,37 @@ def _verify_remote_archive_readback(
                 f"archive_readback_mismatch:blob:{relative.as_posix()}"
             )
         blobs[relative.as_posix()] = hashlib.sha256(remote).hexdigest()
+    return blobs
+
+
+def _verify_remote_agent_report_readback(
+    context: ArchiveContext,
+    receipt: ArchivePublicationReceipt,
+    provenance: Mapping[str, object],
+    required_paths: tuple[Path, ...],
+) -> dict[str, str]:
+    """Read back provenance/index and every sanitized report blob from origin."""
+    blobs = _verify_remote_archive_readback(context, receipt, required_paths)
+    index_path = context.archive_root / "agent-reports" / context.repo_key / "index.jsonl"
+    remote_index = _archive_blob_at(context, receipt.archive_commit_oid, index_path.relative_to(context.archive_root))
+    expected_line = json.dumps(dict(provenance), sort_keys=True, separators=(",", ":"))
+    matching = []
+    for line in remote_index.decode("utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ArchiveGitError("agent_report_provenance:remote_index_invalid") from exc
+        if isinstance(value, Mapping) and value.get("snapshot_id") == provenance.get("snapshot_id"):
+            matching.append(json.dumps(dict(value), sort_keys=True, separators=(",", ":")))
+    if matching != [expected_line]:
+        raise ArchiveGitError("agent_report_provenance:remote_provenance_mismatch")
+    for item in cast(list[Mapping[str, object]], provenance["files"]):
+        destination = cast(str, item["destination_path"])
+        remote = _archive_blob_at(context, receipt.archive_commit_oid, Path(destination))
+        if hashlib.sha256(remote).hexdigest() != item["archive_sha256"]:
+            raise ArchiveGitError(f"agent_report_provenance:remote_blob_mismatch:{destination}")
     return blobs
 
 

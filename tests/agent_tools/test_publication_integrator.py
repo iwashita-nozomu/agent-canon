@@ -17,7 +17,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from tools.repository.github.publication_integrator import (  # noqa: E402
+    CANONICAL_INTERFACE_PATH,
     _construct_result_commit,
+    _interface_entry,
     _review_approval,
     _publication_gate,
     PublicationError,
@@ -97,6 +99,34 @@ def publication_readback_receipt(
 
 class PublicationIntegratorTest(unittest.TestCase):
     """Verify review state remains a prerequisite for publication CAS."""
+
+    def test_ordered_integration_uses_durable_interface_path(self) -> None:
+        """The ordered integration gate accepts only the durable contract path."""
+        self.assertEqual(
+            CANONICAL_INTERFACE_PATH,
+            "documents/contracts/ordered_integration_interface.json",
+        )
+        entry = {"path": CANONICAL_INTERFACE_PATH, "new_blob": "a" * 40}
+        self.assertEqual(_interface_entry({"entries": [entry]}), entry)
+        with self.assertRaisesRegex(
+            PublicationError,
+            "ordered_integration:path_set_mismatch",
+        ):
+            retired_path = (
+                "reports" + "/agents/"
+                + "convergence-w2-gates-completion-20260716/"
+                + "ordered_integration_interface.json"
+            )
+            _interface_entry(
+                {
+                    "entries": [
+                        {
+                            "path": retired_path,
+                            "new_blob": "a" * 40,
+                        }
+                    ]
+                }
+            )
 
     def test_ineligible_review_never_produces_publication_authority(self) -> None:
         """A non-eligible review fails closed before authority derivation."""

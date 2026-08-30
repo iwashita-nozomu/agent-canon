@@ -6,6 +6,7 @@
 # upstream design ../../documents/operations/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy.
 # upstream design ../../agents/workflows/main-integration-workflow.md owns main integration ordering.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns AgentCanon PR publication policy.
+# upstream design ../../documents/contracts/ordered_integration_interface.json owns the sole ordered-integration interface path.
 # upstream implementation ./review_dispatch.py resolves current candidate identity only.
 # upstream implementation ./report_artifact_checks.py regenerates materializer-produced validation results.
 # upstream implementation ./artifact_identity.py provides canonical serialization and artifact readback.
@@ -63,7 +64,7 @@ TREE_DELTA_SERIALIZATION = "agent-canon.git-tree-delta.v1"
 PUBLICATION_AUTHORITY_SCHEMA = "agent-canon.publication-authority.v3"
 PUBLICATION_ELIGIBILITY_SCHEMA = "agent-canon.publication-eligibility-projection.v1"
 CANONICAL_INTERFACE_PATH = (
-    "reports/agents/convergence-w2-gates-completion-20260716/"
+    "documents/contracts/"
     "ordered_integration_interface.json"
 )
 ZERO_OID = "0" * 40

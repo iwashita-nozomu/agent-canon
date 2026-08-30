@@ -2,7 +2,7 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests runtime log archive Git clone, branch, status, and push behavior.
+# responsibility Tests runtime log archive Git clone, branch, status, push, and report provenance behavior.
 # upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py manages the ignored log archive clone
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines repo keys and archive mount paths
 # upstream design ../../documents/runtime/runtime-log-archive.md documents archive branch and push policy
@@ -2213,6 +2213,171 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 text=True,
             )
             self.assertIn("agent-reports", remote_tree.stdout)
+
+    def test_prepared_sanitized_report_publishes_provenance_and_supersession(self) -> None:
+        """Prepared v1 provenance is read back without rewriting the old snapshot."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            subprocess.run(["git", "init", "-b", "main", str(source)], check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=source, check=True)
+            subprocess.run(
+                ["git", "remote", "add", "origin", "https://github.com/test/source.git"],
+                cwd=source,
+                check=True,
+            )
+            report = source / "reports" / "agents" / "run-1"
+            report.mkdir(parents=True)
+            original = report / "summary.md"
+            original.write_text("summary\n", encoding="utf-8")
+            subprocess.run(["git", "add", "reports"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-m", "source"], cwd=source, check=True, capture_output=True)
+
+            ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
+            self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
+            old_archive = self.run_tool(
+                "archive-agent-report",
+                "--report-dir",
+                str(report),
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(old_archive.returncode, 0, old_archive.stdout + old_archive.stderr)
+            old_snapshot = next(
+                line.split("=", 1)[1]
+                for line in old_archive.stdout.splitlines()
+                if line.startswith("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT=")
+            )
+            pushed_old = self.run_tool(
+                "push",
+                "--message",
+                "Archive unsafe report",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(pushed_old.returncode, 0, pushed_old.stdout + pushed_old.stderr)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
+            old_commit = subprocess.check_output(["git", "-C", str(archive), "rev-parse", "HEAD"], text=True).strip()
+            old_tree = subprocess.check_output(["git", "-C", str(archive), "rev-parse", "HEAD^{tree}"], text=True).strip()
+            key = repo_log_key(source)
+            index_rel = f"agent-reports/{key}/index.jsonl"
+            old_index_blob = subprocess.check_output(
+                ["git", "-C", str(archive), "rev-parse", f"HEAD:{index_rel}"], text=True
+            ).strip()
+            old_index = json.loads((archive / index_rel).read_text(encoding="utf-8").splitlines()[0])
+
+            prepared = root / "prepared" / "run-1"
+            prepared.mkdir(parents=True)
+            sanitized = prepared / "summary.md"
+            sanitized.write_text("summary\n", encoding="utf-8")
+            source_commit = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
+            source_prefix = "reports/agents/run-1"
+            tree_listing = subprocess.check_output(
+                ["git", "-C", str(source), "ls-tree", "-r", "-z", source_commit, "--", source_prefix]
+            )
+            source_tree = hashlib.sha256(tree_listing).hexdigest()
+            source_sha = hashlib.sha256(original.read_bytes()).hexdigest()
+            archive_sha = hashlib.sha256(sanitized.read_bytes()).hexdigest()
+            supersession = {
+                "status": "superseded",
+                "quarantine_status": "quarantined",
+                "superseded_snapshot_id": old_snapshot,
+                "superseded_archive_ref": f"refs/heads/{self.expected_branch(source)}",
+                "superseded_archive_commit": old_commit,
+                "superseded_archive_tree": old_tree,
+                "superseded_index_blob": old_index_blob,
+                "superseded_destination_prefix": old_index["destination"],
+                "reason": "prepared sanitization replaces an unsafe historical snapshot",
+            }
+            snapshot_payload = {
+                "source_commit": source_commit,
+                "source_tree_digest_sha256": source_tree,
+                "files": [{"archive_sha256": archive_sha, "relative_path": "summary.md", "size": len(sanitized.read_bytes())}],
+                "redaction_count": 0,
+            }
+            provenance = {
+                "archive_schema": "agent-report-snapshot.v1",
+                "files": [{
+                    "archive_sha256": archive_sha,
+                    "redactions": [],
+                    "redaction_count": 0,
+                    "redaction_rule_ids": [],
+                    "redaction_rule_counts": {},
+                    "relative_path": "summary.md",
+                    "size": len(sanitized.read_bytes()),
+                    "source_path": f"{source_prefix}/summary.md",
+                    "source_sha256": source_sha,
+                }],
+                "redaction_count": 0,
+                "redaction_policy": {
+                    "credential_shaped_values": "replace with REDACTED_SECRET_SHA256_<sha256>",
+                    "direct_local_paths": "replace with REDACTED_PATH_SHA256_<sha256>",
+                    "source_value_retention": "never",
+                },
+                "redaction_rule_counts": {},
+                "run_id": "run-1",
+                "schema": "agent-canon-log-report-provenance.v1",
+                "snapshot_id": hashlib.sha256(json.dumps(snapshot_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                "source_branch": "main",
+                "source_commit": source_commit,
+                "source_file_count": 1,
+                "source_normalized_remote": "github.com/test/source",
+                "source_prefix": source_prefix,
+                "source_remote": "https://github.com/test/source.git",
+                "source_stable_id": key,
+                "source_tree_digest_sha256": source_tree,
+                "supersession": supersession,
+            }
+            provenance_path = root / "prepared" / "provenance.json"
+            provenance_path.write_text(json.dumps(provenance, sort_keys=True) + "\n", encoding="utf-8")
+            published = self.run_tool(
+                "archive-agent-report",
+                "--report-dir",
+                str(prepared),
+                "--provenance",
+                str(provenance_path),
+                "--publish",
+                "--message",
+                "Archive sanitized report",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_PROVENANCE=pass", published.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass", published.stdout)
+            index_lines = (archive / index_rel).read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(index_lines), 2)
+            successor = json.loads(index_lines[-1])
+            self.assertEqual(successor["schema"], "agent-canon-log-report-provenance.v1")
+            self.assertEqual(successor["snapshot_schema"], "agent-report-snapshot.v1")
+            self.assertEqual(successor["supersession"]["quarantine_status"], "quarantined")
+            self.assertEqual(successor["supersedes"], successor["supersession"])
+            self.assertEqual(successor["quarantines"], successor["supersession"])
+            self.assertEqual(successor["files"][0]["archive_sha256"], archive_sha)
+            replay = self.run_tool(
+                "archive-agent-report",
+                "--report-dir",
+                str(prepared),
+                "--provenance",
+                str(provenance_path),
+                "--publish",
+                "--message",
+                "Replay sanitized report",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+            )
+            self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED=no", replay.stdout)
+            self.assertEqual(len((archive / index_rel).read_text(encoding="utf-8").splitlines()), 2)
 
     def test_materialize_runtime_event_cli_rejects_decision_and_raw_path_inputs(self) -> None:
         """The public parser exposes only fixed family and source selectors."""
