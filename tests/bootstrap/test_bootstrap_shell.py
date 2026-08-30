@@ -767,12 +767,11 @@ def test_sync_stages_source_before_live_fast_forward() -> None:
 
 
 def test_source_sync_state_is_mounted_read_only_into_the_resident() -> None:
-    """The resident reads the host-owned source-sync file through one mount."""
+    """The host imports source-sync into the single resident volume."""
     text = ADAPTER.read_text(encoding="utf-8")
     assert "AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync.json" in text
-    assert 'src=$AGENT_CANON_RUNTIME_ROOT/source-sync.json' in text
-    assert 'dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly' in text
-    assert '"$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION"' in text
+    assert "_agent_canon_volume_copy import source-sync" in text
+    assert 'dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly' not in text
     assert "_agent_canon_ensure_source_sync_state" in text
     assert "container-state/source-sync.json" not in text
 
@@ -1382,10 +1381,11 @@ def test_exec_request_json_before_separator_uses_typed_digest(tmp_path: Path) ->
 
 
 def test_private_log_source_is_read_back_from_the_owned_mount() -> None:
-    """Structured handoff uses the declared install-sibling private log source."""
+    """Structured handoff uses the versioned private-log volume projection."""
     text = ADAPTER.read_text(encoding="utf-8")
     assert "_agent_canon_validate_private_log_mount" in text
-    assert "AGENT_CANON_PRIVATE_LOG_ROOT=$AGENT_CANON_PRIVATE_LOG_ROOT" in text
+    assert "AGENT_CANON_PRIVATE_LOG_ROOT=$AGENT_CANON_PRIVATE_LOG_DESTINATION" in text
+    assert "_agent_canon_volume_copy import private-log" in text
     assert 'AGENT_CANON_PRIVATE_LOG_DESTINATION"' in text
     assert 'control_parent_root / "private-log"' not in (
         ROOT / "tools/runtime/container/bootstrap_runtime.py"
@@ -2305,16 +2305,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
             "io.agent-canon.source-revision"
         ] == source_head
     expected_mounts = {
-        "/var/lib/agent-canon/runtime",
-        "/var/lib/agent-canon/exchange",
-        "/var/lib/agent-canon/spool",
-        "/var/lib/agent-canon/archive",
-        "/var/lib/agent-canon/cache",
-        "/var/lib/agent-canon/codex-home",
-        "/var/lib/agent-canon/source-sync.json",
-        "/var/lib/agent-canon/private-log",
-        "/var/lib/agent-canon/mount-registry.toml",
-        "/var/lib/agent-canon/host-mounts.tsv",
+        "/var/lib/agent-canon",
     }
     expected_mounts.add(f"/targets/{valid_digest}")
     assert {mount["Destination"] for mount in replacement["Mounts"]} == expected_mounts
@@ -2502,7 +2493,7 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     )
     stale_target = home / "removed-agent-canon"
     stale_digest = hashlib.sha256(str(stale_target).encode("utf-8")).hexdigest()
-    stale_state = json.loads((volume_root / "state.json").read_text(encoding="utf-8"))
+    stale_state = json.loads((volume_root / "runtime" / "state.json").read_text(encoding="utf-8"))
     stale_state["targets"] = {
         stale_digest: {
             "root": str(stale_target),
@@ -2512,7 +2503,7 @@ def test_public_clean_install_materializes_source_view_and_first_target(
         }
     }
     stale_state["rollback_generation"] = "generation-stale"
-    (volume_root / "state.json").write_text(
+    (volume_root / "runtime" / "state.json").write_text(
         json.dumps(stale_state), encoding="utf-8"
     )
     (state_root / "mounts.tsv").write_text(
@@ -2522,7 +2513,7 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     (state_root / "rollback-plan.tsv").write_text(
         "schema\tagent-canon.rollback-plan.v1\n", encoding="utf-8"
     )
-    (volume_root / "generations" / "stale-generation").mkdir()
+    (volume_root / "runtime" / "generations" / "stale-generation").mkdir()
     preserved_surfaces = {}
     for name in ("spool", "archive", "cache", "codex-home"):
         preserved = state_root / name / "preexisting-host-data.txt"
@@ -2534,7 +2525,7 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     )
     assert repeated_install.returncode == 0, repeated_install.stderr
     assert not (state_root / "rollback-plan.tsv").exists()
-    assert not (volume_root / "generations" / "stale-generation").exists()
+    assert not (volume_root / "runtime" / "generations" / "stale-generation").exists()
     assert (state_root / "mounts.tsv").read_text(encoding="utf-8") == ""
     for name, preserved in preserved_surfaces.items():
         assert preserved.read_text(encoding="utf-8") == f"{name}\n"
