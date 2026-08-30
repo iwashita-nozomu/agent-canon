@@ -4,7 +4,7 @@
 contract skill
 responsibility Documents Agent Update Branch Skill for this repository.
 upstream design ../workflows/agent-update-branch-workflow.md defines update branch lifecycle
-upstream implementation ../../tools/agent_tools/agent_update_branch.sh validates update branch lanes
+upstream implementation ../../tools/repository/git/agent_update_branch.sh validates update branch lanes
 @dependency-end
 -->
 
@@ -32,6 +32,6 @@ checkout collides with another chat, keep it unchanged and request direction.
 
 ## Required Gates
 
-- Validate the lane with `bash tools/agent_tools/agent_update_branch.sh validate <lane>`.
-- Push the branch with `bash tools/agent_tools/agent_update_branch.sh push <lane> <branch>`.
-- For integration branches, run `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` and repo static analysis before merging to `main`.
+- Validate the lane with `bash tools/repository/git/agent_update_branch.sh validate <lane>`.
+- Push the branch with `bash tools/repository/git/agent_update_branch.sh push <lane> <branch>`.
+- For integration branches, run `bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing` and repo static analysis before merging to `main`.

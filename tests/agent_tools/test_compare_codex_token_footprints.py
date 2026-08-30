@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Codex token footprint comparison behavior.
-# upstream implementation ../../tools/agent_tools/compare_codex_token_footprints.py token comparer
+# upstream implementation ../../eval/checkers/compare_codex_token_footprints.py token comparer
 # upstream design ../../agents/workflows/token-efficient-codex-workflow.md token protocol
 # @dependency-end
 """Tests for Codex session token footprint comparison."""
@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "compare_codex_token_footprints.py"
+SCRIPT = PROJECT_ROOT / "eval" / "checkers" / "compare_codex_token_footprints.py"
 
 
 def write_session(path: Path, total_tokens: int) -> None:

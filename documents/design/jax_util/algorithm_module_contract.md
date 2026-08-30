@@ -4,10 +4,10 @@ contract design
 responsibility Documents the jax_util algorithm module contract and its single AgentCanon checker route.
 upstream design ../algorithm-implementation-boundary.md algorithm boundary policy
 upstream design ../../conventions/coding-conventions-python.md Python implementation policy
-downstream implementation ../../../tools/agent_tools/check_algorithm_config_partition.py checks config ownership
-downstream implementation ../../../rust/agent-canon/src/python_algorithm_contract.rs owns the single algorithm contract checker
+downstream implementation ../../../tools/validation/semantic/algorithm/check_algorithm_config_partition.py checks config ownership
+downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the single algorithm contract checker
 downstream implementation ../../../tools/catalog.yaml records the canonical checker and capability surface
-downstream implementation ../../../tools/ci/run_all_checks.sh invokes the canonical checker in CI
+downstream implementation ../../../tools/validation/ci/runners/run_all_checks.sh invokes the canonical checker in CI
 @dependency-end
 -->
 
@@ -47,16 +47,16 @@ algorithm を包む場合は、child の ownership を親の contract field と�
 
 根拠は最終 tree の次の source に固定する。
 
-- `rust/agent-canon/src/python_algorithm_contract.rs` が単一の Rust owner として AST
+- `tools/runtime/dispatch/agent-canon/src/python_algorithm_contract.rs` が単一の Rust owner として AST
   JSON を一度抽出し、standard surface、callable `Algorithm`、nested `Info` を含む
   contract、legacy stopping policy の finding を一つの report にまとめる。退役した
   Python checker は互換 wrapper や別 route として残さない。
-- `tools/catalog.yaml`、`documents/tools/README.md`、`tools/ci/run_all_checks.sh`
+- `tools/catalog.yaml`、`documents/tools/README.md`、`tools/validation/ci/runners/run_all_checks.sh`
   は `python-algorithm-contract-check` の単一 capability、CLI、CI wiring を final
   tree の source として参照する。旧 Python implementation/test path は retire set
   と parity matrix の履歴 evidence にだけ残り、active route の根拠にはしない。
 - `tests/fixtures/python_algorithm_contract/` の `.py.fixture` と
-  `rust/agent-canon/tests/python_algorithm_contract_cli.rs` が、CLI artifact の
+  `tools/runtime/dispatch/agent-canon/tests/python_algorithm_contract_cli.rs` が、CLI artifact の
   file/module/finding/parse-error readback を固定する canonical fixture/test surface
   である。
 
@@ -386,11 +386,11 @@ artifact は空 arrays を含み、下流が text の exit status だけに依�
 
 | 種別 | retire path / route | 置換または追随 |
 | --- | --- | --- |
-| Python implementation | `tools/agent_tools/check_algorithm_module_public_surface.py` | `rust/agent-canon/src/python_algorithm_contract.rs` の public analysis |
+| Python implementation | `tools/agent_tools/check_algorithm_module_public_surface.py` | `tools/runtime/dispatch/agent-canon/src/python_algorithm_contract.rs` の public analysis |
 | Python implementation | `tools/agent_tools/check_algorithm_module_nested_contract.py` | 同 Rust owner の nested analysis |
 | Python test | `tests/agent_tools/test_check_algorithm_module_public_surface.py` | Rust unit/integration tests と CLI fixture readback |
 | Python test | `tests/agent_tools/test_check_algorithm_module_nested_contract.py` | Rust unit/integration tests と CLI fixture readback |
-| CI route | `tools/ci/run_all_checks.sh` の Python nested invocation と header | `${CANON_BIN} python-algorithm-contract-check --root "$WORKSPACE_ROOT" python` に置換 |
+| CI route | `tools/validation/ci/runners/run_all_checks.sh` の Python nested invocation と header | `${CANON_BIN} python-algorithm-contract-check --root "$WORKSPACE_ROOT" python` に置換 |
 | catalog | `check-algorithm-module-public-surface` entry | 削除。Rust entry に capability を統合 |
 | catalog | `check-algorithm-module-nested-contract` entry | 削除。Rust entry の `default_wiring.ci` を `true` に変更 |
 | runtime inventory | `documents/runtime/log-surface-inventory.json` | Rust owner fix 後に canonical inventory tool で再生成し、stale-path diff を閉じる。logs/log archive は保持 |
@@ -398,7 +398,7 @@ artifact は空 arrays を含み、下流が text の exit status だけに依�
 | tool docs | `tools/README.md` の nested checker bullet | 削除し Rust CLI entry を唯一の案内にする |
 | provenance | `documents/tools/repo-local-tool-imports.md` の nested checker rows | 現行 capability から削除または retired record に明示更新 |
 
-`tools/agent_tools/check_algorithm_config_partition.py` と
+`tools/validation/semantic/algorithm/check_algorithm_config_partition.py` と
 `tests/agent_tools/test_check_algorithm_config_partition.py` は retire set に含めない。
 この二つは同じ design owner を参照するが、config partition の独立した public route と
 finding schema を持つためである。
@@ -418,7 +418,7 @@ finding schema を持つためである。
    status、root-relative path/line、malformed syntax を readback する。fixture source は
    `tests/fixtures/python_algorithm_contract/` に `.py.fixture` で保存し、CLI integration の
    単一 loader が一時 tree に `.py` として materialize する。CLI integration は
-   `rust/agent-canon/tests/python_algorithm_contract_cli.rs` を canonical test surface
+   `tools/runtime/dispatch/agent-canon/tests/python_algorithm_contract_cli.rs` を canonical test surface
    とする。
 3. **Route cutover:** `run_all_checks.sh` が Rust CLI を一度だけ呼ぶようにし、catalog の
    Rust entry を CI owner にする。public と nested の二つを別々に起動する期間を作らない。
@@ -426,7 +426,7 @@ finding schema を持つためである。
    dependency headers を single owner へ更新する。Rust entry の docs/tests は design
    owner、tool docs、Rust source/test、fixture path を指す。
 5. **PR #471 clean-baseline gate:** PR #471 の log-surface owner fix が統合された後、
-   clean baseline から `python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json`
+   clean baseline から `python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json`
    を先に実行する。この時点で既に存在する added/removed/stale record は、algorithm
    checker consolidation の差分に混ぜず、PR #471 の owner または inventory owner に
    `pre-existing log-surface drift` の別 owner blocker として識別する。baseline の再生成、
@@ -438,15 +438,15 @@ finding schema を持つためである。
 7. **Final inventory regeneration/check:** PR #471 の clean-baseline gate が pass（または
    pre-existing drift を別 owner blocker として明示）した後、かつ Rust route cutover と
    Python implementation/test retirement が完了した後に、初めて
-   `python3 tools/agent_tools/log_surface_inventory.py --root . --output /tmp/python-algorithm-contract-log-surface.current.json`
+   `python3 tools/runtime/archive/log_surface_inventory.py --root . --output /tmp/python-algorithm-contract-log-surface.current.json`
    で current inventory を生成する。algorithm route retirement の意図した差分だけを
-   canonical baseline に反映するため、`python3 tools/agent_tools/log_surface_inventory.py --root . --output documents/runtime/log-surface-inventory.json`
-   で再生成し、`python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json`
+   canonical baseline に反映するため、`python3 tools/runtime/archive/log_surface_inventory.py --root . --output documents/runtime/log-surface-inventory.json`
+   で再生成し、`python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json`
    を再実行して stale-path closure を pass にする。この final inventory 操作も inventory
    projection だけを更新し、runtime logs、hook JSONL、eval report、log archive branch の
    file は削除・truncate・retention変更しない。pre-existing drift blocker が未解決なら、
    baseline を上書きせず別 owner blocker のまま停止する。
-8. **Closeout:** `cargo fmt --check`、`cargo test --manifest-path rust/agent-canon/Cargo.toml`,
+8. **Closeout:** `cargo fmt --check`、`cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml`,
    CLI fixture matrix、`tools/bin/agent-canon python-algorithm-contract-check --format json`,
    catalog/dependency checks、final log-surface regeneration/check、
    `tools/bin/agent-canon docs check` を実行し、旧 path/id が source、catalog、CI、docs、

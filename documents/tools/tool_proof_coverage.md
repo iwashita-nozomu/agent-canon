@@ -5,14 +5,14 @@ responsibility Documents the tool proof coverage checker.
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog.
 upstream design lean_capability_matrix.md Lean capability routing policy.
 upstream design ../../agents/skills/formal-proof-workflow.md formal proof status policy.
-upstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports proof coverage.
+upstream implementation ../../tools/analysis/proof/tool_proof_coverage.py reports proof coverage.
 downstream implementation ../../tests/agent_tools/test_tool_proof_coverage.py tests checker behavior.
 @dependency-end
 -->
 
 # Tool Proof Coverage
 
-`tools/agent_tools/tool_proof_coverage.py` reports formal proof-obligation
+`tools/analysis/proof/tool_proof_coverage.py` reports formal proof-obligation
 coverage for catalog entries selected by the caller. Without a selection it is
 an observational report; it does not create a universal Lean backlog.
 
@@ -34,7 +34,7 @@ that genuinely needs a proof selects the exact tool IDs and enables strict
 mode:
 
 ```bash
-python3 tools/agent_tools/tool_proof_coverage.py \
+python3 tools/analysis/proof/tool_proof_coverage.py \
   --tool-id check-dependency-headers \
   --require-lean-verified
 ```
@@ -64,10 +64,10 @@ as `sorry`, `admit`, or unchecked `axiom`.
 ## Output
 
 ```bash
-python3 tools/agent_tools/tool_proof_coverage.py
-python3 tools/agent_tools/tool_proof_coverage.py --format markdown
-python3 tools/agent_tools/tool_proof_coverage.py --format json
-python3 tools/agent_tools/tool_proof_coverage.py --tool-id <catalog-id> --require-lean-verified
+python3 tools/analysis/proof/tool_proof_coverage.py
+python3 tools/analysis/proof/tool_proof_coverage.py --format markdown
+python3 tools/analysis/proof/tool_proof_coverage.py --format json
+python3 tools/analysis/proof/tool_proof_coverage.py --tool-id <catalog-id> --require-lean-verified
 ```
 
 The compact text output includes counts such as:

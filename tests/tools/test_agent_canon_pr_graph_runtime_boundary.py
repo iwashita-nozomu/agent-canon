@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies graph selector staging and receipts use explicit external roots.
-# upstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py owns graph selector boundaries
-# upstream implementation ../../tools/agent_tools/runtime_artifacts.py owns runtime artifact paths
+# upstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py owns graph selector boundaries
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns runtime artifact paths
 # @dependency-end
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from tools.ci import agent_canon_pr_graph_selector as selector
+from tools.validation.ci.checks import agent_canon_pr_graph_selector as selector
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -49,7 +49,7 @@ def test_graph_cli_emits_fail_closed_receipt_when_runtime_is_missing() -> None:
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "tools/ci/agent_canon_pr_graph_selector.py"),
+            str(ROOT / "tools/validation/ci/checks/agent_canon_pr_graph_selector.py"),
             "--root",
             str(ROOT),
             "--source-root",

@@ -3,7 +3,7 @@
 # responsibility Seeds the canonical total single-owner relation for tracked paths in template-derived repositories.
 # upstream design ../../documents/design/responsibility-scope-management.md scope ownership policy
 # upstream design ../../documents/structure/repo-structure-contract.toml separate path existence and kind contract
-# upstream implementation ../../tools/agent_tools/responsibility_scope.py validates this schema
+# upstream implementation ../../tools/validation/semantic/responsibility/responsibility_scope.py validates this schema
 # downstream implementation ../../responsibility-scope.toml is the rendered project-local contract
 # @dependency-end
 
@@ -93,8 +93,8 @@ paths = [
 ]
 exclude_paths = []
 protecting_tools = [
-  "tools/agent_tools/responsibility_scope.py",
-  "tools/agent_tools/import_responsibility.py",
+  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/analysis/code/import_responsibility.py",
 ]
 issues = []
 
@@ -111,8 +111,8 @@ paths = [
   "references/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/task_close.py",
-  "tools/agent_tools/responsibility_scope.py",
+  "tools/runtime/lifecycle/task_close.py",
+  "tools/validation/semantic/responsibility/responsibility_scope.py",
 ]
 issues = []
 
@@ -125,8 +125,8 @@ paths = [
   ".github/**",
 ]
 protecting_tools = [
-  "tools/ci/check_github_workflows.py",
-  "tools/agent_tools/github_status_lifecycle.py",
+  "tools/validation/ci/checks/check_github_workflows.py",
+  "tools/repository/github/github_status_lifecycle.py",
 ]
 issues = []
 
@@ -139,6 +139,6 @@ paths = [
   "vendor/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/task_authority.py",
+  "tools/runtime/authority/task_authority.py",
 ]
 issues = []

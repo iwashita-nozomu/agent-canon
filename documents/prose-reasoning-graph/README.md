@@ -6,9 +6,9 @@ upstream design ../README.md AgentCanon document index
 upstream design ../structured-analysis/README.md structured analysis package boundary
 upstream design ../structured-analysis/graph-dsl.md shared Graph DSL Core storage contract
 downstream design dsl-spec.md normative DSL and graph contract
-downstream design ../../tools/agent_tools/prose_reasoning_graph.py tool usage documentation
+downstream design ../../tools/analysis/documents/prose_reasoning_graph.py tool usage documentation
 downstream design ../../agents/skills/prose-reasoning-graph.md skill handoff contract
-downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py current MVP implementation
+downstream implementation ../../tools/analysis/documents/prose_reasoning_graph.py current MVP implementation
 @dependency-end
 -->
 
@@ -44,7 +44,7 @@ projection rules, validation rules, and extension contract live here.
 - `documents/tools/prose_reasoning_graph.md` owns CLI usage and operator flow.
 - `agents/skills/prose-reasoning-graph.md` owns skill selection, handoff, and
   authority boundaries.
-- `tools/agent_tools/prose_reasoning_graph.py` owns the current MVP
+- `tools/analysis/documents/prose_reasoning_graph.py` owns the current MVP
   implementation and must be kept in sync with the DSL spec.
 
 ## Expansion Rule

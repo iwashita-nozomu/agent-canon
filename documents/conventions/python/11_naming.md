@@ -43,7 +43,7 @@ responsibility Documents 命名規約（Python） for this repository.
 - `snake_case` を使ってください。
 - **動詞で始める**ことを推奨します（例: `load_*`, `build_*`, `run_*`, `update_*`, `check_*`）。
 - helper / local function では、推定 role に対応する action token を名前へ含めます。例: parser / loader は `parse_*` / `load_*`、collector は `collect_*` / `list_*`、validator は `check_*` / `validate_*`、writer は `write_*` / `persist_*`。
-- role/action token alignment は `python3 tools/agent_tools/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps` で確認します。
+- role/action token alignment は `python3 tools/analysis/code/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps` で確認します。
 - 関数名は、呼び出し側が読む契約です。`do_*`、`handle_*`、`process_*`、
   `manage_*` のような総称動詞だけで始める名前は、対象 object と結果が続く場合だけ
   許可します。

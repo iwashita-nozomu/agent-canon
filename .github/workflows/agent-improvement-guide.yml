@@ -2,8 +2,8 @@
 # contract configuration
 # responsibility Generates bounded AgentCanon improvement guidance for its generator surface and manual dispatch.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
-# upstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py builds the guide
-# upstream implementation ../../tools/agent_tools/runtime_artifacts.py owns external report/archive paths
+# upstream implementation ../../eval/producers/generate_agent_improvement_guide.py builds the guide
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external report/archive paths
 # @dependency-end
 
 # Standalone AgentCanon improvement guidance workflow. Derived repositories run
@@ -14,7 +14,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/agent-improvement-guide.yml"
-      - "tools/agent_tools/generate_agent_improvement_guide.py"
+      - "eval/producers/generate_agent_improvement_guide.py"
       - "tests/agent_tools/test_generate_agent_improvement_guide.py"
   workflow_dispatch:
 
@@ -30,7 +30,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
-      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,21 +44,33 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Prepare PR candidate source
+        run: |
+          set -euo pipefail
+          candidate_bare="${RUNNER_TEMP}/agent-canon-pr-candidate.git"
+          candidate_source="${RUNNER_TEMP}/agent-canon-pr-candidate"
+          rm -rf -- "${candidate_bare}" "${candidate_source}"
+          git init --bare "${candidate_bare}"
+          git -C "${GITHUB_WORKSPACE}" push "${candidate_bare}" "HEAD:refs/heads/main"
+          git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main
+          git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"
+          printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\n' "${candidate_source}" >> "${GITHUB_ENV}"
+          echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=${candidate_source}/.runtime/container-state" >> "${GITHUB_ENV}"
+
       - name: Start shared tool runtime
         run: |
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" install
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" start
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
       - name: Generate improvement guide
         id: guide
         run: |
-          report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-improvement-guide")"
+          report_dir="$(realpath -m "${AGENT_CANON_GUIDE_RUNTIME_ROOT}/reports/agent-improvement-guide")"
           guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- python3 \
-            /usr/local/share/agent-canon/runtime/tools/agent_tools/generate_agent_improvement_guide.py \
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            tool run --root "${GITHUB_WORKSPACE}" generate-agent-improvement-guide -- \
             --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}" \
             --output-mode 644
           cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"
@@ -74,5 +85,7 @@ jobs:
       - name: Release shared tool runtime
         if: always()
         run: |
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" stop || true
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
+          if [[ -n "${AGENT_CANON_CANDIDATE_SOURCE:-}" ]]; then
+            "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" stop || true
+            "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" uninstall || true
+          fi

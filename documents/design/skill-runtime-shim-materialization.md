@@ -9,13 +9,13 @@ upstream design ../../agents/skills/skill-dependencies.yaml typed prerequisite, 
 upstream design ../../agents/canonical/skills.md public skill reader/index boundary
 upstream design ./skill-tool-invocation-graph.md skill/tool identity, graph projection, and readback contract
 upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md fresh evaluator and report contract
-downstream implementation ../../tools/agent_tools/skill_tool_commands.py read-only command packet producer
-downstream implementation ../../tools/agent_tools/route.py deterministic catalog-backed route consumer
-downstream implementation ../../tools/agent_tools/skill_dependency_map.py graph materializer and semantic golden producer
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py host-discovery and catalog/shim parity checker
-downstream implementation ../../tools/agent_tools/check_skill_frontmatter.py frontmatter readback checker
-downstream implementation ../../tools/agent_tools/check_skill_tool_invocation_graph.py graph projection readback checker
-downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py prompt checklist evaluator
+downstream implementation ../../tools/agent/skills/skill_tool_commands.py read-only command packet producer
+downstream implementation ../../tools/agent/orchestration/route.py deterministic catalog-backed route consumer
+downstream implementation ../../tools/agent/skills/skill_dependency_map.py graph materializer and semantic golden producer
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py host-discovery and catalog/shim parity checker
+downstream implementation ../../tools/validation/semantic/skills/check_skill_frontmatter.py frontmatter readback checker
+downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py graph projection readback checker
+downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py prompt checklist evaluator
 @dependency-end
 -->
 
@@ -48,7 +48,7 @@ Wave 4 の target state は次です。
   とする。shim に relation の配列や routing policy を写さない。
 - .codex/personal/skills/<skill>/SKILL.md は frontmatter、owner link、source identity、
   ToolCall command packet の薄い adapter_only projection とする。
-- catalog の全 public skill を同じ schema、同じ template、同じ materializer で生成する（`agents/skills/catalog.yaml`、`tools/agent_tools/skill_shim_materializer.py`）。
+- catalog の全 public skill を同じ schema、同じ template、同じ materializer で生成する（`agents/skills/catalog.yaml`、`tools/agent/skills/skill_shim_materializer.py`）。
   skill_tool_commands.py は read-only の command-packet producer として残すが、
   sync サブコマンド、sync facade、旧 writer の互換概念は target state に存在しない。
   SKILL.md の唯一の writer は materializer である。
@@ -200,10 +200,10 @@ schema/version/digest と owner sources から再構成した record digest を�
 
 - `determinism` は同じ source snapshot、command/tool packet、materializer
   version、record input に対して、同じ canonical record bytes/digest、同じ generated
-  content bytes、同じ catalog-sized projection digest map を返す純粋な render property です（`tools/agent_tools/skill_shim_materializer.py`）。
+  content bytes、同じ catalog-sized projection digest map を返す純粋な render property です（`tools/agent/skills/skill_shim_materializer.py`）。
 - `idempotent fixed point` は実体 target に対する二回の materialize/readback protocol
   の property です。初回は legacy body から content delta が発生し得ます。初回完了後、
-  source が不変なら（`tools/agent_tools/skill_shim_materializer.py`）、二回目は同じ record digest、catalog-sized projection digest map、readback
+  source が不変なら（`tools/agent/skills/skill_shim_materializer.py`）、二回目は同じ record digest、catalog-sized projection digest map、readback
   digest/status を返し、`content_delta_count=0`、`content_delta_paths=[]` になります。
   canonical doc を含む record source が一件でも変わった場合は、acceptance fixture を
   更新する前に catalog-derived な全 target を materialize/readback して target tree を収束させます。その
@@ -241,7 +241,7 @@ FixedPointAcceptance = {
 }
 ~~~
 
-acceptance は record/projection/readback の各 map が catalog の skill id 集合と一致すること（`agents/skills/catalog.yaml`、`tools/agent_tools/skill_shim_materializer.py`）、first/second
+acceptance は record/projection/readback の各 map が catalog の skill id 集合と一致すること（`agents/skills/catalog.yaml`、`tools/agent/skills/skill_shim_materializer.py`）、first/second
 の digest map が byte-for-byte equal であること、second run の content delta がゼロ
 であることを同時に検査します。per-file replace の途中停止後も、同じ materializer を
 再実行した second run がこの fixed-point fixture に一致するまで accepted にしません。
@@ -284,7 +284,7 @@ adapter; it does not restate the canonical skill prose.
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->
-Read-only command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text`; schema `skill_tool_commands.v2`, digest: `<command_packet_identity_digest>`.
+Read-only command packet: `python3 tools/agent/skills/skill_tool_commands.py show --skill agent-orchestration --format text`; schema `skill_tool_commands.v2`, digest: `<command_packet_identity_digest>`.
 <!-- skill-tool-commands:end -->
 
 1. Read the canonical owner above before applying this skill; use the read-only command packet for its ToolCall commands.
@@ -349,9 +349,9 @@ numbered policy rule は移行 receipt を経ずに保持しません。
 予定する唯一の writer surface は次です。
 
 ~~~bash
-python3 tools/agent_tools/skill_shim_materializer.py check --root . --all
-python3 tools/agent_tools/skill_shim_materializer.py materialize --root . --all
-python3 tools/agent_tools/skill_shim_materializer.py readback --root . --all
+python3 tools/agent/skills/skill_shim_materializer.py check --root . --all
+python3 tools/agent/skills/skill_shim_materializer.py materialize --root . --all
+python3 tools/agent/skills/skill_shim_materializer.py readback --root . --all
 ~~~
 
 `skill_tool_commands.py` は `show` と `check` の read-only command packet surface だけを
@@ -404,14 +404,14 @@ runtime targets:     .codex/personal/skills/<skill_id>/SKILL.md for all catalog 
 source diff:         agents/skills/catalog.yaml (discovery.name/description only)
 host discovery:      Codex automatic global .agents/skills discovery via managed per-skill links; no config registry
 canonical/deps:      read-only agents/skills/<id>.md and skill-dependencies.yaml
-runtime source:      tools/agent_tools/skill_shim_materializer.py (normal implementation diff)
-command source:      tools/agent_tools/skill_tool_commands.py (normal implementation diff;
+runtime source:      tools/agent/skills/skill_shim_materializer.py (normal implementation diff)
+command source:      tools/agent/skills/skill_tool_commands.py (normal implementation diff;
                        show/check remain read-only)
 tests:               tests/agent_tools/test_skill_shim_materializer.py and
                       tests/agent_tools/test_skill_shim_evaluation.py plus
                       tests/fixtures/skill-runtime-shim/fixed-point/expected.json
                       (normal implementation diff)
-eval producer:       tools/agent_tools/skill_shim_evaluation.py (normal implementation diff)
+eval producer:       eval/producers/skill_shim_evaluation.py (normal implementation diff)
 ~~
 
 `agents/skills/<id>.md`、`skill-dependencies.yaml`、route/graph
@@ -448,7 +448,7 @@ README だけであり、上記の source/tests/eval producer diff は次の imp
 | --- | --- | --- | --- |
 | preflight | catalog、dependencies、generated shim、canonical docs、full command/tool packets | catalog-sized source/target inventory | catalog id 集合と shim/owner 集合が一致する |
 | classify | current shim の固定節 parser | `LegacyResolutionRecord` の catalog-sized rows、unmatched locator | unresolved=0 |
-| source bind | catalog、dependency map、route.py、typed tool owner、canonical docs | `SkillRuntimeShimRecord` の catalog-sized rowsと record digest（`agents/skills/catalog.yaml`、`tools/agent_tools/skill_shim_materializer.py`） | 全 owner/ref/schema が解決 |
+| source bind | catalog、dependency map、route.py、typed tool owner、canonical docs | `SkillRuntimeShimRecord` の catalog-sized rowsと record digest（`agents/skills/catalog.yaml`、`tools/agent/skills/skill_shim_materializer.py`） | 全 owner/ref/schema が解決 |
 | stage | record 集合、runtime target set | staged bytes、target manifest、staged readback | 全 staged rows pass、未承認 path=0 |
 | replace | staged runtime targets | per-file replace receipt、target digest | 各 target を deterministic order で temp + `os.replace` |
 | readback | runtime targets、catalog、owners、packets | per-row readback、partial-stop receipt if needed | missing/extra/duplicate/stale/absolute=0 |
@@ -476,7 +476,7 @@ catalog-derived row readback は各 row で次を検査します。
 
 現 snapshot の skill/command/tool/edge 件数と graph/JSON/Mermaid digest は、この設計へ
 埋め込みません。`documents/runtime/skill-dependency-graph.json` の catalog-derived
-projection と `tools/agent_tools/check_skill_tool_invocation_graph.py` の readback が
+projection と `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` の readback が
 current value の owner です。
 
 shim の body は graph source ではないため、shim materialization だけでは graph の
@@ -504,7 +504,7 @@ projection equality とします。raw digest の変化は別の `source_digest_
   source-mutation capability と外部 before/after evidence を明示する。generated graph を
   手編集しない。
 
-route golden は実在する `evidence/agent-evals/workflow_selection_eval.toml` の
+route golden は実在する `eval/definitions/workflow_selection_eval.toml` の
 `expected_case_count=525`、`expected_generated_case_count=525` を読み、manifest loader
 が展開した 525 cases の固定 prompt を、実在する `route.py` の CLI または
 `load_skill_route_rules` + `decide_skills` + `RouteRenderer("json")` の実在関数へ直接
@@ -520,7 +520,7 @@ RouteGoldenCase = {
   case_id: string,
   prompt_sha256: hex64,
   invocation: {
-    cli: "tools/agent_tools/route.py",
+    cli: "tools/agent/orchestration/route.py",
     mode: "repo-changing" | "routing-only",
     format: "json"
   },
@@ -566,20 +566,20 @@ fresh evaluator packet; the parent-only oracle stores the expected case projecti
 usage text、error text は変更・置換しません。`stderr_sha256` は raw UTF-8 stderr の
 digest とし、表示用 stderr 本文を golden identity にしません。
 
-producer の exact path は `tools/agent_tools/skill_shim_evaluation.py` の
+producer の exact path は `eval/producers/skill_shim_evaluation.py` の
 `route-golden` subcommand、focused test path は
 `tests/agent_tools/test_skill_shim_evaluation.py::test_route_golden_normalizes_argparse_error`、
 validation command は次です。
 
 ~~~bash
-python3 tools/agent_tools/skill_shim_evaluation.py route-golden \
-  --root . --manifest evidence/agent-evals/workflow_selection_eval.toml \
-  --route-cli tools/agent_tools/route.py \
+python3 eval/producers/skill_shim_evaluation.py route-golden \
+  --root . --manifest eval/definitions/workflow_selection_eval.toml \
+  --route-cli tools/agent/orchestration/route.py \
   --output <run-dir>/route-golden.json
 ~~~
 
 この producer、test、validation report は通常の implementation/evidence diff であり、
-`tools/agent_tools/route.py` と catalog-derived shim の materializer runtime write set には含めません（`tools/agent_tools/skill_shim_materializer.py`）。
+`tools/agent/orchestration/route.py` と catalog-derived shim の materializer runtime write set には含めません（`tools/agent/skills/skill_shim_materializer.py`）。
 
 ~~~text
 public skill selection with a canonical skill name
@@ -593,15 +593,15 @@ host-provided system skill delegation
 shim body の短縮に影響されないことを確認するためだけに使います。
 
 525-case workflow-selection evidence remains a separate deterministic evaluator owned by
-`tools/agent_tools/evaluate_workflow_selection.py`, whose current implementation loads
+`eval/producers/evaluate_workflow_selection.py`, whose current implementation loads
 `.codex/hooks/skill_usage_logger.py` and records workflow-selection evidence. That evaluator
 and its logger are not the route golden producer and are not the shim routing owner.
 
 決定論評価の実在 CLI は次です。
 
 ~~~bash
-python3 tools/agent_tools/evaluate_workflow_selection.py \
-  --root . --manifest evidence/agent-evals/workflow_selection_eval.toml \
+python3 eval/producers/evaluate_workflow_selection.py \
+  --root . --manifest eval/definitions/workflow_selection_eval.toml \
   --report-out <run-dir>/workflow-selection.md
 ~~~
 
@@ -612,7 +612,7 @@ shim route golden の planned producer は、次の実在 `route.py` CLI を cas
 呼び出します（route golden producer 自体は implementation phase の通常 diff です）。
 
 ~~~bash
-python3 tools/agent_tools/route.py --root . --prompt-file <case-prompt-file> --format json
+python3 tools/agent/orchestration/route.py --root . --prompt-file <case-prompt-file> --format json
 ~~~
 
 in-process 版を選ぶ場合も、同じ `route.py` の
@@ -626,7 +626,7 @@ result を route JSON に変換しません。
 ### Token Contract
 
 tokenizer registry や独自 tokenizer は新設しません。measurement producer は実装時に
-`tools/agent_tools/skill_shim_evaluation.py` として追加し、fresh `gpt-5.4-mini` host
+`eval/producers/skill_shim_evaluation.py` として追加し、fresh `gpt-5.4-mini` host
 evaluation が返す観測可能な `input_tokens` usage をそのまま artifact に保存します。
 この usage は model-host observation であり、決定論尺度と同一視しません。
 
@@ -773,7 +773,7 @@ command、期待 answer を受け取りません。parent-only oracle が expect
 で保持します。
 
 実装時の packet manifest path は固定で
-`evidence/agent-evals/skill_runtime_shim_eval.toml` とします。manifest は次の schema
+`eval/definitions/skill_runtime_shim_eval.toml` とします。manifest は次の schema
 だけを持ち、answer-free packet の content と parent-only oracle を混ぜません。
 
 ~~~toml
@@ -784,7 +784,7 @@ packet_class_order = ["full", "changed"]
 [[packet]]
 id = "shim-discovery-selection-v1"
 packet_class = "full"
-prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-discovery-selection-v1.md"
+prompt_path = "eval/fixtures/skill-runtime-shim/packets/full/shim-discovery-selection-v1.md"
 canonical_target_files = [".codex/personal/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
@@ -795,7 +795,7 @@ packet_digest = "sha256-of-the-complete-answer-free-packet"
 [[packet]]
 id = "shim-boundary-and-negative-v1"
 packet_class = "full"
-prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-boundary-and-negative-v1.md"
+prompt_path = "eval/fixtures/skill-runtime-shim/packets/full/shim-boundary-and-negative-v1.md"
 canonical_target_files = [".codex/personal/skills/task-routing/SKILL.md", "agents/skills/task-routing.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
@@ -806,7 +806,7 @@ packet_digest = "sha256-of-the-complete-answer-free-packet"
 [[packet]]
 id = "shim-toolcall-route-v1"
 packet_class = "changed"
-prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-toolcall-route-v1.md"
+prompt_path = "eval/fixtures/skill-runtime-shim/packets/changed/shim-toolcall-route-v1.md"
 canonical_target_files = [".codex/personal/skills/structure-planning/SKILL.md", "agents/skills/structure-planning.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/design/skill-tool-invocation-graph.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
@@ -819,9 +819,11 @@ packet_digest = "sha256-of-the-complete-answer-free-packet"
 bytes から計算します。packet file は prompt、target/dependency paths、scenario、
 requirements、method、report grammar だけを持ち、`expected_*`, `oracle_*`, expected
 command/artifacts、prior result は schema 上禁止します。parent-only oracle の exact path
-は `evidence/agent-evals/skill-runtime-shim/oracles/<packet-id>.json`、measurement
-artifact の exact path は `evidence/agent-evals/skill-runtime-shim/measurements/<run-id>.json`
-とし、evaluator allowlist に oracle path を入れません。oracle JSON は
+は外部 runtime spool の
+`<runtime-root>/spool/skill-runtime-shim/oracles/<packet-id>.json`、measurement
+artifact の exact path は
+`<runtime-root>/spool/skill-runtime-shim/measurements/<run-id>.json` とし、
+evaluator allowlist に oracle path を入れません。oracle JSON は
 `schema, packet_id, scenario_id, baseline_projection, generated_projection,
 expected_route_projection, expected_failure_projection, oracle_digest` の順で保存し、
 fresh packet からは不可視です。
@@ -837,11 +839,11 @@ fresh scenario artifact/token measurement producer は実装時に次の一つ�
 とは主張しません。
 
 ~~~bash
-python3 tools/agent_tools/skill_shim_evaluation.py packets \
-  --root . --manifest evidence/agent-evals/skill_runtime_shim_eval.toml \
+python3 eval/producers/skill_shim_evaluation.py packets \
+  --root . --manifest eval/definitions/skill_runtime_shim_eval.toml \
   --model gpt-5.4-mini --profile medium --output-dir <run-dir>/packets
-python3 tools/agent_tools/skill_shim_evaluation.py tokens \
-  --root . --model gpt-5.4-mini --manifest evidence/agent-evals/skill_runtime_shim_eval.toml \
+python3 eval/producers/skill_shim_evaluation.py tokens \
+  --root . --model gpt-5.4-mini --manifest eval/definitions/skill_runtime_shim_eval.toml \
   --host-evaluation-dir <run-dir>/host-evaluations \
   --output <run-dir>/measurements/<run-id>.json
 ~~~
@@ -865,16 +867,16 @@ convergence を意味しません。
 Wave 4 design の validation evidence は次です。
 
 ~~~bash
-python3 tools/agent_tools/check_agent_runtime_alignment.py
-python3 tools/agent_tools/check_skill_frontmatter.py --root .
-python3 tools/agent_tools/skill_tool_commands.py --root . check
-python3 tools/agent_tools/skill_dependency_map.py check --root .
-python3 tools/agent_tools/check_skill_tool_invocation_graph.py --root .
-python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
-  --root . --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml \
+python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
+python3 tools/agent/skills/skill_tool_commands.py --root . check
+python3 tools/agent/skills/skill_dependency_map.py check --root .
+python3 tools/validation/semantic/skills/check_skill_tool_invocation_graph.py --root .
+python3 eval/producers/evaluate_skill_workflow_prompts.py \
+  --root . --manifest eval/definitions/skill_workflow_prompt_eval.toml \
   --report-out <run-dir>/skill-workflow-prompt.md
-python3 tools/agent_tools/evaluate_workflow_selection.py \
-  --root . --manifest evidence/agent-evals/workflow_selection_eval.toml \
+python3 eval/producers/evaluate_workflow_selection.py \
+  --root . --manifest eval/definitions/workflow_selection_eval.toml \
   --report-out <run-dir>/workflow-selection.md
 ~~~
 
@@ -886,12 +888,12 @@ producer reports を追加します。固定点 acceptance は次の focused tes
 python3 -m pytest \
   tests/agent_tools/test_skill_shim_materializer.py \
   -k test_materialize_fixed_point
-python3 tools/agent_tools/skill_shim_evaluation.py route-golden \
-  --root . --manifest evidence/agent-evals/workflow_selection_eval.toml \
-  --route-cli tools/agent_tools/route.py \
+python3 eval/producers/skill_shim_evaluation.py route-golden \
+  --root . --manifest eval/definitions/workflow_selection_eval.toml \
+  --route-cli tools/agent/orchestration/route.py \
   --output <run-dir>/route-golden.json
-python3 tools/agent_tools/skill_shim_evaluation.py tokens \
-  --root . --model gpt-5.4-mini --manifest evidence/agent-evals/skill_runtime_shim_eval.toml \
+python3 eval/producers/skill_shim_evaluation.py tokens \
+  --root . --model gpt-5.4-mini --manifest eval/definitions/skill_runtime_shim_eval.toml \
   --host-evaluation-dir <run-dir>/host-evaluations \
   --output <run-dir>/measurements/<run-id>.json
 ~~~
@@ -908,9 +910,9 @@ python3 tools/agent_tools/skill_shim_evaluation.py tokens \
 | kind | statement | evidence / owner | status |
 | --- | --- | --- | --- |
 | fact | public shim と canonical skill doc は catalog の skill id 集合で照合される | current find inventory、check_agent_runtime_alignment.py、graph checker | observed |
-| fact | graph projection の skill/command/tool/edge counts は source snapshot から生成される（`documents/runtime/skill-dependency-graph.json`） | `tools/agent_tools/check_skill_tool_invocation_graph.py` --root . | observed |
+| fact | graph projection の skill/command/tool/edge counts は source snapshot から生成される（`documents/runtime/skill-dependency-graph.json`） | `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` --root . | observed |
 | fact | shim frontmatter は catalog-derived な全件で readback され、body size は不均一になり得る | check_skill_frontmatter.py、catalog-sized inventory | observed |
-| fact | current skill_tool_commands.py は catalog structured branch で command phase を解決し、現在の `sync` は runtime file を直接編集する | tools/agent_tools/skill_tool_commands.py | observed; target state では sync surface を削除 |
+| fact | current skill_tool_commands.py は catalog structured branch で command phase を解決し、現在の `sync` は runtime file を直接編集する | tools/agent/skills/skill_tool_commands.py | observed; target state では sync surface を削除 |
 | assumption | discovery metadata を catalog に追加しても graph semantic payload は変わらない | graph builder の skill payload は id/doc/shim/command/capability/phase だけを投影 | explicit; implementation readback required |
 | assumption | Codex の `.agents/skills` 自動探索（bootstrap の個別リンク経由）は frontmatter を読み、fresh gpt-5.4-mini evaluator は adapter の canonical relative link を辿れる | official discovery contract、fresh packet artifact と observation reportで検証 | pending implementation eval |
 | limitation | fresh clone には dependency graph DB と semantic-index cache がなく、依存 review/semantic relations は今回実行不可 | run_repo_dependency_review.sh、semantic-index output | recorded, non-blocking for design |
@@ -919,26 +921,26 @@ python3 tools/agent_tools/skill_shim_evaluation.py tokens \
 
 | clause | implementation owner | planned path / symbol | reverse readback |
 | --- | --- | --- | --- |
-| SHIM-001 one schema and fixed field order | shim materializer | tools/agent_tools/skill_shim_materializer.py / SkillRuntimeShimRecord | schema/version/field order and canonical JSON digest |
+| SHIM-001 one schema and fixed field order | shim materializer | tools/agent/skills/skill_shim_materializer.py / SkillRuntimeShimRecord | schema/version/field order and canonical JSON digest |
 | SHIM-002 catalog-owned discovery metadata | catalog reader | agents/skills/catalog.yaml / skill_families[].discovery | catalog-sized frontmatter pairs equal generated records |
 | SHIM-003 canonical prose stays out of runtime adapter | human skill canon | agents/skills/<skill>.md and generated template | adapter contains link/digest only; duplicate-policy scan=0 |
-| SHIM-004 owner/dependency/route identity | route/dependency readers | `agents/skills/catalog.yaml`、`tools/agent_tools/skill_route_catalog.py`、`tools/agent_tools/route.py`、`documents/runtime/skill-dependency-graph.json`、`tools/agent_tools/check_skill_tool_invocation_graph.py` | catalog-derived route/dependency digests and semantic edge golden |
-| SHIM-005 command packet preservation | command packet owner | `agents/skills/catalog.yaml`、`tools/agent_tools/skill_tool_commands.py` / SkillCommandPacket (read-only) | complete packet JSON/digest, all phases/resolved fields, catalog-derived command count equals `documents/runtime/skill-dependency-graph.json` readback |
+| SHIM-004 owner/dependency/route identity | route/dependency readers | `agents/skills/catalog.yaml`、`tools/agent/skills/skill_route_catalog.py`、`tools/agent/orchestration/route.py`、`documents/runtime/skill-dependency-graph.json`、`tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` | catalog-derived route/dependency digests and semantic edge golden |
+| SHIM-005 command packet preservation | command packet owner | `agents/skills/catalog.yaml`、`tools/agent/skills/skill_tool_commands.py` / SkillCommandPacket (read-only) | complete packet JSON/digest, all phases/resolved fields, catalog-derived command count equals `documents/runtime/skill-dependency-graph.json` readback |
 | SHIM-005b typed ToolID/ToolCall preservation | graph/tool-packet owner | agent_team.py, skill-tool-invocation-graph.md | ToolID/ToolCall/argument-schema Ref and digest equal; no payload in shim |
 | SHIM-006 host discovery preservation | runtime alignment | `.codex/personal/skills/*/SKILL.md`, check_agent_runtime_alignment.py | catalog-sized shim paths、frontmatter pass、project config skill registry absent |
 | SHIM-007 single writer | shim materializer | skill_shim_materializer.py; skill_tool_commands.py has no sync/write surface | writer inventory identifies exactly one SKILL.md writer; sync symbol absent |
-| SHIM-008 all-catalog migration/readback | migration route | `tools/agent_tools/skill_shim_materializer.py` migrate/readback and tests | catalog-sized row receipt, unresolved=0 |
+| SHIM-008 all-catalog migration/readback | migration route | `tools/agent/skills/skill_shim_materializer.py` migrate/readback and tests | catalog-sized row receipt, unresolved=0 |
 | SHIM-009 graph/route golden | graph and route checkers | skill_dependency_map.py, check_skill_tool_invocation_graph.py, frozen route cases | typed identity/edge/order/route equality |
 | SHIM-010 token reduction | prompt eval owner | existing prompt/workflow CLIs plus planned skill_shim_evaluation.py tokens | observed host usage, UTF-8 bytes/Unicode scalars, envelope/cache observation, percentile/paired rows; aggregate >=70% |
 | SHIM-011 fresh mini usability | evaluator route | planned skill_shim_evaluation.py packets; checklist full/changed packet classes | three scenario variants in two packet classes, no prior context, fixed report grammar |
 | SHIM-012 no keyword/duplicate policy | route and checker tests | route tests plus shim materializer negative tests | keyword-only route and canonical-prose-in-adapter both fail |
 | SHIM-013 determinism vs fixed point | materializer acceptance | `tests/fixtures/skill-runtime-shim/fixed-point/expected.json`, `tests/agent_tools/test_skill_shim_materializer.py::test_materialize_fixed_point` | first/second catalog-sized record/projection maps, readback digest equal; second content delta=0 |
-| SHIM-014 route CLI error normalization | golden producer owner | `tools/agent_tools/skill_shim_evaluation.py route-golden`, `tests/agent_tools/test_skill_shim_evaluation.py::test_route_golden_normalizes_argparse_error` | route.py unchanged; argparse exit 2 + usage/error stderr maps exactly to ARGUMENT_ERROR |
-| SHIM-015 measurement artifact contract | measurement producer owner | `tools/agent_tools/skill_shim_evaluation.py tokens` and `tests/agent_tools/test_skill_shim_evaluation.py` | top-level schema/version, required non-null rows, host_input_tokens >=0, host/candidate separation |
+| SHIM-014 route CLI error normalization | golden producer owner | `eval/producers/skill_shim_evaluation.py route-golden`, `tests/agent_tools/test_skill_shim_evaluation.py::test_route_golden_normalizes_argparse_error` | route.py unchanged; argparse exit 2 + usage/error stderr maps exactly to ARGUMENT_ERROR |
+| SHIM-015 measurement artifact contract | measurement producer owner | `eval/producers/skill_shim_evaluation.py tokens` and `tests/agent_tools/test_skill_shim_evaluation.py` | top-level schema/version, required non-null rows, host_input_tokens >=0, host/candidate separation |
 
 Implementation handoff must cite SHIM-001..SHIM-015. The normal implementation diff may
 contain the materializer source, command-surface source, catalog discovery metadata,
-tests, and eval producer; the materializer runtime write set（`tools/agent_tools/skill_shim_materializer.py`）remains only the `agents/skills/catalog.yaml`-generated
+tests, and eval producer; the materializer runtime write set（`tools/agent/skills/skill_shim_materializer.py`）remains only the `agents/skills/catalog.yaml`-generated
 shim targets. Required checker/eval projections are readback artifacts, not a second runtime
 writer. The handoff must not edit canonical skill prose to make the adapter look useful. Any
 need to change public identity, route semantics, ToolID, argument schema, or discovery method

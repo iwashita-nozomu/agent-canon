@@ -7,11 +7,11 @@ upstream design ../design/dependency-manifest-design.md dependency manifest grap
 downstream design database-design.md SQLite materialization
 downstream design ../prose-reasoning-graph/README.md documents prose adapter ownership
 downstream design ../prose-reasoning-graph/dsl-spec.md prose adapter/profile over the core
-downstream implementation ../../rust/agent-canon/src/structured_analysis.rs graph contract implementation
-downstream design ../../tools/agent_tools/prose_reasoning_graph.py documents the prose graph adapter command surface
-downstream design ../../tools/agent_tools/render_dependency_manifest_graph.py documents dependency graph projection rendering
-downstream implementation ../../rust/agent-canon/src/graph.rs materializes canonical repository graph facts into this schema
-downstream implementation ../../tools/agent_tools/graph_client.py supplies typed read-only graph projections
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs graph contract implementation
+downstream design ../../tools/analysis/documents/prose_reasoning_graph.py documents the prose graph adapter command surface
+downstream design ../../tools/analysis/dependencies/render_dependency_manifest_graph.py documents dependency graph projection rendering
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs materializes canonical repository graph facts into this schema
+downstream implementation ../../tools/analysis/dependencies/graph_client.py supplies typed read-only graph projections
 @dependency-end
 -->
 
@@ -25,7 +25,7 @@ surfaces.
 The core boundary is storage, joins, projections, and representation checks.
 Domain tools keep their own semantics and pass/fail authority as documented in `../prose-reasoning-graph/dsl-spec.md`,
 `../design/dependency-manifest-design.md`, and
-`../../rust/agent-canon/src/structured_analysis.rs`.
+`../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 
 ## Reader Map
 
@@ -41,11 +41,11 @@ sections define validation, SQLite materialization, and extension rules.
   `README.md`, `database-design.md`,
   `../prose-reasoning-graph/dsl-spec.md`,
   `../design/dependency-manifest-design.md`, and
-  `../../rust/agent-canon/src/structured_analysis.rs`.
+  `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - DSL term:
   Graph DSL Core means this storage contract plus the
   `structured-analysis graph-contract` validator path in
-  `../../rust/agent-canon/src/structured_analysis.rs`.
+  `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - Assumption:
   SQLite files are regenerated artifacts. Source documents, adapter contracts,
   command outputs, and checker findings are durable authority.
@@ -77,7 +77,7 @@ where adapter profiles can demand non-empty families, and:
 
 Each node and edge is qualified by `layer` and `kind`. The pair
 `(layer, kind)` carries the local meaning recorded by
-`../../rust/agent-canon/src/structured_analysis.rs`; adapter documents define
+`../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`; adapter documents define
 each layer's native semantics.
 
 ### Necessary
@@ -261,15 +261,15 @@ layer is promoted here.
 | Dependency manifest graph | Manifest records correspond to `deps` nodes and edges; dependency validation findings correspond to diagnostics/check records in `../design/dependency-manifest-design.md`. |
 | Canonical repository graph | `graph.rs` maps the parser-owned source snapshot and authoritative producer artifacts into validated nodes, edges, diagnostics, projections, and metadata. `GraphClient` reads command JSON only; no Python transport decoder or alternate SQLite writer exists. |
 | Code dependency graph | Source files and symbols correspond to `code` nodes or payload locators; imports/includes/source references correspond to `code` edges. |
-| Artifact and directory responsibility | Files/directories correspond to `artifact` nodes; containment and responsibility support correspond to `artifact` edges in `../../rust/agent-canon/src/structured_analysis.rs`. |
-| Document canon | Inventory rows and findings correspond to document-canon layer nodes, edges, and diagnostics in `../../rust/agent-canon/src/structured_analysis.rs`. |
-| Report contract | Reports, sections, claims, evidence refs, findings, actions, and check runs correspond to `report` layer objects in `../../rust/agent-canon/src/structured_analysis.rs`. |
+| Artifact and directory responsibility | Files/directories correspond to `artifact` nodes; containment and responsibility support correspond to `artifact` edges in `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`. |
+| Document canon | Inventory rows and findings correspond to document-canon layer nodes, edges, and diagnostics in `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`. |
+| Report contract | Reports, sections, claims, evidence refs, findings, actions, and check runs correspond to `report` layer objects in `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`. |
 | Algorithm/proof graphs | Algorithm steps, recurrence facts, theorem nodes, proof dependencies, and proof status correspond to `algorithm` and `proof` layers while retaining checker/proof authority outside the storage core. |
 
 ## Validation Contract
 
 The deterministic validator in
-`../../rust/agent-canon/src/structured_analysis.rs` checks representation
+`../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs` checks representation
 shape. The current SQLite materialization covers the materialized tables
 `documents`, `nodes`, `edges`, `diagnostics`, and `metadata`; projection and
 operation families are checked when a DB materializes them as projection/edit-
@@ -287,7 +287,7 @@ operation tables or as projection/edit-operation layer nodes.
   projection nodes are present.
 
 Graph-contract diagnostics are emitted by
-`../../rust/agent-canon/src/structured_analysis.rs`. Semantic checks stay with
+`../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`. Semantic checks stay with
 the owning adapter:
 
 - the canonical repository adapter stores its exact `P(S)`, `X(S)`, `U(S)`,

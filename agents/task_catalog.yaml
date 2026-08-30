@@ -658,9 +658,9 @@ workflow_families:
         - Consume only an explicit IssueWorker candidate and the #938 checkout identity readback; counts, status rows, and selection misses are not candidates.
         - Route same-repository candidates to the logical IssueWorker path executed by publisher. Route other repositories as qualified no-mutation handoffs.
         - Keep same-repository evidence gaps in publisher investigation; they may produce need verification and must not be silently discarded.
-      dispatch_route: tools/agent_tools/agent_team.py#dispatch_issue_worker
+      dispatch_route: tools/agent/orchestration/agent_team.py#dispatch_issue_worker
       execution_role: publisher
-      tool_call_route: tools/agent_tools/tool_calls.py#materialize_issue_worker_tool_call
+      tool_call_route: tools/agent/orchestration/tool_calls.py#materialize_issue_worker_tool_call
       workflow_focus:
         - Read open and closed related Issues, narrow mixed responsibility, transfer clauses and backlinks, and mutate only when the selected responsibility requires it.
         - Read back every affected Issue URL, number, body, and state. Do not request an extra approval gate or create a local Issue database.

@@ -13,7 +13,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP = ROOT / "bootstrap.sh"
-ADAPTER = ROOT / "bootstrap" / "lib" / "entrypoint.sh"
+ADAPTER = ROOT / "bootstrap" / "host" / "lifecycle" / "entrypoint.sh"
 GPU006_FIXTURE = ROOT / "tests" / "fixtures" / "bootstrap" / "gpu006_stale_source_sync_resident.json"
 
 
@@ -27,7 +27,7 @@ def test_host_entrypoint_has_no_python_fallback() -> None:
     assert "docker.sock" not in text
     assert "AGENT_CANON_CONTAINER_NETWORK" in text
     assert "docker-rpc" not in text
-    controller = (ROOT / "tools/agent_tools/bootstrap_runtime.py").read_text(
+    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
         encoding="utf-8"
     )
     assert "AGENT_CANON_DOCKER_RPC" not in controller
@@ -440,6 +440,14 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
         ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
         check=True,
         capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
+        check=True,
     )
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
     state_path = tmp_path / "docker-state.json"
@@ -1297,7 +1305,7 @@ def test_private_log_source_is_read_back_from_the_owned_mount() -> None:
     assert "AGENT_CANON_PRIVATE_LOG_ROOT=$AGENT_CANON_PRIVATE_LOG_ROOT" in text
     assert 'AGENT_CANON_PRIVATE_LOG_DESTINATION"' in text
     assert 'control_parent_root / "private-log"' not in (
-        ROOT / "tools/agent_tools/bootstrap_runtime.py"
+        ROOT / "tools/runtime/container/bootstrap_runtime.py"
     ).read_text(encoding="utf-8")
 
 
@@ -1317,7 +1325,7 @@ def test_uninstall_preserves_foreign_links_and_restores_owned_config() -> None:
 
 def test_container_controller_routes_non_docker_public_operations() -> None:
     """Documented non-Docker operations enter the resident Python owner."""
-    controller = (ROOT / "tools/agent_tools/bootstrap_runtime.py").read_text(
+    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
         encoding="utf-8"
     )
     for marker in (
@@ -1338,6 +1346,23 @@ def test_host_configuration_is_fixed_and_not_a_toml_parser() -> None:
     assert "AGENT_CANON_CONTAINER_CPUS=2" in text
     assert "AGENT_CANON_RUNTIME_DESTINATION=" in text
     assert "source \"$AGENT_CANON_REPOSITORY_ROOT/bootstrap/" not in text
+
+
+def test_container_create_maps_caller_without_fixed_user_policy() -> None:
+    """Resident creation inherits the invoking host UID/GID without policy overrides."""
+    text = ADAPTER.read_text(encoding="utf-8")
+    create = text.split('"$AGENT_CANON_DOCKER_CMD" create', 1)[1].split(
+        '"$AGENT_CANON_IMAGE_REF"', 1
+    )[0]
+    assert "_agent_canon_caller_user" in text
+    assert "caller_uid=$(id -u)" in text
+    assert "caller_gid=$(id -g)" in text
+    assert "local caller_user" in text
+    assert '--user "$caller_user"' in create
+    assert "AGENT_CANON_FIXED_UID" not in text
+    assert "AGENT_CANON_USER" not in text
+    dockerfile = (ROOT / "bootstrap/container/image/Dockerfile").read_text(encoding="utf-8")
+    assert not any(line.lstrip().startswith("USER ") for line in dockerfile.splitlines())
 
 
 def test_help_does_not_require_python_or_docker(tmp_path: Path) -> None:
@@ -2024,6 +2049,14 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
         check=True,
         capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
+        check=True,
     )
     if operation == "install":
         current_head = subprocess.run(
@@ -2785,7 +2818,7 @@ def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
     )
     assert completed.returncode == 2
     receipt = json.loads(completed.stderr)
-    assert receipt["code"] == "runtime_unavailable"
+    assert receipt["code"] == "source_sync_commit_mismatch"
 
 
 def test_legacy_runtime_argument_keeps_install_state_at_source_sibling_paths(
@@ -3009,7 +3042,7 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
     completed = subprocess.run(
         [
             "python3",
-            str(ROOT / "tools/agent_tools/bootstrap_runtime.py"),
+            str(ROOT / "tools/runtime/container/bootstrap_runtime.py"),
             "--container-control",
             "--repository-root",
             str(ROOT),
@@ -3034,7 +3067,7 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
 
 def test_scheduler_template_invokes_shell_bootstrap() -> None:
     """Generated systemd units keep the shell boundary as their entrypoint."""
-    text = (ROOT / "bootstrap/systemd/user/agent-canon-sync.service.in").read_text(
+    text = (ROOT / "bootstrap/host/scheduler/systemd/user/agent-canon-sync.service.in").read_text(
         encoding="utf-8"
     )
     assert "ExecStart=@BOOTSTRAP@" in text
@@ -3072,7 +3105,7 @@ def test_sync_never_projects_links_from_staging() -> None:
 
 def test_target_generation_uses_reversible_shared_rollback_plan() -> None:
     """Target-only generations keep the same host rollback protocol."""
-    controller = (ROOT / "tools/agent_tools/bootstrap_runtime.py").read_text(encoding="utf-8")
+    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(encoding="utf-8")
     target_control = controller.split('def _container_control_run', 1)[1].split(
         '\ndef build_parser', 1
     )[0]
@@ -3137,7 +3170,7 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     assert '_agent_canon_run_controller "$codex_container" codex prepare' in text
     assert '"$codex_executable" --project-root "$codex_project"' in text
     assert 'if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then' in text
-    controller = (ROOT / "tools/agent_tools/bootstrap_runtime.py").read_text(encoding="utf-8")
+    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(encoding="utf-8")
     assert 'source_identity = sub.add_parser' in controller
     assert 'normalize_remote' in controller
     container_control = controller.split('def _container_control_run', 1)[1].split(
@@ -3172,7 +3205,7 @@ fi
     fake_docker.chmod(0o755)
     script = r'''
 set -eu
-source "$1/bootstrap/lib/entrypoint.sh"
+source "$1/bootstrap/host/lifecycle/entrypoint.sh"
 _agent_canon_validate_existing_container() { :; }
 _agent_canon_use_active_image() {
   AGENT_CANON_IMAGE_REF=current-ref

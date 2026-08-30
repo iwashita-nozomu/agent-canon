@@ -2,7 +2,7 @@
 # contract test
 # responsibility Verifies deterministic consumer-root AGENTS.md composition and fail-closed collisions.
 # upstream design ../../documents/design/entrypoint-owner-map.md consumer root composition contract
-# upstream implementation ../../tools/agent_tools/entrypoint_composer.py composer under test
+# upstream implementation ../../tools/agent/templates/entrypoint_composer.py composer under test
 # upstream design ../../ROOT_AGENTS.md common consumer base
 # @dependency-end
 """Focused tests for the consumer root instruction composer."""
@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools import entrypoint_composer as composer
+from tools.agent.templates import entrypoint_composer as composer
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]

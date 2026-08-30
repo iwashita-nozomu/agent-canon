@@ -17,7 +17,7 @@ __pycache__/
 .agent-canon/log-archive/
 .agent-canon/knowledge-graph/
 .agent-canon/writer-target.json
-rust/agent-canon/target/
+tools/runtime/dispatch/agent-canon/target/
 
 # Local run artifacts
 reports/agents/

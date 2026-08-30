@@ -3,7 +3,7 @@
 # responsibility Provides a parse-valid module/class/function Docstring and type-boundary example.
 # upstream design ../../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and D213 route.
 # upstream design ../README.md code-template owner and materialization contract.
-# downstream implementation ../../../tools/agent_tools/manifest_rendering.py renders this source.
+# downstream implementation ../../../tools/runtime/manifest/manifest_rendering.py renders this source.
 # @dependency-end
 
 """

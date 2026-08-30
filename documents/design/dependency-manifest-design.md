@@ -6,30 +6,30 @@ contract design
 responsibility Defines the repository-wide dependency manifest DSL and validation model.
 upstream design source-owned-dependency-validation.md source authority, PR receipt, and source/runtime boundary
 downstream design dependency-contract-kinds.toml registered dependency header contract kinds
-downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates changed-file manifests
-downstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans manifest marker coverage
-downstream implementation ../../tools/agent_tools/check_dependency_header_format.sh validates manifest syntax and contract kinds
-downstream implementation ../../tools/agent_tools/check_dependency_graph.sh validates manifest graph semantics
-downstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide dependency review
-downstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
-downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
-downstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders dependency graph review artifacts
-downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
-downstream implementation ../../tools/ci/check_agent_canon_pr.sh executes selected source review and writes the source/skipped receipt
-downstream implementation ../../tools/ci/pr_gate_receipt.py owns the owner/root/PID/status-bound receipt schema
-downstream implementation ../../tools/ci/run_all_checks.sh consumes the validated source/skipped receipt
+downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates changed-file manifests
+downstream implementation ../../tools/analysis/dependencies/scan_dependency_headers.sh scans manifest marker coverage
+downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh validates manifest syntax and contract kinds
+downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates manifest graph semantics
+downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps repo-wide dependency review
+downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency evidence separately
+downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design claims against manifest evidence
+downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
+downstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
+downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh executes selected source review and writes the source/skipped receipt
+downstream implementation ../../tools/validation/ci/receipts/pr_gate_receipt.py owns the owner/root/PID/status-bound receipt schema
+downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh consumes the validated source/skipped receipt
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies the source/runtime boundary and receipt owner
 downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection
 downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py verifies writer/parser/consumer execution
-downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
-downstream implementation ../../rust/agent-canon/src/graph.rs owns canonical graph materialization and queries
-downstream implementation ../../rust/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
-downstream implementation ../../rust/agent-canon/src/main.rs dispatches public graph commands
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs owns canonical graph materialization and queries
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs dispatches public graph commands
 downstream implementation ../../tools/bin/agent-canon provides the stable bootstrap CLI for public graph commands
-downstream implementation ../../tools/agent_tools/graph_client.py provides the sole Python graph adapter
+downstream implementation ../../tools/analysis/dependencies/graph_client.py provides the sole Python graph adapter
 downstream design ../structured-analysis/graph-dsl.md maps dependency manifest evidence into Graph DSL Core
 downstream design ../structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
 @dependency-end
@@ -150,7 +150,7 @@ The PR selector still selects trusted base/head evidence and the changed-path
 packet. `run_pr_dependency_source_gate.sh` then runs source scan, format,
 relation/cycle, and source-derived TSV/DOT projections. It records a receipt
 with exactly `source` or `skipped`; it never creates or reads persisted graph
-state. `tools/ci/pr_gate_receipt.py` is the sole receipt schema/parser owner,
+state. `tools/validation/ci/receipts/pr_gate_receipt.py` is the sole receipt schema/parser owner,
 and `run_all_checks.sh` consumes its single validated status output. The
 retired `prepared` and `scoped` graph states are not compatibility values.
 
@@ -174,7 +174,7 @@ consumer.
 contract design
 responsibility Documents this file's role so agents can identify why it exists.
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow contract
-upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py consumes workflow metadata
+upstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py consumes workflow metadata
 downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies emitted output
 @dependency-end
 ```
@@ -274,7 +274,7 @@ Markdown:
 contract design
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow contract
 responsibility Provides a Python helper entrypoint for agent run bootstrap.
-downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py consumes workflow contract
+downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py consumes workflow contract
 @dependency-end
 -->
 ```
@@ -285,7 +285,7 @@ Python / shell / TOML:
 # @dependency-start
 # contract tool
 # responsibility Implements one repository tool or runtime helper.
-# upstream implementation ../../tools/agent_tools/agent_team.py imports helper contract
+# upstream implementation ../../tools/agent/orchestration/agent_team.py imports helper contract
 # downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies CLI behavior
 # @dependency-end
 ```
@@ -321,7 +321,7 @@ An agent can load upstream closure before editing, then load downstream closure 
 
 ## Explicit Graph Analysis Artifact
 
-`rust/agent-canon/src/dependency_manifest.rs::ManifestParser` is the sole
+`tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs::ManifestParser` is the sole
 complete-file parser. `agent-canon graph build` captures its parent-profile
 source snapshot and atomically publishes the parent-owned SQLite database at
 `.agent-canon/knowledge-graph/graph.sqlite`. Source facts and their typed
@@ -535,7 +535,7 @@ agent-canon semantic-index context-pack \
   --format text \
   > reports/search_responsibility_context.txt
 git grep -l "search phrase" -- <responsibility-scoped dirs> > reports/search_hits.txt
-bash tools/agent_tools/run_repo_dependency_review.sh \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
 ```

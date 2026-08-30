@@ -1,9 +1,9 @@
 # @dependency-start
 # contract test
 # responsibility Verifies provider-independent direct GPU admission, conservative selection, post-lock race rejection, exact environment, shell-free execution, and descendant-safe release.
-# upstream implementation ../../tools/experiments/gpu_command_admission.py direct admission owner
-# upstream implementation ../../tools/experiments/run_gpu_command.py CLI adapter
-# upstream implementation ../../tools/experiments/execution_resource_plan.py strict NVIDIA, occupancy, and reservation evidence types
+# upstream implementation ../../tools/experiments/execution/gpu_command_admission.py direct admission owner
+# upstream implementation ../../tools/experiments/execution/run_gpu_command.py CLI adapter
+# upstream implementation ../../tools/experiments/execution/execution_resource_plan.py strict NVIDIA, occupancy, and reservation evidence types
 # @dependency-end
 
 from __future__ import annotations
@@ -19,9 +19,9 @@ from typing import Mapping, Sequence
 
 import pytest
 
-from tools.experiments import gpu_command_admission as direct
-from tools.experiments import run_gpu_command as direct_cli
-from tools.experiments.execution_resource_plan import (
+from tools.experiments.execution import gpu_command_admission as direct
+from tools.experiments.execution import run_gpu_command as direct_cli
+from tools.experiments.execution.execution_resource_plan import (
     FdReleaseEvidence,
     GPUDevice,
     LockReadback,
@@ -758,7 +758,7 @@ def test_linux_executor_preserves_exit_and_waits_for_descendants(
             from types import SimpleNamespace
 
             sys.path.insert(0, {str(repo_root)!r})
-            from tools.experiments.gpu_command_admission import LinuxSubreaperCommandExecutor
+            from tools.experiments.execution.gpu_command_admission import LinuxSubreaperCommandExecutor
 
             child_code = (
                 "import subprocess,sys; "
@@ -831,7 +831,7 @@ def test_linux_executor_does_not_wait_for_preexisting_runner_child(
             from types import SimpleNamespace
 
             sys.path.insert(0, {str(repo_root)!r})
-            from tools.experiments.gpu_command_admission import LinuxSubreaperCommandExecutor
+            from tools.experiments.execution.gpu_command_admission import LinuxSubreaperCommandExecutor
 
             unrelated = subprocess.Popen([
                 sys.executable,

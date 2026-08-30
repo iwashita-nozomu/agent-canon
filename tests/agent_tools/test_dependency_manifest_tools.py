@@ -5,12 +5,12 @@
 # responsibility Tests dependency manifest shell tool behavior.
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream design ../../documents/design/dependency-manifest-design.md manifest design
-# upstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans
-# upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh format checks
-# upstream implementation ../../tools/agent_tools/check_dependency_graph.sh graph checks
-# upstream implementation ../../tools/agent_tools/visualization_contract.py owns complete projection/readback coverage after graph extraction
-# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps
-# upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh scans code
+# upstream implementation ../../tools/analysis/dependencies/scan_dependency_headers.sh scans
+# upstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh format checks
+# upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh graph checks
+# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns complete projection/readback coverage after graph extraction
+# upstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps
+# upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh scans code
 # @dependency-end
 
 from __future__ import annotations
@@ -24,15 +24,15 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_dependency_headers.sh"
-FORMAT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_header_format.sh"
-GRAPH = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_graph.sh"
-REPO_REVIEW = PROJECT_ROOT / "tools" / "agent_tools" / "run_repo_dependency_review.sh"
-CODE_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_code_dependencies.sh"
-DESIGN_CLAIMS = PROJECT_ROOT / "tools" / "agent_tools" / "check_design_doc_claims.py"
-WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
-AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
-DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
+SCAN = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh"
+FORMAT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_header_format.sh"
+GRAPH = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "check_dependency_graph.sh"
+REPO_REVIEW = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "run_repo_dependency_review.sh"
+CODE_SCAN = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "scan_code_dependencies.sh"
+DESIGN_CLAIMS = PROJECT_ROOT / "tools" / "validation" / "semantic" / "documents" / "check_design_doc_claims.py"
+WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
+AGENT_TEAM = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "agent_team.py"
+DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "validation" / "dependencies" / "docker_dependency_validator.sh"
 
 
 def runtime_root_for(root: Path) -> Path:
@@ -1138,15 +1138,17 @@ class DependencyManifestToolTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "python").mkdir()
             (root / "docker").mkdir()
-            agent_tools = root / "tools" / "agent_tools"
-            agent_tools.mkdir(parents=True)
-            (agent_tools / "devcontainer_dependencies.py").symlink_to(
-                PROJECT_ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+            container_tools = root / "tools" / "runtime" / "container"
+            container_tools.mkdir(parents=True)
+            (container_tools / "devcontainer_dependencies.py").symlink_to(
+                PROJECT_ROOT / "tools" / "runtime" / "container" / "devcontainer_dependencies.py"
             )
-            (agent_tools / "dependency_plan.py").symlink_to(
-                PROJECT_ROOT / "tools" / "agent_tools" / "dependency_plan.py"
+            dependency_tools = root / "tools" / "analysis" / "dependencies"
+            dependency_tools.mkdir(parents=True)
+            (dependency_tools / "dependency_plan.py").symlink_to(
+                PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "dependency_plan.py"
             )
-            manifest = root / "bootstrap" / "container" / "dependencies.toml"
+            manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"
             manifest.parent.mkdir(parents=True)
             manifest.write_text(
                 "\n".join(

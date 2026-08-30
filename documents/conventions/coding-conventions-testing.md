@@ -179,7 +179,7 @@ contract-only wrapper の validation evidence は次のように固定します�
 - SOLID / OOP boundary assertion は checker-owned property として扱います。
   Single responsibility、Open/closed、Liskov substitution、Interface segregation、
   Dependency inversion の risk は `$oop-readability-check`、
-  `tools/oop/python/readability.py` / `tools/oop/cpp/readability.py`、
+  `tools/validation/code/oop/python/readability.py` / `tools/validation/code/oop/cpp/readability.py`、
   `import_responsibility.py`、type checker、dependency review の evidence route に置きます。
   実行テストは observable behavior、shared behavior contract、または public API regression
   を固定する場合に限ります。

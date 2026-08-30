@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies secret-scan temporary state stays in the selected repository.
-# upstream implementation ../../tools/ci/scan_secrets.sh owns scanner orchestration and cleanup.
+# upstream implementation ../../tools/validation/ci/checks/scan_secrets.sh owns scanner orchestration and cleanup.
 # @dependency-end
 
 """Focused tests for the secret scanner shell entrypoint."""
@@ -14,7 +14,7 @@ import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "ci" / "scan_secrets.sh"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "scan_secrets.sh"
 PATH_ENV_KEYS = {
     "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
     "AGENT_CANON_ROOT",

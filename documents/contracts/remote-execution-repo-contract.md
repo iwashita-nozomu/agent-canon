@@ -22,7 +22,7 @@ target host のセットアップ自体は利用者責務にしつつ、repo 側
 
 - CPU 前提の default runtime pack を 1 つ持つ
 - GPU を要する場合だけ追加 pack を持つ
-- `python3 tools/ci/run_container_pack.py --pack ... --print-only` で preview できる
+- `python3 tools/validation/ci/runners/run_container_pack.py --pack ... --print-only` で preview できる
 - `README.md` か `docker/README.md` に runtime の役割が書かれている
 
 ## branch と commit の扱い

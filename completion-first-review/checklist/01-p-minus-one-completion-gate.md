@@ -5,7 +5,7 @@ contract reference
 responsibility Defines the first-priority completion judgment checklist.
 upstream design ../README.md completion-first review index
 upstream design ../explanation/00-completion-first-principle.md completion-first rationale
-upstream implementation ../../tools/agent_tools/task_close.py current closeout evaluator
+upstream implementation ../../tools/runtime/lifecycle/task_close.py current closeout evaluator
 @dependency-end
 -->
 

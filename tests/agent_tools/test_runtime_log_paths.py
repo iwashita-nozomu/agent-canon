@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests AgentCanon runtime log archive path resolution.
-# upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves active and legacy log archive paths
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves active and legacy log archive paths
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
 # @dependency-end
 
@@ -22,8 +22,8 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.agent_tools.runtime_artifacts import RuntimePathEscape, SourceLocalArtifact
-from tools.agent_tools.runtime_log_paths import (
+from tools.runtime.artifacts.runtime_artifacts import RuntimePathEscape, SourceLocalArtifact
+from tools.runtime.archive.runtime_log_paths import (
     agent_report_archive_dir,
     codex_runtime_index_path,
     codex_runtime_summary_path,

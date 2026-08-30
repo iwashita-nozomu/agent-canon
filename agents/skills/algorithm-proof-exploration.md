@@ -7,8 +7,8 @@ responsibility Documents theorem-driven algorithm exploration before final forma
 upstream design lean-algorithm-design.md Lean-first algorithm design workflow.
 upstream design formal-proof-workflow.md checker-backed formal proof workflow.
 upstream design computational-optimization.md numerical optimization contract workflow.
-upstream implementation ../../tools/agent_tools/jit_canonical_ir.py builds JIT-canonical IR.
-upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
+upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py builds JIT-canonical IR.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by frontier shape.
 downstream implementation ../../.codex/personal/skills/algorithm-proof-exploration/SKILL.md exposes the skill to Codex.
 @dependency-end
@@ -315,7 +315,7 @@ frontier を checked boundary と誤分類していないかを検査するこ�
    - proof status overlay には `operational_assumptions` として記録し、
      `open_frontier` や backend coverage gap と混ぜない
 1. JIT-canonical IR:
-   - use `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::factory> --out <ir.json> --stablehlo-out <root.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
+   - use `python3 tools/analysis/proof/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::factory> --out <ir.json> --stablehlo-out <root.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
    - extract StableHLO, thin operational op kinds, dtype coverage, backend phase traces, and LLVM typed traces when the backend reaches LLVM
    - do not add recursion-depth knobs or hand-written implementation equations to change proof conclusions
    - generate checker-facing Lean evidence modules with `tools/bin/agent-canon jit-ir-to-lean`

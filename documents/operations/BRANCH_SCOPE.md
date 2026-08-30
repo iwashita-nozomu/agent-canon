@@ -77,11 +77,11 @@ validation route を同じ entrypoint で再実行できることを指します
 
 - commit は Git 上の runnable unit です。`git checkout <commit>` で得られる tracked tree と、明示された external runtime/source clone だけで、選択した validation route が再実行できる状態にします。
 - validation が読んだ source、config、schema、fixture、文書、tool entrypoint は、その commit の tracked tree に含めます。ignored / generated runtime output は artifact、cache、log、result のどれかに分類して evidence に残します。
-- code 変更では、file-level の code dependency scan と、言語 tool が対応する関数 / public entrypoint 単位の call-site evidence を commit evidence に含めます。Python では `python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions --format json` を関数単位 evidence に使います。
+- code 変更では、file-level の code dependency scan と、言語 tool が対応する関数 / public entrypoint 単位の call-site evidence を commit evidence に含めます。Python では `python3 tools/analysis/code/helper_function_inventory.py --changed --all-functions --format json` を関数単位 evidence に使います。
 - commit evidence には branch、commit SHA、source clone SHA/PR readback（該当時）、validation command、validation 対象 path、残った dirty / untracked path の分類を含めます。
 - `WORKTREE_SCOPE.md` を更新した場合は、早い段階で commit します。
 - push 前に、その branch で必須の test / lint / document check を実行します。
-- 初回 push と PR 作成は `python3 tools/agent_tools/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。
+- 初回 push と PR 作成は `python3 tools/repository/github/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。
 - user-facing の完了報告は、原則として commit と push を終えてから行います。
 - さらに `verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved`、`review_convergence_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで完了報告を出しません。
 - push を行わない task が許されるのは、review-only、no-change、または user が明示的に commit / push を止めた場合です。
@@ -96,7 +96,7 @@ validation route を同じ entrypoint で再実行できることを指します
 - 別 branch と同じファイルを触っている場合は、先に `documents/notes/branches/` と `documents/notes/worktrees/` で衝突リスクを明示します。
 - file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、`agents/workflows/main-integration-workflow.md` の手順で統合します。
 - 構成変更がある branch は、`main` 側で file 単位に拾い直して close してはいけません。
-- 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
+- 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`python3 tools/validation/ci/checks/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - integration branch が妥当なら、`main` へは `git merge --ff-only integrate/<topic>-YYYYMMDD` で持ち帰ります。
 
 ## 6. 削除前チェック

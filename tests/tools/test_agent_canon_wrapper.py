@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies stable wrapper requests and bootstrap-owned runtime boundaries.
 # upstream implementation ../../tools/bin/agent-canon stable wrapper
-# upstream implementation ../../tools/agent_tools/tool_dispatch.py typed dispatcher
+# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py typed dispatcher
 # downstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 # @dependency-end
 
@@ -31,7 +31,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     dispatcher = source / "tools" / "agent_tools"
     dispatcher.mkdir(parents=True)
     (dispatcher / "tool_dispatch.py").write_bytes(
-        (PROJECT_ROOT / "tools/agent_tools/tool_dispatch.py").read_bytes()
+        (PROJECT_ROOT / "tools/runtime/dispatch/tool_dispatch.py").read_bytes()
     )
     control = tmp_path / "control"
     runtime = control / "runtime"

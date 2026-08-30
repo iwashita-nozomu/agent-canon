@@ -18,9 +18,9 @@ downstream implementation ../../.codex/personal/skills/skill-cleanup/SKILL.md ru
 downstream implementation ./catalog.yaml public skill registry
 downstream implementation ./skill-dependencies.yaml public skill dependency DAG
 downstream implementation ../../.codex/config.toml host skill configuration
-downstream implementation ../../tools/agent_tools/skill_shim_materializer.py generated shim materializer
-downstream implementation ../../tools/agent_tools/skill_dependency_map.py generated graph materializer
-downstream implementation ../../tools/agent_tools/check_skill_tool_invocation_graph.py graph readback checker
+downstream implementation ../../tools/agent/skills/skill_shim_materializer.py generated shim materializer
+downstream implementation ../../tools/agent/skills/skill_dependency_map.py generated graph materializer
+downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py graph readback checker
 @dependency-end
 -->
 
@@ -49,16 +49,16 @@ graph/readback を一つの source-to-generated cleanup unit として既存 own
 ## Tool Commands
 
 ```bash
-python3 tools/agent_tools/check_agent_runtime_alignment.py
-python3 tools/agent_tools/skill_shim_materializer.py materialize --root . --all
-python3 tools/agent_tools/skill_shim_materializer.py readback --root . --all
-python3 tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>
+python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+python3 tools/agent/skills/skill_shim_materializer.py materialize --root . --all
+python3 tools/agent/skills/skill_shim_materializer.py readback --root . --all
+python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>
 # tracked reader pair の更新（capability は documents/runtime の md/json だけを列挙）
-python3 tools/agent_tools/skill_dependency_map.py graph --root . \
+python3 tools/agent/skills/skill_dependency_map.py graph --root . \
   --output documents/runtime/skill-dependency-graph.md \
   --runtime-root <external-runtime-root> \
   --source-mutation-capability-json <exact-two-path-capability.json>
-python3 tools/agent_tools/check_skill_tool_invocation_graph.py --root .
+python3 tools/validation/semantic/skills/check_skill_tool_invocation_graph.py --root .
 ```
 
 ## Boundary

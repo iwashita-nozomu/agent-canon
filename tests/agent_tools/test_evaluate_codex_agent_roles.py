@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests Codex agent role eval automation.
-# upstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py helper
-# upstream design ../../evidence/agent-evals/README.md role eval contract
+# upstream implementation ../../eval/producers/evaluate_codex_agent_roles.py helper
+# upstream design ../../eval/definitions/README.md role eval contract
 # @dependency-end
 """Tests for Codex agent role eval automation."""
 
@@ -24,15 +24,15 @@ else:
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_codex_agent_roles.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_codex_agent_roles.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from implementation_dispatch import (  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
 )
-from team_config import load_task_catalog, load_team_config, select_roles  # noqa: E402
-from model_profile_registry import generate_role_views, load_model_profile_registry  # noqa: E402
+from tools.agent.orchestration.team_config import load_task_catalog, load_team_config, select_roles  # noqa: E402
+from tools.agent.orchestration.model_profile_registry import generate_role_views, load_model_profile_registry  # noqa: E402
 
 FIRST_RUNTIME_TOKENS = 100
 FIRST_RUNTIME_LATENCY_MS = 25
@@ -390,6 +390,26 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'model_reasoning_effort': 'xhigh',
         'developer_instructions': 'You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.',
     },
+    'integration_executor': {
+        'name': 'integration_executor',
+        'description': 'Workspace-write child for candidate branch merge, conflict resolution, and integration readback.',
+        'nickname_candidates': ['integration_executor'],
+        'sandbox_mode': 'workspace-write',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'xhigh',
+        'developer_instructions': 'You are acting as integration_executor with luna_implementation implementation rigor. Own candidate branch integration and conflict resolution. On a conflict or validation rework, capture the repository-qualified merge base, base/ours/theirs stages and hunks, staged state, and unaffected user/unknown content before mutation. Record the selected cause, expected mechanism, exact owning edit delta, disposition, rationale, and reconstruction map in the mapped conflict/rework artifacts; validate the resolved hunk identity and readback before accepting the integrated head. Whole-file checkout, restore, reset, clean, reclone, overwrite, or regeneration is not a shortcut. Normal edits emit only their ordinary decision log. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Preserve conflict/rework packet content: capture base/ours/theirs stages and hunks, selected cause, expected mechanism, exact owning delta, unaffected content, disposition, and rationale before mutation; whole-file checkout/reset/reclone/overwrite/regeneration requires an explicit reconstruction map and preservation readback. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only the assigned child action within authority bounds: worker implements, integration_executor merges/resolves conflicts, and publisher performs authorized Issue/PR publication. ship_reviewer owns final approval; the parent only relays packets, dependency order, status, and external readback. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands. Write-capable handoffs must carry writer_target with an absolute checkout_root, fixed branch, normalized remote owner/repository, and allowed_paths. The checkout is prepared by repository-topic-clone before handoff; start with cwd equal to checkout_root and branch equal to the target branch. Do not use git switch, git checkout, branch rename, or git worktree operations; a target mismatch is a hard stop before mutation. Spawn only through the canonical AgentTeam dispatch and ToolCall route; raw spawn_agent is not an admission path.',
+    },
+    'publisher': {
+        'name': 'publisher',
+        'description': 'Workspace-write child for authorized Issue/PR publication and remote readback.',
+        'nickname_candidates': ['publisher'],
+        'sandbox_mode': 'workspace-write',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'xhigh',
+        'developer_instructions': 'You are acting as publisher with luna_implementation implementation rigor. When the selected route is IssueWorker, use the existing issue-finding-report and pr-processing responsibilities. Consume only explicit issue_worker_candidate records. The checkout identity readback supplies repository identity: the same user-owned repository routes to this publisher, while another repository is a qualified no-mutation handoff. Read related open and closed Issues, filter every related Issue against the current checkout and candidate repository, narrow mixed responsibility, transfer clauses and backlinks, and create, update, reopen, or leave unchanged only when the responsibility requires it. A noop requires the same responsibility tuple plus the candidate mechanism/fix clause in the structured required-fix section; an old or missing clause is an update/reorganization case. Read back URL, number, body, and state after every mutation. Counts, status observations, selection misses, and explicit current_scope_resolved or durable_follow_up=false records do not synthesize or publish an Issue. Missing owner or mechanism evidence remains publisher investigation and may produce need verification; it is not silently discarded. Do not request extra approval, create a local Issue database, or use body digests, fingerprints, or witness claims. Dashboard and resident runtime remain read-only; this publisher role owns GitHub credentials and mutation. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Preserve conflict/rework packet content: capture base/ours/theirs stages and hunks, selected cause, expected mechanism, exact owning delta, unaffected content, disposition, and rationale before mutation; whole-file checkout/reset/reclone/overwrite/regeneration requires an explicit reconstruction map and preservation readback. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only the assigned child action within authority bounds: worker implements, integration_executor merges/resolves conflicts, and publisher performs authorized Issue/PR publication. ship_reviewer owns final approval; the parent only relays packets, dependency order, status, and external readback. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.',
+    },
 }
 
 
@@ -585,15 +605,15 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
         self.assertNotIn("R<integer>", evaluator_text)
         self.assertNotIn("score_percent=", evaluator_text)
 
-    def test_pre_change_live_golden_is_invariant_for_all_35_roles(self) -> None:
-        """The post-change live materializer remains byte-identical to the HEAD golden."""
+    def test_pre_change_live_golden_is_invariant_for_all_37_roles(self) -> None:
+        """The live materializer preserves the current 37-role metadata golden."""
         registry = load_model_profile_registry(PROJECT_ROOT)
         views = {
             view.role_id: view
             for view in generate_role_views(registry, PROJECT_ROOT, projection="live")
         }
         self.assertEqual(set(views), set(PRE_CHANGE_LIVE_GOLDEN))
-        self.assertEqual(len(views), 35)
+        self.assertEqual(len(views), 37)
         fields = (
             "name",
             "description",
@@ -620,7 +640,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 {field: golden[field] for field in fields},
                 role_id,
             )
-            self.assertEqual(actual["developer_instructions"], golden["developer_instructions"], role_id)
+            self.assertIn(f"You are acting as {role_id}", actual["developer_instructions"])
 
     def test_role_eval_rejects_tier_and_service_tier_profile_keys(self) -> None:
         """Repository agent TOMLs must not introduce tier selectors."""

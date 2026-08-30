@@ -2,9 +2,9 @@
 # contract test
 # responsibility Tests agent team template rendering behavior.
 # upstream design ../../templates/agents/README.md template partial contract
-# downstream implementation ../../tools/agent_tools/manifest_rendering.py renders templates and partials
+# downstream implementation ../../tools/runtime/manifest/manifest_rendering.py renders templates and partials
 # downstream implementation ../../templates/code/python/docstring_template.py is the materializable code source
-# downstream implementation ../../tools/agent_tools/agent_team.py owns facade orchestration
+# downstream implementation ../../tools/agent/orchestration/agent_team.py owns facade orchestration
 # @dependency-end
 
 """Tests for run artifact template rendering."""
@@ -26,32 +26,31 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-import capacity_handshake  # noqa: E402
-import task_close  # noqa: E402
-import update_lifecycle_contract  # noqa: E402
-from agent_team import (  # noqa: E402
+from tools.agent.orchestration import capacity_handshake  # noqa: E402
+from tools.runtime.lifecycle import task_close, update_lifecycle_contract  # noqa: E402
+from tools.agent.orchestration.agent_team import (  # noqa: E402
     RunBundleSpec,
     create_run_bundle,
 )
-from implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
-from writer_target import WriterTarget  # noqa: E402
-from manifest_rendering import (  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
+from tools.runtime.authority.writer_target import WriterTarget  # noqa: E402
+from tools.runtime.manifest.manifest_rendering import (  # noqa: E402
     language_review_candidates,
     render_code_template,
     render_template,
     suggested_public_skills,
 )
-from packets import (  # noqa: E402
+from tools.agent.orchestration.packets import (  # noqa: E402
     iter_artifacts,
     resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_role_document_packet,
     _spec_source_root,
 )
-from team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
-from task_authority import hash_baseline_bytes  # noqa: E402
-from runtime_artifacts import RuntimeArtifactBoundary  # noqa: E402
-from checkout_identity import resolve_checkout_identity  # noqa: E402
+from tools.agent.orchestration.team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
+from tools.runtime.authority.task_authority import hash_baseline_bytes  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary  # noqa: E402
+from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # noqa: E402
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
@@ -255,13 +254,13 @@ class AgentTeamTemplateTest(unittest.TestCase):
     def test_code_template_renderer_works_from_repo_root_package_route(self) -> None:
         """リポジトリ root の canonical package invocation が source を読み戻せます."""
         environment = dict(os.environ)
-        environment["PYTHONPATH"] = str(PROJECT_ROOT / "tools")
+        environment["PYTHONPATH"] = str(PROJECT_ROOT)
         result = subprocess.run(
             [
                 sys.executable,
                 "-c",
                 (
-                    "from agent_tools.code_template_rendering import "
+                    "from tools.agent.templates.code_template_rendering import "
                     "render_code_template; "
                     "source = render_code_template('python/docstring_template.py'); "
                     "assert 'class ExampleState' in source"
@@ -427,7 +426,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             ],
             "invariant": {
                 "owner": "implementation_route",
-                "owner_path": "tools/agent_tools/implementation_route.py",
+                "owner_path": "tools/agent/orchestration/implementation_route.py",
                 "owner_symbol": "route_implementation",
                 "edit": "replacement://generic-route",
                 "validation": "implementation-execution://v1",
@@ -463,7 +462,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             "abstract_design_frame_sha256": sha,
             "exact_owner": "implementation_route",
             "exact_write_set": [
-                "tools/agent_tools/implementation_route.py",
+                "tools/agent/orchestration/implementation_route.py",
                 "tests/agent_tools/test_implementation_route.py",
             ],
             "forbidden_write_set": [],
@@ -515,7 +514,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 }
             ],
             "static_validation_commands": [
-                "python3 -m py_compile tools/agent_tools/implementation_route.py"
+                "python3 -m py_compile tools/agent/orchestration/implementation_route.py"
             ],
             "unresolved_algorithm_decisions": [],
             "unresolved_api_decisions": [],
@@ -625,7 +624,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
         )
         self.assertEqual(nonmath_dispatch.status, "spawned")
         with patch(
-            "implementation_dispatch.resolve_checkout_identity",
+            "tools.agent.orchestration.implementation_dispatch.resolve_checkout_identity",
             side_effect=AssertionError("checkout identity must be reused"),
         ):
             snapshot_dispatch = dispatch_fixed_implementation(

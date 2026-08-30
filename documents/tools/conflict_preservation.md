@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents the focused content-preservation checker for conflict and rework.
 upstream design ../../agents/skills/pr-processing.md owns integration and rework order.
-upstream implementation ../../tools/agent_tools/conflict_preservation.py owns packet capture and readback.
+upstream implementation ../../tools/repository/git/conflict_preservation.py owns packet capture and readback.
 downstream implementation ../../tests/agent_tools/test_conflict_preservation.py validates the focused fixture.
 @dependency-end
 -->
@@ -23,15 +23,15 @@ commit a stopped merge, and those routes invoke the validation and readback
 against the current clone.
 
 ```bash
-python3 tools/agent_tools/conflict_preservation.py capture \
+python3 tools/repository/git/conflict_preservation.py capture \
   --repo-root <clone> --base <merge-base> --ours <head> --theirs <origin-main> \
   --output <clone>/.agent-canon/conflict-preservation.json
 
-python3 tools/agent_tools/conflict_preservation.py validate \
+python3 tools/repository/git/conflict_preservation.py validate \
   --inventory <clone>/.agent-canon/conflict-preservation.json \
   --plan <preservation-plan.json> --repo-root <clone>
 
-python3 tools/agent_tools/conflict_preservation.py validate-rework \
+python3 tools/repository/git/conflict_preservation.py validate-rework \
   --packet <rework-preservation.json>
 ```
 

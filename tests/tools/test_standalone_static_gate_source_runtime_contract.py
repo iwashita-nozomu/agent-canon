@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies standalone static units own no-runtime dependency regressions and prompt-eval skill evidence.
-# upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh owns contract and eval unit commands
-# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py consumes explicit skill-used evidence
+# upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns contract and eval unit commands
+# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py consumes explicit skill-used evidence
 # upstream design ../../documents/design/source-owned-dependency-validation.md source and persisted graph authority split
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs selected unit owners
 # @dependency-end
@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNNER = ROOT / "tools" / "ci" / "run_standalone_static_gate_unit.sh"
+RUNNER = ROOT / "tools" / "validation" / "ci" / "runners" / "run_standalone_static_gate_unit.sh"
 
 SOURCE_REGRESSION_MODULES = (
     "tests.agent_tools.test_graph_client_source_projection",
@@ -70,13 +70,13 @@ def test_eval_failure_evidence_is_filtered_before_temporary_cleanup() -> None:
 
 def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots() -> None:
     """A source checkout cannot become either the control or runtime owner."""
-    source = (ROOT / "tools" / "ci" / "run_standalone_static_gate_unit.sh").read_text(
+    source = (ROOT / "tools" / "validation" / "ci" / "runners" / "run_standalone_static_gate_unit.sh").read_text(
         encoding="utf-8"
     )
-    run_all = (ROOT / "tools" / "ci" / "run_all_checks.sh").read_text(
+    run_all = (ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh").read_text(
         encoding="utf-8"
     )
-    pr = (ROOT / "tools" / "ci" / "check_agent_canon_pr.sh").read_text(
+    pr = (ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh").read_text(
         encoding="utf-8"
     )
     for text in (run_all, pr):

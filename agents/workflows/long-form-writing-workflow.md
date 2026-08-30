@@ -108,7 +108,7 @@ feedback は action list に落とし、higher-order concern から先に潰し�
 開始時は、必要なら次で run bundle と宣言を機械生成します。
 
 ```bash
-python3 tools/agent_tools/doc_start.py \
+python3 tools/analysis/documents/doc_start.py \
   --task "long-form document task" \
   --kind long-form \
   --owner "codex" \
@@ -182,4 +182,4 @@ validation command が通っても readability は自動では pass しません
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

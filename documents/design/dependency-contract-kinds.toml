@@ -2,9 +2,9 @@
 # contract registry
 # responsibility Registers dependency header contract kinds and changed-file header surfaces.
 # upstream design dependency-manifest-design.md dependency manifest DSL design
-# downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates changed-file contract kinds and surface selection
-# downstream implementation ../../tools/agent_tools/check_dependency_header_format.sh validates registered contract kinds
-# downstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans the same dependency-owned surfaces
+# downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates changed-file contract kinds and surface selection
+# downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh validates registered contract kinds
+# downstream implementation ../../tools/analysis/dependencies/scan_dependency_headers.sh scans the same dependency-owned surfaces
 # @dependency-end
 
 schema = "agent_canon.dependency_contract_kinds.v1"
@@ -21,9 +21,9 @@ header_surfaces = [
   "agents/workflows/**",
   "documents/design/**",
   "documents/runtime/**",
-  "tools/agent_tools/**",
-  "tools/ci/**",
-  "rust/**",
+  "tools/agent/**",
+  "tools/validation/**",
+  "tools/runtime/dispatch/**",
   ".devcontainer/**",
   ".github/workflows/**",
   ".github/scripts/**",

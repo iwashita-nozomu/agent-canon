@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Provides the stable AgentCanon CLI through the bootstrap-owned shared tool container.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md typed bootstrap request boundary
-# downstream implementation ../../tools/agent_tools/tool_dispatch.py request builder and catalog route
+# downstream implementation ../../tools/runtime/dispatch/tool_dispatch.py request builder and catalog route
 # downstream implementation ../../bootstrap.sh host lifecycle entrypoint
 # @dependency-end
 
@@ -33,7 +33,7 @@ if [ "${1:-}" = "tool" ] && [ "${2:-}" = "run" ]; then
 
   # Catalog tool paths retain the dispatcher contract: they require an
   # already-registered external runtime and are not source-tree fallbacks.
-  dispatcher="${canon_root}/tools/agent_tools/tool_dispatch.py"
+  dispatcher="${canon_root}/tools/runtime/dispatch/tool_dispatch.py"
   if [ ! -f "$dispatcher" ]; then
     echo "agent-canon dispatcher is unavailable" >&2
     exit 2

@@ -144,7 +144,7 @@ paper writing では、次をすべて別 instance で通します。
 開始時は次で run bundle と review 宣言を機械生成できます。
 
 ```bash
-python3 tools/agent_tools/doc_start.py \
+python3 tools/analysis/documents/doc_start.py \
   --task "paper writing task" \
   --kind paper \
   --owner "codex" \
@@ -183,4 +183,4 @@ tools/bin/agent-canon docs check documents notes
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

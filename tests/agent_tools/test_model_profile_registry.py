@@ -2,8 +2,8 @@
 # contract test
 # responsibility Tests the closed model-profile registry, prompt/token materializers, and generated projections.
 # upstream implementation ../../agents/model_profiles.toml declares the canonical profile schema
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py implements registry behavior
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py consumes generated projections
+# upstream implementation ../../tools/agent/orchestration/model_profile_registry.py implements registry behavior
+# downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py consumes generated projections
 # @dependency-end
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.agent_tools import model_profile_registry as registry_module
-from tools.agent_tools.model_profile_registry import (
+from tools.agent.orchestration import model_profile_registry as registry_module
+from tools.agent.orchestration.model_profile_registry import (
     REQUIRED_STATIC_OBLIGATION_SETS,
     STATIC_OBLIGATION_TABLE,
     ContextItem,

@@ -250,7 +250,7 @@ component ではありません。数値側の evidence は residual / objective
 KKT trajectory、iteration count、step acceptance / size、termination status、
 conditioning、inner-solver work、finite / non-finite event、および per-iteration
 cost を含めます。正規化と分類は
-`python3 tools/agent_tools/numeric_performance.py --input <post-run-observations.json> --format json`
+`python3 tools/analysis/numerical/numeric_performance.py --input <post-run-observations.json> --format json`
 で行い、prose だけで JIT handoff を決めません。
 
 入力は `agent-canon.numeric-performance-observation.v1` の closed JSON です。

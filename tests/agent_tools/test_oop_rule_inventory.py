@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests language-specific OOP rule inventory tooling.
-# upstream implementation ../../tools/oop/python/rule_inventory.py Python inventory CLI
-# upstream implementation ../../tools/oop/cpp/rule_inventory.py C++ inventory CLI
-# upstream implementation ../../tools/oop/shared/rule_inventory_core.py shared inventory behavior
+# upstream implementation ../../tools/validation/code/oop/python/rule_inventory.py Python inventory CLI
+# upstream implementation ../../tools/validation/code/oop/cpp/rule_inventory.py C++ inventory CLI
+# upstream implementation ../../tools/validation/code/oop/shared/rule_inventory_core.py shared inventory behavior
 # upstream design ../../documents/conventions/object-oriented-design.md OOP policy source
 # @dependency-end
 
@@ -18,7 +18,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.oop.shared.rule_inventory_core import (
+from tools.validation.code.oop.shared.rule_inventory_core import (
     InventoryEntry,
     inventory_payload,
     missing_entries,
@@ -26,8 +26,8 @@ from tools.oop.shared.rule_inventory_core import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PYTHON_SCRIPT = PROJECT_ROOT / "tools" / "oop" / "python" / "rule_inventory.py"
-CPP_SCRIPT = PROJECT_ROOT / "tools" / "oop" / "cpp" / "rule_inventory.py"
+PYTHON_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "rule_inventory.py"
+CPP_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "cpp" / "rule_inventory.py"
 
 
 def run_inventory(
@@ -60,10 +60,10 @@ class OopRuleInventoryTest(unittest.TestCase):
         )
         self.assertEqual(cpp_result.returncode, 0, cpp_result.stdout + cpp_result.stderr)
         self.assertIn("OOP_PYTHON_RULE_INVENTORY=pass", python_result.stdout)
-        self.assertIn("tools/oop/python/readability.py", python_result.stdout)
+        self.assertIn("tools/validation/code/oop/python/readability.py", python_result.stdout)
         self.assertIn("documents/tools/oop/python/readability.md", python_result.stdout)
         self.assertIn("OOP_CPP_RULE_INVENTORY=pass", cpp_result.stdout)
-        self.assertIn("tools/oop/cpp/readability.py", cpp_result.stdout)
+        self.assertIn("tools/validation/code/oop/cpp/readability.py", cpp_result.stdout)
         self.assertIn("documents/tools/oop/cpp/readability.md", cpp_result.stdout)
         self.assertIn("resolved=", cpp_result.stdout)
 
@@ -85,7 +85,7 @@ class OopRuleInventoryTest(unittest.TestCase):
         self.assertEqual(payload["status"], "pass")
         paths = {entry["path"] for entry in payload["entries"]}
         self.assertIn("documents/conventions/coding-conventions-cpp.md", paths)
-        self.assertIn("tools/oop/cpp/rule_inventory.py", paths)
+        self.assertIn("tools/validation/code/oop/cpp/rule_inventory.py", paths)
         resolved_paths = {
             entry["path"]: entry["resolved_path"] for entry in payload["entries"]
         }

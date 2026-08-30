@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Rust document-canon inventory CLI behavior.
-# upstream implementation ../../rust/agent-canon/src/structured_analysis.rs implements document inventory.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs implements document inventory.
 # upstream design ../../agents/skills/document-canon-cleanup.md defines cleanup workflow.
 # @dependency-end
 

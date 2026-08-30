@@ -7,7 +7,7 @@ of ordinary source-branch publication.
 # @dependency-start
 # contract test
 # responsibility Tests GitHub publish tool command construction and failure boundaries.
-# upstream implementation ../../tools/agent_tools/github_publish.py implements gh-backed publish.
+# upstream implementation ../../tools/repository/github/github_publish.py implements gh-backed publish.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines publish workflow policy.
 # @dependency-end
 
@@ -24,14 +24,14 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent_tools import github_publish  # noqa: E402
-from tools.agent_tools.update_lifecycle_contract import (  # noqa: E402
+from tools.repository.github import github_publish  # noqa: E402
+from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
     materialize_gate_verdict,
     materialize_source_main_rebind_receipt,
     validate_pull_request_lifecycle,
     validate_pull_request_transition,
 )  # noqa: E402
-from tools.ci.check_agent_canon_pr import (  # noqa: E402
+from tools.validation.ci.checks.check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
     materialize_generated_completeness_receipt,
 )  # noqa: E402
@@ -221,9 +221,7 @@ class GithubPublishTest(unittest.TestCase):
             invariant="source_correctness",
             output_digest="sha256:" + "b" * 64,
             owner=str(
-                PROJECT_ROOT / "tools"
-                / "agent_tools"
-                / "publication_integrator.py"
+                PROJECT_ROOT / "tools" / "repository" / "github" / "publication_integrator.py"
             )
             + "#resolve_publication_eligibility",
             verdict="pass",
@@ -1152,7 +1150,7 @@ class GithubPublishTest(unittest.TestCase):
             invariant="remote_publication_readback",
             output_digest="sha256:" + "5" * 64,
             owner=str(
-                PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py"
+                PROJECT_ROOT / "tools" / "repository" / "github" / "publication_integrator.py"
             )
             + "#integrate_publication",
             verdict="pass",

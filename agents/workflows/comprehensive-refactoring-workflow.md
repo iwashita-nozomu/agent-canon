@@ -9,9 +9,9 @@ upstream design ../skills/refactor-loop.md refactor loop contract
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json activated validation profile owner
 upstream design ../../documents/conventions/object-oriented-design.md OOP boundary policy
 upstream design ../../documents/design/algorithm-implementation-boundary.md algorithm boundary policy
-downstream implementation ../../tools/agent_tools/analyze_refactor_surface.py static refactor surface analyzer
-downstream implementation ../../tools/oop/python/readability.py Python OOP readability analyzer
-downstream implementation ../../tools/oop/cpp/readability.py C++ OOP readability analyzer
+downstream implementation ../../tools/analysis/code/analyze_refactor_surface.py static refactor surface analyzer
+downstream implementation ../../tools/validation/code/oop/python/readability.py Python OOP readability analyzer
+downstream implementation ../../tools/validation/code/oop/cpp/readability.py C++ OOP readability analyzer
 @dependency-end
 -->
 
@@ -63,7 +63,7 @@ primary family は `Large Delivery` または `Comprehensive Development` とし
   state、consumer-to-provider target graph、root-anchored command contract を同じ packet に置く。
 
 設計見直しは、既存コードを読まずに始めません。
-構造化された owner 探索、`git grep`、dependency graph、test inventory、必要なら `tools/agent_tools/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
+構造化された owner 探索、`git grep`、dependency graph、test inventory、必要なら `tools/analysis/code/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
 
 ## Gate B. OOP 的な責務境界方針
 
@@ -109,7 +109,7 @@ ledger、human review gate を設計に入れます。strict score floor は明�
 Python code surface の size / surface baseline では次を使えます。
 
 ```bash
-python3 tools/agent_tools/analyze_refactor_surface.py python tests --min-score 85
+python3 tools/analysis/code/analyze_refactor_surface.py python tests --min-score 85
 ```
 
 この tool は AST と file length から、長すぎる function / class / file、公開 method 過多の class を検出し、score を出します。
@@ -117,7 +117,7 @@ python3 tools/agent_tools/analyze_refactor_surface.py python tests --min-score 8
 Python の OOP readability baseline では次を使います。
 
 ```bash
-python3 tools/oop/python/readability.py \
+python3 tools/validation/code/oop/python/readability.py \
   --format markdown \
   --include-snippets \
   --exclude vendor \
@@ -129,7 +129,7 @@ Python tool は `object-oriented-design.md` に合わせ、責務不明 class / 
 C / C++ surface がある場合は別 entrypoint を使います。
 
 ```bash
-python3 tools/oop/cpp/readability.py \
+python3 tools/validation/code/oop/cpp/readability.py \
   --format markdown \
   --include-snippets \
   --exclude vendor \
@@ -201,4 +201,4 @@ closeout 前に次を確認します。
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

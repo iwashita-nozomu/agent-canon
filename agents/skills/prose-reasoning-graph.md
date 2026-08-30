@@ -6,8 +6,8 @@ responsibility Documents prose-reasoning-graph analysis, source-truth graph cont
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design ../../documents/prose-reasoning-graph/dsl-spec.md normative source truth graph, DSL, projection, verification route, presentation decision, evidence, and responsibility contract
-downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds SQLite-backed graph projections, diagnostics, evidence support, presentation candidates, integration operations, rewrite-packet operation ids, and skill handoff packets
-downstream implementation ../../rust/agent-canon/src/structured_analysis.rs reports document responsibility gaps and dependency-manifest coverage diagnostics
+downstream implementation ../../tools/analysis/documents/prose_reasoning_graph.py builds SQLite-backed graph projections, diagnostics, evidence support, presentation candidates, integration operations, rewrite-packet operation ids, and skill handoff packets
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs reports document responsibility gaps and dependency-manifest coverage diagnostics
 downstream implementation ../../.codex/personal/skills/prose-reasoning-graph/SKILL.md exposes this workflow as a runtime skill with diagnostics, recursive verification, unresolved leaf policy, presentation decision, and closeout evidence rules
 downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI usage, stats artifacts, runtime result contract, and handoff boundaries
 @dependency-end

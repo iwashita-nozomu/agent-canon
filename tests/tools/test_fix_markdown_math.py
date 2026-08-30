@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests the Rust markdown math fixer CLI behavior.
-# upstream implementation ../../rust/agent-canon/src/docs.rs implements docs fix-math.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs fix-math.
 # upstream design ../../tools/README.md validated automation surface
 # @dependency-end
 

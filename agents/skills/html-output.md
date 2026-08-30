@@ -9,7 +9,7 @@ upstream design structure-planning.md optional structural-decision owner
 upstream design report-writing.md reader-facing report content owner
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 downstream implementation ../../.codex/personal/skills/html-output/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
 

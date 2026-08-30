@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies SourceRootFailure follows the Python exception lifecycle.
-# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py SourceRootFailure definition
+# upstream implementation ../../tools/runtime/source/agent_canon_source_root.py SourceRootFailure definition
 # @dependency-end
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
-from agent_canon_source_root import SourceRootFailure  # noqa: E402
+from tools.runtime.source.agent_canon_source_root import SourceRootFailure  # noqa: E402
 
 
 @contextmanager

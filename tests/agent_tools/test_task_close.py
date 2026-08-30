@@ -1,16 +1,16 @@
 # @dependency-start
 # contract test
 # responsibility Tests exact postorder close tokens and lifecycle reservation release.
-# upstream implementation ../../tools/agent_tools/task_close.py consumes the provider ledger
-# upstream implementation ../../tools/agent_tools/capacity_handshake.py owns lifecycle state
+# upstream implementation ../../tools/runtime/lifecycle/task_close.py consumes the provider ledger
+# upstream implementation ../../tools/agent/orchestration/capacity_handshake.py owns lifecycle state
 # @dependency-end
 
 """Task-close tests for AgentCanon parent sync gating and lifecycle closeout."""
 
 from __future__ import annotations
 
-from tools.agent_tools import capacity_handshake
-from tools.agent_tools.task_close import validate_capacity_lifecycle_closeout
+from tools.agent.orchestration import capacity_handshake
+from tools.runtime.lifecycle.task_close import validate_capacity_lifecycle_closeout
 
 
 def _readback_record(work_id: str, parent: str) -> capacity_handshake.DescendantLifecycleRecord:

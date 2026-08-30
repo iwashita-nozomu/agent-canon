@@ -6,7 +6,7 @@ responsibility Defines the canonical semantic-unit route for auditing an AgentCa
 upstream design ../design/parent-repository-audit.md owns unit identity, selection, and failure semantics
 upstream design ../rule/README.md owns document placement and filename rules
 upstream design ../../responsibility-scope.toml owns AgentCanon path owner/class assignments
-upstream implementation ../../tools/agent_tools/parent_repository_audit.py enumerates semantic units and records tracked evidence
+upstream implementation ../../tools/analysis/code/parent_repository_audit.py enumerates semantic units and records tracked evidence
 upstream implementation ../../agents/skills/parent-repository-audit.md owns the public repair workflow
 @dependency-end
 -->
@@ -47,11 +47,11 @@ path を一件も持たないことは、path の存在要求ではないため�
 で返します。
 
 ```bash
-python3 tools/agent_tools/parent_repository_audit.py list \
+python3 tools/analysis/code/parent_repository_audit.py list \
   --root <parent-root> --format text
-python3 tools/agent_tools/parent_repository_audit.py list \
+python3 tools/analysis/code/parent_repository_audit.py list \
   --root <parent-root> --surface environment.containers --scope docker --format text
-python3 tools/agent_tools/parent_repository_audit.py check \
+python3 tools/analysis/code/parent_repository_audit.py check \
   --root <parent-root> --unit-status pass --unit-status closed --format text
 ```
 

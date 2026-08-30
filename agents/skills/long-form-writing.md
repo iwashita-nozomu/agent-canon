@@ -8,7 +8,7 @@ upstream design structure-planning.md reusable document structure contract
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design formal-proof-workflow.md mathematical claim proof-obligation routing
 upstream design code-visualization.md sole public visualization owner and typed projection contract
-downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
 
@@ -94,7 +94,7 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 1. paragraph order / transition evidence が必要なら discourse-relations JSONL を構造 contract に添付する
 1. roadmap と section contract を作る
 1. 非自明または substantive な一般説明文書の追記・修正なら prose graph handoff を作るか受け取り、DSL / projection finding closure loop を回してから reader-facing prose に入る
-1. 必要なら `python3 tools/agent_tools/doc_start.py --kind long-form ...` で run bundle と review 宣言を先に起こす
+1. 必要なら `python3 tools/analysis/documents/doc_start.py --kind long-form ...` で run bundle と review 宣言を先に起こす
 1. reader order で draft する
 1. DSL / projection から prose に射影した後、同じ graph check を再実行し、射影後だけの finding は `dsl_to_prose_prompt_defect` として記録する
 1. reverse outline で section order と gap を確認する

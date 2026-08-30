@@ -4,7 +4,7 @@ contract agent-runtime
 responsibility Describes the standalone AgentCanon bootstrap and shared tool-runtime user contract.
 upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream implementation ../../bootstrap.sh Host entrypoint
-upstream implementation ../../tools/agent_tools/bootstrap_runtime.py lifecycle owner
+upstream implementation ../../tools/runtime/container/bootstrap_runtime.py lifecycle owner
 downstream design runtime-profiles-and-check-matrix.md validation profiles
 downstream design runtime-log-archive.md archive publication
 @dependency-end
@@ -26,7 +26,7 @@ Cargo toolchain, volume, or source checkout is created.
 
 ## Host/container activation boundary
 
-`bootstrap.sh` and `bootstrap/lib/entrypoint.sh` are executable by a host that
+`bootstrap.sh` and `bootstrap/host/lifecycle/entrypoint.sh` are executable by a host that
 has Docker and Git but no Python package environment. They never import or
 execute AgentCanon Python directly. Lifecycle and tool operations first build
 or adopt the image, create/start exactly one resident container with
@@ -158,7 +158,7 @@ invocation; target registration and tool execution remain separate operations.
 `install` creates the runtime state directories and adopts the published GHCR
 image when the source was installed by the distribution route. Development
 and CI checkouts may still use the ordinary Docker build from
-`bootstrap/container/Dockerfile`; live `sync` never builds locally. The image
+`bootstrap/container/image/Dockerfile`; live `sync` never builds locally. The image
 is one OCI index for `linux/amd64` and `linux/arm64`; Docker selects the native
 variant without a user platform selector. `start` creates or starts at most
 one manifest-owned container. The image contains the Rust CLI, Python tools,
@@ -284,7 +284,7 @@ AgentCanon `reports/`, `.agent-canon/`, `target/`, or another source path.
 Producer code, role configuration, and eval manifests resolve from the
 image-owned AgentCanon snapshot. `--root <project-root>` supplies only the
 observed read-only target identity; the target is not required to copy
-`agents/`, `.codex/`, or `evidence/agent-evals/`. Producer failure is recorded
+`agents/`, `.codex/`, or `eval/`. Producer failure is recorded
 before export, and the Host adapter exports the pre-created output/log trees
 without replacing that failure with a missing-path error.
 

@@ -14,8 +14,8 @@ import pytest
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
-import tools.agent_tools.bootstrap_runtime as bootstrap_runtime_module  # noqa: E402
-from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
+import tools.runtime.container.bootstrap_runtime as bootstrap_runtime_module  # noqa: E402
+from tools.runtime.container.bootstrap_runtime import (  # noqa: E402
     BootstrapError,
     BootstrapRuntime,
     DockerAdapter,
@@ -26,7 +26,7 @@ from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
     sha256_bytes,
     validate_roots,
 )
-from tools.agent_tools.runtime_exchange_cleanup import clear_exchange  # noqa: E402
+from tools.runtime.archive.runtime_exchange_cleanup import clear_exchange  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -54,7 +54,7 @@ def test_container_source_identity_matches_canonical_remote_normalization(
     remote: str, normalized: str
 ) -> None:
     """The resident identity operation delegates to the canonical resolver."""
-    from tools.agent_tools.log_repository_identity import stable_source_repository_id
+    from tools.runtime.archive.log_repository_identity import stable_source_repository_id
 
     result = _container_source_identity(remote)
     repository_id = stable_source_repository_id(remote)
@@ -95,6 +95,59 @@ def test_source_identity_operation_has_no_runtime_side_effects(tmp_path: Path) -
         "logs/github.com-iwashita-nozomu-agent-canon-"
         "9680c2230417944f4dd780e2"
     )
+
+
+def test_direct_container_materializer_bootstraps_without_pythonpath(
+    tmp_path: Path,
+) -> None:
+    """Direct container control loads the materializer from its source root."""
+    control = tmp_path / "control"
+    runtime = control / "runtime"
+    control.mkdir()
+    probe = """
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+controller_path, repository_root, control_root, runtime_root = map(Path, sys.argv[1:])
+spec = importlib.util.spec_from_file_location("agent_canon_bootstrap_runtime", controller_path)
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+manager = module.BootstrapRuntime(
+    control_root,
+    runtime_root,
+    repository_root=repository_root,
+)
+result = manager._materialize_skill_view()
+print(json.dumps({"mode": result["mode"], "materialized": result["materialized"]}))
+"""
+    environment = {**os.environ, "AGENT_CANON_CONTAINER_CONTROL": "1"}
+    environment.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            probe,
+            str(REPOSITORY_ROOT / "tools/runtime/container/bootstrap_runtime.py"),
+            str(REPOSITORY_ROOT),
+            str(control),
+            str(runtime),
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "mode": "resident-exchange",
+        "materialized": True,
+    }
+    assert (runtime / "container-runtime" / "skill-projection").is_dir()
 
 
 def test_source_identity_accepts_transport_variants_and_rejects_other_repo() -> None:
@@ -187,12 +240,12 @@ def test_default_source_runtime_rebuilds_without_copying_legacy_state(
 ) -> None:
     """Migrate the fixed legacy root and remove it only after new readback."""
     repository = tmp_path / "repo"
-    (repository / "bootstrap").mkdir(parents=True)
-    (repository / "bootstrap" / "manifest.toml").write_bytes(
-        (REPOSITORY_ROOT / "bootstrap" / "manifest.toml").read_bytes()
+    (repository / "bootstrap" / "host").mkdir(parents=True)
+    (repository / "bootstrap" / "host" / "manifest.toml").write_bytes(
+        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
     )
-    scheduler_source = REPOSITORY_ROOT / "bootstrap" / "systemd" / "user"
-    scheduler_target = repository / "bootstrap" / "systemd" / "user"
+    scheduler_source = REPOSITORY_ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target = repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
     scheduler_target.mkdir(parents=True)
     for template in scheduler_source.glob("*.in"):
         (scheduler_target / template.name).write_bytes(template.read_bytes())
@@ -326,7 +379,7 @@ def test_install_start_status_readback_and_single_container(
     assert "--build-arg" not in build
     assert not any(command[1:3] == ["container", "ls"] for command in install_commands)
     create = next(command for command in fake_docker.commands if command[1] == "create")
-    assert "--user" not in create
+    assert create[create.index("--user") + 1] == f"{os.getuid()}:{os.getgid()}"
     assert (
         sum(
             command[1:3] == ["container", "inspect"] for command in fake_docker.commands
@@ -426,7 +479,7 @@ def test_health_timeout_quarantines_and_removes_container(
     """Stop and quarantine a container that never reaches healthy."""
     monkeypatch.setenv("FAKE_DOCKER_HEALTH_POLLS", "1000")
     manifest = tmp_path / "manifest.toml"
-    source = (REPOSITORY_ROOT / "bootstrap" / "manifest.toml").read_text(
+    source = (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml").read_text(
         encoding="utf-8"
     )
     source = source.replace(
@@ -738,7 +791,7 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
         "tool_id": "generate-agent-runtime-dashboard",
-        "argv": ["python3", "tools/agent_tools/generate_agent_runtime_dashboard.py"],
+        "argv": ["python3", "eval/producers/generate_agent_runtime_dashboard.py"],
         "child_args": ["--root", ".", "--api-out", "reports/api.json"],
         "source_root": str(REPOSITORY_ROOT),
         "cwd": str(target),
@@ -833,7 +886,7 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
         "tool_id": "route",
-        "argv": ["python3", "tools/agent_tools/route.py"],
+        "argv": ["python3", "tools/agent/orchestration/route.py"],
         "child_args": ["--help"],
         "source_root": str(REPOSITORY_ROOT),
         "cwd": str(target),
@@ -1029,8 +1082,10 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     control = tmp_path / "control"
     runtime_root = control / "runtime"
     control.mkdir()
-    (control / "private-log").mkdir()
+    private_log = control / "private-log"
+    private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
     manager = BootstrapRuntime(
         control, runtime_root, repository_root=REPOSITORY_ROOT
     )
@@ -1121,8 +1176,10 @@ def test_container_restore_reads_mounted_target_backup(
     control = tmp_path / "control"
     runtime_root = control / "runtime"
     control.mkdir()
-    (control / "private-log").mkdir()
+    private_log = control / "private-log"
+    private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     candidate_root, restored_root = tmp_path / "candidate", tmp_path / "restored"
@@ -1211,8 +1268,10 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
     control = tmp_path / "control"
     runtime_root = control / "runtime"
     control.mkdir()
-    (control / "private-log").mkdir()
+    private_log = control / "private-log"
+    private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
     image_id = "sha256:shared-image-1234567890"
     image_ref = "agent-canon-tools:shared"
     monkeypatch.setenv("AGENT_CANON_IMAGE_ID", image_id)
@@ -1236,6 +1295,20 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
     target_a, target_b = tmp_path / "target-a", tmp_path / "target-b"
     target_a.mkdir()
     target_b.mkdir()
+
+    existing_no_symlink = bootstrap_runtime_module._existing_no_symlink
+
+    def mounted_target(path: Path, *, field: str) -> Path:
+        if path.parts[:2] == ("/", "targets"):
+            return path
+        return existing_no_symlink(path, field=field)
+
+    monkeypatch.setattr(bootstrap_runtime_module, "_existing_no_symlink", mounted_target)
+    monkeypatch.setattr(
+        bootstrap_runtime_module.BootstrapRuntime,
+        "_prune_stale_targets",
+        lambda _self, _state: [],
+    )
 
     def target_args(action: str, root: Path, digest: str) -> Any:
         monkeypatch.setenv("AGENT_CANON_TARGET_HOST_ROOT", str(root))
@@ -1427,7 +1500,7 @@ def test_gc_enforces_archive_quota_only_without_unpublished_spool(
     """Prune a reproducible archive cache, but never while a spool is pending."""
     manifest = tmp_path / "manifest.toml"
     manifest.write_text(
-        (REPOSITORY_ROOT / "bootstrap" / "manifest.toml")
+        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml")
         .read_text(encoding="utf-8")
         .replace("archive_lease_quota_bytes = 2147483648", "archive_lease_quota_bytes = 1"),
         encoding="utf-8",
@@ -1487,7 +1560,7 @@ def test_uninstall_removes_only_owned_container_and_image(
         for index, command in enumerate(fake_docker.commands)
         if command[-2:] == [
             "python3",
-            "/usr/local/share/agent-canon/runtime/tools/agent_tools/"
+            "/usr/local/share/agent-canon/runtime/tools/runtime/archive/"
             "runtime_exchange_cleanup.py",
         ]
     )
@@ -1551,7 +1624,7 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
 
     changed_manifest = tmp_path / "changed-manifest.toml"
     changed_manifest.write_text(
-        (REPOSITORY_ROOT / "bootstrap" / "manifest.toml")
+        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml")
         .read_text(encoding="utf-8")
         .replace("idle_stop_seconds = 3600", "idle_stop_seconds = 1800"),
         encoding="utf-8",
@@ -1575,7 +1648,7 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
 
 def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
     """Keep all documented typed parser routes available."""
-    from tools.agent_tools.bootstrap_runtime import build_parser
+    from tools.runtime.container.bootstrap_runtime import build_parser
 
     base = [
         "--repository-root",
@@ -1621,7 +1694,7 @@ def test_public_python_source_sync_route_is_removed() -> None:
     ]
     with pytest.raises(SystemExit):
         build_parser().parse_args(base + ["sync", "--install-root", str(REPOSITORY_ROOT)])
-    controller = (REPOSITORY_ROOT / "tools/agent_tools/bootstrap_runtime.py").read_text(
+    controller = (REPOSITORY_ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
         encoding="utf-8"
     )
     assert "SourceSync" not in controller
@@ -1736,7 +1809,7 @@ def test_top_level_entrypoint_reports_typed_docker_failure_without_fallback(
         text=True,
     )
     assert completed.returncode != 0
-    assert json.loads(completed.stderr)["code"] == "runtime_unavailable"
+    assert json.loads(completed.stderr)["code"] == "source_sync_commit_mismatch"
 
 
 def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
@@ -1774,7 +1847,7 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     subprocess.run(["git", "clone", "-q", "--bare", str(seed), str(remote)], check=True)
     manifest = tmp_path / "manifest.toml"
     manifest.write_text(
-        (REPOSITORY_ROOT / "bootstrap" / "manifest.toml")
+        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml")
         .read_text(encoding="utf-8")
         .replace(
             'remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"',
@@ -1804,7 +1877,7 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     eval_command = next(
         command
         for command in fake_docker.commands
-        if "/usr/local/share/agent-canon/runtime/tools/agent_tools/run_accumulated_agent_evals.py"
+        if "/usr/local/share/agent-canon/runtime/eval/producers/run_accumulated_agent_evals.py"
         in command
     )
     assert eval_command[eval_command.index("--root") + 1] == (
@@ -1813,7 +1886,7 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     observed_target = eval_command[eval_command.index("--target-root") + 1]
     assert observed_target.startswith("/targets/")
     assert eval_command[eval_command.index("--prompt-eval-manifest") + 1] == (
-        "/usr/local/share/agent-canon/runtime/evidence/agent-evals/"
+        "/usr/local/share/agent-canon/runtime/eval/definitions/"
         "skill_workflow_prompt_eval.toml"
     )
     spool = manager.paths.runtime_root / "spool" / "eval-e2e"

@@ -3,7 +3,7 @@
 contract template
 responsibility Documents reusable run artifact templates for this repository.
 upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement contract.
-downstream implementation ../../tools/agent_tools/agent_team.py renders templates and partials.
+downstream implementation ../../tools/agent/orchestration/agent_team.py renders templates and partials.
 downstream implementation ./_partials/reader_map.md shared reader-path fields.
 downstream implementation ./_partials/review_contract.md shared review evidence boundary.
 @dependency-end
@@ -12,7 +12,7 @@ downstream implementation ./_partials/review_contract.md shared review evidence 
 # Agent 用テンプレート
 
 `templates/agents/` は run-bundle artifact の正規 source template を収録します。
-`tools/agent_tools/agent_team.py` がこれらを `reports/agents/<run-id>/` へ展開します。
+`tools/agent/orchestration/agent_team.py` がこれらを `reports/agents/<run-id>/` へ展開します。
 
 ## Reader Map（読者 map）
 

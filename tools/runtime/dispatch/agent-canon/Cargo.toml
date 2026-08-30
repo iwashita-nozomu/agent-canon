@@ -1,0 +1,24 @@
+# @dependency-start
+# contract implementation
+# responsibility Defines the AgentCanon Rust CLI crate.
+# upstream design ../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+# downstream implementation src/main.rs CLI entrypoint
+# downstream implementation src/migration_audit.rs Rust migration audit command
+# downstream implementation src/python_algorithm_contract.rs Python algorithm contract checker
+# downstream implementation src/rust_migration_plan.rs Rust migration planning command
+# downstream implementation src/structured_analysis.rs structured analysis document inventory and cache build commands
+# downstream implementation src/test_design.rs test design resilience diagnostics
+# @dependency-end
+
+[package]
+name = "agent-canon"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+rusqlite = { version = "0.32", features = ["bundled"] }
+yaml-rust2 = "0.11"

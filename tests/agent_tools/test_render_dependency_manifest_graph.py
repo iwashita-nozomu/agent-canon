@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests dependency manifest graph bundle and projection public contracts.
-# upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders deterministic graph bundles and projections.
-# upstream implementation ../../tools/agent_tools/visualization_contract.py validates complete projection and readback coverage.
-# upstream implementation ../../tools/agent_tools/check_dependency_graph.sh produces graph TSV inputs.
+# upstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders deterministic graph bundles and projections.
+# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py validates complete projection and readback coverage.
+# upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh produces graph TSV inputs.
 # upstream design ../../documents/tools/render_dependency_manifest_graph.md defines renderer bundle, projection, and Graph IR contracts.
 # @dependency-end
 
@@ -22,10 +22,10 @@ from pathlib import Path
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RENDER_GRAPH = PROJECT_ROOT / "tools" / "agent_tools" / "render_dependency_manifest_graph.py"
+RENDER_GRAPH = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "render_dependency_manifest_graph.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import visualization_contract as contract  # noqa: E402
-from render_dependency_manifest_graph import HTML_SCRIPT, GraphIR  # noqa: E402
+import tools.validation.semantic.tools.visualization_contract as contract  # noqa: E402
+from tools.analysis.dependencies.render_dependency_manifest_graph import HTML_SCRIPT, GraphIR  # noqa: E402
 
 
 def run_renderer(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -67,7 +67,7 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
         """Bundle mode rejects existing targets and commits exactly six deterministic files."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            checker = root / "tools" / "agent_tools" / "check_dependency_graph.sh"
+            checker = root / "tools" / "analysis" / "dependencies" / "check_dependency_graph.sh"
             checker.parent.mkdir(parents=True)
             checker.write_text(
                 "#!/usr/bin/env bash\n"
@@ -120,7 +120,7 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             self.assertEqual(stdout_manifest["source"]["origin_kind"], "generated")
             self.assertEqual(
                 stdout_manifest["source"]["origin_locator"],
-                "tools/agent_tools/check_dependency_graph.sh#graph-tsv",
+                "tools/analysis/dependencies/check_dependency_graph.sh#graph-tsv",
             )
             self.assertEqual(stdout_manifest["source"]["root"], root.resolve().as_posix())
             self.assertEqual(stdout_manifest["checker"]["status"], "pass")
@@ -510,7 +510,7 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
         """Generated TSV mode preserves checker authority even when a TSV was written."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            checker = root / "tools" / "agent_tools" / "check_dependency_graph.sh"
+            checker = root / "tools" / "analysis" / "dependencies" / "check_dependency_graph.sh"
             checker.parent.mkdir(parents=True)
             checker.write_text(
                 "#!/usr/bin/env bash\n"

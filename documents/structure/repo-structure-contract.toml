@@ -5,7 +5,7 @@
 # upstream design ../runtime/SHARED_RUNTIME_SURFACES.md standalone runtime surface policy
 # upstream design ../runtime/shared-runtime-surfaces.toml machine-readable runtime inventory
 # upstream design ../../responsibility-scope.toml canonical path owner and class relation
-# downstream implementation ../../tools/agent_tools/repo_structure_contract.py compares observed trees against this contract
+# downstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py compares observed trees against this contract
 # downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
 # @dependency-end
 
@@ -35,8 +35,8 @@ ignore_globs = [
   "experiments/*/result",
   "experiments/*/result/**",
   "*/__pycache__",
-  "rust/agent-canon/target",
-  "rust/agent-canon/target/**",
+  "tools/runtime/dispatch/agent-canon/target",
+  "tools/runtime/dispatch/agent-canon/target/**",
   "tools/**/__pycache__",
 ]
 
@@ -48,7 +48,7 @@ detect_all = [
   "agents/TASK_WORKFLOWS.md",
   "documents/runtime/shared-runtime-surfaces.toml",
   "tools/catalog.yaml",
-  "rust/agent-canon/Cargo.toml",
+  "tools/runtime/dispatch/agent-canon/Cargo.toml",
 ]
 [[profile.required]]
 path = "README.md"
@@ -135,11 +135,11 @@ path = "tools/catalog.yaml"
 kind = "file"
 
 [[profile.required]]
-path = "tools/agent_tools"
+path = "tools/agent"
 kind = "dir"
 
 [[profile.required]]
-path = "tools/agent_tools/update_lifecycle_contract.py"
+path = "tools/runtime/lifecycle/update_lifecycle_contract.py"
 kind = "file"
 
 [[profile.required]]
@@ -147,19 +147,23 @@ path = "tools/user"
 kind = "dir"
 
 [[profile.required]]
-path = "tools/internal"
+path = "tools/analysis"
 kind = "dir"
 
 [[profile.required]]
-path = "tools/ci"
+path = "tools/repository"
 kind = "dir"
 
 [[profile.required]]
-path = "rust/agent-canon"
+path = "tools/runtime"
 kind = "dir"
 
 [[profile.required]]
-path = "rust/agent-canon/Cargo.toml"
+path = "tools/validation"
+kind = "dir"
+
+[[profile.required]]
+path = "tools/runtime/dispatch/agent-canon/Cargo.toml"
 kind = "file"
 
 [[profile.required]]
@@ -168,10 +172,6 @@ kind = "dir"
 
 [[profile.required]]
 path = "documents/notes"
-kind = "dir"
-
-[[profile.required]]
-path = "issues"
 kind = "dir"
 
 [[profile.optional]]

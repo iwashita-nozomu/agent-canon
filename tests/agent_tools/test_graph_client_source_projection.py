@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Verifies dependency consumers do not require persisted graph runtime state.
-# upstream implementation ../../tools/agent_tools/source_dependency_graph.py derives source projections
-# upstream implementation ../../tools/agent_tools/graph_client.py routes dependency reads to source
-# downstream implementation ../../tools/ci/check_agent_canon_pr.sh uses source-owned dependency review
+# upstream implementation ../../tools/analysis/dependencies/source_dependency_graph.py derives source projections
+# upstream implementation ../../tools/analysis/dependencies/graph_client.py routes dependency reads to source
+# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh uses source-owned dependency review
 # @dependency-end
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.graph_client import GraphClient, GraphClientError
+from tools.analysis.dependencies.graph_client import GraphClient, GraphClientError
 
 
 def write(path: Path, content: str) -> None:

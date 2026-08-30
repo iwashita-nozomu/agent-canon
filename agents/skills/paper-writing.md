@@ -87,7 +87,7 @@ section contract と citation/evidence trace を先に固定し、複数 reviewe
 ## Standard Command
 
 ```bash
-python3 tools/agent_tools/doc_start.py \
+python3 tools/analysis/documents/doc_start.py \
   --task "paper writing task" \
   --kind paper \
   --owner "codex" \

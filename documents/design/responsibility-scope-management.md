@@ -8,10 +8,10 @@ upstream design ../structure/repo-structure-contract.toml separate path existenc
 upstream design ../../responsibility-scope.toml machine-readable repo-local ownership manifest
 downstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
 upstream design ../../tools/catalog.yaml structured tool ownership
-downstream implementation ../../tools/agent_tools/responsibility_scope.py validates total single ownership
-downstream implementation ../../tools/agent_tools/import_responsibility.py validates local import ownership
-downstream implementation ../../tools/agent_tools/task_authority.py owns protected external dependency authority
-downstream implementation ../../tools/agent_tools/tool_drift.py validates scope/tool trace links
+downstream implementation ../../tools/validation/semantic/responsibility/responsibility_scope.py validates total single ownership
+downstream implementation ../../tools/analysis/code/import_responsibility.py validates local import ownership
+downstream implementation ../../tools/runtime/authority/task_authority.py owns protected external dependency authority
+downstream implementation ../../tools/validation/semantic/tools/tool_drift.py validates scope/tool trace links
 @dependency-end
 -->
 
@@ -87,7 +87,7 @@ Each `[[import_rule]]` declares which local Python scope imports are allowed:
 
 ## Tool Contract
 
-`tools/agent_tools/responsibility_scope.py` validates the manifest. It scans the
+`tools/validation/semantic/responsibility/responsibility_scope.py` validates the manifest. It scans the
 tracked path set once and fails when a tracked path has no owning scope or more
 than one owning scope after exclusions, a scope names a missing or uncataloged
 protecting tool, a GitHub Issue identity is malformed, or an `[[import_rule]]`
@@ -98,10 +98,10 @@ Use it before adding a new checker, hook, skill, workflow, issue family, or
 tracked top-level path:
 
 ```bash
-python3 tools/agent_tools/responsibility_scope.py --root .
+python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .
 ```
 
-`tools/agent_tools/import_responsibility.py` uses the same manifest for code
+`tools/analysis/code/import_responsibility.py` uses the same manifest for code
 imports. It parses Python AST, flags unused imported aliases and wildcard
 imports, resolves local imports to files when possible, and rejects source-scope
 to target-scope crossings that are not present in `[[import_rule]]`. Because
@@ -109,11 +109,11 @@ tracked paths have exactly one owning scope, import resolution consumes the same
 canonical relation instead of choosing among competing owner maps.
 
 ```bash
-python3 tools/agent_tools/import_responsibility.py --root .
-python3 tools/agent_tools/import_responsibility.py --root . --changed
+python3 tools/analysis/code/import_responsibility.py --root .
+python3 tools/analysis/code/import_responsibility.py --root . --changed
 ```
 
-`tools/agent_tools/task_authority.py` owns direct rewrite authority for vendored
+`tools/runtime/authority/task_authority.py` owns direct rewrite authority for vendored
 or installed library implementation files. External code changes must be a
 wrapper/adapter, fork/upstream patch, or manifest-backed vendor import rather
 than an in-place patch to library internals.
@@ -132,7 +132,7 @@ repository-qualified URL/number such as
 `iwashita-nozomu/agent-canon#882` or its full GitHub URL; no local `issues/`
 directory, mirror, state database, or pending marker is maintained.
 
-`tools/agent_tools/issue_sync.py` is a host adapter. Online mode reads and
+`tools/repository/github/issue_sync.py` is a host adapter. Online mode reads and
 publishes GitHub Issues with title/body/state readback. Offline mode writes only
 metadata (`body_locator`, `body_digest`, repository, number/title context, and
 run/task) under the private `agent-canon-log/feedback/issue-packets/pending/`
@@ -145,7 +145,7 @@ the mounted `.agent-canon/log-archive/` archive. The source tree must not
 contain an `agents/evals/results/` result surface. They are validated by:
 
 ```bash
-python3 tools/agent_tools/eval_accumulation_check.py --root .
+python3 eval/checkers/eval_accumulation_check.py --root .
 ```
 
 This gate checks structure, ignored-file status, JSONL readability, and unique

@@ -4,8 +4,8 @@
 # contract test
 # responsibility Verifies route failure normalization and fresh measurement schemas.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md route/measurement producer contract
-# upstream implementation ../../tools/agent_tools/skill_shim_evaluation.py evaluation producer
-# upstream implementation ../../tools/agent_tools/route.py unchanged route CLI
+# upstream implementation ../../eval/producers/skill_shim_evaluation.py evaluation producer
+# upstream implementation ../../tools/agent/orchestration/route.py unchanged route CLI
 # @dependency-end
 
 from __future__ import annotations
@@ -21,12 +21,12 @@ from types import SimpleNamespace
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
-sys.path.insert(0, str(TOOLS_ROOT))
+TOOLS_ROOT = PROJECT_ROOT / "eval" / "producers"
+sys.path.insert(0, str(PROJECT_ROOT))
 
-import skill_shim_evaluation  # noqa: E402
-from skill_shim_materializer import build_context  # noqa: E402
-from skill_shim_evaluation import (  # noqa: E402
+from eval.producers import skill_shim_evaluation  # noqa: E402
+from tools.agent.skills.skill_shim_materializer import build_context  # noqa: E402
+from eval.producers.skill_shim_evaluation import (  # noqa: E402
     ProducerError,
     _host_observation,
     _packet_manifest,
@@ -80,7 +80,7 @@ class SkillShimEvaluationTest(unittest.TestCase):
                     "--manifest",
                     str(
                         PROJECT_ROOT
-                        / "evidence/agent-evals/skill_runtime_shim_eval.toml"
+                        / "eval/definitions/skill_runtime_shim_eval.toml"
                     ),
                     "--host-evaluation-dir",
                     str(PROJECT_ROOT / "tests/fixtures/skill-runtime-shim/host-evaluations"),
@@ -172,7 +172,7 @@ def test_route_golden_uses_external_runtime_receipt(tmp_path: Path) -> None:
 
     def test_host_pairs_fail_closed_for_every_manifest_scenario(self) -> None:
         """Missing, duplicate, mismatched, and incomplete observations fail directly."""
-        manifest = PROJECT_ROOT / "evidence/agent-evals/skill_runtime_shim_eval.toml"
+        manifest = PROJECT_ROOT / "eval/definitions/skill_runtime_shim_eval.toml"
         _, packets = _packet_manifest(manifest)
         host_dir = PROJECT_ROOT / "tests/fixtures/skill-runtime-shim/host-evaluations"
         rows = [_host_observation(path) for path in sorted(host_dir.glob("*.json"))]

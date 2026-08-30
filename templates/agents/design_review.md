@@ -5,7 +5,7 @@ contract template
 responsibility Documents Detailed Design Review for this repository.
 upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement contract
 upstream design ../../documents/design/dependency-manifest-design.md dependency evidence contract
-upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verifies design-doc evidence claims
+upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py verifies design-doc evidence claims
 @dependency-end
 -->
 
@@ -67,7 +67,7 @@ implementation を進められるかを確認します。approve は以下に記
 
 ## Evidence Coverage Review（evidence coverage レビュー）
 
-<!-- major design claim が current code、dependency-header evidence、既存 docs、parent document を引用するか確認します。新規または変更した design doc では `python3 tools/agent_tools/check_design_doc_claims.py --root . <design-doc>` と artifact path を記録します。 -->
+<!-- major design claim が current code、dependency-header evidence、既存 docs、parent document を引用するか確認します。新規または変更した design doc では `python3 tools/validation/semantic/documents/check_design_doc_claims.py --root . <design-doc>` と artifact path を記録します。 -->
 
 ## Assumption Definition Review（仮定定義レビュー）
 

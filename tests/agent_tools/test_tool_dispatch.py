@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests typed catalog loading, parity gating, and argv-safe dispatch.
-# upstream implementation ../../tools/agent_tools/tool_dispatch.py owns dispatcher behavior
+# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py owns dispatcher behavior
 # upstream design ../../tools/catalog.yaml owns runtime schema and public inventory
 # downstream implementation ../../tools/bin/agent-canon owns the stable CLI namespace
 # @dependency-end
@@ -23,7 +23,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import yaml
-from tools.agent_tools import tool_dispatch
+from tools.runtime.dispatch import tool_dispatch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -69,6 +69,7 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(
             {spec.tool_id for spec in specs.values() if spec.parity == "verified"},
             {
+                "generate-agent-improvement-guide",
                 "generate-agent-runtime-dashboard",
                 "issue-sync",
                 "route",
@@ -83,7 +84,7 @@ class ToolDispatchTest(unittest.TestCase):
         issue_sync = specs["issue-sync"]
         self.assertEqual(
             issue_sync.argv,
-            ("python3", "tools/agent_tools/issue_sync.py"),
+            ("python3", "tools/repository/github/issue_sync.py"),
         )
         self.assertEqual(issue_sync.execution_plane, "tool-container")
         self.assertEqual(issue_sync.cwd_policy, "target-root")
@@ -125,7 +126,7 @@ class ToolDispatchTest(unittest.TestCase):
         dashboard = specs["generate-agent-runtime-dashboard"]
         self.assertEqual(
             dashboard.argv,
-            ("python3", "tools/agent_tools/generate_agent_runtime_dashboard.py"),
+            ("python3", "eval/producers/generate_agent_runtime_dashboard.py"),
         )
         self.assertEqual(dashboard.execution_plane, "tool-container")
         self.assertEqual(dashboard.cwd_policy, "target-root")
@@ -141,7 +142,7 @@ class ToolDispatchTest(unittest.TestCase):
                 "runtime": "python",
                 "argv": [
                     "python3",
-                    "tools/agent_tools/generate_agent_runtime_dashboard.py",
+                    "eval/producers/generate_agent_runtime_dashboard.py",
                 ],
                 "execution_plane": "tool-container",
                 "cwd": "target-root",
@@ -157,7 +158,7 @@ class ToolDispatchTest(unittest.TestCase):
                 "parity": "verified",
             },
             tool_id="generate-agent-runtime-dashboard",
-            path="tools/agent_tools/generate_agent_runtime_dashboard.py",
+            path="eval/producers/generate_agent_runtime_dashboard.py",
         )
         output_root = root / "control" / "runtime" / "reports"
         output_root.mkdir()
@@ -179,12 +180,12 @@ class ToolDispatchTest(unittest.TestCase):
         parity["entries"][0]["id"] = "generate-agent-runtime-dashboard"
         parity["entries"][0]["observed"]["argv"] = [
             "python3",
-            "tools/agent_tools/generate_agent_runtime_dashboard.py",
+            "eval/producers/generate_agent_runtime_dashboard.py",
         ]
         parity["entries"][0]["observed"]["cwd"] = "target-root"
         fixture.write_text(json.dumps(parity), encoding="utf-8")
         with patch(
-            "tools.agent_tools.tool_dispatch.subprocess.run",
+            "tools.runtime.dispatch.tool_dispatch.subprocess.run",
             return_value=subprocess.CompletedProcess([], 0),
         ) as run:
             status = tool_dispatch.run_tool(
@@ -216,7 +217,7 @@ class ToolDispatchTest(unittest.TestCase):
             request["argv"],
             [
                 "python3",
-                "tools/agent_tools/generate_agent_runtime_dashboard.py",
+                "eval/producers/generate_agent_runtime_dashboard.py",
                 "--root",
                 ".",
                 "--compact-out",

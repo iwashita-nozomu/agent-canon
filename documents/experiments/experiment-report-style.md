@@ -219,7 +219,7 @@ repo では、次のラベルで observation と interpretation を分けると�
   - plots / HTML report / `visualization.py` renderer output
   - `main` に持ち帰るもの
 - HTML report は standalone で開ける artifact として扱い、CSS で page background を明示的に白に指定します。browser / OS の dark mode に依存した背景色にしません。
-- SSH 越しの HPC / container で生成された HTML report を手元 PC のブラウザで確認する場合は、`tools/experiments/html_artifact_access.py` で server command、SSH tunnel command、local URL を出し、report または closeout evidence から辿れるようにします。
+- SSH 越しの HPC / container で生成された HTML report を手元 PC のブラウザで確認する場合は、`tools/experiments/artifacts/html_artifact_access.py` で server command、SSH tunnel command、local URL を出し、report または closeout evidence から辿れるようにします。
 
 ## 2.10 Critical Review
 

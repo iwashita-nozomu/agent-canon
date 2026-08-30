@@ -4,7 +4,7 @@
 @dependency-start
 contract template
 responsibility Documents Closeout Gate for this repository.
-downstream implementation ../../tools/agent_tools/task_close.py enforces closeout keys
+downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces closeout keys
 downstream design workflow_monitoring.md records in-workflow monitoring and self-improvement decisions
 downstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest evidence
 @dependency-end
@@ -131,7 +131,7 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 ## Repo-Wide Dependency Tool Evidence（repo-wide dependency tool evidence）
 
-<!-- checkpoint と final review では全 repository に `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を実行します。changed-file dependency check だけなら closeout を unlock しません。REPO_DEPENDENCY_REVIEW=pass と checked path count を記録し、header が missing/invalid なら修正して rerun します。 -->
+<!-- checkpoint と final review では全 repository に `bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing` を実行します。changed-file dependency check だけなら closeout を unlock しません。REPO_DEPENDENCY_REVIEW=pass と checked path count を記録し、header が missing/invalid なら修正して rerun します。 -->
 
 ## Canonical Formatter And Static Evidence（canonical formatter/static evidence）
 
@@ -291,11 +291,11 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 ## Agent Evaluation Evidence（agent evaluation evidence）
 
-<!-- evaluation reviewer が `tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` を実行し、生成した agent_evaluation.md の status、score、feedback action、learning capture decision を記録します。evaluation_status が pass でない、または feedback_actions_resolved が yes でない間は completion を unlock しません。evaluation は active signal、Behavior Events、intervention、skill/config/workflow/memory improvement decision の workflow_monitoring.md evidence を含めます。 -->
+<!-- evaluation reviewer が `eval/producers/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest eval/definitions/agent_behavior_eval.toml --write` を実行し、生成した agent_evaluation.md の status、score、feedback action、learning capture decision を記録します。evaluation_status が pass でない、または feedback_actions_resolved が yes でない間は completion を unlock しません。evaluation は active signal、Behavior Events、intervention、skill/config/workflow/memory improvement decision の workflow_monitoring.md evidence を含めます。 -->
 
 ## Runtime Log Archive Evidence（runtime log archive evidence）
 
-<!-- active run を `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>` で archive し、`python3 tools/agent_tools/runtime_log_archive_git.py push`、`python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` を user-facing completion 前に実行します。蓄積 runtime family を意図的に集める場合だけ broad `sync` を使います。archive が dirty、誤った `logs/<environment-key>-<chat-key>` branch、foreign repo-key の dirty path/commit tree を含む場合は closeout を unlock しません。archive/push が commit したか no-op か、archive branch と repo key を記録します。 -->
+<!-- active run を `python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>` で archive し、`python3 tools/runtime/archive/runtime_log_archive_git.py push`、`python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain` を user-facing completion 前に実行します。蓄積 runtime family を意図的に集める場合だけ broad `sync` を使います。archive が dirty、誤った `logs/<environment-key>-<chat-key>` branch、foreign repo-key の dirty path/commit tree を含む場合は closeout を unlock しません。archive/push が commit したか no-op か、archive branch と repo key を記録します。 -->
 
 - runtime_log_archive_sync_command:
 - runtime_log_archive_sync_status:

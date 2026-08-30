@@ -34,9 +34,9 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 
 - project-native configure / build / test evidence
 - When native static analysis is relevant and a CMake-generated database exists, use:
-  `python3 tools/static_analysis/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
-  `python3 tools/static_analysis/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`;
-  and `python3 tools/static_analysis/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`.
+  `python3 tools/validation/code/static/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
+  `python3 tools/validation/code/static/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`;
+  and `python3 tools/validation/code/static/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`.
   The build directory is explicit per module; the tool does not enumerate or add include paths,
   compiler flags, or provider-specific diagnostics.
 - `ctest` があるならその結果
@@ -121,7 +121,7 @@ workload、compiler、thread / device 条件を明記して handoff します。
 最初の判定は `computational-optimization` の convergence-first numerical
 performance diagnosis に委譲します。cpp review はその post-run record を
 受け取り、数学 / algorithm の観測と native implementation evidence を混ぜません。
-record は `python3 tools/agent_tools/numeric_performance.py --input
+record は `python3 tools/analysis/numerical/numeric_performance.py --input
 <post-run-observations.json> --format json` の分類結果を使います。
 
 - iteration count、residual / objective / KKT trajectory、KKT / finite state、step

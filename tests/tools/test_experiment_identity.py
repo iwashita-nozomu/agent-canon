@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests the canonical experiment identity codec and path grammar.
-# upstream implementation ../../tools/experiments/experiment_identity.py canonical owner
+# upstream implementation ../../tools/experiments/lifecycle/experiment_identity.py canonical owner
 # @dependency-end
 
 """Tests for canonical experiment identity validation and serialization."""
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.experiments.experiment_identity import (
+from tools.experiments.lifecycle.experiment_identity import (
     DuplicateJSONKeyError,
     ExperimentIdentity,
     ExperimentIdentityError,

@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests log surface inventory, Rust CLI field extraction, and baseline drift detection.
-# upstream implementation ../../tools/agent_tools/log_surface_inventory.py inventories emitted machine-readable fields
-# downstream implementation ../../tools/agent_tools/check_hook_retirement.py consumes inventory checks
+# upstream implementation ../../tools/runtime/archive/log_surface_inventory.py inventories emitted machine-readable fields
+# downstream implementation ../../tools/validation/semantic/hooks/check_hook_retirement.py consumes inventory checks
 # @dependency-end
 """Tests for log-surface field inventory."""
 
@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "log_surface_inventory.py"
+TOOL = PROJECT_ROOT / "tools" / "runtime" / "archive" / "log_surface_inventory.py"
 
 
 class LogSurfaceInventoryTest(unittest.TestCase):
@@ -73,13 +73,21 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             github_shell = root / ".github" / "scripts" / "sample.sh"
             github_shell.parent.mkdir(parents=True)
             github_shell.write_text("echo GITHUB_SCRIPT_STATUS=pass\n", encoding="utf-8")
-            rust_tool = root / "rust" / "agent-canon" / "src" / "sample.rs"
+            rust_tool = (
+                root
+                / "tools"
+                / "runtime"
+                / "dispatch"
+                / "agent-canon"
+                / "src"
+                / "sample.rs"
+            )
             rust_tool.parent.mkdir(parents=True)
             rust_tool.write_text(
                 'fn main() {\n    println!("RUST_TOOL_STATUS=pass");\n}\n',
                 encoding="utf-8",
             )
-            skill = root / ".agents" / "skills" / "sample" / "SKILL.md"
+            skill = root / "agents" / "skills" / "sample.md"
             skill.parent.mkdir(parents=True)
             skill.write_text("```text\nSKILL_RESULT=pass\n```\n", encoding="utf-8")
 
@@ -94,8 +102,8 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                     ".codex",
                     "tools",
                     ".github",
-                    "rust",
-                    ".agents",
+                    "tools/runtime/dispatch",
+                    "agents",
                 ],
                 check=True,
                 capture_output=True,

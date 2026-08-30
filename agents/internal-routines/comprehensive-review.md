@@ -21,7 +21,7 @@ repo 全体を横断して、文書、skill、ツール、統合設定の破綻�
 
 ## Core References
 
-- `tools/run_comprehensive_review.sh`
+- `tools/validation/review/run_comprehensive_review.sh`
 - `documents/tools/README.md`
 - `agents/internal-routines/project-review.md`
 
@@ -34,23 +34,23 @@ repo 全体を横断して、文書、skill、ツール、統合設定の破綻�
 ## Mandatory Checklist
 
 - review 対象が docs、skills、tools、integration points をまたいでいる
-- `tools/run_comprehensive_review.sh` の結果を確認している
+- `tools/validation/review/run_comprehensive_review.sh` の結果を確認している
 - fail した validator を個別に再現できる状態で残している
 - findings を repo-wide issue と局所 issue に分けている
 
 ## Default Sequence
 
 1. `project-review` で inventory を取り、comprehensive に見る必要があるかを判断します。
-1. `bash tools/run_comprehensive_review.sh` を実行します。
+1. `bash tools/validation/review/run_comprehensive_review.sh` を実行します。
 1. 失敗した validator の log を見て、repo-wide issue と局所 issue を切り分けます。
 1. 必要に応じて `make agent-checks`、`tools/bin/agent-canon docs check`、`make ci-quick` へ掘り下げます。
 1. closeout では、通った validator、失敗した validator、未確認領域を残します。
 
 ## Default Commands
 
-- `bash tools/run_comprehensive_review.sh`
-- `bash tools/run_comprehensive_review.sh --parallel`
-- `bash tools/run_comprehensive_review.sh --report`
+- `bash tools/validation/review/run_comprehensive_review.sh`
+- `bash tools/validation/review/run_comprehensive_review.sh --parallel`
+- `bash tools/validation/review/run_comprehensive_review.sh --report`
 
 ## Boundary
 

@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests import responsibility validation.
-# upstream implementation ../../tools/agent_tools/import_responsibility.py checks import boundaries
+# upstream implementation ../../tools/analysis/code/import_responsibility.py checks import boundaries
 # upstream design ../../responsibility-scope.toml declares scope import rules
 # @dependency-end
 
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "import_responsibility.py"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "code" / "import_responsibility.py"
 
 
 class ImportResponsibilityTest(unittest.TestCase):

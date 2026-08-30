@@ -10,7 +10,7 @@ upstream design ../workflows/pr-queue-cleanup-workflow.md dependency-queue workf
 upstream design ../workflows/agent-canon-pr-workflow.md AgentCanon source PR workflow
 upstream design ../../documents/agent-canon/agent-canon-update-route.md source PR versus parent pin route
 upstream design ../internal-routines/github-status-lifecycle.md deterministic GitHub Issue status-label reconciliation and evidence contract
-upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
+upstream implementation ../../tools/repository/github/github_publish.py publishes PRs and writes summary artifacts
 downstream implementation ../../.codex/personal/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -82,7 +82,7 @@ snapshot -> refresh_base -> integrate_on_pr_branch -> resolve
    stages (immutable blob references), staged/unmerged state, diff hunks, and
    unaffected user/unknown paths or hunks. The disposition for every path is
    `keep`, `replace`, or `manual`, with its owner and rationale. Use
-   `python3 tools/agent_tools/conflict_preservation.py capture ...` for the
+   `python3 tools/repository/git/conflict_preservation.py capture ...` for the
    inventory. The plan binds preserved content to the captured hunk identity
    (source blob/hunk hash, base path/range/context, and resolved diff); its
    changed/context lines are derived from the captured hunk, so a caller cannot

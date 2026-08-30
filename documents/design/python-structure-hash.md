@@ -4,10 +4,10 @@ contract design
 responsibility Defines Python structural duplicate analysis and module-group dependency semantics.
 upstream design ./rust-agent-tool-migration.md Rust tool migration policy for native agent tools.
 upstream design dependency-manifest-design.md repository dependency graph principles.
-downstream implementation ../../rust/agent-canon/src/python_structure_hash.rs extracts dependency-expanded structural findings.
-downstream implementation ../../rust/agent-canon/src/python_structure_hash_report.rs structures findings and computes module-group priority order.
-downstream implementation ../../rust/agent-canon/src/python_structure_hash_impact.rs compares before/after structured reports.
-downstream implementation ../../rust/agent-canon/src/python_structure_hash_scope_plan.rs builds change-impact scope plans from structured findings and dependency evidence.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_structure_hash.rs extracts dependency-expanded structural findings.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_structure_hash_report.rs structures findings and computes module-group priority order.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_structure_hash_impact.rs compares before/after structured reports.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_structure_hash_scope_plan.rs builds change-impact scope plans from structured findings and dependency evidence.
 @dependency-end
 -->
 

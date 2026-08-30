@@ -2,9 +2,9 @@
 @dependency-start
 contract tool
 responsibility Documents the exact D2.4 seven-function executable typed visualization contract owner.
-upstream implementation ../../tools/agent_tools/visualization_contract.py typed contract, ToolCall, marker, readback, and checker owner
+upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py typed contract, ToolCall, marker, readback, and checker owner
 downstream implementation ../../tests/agent_tools/test_visualization_contract.py exact contract coverage tests
-downstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py dependency artifact adapter
+downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py dependency artifact adapter
 @dependency-end
 -->
 
@@ -88,7 +88,7 @@ artifact readback without truncating failures.
 | knowledge adapter | `agent_canon.visualization.adapter.knowledge_graph` | `agent_canon.visualization.arguments.knowledge_graph.v1` |
 
 The executable path
-`tools/agent_tools/render_dependency_manifest_graph.py` is a command and is
+`tools/analysis/dependencies/render_dependency_manifest_graph.py` is a command and is
 never a ToolCall ID. `serialize_tool_call` validates the paired schema, exact
 shared fields, adapter locator fields, JSON types, and absence of unknown fields
 before emitting canonical UTF-8 JSON. Non-mappings, missing/extra top-level

@@ -88,7 +88,7 @@ Docstring の意味契約へ混ぜません。
   `responsibility-scope.toml` の `[[import_rule]]` に沿う必要があります。
 - 既存 scope を越える import が必要な場合は、先に設計上の依存方向を確認し、
   scope rule を更新するか、薄い adapter を既存責務側へ置きます。
-- `python3 tools/agent_tools/import_responsibility.py --changed` を
+- `python3 tools/analysis/code/import_responsibility.py --changed` を
   `ruff F401` より前の軽量 gate として使い、tool rejection を実装前に予測します。
 
 ## Library と helper-first の禁止
@@ -109,21 +109,21 @@ Docstring の意味契約へ混ぜません。
   `redundant_helper`、`redundancy_rule`、`redundant_with` を見て、既存実装へ
   統合するか、残す理由を design / issue に書きます。
 - helper / local function の名前は、推定 role に対応する action token を含めます。
-  `python3 tools/agent_tools/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps`
+  `python3 tools/analysis/code/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps`
   は、責務検索で再利用候補として見つけやすい名前へ寄せる review 対象を出します。
-- `tools/agent_tools/task_authority.py` と
-  `tools/agent_tools/responsibility_scope.py` はこの規約の edit-time owner です。
-- `tools/agent_tools/tool_rejection_preflight.py` は code edit 前の cause evidence
+- `tools/runtime/authority/task_authority.py` と
+  `tools/validation/semantic/responsibility/responsibility_scope.py` はこの規約の edit-time owner です。
+- `tools/validation/semantic/tools/tool_rejection_preflight.py` は code edit 前の cause evidence
   gate です。
 
 ## SOLID 設計契約
 
 Python 実装で class、dataclass、`Protocol`、継承、public API、型境界、依存方向を
 触る場合は、[オブジェクト指向設計方針](./object-oriented-design.md) と
-`tools/oop/python/readability.py` を SOLID principle signal の primary OOP evidence route にします。
-`tools/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` が finding kind から
+`tools/validation/code/oop/python/readability.py` を SOLID principle signal の primary OOP evidence route にします。
+`tools/validation/code/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` が finding kind から
 SOLID 見出しへの機械投影を所有します。
-`tools/agent_tools/check_solid_evidence.py` は SOLID-sensitive な Python 差分と
+`tools/validation/semantic/code/check_solid_evidence.py` は SOLID-sensitive な Python 差分と
 OOP readability report の `scanned_paths` coverage を照合します。
 
 | Principle | Python coding contract | Static risk signal |
@@ -137,7 +137,7 @@ OOP readability report の `scanned_paths` coverage を照合します。
 SOLID / OOP 境界の検証は、pytest wrapper ではなく該当 checker command を validation route に置きます。
 repo-wide review では `$oop-readability-check` を使い、Markdown / JSON report の
 SOLID principle signal counts、OOP dimension、finding kind、`path:line` を design artifact に引用します。
-closeout では `python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>`
+closeout では `python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>`
 で、SOLID-sensitive な path と OOP readability evidence の対応を確認します。
 
 ## 目次
@@ -157,7 +157,7 @@ closeout では `python3 tools/agent_tools/check_solid_evidence.py --changed --e
 
 ## Python ファイル修正後
 
-- `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
+- `python3 tools/validation/semantic/code/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
 - `python3 -m pyright`
 - `python3 -m pytest tests/ -q --tb=short`
 - `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`

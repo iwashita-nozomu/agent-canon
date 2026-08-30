@@ -6,9 +6,9 @@ contract tool
 responsibility Documents the standalone AgentCanon tool surface and execution-plane boundary.
 upstream design ../documents/runtime/bootstrap-runtime.md shared bootstrap user contract
 upstream design ../documents/runtime/runtime-log-archive.md external archive publication contract
-upstream implementation agent_tools/bootstrap_runtime.py lifecycle implementation
-upstream implementation agent_tools/tool_dispatch.py typed dispatch implementation
-upstream implementation agent_tools/runtime_artifacts.py external artifact boundary
+upstream implementation runtime/container/bootstrap_runtime.py lifecycle implementation
+upstream implementation runtime/dispatch/tool_dispatch.py typed dispatch implementation
+upstream implementation runtime/artifacts/runtime_artifacts.py external artifact boundary
 upstream design catalog.yaml public tool registry
 @dependency-end
 -->
@@ -18,6 +18,12 @@ the Python tools, Rust/CLI wrappers, host adapters, checkers, and tool catalog
 used by AgentCanon. A parent repository does not vendor this directory, copy it
 into its own `tools/`, or create a symlink view. Parent automation and project
 tests stay parent-owned.
+
+`tools/bin/agent-canon` resolves the repository root from its `BASH_SOURCE`
+script location before dispatching to `bootstrap.sh`. It is therefore
+cwd-independent: invoking the wrapper from any working directory uses the same
+source checkout and bootstrap runtime. Runtime and output roots remain the
+explicit control/runtime arguments supplied to the command.
 
 ## Execution planes
 
@@ -103,13 +109,13 @@ second README registry.
 
 | Need | Owner command |
 | --- | --- |
-| catalog shape and docs wiring | `python3 tools/agent_tools/tool_catalog.py` |
-| tool/workflow drift | `python3 tools/agent_tools/tool_drift.py` |
-| responsibility scope | `python3 tools/agent_tools/responsibility_scope.py --root .` |
-| runtime artifact boundary | `python3 tools/agent_tools/generated_artifact_guard.py` |
-| archive state | `python3 tools/agent_tools/runtime_log_archive_git.py status` |
-| eval archive structure | `python3 tools/agent_tools/eval_accumulation_check.py` |
-| path-risk/profile selection | `python3 tools/agent_tools/classify_path_risk.py` |
+| catalog shape and docs wiring | `python3 tools/runtime/manifest/tool_catalog.py` |
+| tool/workflow drift | `python3 tools/validation/semantic/tools/tool_drift.py` |
+| responsibility scope | `python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .` |
+| runtime artifact boundary | `python3 tools/runtime/artifacts/generated_artifact_guard.py` |
+| archive state | `python3 tools/runtime/archive/runtime_log_archive_git.py status` |
+| eval archive structure | `python3 eval/checkers/eval_accumulation_check.py` |
+| path-risk/profile selection | `python3 tools/validation/semantic/path/classify_path_risk.py` |
 | Markdown/links/Mermaid | `tools/bin/agent-canon docs check` |
 | semantic repository search | `tools/bin/agent-canon semantic-index ...` |
 | bounded Skill read and EOF admission | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` (shared tool container) |

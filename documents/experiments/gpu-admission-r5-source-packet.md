@@ -5,8 +5,8 @@
 contract design
 responsibility Records the reviewed GPU admission and managed-run handshake.
 upstream design ../runtime/runtime-profiles-and-check-matrix.md validation routing
-downstream implementation ../../tools/experiments/execution_resource_plan.py admission owner
-downstream implementation ../../tools/experiments/run_managed_experiment.py managed-run composition root
+downstream implementation ../../tools/experiments/execution/execution_resource_plan.py admission owner
+downstream implementation ../../tools/experiments/execution/run_managed_experiment.py managed-run composition root
 @dependency-end
 -->
 
@@ -53,7 +53,7 @@ identity は `-gpu-admission` suffix とし、default container/project を prof
 のいずれかが失敗した場合は default へ降格せず non-zero で停止します。provision/Compose generation/up/finalize
 failure は検証済み profile Compose/project だけを cleanup し、cleanup 結果と独立に元の
 rc を保持します。finalize の provision/readback parse と atomic publication は
-`tools/experiments/execution_resource_plan.py` が唯一の owner です。RDC-003 の bind
+`tools/experiments/execution/execution_resource_plan.py` が唯一の owner です。RDC-003 の bind
 acceptance は `finalize-shared-runtime.sh` が container-side target で
 create/write/read/remove を証明できることとし、host-visible owner、host-vs-container
 UID/GID、inode owner の exact equality を oracle にしません。`host_uid`/`host_gid`/
@@ -65,7 +65,7 @@ UID/GID、inode owner の exact equality を oracle にしません。`host_uid`
 symlink/type/mode、source/target device/inode、open-fd/path race、mount namespace と
 mount id/root、closed probe、schema/fingerprint、receipt lock、atomic publication、
 within-side group shape、UID non-zero/GID numeric の gate を弱めません。特に
-`tools/experiments/execution_resource_plan.py` の `read_shared_runtime_provision`、
+`tools/experiments/execution/execution_resource_plan.py` の `read_shared_runtime_provision`、
 `read_shared_runtime_readback`、`RuntimeIdentityReader.read` は receipt-file-owner と
 host/container numeric identity の mapping-sensitive equality だけを acceptance gate から
 外し、他の typed and fingerprinted evidence を保持します。

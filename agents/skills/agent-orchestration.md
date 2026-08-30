@@ -12,10 +12,10 @@ upstream design ./skill-dependencies.yaml typed public-skill prerequisites, succ
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
 upstream design ../../documents/design/request-intent-and-update-relation.md compact question, write-clause, and update-overlay flow
 upstream design ../../documents/tools/search-coordination.md unresolved owner/path search fallback
-upstream implementation ../../tools/agent_tools/skill_document_reader.py bounded Skill read and EOF admission
-downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
-downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives canonical invocation order
-downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the dependency graph
+upstream implementation ../../tools/agent/skills/skill_document_reader.py bounded Skill read and EOF admission
+downstream implementation ../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py execution contract checker
+downstream implementation ../../tools/agent/skills/skill_route_catalog.py derives canonical invocation order
+downstream implementation ../../tools/agent/skills/skill_dependency_map.py validates and projects the dependency graph
 downstream design ./direct-luna-communication.md owns bounded direct-Luna packet exchange and runtime acknowledgement
 @dependency-end
 -->
@@ -183,7 +183,7 @@ that decision.
    minimum decision fields. A structured handoff message or tool result is
    sufficient; create a durable packet only when coordination or resumption
    needs one.
-1. repo-changing execution では、owner、責務単位、実装機構、validation route が未確定のときだけ deterministic search を使う。明示された owner/README/user path が一つの編集先を選ぶ場合は provider 全体を走査せず、その owner evidence を source packet に記録する。`python3 tools/agent_tools/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` が利用できない場合は診断を残し、実際に owner/path の曖昧さが残るときだけ `router_unavailable_blocker` とする
+1. repo-changing execution では、owner、責務単位、実装機構、validation route が未確定のときだけ deterministic search を使う。明示された owner/README/user path が一つの編集先を選ぶ場合は provider 全体を走査せず、その owner evidence を source packet に記録する。`python3 tools/analysis/search/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` が利用できない場合は診断を残し、実際に owner/path の曖昧さが残るときだけ `router_unavailable_blocker` とする
 1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の structured output を信頼する。ただし tool が返した path は作業 packet であり、`requested_scope` を縮める許可ではありません。owner、依存、downstream、意図的に外す surface を確認し、packet が user request を覆うことを証明してから編集に入ります
 1. Structure Intake Packet と構造 checker は、directory/path ownership、root view、stale surface、document responsibility などの構造変更、または owner/path の曖昧さが実際に次の編集判断を変える場合だけ作る。通常の bounded edit、直接 owner path、README/user path の変更ではこれを必須化しない。必要な場合は `repo_structure_contract.py`、`responsibility_scope.py`、`file_surface_inventory.py --submodule-aware`、`import_responsibility.py` のうち判断に必要なものだけを使い、選択した構造要約を context に残す
 1. LLM-visible context に material を追加する前に Context Input Discipline を通す。各 material は routing、編集場所、validation、review、保留判断のどれを変えるのかを持つ必要があります。既読の owner surface、tool output、artifact は path、line、artifact reference で再利用し、runtime view と canonical owner、同じ log の再出力、同じ checker 結果の全文貼り直しは重複 input として扱います。exact wording が対象でない長い raw output は durable artifact と構造要約へ移し、request coverage と design evidence を落とさずに LLM-visible context を作ります
@@ -198,13 +198,13 @@ that decision.
 1. multi-agent にする場合でも、分割境界は `差し替え可能な単位` に限る。別実装、別証明、別文書責務、別 validation oracle、別 review decision に置き換え得る境界だけを slice / wave / worker scope にする。数理的に差し替えが発生しない境界、単なる記法・読解補助・固定 context・同じ oracle を共有する連続導出は分割せず、同じ packet と同じ owner scope に残す
 1. subagent scheduling は `CODEX_SUBAGENTS.md` が所有する typed capacity handshake と lifecycle ledger を消費し、ready dependency-DAG frontier の stage owner ごとに `vertical dynamic wave` を組みます。requested / configured / platform-effective / workflow-demand / write-cap / nested-reserved / available を分離し、既知制約の最小値を startup で read back してから reservation 成功時だけ spawn します。capacity が足りない ready work は失敗させず queue し、durable handback、全 descendant close readback、reservation release を終えた slot から再開します。固定 active/write 数、disposable capacity probe、または generated role view は scheduling authority になりません
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
-1. prompt-derived skill routing が必要なら `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
+1. prompt-derived skill routing が必要なら `python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
 1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。依存 source clone / module lifecycle が scope の場合は `$dependency-module-change` を一般 route として先に選び、AgentCanon update はその具体例として後続に置く。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
 1. repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。
 1. owner boundary、差し替え可能な単位、validation route が閉じた bounded edit も、write-capable child の通常 routeとして実行する。parent は既存 tool と targeted validation を child packet に指定するだけで、実行結果を自ら解釈しない。public API/behavior/schema の追加、縮小、削除、rename、restriction、deprecation、意味変更だけは `scoped_change` または broader route に進め、必要な dependency/consumer/migration/docs closure を形成する
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
-1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
+1. repo-changing execution では `python3 tools/validation/semantic/convention/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
 1. implementation が scope に入るときだけ Codex routing を出す
 1. tool が既に check した property を `explorer` や read-only reviewer に再読解させない。subagent へ渡すのは structured tool artifact と owned finding scope で、tool output が必要な抽象を欠く場合は tool contract の不足として扱う
 
@@ -338,7 +338,7 @@ format成功を、完成形の十分条件や全責務の証明へ自動昇格�
 ### Checkout Identity Readback
 
 Git 状態に関係する agent / work unit は、`checkout_identity` を一つの観測ブロック
-として扱います。`python3 tools/agent_tools/checkout_identity.py --format lines` が
+として扱います。`python3 tools/runtime/authority/checkout_identity.py --format lines` が
 絶対 `cwd`、Git root、branch または `detached`、HEAD、normalized remote
 `owner/repository` を出力します。開始時、cwd / checkout 変更後、conflict 解消前、
 commit / push / PR 前、cleanup または destructive Git 前、handoff / final handback
@@ -370,7 +370,7 @@ repository workflows. Consumers may project its state fields, but they must
 not create a second scheduling policy or reduce the requested responsibility.
 The machine-readable contract is
 `agents/skills/agent-orchestration.execution-contract.toml`; its production
-checker is `tools/agent_tools/check_execution_time_aware_orchestration.py`.
+checker is `tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py`.
 The selected-skill command catalog owns the required checker invocation; this
 owner and its runtime shim do not duplicate that command.
 Validation command scope is governed by the preceding write-capable handoff
@@ -589,7 +589,7 @@ requirement.
 
 `H`、`possible_branches`、`route_verdict`、`value_of_information`、evidence
 digest、または threshold は generic routing fields ではありません。必要な場合に
-限り、固定 Spark implementation route (`tools/agent_tools/implementation_route.py`)
+限り、固定 Spark implementation route (`tools/agent/orchestration/implementation_route.py`)
 の transport detail として scoped されます。Decision sufficiency is determined by
 the semantic owner, replaceable unit, implementation mechanism, validation route, and
 unresolved branches that can change them; no hypothesis-space or read-count form is
@@ -628,7 +628,7 @@ a new mandatory gate.
   design、document-flow、implementation、review の段階は、各 surface の未解決
   decision と validation need が実際に要求する場合だけ起動する
 - 着手時の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
-- PR を作る task では、同じ routing 宣言と `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
+- PR を作る task では、同じ routing 宣言と `python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
 - coordination/resumption が必要な場合だけ run bundle command と specialist
   activation を materialize する
 - `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` と typed parent-packet selection による implementer routing

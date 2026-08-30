@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests Codex runtime summary export into the AgentCanon log archive.
-# upstream implementation ../../tools/agent_tools/export_codex_runtime_summary.py exports bounded Codex runtime summaries
-# upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves codex-runtime archive paths
+# upstream implementation ../../tools/runtime/archive/export_codex_runtime_summary.py exports bounded Codex runtime summaries
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves codex-runtime archive paths
 # upstream design ../../documents/runtime/runtime-log-archive.md documents runtime log archive ownership
 # @dependency-end
 
@@ -21,9 +21,9 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "export_codex_runtime_summary.py"
+SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "archive" / "export_codex_runtime_summary.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import (  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
     codex_runtime_index_path,
     codex_runtime_summary_path,
     mounted_log_archive_root,

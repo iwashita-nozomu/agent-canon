@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests real observation classification and owner/handoff output.
-# upstream implementation ../../tools/agent_tools/numeric_performance.py owns the closed JSON classifier
+# upstream implementation ../../tools/analysis/numerical/numeric_performance.py owns the closed JSON classifier
 # upstream design ../../agents/skills/computational-optimization.md owns numerical performance ownership
 # downstream implementation ../../agents/skills/catalog.yaml exposes the classifier command
 # @dependency-end
@@ -17,7 +17,7 @@ from copy import deepcopy
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CLASSIFIER = PROJECT_ROOT / "tools" / "agent_tools" / "numeric_performance.py"
+CLASSIFIER = PROJECT_ROOT / "tools" / "analysis" / "numerical" / "numeric_performance.py"
 INPUT_SCHEMA = "agent-canon.numeric-performance-observation.v1"
 
 

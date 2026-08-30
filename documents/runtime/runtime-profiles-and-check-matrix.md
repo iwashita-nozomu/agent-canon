@@ -6,8 +6,8 @@ upstream design ../../ROOT_AGENTS.md root runtime entrypoint and closeout model
 upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
 downstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
-downstream implementation ../../tools/ci/run_all_checks.sh repo check runner
-downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects strict parent graph requirement from canonical profile IDs
+downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh repo check runner
+downstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects strict parent graph requirement from canonical profile IDs
 downstream implementation ../../tools/catalog.yaml structured tool catalog
 @dependency-end
 -->

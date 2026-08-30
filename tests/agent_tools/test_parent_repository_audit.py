@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies parent audit unit schema, semantic surface selection, path safety, and receipt aggregation.
 # upstream design ../../documents/design/parent-repository-audit.md owns failure semantics and unit contract
-# upstream implementation ../../tools/agent_tools/parent_repository_audit.py owns enumeration and evidence selection
+# upstream implementation ../../tools/analysis/code/parent_repository_audit.py owns enumeration and evidence selection
 # downstream implementation ../../documents/parent-repository-audit/README.md owns self-contained audit units
 # @dependency-end
 
@@ -19,10 +19,10 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "parent_repository_audit.py"
+TOOL = PROJECT_ROOT / "tools" / "analysis" / "code" / "parent_repository_audit.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from parent_repository_audit import _load_units
+from tools.analysis.code.parent_repository_audit import _load_units
 
 
 class ParentRepositoryAuditTests(unittest.TestCase):

@@ -3,10 +3,41 @@
   "version": 2,
   "entries": [
     {
+      "id": "generate-agent-improvement-guide",
+      "observed": {
+        "argv": [
+          "python3",
+          "eval/producers/generate_agent_improvement_guide.py"
+        ],
+        "cwd": "target-root",
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "written_paths": []
+      },
+      "probe_args": [
+        "--help"
+      ],
+      "legacy_result": {
+        "exit_code": 0,
+        "stdout_sha256": "b56ab4fd2fd2a679099327ae66d05bdd549ee455c05f805f5cd611135ebeef49",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      },
+      "container_result": {
+        "exit_code": 0,
+        "stdout_sha256": "b56ab4fd2fd2a679099327ae66d05bdd549ee455c05f805f5cd611135ebeef49",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      }
+    },
+    {
       "id": "generate-agent-runtime-dashboard",
       "probe_args": ["--help"],
       "observed": {
-        "argv": ["python3", "tools/agent_tools/generate_agent_runtime_dashboard.py"],
+        "argv": ["python3", "eval/producers/generate_agent_runtime_dashboard.py"],
         "cwd": "target-root",
         "stdin": "inherited",
         "stdout": "inherited",
@@ -32,7 +63,7 @@
       "id": "route",
       "probe_args": ["--list"],
       "observed": {
-        "argv": ["python3", "tools/agent_tools/route.py"],
+        "argv": ["python3", "tools/agent/orchestration/route.py"],
         "cwd": "target-root",
         "stdin": "inherited",
         "stdout": "inherited",
@@ -58,7 +89,7 @@
       "id": "issue-sync",
       "probe_args": ["--help"],
       "observed": {
-        "argv": ["python3", "tools/agent_tools/issue_sync.py"],
+        "argv": ["python3", "tools/repository/github/issue_sync.py"],
         "cwd": "target-root",
         "stdin": "inherited",
         "stdout": "inherited",
@@ -84,7 +115,7 @@
       "id": "template-bundle",
       "probe_args": ["export", "--help"],
       "observed": {
-        "argv": ["python3", "tools/agent_tools/template_bundle.py"],
+        "argv": ["python3", "tools/agent/templates/template_bundle.py"],
         "cwd": "source-root",
         "stdin": "inherited",
         "stdout": "captured",
@@ -108,9 +139,9 @@
     },
     {
       "id": "skill-document-reader",
-      "probe_args": ["index", "--path", "tools/agent_tools/skill_document_reader.py"],
+      "probe_args": ["index", "--path", "tools/agent/skills/skill_document_reader.py"],
       "observed": {
-        "argv": ["python3", "tools/agent_tools/skill_document_reader.py"],
+        "argv": ["python3", "tools/agent/skills/skill_document_reader.py"],
         "cwd": "source-root",
         "stdin": "inherited",
         "stdout": "inherited",

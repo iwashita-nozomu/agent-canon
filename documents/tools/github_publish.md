@@ -5,14 +5,14 @@ responsibility Documents the gh-backed GitHub publish and PR tool.
 upstream design ../agent-canon/agent-canon-github-remote.md defines canonical GitHub remote policy.
 upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR workflow usage.
 upstream design ../../ROOT_AGENTS.md defines PR mutation authority.
-downstream implementation ../../tools/agent_tools/github_publish.py implements the tool.
+downstream implementation ../../tools/repository/github/github_publish.py implements the tool.
 downstream implementation ../../tests/agent_tools/test_github_publish.py validates the tool contract.
 @dependency-end
 -->
 
 # GitHub Publish Tool
 
-`tools/agent_tools/github_publish.py` is the canonical AgentCanon entrypoint for
+`tools/repository/github/github_publish.py` is the canonical AgentCanon entrypoint for
 GitHub branch publication, pull request creation/update, and PR check evidence.
 It is `gh`-based for repository identity and PR operations, and uses `git push`
 only after `gh repo view` and `git remote get-url origin` agree on the same
@@ -46,7 +46,7 @@ branch-name inference, PR-context inference, and machine-local remote inference.
 Push the current topic branch:
 
 ```bash
-python3 tools/agent_tools/github_publish.py push \
+python3 tools/repository/github/github_publish.py push \
   --user-task "<current user task>" \
   --repo iwashita-nozomu/agent-canon
 ```
@@ -54,7 +54,7 @@ python3 tools/agent_tools/github_publish.py push \
 Push and create or update a pull request:
 
 ```bash
-python3 tools/agent_tools/github_publish.py publish-pr \
+python3 tools/repository/github/github_publish.py publish-pr \
   --user-task "<current user task>" \
   --repo iwashita-nozomu/agent-canon \
   --title "<PR title>" \
@@ -65,7 +65,7 @@ python3 tools/agent_tools/github_publish.py publish-pr \
 Read PR checks:
 
 ```bash
-python3 tools/agent_tools/github_publish.py checks \
+python3 tools/repository/github/github_publish.py checks \
   --user-task "<current user task>" \
   --repo iwashita-nozomu/agent-canon \
   --pr <number-or-branch>
@@ -135,6 +135,6 @@ PR body/check updates.
 
 ## Retired Shell Route
 
-`tools/push_origin.sh` no longer performs push work. It prints the replacement
+`tools/repository/publish/push_origin.sh` no longer performs push work. It prints the replacement
 command and exits so old shell snippets cannot become a second publish
 implementation or bypass the required user-task evidence.

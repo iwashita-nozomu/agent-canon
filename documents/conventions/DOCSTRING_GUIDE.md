@@ -232,7 +232,7 @@ normalization の意味、owner、evidence、validation を、次の短い struc
 | --- | --- | --- | --- | --- |
 | DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | `documents/design/cpp-build-layout.md` | canonical dependency readback と design document source anchor | canonical CI/readback、`check_design_doc_claims.py`、native-path candidate |
 | DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | `documents/conventions/coding-conventions-cpp.md` + `documents/design/cpp-build-layout.md` | C++ projection record の adapter owner、target identity、header/source anchor | design claim checker と C++ adapter readback |
-| DAL-03 | reviewer 選択は changed-surface evidence を existing language/docs candidates へ正規化し、OOP ownerだけを capability projection へ渡す | `tools/agent_tools/agent_team.py` + `agents/skills/catalog.yaml` | candidate list、OOP route packet、dependency order | `language_review_candidates`、`route.py`、orchestration check |
+| DAL-03 | reviewer 選択は changed-surface evidence を existing language/docs candidates へ正規化し、OOP ownerだけを capability projection へ渡す | `tools/agent/orchestration/agent_team.py` + `agents/skills/catalog.yaml` | candidate list、OOP route packet、dependency order | `language_review_candidates`、`route.py`、orchestration check |
 | DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | `documents/conventions/DOCSTRING_GUIDE.md` | DIC path / section / clause / evidence trace | docs check、prose readback、design claim checker |
 
 ## Language projection boundary
@@ -261,8 +261,8 @@ template documentation path を読み、選択された touched surface に対�
 | --- | --- |
 | `agents/skills/catalog.yaml` | OOP/type design owner の capability identity and selection |
 | `agents/skills/skill-dependencies.yaml` | prerequisite, successor, and dependency order |
-| `tools/agent_tools/agent_team.py` | changed paths から language reviewer candidates を選択 |
-| `tools/agent_tools/route.py` | OOP/type design capability と既存 route packet を materialize |
+| `tools/agent/orchestration/agent_team.py` | changed paths から language reviewer candidates を選択 |
+| `tools/agent/orchestration/route.py` | OOP/type design capability と既存 route packet を materialize |
 
 `agent_team.language_review_candidates` は Python implementation path（`python/`、`tests/`、
 `.py` / `.pyi`）、native C/C++ implementation path（native suffix または `src/`、`include/`、
@@ -293,7 +293,7 @@ source-root resolverが選ぶAgentCanon canonical D213 configを適用し、tool
 診断がある場合は明示 command が nonzero で終了します。
 
 AgentCanon の既定 review convention は source root 配下の
-`tools/ci/pydocstyle.toml` で D213 を選択し、相反する D212 を無視します。D212 と D213
+`tools/validation/ci/config/pydocstyle.toml` で D213 を選択し、相反する D212 を無視します。D212 と D213
 を同時に要求しません。親固有のDocstring reviewは親ownerの別commandで実行し、AgentCanon
 canonical configのauthorityを置き換えません。
 PR の blocking predicate には pydocstyle を含めず、pydocstyle の missing/diagnostic を

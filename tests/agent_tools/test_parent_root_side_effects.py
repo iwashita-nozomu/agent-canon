@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies authenticated parent capabilities, child state, publication, and exact cleanup.
-# upstream implementation ../../tools/agent_tools/parent_root_side_effects.py owns parent-local filesystem effects
+# upstream implementation ../../tools/repository/workspace/parent_root_side_effects.py owns parent-local filesystem effects
 # @dependency-end
 
 """Focused tests for the parent-root side-effect boundary."""
@@ -19,9 +19,9 @@ import time
 from pathlib import Path
 
 import pytest
-import tools.agent_tools.parent_root_side_effects as side_effects
-from tools.agent_tools.runtime_artifacts import root_capability_environment
-from tools.agent_tools.parent_root_side_effects import (
+import tools.repository.workspace.parent_root_side_effects as side_effects
+from tools.runtime.artifacts.runtime_artifacts import root_capability_environment
+from tools.repository.workspace.parent_root_side_effects import (
     ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
@@ -277,7 +277,7 @@ def test_handoff_nonce_receipt_survives_a_new_process(tmp_path: Path) -> None:
     token = boundary.issue_child_handoff(tmp_path, audience="process-test")
     code = (
         "from pathlib import Path; import sys; "
-        "from tools.agent_tools.parent_root_side_effects import *; "
+        "from tools.repository.workspace.parent_root_side_effects import *; "
         "request=ParentRootAttestationRequest(cwd=Path(sys.argv[1]), explicit_root=Path(sys.argv[1]), "
         "purpose='process-test', child_handoff_token=sys.argv[2]); "
         "ParentRootSideEffectBoundary().attest(request)"
@@ -1154,7 +1154,7 @@ def test_self_check_cli_reports_no_external_sentinel(tmp_path: Path) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     sentinel = tmp_path.parent / ".pbr-sentinel-not-created"
     result = subprocess.run(
-        [sys.executable, "tools/agent_tools/parent_root_side_effects.py", "self-check",
+        [sys.executable, "tools/repository/workspace/parent_root_side_effects.py", "self-check",
          "--root", str(tmp_path), "--sentinel-outside", str(sentinel)],
         check=False, capture_output=True, text=True,
     )
@@ -1241,7 +1241,7 @@ def test_capture_subprocess_publishes_and_replays_stdout(tmp_path: Path) -> None
     result = subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
+            "tools/repository/workspace/parent_root_side_effects.py",
             "capture-subprocess",
             "--root",
             str(tmp_path),
@@ -1293,7 +1293,7 @@ def test_exec_parent_bound_preserves_home_and_bindings(tmp_path: Path) -> None:
     result = subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
+            "tools/repository/workspace/parent_root_side_effects.py",
             "exec-parent-bound",
             "--root",
             str(tmp_path),
@@ -1334,7 +1334,7 @@ def test_exec_parent_bound_failure_does_not_leave_pending_handoff(tmp_path: Path
     result = subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
+            "tools/repository/workspace/parent_root_side_effects.py",
             "exec-parent-bound",
             "--root",
             str(tmp_path),
@@ -1360,7 +1360,7 @@ def test_exec_parent_bound_rejects_external_target_before_side_effects(tmp_path:
     result = subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
+            "tools/repository/workspace/parent_root_side_effects.py",
             "exec-parent-bound",
             "--root",
             str(tmp_path),
@@ -1442,7 +1442,7 @@ def test_verify_child_rejects_forged_purpose_without_handoff(tmp_path: Path) -> 
     result = subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
+            "tools/repository/workspace/parent_root_side_effects.py",
             "verify-child",
             "--root",
             str(tmp_path),

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests PDF/HTML reference materialization into Markdown.
-# upstream implementation ../../tools/agent_tools/reference_materializer.py converts external references
+# upstream implementation ../../tools/analysis/documents/reference_materializer.py converts external references
 # upstream design ../../references/README.md defines reference capture policy
 # @dependency-end
 
@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "reference_materializer.py"
+SCRIPT_PATH = PROJECT_ROOT / "tools" / "analysis" / "documents" / "reference_materializer.py"
 
 
 class ReferenceMaterializerTest(unittest.TestCase):

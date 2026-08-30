@@ -8,7 +8,7 @@
     "default_runtime_policy": "design_first_parent_managed_write_scope_team",
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
-    "canonical_runtime": "tools/agent_tools/agent_team.py",
+    "canonical_runtime": "tools/agent/orchestration/agent_team.py",
     "summary": "The manager owns intake coordination, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability, but subagent execution is modeled as repeatable role instances identified by role_id+instance_id+agent_type. Repo-changing tasks use an explicit staged flow by workflow family: owner-bounded changes use boundary-evidenced triage, while shared-canon and high-risk changes keep requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation -> conditional post-implementation test design -> implementation review. Research and scientific-software tasks use evidence-gated perspective review instead of enabling every reviewer by default. One physical agent candidate is selected for each active decision; specialists remain inactive until the parent cites a distinct decision, input artifact, and expected output, with decision_id, review_focus, and disjoint packets required for multiple perspectives. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles only when their named evidence exists. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are separate agents when activated; the same role may have multiple instances when each instance has a distinct input packet, expected output, and review or write scope. Every reviewed execution role uses one initial owning review per candidate epoch, stable blocking finding IDs, and focused recheck of only repaired blockers plus invalidated evidence. Advisory or duplicate findings never reopen implementation, repeated state/action fingerprints stop as non_convergent_cycle, and zero blockers with selected validation pass is terminal. Every run maintains a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution; detailed design review remains the strongest pre-implementation gate only when owner-boundary evidence is incomplete. Detailed design fixes identifier naming before implementation. Parent-managed write scopes govern all write-capable roles: write-capable agents may run concurrently, including same-role instances, only when their manifest write policies and handoffs assign disjoint paths in the current checkout; colliding writers are serialized into later waves instead of moved to separate worktrees; review roles remain artifact-only."
   },
   "always_on_roles": [
@@ -1797,7 +1797,7 @@
   ],
   "quality_gates": [
     "make agent-checks",
-    "tools/ci/pre_review.sh",
+    "tools/validation/ci/runners/pre_review.sh",
     "make ci"
   ],
   "artifacts": {
@@ -4112,7 +4112,7 @@
   ],
   "generated_profile_projection": {
     "schema_id": "generated_role_profile_projection_v1",
-    "materializer": "tools/agent_tools/model_profile_registry.py",
+    "materializer": "tools/agent/orchestration/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 37,
     "projection_digest": "f0cd3fa653279de50a8aae681ca36ef507b72721ba891235e4aebf56476bd11f"

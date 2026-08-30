@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies eval child runtime propagation and source immutability.
-# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py propagates typed runtime roots
+# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py propagates typed runtime roots
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md external artifact boundary
 # @dependency-end
 
@@ -17,9 +17,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(ROOT))
 
-from run_accumulated_agent_evals import (  # noqa: E402
+from eval.producers.run_accumulated_agent_evals import (  # noqa: E402
     EvalProducer,
     run_producers,
 )
@@ -120,7 +120,7 @@ def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) 
     )
     for command in commands:
         result = subprocess.run(
-            [sys.executable, str(ROOT / "tools" / "agent_tools" / command[0]), *command[1:]],
+            [sys.executable, str(ROOT / "eval" / "producers" / command[0]), *command[1:]],
             cwd=ROOT,
             check=False,
             capture_output=True,

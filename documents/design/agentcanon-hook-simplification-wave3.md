@@ -20,7 +20,7 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 ## Authority と設計境界
 
 - canonical design owner: `.codex/README.md` の Hook Context と `.codex/hooks/hook_dispatcher.py` の lifecycle contract
-- canonical non-hook owners: `tools/agent_tools/` の typed tool/checker modules、`tools/agent_tools/workflow_monitor.py` の monitor projection emitter
+- canonical non-hook owners: `tools/agent/` と `tools/runtime/` の typed tool/checker modules、`tools/runtime/lifecycle/workflow_monitor.py` の monitor projection emitter
 - decision: 3 active dispatcher events、inactive `Stop`、permanent tombstones、retired executable file なし
 - no compatibility surface: 旧 executable、re-export、wrapper、shim、fallback CLI は作らない
 - source checkout: fresh design clone from current `main`; implementation wave は同じ source snapshot を再読込して開始する
@@ -30,9 +30,9 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 | artifact owner | caller path | write/projection policy |
 | --- | --- | --- |
 | `.codex/hooks/hook_dispatcher.py` | finalized `UserPromptSubmit`/`PreToolUse`/`PostToolUse` path | one `record_hook_invocation` call; one `HookLogContext.append` for every active invocation; optional projection when append status is `spooled` and behavior record exists |
-| `tools/agent_tools/behavior_event_assembly.py` | direct import from dispatcher | returns `BehaviorEventRecord | None`; no I/O |
+| `tools/runtime/archive/behavior_event_assembly.py` | direct import from dispatcher | returns `BehaviorEventRecord | None`; no I/O |
 | `.codex/hooks/hook_event_log.py` | direct import from dispatcher | no-replace per-event spool append (`<spool>/<namespace>/<hook_name>/<hook_run_id>.json`) with `spooled|duplicate|failed` result |
-| `tools/agent_tools/workflow_monitor.py` | direct import from dispatcher | emit projection only when append status is `spooled` AND behavior record exists |
+| `tools/runtime/lifecycle/workflow_monitor.py` | direct import from dispatcher | emit projection only when append status is `spooled` AND behavior record exists |
 
 ### Active root and report projection placement
 
@@ -51,7 +51,7 @@ active handler は `record_hook_invocation` を一回、`HookLogContext.append` 
 
 Invalid interpretations:
 
-- no transport relocation (`tools/agent_tools/hook_event_log.py` への新設は不可)
+- no transport relocation（hook transport は `.codex/hooks/hook_event_log.py` に留める）
 - no compatibility wrapper / shim / fallback re-export
 - no count/path semantics changes (`RETIRED_CHILD_TOMBSTONES=23`, `MOVED_SOURCE_ABSENCES=1`, union `24`を維持)
 
@@ -70,8 +70,8 @@ baseline=$(mktemp documents/runtime/wave3-inventory-baseline.XXXXXX)
 git show 94283c909ebd8862942f69d9bf92923ff90e3592:documents/runtime/log-surface-inventory.json > "$baseline"
 printf 'LOG_SURFACE_BASELINE_COMMIT=94283c909ebd8862942f69d9bf92923ff90e3592\n'
 printf 'LOG_SURFACE_BASELINE_CONTENT_SHA256=%s\n' "$(sha256sum "$baseline" | awk '{print $1}')"
-python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline "$baseline"
-python3 tools/agent_tools/check_agent_runtime_alignment.py
+python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline "$baseline"
+python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 ```
 
 `git read-tree` は checkout を作り直すための操作ではなく、実装 clone の index/readback が source snapshot と一致することを確認する読み取り前提の手順である。共有 checkout では実行せず、fresh implementation clone でだけ実行する。
@@ -89,12 +89,12 @@ CALLER_AUDIT_ARTIFACTS = (
   "workflow_monitoring.md",     # monitor projection
 )
 CALLER_AUDIT_CONSUMERS = (
-  "tools/agent_tools/historical_skill_usage_reader.py",
-  "tools/agent_tools/generate_agent_improvement_guide.py",
-  "tools/agent_tools/workflow_monitor.py",
-  "tools/agent_tools/generate_agent_runtime_dashboard.py",
-  "tools/agent_tools/skill_lane_detector.py",
-  "tools/agent_tools/log_surface_inventory.py",
+  "tools/runtime/archive/historical_skill_usage_reader.py",
+  "eval/producers/generate_agent_improvement_guide.py",
+  "tools/runtime/lifecycle/workflow_monitor.py",
+  "eval/producers/generate_agent_runtime_dashboard.py",
+  "tools/agent/skills/skill_lane_detector.py",
+  "tools/runtime/archive/log_surface_inventory.py",
 )
 ```
 
@@ -106,7 +106,7 @@ The artifact sidecar records each artifact's `mode` (`historical_read_only`, `ac
 
 **canonical callers and reviewers**
 
-`tools/agent_tools/evaluate_workflow_selection.py`, `tools/agent_tools/evaluate_skill_workflow_prompts.py`, `tools/agent_tools/prompt_capture.py`（new）、`tools/agent_tools/prompt_classifier.py`（new）、`tools/agent_tools/tool_selection.py`（new）、`tools/agent_tools/subagent_selection.py`（new）、`tools/agent_tools/workflow_context.py`（new）、`tools/agent_tools/behavior_event_assembly.py`（new）、`tools/agent_tools/historical_skill_usage_reader.py`（new）、`tools/agent_tools/execution_resource_projection.py`（new）、`tools/agent_tools/hook_safety.py`（new）、`tools/agent_tools/hook_retirement.py`（new）、`tools/agent_tools/check_hook_retirement.py`（new）、`tools/agent_tools/tool_rejection_preflight.py`, `tools/agent_tools/import_responsibility.py`, `tools/agent_tools/task_authority.py`, `tools/agent_tools/review_dispatch.py`, `tools/agent_tools/report_artifact_checks.py`, `tools/agent_tools/task_close.py`, `tools/agent_tools/workflow_monitor.py`, `tools/agent_tools/skill_lane_detector.py`, `tools/agent_tools/generate_agent_runtime_dashboard.py`, `tools/agent_tools/generate_agent_improvement_guide.py`, `tools/agent_tools/log_surface_inventory.py`, `tools/agent_tools/runtime_log_paths.py`, `tools/agent_tools/runtime_log_archive_git.py`, `tools/agent_tools/export_codex_runtime_summary.py`, `tools/agent_tools/check_agent_runtime_alignment.py`, `tools/agent_tools/check_convention_compliance.py`, `tools/agent_tools/convention_compliance_contracts.toml`, `tools/ci/run_python_quality_checks.sh`, `.github/workflows/agent-improvement-guide.yml`, `tools/catalog.yaml`, `responsibility-scope.toml`, `documents/runtime/log-surface-inventory.json`, `documents/runtime/runtime-log-archive.md`, `documents/runtime/runtime-log-archive-migration.md`, `documents/experiments/gpu-admission-r5-source-packet.md`, `agents/canonical/CODEX_WORKFLOW.md`, `agents/skills/worktree-health.md`, `AGENTS.md`, `ROOT_AGENTS.md`, `README.md`。
+`eval/producers/evaluate_workflow_selection.py`, `eval/producers/evaluate_skill_workflow_prompts.py`, `tools/agent/orchestration/prompt_capture.py`（new）、`tools/agent/orchestration/prompt_classifier.py`（new）、`tools/agent/orchestration/tool_selection.py`（new）、`tools/agent/orchestration/subagent_selection.py`（new）、`tools/agent/orchestration/workflow_context.py`（new）、`tools/runtime/archive/behavior_event_assembly.py`（new）、`tools/runtime/archive/historical_skill_usage_reader.py`（new）、`tools/runtime/container/execution_resource_projection.py`（new）、`tools/runtime/authority/hook_safety.py`（new）、`tools/runtime/authority/hook_retirement.py`（new）、`tools/validation/semantic/hooks/check_hook_retirement.py`（new）、`tools/validation/semantic/tools/tool_rejection_preflight.py`, `tools/analysis/code/import_responsibility.py`, `tools/runtime/authority/task_authority.py`, `tools/agent/orchestration/review_dispatch.py`, `tools/runtime/artifacts/report_artifact_checks.py`, `tools/runtime/lifecycle/task_close.py`, `tools/runtime/lifecycle/workflow_monitor.py`, `tools/agent/skills/skill_lane_detector.py`, `eval/producers/generate_agent_runtime_dashboard.py`, `eval/producers/generate_agent_improvement_guide.py`, `tools/runtime/archive/log_surface_inventory.py`, `tools/runtime/archive/runtime_log_paths.py`, `tools/runtime/archive/runtime_log_archive_git.py`, `tools/runtime/archive/export_codex_runtime_summary.py`, `tools/validation/semantic/runtime/check_agent_runtime_alignment.py`, `tools/validation/semantic/convention/check_convention_compliance.py`, `tools/validation/semantic/convention/convention_compliance_contracts.toml`, `tools/validation/ci/checks/run_python_quality_checks.sh`, `.github/workflows/agent-improvement-guide.yml`, `tools/catalog.yaml`, `responsibility-scope.toml`, `documents/runtime/log-surface-inventory.json`, `documents/runtime/runtime-log-archive.md`, `documents/runtime/runtime-log-archive-migration.md`, `documents/experiments/gpu-admission-r5-source-packet.md`, `agents/canonical/CODEX_WORKFLOW.md`, `agents/skills/worktree-health.md`, `AGENTS.md`, `ROOT_AGENTS.md`, `README.md`。
 
 **tests、fixtures、generated readback**
 
@@ -115,7 +115,7 @@ The artifact sidecar records each artifact's `mode` (`historical_read_only`, `ac
 Audit conclusions:
 
 1. current dispatcher has 23 former child names in `FORMER_ACTIVE_HOOK_CHILDREN` and a duplicated `RETIRED_HOOK_ROUTES` table;
-2. current `tools/agent_tools/evaluate_workflow_selection.py` dynamically loads `.codex/hooks/skill_usage_logger.py`;
+2. current `eval/producers/evaluate_workflow_selection.py` dynamically loads `.codex/hooks/skill_usage_logger.py`;
 3. current dashboard next-action/readback text and `documents/runtime/log-surface-inventory.json` contain `.codex/hooks/skill_usage_logger.py` records;
 4. current `.codex/hooks/hook_dispatcher.py` imports `.codex/hooks/hook_safety.py`, so moving that file requires a direct dispatcher import change and an absent old path proof;
 5. convention, quality, report, worktree-health, GPU admission, catalog, responsibility, and generated-inventory surfaces are callers/readbacks, even when they do not invoke the hook process directly.
@@ -130,15 +130,15 @@ Issue history is recreated as a compatibility surface.
 
 | group | current child/caller | reusable responsibility | one target owner |
 | --- | --- | --- | --- |
-| B1 | `execution_resource_plan_projection_guard.py` → dispatcher and projection tests | exact normalized input and projection byte validation | new `tools/agent_tools/execution_resource_projection.py`; producer authority remains `tools/experiments/execution_resource_plan.py` |
-| B2 | `skill_usage_logger.py` → evaluator and prompt-eval tests | pure prompt-to-workflow/skill classification | new `tools/agent_tools/prompt_classifier.py`; evaluator imports it directly |
-| B3 | `prompt_secret_guard.py` → prompt safety and dispatcher | secret classification and redacted block payload | `tools/agent_tools/hook_safety.py` |
-| B4 | `branch_worktree_guard.py` and workflow docs → dispatcher | destructive Git intent, same-segment authority, redacted payload | the same `tools/agent_tools/hook_safety.py`; policy wording remains `agents/canonical/CODEX_WORKFLOW.md` |
-| B5 | `cause_investigation_guard.py` → preflight gate | cause evidence preflight | existing `tools/agent_tools/tool_rejection_preflight.py` |
-| B6 | `module_boundary_guard.py` → preflight gate | import boundary finding | existing `tools/agent_tools/import_responsibility.py` |
-| B7 | `library_implementation_guard.py`, `first_party_library_guard.py` | dependency/public-surface authority | final decision owner: `tools/agent_tools/task_authority.py`; `responsibility_scope.py` and `$dependency-module-change` are read-only consumers/callers |
+| B1 | `execution_resource_plan_projection_guard.py` → dispatcher and projection tests | exact normalized input and projection byte validation | new `tools/runtime/container/execution_resource_projection.py`; producer authority remains `tools/experiments/execution/execution_resource_plan.py` |
+| B2 | `skill_usage_logger.py` → evaluator and prompt-eval tests | pure prompt-to-workflow/skill classification | new `tools/agent/orchestration/prompt_classifier.py`; evaluator imports it directly |
+| B3 | `prompt_secret_guard.py` → prompt safety and dispatcher | secret classification and redacted block payload | `tools/runtime/authority/hook_safety.py` |
+| B4 | `branch_worktree_guard.py` and workflow docs → dispatcher | destructive Git intent, same-segment authority, redacted payload | the same `tools/runtime/authority/hook_safety.py`; policy wording remains `agents/canonical/CODEX_WORKFLOW.md` |
+| B5 | `cause_investigation_guard.py` → preflight gate | cause evidence preflight | existing `tools/validation/semantic/tools/tool_rejection_preflight.py` |
+| B6 | `module_boundary_guard.py` → preflight gate | import boundary finding | existing `tools/analysis/code/import_responsibility.py` |
+| B7 | `library_implementation_guard.py`, `first_party_library_guard.py` | dependency/public-surface authority | final decision owner: `tools/runtime/authority/task_authority.py`; `responsibility_scope.py` and `$dependency-module-change` are read-only consumers/callers |
 | B8 | `style_checker_guard.py` and quality script | Markdown/style validation | `tools/bin/agent-canon docs check` and `$md-style-check` |
-| B9 | `completion_review_guard.py` → review/report/quality callers | review/completion acceptance | final decision owner: `tools/agent_tools/review_dispatch.py`; `report_artifact_checks.py`, `task_close.py`, and `run_python_quality_checks.sh` are read-only consumers/callers |
+| B9 | `completion_review_guard.py` → review/report/quality callers | review/completion acceptance | final decision owner: `tools/agent/orchestration/review_dispatch.py`; `report_artifact_checks.py`, `task_close.py`, and `run_python_quality_checks.sh` are read-only consumers/callers |
 
 The 14 direct-retirement positions are: `log_archive_mount_warning.py`, `reference_capture_guard.py`, `direct_rg_context_guard.py`, `task_authority_schema_guard.py`, `role_write_policy_guard.py`, `oop_readability_guard.py`, `first_party_library_guard.py`, `helper_inventory_guard.py`, `helper_first_guard.py`, `log_surface_inventory_guard.py`, `notebook_quality_guard.py`, `goal_completion_guard.py`, `codex_runtime_summary_logger.py`, `runtime_log_auto_sync.py`. The 9 blocking positions are `execution_resource_plan_projection_guard.py`, `skill_usage_logger.py`, `prompt_secret_guard.py`, `branch_worktree_guard.py`, `cause_investigation_guard.py`, `module_boundary_guard.py`, `library_implementation_guard.py`, `style_checker_guard.py`, and `completion_review_guard.py`. `first_party_library_guard.py` is the shared B7/direct cleanup position and is stored once, so the typed child manifest remains 23 unique rows while the retirement ledger remains 14+9 positions.
 
@@ -146,8 +146,8 @@ The 14 direct-retirement positions are: `log_archive_mount_warning.py`, `referen
 
 | group | final decision owner | read-only consumers/callers | one execution route |
 | --- | --- | --- | --- |
-| B7 | `tools/agent_tools/task_authority.py:first_party_library_authorized` | `responsibility_scope.py` projects scope evidence; `$dependency-module-change` supplies dependency-source context; `tool_rejection_preflight.py` reports the finding | `import-only:tools.agent_tools.task_authority:first_party_library_authorized` |
-| B9 | `tools/agent_tools/review_dispatch.py:resolve_current_review_state` | `report_artifact_checks.py` consumes the typed review state; `task_close.py` consumes readiness; `tools/ci/run_python_quality_checks.sh` invokes the existing validation set | `import-only:tools.agent_tools.review_dispatch:resolve_current_review_state` |
+| B7 | `tools/runtime/authority/task_authority.py:first_party_library_authorized` | `responsibility_scope.py` projects scope evidence; `$dependency-module-change` supplies dependency-source context; `tool_rejection_preflight.py` reports the finding | `import-only:tools.runtime.authority.task_authority:first_party_library_authorized` |
+| B9 | `tools/agent/orchestration/review_dispatch.py:resolve_current_review_state` | `report_artifact_checks.py` consumes the typed review state; `task_close.py` consumes readiness; `tools/validation/ci/checks/run_python_quality_checks.sh` invokes the existing validation set | `import-only:tools.agent.orchestration.review_dispatch:resolve_current_review_state` |
 
 The read-only consumers may not emit an independent B7/B9 decision, approval, or alternate execution route. Their fields are projections of the decision owner result: B7 exposes authority `allowed/reason`; B9 exposes the current candidate, decision, dispatch blocker, and `publication_unlocked`. A missing or malformed owner result is a blocking finding, not a consumer-local fallback.
 
@@ -167,7 +167,7 @@ The active handler set is exactly `UserPromptSubmit.secret_safety`, `PreToolUse.
 
 ### Dispatcher caller contract for `record_hook_invocation`
 
-The dispatcher imports `record_hook_invocation` directly from `tools/agent_tools/behavior_event_assembly.py` using the same source-root import bootstrap as the other non-hook owners. Each active handler constructs one immutable `HookInvocationParts` value only after its existing handler result is final:
+The dispatcher imports `record_hook_invocation` directly from `tools/runtime/archive/behavior_event_assembly.py` using the same source-root import bootstrap as the other non-hook owners. Each active handler constructs one immutable `HookInvocationParts` value only after its existing handler result is final:
 
 ```text
 HookInvocationParts = frozen {
@@ -246,14 +246,14 @@ event_id = hashlib.sha256(event_id_preimage).hexdigest()
 
 ### One `hook_safety` owner, direct import, old path deleted
 
-The single safety owner is `tools/agent_tools/hook_safety.py`. It receives all pure reusable safety logic from the current `.codex/hooks/hook_safety.py`: `SECRET_PATTERNS`, `SHELL_TOOL_NAMES`, payload extractors, `secret_kind`, `secret_block_payload`, `GitCommand`, `GitIntent`, shell/backtick parsing, protected update/branch/worktree/Git intent classification, authority predicates, `first_block`, `command_sha256`, and `branch_block_payload`. No second `prompt_safety.py`, `destructive_git_safety.py`, or hook-local safety owner exists.
+The single safety owner is `tools/runtime/authority/hook_safety.py`. It receives all pure reusable safety logic from the current `.codex/hooks/hook_safety.py`: `SECRET_PATTERNS`, `SHELL_TOOL_NAMES`, payload extractors, `secret_kind`, `secret_block_payload`, `GitCommand`, `GitIntent`, shell/backtick parsing, protected update/branch/worktree/Git intent classification, authority predicates, `first_block`, `command_sha256`, and `branch_block_payload`. No second `prompt_safety.py`, `destructive_git_safety.py`, or hook-local safety owner exists.
 
-The implementation dispatcher import contract is exact: resolve `Path(__file__).resolve().parents[2]` as source root, prepend `<source-root>/tools/agent_tools` once to `sys.path` if absent, then use this direct-import list exactly once:
+The implementation dispatcher import contract is exact: resolve `Path(__file__).resolve().parents[2]` as source root, prepend `<source-root>` once to `sys.path` if absent, then use this direct-import list exactly once:
 
 ```text
-import hook_safety                              # canonical `tools.agent_tools.hook_safety`
-import execution_resource_projection             # canonical `tools.agent_tools.execution_resource_projection`
-import hook_retirement                          # canonical `tools.agent_tools.hook_retirement`
+import hook_safety                              # canonical `tools.runtime.authority.hook_safety`
+import execution_resource_projection             # canonical `tools.runtime.container.execution_resource_projection`
+import hook_retirement                          # canonical `tools.runtime.authority.hook_retirement`
 from tool_selection import ToolSelection, select_tools
 from subagent_selection import SubagentSelection, select_subagents
 from workflow_context import WorkflowContext, load_workflow_context
@@ -262,13 +262,13 @@ from behavior_event_assembly import HookInvocationParts, record_hook_invocation
 from workflow_monitor import emit_behavior_projection
 ```
 
-After the source-root path insertion, imports are ordinary direct Python imports. The canonical identities for the new parts-prepared precomputed values are `tools.agent_tools.tool_selection`, `tools.agent_tools.subagent_selection`, and `tools.agent_tools.workflow_context`; behavior assembly is `tools.agent_tools.behavior_event_assembly` via `from behavior_event_assembly import HookInvocationParts, record_hook_invocation`; and `.codex/hooks/hook_event_log.py` is not imported as a tool module but as local hook module `from hook_event_log`. No `importlib`, dynamic path loading, CLI subprocess, or second assembly import is permitted. The dispatcher must not inspect cwd or Git, spawn a process, or access a network. It calls the new owner directly; `.codex/hooks/hook_safety.py` is deleted after the new owner and pure-owner tests pass. The old file is not a wrapper and is not importable in target state.
+After the source-root path insertion, imports are ordinary direct Python imports. The canonical identities for the new parts-prepared precomputed values are `tools.agent.orchestration.tool_selection`, `tools.agent.orchestration.subagent_selection`, and `tools.agent.orchestration.workflow_context`; behavior assembly is `tools.runtime.archive.behavior_event_assembly` via `from behavior_event_assembly import HookInvocationParts, record_hook_invocation`; and `.codex/hooks/hook_event_log.py` is not imported as a tool module but as local hook module `from hook_event_log`. No `importlib`, dynamic path loading, CLI subprocess, or second assembly import is permitted. The dispatcher must not inspect cwd or Git, spawn a process, or access a network. It calls the new owner directly; `.codex/hooks/hook_safety.py` is deleted after the new owner and pure-owner tests pass. The old file is not a wrapper and is not importable in target state.
 
 Raw-to-spool mapping: for every active invocation, the handler result defines one base spool record; behavior-only fields are an optional enrichment layer merged into that base before append.
 
 ## Canonical tombstone manifest and guard
 
-`tools/agent_tools/hook_retirement.py` is the one source of retirement metadata. It is a pure import-only data module; dispatcher and guard import it, and neither reproduces the list.
+`tools/runtime/authority/hook_retirement.py` is the one source of retirement metadata. It is a pure import-only data module; dispatcher and guard import it, and neither reproduces the list.
 
 ```text
 TOMBSTONE_SCHEMA = "agent-canon.hook-retirement-tombstones.v2"
@@ -291,12 +291,12 @@ RETIRED_CHILD_TOMBSTONES: tuple[RetiredChildTombstone, ...]  # exactly 23
 MOVED_SOURCE_ABSENCES: tuple[MovedSourceAbsence, ...]       # exactly 1
 ```
 
-The two tuples are type-separated. `RETIRED_CHILD_TOMBSTONES` contains exactly the 23 former child names (14 direct plus 9 blocking). `MOVED_SOURCE_ABSENCES` contains exactly `.codex/hooks/hook_safety.py`, whose implementation moves to `tools/agent_tools/hook_safety.py`; it is an absent source path, not a retired child responsibility. The union has exactly 24 basenames. The 14+9 retirement ledger remains the child retirement order; the safety leaf relocation is a prerequisite move.
+The two tuples are type-separated. `RETIRED_CHILD_TOMBSTONES` contains exactly the 23 former child names (14 direct plus 9 blocking). `MOVED_SOURCE_ABSENCES` contains exactly `.codex/hooks/hook_safety.py`, whose implementation moves to `tools/runtime/authority/hook_safety.py`; it is an absent source path, not a retired child responsibility. The union has exactly 24 basenames. The 14+9 retirement ledger remains the child retirement order; the safety leaf relocation is a prerequisite move.
 
 `command_or_skill` has one fixed metadata grammar and no old executable path:
 
-- pure owner: `import-only:tools.agent_tools.<module>:<symbol>`;
-- canonical command: `command-only:python3 tools/agent_tools/<owner>.py <subcommand>`;
+- pure owner: `import-only:tools.agent.<module>:<symbol>`;
+- canonical command: `command-only:python3 tools/agent/<owner>.py <subcommand>`;
 - canonical skill: `skill-only:$<skill-id>`;
 - canonical docs command: `docs-only:tools/bin/agent-canon docs check`.
 
@@ -306,35 +306,35 @@ The canonical tuple rows are fixed as follows; no row may be inferred from a nea
 
 | filename | owner | command_or_skill |
 | --- | --- | --- |
-| `log_archive_mount_warning.py` | `tools/agent_tools/runtime_log_archive_git.py` | `command-only:python3 tools/agent_tools/runtime_log_archive_git.py ensure` |
-| `reference_capture_guard.py` | `tools/agent_tools/reference_materializer.py` | `command-only:python3 tools/agent_tools/reference_materializer.py` |
+| `log_archive_mount_warning.py` | `tools/runtime/archive/runtime_log_archive_git.py` | `command-only:python3 tools/runtime/archive/runtime_log_archive_git.py ensure` |
+| `reference_capture_guard.py` | `tools/analysis/documents/reference_materializer.py` | `command-only:python3 tools/analysis/documents/reference_materializer.py` |
 | `direct_rg_context_guard.py` | `$task-routing` | `skill-only:$task-routing` |
-| `task_authority_schema_guard.py` | `tools/agent_tools/task_authority.py` | `command-only:python3 tools/agent_tools/task_authority.py` |
-| `role_write_policy_guard.py` | `tools/agent_tools/agent_team.py` | `command-only:python3 tools/agent_tools/agent_team.py` |
+| `task_authority_schema_guard.py` | `tools/runtime/authority/task_authority.py` | `command-only:python3 tools/runtime/authority/task_authority.py` |
+| `role_write_policy_guard.py` | `tools/agent/orchestration/agent_team.py` | `command-only:python3 tools/agent/orchestration/agent_team.py` |
 | `oop_readability_guard.py` | `$oop-readability-check` | `skill-only:$oop-readability-check` |
-| `first_party_library_guard.py` | `tools/agent_tools/task_authority.py` | `import-only:tools.agent_tools.task_authority:first_party_library_authorized` |
-| `helper_inventory_guard.py` | `tools/agent_tools/helper_function_inventory.py` | `command-only:python3 tools/agent_tools/helper_function_inventory.py` |
-| `helper_first_guard.py` | `tools/agent_tools/responsibility_scope.py` | `command-only:python3 tools/agent_tools/responsibility_scope.py --root .` |
-| `log_surface_inventory_guard.py` | `tools/agent_tools/log_surface_inventory.py` | `command-only:python3 tools/agent_tools/log_surface_inventory.py --root . --check` |
-| `notebook_quality_guard.py` | `tools/validation/notebook_quality.py` | `command-only:python3 tools/validation/notebook_quality.py` |
+| `first_party_library_guard.py` | `tools/runtime/authority/task_authority.py` | `import-only:tools.runtime.authority.task_authority:first_party_library_authorized` |
+| `helper_inventory_guard.py` | `tools/analysis/code/helper_function_inventory.py` | `command-only:python3 tools/analysis/code/helper_function_inventory.py` |
+| `helper_first_guard.py` | `tools/validation/semantic/responsibility/responsibility_scope.py` | `command-only:python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .` |
+| `log_surface_inventory_guard.py` | `tools/runtime/archive/log_surface_inventory.py` | `command-only:python3 tools/runtime/archive/log_surface_inventory.py --root . --check` |
+| `notebook_quality_guard.py` | `tools/validation/notebooks/notebook_quality.py` | `command-only:python3 tools/validation/notebooks/notebook_quality.py` |
 | `goal_completion_guard.py` | `$adaptive-improvement-loop` | `skill-only:$adaptive-improvement-loop` |
-| `codex_runtime_summary_logger.py` | `tools/agent_tools/export_codex_runtime_summary.py` | `command-only:python3 tools/agent_tools/export_codex_runtime_summary.py` |
-| `runtime_log_auto_sync.py` | `tools/agent_tools/runtime_log_archive_git.py` | `command-only:python3 tools/agent_tools/runtime_log_archive_git.py sync` |
-| `execution_resource_plan_projection_guard.py` | `tools/agent_tools/execution_resource_projection.py` | `import-only:tools.agent_tools.execution_resource_projection:validate_projection_bytes` |
-| `skill_usage_logger.py` | `tools/agent_tools/behavior_event_assembly.py` | `import-only:tools.agent_tools.behavior_event_assembly:record_hook_invocation` |
-| `prompt_secret_guard.py` | `tools/agent_tools/hook_safety.py` | `import-only:tools.agent_tools.hook_safety:secret_block_payload` |
-| `branch_worktree_guard.py` | `tools/agent_tools/hook_safety.py` | `import-only:tools.agent_tools.hook_safety:first_block` |
-| `cause_investigation_guard.py` | `tools/agent_tools/tool_rejection_preflight.py` | `command-only:python3 tools/agent_tools/tool_rejection_preflight.py --gate cause_investigation` |
-| `module_boundary_guard.py` | `tools/agent_tools/import_responsibility.py` | `command-only:python3 tools/agent_tools/import_responsibility.py` |
-| `library_implementation_guard.py` | `tools/agent_tools/task_authority.py` | `import-only:tools.agent_tools.task_authority:first_party_library_authorized` |
+| `codex_runtime_summary_logger.py` | `tools/runtime/archive/export_codex_runtime_summary.py` | `command-only:python3 tools/runtime/archive/export_codex_runtime_summary.py` |
+| `runtime_log_auto_sync.py` | `tools/runtime/archive/runtime_log_archive_git.py` | `command-only:python3 tools/runtime/archive/runtime_log_archive_git.py sync` |
+| `execution_resource_plan_projection_guard.py` | `tools/runtime/container/execution_resource_projection.py` | `import-only:tools.runtime.container.execution_resource_projection:validate_projection_bytes` |
+| `skill_usage_logger.py` | `tools/runtime/archive/behavior_event_assembly.py` | `import-only:tools.runtime.archive.behavior_event_assembly:record_hook_invocation` |
+| `prompt_secret_guard.py` | `tools/runtime/authority/hook_safety.py` | `import-only:tools.runtime.authority.hook_safety:secret_block_payload` |
+| `branch_worktree_guard.py` | `tools/runtime/authority/hook_safety.py` | `import-only:tools.runtime.authority.hook_safety:first_block` |
+| `cause_investigation_guard.py` | `tools/validation/semantic/tools/tool_rejection_preflight.py` | `command-only:python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation` |
+| `module_boundary_guard.py` | `tools/analysis/code/import_responsibility.py` | `command-only:python3 tools/analysis/code/import_responsibility.py` |
+| `library_implementation_guard.py` | `tools/runtime/authority/task_authority.py` | `import-only:tools.runtime.authority.task_authority:first_party_library_authorized` |
 | `style_checker_guard.py` | `$md-style-check` | `docs-only:tools/bin/agent-canon docs check` |
-| `completion_review_guard.py` | `tools/agent_tools/review_dispatch.py` | `import-only:tools.agent_tools.review_dispatch:resolve_current_review_state` |
+| `completion_review_guard.py` | `tools/agent/orchestration/review_dispatch.py` | `import-only:tools.agent.orchestration.review_dispatch:resolve_current_review_state` |
 
 The moved-source table is separate and has no `command_or_skill` field:
 
 | filename | moved_to | import_contract | reason | artifact |
 | --- | --- | --- | --- | --- |
-| `hook_safety.py` | `tools/agent_tools/hook_safety.py` | `import-only:tools.agent_tools.hook_safety:secret_kind` | pure safety implementation moves out of `.codex/hooks/`; old path must be absent and unimportable | moved-source absence proof |
+| `hook_safety.py` | `tools/runtime/authority/hook_safety.py` | `import-only:tools.runtime.authority.hook_safety:secret_kind` | pure safety implementation moves out of `.codex/hooks/`; old path must be absent and unimportable | moved-source absence proof |
 
 Manifest storage order and digest projection order are deliberately different. `RETIRED_CHILD_TOMBSTONES` is stored in the semantic retirement order: the 14 direct-retirement rows first, followed by the 9 blocking rows in the dependency order in the retirement ledger. `MOVED_SOURCE_ABSENCES` is stored in move-prerequisite order. This order is the human/readback order and must not be rewritten by a serializer. It is not the digest order.
 
@@ -399,7 +399,7 @@ There is no trailing newline, filesystem metadata, absolute root, timestamp, sto
 }
 ```
 
-`--check` is fail-closed: the child tuple count is 23, the moved-source tuple count is 1, the union count is 24, all 24 files are absent, the two typed tuples are unique and disjoint from active handlers, executable references are zero, generated inventory contains no retired executable path, and all child `command_or_skill` values pass the grammar. `--contract` emits the payload above. The exact executable/template scan set is `.codex/hooks.json`, `.codex/config.toml`, `.codex/agents/`, `templates/`, `tools/catalog.yaml`, `tools/ci/run_python_quality_checks.sh`, `tools/agent_tools/check_agent_runtime_alignment.py`, `tools/agent_tools/check_convention_compliance.py`, `tools/agent_tools/convention_compliance_contracts.toml`, `tools/agent_tools/generate_agent_runtime_dashboard.py`, `tools/agent_tools/skill_lane_detector.py`, `tools/agent_tools/report_artifact_checks.py`, `tools/agent_tools/workflow_monitor.py`, `agents/skills/worktree-health.md`, `.codex/personal/skills/worktree-health/SKILL.md`, `documents/experiments/gpu-admission-r5-source-packet.md`, `AGENTS.md`, `ROOT_AGENTS.md`, `README.md`, `documents/runtime/runtime-log-archive.md`, `tools/README.md`, `tools/experiments/execution_resource_plan.py`, and `tools/validation/notebook_quality.py`. Tests, closed issues, and historical evidence are readback inputs but not executable registration/template targets. Metadata-only allowlist is `tools/agent_tools/hook_retirement.py` and this design document; no allowlisted file may execute a retired path.
+`--check` is fail-closed: the child tuple count is 23, the moved-source tuple count is 1, the union count is 24, all 24 files are absent, the two typed tuples are unique and disjoint from active handlers, executable references are zero, generated inventory contains no retired executable path, and all child `command_or_skill` values pass the grammar. `--contract` emits the payload above. The exact executable/template scan set is `.codex/hooks.json`, `.codex/config.toml`, `.codex/agents/`, `templates/`, `tools/catalog.yaml`, `tools/validation/ci/checks/run_python_quality_checks.sh`, `tools/validation/semantic/runtime/check_agent_runtime_alignment.py`, `tools/validation/semantic/convention/check_convention_compliance.py`, `tools/validation/semantic/convention/convention_compliance_contracts.toml`, `eval/producers/generate_agent_runtime_dashboard.py`, `tools/agent/skills/skill_lane_detector.py`, `tools/runtime/artifacts/report_artifact_checks.py`, `tools/runtime/lifecycle/workflow_monitor.py`, `agents/skills/worktree-health.md`, `.codex/personal/skills/worktree-health/SKILL.md`, `documents/experiments/gpu-admission-r5-source-packet.md`, `AGENTS.md`, `ROOT_AGENTS.md`, `README.md`, `documents/runtime/runtime-log-archive.md`, `tools/README.md`, `tools/experiments/execution/execution_resource_plan.py`, and `tools/validation/notebooks/notebook_quality.py`. Tests, closed issues, and historical evidence are readback inputs but not executable registration/template targets. Metadata-only allowlist is `tools/runtime/authority/hook_retirement.py` and this design document; no allowlisted file may execute a retired path.
 
 The dispatcher `--contract` readback uses the same field names and counts: `retired_child_tombstones`, `moved_source_absences`, `counts.retired_child_tombstones=23`, `counts.moved_source_absences=1`, `counts.retired_filenames=24`, and `source_digest`. The old `retired_hook_routes` key is absent from target readback; there is no compatibility alias.
 
@@ -454,21 +454,21 @@ The old hook module is not replaced by one broad helper. Its complete responsibi
 
 | responsibility | single owner | API contract | write set / side effect | callers |
 | --- | --- | --- | --- | --- |
-| prompt capture and redaction | `tools/agent_tools/prompt_capture.py` | `capture_prompt(payload, redaction_rules, excerpt_limit=600) -> PromptCapture` | none; immutable return containing status, redacted excerpt, original char count, fingerprint | `prompt_classifier.py`, behavior assembly |
-| prompt classification | `tools/agent_tools/prompt_classifier.py` | `prompt_intake_signals(inputs: PromptClassifierInputs) -> PromptIntakeSignals` | none; no subprocess, Git, network, environment mutation, or file I/O | workflow evaluator and behavior assembly |
-| feedback, candidate-reason, and related-skill normalization | `tools/agent_tools/prompt_classifier.py` | `feedback_targets(signals) -> tuple[str, ...]` | none; preserves current feedback labels/action/target and candidate-reason ordering | evaluator and behavior assembly consume the classifier result |
-| tool selection | `tools/agent_tools/tool_selection.py` | `select_tools(payload) -> ToolSelection` | none; tuple/list ordering is part of return contract | `hook_dispatcher.py` parts-preparation caller |
-| subagent selection and attribution | `tools/agent_tools/subagent_selection.py` | `select_subagents(payload, workflow_context) -> SubagentSelection` | none; selection/workflow attribution is returned, not emitted directly | `hook_dispatcher.py` parts-preparation caller |
-| workflow context store/load | `tools/agent_tools/workflow_context.py` | `load_workflow_context(path) -> WorkflowContext`; `store_workflow_context(path, context) -> StoreResult` | only the existing paired `skill_usage_context.json` path (resolved under the selected log/report directory); atomic write; load/store failure is fail-open to an empty context, never a second event | `hook_dispatcher.py` loads for parts; evaluator/workflow lifecycle owner stores |
-| monitor emission | `tools/agent_tools/workflow_monitor.py` | existing `--behavior-event` and typed `emit_behavior_projection(report_dir, event)` | only report-dir `workflow_monitoring.md` and its existing monitor projection lines; never `skill_usage.jsonl` or `behavior_events.jsonl` | dispatcher only (closeout/readback paths are read-only consumers) |
-| behavior record assembly | `tools/agent_tools/behavior_event_assembly.py` | `record_hook_invocation(parts) -> BehaviorEventRecord | None` | one record candidate per eligible invocation; returns `BehaviorEventRecord` only, no append/monitor/IO | dispatcher is the sole caller |
-| historical skill-usage readback | `tools/agent_tools/historical_skill_usage_reader.py` | `read_skill_usage_history(path) -> HistoricalReadback` | none; opens `skill_usage.jsonl` read-only, never imports/executes the old logger, never appends or rewrites it | improvement guide, historical dashboard migration, fixture tests |
+| prompt capture and redaction | `tools/agent/orchestration/prompt_capture.py` | `capture_prompt(payload, redaction_rules, excerpt_limit=600) -> PromptCapture` | none; immutable return containing status, redacted excerpt, original char count, fingerprint | `prompt_classifier.py`, behavior assembly |
+| prompt classification | `tools/agent/orchestration/prompt_classifier.py` | `prompt_intake_signals(inputs: PromptClassifierInputs) -> PromptIntakeSignals` | none; no subprocess, Git, network, environment mutation, or file I/O | workflow evaluator and behavior assembly |
+| feedback, candidate-reason, and related-skill normalization | `tools/agent/orchestration/prompt_classifier.py` | `feedback_targets(signals) -> tuple[str, ...]` | none; preserves current feedback labels/action/target and candidate-reason ordering | evaluator and behavior assembly consume the classifier result |
+| tool selection | `tools/agent/orchestration/tool_selection.py` | `select_tools(payload) -> ToolSelection` | none; tuple/list ordering is part of return contract | `hook_dispatcher.py` parts-preparation caller |
+| subagent selection and attribution | `tools/agent/orchestration/subagent_selection.py` | `select_subagents(payload, workflow_context) -> SubagentSelection` | none; selection/workflow attribution is returned, not emitted directly | `hook_dispatcher.py` parts-preparation caller |
+| workflow context store/load | `tools/agent/orchestration/workflow_context.py` | `load_workflow_context(path) -> WorkflowContext`; `store_workflow_context(path, context) -> StoreResult` | only the existing paired `skill_usage_context.json` path (resolved under the selected log/report directory); atomic write; load/store failure is fail-open to an empty context, never a second event | `hook_dispatcher.py` loads for parts; evaluator/workflow lifecycle owner stores |
+| monitor emission | `tools/runtime/lifecycle/workflow_monitor.py` | existing `--behavior-event` and typed `emit_behavior_projection(report_dir, event)` | only report-dir `workflow_monitoring.md` and its existing monitor projection lines; never `skill_usage.jsonl` or `behavior_events.jsonl` | dispatcher only (closeout/readback paths are read-only consumers) |
+| behavior record assembly | `tools/runtime/archive/behavior_event_assembly.py` | `record_hook_invocation(parts) -> BehaviorEventRecord | None` | one record candidate per eligible invocation; returns `BehaviorEventRecord` only, no append/monitor/IO | dispatcher is the sole caller |
+| historical skill-usage readback | `tools/runtime/archive/historical_skill_usage_reader.py` | `read_skill_usage_history(path) -> HistoricalReadback` | none; opens `skill_usage.jsonl` read-only, never imports/executes the old logger, never appends or rewrites it | improvement guide, historical dashboard migration, fixture tests |
 
-The ownership boundary is intentional: `tools/agent_tools/workflow_monitor.py` owns monitor projection, while `.codex/hooks/hook_event_log.py` owns canonical per-event spool transport serialization/append. `tools/agent_tools/workflow_monitor.py` and `.codex/hooks/hook_event_log.py` are not wrappers for the retired logger. `generate_agent_runtime_dashboard.py` and `generate_agent_improvement_guide.py` are read-only consumers; they do not become emitters. The target artifact is `behavior_events.jsonl`; `skill_usage.jsonl` remains a historical input only.
+The ownership boundary is intentional: `tools/runtime/lifecycle/workflow_monitor.py` owns monitor projection, while `.codex/hooks/hook_event_log.py` owns canonical per-event spool transport serialization/append. `tools/runtime/lifecycle/workflow_monitor.py` and `.codex/hooks/hook_event_log.py` are not wrappers for the retired logger. `generate_agent_runtime_dashboard.py` and `generate_agent_improvement_guide.py` are read-only consumers; they do not become emitters. The target artifact is `behavior_events.jsonl`; `skill_usage.jsonl` remains a historical input only.
 
 ### Pure classifier owner
 
-`tools/agent_tools/prompt_classifier.py` owns the current `PromptIntakeSignals` fields exactly: `skills`, `selected_workflows`, `candidate_skills`, `candidate_skill_reasons`, `candidate_workflows`, `candidate_tools`, `feedback_labels`, `feedback_action`, all as tuples of strings except `feedback_action: str`. `feedback_targets()` remains pure. `prompt_intake_signals(inputs)` preserves current keyword, catalog, structural-lane, validation-repair, feedback, and related-skill ordering. `behavior_event_assembly.py` consumes the returned signals and owns `should_log`.
+`tools/agent/orchestration/prompt_classifier.py` owns the current `PromptIntakeSignals` fields exactly: `skills`, `selected_workflows`, `candidate_skills`, `candidate_skill_reasons`, `candidate_workflows`, `candidate_tools`, `feedback_labels`, `feedback_action`, all as tuples of strings except `feedback_action: str`. `feedback_targets()` remains pure. `prompt_intake_signals(inputs)` preserves current keyword, catalog, structural-lane, validation-repair, feedback, and related-skill ordering. `behavior_event_assembly.py` consumes the returned signals and owns `should_log`.
 
 The classifier receives all repository-dependent knowledge as immutable input to return dimensions consumed by assembly; it does not discover it. The exact input contract is:
 
@@ -489,7 +489,7 @@ PromptClassifierInputs = frozen {
 
 ### Skill-lane detector and behavior emitter
 
-The existing pure `tools/agent_tools/skill_lane_detector.py` remains the structural concept detector. Its implementation-ready output contract is:
+The existing pure `tools/agent/skills/skill_lane_detector.py` remains the structural concept detector. Its implementation-ready output contract is:
 
 ```text
 SkillLaneEvidence {
@@ -502,7 +502,7 @@ SkillLaneEvidence {
 }
 ```
 
-The detector returns no record for an unmatched lane; it never writes logs. `tools/agent_tools/behavior_event_assembly.py` is the sole pure assembler (`record_hook_invocation(parts) -> BehaviorEventRecord | None`) and does not perform transport I/O. Canonical durable behavior events are serialized by `.codex/hooks/hook_event_log.py` into per-event no-replace spool files with result `spooled|duplicate|failed`; `tools/agent_tools/workflow_monitor.py` is the monitor owner and the existing `--behavior-event` route accepts one assembled canonical object to emit a monitor projection line; it does not participate in spool file writes. The event envelope is the fixed `agent-canon.behavior-event.v1` schema:
+The detector returns no record for an unmatched lane; it never writes logs. `tools/runtime/archive/behavior_event_assembly.py` is the sole pure assembler (`record_hook_invocation(parts) -> BehaviorEventRecord | None`) and does not perform transport I/O. Canonical durable behavior events are serialized by `.codex/hooks/hook_event_log.py` into per-event no-replace spool files with result `spooled|duplicate|failed`; `tools/runtime/lifecycle/workflow_monitor.py` is the monitor owner and the existing `--behavior-event` route accepts one assembled canonical object to emit a monitor projection line; it does not participate in spool file writes. The event envelope is the fixed `agent-canon.behavior-event.v1` schema:
 
 ```text
 {
@@ -557,7 +557,7 @@ The fields above preserve the current logger's types and empty-value nullability
 
 The exact behavior-event field set is the union of the envelope fields and the parity fields in the table below; no implementation may silently drop a current logger field because a dashboard row does not display it.
 
-The classifier returns the existing behavior dimensions consumed by assembly: selected/candidate skills and workflows, `candidate_skill_reasons`, feedback labels/action/targets, prompt capture, tool selection, subagent selection, workflow attribution/context, and structural lane evidence. This keeps one execution route and one event identity for dashboard aggregation. `.codex/hooks/hook_event_log.py` performs per-event no-replace spool append; `tools/agent_tools/runtime_log_archive_git.py` emits checkpoint `behavior_events` lines after explicit checkpointing from per-event spools, and `tools/agent_tools/workflow_monitor.py` emits monitor projection only after a spooled append result. `hook_event_log` never writes shared `behavior_events.jsonl`; it only spools per-event bytes. `runtime_log_archive_git` writes checkpoint JSONL only after invocation and outside the hot-path. `workflow_monitor.py` emits monitor projection only and never writes `skill_usage.jsonl`.
+The classifier returns the existing behavior dimensions consumed by assembly: selected/candidate skills and workflows, `candidate_skill_reasons`, feedback labels/action/targets, prompt capture, tool selection, subagent selection, workflow attribution/context, and structural lane evidence. This keeps one execution route and one event identity for dashboard aggregation. `.codex/hooks/hook_event_log.py` performs per-event no-replace spool append; `tools/runtime/archive/runtime_log_archive_git.py` emits checkpoint `behavior_events` lines after explicit checkpointing from per-event spools, and `tools/runtime/lifecycle/workflow_monitor.py` emits monitor projection only after a spooled append result. `hook_event_log` never writes shared `behavior_events.jsonl`; it only spools per-event bytes. `runtime_log_archive_git` writes checkpoint JSONL only after invocation and outside the hot-path. `workflow_monitor.py` emits monitor projection only and never writes `skill_usage.jsonl`.
 
 The remaining current logger fields are carried without semantic loss as follows; these are part of the behavior-event schema even when a dashboard view does not display them:
 
@@ -631,10 +631,10 @@ The parser aggregates malformed records without aborting the batch: `malformed_b
 
 ### Inventory emitter and generated readback
 
-`tools/agent_tools/log_surface_inventory.py` remains the sole inventory emitter. Its generated `documents/runtime/log-surface-inventory.json` keeps `schema_version: 1`, sorted `scanned_files`, and sorted records `{path,surface,emitter,field,line,certainty}`. The log-inventory gate materializes the tracked baseline from `94283c909ebd8862942f69d9bf92923ff90e3592` with `git show` and passes that temporary file to the existing `--baseline` option. The implementation validation packet records `LOG_SURFACE_BASELINE_COMMIT=94283c909ebd8862942f69d9bf92923ff90e3592` and the `sha256sum` content digest of the materialized file; an unproven baseline fails closed. After migration:
+`tools/runtime/archive/log_surface_inventory.py` remains the sole inventory emitter. Its generated `documents/runtime/log-surface-inventory.json` keeps `schema_version: 1`, sorted `scanned_files`, and sorted records `{path,surface,emitter,field,line,certainty}`. The log-inventory gate materializes the tracked baseline from `94283c909ebd8862942f69d9bf92923ff90e3592` with `git show` and passes that temporary file to the existing `--baseline` option. The implementation validation packet records `LOG_SURFACE_BASELINE_COMMIT=94283c909ebd8862942f69d9bf92923ff90e3592` and the `sha256sum` content digest of the materialized file; an unproven baseline fails closed. After migration:
 
 - `.codex/hooks/skill_usage_logger.py` is absent from both `scanned_files` and `records`;
-- `tools/agent_tools/prompt_capture.py`, `tools/agent_tools/prompt_classifier.py`, `tools/agent_tools/tool_selection.py`, `tools/agent_tools/subagent_selection.py`, `tools/agent_tools/workflow_context.py`, `tools/agent_tools/behavior_event_assembly.py`, `tools/agent_tools/skill_lane_detector.py`, `tools/agent_tools/workflow_monitor.py`, `tools/agent_tools/generate_agent_runtime_dashboard.py`, and `tools/agent_tools/generate_agent_improvement_guide.py` are present with their new static/dynamic fields or read-only consumer surfaces;
+- `tools/agent/orchestration/prompt_capture.py`, `tools/agent/orchestration/prompt_classifier.py`, `tools/agent/orchestration/tool_selection.py`, `tools/agent/orchestration/subagent_selection.py`, `tools/agent/orchestration/workflow_context.py`, `tools/runtime/archive/behavior_event_assembly.py`, `tools/agent/skills/skill_lane_detector.py`, `tools/runtime/lifecycle/workflow_monitor.py`, `eval/producers/generate_agent_runtime_dashboard.py`, and `eval/producers/generate_agent_improvement_guide.py` are present with their new static/dynamic fields or read-only consumer surfaces;
 - `behavior_events.jsonl` is the checkpoint/readback corpus for `runtime_log_archive_git` (`<hook-name>-<agent-canon-commit>.jsonl` emitted; readback and verification consume `behavior_events.jsonl`); `skill_usage.jsonl` is classified as historical read-only evidence and is not an active emitter path;
 - `behavior_event_json`, `agent-canon.behavior-event.v1`, `prompt_capture_status`, `prompt_excerpt_redacted`, `prompt_char_count`, `tool_name`, `tool_command_verb`, `selected_tools`, `feedback_labels`, `candidate_skill_reasons`, every `subagent_*` and `workflow_*` attribution field, and `skill_lane` are read back from the new emitter where statically discoverable;
 - old hook child names are absent from executable inventory paths, while their names may occur only in the manifest/design metadata allowlist;
@@ -644,26 +644,26 @@ The parser aggregates malformed records without aborting the batch: `malformed_b
 
 | target | import/CLI contract | caller migration |
 | --- | --- | --- |
-| `tools/agent_tools/prompt_capture.py` | import-only: `PromptCapture`, `capture_prompt`; no CLI | `tools/agent_tools/behavior_event_assembly.py` direct import; no write |
-| `tools/agent_tools/prompt_classifier.py` | import-only: `PromptClassifierInputs`, `PromptIntakeSignals`, `prompt_intake_signals`; no hook CLI | evaluator and `tools/agent_tools/behavior_event_assembly.py` direct import; no write |
-| `tools/agent_tools/tool_selection.py` | import-only: `ToolSelection`, `select_tools`; no CLI | `hook_dispatcher.py` parts-preparation direct import; `behavior_event_assembly.py` consumes precomputed typed value only |
-| `tools/agent_tools/subagent_selection.py` | import-only: `SubagentSelection`, `select_subagents`; no CLI | `hook_dispatcher.py` parts-preparation direct import; `behavior_event_assembly.py` consumes precomputed typed value only |
-| `tools/agent_tools/workflow_context.py` | import-only: `WorkflowContext`, `load_workflow_context`, `store_workflow_context`; no hook CLI | `hook_dispatcher.py` parts-preparation direct load import; `behavior_event_assembly.py` consumes precomputed typed value only; evaluator/context lifecycle owner for store |
-| `tools/agent_tools/behavior_event_assembly.py` | import-only: `HookInvocationParts`, `BehaviorEventRecord`, `record_hook_invocation`; no `append_behavior_event`, `parse_behavior_events` | dispatcher is the sole caller; sole pure owner for `should_log` / eligibility / `event_id` / record assembly; returns `BehaviorEventRecord | None`; no file I/O |
-| `tools/agent_tools/historical_skill_usage_reader.py` | import-only: `HistoricalReadback`, `read_skill_usage_history`; no CLI and no import of retired logger | read-only `skill_usage.jsonl` input |
-| `tools/agent_tools/execution_resource_projection.py` | import-only: `validate_normalized_input`, `validate_projection_bytes`, `projection_context_payload`; no guard CLI | dispatcher and pure projection tests direct import |
-| `tools/agent_tools/hook_safety.py` | import-only pure API listed above; no standalone safety CLI | dispatcher direct import; old hook safety path deleted |
-| `tools/agent_tools/hook_retirement.py` | import-only constants/dataclass; no executable entrypoint | dispatcher and `check_hook_retirement.py` share one manifest |
-| `tools/agent_tools/check_hook_retirement.py` | `python3 tools/agent_tools/check_hook_retirement.py --root . --check`; readback via `--contract` | imports both typed tuples, computes digest, and generates the 24-basename caller query |
-| `tools/agent_tools/tool_rejection_preflight.py` | existing CLI and typed gate output | four old gate templates become direct owner commands |
-| `tools/agent_tools/import_responsibility.py` | existing checker CLI/JSON | module-boundary owner |
-| `tools/agent_tools/task_authority.py` | import-only final B7 route: `first_party_library_authorized` | `responsibility_scope.py` and `$dependency-module-change` consume its result read-only |
-| `tools/agent_tools/review_dispatch.py` | import-only final B9 route: `resolve_current_review_state` | sole review decision producer |
-| `tools/agent_tools/report_artifact_checks.py` | existing validation readback API; no B9 decision | consumes typed B9 state read-only |
-| `tools/agent_tools/task_close.py` | existing closeout API; no B9 decision | consumes typed B9 state read-only |
-| `tools/ci/run_python_quality_checks.sh` | existing shell quality route; no B9 decision | invokes validation consumers only |
+| `tools/agent/orchestration/prompt_capture.py` | import-only: `PromptCapture`, `capture_prompt`; no CLI | `tools/runtime/archive/behavior_event_assembly.py` direct import; no write |
+| `tools/agent/orchestration/prompt_classifier.py` | import-only: `PromptClassifierInputs`, `PromptIntakeSignals`, `prompt_intake_signals`; no hook CLI | evaluator and `tools/runtime/archive/behavior_event_assembly.py` direct import; no write |
+| `tools/agent/orchestration/tool_selection.py` | import-only: `ToolSelection`, `select_tools`; no CLI | `hook_dispatcher.py` parts-preparation direct import; `behavior_event_assembly.py` consumes precomputed typed value only |
+| `tools/agent/orchestration/subagent_selection.py` | import-only: `SubagentSelection`, `select_subagents`; no CLI | `hook_dispatcher.py` parts-preparation direct import; `behavior_event_assembly.py` consumes precomputed typed value only |
+| `tools/agent/orchestration/workflow_context.py` | import-only: `WorkflowContext`, `load_workflow_context`, `store_workflow_context`; no hook CLI | `hook_dispatcher.py` parts-preparation direct load import; `behavior_event_assembly.py` consumes precomputed typed value only; evaluator/context lifecycle owner for store |
+| `tools/runtime/archive/behavior_event_assembly.py` | import-only: `HookInvocationParts`, `BehaviorEventRecord`, `record_hook_invocation`; no `append_behavior_event`, `parse_behavior_events` | dispatcher is the sole caller; sole pure owner for `should_log` / eligibility / `event_id` / record assembly; returns `BehaviorEventRecord | None`; no file I/O |
+| `tools/runtime/archive/historical_skill_usage_reader.py` | import-only: `HistoricalReadback`, `read_skill_usage_history`; no CLI and no import of retired logger | read-only `skill_usage.jsonl` input |
+| `tools/runtime/container/execution_resource_projection.py` | import-only: `validate_normalized_input`, `validate_projection_bytes`, `projection_context_payload`; no guard CLI | dispatcher and pure projection tests direct import |
+| `tools/runtime/authority/hook_safety.py` | import-only pure API listed above; no standalone safety CLI | dispatcher direct import; old hook safety path deleted |
+| `tools/runtime/authority/hook_retirement.py` | import-only constants/dataclass; no executable entrypoint | dispatcher and `check_hook_retirement.py` share one manifest |
+| `tools/validation/semantic/hooks/check_hook_retirement.py` | `python3 tools/validation/semantic/hooks/check_hook_retirement.py --root . --check`; readback via `--contract` | imports both typed tuples, computes digest, and generates the 24-basename caller query |
+| `tools/validation/semantic/tools/tool_rejection_preflight.py` | existing CLI and typed gate output | four old gate templates become direct owner commands |
+| `tools/analysis/code/import_responsibility.py` | existing checker CLI/JSON | module-boundary owner |
+| `tools/runtime/authority/task_authority.py` | import-only final B7 route: `first_party_library_authorized` | `responsibility_scope.py` and `$dependency-module-change` consume its result read-only |
+| `tools/agent/orchestration/review_dispatch.py` | import-only final B9 route: `resolve_current_review_state` | sole review decision producer |
+| `tools/runtime/artifacts/report_artifact_checks.py` | existing validation readback API; no B9 decision | consumes typed B9 state read-only |
+| `tools/runtime/lifecycle/task_close.py` | existing closeout API; no B9 decision | consumes typed B9 state read-only |
+| `tools/validation/ci/checks/run_python_quality_checks.sh` | existing shell quality route; no B9 decision | invokes validation consumers only |
 | `.codex/hooks/hook_dispatcher.py` | direct import-only caller: `record_hook_invocation(parts)`; exactly once after each of the three finalized handler results; one `HookLogContext.append` for every active invocation | sole active-hook caller; returns the finalized handler output unchanged; monitor emission is conditional on existing behavior record + append status `spooled` |
-| `tools/agent_tools/workflow_monitor.py` | import-only `emit_behavior_projection(report_dir, event) -> MonitorProjectionResult`; existing `--behavior-event` CLI is the equivalent explicit projection route | consumes the assembled record and writes only `behavior_event_json=<JSON>` projection lines/monitor Markdown; it does not assemble or append canonical JSONL |
+| `tools/runtime/lifecycle/workflow_monitor.py` | import-only `emit_behavior_projection(report_dir, event) -> MonitorProjectionResult`; existing `--behavior-event` CLI is the equivalent explicit projection route | consumes the assembled record and writes only `behavior_event_json=<JSON>` projection lines/monitor Markdown; it does not assemble or append canonical JSONL |
 | `generate_agent_runtime_dashboard.py` | existing read-only dashboard CLI; `agent-canon.behavior-readback.v1` oracle and parser aggregation | reads active behavior events and monitor projections; retains prompt/tool/feedback/subagent/workflow/lane metrics |
 | `generate_agent_improvement_guide.py` | existing read-only guide CLI | consumes `historical_skill_usage_reader.py` for archived `skill_usage.jsonl` and active dashboard evidence; no active emission |
 | `log_surface_inventory.py` | existing `--check --baseline <materialized-94283c9-inventory>` and generated JSON | emits updated inventory once after all path migrations, using the tracked `94283c909ebd8862942f69d9bf92923ff90e3592` baseline |
@@ -674,15 +674,15 @@ This is the exact future implementation write set `W`; this design wave does not
 
 **new files:**
 
-`tools/agent_tools/prompt_capture.py`, `tools/agent_tools/prompt_classifier.py`, `tools/agent_tools/tool_selection.py`, `tools/agent_tools/subagent_selection.py`, `tools/agent_tools/workflow_context.py`, `tools/agent_tools/behavior_event_assembly.py`, `tools/agent_tools/historical_skill_usage_reader.py`, `tools/agent_tools/execution_resource_projection.py`, `tools/agent_tools/hook_safety.py`, `tools/agent_tools/hook_retirement.py`, `tools/agent_tools/check_hook_retirement.py`, `tests/agent_tools/test_prompt_capture.py`, `tests/agent_tools/test_prompt_classifier.py`, `tests/agent_tools/test_tool_selection.py`, `tests/agent_tools/test_subagent_selection.py`, `tests/agent_tools/test_workflow_context.py`, `tests/agent_tools/test_behavior_event_assembly.py`, `tests/agent_tools/test_historical_skill_usage_reader.py`, `tests/agent_tools/test_execution_resource_projection.py`, `tests/agent_tools/test_hook_safety.py`, `tests/agent_tools/test_hook_retirement.py`, `tests/agent_tools/test_behavior_event_parser.py`, `tests/fixtures/hook_retirement/clean/hooks.json`, `tests/fixtures/hook_retirement/clean/template.md`, `tests/fixtures/hook_retirement/clean/catalog.yaml`, `tests/fixtures/hook_retirement/clean/inventory.json`, `tests/fixtures/hook_retirement/violation/hooks.json`, `tests/fixtures/hook_retirement/violation/template.md`, `tests/fixtures/hook_retirement/violation/catalog.yaml`, `tests/fixtures/hook_retirement/violation/inventory.json`, `tests/fixtures/hook_retirement/violation/.codex/hooks/branch_worktree_guard.py`, `tests/fixtures/behavior_events/accepted.jsonl`, `tests/fixtures/behavior_events/duplicate.jsonl`, `tests/fixtures/behavior_events/malformed.jsonl`, `tests/fixtures/behavior_events/out_of_order.jsonl`, `tests/fixtures/behavior_events/escaping.jsonl`, `tests/fixtures/behavior_events/oracle.json`, `tests/fixtures/behavior_events/hook_invocation_parts_user_prompt.json`, `tests/fixtures/behavior_events/hook_invocation_parts_pre_tool.json`, `tests/fixtures/behavior_events/hook_invocation_parts_post_tool.json`, `tests/fixtures/behavior_events/ineligible_blocked.json`, `tests/fixtures/behavior_events/record_hook_invocation_oracle.json`, `tests/fixtures/skill_usage_history/historical.jsonl`, `tests/fixtures/skill_usage_history/malformed.jsonl`, `tests/fixtures/skill_usage_history/oracle.json`。
+`tools/agent/orchestration/prompt_capture.py`, `tools/agent/orchestration/prompt_classifier.py`, `tools/agent/orchestration/tool_selection.py`, `tools/agent/orchestration/subagent_selection.py`, `tools/agent/orchestration/workflow_context.py`, `tools/runtime/archive/behavior_event_assembly.py`, `tools/runtime/archive/historical_skill_usage_reader.py`, `tools/runtime/container/execution_resource_projection.py`, `tools/runtime/authority/hook_safety.py`, `tools/runtime/authority/hook_retirement.py`, `tools/validation/semantic/hooks/check_hook_retirement.py`, `tests/agent_tools/test_prompt_capture.py`, `tests/agent_tools/test_prompt_classifier.py`, `tests/agent_tools/test_tool_selection.py`, `tests/agent_tools/test_subagent_selection.py`, `tests/agent_tools/test_workflow_context.py`, `tests/agent_tools/test_behavior_event_assembly.py`, `tests/agent_tools/test_historical_skill_usage_reader.py`, `tests/agent_tools/test_execution_resource_projection.py`, `tests/agent_tools/test_hook_safety.py`, `tests/agent_tools/test_hook_retirement.py`, `tests/agent_tools/test_behavior_event_parser.py`, `tests/fixtures/hook_retirement/clean/hooks.json`, `tests/fixtures/hook_retirement/clean/template.md`, `tests/fixtures/hook_retirement/clean/catalog.yaml`, `tests/fixtures/hook_retirement/clean/inventory.json`, `tests/fixtures/hook_retirement/violation/hooks.json`, `tests/fixtures/hook_retirement/violation/template.md`, `tests/fixtures/hook_retirement/violation/catalog.yaml`, `tests/fixtures/hook_retirement/violation/inventory.json`, `tests/fixtures/hook_retirement/violation/.codex/hooks/branch_worktree_guard.py`, `tests/fixtures/behavior_events/accepted.jsonl`, `tests/fixtures/behavior_events/duplicate.jsonl`, `tests/fixtures/behavior_events/malformed.jsonl`, `tests/fixtures/behavior_events/out_of_order.jsonl`, `tests/fixtures/behavior_events/escaping.jsonl`, `tests/fixtures/behavior_events/oracle.json`, `tests/fixtures/behavior_events/hook_invocation_parts_user_prompt.json`, `tests/fixtures/behavior_events/hook_invocation_parts_pre_tool.json`, `tests/fixtures/behavior_events/hook_invocation_parts_post_tool.json`, `tests/fixtures/behavior_events/ineligible_blocked.json`, `tests/fixtures/behavior_events/record_hook_invocation_oracle.json`, `tests/fixtures/skill_usage_history/historical.jsonl`, `tests/fixtures/skill_usage_history/malformed.jsonl`, `tests/fixtures/skill_usage_history/oracle.json`。
 
 **modified/migrated files:**
 
-`.codex/hooks/hook_dispatcher.py`, `.codex/hooks.json`, `.codex/README.md`, `README.md`, `agents/canonical/CODEX_SUBAGENTS.md`, `documents/conventions/coding-conventions-python.md`, `documents/design/codex-spark-implementation-routing.md`, `documents/design/responsibility-scope-management.md`, `documents/runtime/runtime-log-archive.md`, `documents/runtime/runtime-log-archive-migration.md`, `documents/tools/README.md`, `evidence/agent-evals/issue_eval_manifest.toml`, `evidence/agent-evals/workflow_selection_eval.toml`, `.codex/personal/skills/worktree-health/SKILL.md`, `tools/README.md`, `tools/experiments/execution_resource_plan.py`, `tools/validation/notebook_quality.py`, `tools/agent_tools/evaluate_workflow_selection.py`, `tools/agent_tools/evaluate_skill_workflow_prompts.py`, `tools/agent_tools/tool_rejection_preflight.py`, `tools/agent_tools/import_responsibility.py`, `tools/agent_tools/task_authority.py`, `tools/agent_tools/review_dispatch.py`, `tools/agent_tools/report_artifact_checks.py`, `tools/agent_tools/task_close.py`, `tools/agent_tools/workflow_monitor.py`, `tools/agent_tools/skill_lane_detector.py`, `tools/agent_tools/generate_agent_runtime_dashboard.py`, `tools/agent_tools/generate_agent_improvement_guide.py`, `.github/workflows/agent-improvement-guide.yml`, `tools/agent_tools/log_surface_inventory.py`, `tools/agent_tools/runtime_log_paths.py`, `tools/agent_tools/runtime_log_archive_git.py`, `tools/agent_tools/export_codex_runtime_summary.py`, `tools/agent_tools/check_agent_runtime_alignment.py`, `tools/agent_tools/check_convention_compliance.py`, `tools/agent_tools/convention_compliance_contracts.toml`, `tools/ci/run_python_quality_checks.sh`, `tools/catalog.yaml`, `responsibility-scope.toml`, `documents/runtime/log-surface-inventory.json`, `documents/experiments/gpu-admission-r5-source-packet.md`, `agents/canonical/CODEX_WORKFLOW.md`, `agents/skills/worktree-health.md`, `AGENTS.md`, `ROOT_AGENTS.md`, `tests/agent_tools/test_codex_hooks.py`, `tests/agent_tools/test_hook_event_log.py`, `tests/tools/test_execution_resource_plan.py`, `tests/agent_tools/test_evaluate_workflow_selection.py`, `tests/agent_tools/test_evaluate_skill_workflow_prompts.py`, `tests/agent_tools/test_tool_rejection_preflight.py`, `tests/agent_tools/test_import_responsibility.py`, `tests/agent_tools/test_review_dispatch.py`, `tests/agent_tools/test_bootstrap_and_close.py`, `tests/agent_tools/test_check_agent_runtime_alignment.py`, `tests/agent_tools/test_check_convention_compliance.py`, `tests/agent_tools/test_generate_agent_runtime_dashboard.py`, `tests/agent_tools/test_generate_agent_improvement_guide.py`, `tests/agent_tools/test_workflow_monitor.py`, `tests/agent_tools/test_log_surface_inventory.py`, `tests/agent_tools/test_responsibility_scope.py`, `tests/agent_tools/test_task_authority.py`。
+`.codex/hooks/hook_dispatcher.py`, `.codex/hooks.json`, `.codex/README.md`, `README.md`, `agents/canonical/CODEX_SUBAGENTS.md`, `documents/conventions/coding-conventions-python.md`, `documents/design/codex-spark-implementation-routing.md`, `documents/design/responsibility-scope-management.md`, `documents/runtime/runtime-log-archive.md`, `documents/runtime/runtime-log-archive-migration.md`, `documents/tools/README.md`, `eval/definitions/issue_eval_manifest.toml`, `eval/definitions/workflow_selection_eval.toml`, `.codex/personal/skills/worktree-health/SKILL.md`, `tools/README.md`, `tools/experiments/execution/execution_resource_plan.py`, `tools/validation/notebooks/notebook_quality.py`, `eval/producers/evaluate_workflow_selection.py`, `eval/producers/evaluate_skill_workflow_prompts.py`, `tools/validation/semantic/tools/tool_rejection_preflight.py`, `tools/analysis/code/import_responsibility.py`, `tools/runtime/authority/task_authority.py`, `tools/agent/orchestration/review_dispatch.py`, `tools/runtime/artifacts/report_artifact_checks.py`, `tools/runtime/lifecycle/task_close.py`, `tools/runtime/lifecycle/workflow_monitor.py`, `tools/agent/skills/skill_lane_detector.py`, `eval/producers/generate_agent_runtime_dashboard.py`, `eval/producers/generate_agent_improvement_guide.py`, `.github/workflows/agent-improvement-guide.yml`, `tools/runtime/archive/log_surface_inventory.py`, `tools/runtime/archive/runtime_log_paths.py`, `tools/runtime/archive/runtime_log_archive_git.py`, `tools/runtime/archive/export_codex_runtime_summary.py`, `tools/validation/semantic/runtime/check_agent_runtime_alignment.py`, `tools/validation/semantic/convention/check_convention_compliance.py`, `tools/validation/semantic/convention/convention_compliance_contracts.toml`, `tools/validation/ci/checks/run_python_quality_checks.sh`, `tools/catalog.yaml`, `responsibility-scope.toml`, `documents/runtime/log-surface-inventory.json`, `documents/experiments/gpu-admission-r5-source-packet.md`, `agents/canonical/CODEX_WORKFLOW.md`, `agents/skills/worktree-health.md`, `AGENTS.md`, `ROOT_AGENTS.md`, `tests/agent_tools/test_codex_hooks.py`, `tests/agent_tools/test_hook_event_log.py`, `tests/tools/test_execution_resource_plan.py`, `tests/agent_tools/test_evaluate_workflow_selection.py`, `tests/agent_tools/test_evaluate_skill_workflow_prompts.py`, `tests/agent_tools/test_tool_rejection_preflight.py`, `tests/agent_tools/test_import_responsibility.py`, `tests/agent_tools/test_review_dispatch.py`, `tests/agent_tools/test_bootstrap_and_close.py`, `tests/agent_tools/test_check_agent_runtime_alignment.py`, `tests/agent_tools/test_check_convention_compliance.py`, `tests/agent_tools/test_generate_agent_runtime_dashboard.py`, `tests/agent_tools/test_generate_agent_improvement_guide.py`, `tests/agent_tools/test_workflow_monitor.py`, `tests/agent_tools/test_log_surface_inventory.py`, `tests/agent_tools/test_responsibility_scope.py`, `tests/agent_tools/test_task_authority.py`。
 
 **runtime artifact write set:**
 
-`behavior_events` checkpoint lines (`<hook-name>-<agent-canon-commit>.jsonl`) are written only by `tools/agent_tools/runtime_log_archive_git.py`; per-invocation transport spooling is performed only by `.codex/hooks/hook_event_log.py` into no-replace `<spool>/<namespace>/<hook_name>/<hook_run_id>.json` with `spooled|duplicate|failed` result. The dispatcher performs exactly one base append per active invocation and merges behavior fields into that same entry when a behavior record exists; no second append is allowed. `workflow_monitoring.md` and its projection lines are written only by `tools/agent_tools/workflow_monitor.py` after a successful spooled append of a behavior record. `.codex/hooks/hook_dispatcher.py` and `tools/agent_tools/behavior_event_assembly.py` write no files. `skill_usage.jsonl` has no active writer. A runtime append or monitor failure is telemetry-only and leaves the finalized handler output unchanged.
+`behavior_events` checkpoint lines (`<hook-name>-<agent-canon-commit>.jsonl`) are written only by `tools/runtime/archive/runtime_log_archive_git.py`; per-invocation transport spooling is performed only by `.codex/hooks/hook_event_log.py` into no-replace `<spool>/<namespace>/<hook_name>/<hook_run_id>.json` with `spooled|duplicate|failed` result. The dispatcher performs exactly one base append per active invocation and merges behavior fields into that same entry when a behavior record exists; no second append is allowed. `workflow_monitoring.md` and its projection lines are written only by `tools/runtime/lifecycle/workflow_monitor.py` after a successful spooled append of a behavior record. `.codex/hooks/hook_dispatcher.py` and `tools/runtime/archive/behavior_event_assembly.py` write no files. `skill_usage.jsonl` has no active writer. A runtime append or monitor failure is telemetry-only and leaves the finalized handler output unchanged.
 
 **deleted files, only after caller migration:**
 
@@ -693,7 +693,7 @@ The exact tombstone scan includes every deleted path above, every path in the ex
 ## Retirement order and reverse trace
 
 1. Establish the pure owners, historical read-only parser, behavior assembly owner, and their pure-owner tests; update dispatcher import bootstrap to the non-hook owner. Keep current child files only as migration evidence.
-2. Move the complete safety implementation to `tools/agent_tools/hook_safety.py`; pass pure safety tests; delete `.codex/hooks/hook_safety.py`; prove the old path is absent before B3/B4 retirement.
+2. Move the complete safety implementation to `tools/runtime/authority/hook_safety.py`; pass pure safety tests; delete `.codex/hooks/hook_safety.py`; prove the old path is absent before B3/B4 retirement.
 3. Migrate dashboard, skill lane, workflow monitor, inventory, evaluator, convention/readback, report, worktree, and GPU source-packet callers; generate the new inventory in memory and compare it before writing the generated file.
 4. Retire the 14 direct files in this order: `log_archive_mount_warning.py`, `reference_capture_guard.py`, `direct_rg_context_guard.py`, `task_authority_schema_guard.py`, `role_write_policy_guard.py`, `oop_readability_guard.py`, `first_party_library_guard.py`, `helper_inventory_guard.py`, `helper_first_guard.py`, `log_surface_inventory_guard.py`, `notebook_quality_guard.py`, `goal_completion_guard.py`, `codex_runtime_summary_logger.py`, `runtime_log_auto_sync.py`.
 5. Retire the 9 blocking files in dependency order: `execution_resource_plan_projection_guard.py`, `skill_usage_logger.py`, `prompt_secret_guard.py`, `branch_worktree_guard.py`, `cause_investigation_guard.py`, `module_boundary_guard.py`, `library_implementation_guard.py`, `style_checker_guard.py`, `completion_review_guard.py`.
@@ -730,7 +730,7 @@ Exact fixture and test corpus:
 - transport/readback separation: no direct shared `behavior_events.jsonl` append path is asserted in hot-path; `HookLogContext.append` to no-replace per-event spool and `runtime_log_archive_git` checkpointing to `behavior_events` JSONL are tested separately in the same run;
 - pure-owner tests: `test_prompt_capture.py`, `test_prompt_classifier.py`, `test_tool_selection.py`, `test_subagent_selection.py`, `test_workflow_context.py`, `test_behavior_event_assembly.py`, `test_historical_skill_usage_reader.py`, `test_hook_safety.py`, `test_execution_resource_projection.py`, and `test_hook_retirement.py` prove import side-effect absence, immutable-input/no-subprocess behavior, domain/nullability, parity, event identity/cardinality, historical parser separation, and tombstone guard behavior; `test_codex_hooks.py` proves the dispatcher caller contract and ordering.
 
-Target validation commands are `python3 tools/agent_tools/check_hook_retirement.py --root . --check`, `python3 tools/agent_tools/check_agent_runtime_alignment.py`, `python3 tools/agent_tools/check_convention_compliance.py`, and the existing inventory command with the temporary baseline materialized from `94283c909ebd8862942f69d9bf92923ff90e3592` in the reproducible audit command above. They also include `tools/bin/agent-canon docs check` on changed Markdown, the focused pytest corpus above, `python3 tools/agent_tools/responsibility_scope.py --root .`, and the repository dependency review selected by the implementation profile. The evidence records the base commit and SHA-256 of the materialized baseline; a baseline without both values is invalid.
+Target validation commands are `python3 tools/validation/semantic/hooks/check_hook_retirement.py --root . --check`, `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`, `python3 tools/validation/semantic/convention/check_convention_compliance.py`, and the existing inventory command with the temporary baseline materialized from `94283c909ebd8862942f69d9bf92923ff90e3592` in the reproducible audit command above. They also include `tools/bin/agent-canon docs check` on changed Markdown, the focused pytest corpus above, `python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .`, and the repository dependency review selected by the implementation profile. The evidence records the base commit and SHA-256 of the materialized baseline; a baseline without both values is invalid.
 
 No code implementation, compatibility wrapper, parent pin update, root-view sync, branch publication, or commit is authorized by this design wave.
 

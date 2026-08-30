@@ -9,17 +9,17 @@ upstream design lean-algorithm-design.md Lean-first algorithm design workflow.
 upstream design algorithm-proof-exploration.md proof-guided algorithm exploration workflow.
 upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
-upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
+upstream implementation ../../tools/analysis/proof/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape.
-upstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces.
-upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR.
-upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions.
-upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template roots into Lean evidence.
-upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
+upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces.
+upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR.
+upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions.
+upstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py fully expands C++ template roots into Lean evidence.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
 downstream implementation ../../.codex/personal/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
 upstream design code-visualization.md sole public visualization owner and typed projection contract
-downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
 
@@ -256,15 +256,15 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   示す場合だけその特殊化を使います。zero が単なる現在の実装選択であり theorem を
   制限ているなら、problem-class witness または algorithmic choice として
   `$algorithm-proof-exploration` に戻します。
-- 実装由来 IR は、JIT route では `python3 tools/agent_tools/jit_canonical_ir.py`、
-  C++ source route では `python3 tools/agent_tools/cpp_template_to_lean.py`
+- 実装由来 IR は、JIT route では `python3 tools/analysis/proof/jit_canonical_ir.py`、
+  C++ source route では `python3 tools/analysis/proof/cpp_template_to_lean.py`
   で full-expansion record と generated Lean evidence を作成し、
   `proof_algorithm_ir`、`proof_goal_directed_slice`、
   `proof_selected_local_obligations` として proof note または run artifact に残します。
 - checker 向けの実装 path evidence は、JIT-canonical IR では
   `tools/bin/agent-canon jit-ir-to-lean` で Lean evaluator / code graph artifact を
   生成し、C++ source route では
-  `python3 tools/agent_tools/cpp_template_to_lean.py` で
+  `python3 tools/analysis/proof/cpp_template_to_lean.py` で
   `OperationalFunction`、`OperationalRegion`、`OperationalOp`、
   `ExpansionEdge`、`CodePath`、`CodePathDecision`、`OperationalCoverage`
   などの Lean evidence definitions を生成します。
@@ -673,7 +673,7 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   Plausible の counterexample route で refutation を試します。活発な proof theme では
   Mathlib/Aesop/Plausible/LeanSearchClient を topic-local Lake package に一度 pin して
   `lake build` で使えるようにし、探索用・fallback 用には
-  `python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` を使います。
+  `python3 tools/analysis/proof/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` を使います。
   実装由来 target では、手で tactic を一つ選ぶ前に
   `lean_recursive_proof_search.py --target <name> --tactic-matrix 'exact?,apply?,simp?,aesop?,grind'`
   のような target-rooted tactic matrix を短い timeout 付きで回し、どの tactic が
@@ -729,7 +729,7 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   ほかの sibling frontier が in-repo で進められないことを示さない限り、同じ Wave を継続します。
 - checker 済み fragment を採用したら、package-retained proof trace に theorem 名、checker command、消費 fragment、残る implementation-instantiation obligation を登録します。
 - implementation-derived proof trace では、証明展開や `verified` 判定の前に
-  `python3 tools/agent_tools/check_proof_trace_alignment.py --trace-module <trace.py>`
+  `python3 tools/validation/semantic/proof/check_proof_trace_alignment.py --trace-module <trace.py>`
   を実行し、contract の命題、retained theorem 名、source path、StableHLO anchor、
   required / forbidden source token が実装 code path と一致することを確認します。
 - proof note、証明整理ノート、reader-facing proof text を作る場合は文書作成系 skill を併用します。
@@ -758,7 +758,7 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
      nested solver edge、certificate / diagnostic edge を JIT root から
      再帰展開する
    - 既定 route は
-     `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
+     `python3 tools/analysis/proof/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
      とする。CUDA の有限精度 claim では `AGENT_CANON_JIT_JAX_PLATFORM`、
      `AGENT_CANON_JIT_BACKEND_TARGET`、
      `AGENT_CANON_JIT_IREE_CUDA_TARGET` を環境変数で固定し、
@@ -1310,7 +1310,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    comparison, or code changes for provability, also use
    `$algorithm-proof-exploration` before final proof adoption.
 1. Split the natural-language claim into assumptions, definitions, target theorem, proof sketch, and proof obligations. For implementation-derived claims, first choose the machine evidence route that matches the implementation source: JIT-canonical public root for JIT-capable Python roots, or the single C++ full-expansion route for C++ template algorithm roots.
-1. Run `python3 tools/agent_tools/formal_proof.py` to generate the proof plan,
+1. Run `python3 tools/analysis/proof/formal_proof.py` to generate the proof plan,
    target-language scaffold, existing formal proofs search packet, and
    literature queries before adopting theorem text or proof obligations.
 1. For implementation-derived algorithm proofs, always start from the whole
@@ -1444,7 +1444,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    route before selecting local proof obligations. The IR is not a proof; it
    records the implementation shape.
 1. Build JIT-canonical IR with
-   `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`.
+   `python3 tools/analysis/proof/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`.
    Retain the StableHLO hash, thin operational ops, backend phase trace, and
    coverage status in the proof artifact. Do not add recursion-depth knobs or
    hand-written operation records.
@@ -1454,7 +1454,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    stops before LLVM. Treat missing LLVM rows as a backend coverage frontier,
    not as permission to introduce external FP axioms.
    Build C++ source evidence and Lean evidence with
-   `python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --out <Generated.lean> --record-out <record.json>`.
+   `python3 tools/analysis/proof/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --out <Generated.lean> --record-out <record.json>`.
    The tool fully expands the selected C++ source route and rejects unresolved
    calls and unassigned operations before Lean output; record missing coverage as
    `failure.kind=ir_extractor_or_lowering` and hand it to the packet's
@@ -1466,7 +1466,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Generate checker-facing Lean evidence definitions from the current
    JIT-canonical IR with `tools/bin/agent-canon jit-ir-to-lean`, or from the
    C++ template source route with
-   `python3 tools/agent_tools/cpp_template_to_lean.py`. Keep this
+   `python3 tools/analysis/proof/cpp_template_to_lean.py`. Keep this
    generated evidence layer separate from the theorem graph. The JIT-generated
    layer owns root identity, StableHLO hash, operational op kinds, dtype
    coverage, and backend trace coverage; the C++ full-expansion route owns
@@ -1723,11 +1723,11 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Store checker-facing IR, theorem graphs, profile libraries, and generated Lean files under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `jit_canonical_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `documents/notes/themes/`.
 1. Build the implementation evidence layer through the route chosen for the
    public root. For JIT-canonical roots, run
-   `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
+   `python3 tools/analysis/proof/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
    and then
    `tools/bin/agent-canon jit-ir-to-lean --jit-ir <ir.json> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean>`.
    For C++ template source roots, run
-   `python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean> --record-out <record.json>`.
+   `python3 tools/analysis/proof/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean> --record-out <record.json>`.
    Convert the generated implementation evidence layer into theorem graph overlays with
    the current theorem-graph tool, not by passing theorem-profile options to
    IR extraction tools. Retain `proof_lemma_graph`,
@@ -2015,7 +2015,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    `main`, the algorithm, or the JIT boundary.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `documents/notes/`, and `documents/` before external web search.
-1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
+1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/analysis/proof/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
 1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or scope-limiting evidence.
 1. Do not mark a claim verified unless the target proof assistant or solver checks the exact artifact without placeholders, `sorry`, `Admitted`, unchecked axioms, or equivalent proof escape hatches.
 1. Do not mark a claim impossible merely because attempts failed. Use
@@ -2068,7 +2068,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    expanded before returning. It may be reported only when a checker-backed
    reduced frontier shows that the remaining item is a code/algorithm change,
    a target input/config condition, or an generated backend coverage boundary.
-1. For implementation-derived proof traces, run `python3 tools/agent_tools/check_proof_trace_alignment.py --trace-module <trace.py>` before proof expansion or verified-status claims. If it reports stale source paths, StableHLO anchors, retained theorem names, or required/forbidden source-token drift, create a proof-tool handoff and let its `proof_tool_worker` repair those surfaces; the math-writer must not edit production code or JIT boundaries for that failure.
+1. For implementation-derived proof traces, run `python3 tools/validation/semantic/proof/check_proof_trace_alignment.py --trace-module <trace.py>` before proof expansion or verified-status claims. If it reports stale source paths, StableHLO anchors, retained theorem names, or required/forbidden source-token drift, create a proof-tool handoff and let its `proof_tool_worker` repair those surfaces; the math-writer must not edit production code or JIT boundaries for that failure.
 1. If the checker cannot be run, record `proof_status=not_run`, the exact command,
    and the missing environment or dependency in a `proof_tool_handoff` with
    `failure.kind=lean_lake_checker_environment`. The named `proof_tool_worker`

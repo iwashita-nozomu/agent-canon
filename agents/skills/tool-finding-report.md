@@ -8,7 +8,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design result-artifact-writeout.md raw result and summary artifact policy
 upstream design report-writing.md reader-facing evidence report policy
 downstream design refactor-loop.md consumes finding packets for repair slices
-upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings
+upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py emits design evidence findings
 downstream implementation ../../.codex/personal/skills/tool-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -57,7 +57,7 @@ before / after impact を同じ source packet で結びます。
 ## Finding Packet
 
 Normalize findings through the host GitHub adapter
-`tools/agent_tools/issue_sync.py` before ranking or Issue handoff. The default scope is changed/user/owner-bounded; `repo-wide`
+`tools/repository/github/issue_sync.py` before ranking or Issue handoff. The default scope is changed/user/owner-bounded; `repo-wide`
 requires an explicit caller choice. Group identical owner/root-cause/fix
 records once and retain all evidence paths in that group. A warning is a
 closeout obligation only when it is actionable or blocking.
@@ -149,7 +149,7 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
    closeout obligation です。
 
 ```bash
-python3 tools/agent_tools/workflow_monitor.py \
+python3 tools/runtime/lifecycle/workflow_monitor.py \
   --report-dir reports/agents/<run-id> \
   --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"
 ```
@@ -162,7 +162,7 @@ python3 tools/agent_tools/workflow_monitor.py \
    警告がなければ次で `tool_warnings_status: none` を明示します。
 
 ```bash
-python3 tools/agent_tools/workflow_monitor.py \
+python3 tools/runtime/lifecycle/workflow_monitor.py \
   --report-dir reports/agents/<run-id> \
   --tool-warning-status none
 ```
@@ -172,7 +172,7 @@ python3 tools/agent_tools/workflow_monitor.py \
 1. prompt feedback は run bundle に構造化して残します。
 
 ```bash
-python3 tools/agent_tools/workflow_monitor.py \
+python3 tools/runtime/lifecycle/workflow_monitor.py \
   --report-dir reports/agents/<run-id> \
   --runtime-feedback "source=<tool|hook|reviewer|subagent|user> target=<skill-or-workflow-or-handoff> action=prompt_repair reason=<short-reason>"
 ```
@@ -181,8 +181,8 @@ python3 tools/agent_tools/workflow_monitor.py \
    実行可能なら次を rerun します。
 
 ```bash
-python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
-  --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml
+python3 eval/producers/evaluate_skill_workflow_prompts.py \
+  --manifest eval/definitions/skill_workflow_prompt_eval.toml
 ```
 
 ## Refactor Integration

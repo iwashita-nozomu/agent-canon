@@ -24,7 +24,7 @@ GPU/JAX 環境の所有境界、artifact / visualization.py renderer / README �
 
 - `experiments/registry.toml` に topic があり、registered command は managed runner
   が呼ぶ topic `run.py` inner command になっている
-- README の standard command は `python3 -m tools.experiments.run_managed_experiment
+- README の standard command は `python3 -m tools.experiments.execution.run_managed_experiment
   --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py` と一致している
 - managed run は既定 run directory を作り、topic `run.py` は必要に応じて
   `EXPERIMENT_RUN_DIR` を尊重して同じ artifact schema を書く

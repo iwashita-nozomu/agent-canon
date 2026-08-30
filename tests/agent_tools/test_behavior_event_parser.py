@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests canonical behavior-event readback parsing.
-# upstream implementation ../../tools/agent_tools/behavior_event_assembly.py owns behavior-event parsing.
+# upstream implementation ../../tools/runtime/archive/behavior_event_assembly.py owns behavior-event parsing.
 # @dependency-end
 """Readback tests for canonical behavior event parsing."""
 from __future__ import annotations
@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from behavior_event_assembly import parse_behavior_events  # noqa: E402
+from tools.runtime.archive.behavior_event_assembly import parse_behavior_events  # noqa: E402
 
 
 class BehaviorEventParserTest(unittest.TestCase):

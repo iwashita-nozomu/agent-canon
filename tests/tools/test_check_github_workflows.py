@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests the standalone AgentCanon GitHub workflow convention checker.
-# upstream implementation ../../tools/ci/check_github_workflows.py convention checker
+# upstream implementation ../../tools/validation/ci/checks/check_github_workflows.py convention checker
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml standalone gate workflow
 # @dependency-end
 
@@ -17,7 +17,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECKER = ROOT / "tools" / "ci" / "check_github_workflows.py"
+CHECKER = ROOT / "tools" / "validation" / "ci" / "checks" / "check_github_workflows.py"
 
 
 def run_checker(root: Path) -> subprocess.CompletedProcess[str]:

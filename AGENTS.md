@@ -10,8 +10,8 @@ upstream design agents/skills/comprehensive-development.md cross-surface impleme
 upstream design agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
 upstream design agents/canonical/CODEX_SUBAGENTS.md subagent lifecycle owner
 downstream design ROOT_AGENTS.md explicit live-integration root entrypoint
-downstream implementation tools/agent_tools/check_entrypoint_owner_map.py validates thin entrypoint structure
-downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
+downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py validates thin entrypoint structure
+downstream implementation tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates runtime owner-map alignment
 @dependency-end
 -->
 
@@ -45,7 +45,7 @@ root, workflow, or Skill policy for visibility.
 | branch, worktree, and destructive Git safety | `agents/skills/worktree-health.md`, `agents/canonical/CODEX_WORKFLOW.md`, `.codex/hooks/` |
 | AgentCanon source update and publication | `agents/skills/agent-canon-update.md`, `agents/workflows/agent-canon-pr-workflow.md` |
 | subagent activation and handoff | `agents/skills/agent-orchestration.md`, `agents/skills/subagent-bootstrap.md`, `agents/canonical/CODEX_SUBAGENTS.md` |
-| validation profile and closeout | `documents/runtime/runtime-profiles-and-check-matrix.md`, `agents/canonical/CODEX_WORKFLOW.md`, `tools/agent_tools/task_close.py` |
+| validation profile and closeout | `documents/runtime/runtime-profiles-and-check-matrix.md`, `agents/canonical/CODEX_WORKFLOW.md`, `tools/runtime/lifecycle/task_close.py` |
 | GitHub Issue / PR publication and status | `agents/skills/pr-processing.md`, `agents/internal-routines/github-status-lifecycle.md` |
 
 ## Always-On Boundary

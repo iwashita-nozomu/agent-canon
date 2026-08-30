@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests JIT-canonical IR extraction and backend trace capture.
-# upstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived IR.
-# upstream implementation ../../tools/experiments/execution_resource_plan.py owns GPU discovery/reservation.
-# upstream implementation ../../tools/experiments/run_managed_experiment.py owns the only managed GPU launch route.
+# upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived IR.
+# upstream implementation ../../tools/experiments/execution/execution_resource_plan.py owns GPU discovery/reservation.
+# upstream implementation ../../tools/experiments/execution/run_managed_experiment.py owns the only managed GPU launch route.
 # upstream design ../../documents/tools/jit_canonical_ir.md defines the extraction contract.
 # upstream design ../../documents/tools/jit_ir_to_lean.md defines the Lean evidence boundary.
 # @dependency-end
@@ -48,7 +48,7 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
     },
     "failure": {
         "kind": "ir_extractor_or_lowering",
-        "producer_surface": "tools/agent_tools/jit_canonical_ir.py",
+        "producer_surface": "tools/analysis/proof/jit_canonical_ir.py",
         "consumer_surface": "generated Lean return projection",
     },
     "math_writer": {
@@ -59,8 +59,8 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
             "tests/numerical_oracle.py",
         ],
         "forbidden_paths": [
-            "tools/agent_tools/jit_canonical_ir.py",
-            "rust/agent-canon/src/jit_ir_to_lean.rs",
+            "tools/analysis/proof/jit_canonical_ir.py",
+            "tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs",
             "lean/",
             "JIT/backend/runtime architecture",
             "production main",
@@ -79,8 +79,8 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
     "proof_tool_worker": {
         "owner": "IR extractor and generated-proof mechanism owner",
         "allowed_paths": [
-            "tools/agent_tools/jit_canonical_ir.py",
-            "rust/agent-canon/src/jit_ir_to_lean.rs",
+            "tools/analysis/proof/jit_canonical_ir.py",
+            "tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs",
             "lean/",
         ],
         "forbidden_paths": [
@@ -96,7 +96,7 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
         "evidence": {
             "status": "awaiting_native_receipt",
             "paths": [
-                "tools/agent_tools/jit_canonical_ir.py",
+                "tools/analysis/proof/jit_canonical_ir.py",
                 "generated Lean return projection",
             ],
         },
@@ -137,7 +137,7 @@ def _jit_env(**overrides: str) -> dict[str, str]:
 
 
 def _load_jit_tool_module() -> _JitToolModule:
-    tool_path = Path(__file__).resolve().parents[2] / "tools/agent_tools/jit_canonical_ir.py"
+    tool_path = Path(__file__).resolve().parents[2] / "tools/analysis/proof/jit_canonical_ir.py"
     spec = importlib.util.spec_from_file_location("_agent_canon_test_jit_tool", tool_path)
     assert spec is not None
     assert spec.loader is not None
@@ -185,7 +185,7 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
     subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/jit_canonical_ir.py",
+            "tools/analysis/proof/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -285,7 +285,7 @@ def test_jit_canonical_ir_records_recursive_control_regions(tmp_path: Path) -> N
     subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/jit_canonical_ir.py",
+            "tools/analysis/proof/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -380,7 +380,7 @@ def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Pat
     subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/jit_canonical_ir.py",
+            "tools/analysis/proof/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",

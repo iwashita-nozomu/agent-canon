@@ -21,7 +21,7 @@ responsibility Documents 関数の型注釈 for this repository.
 - domain の意味を共有したい場合だけ、repo-wide に定義した `TypeAlias`、`Protocol`、typed dataclass を使います。
 - `Any`、`dict[str, Any]`、`tuple[Any, ...]` を public 契約の第一候補にしてはなりません。
 - Python source で明示的な `typing.Any` を使ってはいけません。JSON / TOML / MCP など外部境界は `object`、`Mapping[str, object]`、`TypedDict`、または正規化済み dataclass で受けます。
-- `tools/agent_tools/check_static_any.py` を CI gate とし、`Any` import、`Any` annotation、`typing.Any` attribute reference を fail にします。
+- `tools/validation/semantic/code/check_static_any.py` を CI gate とし、`Any` import、`Any` annotation、`typing.Any` attribute reference を fail にします。
 - 互換性のために曖昧な基底型を露出するより、呼び出し側が守るべき最小契約を名前付き型で表現します。
 
 ## 実行設定の受け渡し

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests historical-only skill-usage readback.
-# upstream implementation ../../tools/agent_tools/historical_skill_usage_reader.py owns historical parsing.
+# upstream implementation ../../tools/runtime/archive/historical_skill_usage_reader.py owns historical parsing.
 # @dependency-end
 """Focused tests for historical-only skill usage parsing."""
 from __future__ import annotations
@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from historical_skill_usage_reader import read_skill_usage_history  # noqa: E402
+from tools.runtime.archive.historical_skill_usage_reader import read_skill_usage_history  # noqa: E402
 
 
 class HistoricalSkillUsageReaderTest(unittest.TestCase):

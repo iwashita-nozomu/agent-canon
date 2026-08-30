@@ -6,7 +6,7 @@ upstream design ../rule/README.md document placement and Japanese prose rules
 upstream design responsibility-scope-management.md owns the unique tracked-path ownership relation
 upstream design ../structure/repo-structure-contract.toml owns path existence and filesystem kind
 downstream design ../parent-repository-audit/README.md owns the reader route
-downstream implementation ../../tools/agent_tools/parent_repository_audit.py enumerates units and evidence
+downstream implementation ../../tools/analysis/code/parent_repository_audit.py enumerates units and evidence
 downstream implementation ../../tests/agent_tools/test_parent_repository_audit.py verifies semantic selection and failure semantics
 @dependency-end
 -->
@@ -58,7 +58,7 @@ evidence の部分集合を作るだけで、unit または owner を選びま�
 | `documents/structure/repo-structure-contract.toml` | expected path -> filesystem kind | owner/class、semantic audit route |
 | `documents/runtime/shared-runtime-surfaces.toml` | source/view projection mechanics | parent path ownership、general structure |
 | `documents/parent-repository-audit/audit-unit/*.md` | semantic invariant、repair、validation、close | broad path coverage、owner overlap |
-| `tools/agent_tools/parent_repository_audit.py` | unit enumeration、surface selection、evidence receipt | path ownership classification |
+| `tools/analysis/code/parent_repository_audit.py` | unit enumeration、surface selection、evidence receipt | path ownership classification |
 
 新しい通常 path を追加するとき、owner/class の変更は一つの `responsibility-scope.toml` だけに
 記録します。required structure なら structure contract に存在/kind を追加しますが、同じ
@@ -69,7 +69,7 @@ owner/class や category を複製しません。runtime view を追加する場
 
 - `documents/parent-repository-audit/README.md`: reader route と選択境界。
 - `documents/parent-repository-audit/audit-unit/*.md`: unit ごとの正本。
-- `tools/agent_tools/parent_repository_audit.py`: deterministic projection。
+- `tools/analysis/code/parent_repository_audit.py`: deterministic projection。
 - `tests/agent_tools/test_parent_repository_audit.py`: semantic selection と failure oracle。
 - 親の tracked tree、branch、commit、finding、repair/readback receipt: 親固有 evidence。
 - generated report、inventory、run bundle: 再生成可能な evidence/projection。
@@ -98,10 +98,10 @@ AgentCanon source と親 root は別の publication lane です。source contrac
 ## Deterministic Execution
 
 ```bash
-python3 tools/agent_tools/parent_repository_audit.py list --root <parent-root> --format text
-python3 tools/agent_tools/parent_repository_audit.py list --root <parent-root> \
+python3 tools/analysis/code/parent_repository_audit.py list --root <parent-root> --format text
+python3 tools/analysis/code/parent_repository_audit.py list --root <parent-root> \
   --surface <stable-surface> --scope <tracked-evidence> --format text
-python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root> \
+python3 tools/analysis/code/parent_repository_audit.py check --root <parent-root> \
   --unit-status <pass|closed|failed|deferred|blocked> --format text
 ```
 

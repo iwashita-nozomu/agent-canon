@@ -4,10 +4,10 @@
 # contract test
 # responsibility Verifies stable identity, root resolution, and runtime archive lifecycle behavior.
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive contract
-# upstream implementation ../../tools/agent_tools/log_repository_identity.py resolves stable source identity
-# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves source and canon roots
-# upstream implementation ../../tools/agent_tools/runtime_log_paths.py derives runtime archive paths
-# upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py publishes archive snapshots and refs
+# upstream implementation ../../tools/runtime/archive/log_repository_identity.py resolves stable source identity
+# upstream implementation ../../tools/runtime/source/agent_canon_source_root.py resolves source and canon roots
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py derives runtime archive paths
+# upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py publishes archive snapshots and refs
 # @dependency-end
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.agent_tools.agent_canon_source_root import resolve_agent_canon_source_root
-from tools.agent_tools.log_repository_identity import (
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+from tools.runtime.archive.log_repository_identity import (
     SourceRepositoryIdentityError,
     normalize_remote,
     source_repository_id_for_write,
@@ -30,12 +30,12 @@ from tools.agent_tools.log_repository_identity import (
     stable_source_id_from_runtime_env,
     stable_source_repository_id,
 )
-from tools.agent_tools.runtime_log_paths import repo_log_key
+from tools.runtime.archive.runtime_log_paths import repo_log_key
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
+SCRIPT = ROOT / "tools" / "runtime" / "archive" / "runtime_log_archive_git.py"
 sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
-import runtime_log_archive_git as archive  # noqa: E402
+import tools.runtime.archive.runtime_log_archive_git as archive  # noqa: E402
 
 
 def git(cwd: Path, *args: str, check: bool = True) -> str:

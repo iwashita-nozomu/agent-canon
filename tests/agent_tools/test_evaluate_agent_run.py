@@ -2,8 +2,8 @@
 # contract test
 # responsibility Tests test evaluate agent run behavior.
 # upstream design ../../agents/workflows/agent-learning-workflow.md agent feedback workflow
-# upstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates run bundles
-# downstream implementation ../../tools/agent_tools/task_close.py consumes agent evaluation status
+# upstream implementation ../../eval/producers/evaluate_agent_run.py evaluates run bundles
+# downstream implementation ../../tools/runtime/lifecycle/task_close.py consumes agent evaluation status
 # @dependency-end
 
 """Tests for agent run evaluation."""
@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_agent_run.py"
-MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_agent_run.py"
+MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )

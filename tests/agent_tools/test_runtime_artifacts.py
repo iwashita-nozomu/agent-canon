@@ -11,7 +11,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
     RuntimeArtifactBoundary,
     RuntimePathEscape,
     RuntimeRootRequired,

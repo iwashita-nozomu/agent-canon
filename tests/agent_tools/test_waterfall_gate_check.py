@@ -2,8 +2,8 @@
 # contract test
 # responsibility Tests test waterfall gate check behavior.
 # upstream design ../../tools/README.md validated automation surface
-# upstream implementation ../../tools/agent_tools/packets.py owns canonical active-packet projection loading
-# upstream implementation ../../tools/agent_tools/workspace_scope.py owns report path resolution
+# upstream implementation ../../tools/agent/orchestration/packets.py owns canonical active-packet projection loading
+# upstream implementation ../../tools/repository/workspace/workspace_scope.py owns report path resolution
 # @dependency-end
 
 """Tests for intermediate waterfall gate checks."""
@@ -24,17 +24,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from packets import (  # noqa: E402
+from tools.agent.orchestration.packets import (  # noqa: E402
     ACTIVE_DESIGN_PACKET_SCHEMA,
     active_design_packet_mapping,
     active_design_packet_reference_projection,
     normalize_active_design_packet_config,
     resolve_active_design_packet_config,
 )
-from team_config import RunBundleSpec, load_team_config  # noqa: E402
+from tools.agent.orchestration.team_config import RunBundleSpec, load_team_config  # noqa: E402
 
-BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
-GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "waterfall_gate_check.py"
+BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
+GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "lifecycle" / "waterfall_gate_check.py"
 
 
 def write_markdown(path: Path, lines: list[str]) -> None:
@@ -261,7 +261,7 @@ def design_brief_lines(
         "## Goals",
         "Implement the approved bounded change.",
         "## Existing Code And Docs To Reuse",
-        "Mirror `tools/agent_tools/task_close.py`.",
+        "Mirror `tools/runtime/lifecycle/task_close.py`.",
     ]
     if include_abstract:
         lines.extend(
@@ -295,7 +295,7 @@ def design_brief_lines(
                 (
                     "Read `user_request_contract.md`, `design_review.md`, "
                     "`document_flow_review.md`, `test_plan.md`, and "
-                    "`tools/agent_tools/task_close.py`."
+                    "`tools/runtime/lifecycle/task_close.py`."
                 ),
             ]
         )
@@ -313,7 +313,7 @@ def design_brief_lines(
             [
                 "## Canonical Tree-Head Plan",
                 (
-                    "Keep `tools/agent_tools/waterfall_gate_check.py` as the only "
+                    "Keep `tools/validation/semantic/lifecycle/waterfall_gate_check.py` as the only "
                     "canonical implementation path and do not leave backup files."
                 ),
             ]

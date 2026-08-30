@@ -7,7 +7,7 @@
 # upstream design ../../agents/skills/result-artifact-writeout.md concrete artifact owner
 # upstream design ../../agents/skills/html-output.md HTML artifact owner
 # upstream design ../../agents/skills/catalog.yaml public skill identity owner
-# upstream implementation ../../tools/agent_tools/prompt_classifier.py prompt signal owner
+# upstream implementation ../../tools/agent/orchestration/prompt_classifier.py prompt signal owner
 # @dependency-end
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from prompt_classifier import SKILL_KEYWORDS  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import SKILL_KEYWORDS  # noqa: E402
 
 REMOVED = ("html-experiment-report", "save-experiment-results")
 

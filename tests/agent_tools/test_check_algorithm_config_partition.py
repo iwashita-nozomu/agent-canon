@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests algorithm config partition checker behavior.
-# upstream implementation ../../tools/agent_tools/check_algorithm_config_partition.py checker
+# upstream implementation ../../tools/validation/semantic/algorithm/check_algorithm_config_partition.py checker
 # upstream design ../../documents/design/jax_util/algorithm_module_contract.md config contract
 # @dependency-end
 """Tests for the algorithm config partition checker."""
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "check_algorithm_config_partition.py"
+TOOL = PROJECT_ROOT / "tools" / "validation" / "semantic" / "algorithm" / "check_algorithm_config_partition.py"
 
 
 class CheckAlgorithmConfigPartitionTest(unittest.TestCase):

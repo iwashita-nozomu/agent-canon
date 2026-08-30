@@ -4,14 +4,14 @@ contract reference
 responsibility Documents the dependency policy adapter command.
 upstream design ../rule/dependency-module-changes.md dependency identity, pin, and projection policy
 upstream design ../rule/repository-topic-clone.md generic clone lifecycle
-upstream implementation ../../tools/agent_tools/dependency_module_change.py dependency adapter
+upstream implementation ../../tools/repository/workspace/dependency_module_change.py dependency adapter
 downstream implementation ../../tests/agent_tools/test_dependency_module_change.py validates command behavior
 @dependency-end
 -->
 
 # dependency_module_change.py
 
-`tools/agent_tools/dependency_module_change.py` は `.gitmodules` から dependency URL と
+`tools/repository/workspace/dependency_module_change.py` は `.gitmodules` から dependency URL と
 repository name を解決し、generic `repository_topic_clone.py` を呼ぶ policy adapter です。
 clone implementation、path alias、fresh/continuation の別 route は持ちません。
 public entry はこの direct executable だけです。同じ `agent_tools/` directory の
@@ -21,18 +21,18 @@ derived `tools/agent-canon` viewのどちらでもpackage contextや`PYTHONPATH`
 ## Commands
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> status \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> status \
   --topic <topic> [--module <module-path>]
 
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <module-path> --branch <branch> \
   --owner-evidence <file> [--allowed-path <relative-path> ...]
 
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> merge-main \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> merge-main \
   --topic <topic> --module <module-path> --branch <branch> \
   --owner-evidence <file> [--allowed-path <relative-path> ...]
 
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <module-path> --branch <branch> \
   --owner-evidence <file> [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \

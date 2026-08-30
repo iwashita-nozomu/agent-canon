@@ -7,8 +7,8 @@ responsibility Documents the canonical private subagent startup route and intern
 upstream design README.md internal routine registry
 upstream design ../COMMUNICATION_PROTOCOL.md owns Fresh Subagent Context Capsule fields
 downstream design ../skills/subagent-bootstrap.md consumes the canonical private subagent startup route
-downstream implementation ../../tools/agent_tools/agent_team.py emits run.subagent_prompt_packet.subagent_startup_route
-downstream implementation ../../tools/agent_tools/route.py strips private startup labels from prompt skill activation
+downstream implementation ../../tools/agent/orchestration/agent_team.py emits run.subagent_prompt_packet.subagent_startup_route
+downstream implementation ../../tools/agent/orchestration/route.py strips private startup labels from prompt skill activation
 downstream implementation ../../tests/agent_tools/test_route.py checks historical startup labels are not public aliases
 downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py checks generated run manifest fields
 @dependency-end

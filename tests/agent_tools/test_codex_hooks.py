@@ -5,7 +5,7 @@
 # responsibility Tests active codex hook behavior and retired-route contract.
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares the three active hooks
-# upstream implementation ../../tools/agent_tools/hook_safety.py owns active safety leaves
+# upstream implementation ../../tools/runtime/authority/hook_safety.py owns active safety leaves
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py owns the typed event contract
 # downstream implementation ../../tests/agent_tools/test_hook_event_log.py validates hook telemetry
 # @dependency-end
@@ -32,7 +32,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
-from prompt_classifier import (  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
 )

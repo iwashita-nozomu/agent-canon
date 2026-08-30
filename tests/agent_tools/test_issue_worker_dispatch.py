@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests orchestration materialization of the IssueWorker publisher route.
-# upstream implementation ../../tools/agent_tools/issue_worker_dispatch.py materializes route and ToolCall
-# upstream implementation ../../tools/agent_tools/agent_team.py exposes orchestration facade
+# upstream implementation ../../tools/repository/github/issue_worker_dispatch.py materializes route and ToolCall
+# upstream implementation ../../tools/agent/orchestration/agent_team.py exposes orchestration facade
 # @dependency-end
 """Focused IssueWorker orchestration tests."""
 
@@ -22,14 +22,14 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import issue_worker_dispatch  # noqa: E402
-from bootstrap_agent_run import main as bootstrap_main  # noqa: E402
-from checkout_identity import CheckoutIdentity  # noqa: E402
-from implementation_dispatch import (  # noqa: E402
+from tools.repository.github import issue_worker_dispatch  # noqa: E402
+from tools.runtime.lifecycle.bootstrap_agent_run import main as bootstrap_main  # noqa: E402
+from tools.runtime.authority.checkout_identity import CheckoutIdentity  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
     recommended_initial_subagent_wave,
     workflow_spawn_budget,
 )
-from team_config import (  # noqa: E402
+from tools.agent.orchestration.team_config import (  # noqa: E402
     load_task_catalog,
     load_team_config,
     select_roles,
@@ -426,7 +426,7 @@ def test_bootstrap_cli_materializes_spawn_handoff_without_injected_callback() ->
         result = subprocess.run(
             [
                 sys.executable,
-                str(PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"),
+                str(PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"),
                 "--task",
                 "publish explicit feedback",
                 "--task-id",

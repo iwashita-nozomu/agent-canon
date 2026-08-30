@@ -6,13 +6,13 @@ responsibility Defines the host bootstrap, shared AgentCanon tool runtime, exter
 upstream design ../../README.md standalone AgentCanon source entrypoint and user journey
 upstream design ../runtime/runtime-log-archive.md agent-canon-log publication and append-only archive policy
 upstream design ../../agents/skills/agent-canon-update.md AgentCanon source and parent integration workflow
-upstream implementation ../../tools/agent_tools/devcontainer_dependencies.py reusable dependency planning and image installation logic
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py existing archive publication owner
+upstream implementation ../../tools/runtime/container/devcontainer_dependencies.py reusable dependency planning and image installation logic
+upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py existing archive publication owner
 downstream implementation ../../bootstrap.sh host bootstrap entrypoint
-downstream implementation ../../bootstrap/container/Dockerfile shared Python and Rust tool image
-downstream implementation ../../tools/agent_tools/bootstrap_runtime.py resident container lifecycle and mount registry
-downstream implementation ../../tools/agent_tools/runtime_artifacts.py external runtime artifact boundary
-downstream implementation ../../tools/agent_tools/tool_dispatch.py catalog-namespaced Python and Rust dispatcher
+downstream implementation ../../bootstrap/container/image/Dockerfile shared Python and Rust tool image
+downstream implementation ../../tools/runtime/container/bootstrap_runtime.py resident container lifecycle and mount registry
+downstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py external runtime artifact boundary
+downstream implementation ../../tools/runtime/dispatch/tool_dispatch.py catalog-namespaced Python and Rust dispatcher
 downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootstrap lifecycle and compatibility tests
 @dependency-end
 -->
@@ -89,7 +89,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
 ```
 
 Bootstrap lifecycle codeだけが固定された `.runtime/` surfaces を直接管理します。
-`tools/agent_tools/runtime_artifacts.py` は source-local artifact を例外なく拒否し、
+`tools/runtime/artifacts/runtime_artifacts.py` は source-local artifact を例外なく拒否し、
 分析 tool は source read-only、telemetry は external root、mutation tool は明示 target
 capability を受けた場合だけ source を変更します。
 
@@ -127,7 +127,7 @@ replacement lock の下で stale な owned Docker resource だけを exact ID/re
 Docker の結果と一つの receipt に結合します。
 
 Bootstrap はホストの Python / Cargo install へ fallback しません。Host
-`bootstrap/lib/entrypoint.sh` は Docker/Git の argv adapter だけを実行し、image を
+`bootstrap/host/lifecycle/entrypoint.sh` は Docker/Git の argv adapter だけを実行し、image を
 build/pull して resident container を起動した後、`docker exec` 経由で
 `bootstrap_runtime.py` を実行します。Docker が無い場合は Host Python を import せず
 typed `runtime_unavailable` を返します。
@@ -141,7 +141,7 @@ TOML/JSON/state/tool/check/eval を実行できます。Target は controller �
 
 ## Bootstrap Manifest
 
-`bootstrap/manifest.toml` は image、container、runtime、skill、archive lease を
+`bootstrap/host/manifest.toml` は image、container、runtime、skill、archive lease を
 一つの lifecycle record へ結合します。`agent-canon-log` の branch、retention、
 legacy import policy は log repository が所有し、Bootstrap は local spool、archive
 checkout lease、publication receipt だけを所有します。
@@ -174,18 +174,18 @@ target = "runtime-root/codex-home/skills"
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 ```
 
-`tools/agent_tools/bootstrap_runtime.py` は container-side controller であり、Docker CLI/daemon の版、daemon
+`tools/runtime/container/bootstrap_runtime.py` は container-side controller であり、Docker CLI/daemon の版、daemon
 mode、buildx、context、host architecture、rootless/rootful、UID/GID を事前
 検証しません。`DockerAdapter.run` の Docker command failure はその exit code と
-stderr を結果に残します。`bootstrap/container/Dockerfile` と
-`bootstrap/container/entrypoint.sh` の container process identity と UID/GID
+stderr を結果に残します。`bootstrap/container/image/Dockerfile` と
+`bootstrap/container/lifecycle/entrypoint.sh` の container process identity と UID/GID
 mapping は Host/caller の責務であり、`tests/tools/test_bootstrap_container_contract.py`
 で契約化しています。AgentCanon は user 作成、`--user` 指定、UID/GID readback を行いません。
 container name と label
 は同じ effective UID に対する共有 runtime を1個に制限し、control-root
 digest と manifest digest が一致しない adopt を拒否します。
 
-`bootstrap/manifest.toml` は current、rollback、in-use、pre-existing、gc-eligible を区別します。
+`bootstrap/host/manifest.toml` は current、rollback、in-use、pre-existing、gc-eligible を区別します。
 target add/remove が成功すると resident state owner は同じ
 `agent-canon.rollback-plan.v1` を `rollback_generation` の image identity と
 target mount snapshot から更新します。従って target だけが変わった世代も
@@ -200,10 +200,10 @@ readback します。`docker system prune` は使用せず、manifest-owned exac
 
 ## Container Image
 
-`bootstrap/container/Dockerfile` は旧developer-containerの dependency planning / Python / Rust build 部分だけを再利用します。editor、post-create、GPU、
+`bootstrap/container/image/Dockerfile` は旧developer-containerの dependency planning / Python / Rust build 部分だけを再利用します。editor、post-create、GPU、
 Compose、workspace lifecycle は移植せず、旧developer-container surfaceは削除します。
 
-`bootstrap/container/Dockerfile` は次を必須にします。
+`bootstrap/container/image/Dockerfile` は次を必須にします。
 
 ```text
 --read-only
@@ -289,7 +289,7 @@ id, typed argv, runtime, execution_plane, cwd policy, env policy,
 stdin/stdout/stderr policy, exit/signal policy, side_effect_policy, output_root
 ```
 
-`tools/agent_tools/tool_dispatch.py` は `tool-container` と
+`tools/runtime/dispatch/tool_dispatch.py` は `tool-container` と
 `read-only`、`external-artifact`、`explicit-target-write` を列挙値にします。
 shell command string を dispatcher authority にしません。
 
@@ -327,7 +327,7 @@ embedding.https.request
 
 Issue/PR/comment など GitHub 操作は Bootstrap の authority に含めず、Host workflow
 の GitHub owner が実行します。上記の Docker/Git 操作は Host shell が実行し、
-`tools/agent_tools/bootstrap_runtime.py` は Docker argv を発行しません。Host
+`tools/runtime/container/bootstrap_runtime.py` は Docker argv を発行しません。Host
 entrypoint はこの Python module を resident container の `docker exec` で起動し、
 shell fragment ではなく固定された Docker argv と exact path を扱います。
 receipt は operation、digest、byte count、exitだけを
@@ -350,9 +350,9 @@ stale/replayed/mismatched response は受理しません。
 
 ## Mutation Capability
 
-`tools/agent_tools/bootstrap_runtime.py` は分析を read-only mount で実行します。docs / memory / materializer など
+`tools/runtime/container/bootstrap_runtime.py` は分析を read-only mount で実行します。docs / memory / materializer など
 意図的な mutation は target root、allowed paths、purpose、authority、before/after、
-receipt を `tools/agent_tools/bootstrap_runtime.py` で必須にします。runtime output を source mutation として扱いません。
+receipt を `tools/runtime/container/bootstrap_runtime.py` で必須にします。runtime output を source mutation として扱いません。
 
 `RuntimeArtifactBoundary` は implicit output が source root 内なら拒否し、external
 rootへ atomic writeします。`__pycache__`、Cargo target、SQLite、event spool、eval、
@@ -388,7 +388,7 @@ Codex を起動することも要求しません。install/update 後は現在 s
 自動更新されないことを表示し、launcher が開く新 session で skill/agent/hook/config
 inventory と link target を readback します。
 
-`tools/agent_tools/bootstrap_runtime.py` は isolated Codex homeのskill/agent surfaceを cross-repository
+`tools/runtime/container/bootstrap_runtime.py` は isolated Codex homeのskill/agent surfaceを cross-repository
 discovery entry とし、project-local `AGENTS.md` は親 repository の責務のままと
 する Codex discovery model を前提にします。
 
@@ -461,7 +461,7 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | `update` | current checkout reconciled in existing v2 lifecycle | ordinary Docker result and existing state/container readback |
 | `start` | exactly one healthy container | inspect, limits, mounts, generation |
 | `target add` | new mount generation active | lock, zero tasks, health, mount readback |
-| `tool run` | typed catalog dispatch | `tools/agent_tools/tool_dispatch.py` receipt |
+| `tool run` | typed catalog dispatch | `tools/runtime/dispatch/tool_dispatch.py` receipt |
 | `template export` | external template bundle exported | container-plane receipt and bundle provenance |
 | `codex prepare` | isolated managed surfaces active | collision result, link/digest/readback |
 | `eval collect` | external eval bundle complete | producer matrix, source unchanged |
@@ -471,9 +471,9 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | `gc` | exact stale owned Docker state absent; resident state/cache/lease GC complete | exact IDs/refs, foreign resources and active/rollback identities retained |
 | `uninstall` | owned runtime/skills absent | absence readback; user roots unchanged |
 
-## Side-Effect Map (`tools/agent_tools/bootstrap_runtime.py`)
+## Side-Effect Map (`tools/runtime/container/bootstrap_runtime.py`)
 
-| Surface (`tools/agent_tools/bootstrap_runtime.py`) | Owner | Allowed write |
+| Surface (`tools/runtime/container/bootstrap_runtime.py`) | Owner | Allowed write |
 | --- | --- | --- |
 | AgentCanon source | explicit mutation operation | allowed target only |
 | runtime root | Bootstrap | task state, receipts, spool, archive lease |
@@ -491,14 +491,14 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 
 ```text
 bootstrap.sh
-bootstrap/manifest.toml
-bootstrap/container/Dockerfile
-bootstrap/container/entrypoint.sh
-bootstrap/container/dependencies.toml
+bootstrap/host/manifest.toml
+bootstrap/container/image/Dockerfile
+bootstrap/container/lifecycle/entrypoint.sh
+bootstrap/container/image/dependencies.toml
 bootstrap/lib/*.sh
-tools/agent_tools/bootstrap_runtime.py
-tools/agent_tools/runtime_artifacts.py
-tools/agent_tools/tool_dispatch.py
+tools/runtime/container/bootstrap_runtime.py
+tools/runtime/artifacts/runtime_artifacts.py
+tools/runtime/dispatch/tool_dispatch.py
 documents/runtime/bootstrap-runtime.md
 tests/bootstrap/*
 tests/agent_tools/test_runtime_artifacts.py
@@ -514,17 +514,17 @@ agents/skills/agent-canon-update.md
 agents/skills/catalog.yaml
 tools/catalog.yaml
 tools/bin/agent-canon
-tools/agent_tools/devcontainer_dependencies.py
-tools/agent_tools/runtime_log_paths.py
-tools/agent_tools/runtime_log_archive_git.py
-tools/agent_tools/run_accumulated_agent_evals.py
-tools/agent_tools/eval_accumulation_check.py
+tools/runtime/container/devcontainer_dependencies.py
+tools/runtime/archive/runtime_log_paths.py
+tools/runtime/archive/runtime_log_archive_git.py
+eval/producers/run_accumulated_agent_evals.py
+eval/checkers/eval_accumulation_check.py
 eval producer / dashboard / hook writers
-rust/agent-canon/src/main.rs
+tools/runtime/dispatch/agent-canon/src/main.rs
 rust graph / semantic / structured-analysis output resolvers
 documents/runtime/runtime-log-archive.md
 documents/runtime/runtime-profiles-and-check-matrix.md
-evidence/agent-evals/skill_workflow_prompt_eval.toml
+eval/definitions/skill_workflow_prompt_eval.toml
 ```
 
 削除はBootstrap parity完了後:

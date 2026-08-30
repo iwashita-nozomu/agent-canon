@@ -1,15 +1,15 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents tools/agent_tools/jit_canonical_ir.py usage and output contract.
-downstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces.
-downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs consumes the generated JIT-canonical IR JSON.
+responsibility Documents tools/analysis/proof/jit_canonical_ir.py usage and output contract.
+downstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs consumes the generated JIT-canonical IR JSON.
 @dependency-end
 -->
 
 # jit_canonical_ir.py
 
-`tools/agent_tools/jit_canonical_ir.py` lowers a JIT-capable Python root and
+`tools/analysis/proof/jit_canonical_ir.py` lowers a JIT-capable Python root and
 writes machine evidence for proof themes. It is an AgentCanon tool. Topic-local
 proof directories may call it, but they do not own the tool contract.
 
@@ -29,7 +29,7 @@ export AGENT_CANON_JIT_JAX_PLATFORM=gpu
 export AGENT_CANON_JIT_BACKEND_TARGET=cuda
 export AGENT_CANON_JIT_IREE_CUDA_TARGET=sm_89
 
-python3 tools/agent_tools/jit_canonical_ir.py \
+python3 tools/analysis/proof/jit_canonical_ir.py \
   --python-symbol lean/<topic>/main.py::main \
   --input-factory lean/<topic>/main.py::example_inputs \
   --xla-dump-dir reports/<topic>/xla-dump \

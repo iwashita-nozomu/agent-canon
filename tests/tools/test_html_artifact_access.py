@@ -3,7 +3,7 @@
 # responsibility Tests remote HTML artifact access command rendering.
 # upstream design ../../documents/tools/html_artifact_access.md user-facing helper contract
 # upstream design ../../documents/experiments/result-log-retention-and-visualization.md visual artifact policy
-# upstream implementation ../../tools/experiments/html_artifact_access.py helper under test
+# upstream implementation ../../tools/experiments/artifacts/html_artifact_access.py helper under test
 # @dependency-end
 
 """Tests for remote HTML artifact browser access commands."""
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "experiments" / "html_artifact_access.py"
+SCRIPT = PROJECT_ROOT / "tools" / "experiments" / "artifacts" / "html_artifact_access.py"
 
 
 def command_env(**updates: str) -> dict[str, str]:

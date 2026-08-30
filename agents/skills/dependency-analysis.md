@@ -7,9 +7,9 @@ responsibility Documents dependency-analysis for this repository.
 upstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest format and tools
 upstream design ../canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ./catalog.yaml registers this public skill
-upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts file-level code dependency evidence
-upstream implementation ../../tools/agent_tools/helper_function_inventory.py extracts Python function-level call graph context
-upstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
+upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts file-level code dependency evidence
+upstream implementation ../../tools/analysis/code/helper_function_inventory.py extracts Python function-level call graph context
+upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design-document evidence claims
 @dependency-end
 -->
 
@@ -51,40 +51,40 @@ code dependency と header dependency は別 evidence として扱い、修正�
 Code dependency surface:
 
 ```bash
-bash tools/agent_tools/scan_code_dependencies.sh --changed
+bash tools/analysis/dependencies/scan_code_dependencies.sh --changed
 ```
 
 Function-level Python dependency surface:
 
 ```bash
-python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions --format json
+python3 tools/analysis/code/helper_function_inventory.py --changed --all-functions --format json
 ```
 
 Changed-file gate:
 
 ```bash
-python3 tools/agent_tools/check_dependency_headers.py --changed
-bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
-bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
+bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing
+bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header
 ```
 
 Graph check when edges changed:
 
 ```bash
-bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
+bash tools/analysis/dependencies/check_dependency_graph.sh --changed --print-edges
 ```
 
 Strict reverse-edge check when that is the migration target:
 
 ```bash
-bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges --check-bidirectional
+bash tools/analysis/dependencies/check_dependency_graph.sh --changed --print-edges --check-bidirectional
 ```
 
 Full migration inventory:
 
 ```bash
-bash tools/agent_tools/scan_dependency_headers.sh
-bash tools/agent_tools/check_dependency_graph.sh --print-edges
+bash tools/analysis/dependencies/scan_dependency_headers.sh
+bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
 ```
 
 Responsibility-first search-to-edit-scope expansion:
@@ -97,7 +97,7 @@ agent-canon semantic-index context-pack \
   --format text \
   > reports/search_responsibility_context.txt
 git grep -l "search phrase" -- <responsibility-scoped dirs> > reports/search_hits.txt
-bash tools/agent_tools/run_repo_dependency_review.sh \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
 ```
@@ -105,7 +105,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 Design-document claim evidence gate:
 
 ```bash
-python3 tools/agent_tools/check_design_doc_claims.py \
+python3 tools/validation/semantic/documents/check_design_doc_claims.py \
   --root . \
   --recursive-depth 3 \
   documents/design/<topic>.md
@@ -114,7 +114,7 @@ python3 tools/agent_tools/check_design_doc_claims.py \
 or through the dependency review wrapper:
 
 ```bash
-bash tools/agent_tools/run_repo_dependency_review.sh \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --check-design-doc-claims
 ```
@@ -122,7 +122,7 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
 For an explicit design document:
 
 ```bash
-bash tools/agent_tools/run_repo_dependency_review.sh \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --check-design-doc-claims \
   --design-doc-claim-path documents/design/<topic>.md

@@ -130,4 +130,4 @@ responsibility Documents レビュー文書の運用規約 for this repository.
 
 ## 11. 検証
 
-- この文書の規範表現、禁止表現、検証経路は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
+- この文書の規範表現、禁止表現、検証経路は `python3 tools/validation/semantic/convention/check_convention_compliance.py` で確認します。

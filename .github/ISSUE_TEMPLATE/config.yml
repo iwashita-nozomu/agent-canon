@@ -5,7 +5,7 @@
 # upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue transport policy.
 # upstream design ../AGENTS.md GitHub subtree instructions.
 # upstream design ../../templates/documents/README.md canonical template owner.
-# downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
+# downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
 
 # Canonical source and checked-in standalone target: update templates/documents/github/issue/config.yml and .github/ISSUE_TEMPLATE/config.yml together.

@@ -5,7 +5,7 @@
 contract design
 responsibility Defines the NVIDIA XML topology, process join, and unit-state boundary.
 upstream design ./gpu-admission-r5-source-packet.md fixed R5 admission packet
-downstream implementation ../../tools/experiments/execution_resource_plan.py NVIDIA and occupancy owners
+downstream implementation ../../tools/experiments/execution/execution_resource_plan.py NVIDIA and occupancy owners
 @dependency-end
 -->
 

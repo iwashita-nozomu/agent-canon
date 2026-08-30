@@ -18,7 +18,7 @@ from pathlib import Path
 def resolve_script() -> Path:
     """Return the nearest available check_merge_structure.py script."""
     for candidate in Path(__file__).resolve().parents:
-        script = candidate / "tools" / "ci" / "check_merge_structure.py"
+        script = candidate / "tools" / "validation" / "ci" / "checks" / "check_merge_structure.py"
         if script.exists():
             return script
     raise unittest.SkipTest("check_merge_structure.py is not available in this tree")

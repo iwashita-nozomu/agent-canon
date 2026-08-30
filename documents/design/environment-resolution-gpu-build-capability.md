@@ -7,10 +7,10 @@ responsibility Defines the #838 environment-resolution child contract for staged
 upstream design ../../agents/skills/gpu-execution.md runtime GPU admission and CDI wiring boundary
 upstream design ../../agents/skills/environment-maintenance.md canonical image repair boundary
 upstream design ../../agents/skills/dependency-design.md dependency provider and placement boundary
-downstream implementation ../../tools/agent_tools/gpu_build_capability.py typed GPU build receipt classifier
+downstream implementation ../../tools/runtime/container/gpu_build_capability.py typed GPU build receipt classifier
 downstream implementation ../../tests/agent_tools/test_gpu_build_capability.py focused staged-receipt regression
-downstream data ../../tests/fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure evidence
-downstream data ../../tests/fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired evidence
+downstream implementation ../../tests/fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure evidence
+downstream implementation ../../tests/fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired evidence
 @dependency-end
 -->
 

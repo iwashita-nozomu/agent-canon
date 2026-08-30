@@ -3,9 +3,9 @@
 contract reference
 responsibility Explains the standalone AgentCanon runtime-surface inventory and archive boundary.
 upstream design ./bootstrap-runtime.md bootstrap lifecycle and resource policy
-upstream implementation ../../tools/agent_tools/surface_manifest.py validates source classifications
-upstream implementation ../../tools/agent_tools/skill_projection_registry.py resolves generated skill owners
-downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs consumes normalized classifications
+upstream implementation ../../tools/runtime/manifest/surface_manifest.py validates source classifications
+upstream implementation ../../tools/agent/skills/skill_projection_registry.py resolves generated skill owners
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs consumes normalized classifications
 @dependency-end
 -->
 
@@ -19,12 +19,13 @@ its own source tree and invokes the shared runtime through `bootstrap.sh`.
 ## Owned surfaces
 
 The machine-readable inventory in
-`documents/runtime/shared-runtime-surfaces.toml` classifies three source-owned
+`documents/runtime/shared-runtime-surfaces.toml` classifies four source-owned
 families:
 
 - `bootstrap/`: lifecycle manifest and container definition;
-- `tools/agent_tools/`: Python orchestration and tool adapters;
-- `evidence/agent-evals/`: evaluation producers and collection metadata.
+- `tools/`: Python orchestration, analysis, validation, and runtime adapters;
+- `eval/`: evaluation producers, checkers, definitions, and fixtures;
+- `tools/runtime/dispatch/agent-canon/`: the standalone Rust CLI crate.
 
 The `normalized-snapshot` command emits schema
 `agent-canon.surface-manifest.v2`. Its required `generated_projections` field
@@ -48,8 +49,9 @@ the project-owned environment and is passed to a selected tool through an
 explicit target. The source inventory is read-only classification metadata;
 it is not a synchronizer and cannot mutate a parent repository root.
 
-`projection_forbidden_roots = ["rust"]` records that the standalone Rust source
-and Cargo target remain owned by AgentCanon itself. It does not grant cleanup
+`projection_forbidden_roots = ["rust"]` records that the legacy top-level Rust
+projection is forbidden while the canonical crate at
+`tools/runtime/dispatch/agent-canon/` remains owned by AgentCanon itself. It does not grant cleanup
 or deletion authority over another repository's `rust/` directory.
 
 ## Validation
@@ -59,6 +61,6 @@ standalone source checks for the changed tool or runtime surface. Check the
 inventory with:
 
 ```bash
-python3 tools/agent_tools/surface_manifest.py --root . --prefix . \
+python3 tools/runtime/manifest/surface_manifest.py --root . --prefix . \
   --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
 ```

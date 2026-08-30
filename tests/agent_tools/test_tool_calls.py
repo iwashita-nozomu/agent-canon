@@ -10,7 +10,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent_tools.tool_calls import (
+from tools.agent.orchestration.tool_calls import (
     build_issue_receipt_stage_command,
     materialize_issue_worker_tool_call,
 )

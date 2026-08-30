@@ -3,7 +3,7 @@
 # responsibility Tests AgentCanon update TODO state routing for parent repositories.
 # upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update TODO workflow
 # upstream design ../../documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest
-# upstream implementation ../../tools/agent_tools/agent_canon_update_todos.py manages parent update state
+# upstream implementation ../../tools/agent/orchestration/agent_canon_update_todos.py manages parent update state
 # @dependency-end
 
 """Tests for parent-repository AgentCanon update TODO routing."""
@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_update_todos.py"
+TOOL = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "agent_canon_update_todos.py"
 TASK_ID = "ACUT-test-parent-state"
 
 

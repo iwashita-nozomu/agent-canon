@@ -1,11 +1,11 @@
 # `extract_docx.py`
 
-`tools/docs/extract_docx.py` decomposes an authorized local `.docx` file into a
+`tools/analysis/documents/extraction/extract_docx.py` decomposes an authorized local `.docx` file into a
 reference bundle without requiring LibreOffice, Pandoc, or `python-docx`.
 It uses the standard-library ZIP and XML readers.
 
 ```bash
-python3 tools/docs/extract_docx.py \
+python3 tools/analysis/documents/extraction/extract_docx.py \
   references/発表原稿_岩下_ver2.docx \
   --output-dir references/ieice-2026g-b-9-04-peak-cut-control
 ```

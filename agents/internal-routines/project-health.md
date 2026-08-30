@@ -23,8 +23,8 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `documents/tools/README.md`
 - `documents/conventions/REVIEW_PROCESS.md`
-- `tools/run_comprehensive_review.sh`
-- `tools/docker_dependency_validator.sh`
+- `tools/validation/review/run_comprehensive_review.sh`
+- `tools/validation/dependencies/docker_dependency_validator.sh`
 
 ## Expected Outcome
 
@@ -43,8 +43,8 @@ upstream design ../canonical/skills.md skill canon registry
 ## Default Sequence
 
 1. 直近の変更有無に関わらず、まず `make agent-checks` と `make ci-quick` で基礎状態を見ます。
-1. 環境 drift を疑う場合は `bash tools/docker_dependency_validator.sh` を追加します。
-1. repo-wide な兆候がある場合は `bash tools/run_comprehensive_review.sh` へ進みます。
+1. 環境 drift を疑う場合は `bash tools/validation/dependencies/docker_dependency_validator.sh` を追加します。
+1. repo-wide な兆候がある場合は `bash tools/validation/review/run_comprehensive_review.sh` へ進みます。
 1. findings を `fix now`、`follow-up`、`watch` に分けます。
 1. ルール変更が必要なら `documents/` または `agents/` の正本更新へつなぎます。
 
@@ -52,8 +52,8 @@ upstream design ../canonical/skills.md skill canon registry
 
 - `make agent-checks`
 - `make ci-quick`
-- `bash tools/docker_dependency_validator.sh`
-- `bash tools/run_comprehensive_review.sh`
+- `bash tools/validation/dependencies/docker_dependency_validator.sh`
+- `bash tools/validation/review/run_comprehensive_review.sh`
 
 ## Boundary
 

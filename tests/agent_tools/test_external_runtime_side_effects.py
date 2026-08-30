@@ -11,10 +11,10 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
-REVIEW_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "review_backlog_scan.sh"
-DEPENDENCY_REVIEW = PROJECT_ROOT / "tools" / "agent_tools" / "run_repo_dependency_review.sh"
+REVIEW_SCAN = PROJECT_ROOT / "tools" / "repository" / "github" / "review_backlog_scan.sh"
+DEPENDENCY_REVIEW = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "run_repo_dependency_review.sh"
 
-from tools.ci import container_runtime
+from tools.validation.ci.runners import container_runtime
 
 
 def clean_runtime_environment() -> dict[str, str]:
@@ -96,7 +96,7 @@ def test_search_index_requires_and_uses_external_runtime(tmp_path: Path) -> None
     result = subprocess.run(
         [
             sys.executable,
-            str(PROJECT_ROOT / "tools" / "agent_tools" / "search_index.py"),
+            str(PROJECT_ROOT / "tools" / "analysis" / "search" / "search_index.py"),
             "build",
             "--root",
             str(source),

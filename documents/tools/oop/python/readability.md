@@ -3,14 +3,14 @@
 @dependency-start
 contract reference
 responsibility Documents Python OOP readability checker behavior in Japanese.
-upstream implementation ../../../../tools/oop/python/readability.py Python OOP readability checker
-upstream implementation ../../../../tools/oop/shared/readability_core.py shared typed-boundary evidence
+upstream implementation ../../../../tools/validation/code/oop/python/readability.py Python OOP readability checker
+upstream implementation ../../../../tools/validation/code/oop/shared/readability_core.py shared typed-boundary evidence
 upstream design ../../../conventions/object-oriented-design.md OOP policy source
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
 -->
 
-この文書は `tools/oop/python/readability.py` と一対一で対応します。
+この文書は `tools/validation/code/oop/python/readability.py` と一対一で対応します。
 同名の `readability.py` が tool、同名の `readability.md` が説明文書です。
 
 ## 何をチェックするか
@@ -37,7 +37,7 @@ Python source に対して、OOP 境界が「責務、状態、契約、公開�
 
 Markdown / JSON report は、finding kind を SOLID principle signal へ投影した
 `solid_counts` と finding ごとの `solid_principles` を含みます。
-対応表の正本は `tools/oop/shared/readability_core.py` の
+対応表の正本は `tools/validation/code/oop/shared/readability_core.py` の
 `SOLID_PRINCIPLES_BY_KIND` です。Python checker では、public method 過多、
 annotation 欠落、`Optional` / `None` routing、mixed effect、不要 wrapper を
 SOLID の見出しで review できるようにします。
@@ -45,7 +45,7 @@ SOLID の見出しで review できるようにします。
 ## 実行例
 
 ```bash
-python3 tools/oop/python/readability.py --format markdown --include-snippets python tools tests
+python3 tools/validation/code/oop/python/readability.py --format markdown --include-snippets python tools tests
 ```
 
 既定の `OOP_READABILITY` は scalar threshold ではなく signal class で判定します。

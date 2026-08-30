@@ -1,0 +1,13 @@
+# @dependency-start
+# contract configuration
+# responsibility Defines the single AgentCanon convention for source-root-bound explicit Docstring review.
+# upstream design ../../../README.md shared CI automation index
+# upstream design ../../../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract
+# upstream implementation ../../semantic/code/pydocstyle_review.py resolves source-root authority
+# downstream design ../guides/PRE_REVIEW_GUIDE.md documents explicit Docstring review usage
+# @dependency-end
+
+[tool.pydocstyle]
+convention = "pep257"
+add-select = "D213"
+add-ignore = "D212"

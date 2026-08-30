@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests pure prompt routing classification.
-# upstream implementation ../../tools/agent_tools/prompt_classifier.py owns prompt classification.
+# upstream implementation ../../tools/agent/orchestration/prompt_classifier.py owns prompt classification.
 # @dependency-end
 """Focused tests for injected prompt classification."""
 from __future__ import annotations
@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from prompt_classifier import PromptClassifierInputs, prompt_intake_signals  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import PromptClassifierInputs, prompt_intake_signals  # noqa: E402
 
 
 class PromptClassifierTest(unittest.TestCase):

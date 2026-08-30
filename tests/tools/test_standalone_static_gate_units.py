@@ -1,9 +1,9 @@
 # @dependency-start
 # contract test
 # responsibility Verifies standalone static-gate unit ownership, canonical selection, workflow activation, and full-confidence parity.
-# upstream implementation ../../tools/agent_tools/classify_path_risk.py canonical selector and unit mapping
-# upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh unit executor
-# upstream implementation ../../tools/ci/check_agent_canon_pr.sh manual full-confidence aggregate
+# upstream implementation ../../tools/validation/semantic/path/classify_path_risk.py canonical selector and unit mapping
+# upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh unit executor
+# upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh manual full-confidence aggregate
 # upstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote selected-unit shared runtime
 # @dependency-end
 
@@ -19,9 +19,9 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-SELECTOR = ROOT / "tools" / "agent_tools" / "classify_path_risk.py"
-RUNNER = ROOT / "tools" / "ci" / "run_standalone_static_gate_unit.sh"
-FULL_WRAPPER = ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
+SELECTOR = ROOT / "tools" / "validation" / "semantic" / "path" / "classify_path_risk.py"
+RUNNER = ROOT / "tools" / "validation" / "ci" / "runners" / "run_standalone_static_gate_unit.sh"
+FULL_WRAPPER = ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
 UNITS = ("rust", "contracts", "eval", "workflow-container")
 
@@ -133,8 +133,8 @@ def test_static_unit_runner_and_full_wrapper_are_shell_syntax_valid() -> None:
 def test_canonical_selector_maps_representative_surfaces_to_units() -> None:
     assert selected_units("documents/design/example.md") == ("contracts",)
     assert selected_units("tools/agent_tools/example.py") == ("contracts",)
-    assert selected_units("rust/agent-canon/src/main.rs") == ("rust",)
-    assert selected_units("agents/evals/skill-workflow-prompt.yaml") == ("eval",)
+    assert selected_units("tools/runtime/dispatch/agent-canon/src/main.rs") == ("rust",)
+    assert selected_units("eval/definitions/skill-workflow-prompt.toml") == ("eval",)
     assert selected_units("agents/skills/catalog.yaml") == ("contracts",)
     assert selected_units(".github/PULL_REQUEST_TEMPLATE.md") == (
         "contracts",
@@ -145,13 +145,13 @@ def test_canonical_selector_maps_representative_surfaces_to_units() -> None:
 
 
 def test_selector_boundary_change_uses_full_confidence_unit_set() -> None:
-    assert selected_units("tools/agent_tools/classify_path_risk.py") == UNITS
+    assert selected_units("tools/validation/semantic/path/classify_path_risk.py") == UNITS
     assert selected_units(".github/workflows/agent-canon-static-gates.yml") == UNITS
 
 
 def test_mixed_surfaces_select_union_without_unrelated_units() -> None:
     assert selected_units(
-        "documents/design/example.md", "rust/agent-canon/src/main.rs"
+        "documents/design/example.md", "tools/runtime/dispatch/agent-canon/src/main.rs"
     ) == ("rust", "contracts")
 
 
@@ -160,14 +160,14 @@ def test_rust_commands_are_confined_to_rust_unit() -> None:
     rust_body = text.split("run_rust() {", 1)[1].split("\n}\n\nrun_contracts()", 1)[0]
     remainder = text.replace(rust_body, "", 1)
     for command in (
-        "cargo build --manifest-path rust/agent-canon/Cargo.toml",
-        "cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check",
-        "cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings",
+        "cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml",
+        "cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check",
+        "cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --all-targets -- -D warnings",
     ):
         assert command in rust_body
         assert command not in remainder
     assert "env -u AGENT_CANON_RUNTIME_ROOT" in rust_body
-    assert "cargo test --manifest-path rust/agent-canon/Cargo.toml" in rust_body
+    assert "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml" in rust_body
 
 
 def test_focused_regression_is_owned_by_workflow_container_unit() -> None:

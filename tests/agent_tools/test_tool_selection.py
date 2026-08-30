@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests normalized tool-selection evidence.
-# upstream implementation ../../tools/agent_tools/tool_selection.py owns tool selection.
+# upstream implementation ../../tools/agent/orchestration/tool_selection.py owns tool selection.
 # @dependency-end
 """Focused tests for pure tool selection."""
 from __future__ import annotations
@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from tool_selection import select_tools  # noqa: E402
+from tools.agent.orchestration.tool_selection import select_tools  # noqa: E402
 
 
 class ToolSelectionTest(unittest.TestCase):

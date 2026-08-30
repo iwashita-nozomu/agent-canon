@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests exact execution-resource projection validation.
-# upstream implementation ../../tools/agent_tools/execution_resource_projection.py owns projection validation.
+# upstream implementation ../../tools/runtime/container/execution_resource_projection.py owns projection validation.
 # @dependency-end
 """Focused tests for projection byte validation."""
 from __future__ import annotations
@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from execution_resource_projection import ProjectionError, validate_projection_bytes  # noqa: E402
+from tools.runtime.container.execution_resource_projection import ProjectionError, validate_projection_bytes  # noqa: E402
 
 
 class ExecutionResourceProjectionTest(unittest.TestCase):

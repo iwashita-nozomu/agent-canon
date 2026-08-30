@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Lean proof-obligation coverage reporting for cataloged tools.
-# upstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof coverage
+# upstream implementation ../../tools/analysis/proof/tool_proof_coverage.py reports tool proof coverage
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof status policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 # @dependency-end
@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "tool_proof_coverage.py"
+CHECKER = PROJECT_ROOT / "tools" / "analysis" / "proof" / "tool_proof_coverage.py"
 
 
 class ToolProofCoverageTest(unittest.TestCase):
@@ -152,9 +152,9 @@ class ToolProofCoverageTest(unittest.TestCase):
         self.write_file(root, "documents/tools/tool-docs.toml", self.tool_docs_manifest())
         self.write_file(
             root,
-            "tools/ci/run_all_checks.sh",
+            "tools/validation/ci/runners/run_all_checks.sh",
             self.manifest("Run all checks.")
-            + "\npython3 tools/agent_tools/tool_catalog.py\n",
+            + "\npython3 tools/runtime/manifest/tool_catalog.py\n",
         )
         self.write_file(
             root,
@@ -166,7 +166,7 @@ class ToolProofCoverageTest(unittest.TestCase):
         """Write fixture tool, test, and proof files."""
         self.write_file(
             root,
-            "tools/agent_tools/tool_catalog.py",
+            "tools/runtime/manifest/tool_catalog.py",
             self.manifest("Fixture catalog checker."),
         )
         self.write_file(
@@ -183,7 +183,7 @@ class ToolProofCoverageTest(unittest.TestCase):
             "documents/tools/README.md",
             "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
-            "tools/ci/check_agent_canon_pr.sh",
+            "tools/validation/ci/checks/check_agent_canon_pr.sh",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
@@ -202,7 +202,7 @@ class ToolProofCoverageTest(unittest.TestCase):
                 "# @dependency-start",
                 "# responsibility Defines fixture tool-doc map.",
                 "# upstream design ../../tools/catalog.yaml fixture catalog",
-                "# downstream implementation ../../tools/agent_tools/tool_catalog.py checker",
+                "# downstream implementation ../../tools/runtime/manifest/tool_catalog.py checker",
                 "# @dependency-end",
                 "# tools/catalog.yaml",
                 "# tool_catalog.py",
@@ -212,7 +212,7 @@ class ToolProofCoverageTest(unittest.TestCase):
                 "",
                 "[[tool]]",
                 'id = "tool-catalog"',
-                'tool = "tools/agent_tools/tool_catalog.py"',
+                'tool = "tools/runtime/manifest/tool_catalog.py"',
                 'doc = "documents/tools/tool_catalog.md"',
                 "",
             ]
@@ -265,11 +265,11 @@ class ToolProofCoverageTest(unittest.TestCase):
                 "entries:",
                 "  - id: tool-catalog",
                 "    summary: Validates the fixture tool catalog.",
-                "    path: tools/agent_tools/tool_catalog.py",
+                "    path: tools/runtime/manifest/tool_catalog.py",
                 "    family: agent_tools",
                 "    role: catalog",
                 "    status: canonical",
-                "    command: python3 tools/agent_tools/tool_catalog.py",
+                "    command: python3 tools/runtime/manifest/tool_catalog.py",
                 "    writes: false",
                 "    default_wiring:",
                 "      ci: true",

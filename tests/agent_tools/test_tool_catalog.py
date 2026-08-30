@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests structured AgentCanon tool catalog validation.
-# upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog
-# upstream implementation ../../tools/agent_tools/visualization_contract.py owns the canonical visualization contract tool.
+# upstream implementation ../../tools/runtime/manifest/tool_catalog.py validates tool catalog
+# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns the canonical visualization contract tool.
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
@@ -21,7 +21,7 @@ from pathlib import Path
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "tool_catalog.py"
+CHECKER = PROJECT_ROOT / "tools" / "runtime" / "manifest" / "tool_catalog.py"
 
 
 class CheckToolCatalogTest(unittest.TestCase):
@@ -46,18 +46,18 @@ class CheckToolCatalogTest(unittest.TestCase):
             entry
             for entry in catalog["entries"]
             if entry["path"]
-            == "tools/agent_tools/render_dependency_manifest_graph.py"
+            == "tools/analysis/dependencies/render_dependency_manifest_graph.py"
         )
         self.assertEqual(
             renderer["command"],
-            "python3 tools/agent_tools/render_dependency_manifest_graph.py "
+            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py "
             "--root . --scope full --bundle-dir reports/dependency-graph --format json",
         )
         visualization_entries = [
             entry
             for entry in catalog["entries"]
             if entry["id"] == "visualization-contract"
-            or entry["path"] == "tools/agent_tools/visualization_contract.py"
+            or entry["path"] == "tools/validation/semantic/tools/visualization_contract.py"
         ]
         self.assertEqual(len(visualization_entries), 1)
         visualization = visualization_entries[0]
@@ -79,7 +79,7 @@ class CheckToolCatalogTest(unittest.TestCase):
             PROJECT_ROOT / "documents" / "tools" / "tool-docs.toml"
         ).read_text(encoding="utf-8")
         self.assertEqual(
-            tool_docs.count('tool = "tools/agent_tools/visualization_contract.py"'),
+            tool_docs.count('tool = "tools/validation/semantic/tools/visualization_contract.py"'),
             1,
         )
         self.assertEqual(
@@ -98,8 +98,8 @@ class CheckToolCatalogTest(unittest.TestCase):
             if entry["id"] in {"workflow-monitor", "waterfall-gate-check"}
         }
         self.assertEqual(set(rows), {"workflow-monitor", "waterfall-gate-check"})
-        self.assertEqual(rows["workflow-monitor"]["path"], "tools/agent_tools/workflow_monitor.py")
-        self.assertEqual(rows["waterfall-gate-check"]["path"], "tools/agent_tools/waterfall_gate_check.py")
+        self.assertEqual(rows["workflow-monitor"]["path"], "tools/runtime/lifecycle/workflow_monitor.py")
+        self.assertEqual(rows["waterfall-gate-check"]["path"], "tools/validation/semantic/lifecycle/waterfall_gate_check.py")
         self.assertTrue(rows["workflow-monitor"]["writes"])
         self.assertFalse(rows["waterfall-gate-check"]["writes"])
         result = self.run_checker(PROJECT_ROOT, "--format", "json")
@@ -113,10 +113,10 @@ class CheckToolCatalogTest(unittest.TestCase):
         role_eval = next(
             entry
             for entry in catalog["entries"]
-            if entry["path"] == "tools/agent_tools/evaluate_codex_agent_roles.py"
+            if entry["path"] == "eval/producers/evaluate_codex_agent_roles.py"
         )
         wrapper = (
-            PROJECT_ROOT / "tools" / "agent_tools" / "run_accumulated_agent_evals.py"
+            PROJECT_ROOT / "eval" / "producers" / "run_accumulated_agent_evals.py"
         ).read_text(encoding="utf-8")
         self.assertTrue(role_eval["default_wiring"]["pr_check"])
         self.assertIn(Path(role_eval["path"]).name, wrapper)
@@ -134,11 +134,11 @@ class CheckToolCatalogTest(unittest.TestCase):
 
         self.assertEqual(
             managed["path"],
-            "tools/experiments/run_managed_experiment.py",
+            "tools/experiments/execution/run_managed_experiment.py",
         )
         self.assertEqual(
             managed["command"],
-            "python3 -m tools.experiments.run_managed_experiment",
+            "python3 -m tools.experiments.execution.run_managed_experiment",
         )
         self.assertIn(
             "tests/tools/test_run_managed_experiment.py",
@@ -146,7 +146,7 @@ class CheckToolCatalogTest(unittest.TestCase):
         )
         self.assertFalse(
             any(
-                entry["path"] == "tools/experiments/execution_resource_plan.py"
+                entry["path"] == "tools/experiments/execution/execution_resource_plan.py"
                 for entry in catalog["entries"]
             )
         )
@@ -159,8 +159,8 @@ class CheckToolCatalogTest(unittest.TestCase):
             catalog = root / "tools" / "catalog.yaml"
             catalog.write_text(
                 catalog.read_text(encoding="utf-8").replace(
-                    "tools/agent_tools/tool_catalog.py",
-                    "tools/agent_tools/missing_tool.py",
+                    "tools/runtime/manifest/tool_catalog.py",
+                    "tools/runtime/manifest/missing_tool.py",
                 ),
                 encoding="utf-8",
             )
@@ -169,7 +169,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "TOOL_CATALOG_FINDING=entry:tools/agent_tools/missing_tool.py:missing-path",
+                "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/missing_tool.py:missing-path",
                 result.stdout,
             )
 
@@ -333,13 +333,13 @@ class CheckToolCatalogTest(unittest.TestCase):
             self.write_minimal_repo(root)
             self.write_file(
                 root,
-                "tools/ci/run_all_checks.sh",
+                "tools/validation/ci/runners/run_all_checks.sh",
                 self.manifest("Run all checks.")
-                + "\npython3 tools/agent_tools/uncataloged.py\n",
+                + "\npython3 tools/runtime/manifest/uncataloged.py\n",
             )
             self.write_file(
                 root,
-                "tools/agent_tools/uncataloged.py",
+                "tools/runtime/manifest/uncataloged.py",
                 self.manifest("Fixture uncataloged tool."),
             )
 
@@ -347,7 +347,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "default_wiring:tools/agent_tools/uncataloged.py:uncataloged-tool-reference",
+                "default_wiring:tools/runtime/manifest/uncataloged.py:uncataloged-tool-reference",
                 result.stdout,
             )
 
@@ -363,13 +363,13 @@ class CheckToolCatalogTest(unittest.TestCase):
             pattern.findall(
                 "python3 tests/tools/test_catalog_fixture.py\n"
                 "python3 tests/tools/tools/run_symlink_lint.py\n"
-                "python3 tools/agent_tools/uncataloged.py\n"
+                "python3 tools/runtime/manifest/uncataloged.py\n"
             )
         )
 
         self.assertNotIn("tools/test_catalog_fixture.py", matches)
         self.assertNotIn("tools/tools/run_symlink_lint.py", matches)
-        self.assertIn("tools/agent_tools/uncataloged.py", matches)
+        self.assertIn("tools/runtime/manifest/uncataloged.py", matches)
 
     def test_entry_summary_is_required(self) -> None:
         """Catalog entries must include a reader-facing summary."""
@@ -389,7 +389,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "entry:tools/agent_tools/tool_catalog.py:missing-summary",
+                "entry:tools/runtime/manifest/tool_catalog.py:missing-summary",
                 result.stdout,
             )
 
@@ -445,9 +445,9 @@ class CheckToolCatalogTest(unittest.TestCase):
             catalog = root / "tools" / "catalog.yaml"
             catalog.write_text(
                 catalog.read_text(encoding="utf-8").replace(
-                    "    command: python3 tools/agent_tools/tool_catalog.py\n",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py\n",
                     "    audience: unclear\n"
-                    "    command: python3 tools/agent_tools/tool_catalog.py\n",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py\n",
                 ),
                 encoding="utf-8",
             )
@@ -456,7 +456,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "TOOL_CATALOG_FINDING=entry:tools/agent_tools/tool_catalog.py:invalid-audience",
+                "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/tool_catalog.py:invalid-audience",
                 result.stdout,
             )
 
@@ -468,9 +468,9 @@ class CheckToolCatalogTest(unittest.TestCase):
             catalog = root / "tools" / "catalog.yaml"
             catalog.write_text(
                 catalog.read_text(encoding="utf-8").replace(
-                    "    command: python3 tools/agent_tools/tool_catalog.py\n",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py\n",
                     "    audience: 123\n"
-                    "    command: python3 tools/agent_tools/tool_catalog.py\n",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py\n",
                 ),
                 encoding="utf-8",
             )
@@ -479,7 +479,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "TOOL_CATALOG_FINDING=entry:tools/agent_tools/tool_catalog.py:invalid-audience",
+                "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/tool_catalog.py:invalid-audience",
                 result.stdout,
             )
 
@@ -491,9 +491,9 @@ class CheckToolCatalogTest(unittest.TestCase):
             catalog = root / "tools" / "catalog.yaml"
             catalog.write_text(
                 catalog.read_text(encoding="utf-8").replace(
-                    "    command: python3 tools/agent_tools/tool_catalog.py\n",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py\n",
                     "    placement: somewhere_else\n"
-                    "    command: python3 tools/agent_tools/tool_catalog.py\n",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py\n",
                 ),
                 encoding="utf-8",
             )
@@ -502,7 +502,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "TOOL_CATALOG_FINDING=entry:tools/agent_tools/tool_catalog.py:invalid-placement",
+                "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/tool_catalog.py:invalid-placement",
                 result.stdout,
             )
 
@@ -514,9 +514,9 @@ class CheckToolCatalogTest(unittest.TestCase):
             catalog = root / "tools" / "catalog.yaml"
             catalog.write_text(
                 catalog.read_text(encoding="utf-8").replace(
-                    "    command: python3 tools/agent_tools/tool_catalog.py\n",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py\n",
                     "    placement: []\n"
-                    "    command: python3 tools/agent_tools/tool_catalog.py\n",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py\n",
                 ),
                 encoding="utf-8",
             )
@@ -525,7 +525,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "TOOL_CATALOG_FINDING=entry:tools/agent_tools/tool_catalog.py:invalid-placement",
+                "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/tool_catalog.py:invalid-placement",
                 result.stdout,
             )
 
@@ -549,7 +549,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "TOOL_CATALOG_FINDING=entry:tools/agent_tools/tool_catalog.py:"
+                "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/tool_catalog.py:"
                 "compatibility-wrapper-placement-required",
                 result.stdout,
             )
@@ -602,7 +602,7 @@ class CheckToolCatalogTest(unittest.TestCase):
         self.write_file(root, "README.md", self.manifest("Fixture root."))
         self.write_file(
             root,
-            "tools/agent_tools/tool_catalog.py",
+            "tools/runtime/manifest/tool_catalog.py",
             self.manifest("Fixture catalog checker."),
         )
         self.write_file(
@@ -615,8 +615,8 @@ class CheckToolCatalogTest(unittest.TestCase):
             "documents/tools/README.md",
             "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
-            "tools/ci/check_agent_canon_pr.sh",
-            "tools/agent_tools/run_accumulated_agent_evals.py",
+            "tools/validation/ci/checks/check_agent_canon_pr.sh",
+            "eval/producers/run_accumulated_agent_evals.py",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
@@ -635,7 +635,7 @@ class CheckToolCatalogTest(unittest.TestCase):
                     "# @dependency-start",
                     "# responsibility Defines fixture tool-doc map.",
                     "# upstream design ../../tools/catalog.yaml fixture catalog",
-                    "# downstream implementation ../../tools/agent_tools/tool_catalog.py checker",
+                    "# downstream implementation ../../tools/runtime/manifest/tool_catalog.py checker",
                     "# @dependency-end",
                     "# tools/catalog.yaml",
                     "# tool_catalog.py",
@@ -645,7 +645,7 @@ class CheckToolCatalogTest(unittest.TestCase):
                     "",
                     "[[tool]]",
                     'id = "tool-catalog"',
-                    'tool = "tools/agent_tools/tool_catalog.py"',
+                    'tool = "tools/runtime/manifest/tool_catalog.py"',
                     'doc = "documents/tools/tool_catalog.md"',
                     "",
                 ]
@@ -653,9 +653,9 @@ class CheckToolCatalogTest(unittest.TestCase):
         )
         self.write_file(
             root,
-            "tools/ci/run_all_checks.sh",
+            "tools/validation/ci/runners/run_all_checks.sh",
             self.manifest("Run all checks.")
-            + "\npython3 tools/agent_tools/tool_catalog.py\n",
+            + "\npython3 tools/runtime/manifest/tool_catalog.py\n",
         )
         self.write_file(
             root,
@@ -684,17 +684,17 @@ class CheckToolCatalogTest(unittest.TestCase):
                     "  - compatibility_wrapper",
                     "families:",
                     "  agent_tools:",
-                    "    root: tools/agent_tools",
+                    "    root: tools",
                     "    audience: agent",
                     "    placement: workflow_helper",
                     "entries:",
                     "  - id: tool-catalog",
                     "    summary: Validates the fixture tool catalog.",
-                    "    path: tools/agent_tools/tool_catalog.py",
+                    "    path: tools/runtime/manifest/tool_catalog.py",
                     "    family: agent_tools",
                     "    role: catalog",
                     "    status: canonical",
-                    "    command: python3 tools/agent_tools/tool_catalog.py",
+                    "    command: python3 tools/runtime/manifest/tool_catalog.py",
                     "    writes: false",
                     "    default_wiring:",
                     "      ci: true",

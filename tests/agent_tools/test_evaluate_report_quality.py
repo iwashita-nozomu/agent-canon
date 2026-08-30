@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests report quality eval automation.
-# upstream implementation ../../tools/agent_tools/evaluate_report_quality.py report quality eval helper
-# upstream design ../../evidence/agent-evals/report_quality_eval.toml report quality eval manifest
+# upstream implementation ../../eval/producers/evaluate_report_quality.py report quality eval helper
+# upstream design ../../eval/definitions/report_quality_eval.toml report quality eval manifest
 # upstream design ../../documents/runtime/runtime-log-archive.md accumulated result archive contract
 # @dependency-end
 """Tests for report quality evals."""
@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_report_quality.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_report_quality.py"
 
 
 def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProcess[str]:

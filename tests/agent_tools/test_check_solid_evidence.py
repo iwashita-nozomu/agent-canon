@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests SOLID-sensitive Python evidence coverage checks.
-# upstream implementation ../../tools/agent_tools/check_solid_evidence.py evidence coverage checker
-# upstream implementation ../../tools/oop/shared/readability_core.py emits scanned_paths in OOP reports
+# upstream implementation ../../tools/validation/semantic/code/check_solid_evidence.py evidence coverage checker
+# upstream implementation ../../tools/validation/code/oop/shared/readability_core.py emits scanned_paths in OOP reports
 # upstream design ../../documents/conventions/coding-conventions-python.md SOLID evidence route policy
 # @dependency-end
 
@@ -18,8 +18,8 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_solid_evidence.py"
-OOP_ANALYZER = PROJECT_ROOT / "tools" / "oop" / "python" / "readability.py"
+CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "code" / "check_solid_evidence.py"
+OOP_ANALYZER = PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "readability.py"
 
 
 class CheckSolidEvidenceTest(unittest.TestCase):

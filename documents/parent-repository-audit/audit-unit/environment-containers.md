@@ -6,7 +6,7 @@ responsibility Audits Ubuntu direct base, cold-build reproducibility, non-root o
 upstream design ../README.md owns static-first audit policy
 upstream design ../../runtime/runtime-profiles-and-check-matrix.md owns profile validation selection
 upstream implementation ../../../agents/skills/environment-maintenance.md owns environment repair
-downstream implementation ../../../tools/agent_tools/parent_repository_audit.py selects this unit by semantic change surface
+downstream implementation ../../../tools/analysis/code/parent_repository_audit.py selects this unit by semantic change surface
 @dependency-end
 -->
 
@@ -53,7 +53,7 @@ setup、親固有 setup の owner split を監査します。
 - `.zshenv`、`ZDOTDIR`、`.zshrc`、shell startup の mount/source/readback
 - host file mount inventory と default/optional profile の create/tool-availability readback
 - `documents/runtime/runtime-profiles-and-check-matrix.md`
-- `tools/docker_dependency_validator.sh` と container config parser
+- `tools/validation/dependencies/docker_dependency_validator.sh` と container config parser
 - host driver は `nvidia-smi` 等の host evidence、image 側は driver 非同梱の static readback
 
 ## Repair Route

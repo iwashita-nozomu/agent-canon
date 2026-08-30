@@ -3,8 +3,8 @@
 contract policy
 responsibility Documents 文書および識別子の命名規約。
 upstream design ./README.md document rule canon index
-downstream implementation ../../tools/agent_tools/check_convention_compliance.py convention validation
-downstream implementation ../../tools/agent_tools/check_log_helper_names.py log helper naming validation
+downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py convention validation
+downstream implementation ../../tools/validation/semantic/logging/check_log_helper_names.py log helper naming validation
 @dependency-end
 -->
 
@@ -52,5 +52,5 @@ downstream implementation ../../tools/agent_tools/check_log_helper_names.py log 
 ログ helper の命名は、次の checker で検証します。
 
 ```bash
-python3 tools/agent_tools/check_log_helper_names.py --changed --exclude vendor --exclude reports
+python3 tools/validation/semantic/logging/check_log_helper_names.py --changed --exclude vendor --exclude reports
 ```

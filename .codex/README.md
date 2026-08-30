@@ -9,8 +9,8 @@ upstream design ../agents/task_catalog.yaml workflow family runtime budgets
 upstream design ../agents/canonical/CODEX_SUBAGENTS.md subagent routing
 downstream implementation ./hooks.json project-local hook declarations
 downstream implementation ./hooks/hook_dispatcher.py owns the in-process active lifecycle contract
-downstream implementation ../tools/agent_tools/hook_safety.py owns pure secret and destructive-Git leaves
-downstream implementation ../tools/agent_tools/execution_resource_projection.py validates exact PostToolUse projection bytes
+downstream implementation ../tools/runtime/authority/hook_safety.py owns pure secret and destructive-Git leaves
+downstream implementation ../tools/runtime/container/execution_resource_projection.py validates exact PostToolUse projection bytes
 downstream design ./hooks/hook_dispatcher.py RETIRED_HOOK_ROUTES assigns former child routes to explicit owners
 @dependency-end
 -->
@@ -110,7 +110,7 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - project-local hook は `.codex/hooks.json` で宣言し、project config に stable feature flag を重ねません。
 - `hooks.json` は active event ごとに dispatcher を一回だけ起動し、コマンド自体に Git の root 探索や child subprocess を含めません。active events は `UserPromptSubmit`、`PreToolUse`、`PostToolUse` だけです。legacy `Stop` は dispatcher が inactive no-op として受け付けますが、`hooks.json` には登録しません。
 - `HOOK_EVENT_CONTRACTS` がイベント、matcher、failure semantics、telemetry を canonical typed table として所有します。`python3 .codex/hooks/hook_dispatcher.py --contract` は active/inactive event、matcher、failure、telemetry、retired route table を readback します。
-- `UserPromptSubmit` は pure owner `tools/agent_tools/hook_safety.py` の secret matcher だけを使い、高確信の private key / API key を block します。`PreToolUse` は同じ owner の destructive Git parser だけを使い、block payload の command 情報は `operation` と `command_sha256` に限定します。retired child tombstones は `tools/agent_tools/hook_retirement.py` が単独で所有します。
+- `UserPromptSubmit` は pure owner `tools/runtime/authority/hook_safety.py` の secret matcher だけを使い、高確信の private key / API key を block します。`PreToolUse` は同じ owner の destructive Git parser だけを使い、block payload の command 情報は `operation` と `command_sha256` に限定します。retired child tombstones は `tools/runtime/authority/hook_retirement.py` が単独で所有します。
 - `PostToolUse` は managed execution resource producer の成功した exact projection だけを in-process validator で forward します。malformed payload、validator failure、spool failure は fail-open です。
 - 各 active event は `HookLogContext` を一度だけ使い、payload は fingerprint、event、bounded かつ redacted decision telemetry だけを local spool へ no-replace で書きます。prompt、command、stdout、stderr は保存せず、spool failure は安全判定を変更しません。
 - 旧 log mount、cause、OOP、module、library、helper、style、notebook、review、goal、authority、role、reference、summary、auto-sync child は削除せず、`RETIRED_HOOK_ROUTES` と各 owner の explicit command / skill が移行先を示します。これらは active hook hot path ではありません。
@@ -121,10 +121,10 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `agents/model_profiles.toml` is the canonical typed authority for every
   parent and child model, reasoning, capability, context, return, checkpoint,
   and continuation field.
-- `tools/agent_tools/model_profile_registry.py` materializes closed
+- `tools/agent/orchestration/model_profile_registry.py` materializes closed
   `.codex/agents/*.toml` and `agents/agents_config.json` generated views.
-- `tools/agent_tools/check_agent_runtime_alignment.py` and
-  `tools/agent_tools/evaluate_codex_agent_roles.py` validate the materialized
+- `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` and
+  `eval/producers/evaluate_codex_agent_roles.py` validate the materialized
   agent TOML files directly.
 - `agents/model_profiles.toml` が child model、reasoning、capability、context、
   return schema、continuation を所有し、canonical materializer が
@@ -184,7 +184,7 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 subagent inventory や research perspective pack を触ったら、次で bundle と runtime surface を確認します。
 
 ```bash
-python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-python3 tools/agent_tools/bootstrap_agent_run.py --help
-python3 tools/agent_tools/doc_start.py --task "paper writing task" --kind paper --owner "codex" --dry-run
+python3 eval/checkers/smoke_test_research_perspective_pack.py
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py --help
+python3 tools/analysis/documents/doc_start.py --task "paper writing task" --kind paper --owner "codex" --dry-run
 ```

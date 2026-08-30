@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests current candidate review state and APPROVE-only unlock.
-# upstream implementation ../../tools/agent_tools/review_dispatch.py materializes automatic-review state and routing
+# upstream implementation ../../tools/agent/orchestration/review_dispatch.py materializes automatic-review state and routing
 # @dependency-end
 
 from __future__ import annotations
@@ -15,10 +15,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(PROJECT_ROOT))
 
-import review_dispatch  # noqa: E402
-from artifact_identity import canonical_body_sha256  # noqa: E402
+from tools.agent.orchestration import review_dispatch  # noqa: E402
+from tools.runtime.artifacts.artifact_identity import canonical_body_sha256  # noqa: E402
 
 
 def candidate() -> dict[str, object]:

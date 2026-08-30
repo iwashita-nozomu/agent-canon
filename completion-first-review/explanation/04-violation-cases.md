@@ -5,8 +5,8 @@ contract reference
 responsibility Catalogs cases that should not pass completion under the completion-first AgentCanon review.
 upstream design ../README.md completion-first review index
 upstream design 03-evidence-and-closeout.md evidence hierarchy and closeout rules
-upstream implementation ../../tools/agent_tools/evaluate_agent_run.py current run evaluator
-upstream implementation ../../tools/agent_tools/workflow_monitor.py current monitoring helper
+upstream implementation ../../eval/producers/evaluate_agent_run.py current run evaluator
+upstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py current monitoring helper
 @dependency-end
 -->
 

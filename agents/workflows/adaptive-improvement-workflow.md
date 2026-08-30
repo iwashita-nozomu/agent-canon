@@ -64,14 +64,14 @@ outer loop は agile、inner change pass は waterfall です。
 - active profile が要求する依存解析、コード依存抽出、OOP/readability 解析、数値ハードコード検証、repo-wide 静的解析 / CI、objective 固有 evidence は exit criteria から外しません。
 - criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
 - skill を使う run では、`evaluate_skill_workflow_prompts.py --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細 report を蓄積します。report file は `<eval_run_id>-<status>-<skill-slug>.md` で採番し、既存 report を上書きしません。
-- skill/workflow prompt 改善では、テスト対象ごとに skill/workflow eval を先に固定し、`evidence/agent-evals/skill_workflow_prompt_eval.toml` を正本にします。
+- skill/workflow prompt 改善では、テスト対象ごとに skill/workflow eval を先に固定し、`eval/definitions/skill_workflow_prompt_eval.toml` を正本にします。
 - prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0`、`EVAL_RUN_ID`、`EVAL_ACCUMULATED_REPORT` が揃うまで loop を閉じません。
 - eval manifest の growth candidate は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs です。既存 prompt surface の coverage を増やす場合は、同じ target / same target の eval entry に checklist を統合し、重複 target の並行 eval を残しません。
-- agent 行動改善では、run 中に `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、accumulated prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を蓄積し、`evidence/agent-evals/agent_behavior_eval.toml` を正本にして `evaluate_agent_run.py` で採点します。
+- agent 行動改善では、run 中に `workflow_monitor.py --behavior-event` で skill invocation、subagent routing、tool gate、accumulated prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を蓄積し、`eval/definitions/agent_behavior_eval.toml` を正本にして `evaluate_agent_run.py` で採点します。
 - closeout evidence を確認したあと、標準 behavior token の記録だけを省力化する場合は `workflow_monitor.py --closeout-token-preset` を使います。この preset は `evaluate_agent_run.py` の required tokens を埋める記録 shortcut であり、validation、dependency review、diff-check、review finding resolution の代替ではありません。
 - 利用中の user / reviewer feedback は、`workflow_monitor.py --runtime-feedback "source=<...> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op> evidence=<...>"` で `runtime_feedback=observed` event として蓄積します。target が skill / workflow prompt なら、対応 eval を確認してから prompt repair し、同じ eval を rerun します。target が private knowledge / feedback なら `agent-canon k/f` へ還元し、target が no-op なら理由を evidence に残します。
 - static analysis の結果が agent の設計・実装経路の弱さを示す場合は、結果を `static_analysis_feedback=applied|recorded` として workflow monitoring に残し、還元先の skill / workflow / eval を明記します。`static_analysis_feedback=pending` または `missing` は behavior eval で revise にします。
-- 同じ objective で 2 回の実行経路が異なり得る場合は、`tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` で `execution_path` と `route_efficiency` を比較します。経路が異なり、candidate が `route_efficiency=inefficient` または `selected_inefficient_route=yes` なら、非効率経路を選んだとき発火する eval を追加または更新し、skill / workflow prompt を修正してから rerun します。
+- 同じ objective で 2 回の実行経路が異なり得る場合は、`eval/checkers/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` で `execution_path` と `route_efficiency` を比較します。経路が異なり、candidate が `route_efficiency=inefficient` または `selected_inefficient_route=yes` なら、非効率経路を選んだとき発火する eval を追加または更新し、skill / workflow prompt を修正してから rerun します。
 - behavior eval の feedback action は prompt repair、workflow artifact 修正、または monitoring rule 修正のいずれかで閉じ、`AGENT_EVALUATION_STATUS=pass` になるまで loop を閉じません。
 
 ## 4. Canonical Outer Loop
@@ -79,9 +79,9 @@ outer loop は agile、inner change pass は waterfall です。
 1. 今回の Objective、Exit Criteria、Stop Budget、Improvement Backlog を固定する
 1. durable lifecycle evidence が必要な場合は work unit を `schedule.md`、iteration result と next action を `work_log.md` に記録する
 1. `Question:`、`Comparison Target:`、`Exit Criteria:`、`Stop Budget:` を決める
-1. skill/workflow prompt 改善の場合は、各テスト対象の eval を `evidence/agent-evals/skill_workflow_prompt_eval.toml` に固定する
-1. `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml` を baseline として実行する
-1. agent 行動改善の場合は、`evidence/agent-evals/agent_behavior_eval.toml` の behavior criteria と `workflow_monitoring.md` の required behavior event を固定する
+1. skill/workflow prompt 改善の場合は、各テスト対象の eval を `eval/definitions/skill_workflow_prompt_eval.toml` に固定する
+1. `python3 eval/producers/evaluate_skill_workflow_prompts.py --manifest eval/definitions/skill_workflow_prompt_eval.toml` を baseline として実行する
+1. agent 行動改善の場合は、`eval/definitions/agent_behavior_eval.toml` の behavior criteria と `workflow_monitoring.md` の required behavior event を固定する
 1. 利用中 feedback がある場合は、`runtime_feedback=observed`、`source=...`、`target=...`、`action=...` を workflow monitoring に記録し、還元先の skill / workflow / eval / memory と rerun する eval を固定する
 1. static analysis feedback を還元する task では、static-analysis command、feedback target、skill/workflow/eval への反映先を先に固定する
 1. 2 回実行比較が必要な task では、baseline run と candidate run の `workflow_monitoring.md` に `execution_path=...`、`route_efficiency=...`、`static_analysis_feedback=...` を記録する
@@ -192,4 +192,4 @@ close 前には、少なくとも次を残します。
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

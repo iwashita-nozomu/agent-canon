@@ -30,4 +30,4 @@ responsibility Documents 演算子記法（共通） for this repository.
 
 ## 検証
 
-- この文書の規範表現は `python3 tools/agent_tools/check_convention_compliance.py` の convention assertions inventory で確認します。
+- この文書の規範表現は `python3 tools/validation/semantic/convention/check_convention_compliance.py` の convention assertions inventory で確認します。

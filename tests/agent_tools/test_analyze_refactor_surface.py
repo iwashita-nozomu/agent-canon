@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests test analyze refactor surface behavior.
-# upstream implementation ../../tools/agent_tools/analyze_refactor_surface.py analyzer
+# upstream implementation ../../tools/analysis/code/analyze_refactor_surface.py analyzer
 # upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md analyzer gate policy
 # @dependency-end
 
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ANALYZER = PROJECT_ROOT / "tools" / "agent_tools" / "analyze_refactor_surface.py"
+ANALYZER = PROJECT_ROOT / "tools" / "analysis" / "code" / "analyze_refactor_surface.py"
 
 
 class AnalyzeRefactorSurfaceTest(unittest.TestCase):

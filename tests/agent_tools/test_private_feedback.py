@@ -2,9 +2,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies the private feedback/knowledge adapter's owner-local observations.
-# upstream implementation ../../tools/agent_tools/private_feedback.py
-# upstream external-schema git@github.com:iwashita-nozomu/agent-canon-log.git@db3722b817be8574c682949db733df0fb5c2674a
-# downstream documentation ../../documents/runtime/private-feedback-knowledge.md
+# upstream implementation ../../tools/runtime/archive/private_feedback.py private feedback adapter behavior
+# upstream design ../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
 # @dependency-end
 """Focused tests for private feedback storage and promotion."""
 
@@ -18,12 +17,12 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tools.agent_tools import private_feedback
-from tools.agent_tools.bootstrap_runtime import (
+from tools.runtime.archive import private_feedback
+from tools.runtime.container.bootstrap_runtime import (
     PRIVATE_LOG_DESTINATION,
     BootstrapRuntime,
 )
-from tools.agent_tools.log_repository_identity import stable_log_branch
+from tools.runtime.archive.log_repository_identity import stable_log_branch
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
 

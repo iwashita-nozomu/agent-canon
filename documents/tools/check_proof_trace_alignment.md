@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents check_proof_trace_alignment.py operator usage.
-upstream implementation ../../tools/agent_tools/check_proof_trace_alignment.py checks proof trace anchors.
+upstream implementation ../../tools/validation/semantic/proof/check_proof_trace_alignment.py checks proof trace anchors.
 upstream design ../../agents/skills/formal-proof-workflow.md defines proof trace alignment policy.
 downstream implementation ../../tests/agent_tools/test_check_proof_trace_alignment.py tests CLI behavior.
 @dependency-end
@@ -18,7 +18,7 @@ proof work proceeds.
 Use it from a repository root:
 
 ```bash
-python3 tools/agent_tools/check_proof_trace_alignment.py \
+python3 tools/validation/semantic/proof/check_proof_trace_alignment.py \
   --root . \
   --trace-module python/<package>/proof_traces/<claim>_proof_trace.py
 ```

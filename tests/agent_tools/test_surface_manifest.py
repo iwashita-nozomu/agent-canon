@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies standalone runtime inventory parsing and graph snapshot output.
-# upstream implementation ../../tools/agent_tools/surface_manifest.py parses runtime metadata
+# upstream implementation ../../tools/runtime/manifest/surface_manifest.py parses runtime metadata
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md owns the reader boundary
 # @dependency-end
 
@@ -17,8 +17,8 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "surface_manifest.py"
-from tools.agent_tools.skill_projection_registry import (  # noqa: E402
+SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "manifest" / "surface_manifest.py"
+from tools.agent.skills.skill_projection_registry import (  # noqa: E402
     GeneratedProjectionRegistryError,
     generated_skill_projections,
 )

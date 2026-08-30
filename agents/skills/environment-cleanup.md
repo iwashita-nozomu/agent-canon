@@ -44,7 +44,7 @@ Dockerfile -> canonical image -> docker run <canonical-full-test-command> -> pas
 ## Tool Commands
 
 ```bash
-bash tools/docker_dependency_validator.sh
+bash tools/validation/dependencies/docker_dependency_validator.sh
 docker build -f <Dockerfile> --target <canonical-target> -t <image> .
 docker run --rm <runtime-wiring> <image> <canonical-full-test-command>
 ```

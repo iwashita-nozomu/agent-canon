@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests default bootstrap docs and source-hidden static-seed consumer validation.
-# upstream implementation ../../tools/docs/check_bootstrap_docs.py bootstrap and static-consumer checker under test
+# upstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py bootstrap and static-consumer checker under test
 # upstream design ../../documents/contracts/template-bootstrap.md default static-seed bootstrap contract
 # upstream design ../../documents/contracts/static-seed-export.md static seed boundary
 # @dependency-end
@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "docs" / "check_bootstrap_docs.py"
+SCRIPT_PATH = PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "check_bootstrap_docs.py"
 
 
 class CheckBootstrapDocsTest(unittest.TestCase):

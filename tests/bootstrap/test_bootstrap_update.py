@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from tools.agent_tools.bootstrap_runtime import (
+from tools.runtime.container.bootstrap_runtime import (
     BootstrapError,
     BootstrapRuntime,
     DockerAdapter,
@@ -33,7 +33,7 @@ def _runtime(tmp_path: Path) -> tuple[BootstrapRuntime, DockerAdapter]:
 
 
 def _fast_manifest(tmp_path: Path) -> Path:
-    text = (ROOT / "bootstrap/manifest.toml").read_text(encoding="utf-8")
+    text = (ROOT / "bootstrap/host/manifest.toml").read_text(encoding="utf-8")
     for old, new in (
         ("idle_stop_seconds = 3600", "idle_stop_seconds = 1800"),
         ("health_start_period_seconds = 10", "health_start_period_seconds = 0.01"),
@@ -47,7 +47,7 @@ def _fast_manifest(tmp_path: Path) -> Path:
 
 
 def _local_manifest(tmp_path: Path, *, fast: bool = False) -> Path:
-    text = (ROOT / "bootstrap/manifest.toml").read_text(encoding="utf-8")
+    text = (ROOT / "bootstrap/host/manifest.toml").read_text(encoding="utf-8")
     if fast:
         for old, new in (
             ("idle_stop_seconds = 3600", "idle_stop_seconds = 1800"),
@@ -69,10 +69,15 @@ def test_bootstrap_defaults_runtime_to_repository_dot_runtime(tmp_path: Path) ->
     """The persistent default follows the install checkout."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
-    (repository / "bootstrap").mkdir(parents=True)
-    (repository / "bootstrap" / "manifest.toml").write_bytes(
-        (ROOT / "bootstrap" / "manifest.toml").read_bytes()
+    (repository / "bootstrap" / "host").mkdir(parents=True)
+    (repository / "bootstrap" / "host" / "manifest.toml").write_bytes(
+        (ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
     )
+    scheduler_source = ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target = repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target.mkdir(parents=True)
+    for template in scheduler_source.glob("*.in"):
+        (scheduler_target / template.name).write_bytes(template.read_bytes())
     control.mkdir()
     args = build_parser().parse_args(
         [
@@ -144,10 +149,15 @@ def test_bootstrap_maps_only_the_exact_legacy_runtime_default(tmp_path: Path) ->
     """Migrate the removed default without rewriting an explicit runtime root."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
-    (repository / "bootstrap").mkdir(parents=True)
-    (repository / "bootstrap" / "manifest.toml").write_bytes(
-        (ROOT / "bootstrap" / "manifest.toml").read_bytes()
+    (repository / "bootstrap" / "host").mkdir(parents=True)
+    (repository / "bootstrap" / "host" / "manifest.toml").write_bytes(
+        (ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
     )
+    scheduler_source = ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target = repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target.mkdir(parents=True)
+    for template in scheduler_source.glob("*.in"):
+        (scheduler_target / template.name).write_bytes(template.read_bytes())
     control.mkdir()
 
     def parse(runtime_root: Path):
@@ -185,17 +195,22 @@ def test_update_adopts_fresh_source_runtime_after_legacy_default_reset(
     docker = DockerAdapter(str(ROOT / "tests/bootstrap/fake_docker.py"))
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
-    (repository / "bootstrap").mkdir(parents=True)
-    (repository / "bootstrap" / "manifest.toml").write_bytes(
-        (ROOT / "bootstrap" / "manifest.toml").read_bytes()
+    (repository / "bootstrap" / "host").mkdir(parents=True)
+    (repository / "bootstrap" / "host" / "manifest.toml").write_bytes(
+        (ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
     )
+    scheduler_source = ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target = repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target.mkdir(parents=True)
+    for template in scheduler_source.glob("*.in"):
+        (scheduler_target / template.name).write_bytes(template.read_bytes())
     control.mkdir()
     legacy = control / "workspace/agent-canon-runtime/host"
     old = BootstrapRuntime(
         control,
         legacy,
         repository_root=repository,
-        manifest_path=repository / "bootstrap/manifest.toml",
+        manifest_path=repository / "bootstrap/host/manifest.toml",
         docker=docker,
     )
     with old.locked():
@@ -208,7 +223,7 @@ def test_update_adopts_fresh_source_runtime_after_legacy_default_reset(
         control,
         repository / ".runtime",
         repository_root=repository,
-        manifest_path=repository / "bootstrap/manifest.toml",
+        manifest_path=repository / "bootstrap/host/manifest.toml",
         docker=docker,
     )
     monkeypatch.setattr(runtime, "codex_prepare", lambda: {"code": "prepared"})

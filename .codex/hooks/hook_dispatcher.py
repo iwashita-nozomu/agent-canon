@@ -4,11 +4,11 @@
 # responsibility Dispatches the bounded active hook contract in-process without child processes, Git, or network access.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ../hooks.json invokes this dispatcher once per active event.
-# upstream implementation ../../tools/agent_tools/hook_safety.py owns pure secret and destructive Git safety leaves.
-# upstream implementation ../../tools/agent_tools/execution_resource_projection.py validates producer projection bytes.
+# upstream implementation ../../tools/runtime/authority/hook_safety.py owns pure secret and destructive Git safety leaves.
+# upstream implementation ../../tools/runtime/container/execution_resource_projection.py validates producer projection bytes.
 # upstream implementation ./hook_event_log.py provides one bounded local spool context per event.
-# downstream implementation ../../tools/agent_tools/behavior_event_assembly.py records one behavior snapshot.
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates the active/inactive contract.
+# downstream implementation ../../tools/runtime/archive/behavior_event_assembly.py records one behavior snapshot.
+# downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates the active/inactive contract.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch, redaction, malformed input, and no-subprocess behavior.
 # @dependency-end
 
@@ -26,31 +26,30 @@ from enum import Enum
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
-TOOLS_ROOT = SOURCE_ROOT / "tools" / "agent_tools"
-if str(TOOLS_ROOT) not in sys.path:
-    sys.path.insert(0, str(TOOLS_ROOT))
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
-from agent_canon_source_root import (  # noqa: E402
+from tools.runtime.source.agent_canon_source_root import (  # noqa: E402
     LAYOUT_STANDALONE,
     resolve_agent_canon_source_root,
 )
-from behavior_event_assembly import (  # noqa: E402
+from tools.runtime.archive.behavior_event_assembly import (  # noqa: E402
     FinalHandlerResult,
     HookInvocationParts,
     record_hook_invocation,
 )
-from execution_resource_projection import (  # noqa: E402
+from tools.runtime.container.execution_resource_projection import (  # noqa: E402
     ProjectionError,
     validate_normalized_input,
     validate_projection_bytes,
 )
 from hook_event_log import HookLogContext, utc_now  # noqa: E402
-from hook_retirement import (  # noqa: E402
+from tools.runtime.authority.hook_retirement import (  # noqa: E402
     MOVED_SOURCE_ABSENCES,
     RETIRED_CHILD_TOMBSTONES,
     source_digest,
 )
-from hook_safety import (  # noqa: E402
+from tools.runtime.authority.hook_safety import (  # noqa: E402
     SHELL_TOOL_NAMES,
     branch_block_payload,
     first_block,
@@ -64,25 +63,25 @@ from hook_safety import (  # noqa: E402
     secret_block_payload,
     secret_kind,
 )
-from parent_root_side_effects import (  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
     attest_parent_root,
 )
-from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
-from mutation_authority import (  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
+from tools.runtime.authority.mutation_authority import (  # noqa: E402
     evaluate_mutation_authority,
     mutation_block_payload,
 )
-from subagent_selection import (  # noqa: E402
+from tools.agent.orchestration.subagent_selection import (  # noqa: E402
     SubagentSelection,
     build_coordination_receipt,
     select_subagents,
 )
-from tool_selection import select_tools  # noqa: E402
-from workflow_context import WorkflowContext, load_workflow_context  # noqa: E402
-from workflow_monitor import emit_behavior_projection  # noqa: E402
+from tools.agent.orchestration.tool_selection import select_tools  # noqa: E402
+from tools.agent.orchestration.workflow_context import WorkflowContext, load_workflow_context  # noqa: E402
+from tools.runtime.lifecycle.workflow_monitor import emit_behavior_projection  # noqa: E402
 
 OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
 HOOK_CONTRACT_SCHEMA = "agent-canon.hook-contract.v1"

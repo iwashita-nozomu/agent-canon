@@ -3,9 +3,9 @@
 contract policy
 responsibility Documents ドキュメント運用 for this repository.
 upstream design ../../../agents/skills/formal-proof-workflow.md mathematical claim grounding policy
-downstream implementation ../../../rust/agent-canon/src/docs.rs enforces Markdown math notation and fence rules
-downstream implementation ../../../tools/agent_tools/check_convention_compliance.py validates document claim grounding
-downstream implementation ../../../tools/agent_tools/task_close.py validates document split decision closeout evidence
+downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/docs.rs enforces Markdown math notation and fence rules
+downstream implementation ../../../tools/validation/semantic/convention/check_convention_compliance.py validates document claim grounding
+downstream implementation ../../../tools/runtime/lifecycle/task_close.py validates document split decision closeout evidence
 @dependency-end
 -->
 
@@ -98,8 +98,8 @@ validation route、更新頻度、正本 owner の組み合わせで判断しま
 - `invalid_split_boundaries` は、本文量、token 量、読み込み chunk、章番号、近い path、
   一時的な作業都合、同じ validation oracle を共有する連続説明を含めます。
 - closeout の Document Structure Evidence は `document_split_decision` を記録し、
-  `python3 tools/agent_tools/check_convention_compliance.py` と
-  `python3 tools/agent_tools/task_close.py` がこの field の有無を確認します。
+  `python3 tools/validation/semantic/convention/check_convention_compliance.py` と
+  `python3 tools/runtime/lifecycle/task_close.py` がこの field の有無を確認します。
 
 ## Claim Grounding
 
@@ -151,6 +151,6 @@ validation route、更新頻度、正本 owner の組み合わせで判断しま
 
 ## 検証
 
-- この文書の規範表現、positive label、検証経路は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
+- この文書の規範表現、positive label、検証経路は `python3 tools/validation/semantic/convention/check_convention_compliance.py` で確認します。
 - `claim grounding`、provisional wording、proof obligation の wiring は
-  `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
+  `python3 tools/validation/semantic/convention/check_convention_compliance.py` で確認します。

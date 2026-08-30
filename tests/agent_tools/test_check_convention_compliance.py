@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests convention compliance verifier behavior.
-# upstream implementation ../../tools/agent_tools/check_convention_compliance.py verifier  # noqa: E501
+# upstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py verifier  # noqa: E501
 # upstream design ../../documents/conventions/README.md convention index
 # @dependency-end
 
@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.check_convention_compliance import (
+from tools.validation.semantic.convention.check_convention_compliance import (
     BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
     DESIGN_INTEGRITY_GATE_MARKERS,
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
@@ -40,30 +40,30 @@ from tools.agent_tools.check_convention_compliance import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_convention_compliance.py"
+CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py"
 
 
 MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
-path: tools/agent_tools/run_repo_dependency_review.sh
-path: tools/agent_tools/scan_code_dependencies.sh
-path: tools/agent_tools/check_hardcoded_numbers.py
-path: tools/agent_tools/check_static_any.py
-path: tools/agent_tools/check_log_helper_names.py
-path: tools/validation/notebook_quality.py
-path: tools/oop/python/readability.py
-path: tools/oop/cpp/readability.py
-path: tools/agent_tools/evaluate_skill_workflow_prompts.py
-path: tools/agent_tools/evaluate_agent_run.py
-path: tools/agent_tools/check_skill_frontmatter.py
-path: tools/agent_tools/check_convention_compliance.py
-path: tools/agent_tools/tool_catalog.py
-path: tools/agent_tools/tool_drift.py
-path: tools/agent_tools/import_responsibility.py
-path: tools/ci/check_github_workflows.py
+path: tools/analysis/dependencies/run_repo_dependency_review.sh
+path: tools/analysis/dependencies/scan_code_dependencies.sh
+path: tools/validation/semantic/code/check_hardcoded_numbers.py
+path: tools/validation/semantic/code/check_static_any.py
+path: tools/validation/semantic/logging/check_log_helper_names.py
+path: tools/validation/notebooks/notebook_quality.py
+path: tools/validation/code/oop/python/readability.py
+path: tools/validation/code/oop/cpp/readability.py
+path: eval/producers/evaluate_skill_workflow_prompts.py
+path: eval/producers/evaluate_agent_run.py
+path: tools/validation/semantic/skills/check_skill_frontmatter.py
+path: tools/validation/semantic/convention/check_convention_compliance.py
+path: tools/runtime/manifest/tool_catalog.py
+path: tools/validation/semantic/tools/tool_drift.py
+path: tools/analysis/code/import_responsibility.py
+path: tools/validation/ci/checks/check_github_workflows.py
 """,
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
-    "bootstrap/container/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
+    "bootstrap/container/image/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
     "tests/tools/test_bootstrap_container_contract.py": "# bootstrap_runtime\ndef test_bootstrap_container_contract(): pass\n",
     "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
     "documents/conventions/README.md": "conventions\n",
@@ -96,13 +96,13 @@ path: tools/ci/check_github_workflows.py
         "python import_responsibility.py\n"
         "SOLID 設計契約 Single responsibility Open/closed Liskov substitution "
         "Interface segregation Dependency inversion "
-        "tools/oop/python/readability.py tools/oop/shared/readability_core.py "
-        "tools/agent_tools/check_solid_evidence.py SOLID principle signal scanned_paths "
+        "tools/validation/code/oop/python/readability.py tools/validation/code/oop/shared/readability_core.py "
+        "tools/validation/semantic/code/check_solid_evidence.py SOLID principle signal scanned_paths "
         "SOLID_PRINCIPLES_BY_KIND readability.py\n"
     ),
     "documents/conventions/coding-conventions-cpp.md": "cpp\n",
     "documents/conventions/coding-conventions-project.md": (
-        "project bootstrap/container/Dockerfile claim grounding program contract "
+        "project bootstrap/container/image/Dockerfile claim grounding program contract "
         "proof obligation run-local planning evidence\n"
     ),
     "documents/conventions/coding-conventions-house-style.md": (
@@ -120,8 +120,8 @@ path: tools/ci/check_github_workflows.py
         "Validation test/check "
         "mathematical necessity gate Numerical Trigger Non-Numerical Alternative "
         "checker-owned property SOLID / OOP boundary assertion "
-        "$oop-readability-check tools/oop/python/readability.py "
-        "tools/oop/cpp/readability.py import_responsibility.py "
+        "$oop-readability-check tools/validation/code/oop/python/readability.py "
+        "tools/validation/code/oop/cpp/readability.py import_responsibility.py "
         "failing_contract cause_classification intent_preservation "
         "documents/runtime/runtime-profiles-and-check-matrix.json "
         "documents/runtime/runtime-profiles-and-check-matrix.md\n"
@@ -133,7 +133,7 @@ path: tools/ci/check_github_workflows.py
     "documents/conventions/object-oriented-design.md": (
         "readability.py SOLID との対応 Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "tools/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND "
+        "tools/validation/code/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND "
         "import_responsibility.py\n"
     ),
     "documents/experiments/experiment-registry.md": (
@@ -177,7 +177,7 @@ path: tools/ci/check_github_workflows.py
         "check_runtime_profile_inventory.py tool_rejection_preflight.py "
         "responsibility_scope responsibility-scope.toml protecting tools\n"
     ),
-    "tools/agent_tools/tool_rejection_preflight.py": (
+    "tools/validation/semantic/tools/tool_rejection_preflight.py": (
         "RESPONSIBILITY_SCOPE_COMMAND responsibility_scope_gate scope_covers "
         'protecting_tools gate="responsibility_scope" '
         "EXPERIMENT_EXECUTION_SURFACE_PATHS experiment_execution_surface_guard "
@@ -210,7 +210,7 @@ path: tools/ci/check_github_workflows.py
         "legacy-route drift duplicate implementation canonical owner "
         "caller migration contract-complete implementation acceptance contract "
         "design_issue_blocker implementation shortcut\n"
-        "Branch Reuse Default tools/agent_tools/hook_safety.py user が別 branch を明示 "
+        "Branch Reuse Default tools/runtime/authority/hook_safety.py user が別 branch を明示 "
         "AgentCanon branch / PR workflow "
         "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
         "proven exact task ownership session restart "
@@ -228,19 +228,19 @@ path: tools/ci/check_github_workflows.py
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (
         "Before closeout, run "
-        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/workflows/long-form-writing-workflow.md": (
         "$structure-planning $prose-reasoning-graph $md-style-check "
         "structure_contract=skipped\n"
         "Before closeout, run "
-        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/workflows/pr-queue-cleanup-workflow.md": (
         "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
-        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
@@ -285,7 +285,7 @@ path: tools/ci/check_github_workflows.py
         "durable_blocker_or_issue router_unavailable_blocker new state evidence "
         "revised parent packet\n"
         "$oop-readability-check SOLID principle signal OOP dimension finding kind "
-        "tools/oop/shared/readability_core.py check_solid_evidence.py scanned_paths "
+        "tools/validation/code/oop/shared/readability_core.py check_solid_evidence.py scanned_paths "
         "class Protocol responsibility_scope owner scope protecting tools "
         "実装ディレクトリ\n"
     ),
@@ -295,7 +295,7 @@ path: tools/ci/check_github_workflows.py
     ),
     "agents/skills/change-review.md": (
         "issue_route github_issue issue_sync.py private packet "
-        "python-review $oop-readability-check tools/agent_tools/check_solid_evidence.py "
+        "python-review $oop-readability-check tools/validation/semantic/code/check_solid_evidence.py "
         "SOLID principle signal OOP readability report class Protocol\n"
     ),
     "agents/skills/pr-processing.md": (
@@ -335,7 +335,7 @@ path: tools/ci/check_github_workflows.py
     ),
     "agents/skills/worktree-health.md": (
         "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
-        "tools/agent_tools/hook_safety.py "
+        "tools/runtime/authority/hook_safety.py "
         "branch_creation_reason=<reason> "
         "worktree_creation_reason=<reason> git worktree list --porcelain "
         "git branch --show-current\n"
@@ -351,7 +351,7 @@ path: tools/ci/check_github_workflows.py
     ),
     "agents/skills/python-review.md": (
         "SOLID 原則シグナル OOP 可読性レポート "
-        "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
+        "tools/validation/code/oop/python/readability.py tools/validation/semantic/code/check_solid_evidence.py "
         "Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
         "readability.py scanned_paths 定義順 読者順序 "
@@ -360,7 +360,7 @@ path: tools/ci/check_github_workflows.py
     "agents/skills/oop-readability-check.md": (
         "SOLID Single responsibility Open/closed Liskov substitution "
         "Interface segregation Dependency inversion "
-        "tools/oop/shared/readability_core.py SOLID route owner mechanical projections "
+        "tools/validation/code/oop/shared/readability_core.py SOLID route owner mechanical projections "
         "readability.py\n"
     ),
     "agents/workflows/implementation-waterfall-workflow.md": (
@@ -368,7 +368,7 @@ path: tools/ci/check_github_workflows.py
         "replaceable unit mechanism validation route unresolved branch "
         "design_issue_blocker implementation shortcut\n"
         "Before closeout, run "
-        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/skills/formal-proof-workflow.md": (
         "program contract public entrypoint return projection proof obligation "
@@ -402,7 +402,7 @@ path: tools/ci/check_github_workflows.py
         "external public API/behavior/schema unchanged scoped_change "
         "dependency/consumer/migration/docs closure\n"
     ),
-    "tools/agent_tools/agent_team.py": (
+    "tools/agent/orchestration/agent_team.py": (
         "$literature-survey $research-workflow research_driven_change selected.append\n"
     ),
     ".codex/agents/python_reviewer.toml": (
@@ -434,7 +434,7 @@ path: tools/ci/check_github_workflows.py
         "| run bundle, declared workflow / skills / review, and dynamic wave ledger | "
         "`bootstrap_agent_run.py`; `workflow_monitor.py` |\n"
         "| skill selection | `agents/skills/catalog.yaml`; "
-        "`python3 tools/agent_tools/route.py --prompt` |\n"
+        "`python3 tools/agent/orchestration/route.py --prompt` |\n"
         "| implementation stage gate | "
         "`agents/workflows/implementation-waterfall-workflow.md` |\n"
         "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
@@ -449,12 +449,12 @@ path: tools/ci/check_github_workflows.py
         "Implementation design uses the four-entry active design packet.\n"
     ),
     "templates/agents/test_plan.md": "validation route behavior-owned cases\n",
-    "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
+    "eval/definitions/skill_workflow_prompt_eval.toml": (
         "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL "
         "write-capable handoff ORCH-SHIM-TOOLCALL-1 WORKFLOW-GENERIC-1\n"
         "evaluate_skill_workflow_prompts.py\n"
     ),
-    "evidence/agent-evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
+    "eval/definitions/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
     "agents/USER_GUIDE_JA.md": (
         "structure-planning prose-reasoning-graph md-style-check "
         "Document Structure Evidence structure_contract=skipped "
@@ -476,7 +476,7 @@ path: tools/ci/check_github_workflows.py
     "agents/workflows/hypothesis-validation-workflow.md": (
         "scan_code_dependencies.sh\n"
         "Before closeout, run "
-        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/workflows/comprehensive-refactoring-workflow.md": (
         "readability.py check_convention_compliance.py\n"
@@ -484,19 +484,19 @@ path: tools/ci/check_github_workflows.py
         "Removal and Caller Migration Plan two-stage refactor forced migration "
         "usage-surface repair return-gate validation\n"
         "Before closeout, run "
-        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/workflows/adaptive-improvement-workflow.md": (
         "evaluate_skill_workflow_prompts.py check_convention_compliance.py\n"
         "Before closeout, run "
-        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/workflows/agent-canon-pr-workflow.md": (
         "check_github_workflows.py\n"
         "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
-        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     ".github/PULL_REQUEST_TEMPLATE.md": (
         "## PR Essence\n"
@@ -512,18 +512,18 @@ path: tools/ci/check_github_workflows.py
         "Behavior or contract delta:\n"
         "Evidence route:\n"
     ),
-    "tools/ci/run_all_checks.sh": (
+    "tools/validation/ci/runners/run_all_checks.sh": (
         "check_static_any.py "
         "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py bootstrap_runtime.py check_runtime_profile_inventory.py\n"
     ),
-    "tools/ci/check_agent_canon_pr.sh": (
+    "tools/validation/ci/checks/check_agent_canon_pr.sh": (
         'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
-        "python3 tools/ci/check_github_workflows.py\n"
+        "python3 tools/validation/ci/checks/check_github_workflows.py\n"
     ),
-    "rust/agent-canon/src/docs.rs": "runtime profile inventory\n",
+    "tools/runtime/dispatch/agent-canon/src/docs.rs": "runtime profile inventory\n",
     "documents/tools/agent-canon.md": "docs\n",
     "bootstrap.sh": "runtime boundary\n",
     "agents/skills/environment-maintenance.md": (
@@ -539,14 +539,14 @@ path: tools/ci/check_github_workflows.py
         "validate_projection_bytes record_hook_invocation HookLogContext "
         "RETIRED_CHILD_TOMBSTONES MOVED_SOURCE_ABSENCES\n"
     ),
-    "tools/agent_tools/hook_safety.py": (
+    "tools/runtime/authority/hook_safety.py": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
         "AGENT_CANON_BRANCH_WORKTREE_REASON AGENT_CANON_DESTRUCTIVE_GIT_REASON "
         "explicit_user_approval user_request agent_canon_workflow same-segment "
         "branch_block_payload operation command_sha256 DESTRUCTIVE_GIT_GUARD=block "
         "BRANCH_WORKTREE_CREATION_GUARD=block\n"
     ),
-    "tools/agent_tools/task_close.py": (
+    "tools/runtime/lifecycle/task_close.py": (
         "changed_markdown_paths Document Structure Evidence "
         "document_structure_evidence DOCUMENT_STRUCTURE_REQUIRED "
         "document_split_decision DOCUMENT_SPLIT_DECISION_EVIDENCE "
@@ -600,27 +600,10 @@ path: tools/ci/check_github_workflows.py
     ),
 }
 
-MINIMAL_AGENT_TOOLS = (
-    "run_repo_dependency_review.sh",
-    "scan_code_dependencies.sh",
-    "check_hardcoded_numbers.py",
-    "check_static_any.py",
-    "check_log_helper_names.py",
-    "import_responsibility.py",
-    "evaluate_skill_workflow_prompts.py",
-    "evaluate_agent_run.py",
-    "check_convention_compliance.py",
-    "check_skill_frontmatter.py",
-    "tool_catalog.py",
-    "tool_drift.py",
-    "check_runtime_profile_inventory.py",
-    "bootstrap_runtime.py",
-)
-
-MINIMAL_PYTHON_TOOLS = (
-    "tools/oop/python/readability.py",
-    "tools/oop/cpp/readability.py",
-    "tools/validation/notebook_quality.py",
+MINIMAL_TOOL_PATHS = tuple(
+    tool_path
+    for tool_path, _references in TOOL_GATES.values()
+    if tool_path != "bootstrap.sh"
 )
 
 
@@ -687,14 +670,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             workflow.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "workflow_hook:tools/ci/check_agent_canon_pr.sh",
+                "workflow_hook:tools/validation/ci/checks/check_agent_canon_pr.sh",
                 result.stdout,
             )
             self.assertIn("missing-convention-compliance-gate", result.stdout)
@@ -704,7 +687,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             workflow.write_text(
                 "#!/usr/bin/env bash\n# Mention check_convention_compliance.py only.\n",
                 encoding="utf-8",
@@ -723,7 +706,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
@@ -743,7 +726,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
@@ -764,10 +747,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
-                "python3 tools/agent_tools/check_convention_compliance.py\n"
+                "python3 tools/validation/semantic/convention/check_convention_compliance.py\n"
                 "# Do not run check_convention_compliance.py for quick tasks.\n",
                 encoding="utf-8",
             )
@@ -786,7 +769,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             manifest = (
-                root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+                root / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
             )
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
@@ -878,7 +861,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            (root / "tools" / "agent_tools" / "hook_safety.py").write_text(
+            (root / "tools" / "runtime" / "authority" / "hook_safety.py").write_text(
                 "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
                 "explicit_user_approval\n",
                 encoding="utf-8",
@@ -888,7 +871,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "hook_guardrail_policy:tools/agent_tools/hook_safety.py", result.stdout
+                "hook_guardrail_policy:tools/runtime/authority/hook_safety.py", result.stdout
             )
             self.assertIn("missing-marker:operation", result.stdout)
 
@@ -949,6 +932,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             forwarder = root / "tools" / "agent_tools" / "legacy_forwarder.py"
+            forwarder.parent.mkdir(parents=True, exist_ok=True)
             forwarder.write_text(
                 "LEGACY_FORWARDER_WARNING_REQUIRED = True\n",
                 encoding="utf-8",
@@ -1242,7 +1226,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
         )
         self.assertIn(
-            "tools/agent_tools/agent_team.py",
+            "tools/agent/orchestration/agent_team.py",
             LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
         )
 
@@ -1388,7 +1372,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
-                    "tools/agent_tools/hook_safety.py",
+                    "tools/runtime/authority/hook_safety.py",
                     "",
                 ),
                 encoding="utf-8",
@@ -1399,7 +1383,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("branch_worktree_creation_guard", result.stdout)
             self.assertIn(
-                "missing-marker:tools/agent_tools/hook_safety.py", result.stdout
+                "missing-marker:tools/runtime/authority/hook_safety.py", result.stdout
             )
 
     def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
@@ -1852,15 +1836,11 @@ class CheckConventionComplianceTest(unittest.TestCase):
             target = root / path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8")
-        for tool in MINIMAL_AGENT_TOOLS:
-            target = root / "tools" / "agent_tools" / tool
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-        for tool_path in MINIMAL_PYTHON_TOOLS:
+        for tool_path in MINIMAL_TOOL_PATHS:
             target = root / tool_path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
-        github_checker = root / "tools" / "ci" / "check_github_workflows.py"
+            target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        github_checker = root / "tools" / "validation" / "ci" / "checks" / "check_github_workflows.py"
         github_checker.parent.mkdir(parents=True, exist_ok=True)
         github_checker.write_text(
             "#!/usr/bin/env python3\ncheck_skill_frontmatter.py\n",

@@ -4,9 +4,9 @@
 # contract test
 # responsibility Verifies fail-closed GPU build admission, WSL thunk diagnosis, and runtime/build separation.
 # upstream design ../../documents/design/environment-resolution-gpu-build-capability.md staged GPU build capability contract
-# upstream implementation ../../tools/agent_tools/gpu_build_capability.py typed receipt and decision model
-# upstream data ../fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure readback
-# upstream data ../fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired readback
+# upstream implementation ../../tools/runtime/container/gpu_build_capability.py typed receipt and decision model
+# upstream implementation ../fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure readback
+# upstream implementation ../fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired readback
 # @dependency-end
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.agent_tools.gpu_build_capability import (  # noqa: E402
+from tools.runtime.container.gpu_build_capability import (  # noqa: E402
     BuildCapability,
     BuilderDriver,
     DaemonMode,

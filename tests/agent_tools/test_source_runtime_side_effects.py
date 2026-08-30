@@ -8,9 +8,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.formal_proof import build_verification_commands
-from tools.agent_tools.runtime_artifacts import RuntimeArtifactError, RuntimeRootRequired
-from tools.audit.audit_logger import AuditLogger
+from tools.analysis.proof.formal_proof import build_verification_commands
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, RuntimeRootRequired
+from tools.audit.logging.audit_logger import AuditLogger
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -75,8 +75,8 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
     ) -> None:
         """Similarity reports are runtime artifacts, never source-tree files."""
         scripts = (
-            PROJECT_ROOT / "tools" / "docs" / "find_similar_documents.py",
-            PROJECT_ROOT / "tools" / "docs" / "tfidf_similar_docs.py",
+            PROJECT_ROOT / "tools" / "analysis" / "documents" / "analysis" / "find_similar_documents.py",
+            PROJECT_ROOT / "tools" / "analysis" / "documents" / "analysis" / "tfidf_similar_docs.py",
         )
         source_files = tuple(
             Path(path)
@@ -143,9 +143,9 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
     def test_shell_loggers_fail_with_typed_missing_root(self) -> None:
         """Shell wrappers fail before writing when the runtime root is absent."""
         scripts = (
-            PROJECT_ROOT / "tools" / "run_pytest_with_logs.sh",
-            PROJECT_ROOT / "tools" / "run_comprehensive_review.sh",
-            PROJECT_ROOT / "tools" / "docs" / "check_worktree_scopes.sh",
+            PROJECT_ROOT / "tools" / "validation" / "tests" / "run_pytest_with_logs.sh",
+            PROJECT_ROOT / "tools" / "validation" / "review" / "run_comprehensive_review.sh",
+            PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "check_worktree_scopes.sh",
         )
         for script in scripts:
             env = os.environ.copy()
@@ -171,7 +171,7 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
             pytest_result = subprocess.run(
                 [
                     "bash",
-                    str(PROJECT_ROOT / "tools" / "run_pytest_with_logs.sh"),
+                    str(PROJECT_ROOT / "tools" / "validation" / "tests" / "run_pytest_with_logs.sh"),
                     str(PROJECT_ROOT / "tests" / "agent_tools" / "test_source_runtime_side_effects.py"),
                     "--collect-only",
                     "-q",
@@ -186,7 +186,7 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
             self.assertFalse((PROJECT_ROOT / "tests" / "logs").exists())
 
             scope_result = subprocess.run(
-                ["bash", str(PROJECT_ROOT / "tools" / "docs" / "check_worktree_scopes.sh")],
+                ["bash", str(PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "check_worktree_scopes.sh")],
                 cwd=PROJECT_ROOT.parent,
                 env=env,
                 capture_output=True,

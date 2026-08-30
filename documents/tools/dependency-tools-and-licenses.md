@@ -7,10 +7,10 @@ upstream design ../runtime/runtime-profiles-and-check-matrix.md runtime profile 
 upstream design ../../CONTAINER_OPERATIONS.md devcontainer and Docker ownership boundary
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 upstream environment ../../agent-canon-environment.toml machine-readable environment and compiled tool contract
-upstream implementation ../../rust/agent-canon/Cargo.toml AgentCanon Rust CLI crate license and dependency manifest
-downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog and docs consistency
-downstream implementation ../../tools/agent_tools/tool_drift.py validates tool and documentation trace links
-downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates shared convention wiring
+upstream implementation ../../tools/runtime/dispatch/agent-canon/Cargo.toml AgentCanon Rust CLI crate license and dependency manifest
+downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates catalog and docs consistency
+downstream implementation ../../tools/validation/semantic/tools/tool_drift.py validates tool and documentation trace links
+downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py validates shared convention wiring
 @dependency-end
 -->
 
@@ -66,7 +66,7 @@ flowchart TD
 再確認コマンドの例:
 
 ```bash
-cargo metadata --manifest-path rust/agent-canon/Cargo.toml --format-version 1 \
+cargo metadata --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --format-version 1 \
   | jq -r '.packages[] | [.name, .version, (.license // "NOASSERTION")] | @tsv'
 
 dpkg-query -L <debian-package> | rg '/copyright$'
@@ -82,8 +82,8 @@ table as stale and rerun the verification policy when any of these events occur:
   container base changes;
 - AgentCanon starts distributing a compiled binary, container image, packaged
   archive, or bundled model artifact;
-- a PR changes `bootstrap/container/Dockerfile`,
-  `bootstrap/container/dependencies.toml`, or `rust/agent-canon/Cargo.toml`;
+- a PR changes `bootstrap/container/image/Dockerfile`,
+  `bootstrap/container/image/dependencies.toml`, or `tools/runtime/dispatch/agent-canon/Cargo.toml`;
 - an upstream license, model card, distro package copyright file, or package
   metadata source is unavailable, inconsistent, or moved.
 
@@ -95,19 +95,19 @@ left `unresolved`. Do not claim license compatibility from this document alone.
 ## AgentCanon-Owned Dependency Tools
 
 この表の tool は AgentCanon repository 内の実装です。license は repository
-license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.toml`
+license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/agent-canon/Cargo.toml`
 を根拠にします。
 
 | Tool | Command | Purpose | Writes | License Status |
 | --- | --- | --- | --- | --- |
-| `run-repo-dependency-review` | `bash tools/agent_tools/run_repo_dependency_review.sh` | dependency manifest の scan、format、graph review をまとめて実行します。 | no | local: Apache-2.0 |
-| `scan-dependency-headers` | `bash tools/agent_tools/scan_dependency_headers.sh` | canonical graph の parser-owned manifest coverage を棚卸しします。 | no | local: Apache-2.0 |
-| `check-dependency-header-format` | `bash tools/agent_tools/check_dependency_header_format.sh` | selected path の manifest context projection を検証します。 | no | local: Apache-2.0 |
-| `check-dependency-headers` | `python3 tools/agent_tools/check_dependency_headers.py` | changed file に required dependency manifest があるか検証します。 | no | local: Apache-2.0 |
-| `check-dependency-graph` | `bash tools/agent_tools/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
-| `scan-code-dependencies` | `bash tools/agent_tools/scan_code_dependencies.sh` | Python import、C/C++ include、shell source など code-level dependency edge を抽出します。 | no | local: Apache-2.0 |
-| `check-design-doc-claims` | `python3 tools/agent_tools/check_design_doc_claims.py` | design document の claim を bounded graph context と parent evidence で検査します。 | no | local: Apache-2.0 |
-| `render-dependency-manifest-graph` | `python3 tools/agent_tools/render_dependency_manifest_graph.py` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
+| `run-repo-dependency-review` | `bash tools/analysis/dependencies/run_repo_dependency_review.sh` | dependency manifest の scan、format、graph review をまとめて実行します。 | no | local: Apache-2.0 |
+| `scan-dependency-headers` | `bash tools/analysis/dependencies/scan_dependency_headers.sh` | canonical graph の parser-owned manifest coverage を棚卸しします。 | no | local: Apache-2.0 |
+| `check-dependency-header-format` | `bash tools/validation/semantic/dependencies/check_dependency_header_format.sh` | selected path の manifest context projection を検証します。 | no | local: Apache-2.0 |
+| `check-dependency-headers` | `python3 tools/validation/semantic/dependencies/check_dependency_headers.py` | changed file に required dependency manifest があるか検証します。 | no | local: Apache-2.0 |
+| `check-dependency-graph` | `bash tools/analysis/dependencies/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
+| `scan-code-dependencies` | `bash tools/analysis/dependencies/scan_code_dependencies.sh` | Python import、C/C++ include、shell source など code-level dependency edge を抽出します。 | no | local: Apache-2.0 |
+| `check-design-doc-claims` | `python3 tools/validation/semantic/documents/check_design_doc_claims.py` | design document の claim を bounded graph context と parent evidence で検査します。 | no | local: Apache-2.0 |
+| `render-dependency-manifest-graph` | `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
 
 ## AgentCanon Runtime And Environment Tools
 
@@ -117,7 +117,7 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 
 | Tool | Purpose | AgentCanon Surface | License Status |
 | --- | --- | --- | --- |
-| `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `rust/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
+| `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `tools/runtime/dispatch/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
 | Rust toolchain: `rustup`, `cargo`, `rustc`, `rustfmt`, `clippy`, `rust-analyzer` | AgentCanon Rust CLI の build、format、lint、editor support。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
 | `clang-format` (Ubuntu 22.04 package `1:14.0-55~exp2`, executable `14.0.0-1ubuntu1.1`) | Shared C/C++ source formatting。 | `.devcontainer/dependencies.toml` (`clang-format`) | distro: `/usr/share/doc/clang-format/copyright` in the pinned Ubuntu image; upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/jammy/clang-format> |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
@@ -125,10 +125,10 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/devcontainer.json`, `.devcontainer/gpu-admission/devcontainer.json` の digest-pinned official Feature | upstream: MIT for Node.js core, with bundled third-party notices |
 | `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/dependencies.toml` | upstream: Artistic-2.0 |
 | Codex CLI: `@openai/codex` | local Codex runtime entrypoint。 | `.devcontainer/dependencies.toml` | upstream: Apache-2.0 |
-| GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/agent_tools/github_publish.py` | upstream: MIT |
-| `gitleaks` | secret scanning。 | `.devcontainer/dependencies.toml`, `tools/ci/scan_secrets.sh` | upstream: MIT |
-| `trufflehog` | secret discovery / verification。 | `.devcontainer/dependencies.toml`, `tools/ci/scan_secrets.sh` | upstream: AGPL-3.0 |
-| `detect-secrets` | current tree / baseline 型の secret scanning。 | `.devcontainer/dependencies.toml`, `tools/ci/scan_secrets.sh` | upstream: Apache-2.0 |
+| GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/repository/github/github_publish.py` | upstream: MIT |
+| `gitleaks` | secret scanning。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: MIT |
+| `trufflehog` | secret discovery / verification。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: AGPL-3.0 |
+| `detect-secrets` | current tree / baseline 型の secret scanning。 | `.devcontainer/dependencies.toml`, `tools/validation/ci/checks/scan_secrets.sh` | upstream: Apache-2.0 |
 | `git` | source checkout、submodule、branch / PR workflow。 | `.devcontainer/post-create.sh`, update tools | upstream: GPL-2.0 |
 | `cmake` | native tool build。 | `.devcontainer/post-create.sh` | upstream: BSD-3-Clause |
 | `curl` | installer、release asset、license source fetch。 | `.devcontainer/post-create.sh` | upstream: curl license |
@@ -147,8 +147,8 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 ## Rust Crate Dependency Snapshot
 
 The AgentCanon Rust CLI declared its own license as Apache-2.0 in
-`rust/agent-canon/Cargo.toml`. On 2026-06-18, `cargo metadata` for
-`rust/agent-canon/Cargo.toml` reported these license families in direct and
+`tools/runtime/dispatch/agent-canon/Cargo.toml`. On 2026-06-18, `cargo metadata` for
+`tools/runtime/dispatch/agent-canon/Cargo.toml` reported these license families in direct and
 transitive crates:
 
 - Apache-2.0
