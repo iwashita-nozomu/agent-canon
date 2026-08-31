@@ -4421,8 +4421,7 @@ bootstrap_host_entrypoint() {
       ;;
     update)
       AGENT_CANON_ALLOW_BUILD=1
-      AGENT_CANON_FORCE_BUILD=1
-      export AGENT_CANON_ALLOW_BUILD AGENT_CANON_FORCE_BUILD
+      export AGENT_CANON_ALLOW_BUILD
       _agent_canon_image_reference "$image_ref"
       _agent_canon_update "$image_ref" "$AGENT_CANON_IMAGE_REF"
       return $?
