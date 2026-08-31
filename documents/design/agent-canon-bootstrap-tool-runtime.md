@@ -207,10 +207,14 @@ Image は `node-provider -> runtime-base -> builder -> runtime` の四段構成�
 runtime-base は retained system closure と exact clangd を一度だけ導入し、key/source/
 apt lists と transient installer を同じ layer で削除します。builder はそこへ
 `build-essential`、`curl`、pipx、npm/corepack、`rustup-init` と Cargo build を一時的に
-加え、そこから生成した dependency plan / receipts、AgentCanon
+加え、builder-owned records から生成した dependency plan / receipts、AgentCanon
 binary、full Rust components、pipx venvs、Node LSP assets のみを final runtime へ
 コピーします。system `pip` は不要です。Cargo target/registry/git cache、npm/npx/corepack、
 rustup-init は runtime に持ち込みません。cache mount は使用しません。
+
+この dependency plan / receipts は `--records` で選択した builder-owned records の
+build provenance です。`clangd-language-server` は plan/receipt set に含めず、
+runtime-base が package URL/checksum/version を検証して所有します。
 
 runtime が保持する system capability は `ca-certificates`、`git`、`jq`、`tree`、
 Python 3 と `packaging`/`tomli`/`yaml`、`pipx`、および固定 digest の `clangd-18` です。

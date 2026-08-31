@@ -182,6 +182,7 @@ def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None
     assert "apt-get update" in builder
     assert "--records pipx pyright-language-server bash-language-server jq tree rust-toolchain check-jsonschema yamllint agent-canon-cli" in builder
     assert "clangd-language-server" not in builder
+    assert "clangd-language-server.json" not in runtime
     assert "pipx" not in runtime_base
     assert "python3-pip" not in runtime_base
     assert text.count("printf 'deb [arch=%s") == 1

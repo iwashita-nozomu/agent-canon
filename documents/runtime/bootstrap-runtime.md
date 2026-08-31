@@ -31,7 +31,9 @@ then removes its key, source list, apt indexes, and transient installers. The
 disposable builder adds build-essential, curl, pipx, npm/corepack, rustup-init,
 and Cargo build support; system pip, gnupg, and ninja are unnecessary.
 The final runtime receives only declared Python/Rust/LSP artifacts, pipx venvs,
-and build receipts/plan. It has no pipx package or command and excludes pytest,
+and builder-owned build receipts/plan. The plan/receipt set intentionally omits
+`clangd-language-server`: runtime-base owns its package URL/checksum/version
+verification. The final runtime has no pipx package or command and excludes pytest,
 pip, ninja, build-essential, curl, gnupg, clang-format, package-manager caches,
 and Cargo registry/git/target caches. No Docker cache mounts are used.
 

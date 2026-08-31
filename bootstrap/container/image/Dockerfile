@@ -154,8 +154,7 @@ RUN set -eux; \
     && test ! -e /opt/agent-canon \
     && test ! -e "$AGENT_CANON_CARGO_TARGET_DIR" \
     && test ! -e "$CARGO_HOME/registry" \
-    && test ! -e "$CARGO_HOME/git" \
-    && rm -rf /var/lib/apt/lists/*
+    && test ! -e "$CARGO_HOME/git"
 
 # Final runtime inherits the already-clean retained system closure.
 FROM runtime-base AS runtime
