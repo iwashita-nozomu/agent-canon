@@ -123,7 +123,6 @@ version = "0.1.0"
 source = "tools/runtime/dispatch/agent-canon"
 repo = "https://github.com/iwashita-nozomu/agent-canon.git"
 source_identity = "canonical-snapshot"
-source_tree_sha256 = "c586f4e0688c7499aac9041b0784d61619ae0c8c4a000391aa755fc46f178183"
 cargo_lock_sha256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
 locked = true
 verification = { kind = "cargo-binary", path = "target/release/agent-canon", args = ["--version"], output_contains = "agent-canon 0.1.0" }
