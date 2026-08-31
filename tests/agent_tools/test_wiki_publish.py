@@ -100,6 +100,19 @@ def compute_digest(page_root: Path, source_commit: str) -> str:
     return hasher.hexdigest()
 
 
+def registered_temporary_directory(testcase: unittest.TestCase) -> Path:
+    """Register one temporary parent and assert its exact removal at cleanup."""
+    temporary = tempfile.TemporaryDirectory()
+    path = Path(temporary.name)
+
+    def cleanup() -> None:
+        temporary.cleanup()
+        testcase.assertFalse(path.exists(), f"temporary fixture remains: {path}")
+
+    testcase.addCleanup(cleanup)
+    return path
+
+
 @contextmanager
 def runtime_environment(source_root: Path, runtime_root: Path) -> Iterator[None]:
     """Bind a wiki fixture to explicit control/runtime roots for its duration."""
@@ -148,7 +161,9 @@ class WikiPublishTests(unittest.TestCase):
 
     def test_required_top_level_wiki_pages_are_enforced(self) -> None:
         runner = FakeRunner()
-        source_root = Path(tempfile.mkdtemp())
+        temp_root = registered_temporary_directory(self)
+        source_root = temp_root / "source"
+        source_root.mkdir()
         wiki_root = source_root / "wiki"
         wiki_root.mkdir(parents=True)
         runner.add(["git", "cat-file", "-t", "a" * 40], stdout="commit")
@@ -178,8 +193,10 @@ class WikiPublishTests(unittest.TestCase):
 
     def test_prepare_without_expected_digest_outputs_page_set_digest(self) -> None:
         runner = FakeRunner()
-        source_root = Path(tempfile.mkdtemp())
-        runtime_root = source_root.parent / f"{source_root.name}-runtime"
+        temp_root = registered_temporary_directory(self)
+        source_root = temp_root / "source"
+        source_root.mkdir()
+        runtime_root = temp_root / "runtime"
         wiki_root = runtime_root / "wiki"
         wiki_root.mkdir(parents=True)
         source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
@@ -211,8 +228,10 @@ class WikiPublishTests(unittest.TestCase):
 
     def test_publish_rejects_digest_mismatch_after_reviewer_step(self) -> None:
         runner = FakeRunner()
-        source_root = Path(tempfile.mkdtemp())
-        runtime_root = source_root.parent / f"{source_root.name}-runtime"
+        temp_root = registered_temporary_directory(self)
+        source_root = temp_root / "source"
+        source_root.mkdir()
+        runtime_root = temp_root / "runtime"
         wiki_root = runtime_root / "wiki"
         wiki_root.mkdir(parents=True)
         source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
@@ -247,8 +266,10 @@ class WikiPublishTests(unittest.TestCase):
 
     def test_publish_requires_exact_default_branch_push_and_readback(self) -> None:
         runner = FakeRunner()
-        source_root = Path(tempfile.mkdtemp())
-        runtime_root = source_root.parent / f"{source_root.name}-runtime"
+        temp_root = registered_temporary_directory(self)
+        source_root = temp_root / "source"
+        source_root.mkdir()
+        runtime_root = temp_root / "runtime"
         wiki_root = runtime_root / "wiki"
         wiki_root.mkdir(parents=True)
         source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
@@ -290,8 +311,10 @@ class WikiPublishTests(unittest.TestCase):
 
     def test_prepare_uses_supplied_wiki_root_including_untracked_pages_and_no_clone(self) -> None:
         runner = FakeRunner()
-        source_root = Path(tempfile.mkdtemp())
-        runtime_root = source_root.parent / f"{source_root.name}-runtime"
+        temp_root = registered_temporary_directory(self)
+        source_root = temp_root / "source"
+        source_root.mkdir()
+        runtime_root = temp_root / "runtime"
         wiki_root = runtime_root / "wiki"
         wiki_root.mkdir(parents=True)
 

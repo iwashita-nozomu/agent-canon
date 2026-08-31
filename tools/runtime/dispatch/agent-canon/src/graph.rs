@@ -222,7 +222,9 @@ impl GraphStaging {
             .create_new(true)
             .open(&database)
         {
-            let _ = fs::remove_dir(&root);
+            if let Err(cleanup_error) = fs::remove_dir(&root) {
+                report_cleanup_failure(&root, &cleanup_error);
+            }
             return Err(GraphError::Io(error.to_string()));
         }
         let staging = Self { root, database };
@@ -247,7 +249,9 @@ impl GraphStaging {
 
 impl Drop for GraphStaging {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
+        if let Err(error) = fs::remove_dir_all(&self.root) {
+            report_cleanup_failure(&self.root, &error);
+        }
     }
 }
 
@@ -272,9 +276,20 @@ impl PublicationTemp {
 impl Drop for PublicationTemp {
     fn drop(&mut self) {
         if self.armed {
-            let _ = fs::remove_file(&self.path);
+            if let Err(error) = fs::remove_file(&self.path) {
+                report_cleanup_failure(&self.path, &error);
+            }
         }
     }
+}
+
+fn report_cleanup_failure(path: &Path, error: &std::io::Error) {
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(
+        stderr,
+        "graph cleanup failed for {}: {error}",
+        path.display()
+    );
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -3409,6 +3424,7 @@ mod tests {
 
     struct GraphFixture {
         root: PathBuf,
+        runtime_root: PathBuf,
         target: PathBuf,
         artifact: PathBuf,
         artifact_value: Value,
@@ -3419,9 +3435,50 @@ mod tests {
         base_oid: String,
     }
 
+    struct GraphFixtureSetupGuard {
+        root: PathBuf,
+        runtime_root: Option<PathBuf>,
+        disarmed: bool,
+    }
+
+    impl GraphFixtureSetupGuard {
+        fn new(root: PathBuf) -> Self {
+            Self {
+                root,
+                runtime_root: None,
+                disarmed: false,
+            }
+        }
+
+        fn disarm(&mut self) {
+            self.disarmed = true;
+        }
+    }
+
+    impl Drop for GraphFixtureSetupGuard {
+        fn drop(&mut self) {
+            if self.disarmed {
+                return;
+            }
+            if let Some(runtime_root) = &self.runtime_root {
+                if let Err(error) = fs::remove_dir_all(runtime_root) {
+                    report_cleanup_failure(runtime_root, &error);
+                }
+            }
+            if let Err(error) = fs::remove_dir_all(&self.root) {
+                report_cleanup_failure(&self.root, &error);
+            }
+        }
+    }
+
     impl Drop for GraphFixture {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.root);
+            if let Err(error) = fs::remove_dir_all(&self.runtime_root) {
+                report_cleanup_failure(&self.runtime_root, &error);
+            }
+            if let Err(error) = fs::remove_dir_all(&self.root) {
+                report_cleanup_failure(&self.root, &error);
+            }
         }
     }
 
@@ -3535,17 +3592,31 @@ mod tests {
         }
     }
 
+    fn unique_graph_fixture_root() -> PathBuf {
+        loop {
+            let counter = FIXTURE_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos();
+            let root = std::env::temp_dir().join(format!(
+                "agent-canon-graph-{}-{counter}-{nanos}",
+                std::process::id()
+            ));
+            match fs::create_dir(&root) {
+                Ok(()) => return root,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("create graph fixture {}: {error}", root.display()),
+            }
+        }
+    }
+
     fn graph_fixture() -> GraphFixture {
-        let counter = FIXTURE_COUNTER.fetch_add(1, Ordering::SeqCst);
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "agent-canon-graph-{}-{counter}-{nanos}",
-            std::process::id()
-        ));
-        fs::create_dir_all(root.join("src")).expect("fixture root");
+        let root = unique_graph_fixture_root();
+        let mut setup_guard = GraphFixtureSetupGuard::new(root.clone());
+        fs::create_dir(root.join("src")).expect("fixture root");
+        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        setup_guard.runtime_root = Some(runtime_root.clone());
         fixture_git(&root, &["init", "-q"]);
         materialize_standalone_surface_manifest(&root);
         fixture_git(&root, &["config", "user.email", "test@example.invalid"]);
@@ -3730,8 +3801,9 @@ mod tests {
             attempt_id
         ));
         fs::write(&receipt, &receipt_bytes).expect("receipt");
-        GraphFixture {
+        let fixture = GraphFixture {
             root,
+            runtime_root,
             target,
             artifact: artifact_target,
             artifact_value,
@@ -3740,7 +3812,9 @@ mod tests {
             receipt_value,
             receipt_bytes,
             base_oid,
-        }
+        };
+        setup_guard.disarm();
+        fixture
     }
 
     fn graph_args(root: &Path) -> GraphArgs {
@@ -3771,6 +3845,19 @@ mod tests {
 
     fn test_graph_db(root: &Path) -> PathBuf {
         test_graph_root(root).join("graph.sqlite")
+    }
+
+    #[test]
+    fn graph_fixture_drop_removes_source_and_external_runtime_root() {
+        let (root, runtime_root) = {
+            let fixture = graph_fixture();
+            assert!(fixture.root.is_dir());
+            assert!(fixture.runtime_root.is_dir());
+            (fixture.root.clone(), fixture.runtime_root.clone())
+        };
+
+        assert!(!root.exists());
+        assert!(!runtime_root.exists());
     }
 
     #[test]

@@ -33,10 +33,17 @@ use super::storage::{
     persist_natural_relations, provider_dimensions, temporary_db_identity, DiscourseRelationRow,
     NaturalRelationRow,
 };
+use crate::runtime_boundary::resolve_runtime_root_at;
 use serde_json::Value;
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::io::{ErrorKind, Write};
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[test]
 fn markdown_segmentation_emits_document_sections_and_blocks() {
@@ -308,7 +315,7 @@ fn candidate_commands_auto_resolve_provider_dimension() {
     assert!(!pairs.is_empty());
 
     let candidates = thin_docs(&ThinDocsArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         provider: "fixture-provider".to_string(),
         model: "fixture-model".to_string(),
@@ -546,7 +553,7 @@ fn sqlite_build_and_search_roundtrip() {
     assert_eq!(stats.files, 2);
     assert!(stats.nodes >= 4);
     let search_args = SearchArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         query: "latest submodule update workflow".to_string(),
         provider: DEFAULT_PROVIDER.to_string(),
@@ -594,7 +601,7 @@ fn context_pack_returns_bounded_evidence_cells() {
     .unwrap();
 
     let cells = context_pack(&ContextPackArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         query: "skill workflow responsibility".to_string(),
         provider: DEFAULT_PROVIDER.to_string(),
@@ -721,7 +728,7 @@ fn responsibility_tree_detects_missing_directory_coverage() {
     )
     .unwrap();
     let report = responsibility_tree(&ResponsibilityTreeArgs {
-        root,
+        root: root.to_path_buf(),
         includes: vec![PathBuf::from(".")],
         excludes: default_excludes(),
         db,
@@ -780,7 +787,7 @@ fn mismatched_search_dimension_returns_no_hits() {
     };
     build_index(&build_args).unwrap();
     let search_args = SearchArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         query: "semantic vector".to_string(),
         provider: DEFAULT_PROVIDER.to_string(),
@@ -820,7 +827,7 @@ fn search_skips_cached_nodes_for_deleted_paths() {
     fs::remove_file(stale_path).unwrap();
 
     let hits = search_index(&SearchArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         query: "deleted path phrase".to_string(),
         provider: DEFAULT_PROVIDER.to_string(),
@@ -865,7 +872,7 @@ fn merge_candidates_exclude_same_file_pairs_by_default() {
     };
     build_index(&build_args).unwrap();
     let args = SimilarArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -887,7 +894,7 @@ fn merge_candidates_exclude_same_file_pairs_by_default() {
 fn merge_candidates_stay_within_responsibility_bucket_on_full_repo_input() {
     let root = unique_temp_dir("semantic-index-merge-buckets");
     fs::create_dir_all(root.join("docs")).unwrap();
-    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir(root.join("src")).unwrap();
     let duplicate =
         "# Duplicate\nshared responsibility vector phrase\n\nshared responsibility vector phrase";
     fs::write(root.join("docs").join("one.md"), duplicate).unwrap();
@@ -908,7 +915,7 @@ fn merge_candidates_stay_within_responsibility_bucket_on_full_repo_input() {
     };
     build_index(&build_args).unwrap();
     let args = SimilarArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -990,7 +997,7 @@ fn responsibility_scope_bucket_tracks_manifest_surfaces() {
 fn similar_pairs_can_cross_responsibility_bucket_for_alignment_search() {
     let root = unique_temp_dir("semantic-index-similar-cross-bucket");
     fs::create_dir_all(root.join("docs")).unwrap();
-    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir(root.join("src")).unwrap();
     let duplicate = "# Alignment\nsame exact phrase for code and docs";
     fs::write(root.join("docs").join("alignment.md"), duplicate).unwrap();
     fs::write(root.join("src").join("alignment.py"), duplicate).unwrap();
@@ -1009,7 +1016,7 @@ fn similar_pairs_can_cross_responsibility_bucket_for_alignment_search() {
     };
     build_index(&build_args).unwrap();
     let args = SimilarArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -1088,7 +1095,7 @@ fn merge_candidates_skip_alignment_mirrors_and_eval_logs() {
     };
     build_index(&build_args).unwrap();
     let args = SimilarArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -1145,7 +1152,7 @@ fn merge_candidates_skip_tiny_heading_only_sections() {
     };
     build_index(&build_args).unwrap();
     let args = SimilarArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -1198,7 +1205,7 @@ fn thin_docs_reports_short_wrapper_from_vector_db() {
     })
     .unwrap();
     let candidates = thin_docs(&ThinDocsArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -1261,7 +1268,7 @@ fn thin_docs_marks_readme_wrappers_as_protected_entrypoints() {
     })
     .unwrap();
     let candidates = thin_docs(&ThinDocsArgs {
-        root,
+        root: root.to_path_buf(),
         db,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -1325,10 +1332,26 @@ fn default_db_path_uses_test_runtime_and_stays_outside_repo() {
 }
 
 #[test]
+fn unique_temp_dir_removes_source_and_test_runtime_roots_on_drop() {
+    let (root, runtime_root) = {
+        let fixture = unique_temp_dir("semantic-index-cleanup");
+        let root = fixture.to_path_buf();
+        let runtime_root = resolve_runtime_root_at(&fixture, None).expect("test runtime root");
+        assert!(root.is_dir());
+        assert!(runtime_root.is_dir());
+        (root, runtime_root)
+    };
+
+    assert!(!root.exists());
+    assert!(!runtime_root.exists());
+}
+
+#[test]
 fn eval_fixture_reports_pass() {
-    let fixture = unique_temp_dir("semantic-index-eval");
+    let mut fixture = unique_temp_dir("semantic-index-eval");
     let input = fixture.join("input").join("docs");
     fs::create_dir_all(&input).unwrap();
+    fixture.track_runtime_root(&fixture.join("input"));
     fs::write(
         input.join("agent_update.md"),
         "# Agent update\nAgentCanon latest submodule pin workflow",
@@ -1397,9 +1420,10 @@ fn eval_fixture_reports_pass() {
 
 #[test]
 fn eval_run_returns_nonzero_when_quality_fails() {
-    let fixture = unique_temp_dir("semantic-index-failing-eval");
+    let mut fixture = unique_temp_dir("semantic-index-failing-eval");
     let input = fixture.join("input").join("docs");
     fs::create_dir_all(&input).unwrap();
+    fixture.track_runtime_root(&fixture.join("input"));
     fs::write(input.join("only.md"), "# Only\nunrelated text").unwrap();
     fs::write(
         fixture.join("expected.json"),
@@ -1429,9 +1453,10 @@ fn eval_run_returns_nonzero_when_quality_fails() {
 
 #[test]
 fn eval_missing_must_not_path_fails() {
-    let fixture = unique_temp_dir("semantic-index-missing-path");
+    let mut fixture = unique_temp_dir("semantic-index-missing-path");
     let input = fixture.join("input").join("docs");
     fs::create_dir_all(&input).unwrap();
+    fixture.track_runtime_root(&fixture.join("input"));
     fs::write(input.join("one.md"), "# One\nsemantic content").unwrap();
     fs::write(
         fixture.join("expected.json"),
@@ -1563,7 +1588,7 @@ fn absolute_include_outside_root_is_rejected() {
     fs::write(outside.join("outside.md"), "# Outside\nexternal").unwrap();
     let args = BuildArgs {
         root: root.clone(),
-        includes: vec![outside],
+        includes: vec![outside.to_path_buf()],
         excludes: default_excludes(),
         db: root.join("index.sqlite"),
         provider: DEFAULT_PROVIDER.to_string(),
@@ -1577,12 +1602,74 @@ fn absolute_include_outside_root_is_rejected() {
     assert!(error.contains("outside --root"));
 }
 
-fn unique_temp_dir(prefix: &str) -> PathBuf {
-    let path = env::temp_dir().join(format!(
-        "{prefix}-{}-{}",
-        std::process::id(),
-        temporary_db_identity()
-    ));
-    fs::create_dir_all(&path).unwrap();
-    path
+struct TempDirGuard {
+    path: PathBuf,
+    runtime_roots: Vec<PathBuf>,
+}
+
+impl Deref for TempDirGuard {
+    type Target = PathBuf;
+
+    fn deref(&self) -> &Self::Target {
+        &self.path
+    }
+}
+
+impl AsRef<Path> for TempDirGuard {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl TempDirGuard {
+    fn track_runtime_root(&mut self, source_root: &Path) {
+        self.runtime_roots
+            .push(resolve_runtime_root_at(source_root, None).expect("test runtime root"));
+    }
+}
+
+impl Drop for TempDirGuard {
+    fn drop(&mut self) {
+        for runtime_root in &self.runtime_roots {
+            if let Err(error) = fs::remove_dir_all(runtime_root) {
+                report_cleanup_failure(runtime_root, &error);
+            }
+        }
+        if let Err(error) = fs::remove_dir_all(&self.path) {
+            report_cleanup_failure(&self.path, &error);
+        }
+    }
+}
+
+fn unique_temp_dir(prefix: &str) -> TempDirGuard {
+    let path = loop {
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before Unix epoch")
+            .as_nanos();
+        let candidate =
+            env::temp_dir().join(format!("{prefix}-{}-{nanos}-{counter}", std::process::id(),));
+        match fs::create_dir(&candidate) {
+            Ok(()) => break candidate,
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!("create test fixture {}: {error}", candidate.display()),
+        }
+    };
+    let mut guard = TempDirGuard {
+        runtime_roots: Vec::new(),
+        path,
+    };
+    let source_root = guard.path.clone();
+    guard.track_runtime_root(&source_root);
+    guard
+}
+
+fn report_cleanup_failure(path: &Path, error: &std::io::Error) {
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(
+        stderr,
+        "semantic-index test cleanup failed for {}: {error}",
+        path.display()
+    );
 }
