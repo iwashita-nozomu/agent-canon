@@ -88,10 +88,9 @@ RUN set -eux; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       curl \
-      gnupg \
       build-essential \
-      ninja-build \
-      pipx
+      pipx; \
+    rm -rf /var/lib/apt/lists/*
 
 # Node/npm/corepack are builder-only package-management capabilities.
 COPY --from=node-provider /usr/local/bin/node /usr/local/bin/node
@@ -132,9 +131,12 @@ ENV CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
     AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies \
     PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
 
-RUN python3 /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py \
+RUN set -eux; \
+    apt-get update; \
+    python3 /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py \
       image-install --workspace /opt/agent-canon \
       --manifest /opt/agent-canon/bootstrap/container/image/dependencies.toml \
+      --records pipx pyright-language-server bash-language-server jq tree rust-toolchain check-jsonschema yamllint agent-canon-cli \
       --final-binary-dir /usr/local/bin --format text \
     && test -x /usr/local/bin/agent-canon \
     && test -d /usr/local/share/agent-canon/toolchains/cargo \
@@ -152,7 +154,8 @@ RUN python3 /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py \
     && test ! -e /opt/agent-canon \
     && test ! -e "$AGENT_CANON_CARGO_TARGET_DIR" \
     && test ! -e "$CARGO_HOME/registry" \
-    && test ! -e "$CARGO_HOME/git"
+    && test ! -e "$CARGO_HOME/git" \
+    && rm -rf /var/lib/apt/lists/*
 
 # Final runtime inherits the already-clean retained system closure.
 FROM runtime-base AS runtime
@@ -225,7 +228,6 @@ RUN set -eux; \
     python3 -c 'import packaging, tomli, yaml'; \
     test -f /usr/local/share/agent-canon/image-dependencies/plan.json; \
     test -f /usr/local/share/agent-canon/image-dependencies/receipts/agent-canon-cli.json; \
-    test -f /usr/local/share/agent-canon/image-dependencies/receipts/clangd-language-server.json; \
     test -f /usr/local/share/agent-canon/image-dependencies/receipts/rust-toolchain.json; \
     test ! -e /usr/local/share/agent-canon/toolchains/cargo-target; \
     test ! -e /usr/local/share/agent-canon/toolchains/cargo/registry; \

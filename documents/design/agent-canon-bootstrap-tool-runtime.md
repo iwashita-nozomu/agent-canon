@@ -206,8 +206,8 @@ Compose、workspace lifecycle は移植せず、旧developer-container surface�
 Image は `node-provider -> runtime-base -> builder -> runtime` の四段構成です。
 runtime-base は retained system closure と exact clangd を一度だけ導入し、key/source/
 apt lists と transient installer を同じ layer で削除します。builder はそこへ
-`build-essential`、`curl`、`gnupg`、`ninja`、pipx、npm/corepack、`rustup-init` と
-Cargo build を一時的に加え、そこから生成した dependency plan / receipts、AgentCanon
+`build-essential`、`curl`、pipx、npm/corepack、`rustup-init` と Cargo build を一時的に
+加え、そこから生成した dependency plan / receipts、AgentCanon
 binary、full Rust components、pipx venvs、Node LSP assets のみを final runtime へ
 コピーします。system `pip` は不要です。Cargo target/registry/git cache、npm/npx/corepack、
 rustup-init は runtime に持ち込みません。cache mount は使用しません。
