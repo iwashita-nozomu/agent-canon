@@ -383,6 +383,12 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:1] == ["pull"]:
         ref = argv[-1]
+        previous = state["images"].get(ref)
+        if previous is not None:
+            state["images"][f"untagged:{previous['Id']}"] = {
+                **previous,
+                "RepoTags": [],
+            }
         image_number = int(state.get("next_image", 1))
         state["next_image"] = image_number + 1
         image_id = f"sha256:{image_number:064x}"

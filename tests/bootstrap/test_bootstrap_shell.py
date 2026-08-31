@@ -3716,12 +3716,12 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     assert replacement["HostConfig"]["CapDrop"] == security["cap_drop"]
     assert replacement["HostConfig"]["SecurityOpt"] == security["security_opt"]
     calls = calls_path.read_text(encoding="utf-8").splitlines()
-    build_index = next(index for index, call in enumerate(calls) if call.startswith("build\t"))
+    pull_index = next(index for index, call in enumerate(calls) if call.startswith("pull\t"))
     stop_index = next(index for index, call in enumerate(calls) if call.startswith("stop\t"))
     if operation == "install":
-        assert stop_index < build_index
+        assert stop_index < pull_index
     else:
-        assert build_index < stop_index
+        assert pull_index < stop_index
     assert resident["id"] in calls[stop_index]
     assert any(old_image_id in call for call in calls if call.startswith("tag\t"))
     if operation == "install":
