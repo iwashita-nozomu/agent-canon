@@ -69,8 +69,8 @@ def test_container_definition_has_only_expected_files() -> None:
 
 def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    assert "FROM node:22.14.0-bullseye-slim@sha256:" in text
-    assert "FROM ubuntu:22.04@sha256:" in text
+    assert "FROM node:" not in text
+    assert "FROM ubuntu:24.04@sha256:" in text
     assert "AGENT_CANON_RUNTIME_UID" not in text
     assert "AGENT_CANON_RUNTIME_GID" not in text
     assert "USER agentcanon" not in text
@@ -78,115 +78,35 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert 'CMD ["resident"]' in text
     assert "rootless" not in text.lower()
     digests = re.findall(r"@sha256:([0-9a-f]{64})(?:\s|$)", text, re.MULTILINE)
-    assert len(digests) == 2
-    assert (
-        text.index("AS node-provider")
-        < text.index("AS runtime-base")
-        < text.index("AS builder")
-        < text.index("FROM runtime-base AS runtime")
-    )
-    assert text.count("FROM runtime-base AS ") == 2
-    assert "--mount=type=cache" not in text
-    assert "FROM ubuntu:22.04@sha256:" in text[text.rfind("FROM ubuntu") :]
-    assert "--manifest /opt/agent-canon/bootstrap/container/image/dependencies.toml" in text
-    assert "COPY bootstrap/container/image/dependencies.toml" in text
-    assert "COPY tools /usr/local/share/agent-canon/runtime/tools" in text
-    assert "skill_shim_materializer.py" in text
+    assert len(digests) == 1
+    assert "--mount=type=bind,source=.,target=/src,readonly" in text
+    assert text.count("apt-get update") == 1
+    assert "nodejs" in text and "npm" in text
+    assert "apt-get purge" in text
     assert "materialize --root /usr/local/share/agent-canon/runtime --all --image-build" in text
-    assert "COPY .codex/personal/skills" not in text
-    assert "COPY .codex/agents /usr/local/share/agent-canon/runtime/.codex/agents" in text
-    assert "COPY eval/definitions /usr/local/share/agent-canon/runtime/eval/definitions" in text
-    assert "COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/" in text
-    assert "COPY agents /usr/local/share/agent-canon/runtime/agents" in text
-    assert "COPY schemas /usr/local/share/agent-canon/runtime/schemas" in text
-    assert "PIPX_HOME=/usr/local/share/agent-canon/pipx" in text
-    assert "PIPX_BIN_DIR=/usr/local/bin" in text
-    assert "command -v yamllint" in text
-    assert "command -v check-jsonschema" in text
-    materializer_offset = text.index("skill_shim_materializer.py")
-    assert text.index("command -v yamllint") < materializer_offset
-    assert text.index("command -v check-jsonschema") < materializer_offset
-    assert "runtime/schemas/agent-canon/skill-catalog.schema.json" in text
-    assert "tools/catalog.yaml" in text
-    assert "tools/runtime/dispatch/tool_dispatch.py" in text
-    assert (
-        "COPY tools/runtime/dispatch/agent-canon "
-        "/opt/agent-canon/tools/runtime/dispatch/agent-canon"
-    ) in text
-    assert "COPY bootstrap/container/dispatch/tool-wrapper.sh" in text
-    assert "COPY bootstrap/container/lifecycle/entrypoint.sh" in text
+    assert "test -x" not in text
+    assert "command -v" not in text
+    assert "HEALTHCHECK" in text
+    assert "COPY --from=" not in text
     assert "/.devcontainer/" not in text
 
 
 def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    assert "COPY --from=builder /usr/local/bin/node /usr/local/bin/node" in text
-    assert "/usr/local/lib/node_modules/pyright" in text
-    assert "/usr/local/lib/node_modules/bash-language-server" in text
-    assert "/usr/local/bin/pyright" in text
-    assert "/usr/local/bin/pyright-langserver" in text
-    assert "/usr/local/bin/bash-language-server" in text
-    assert "ln -sfn ../lib/node_modules/pyright/index.js /usr/local/bin/pyright" in text
-    assert "ln -sfn ../lib/node_modules/pyright/langserver.index.js /usr/local/bin/pyright-langserver" in text
-    assert "ln -sfn ../lib/node_modules/bash-language-server/out/cli.js /usr/local/bin/bash-language-server" in text
-    assert "COPY --from=builder /usr/local/bin/pyright" not in text
-    assert "COPY --from=builder /usr/local/bin/pyright-langserver" not in text
-    assert "COPY --from=builder /usr/local/bin/bash-language-server" not in text
-    assert "/usr/local/share/agent-canon/pipx/venvs/check-jsonschema" in text
-    assert "/usr/local/share/agent-canon/pipx/venvs/yamllint" in text
-    assert "/usr/local/share/agent-canon/toolchains/cargo/bin" in text
-    assert "/usr/local/share/agent-canon/toolchains/rustup" in text
     assert "/usr/local/share/agent-canon/image-dependencies" in text
-    assert "COPY --from=builder /usr/local/bin/npm" not in text
-    assert "COPY --from=builder /usr/local/bin/npx" not in text
-    assert "COPY --from=builder /usr/local/bin/corepack" not in text
-    assert "test -x /usr/local/bin/pyright-langserver" in text
-    assert 'langserver="$(readlink -f /usr/local/bin/pyright-langserver)"' in text
-    assert 'node --check "$langserver"' in text
-    assert "pyright-langserver --version" not in text
+    assert "/usr/local/share/agent-canon/toolchains/cargo" in text
+    assert "rustfmt" not in text
+    assert "clippy" not in text
 
 
 def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    runtime_base = text[text.index("FROM ubuntu:22.04"): text.index("FROM runtime-base AS builder")]
-    runtime = text[text.index("FROM runtime-base AS runtime") :]
-    for marker in (
-        "clangd-18 --version",
-        "sha256sum --check --strict",
-        "6084F3CF814B57C1CF12EFD515CF4D18AF4F7421",
-        "clangd-language-server.gpg",
-        "clangd-language-server.list",
-        "apt-get purge -y --auto-remove curl gnupg",
-    ):
-        assert marker in runtime_base
-    for marker in (
-        "! command -v pytest",
-        "! command -v pip",
-        "! command -v ninja",
-        "! command -v curl",
-        "! command -v gpg",
-        "! command -v pipx",
-        "test ! -e /usr/bin/pipx",
-        "test ! -d /usr/lib/python3/dist-packages/pipx",
-        "! command -v clang-format",
-    ):
-        assert marker in runtime
-    assert "python3-pytest" not in runtime
-    assert "python3-pip" not in runtime
-    assert "build-essential" not in runtime
-    builder = text[text.index("FROM runtime-base AS builder") : text.index("FROM runtime-base AS runtime")]
-    assert "pipx" in builder
-    assert "python3-pip" not in builder
-    assert "gnupg" not in builder
-    assert "ninja-build" not in builder
-    assert "apt-get update" in builder
-    assert "--records pipx pyright-language-server bash-language-server jq tree clangd-language-server rust-toolchain check-jsonschema yamllint agent-canon-cli" in builder
-    assert "test -f /usr/local/share/agent-canon/image-dependencies/receipts/clangd-language-server.json" in builder
-    assert "clangd-language-server.json" in runtime
-    assert "pipx" not in runtime_base
-    assert "python3-pip" not in runtime_base
-    assert text.count("printf 'deb [arch=%s") == 1
-    assert text.count("clangd-18 --version") == 1
+    assert "clangd-18" in text
+    assert "apt-get purge -y --auto-remove npm pipx build-essential curl" in text
+    assert "python3.12" in text
+    assert "nodejs" in text and "npm" in text
+    assert "test -x" not in text
+    assert "command -v" not in text
 
 
 def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
@@ -198,8 +118,6 @@ def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
     assert "printf 'agent-canon-tool-container/v1\\n'" in text
     assert "printf 'agent-canon-runtime/v1\\n'" in text
     assert "chmod 0444" in text
-    assert "stat -c '%a:%u:%g'" in text
-    assert "444:0:0" in text
     assert "AGENT_CANON_IMAGE_ROOT=/usr/local/share/agent-canon" in text
     assert "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies" in text
     assert "AGENT_CANON_RUNTIME_TOOLS_ROOT=/usr/local/share/agent-canon/runtime" in text
@@ -268,7 +186,7 @@ def test_dockerfile_does_not_pull_project_or_host_tooling() -> None:
         "project_gid",
     ):
         assert forbidden not in text
-    assert "      git \\" in text
+    assert " git " in text
 
 
 def test_entrypoint_is_executable_and_has_strict_health_dispatch() -> None:
@@ -354,23 +272,24 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     cli = next(record for record in records if record["id"] == "agent-canon-cli")
     assert cli["source_identity"] == "canonical-snapshot"
     assert cli["locked"] is True
-    assert len(cli["source_tree_sha256"]) == 64
+    assert "source_tree_sha256" not in cli
     assert len(cli["cargo_lock_sha256"]) == 64
     source_digest, lock_digest = Installer._cargo_snapshot(
         ROOT / "tools/runtime/dispatch/agent-canon"
     )
-    assert cli["source_tree_sha256"] == source_digest
+    assert len(source_digest) == 64
     assert cli["cargo_lock_sha256"] == lock_digest
     assert cli["source"] == "tools/runtime/dispatch/agent-canon"
     assert all("project" not in str(record).lower() for record in records)
     clangd = next(record for record in records if record["id"] == "clangd-language-server")
     assert clangd["method"] == "apt-package"
     assert clangd["package"] == "clangd-18"
-    assert clangd["source"] == "https://apt.llvm.org/jammy/"
+    assert clangd["source"] == "ubuntu:24.04"
     assert clangd["executable_owner_packages"] == ["clangd-18"]
     assert clangd["verification"]["kind"] == "apt-package"
     assert not any(key.startswith("repository_") for key in clangd)
-    assert 'Path(spec.command[0]).name == "clangd"' in DOCKERFILE.read_text(encoding="utf-8")
+    rust = next(record for record in records if record["id"] == "rust-toolchain")
+    assert rust["components"] == ["rust-src", "rust-analyzer"]
 
 
 def test_single_repository_dockerignore_is_deny_by_default() -> None:

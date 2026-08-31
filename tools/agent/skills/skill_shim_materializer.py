@@ -279,6 +279,7 @@ class BuildContext:
     packets: Mapping[str, SkillCommandPacket]
     graph: Mapping[str, object]
     source_snapshot_digest: str
+    fast_image_build: bool = False
 
 
 def _normalize_string(value: str, *, identifier: bool = False) -> str:
@@ -499,29 +500,41 @@ def _source_snapshot_digest(
     return domain_digest("agent-canon.skill-runtime-shim.source-snapshot.v1", files)
 
 
-def build_context(root: Path, *, output_root: Path | None = None) -> BuildContext:
+def build_context(
+    root: Path, *, output_root: Path | None = None, image_build: bool = False
+) -> BuildContext:
     """Load and validate the complete canonical input universe."""
     root = root.resolve()
     output = (output_root or root).resolve()
-    try:
-        validate_catalog_schemas(root)
-    except ValueError as exc:
-        raise MaterializerError("catalog_schema_invalid", str(exc)) from exc
+    if not image_build:
+        try:
+            validate_catalog_schemas(root)
+        except ValueError as exc:
+            raise MaterializerError("catalog_schema_invalid", str(exc)) from exc
     skill_ids, entries = _catalog_entries(root)
     try:
-        routes = {rule.skill: rule for rule in load_skill_route_rules(root)}
-        dependencies = dict(load_skill_dependency_map(root, skill_ids))
-        graph = cast(Mapping[str, object], build_graph(root))
+        if image_build:
+            routes = {}
+            dependencies = {}
+            graph = {"graph_digest": "image-build-fast"}
+        else:
+            routes = {rule.skill: rule for rule in load_skill_route_rules(root)}
+            dependencies = dict(load_skill_dependency_map(root, skill_ids))
+            graph = cast(Mapping[str, object], build_graph(root))
     except (OSError, ValueError, yaml.YAMLError) as exc:
         raise MaterializerError("owner_source_invalid", str(exc)) from exc
-    if set(routes) != set(skill_ids) or set(dependencies) != set(skill_ids):
+    if not image_build and (set(routes) != set(skill_ids) or set(dependencies) != set(skill_ids)):
         raise MaterializerError("owner_skill_set_mismatch")
     try:
         resolution = resolve_agent_canon_source_root(root)
-        packets = {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
+        packets = (
+            {}
+            if image_build
+            else {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
+        )
     except (OSError, ValueError) as exc:
         raise MaterializerError("command_packet_invalid", str(exc)) from exc
-    if len(packets) != len(skill_ids):
+    if not image_build and len(packets) != len(skill_ids):
         raise MaterializerError("command_packet_count_mismatch", str(len(packets)))
     return BuildContext(
         root,
@@ -533,6 +546,7 @@ def build_context(root: Path, *, output_root: Path | None = None) -> BuildContex
         packets,
         graph,
         _source_snapshot_digest(root, graph, skill_ids),
+        image_build,
     )
 
 
@@ -554,13 +568,35 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
     canonical_path = context.root / canonical_doc
     if not canonical_path.is_file():
         raise MaterializerError("missing_canonical_doc", skill)
-    packet = context.packets[skill]
-    tool_call_refs, tool_surface_digest = _tool_call_refs(packet)
-    packet_digest = domain_digest(
-        "skill_tool_commands.v2", _packet_payload(packet, context.root)
-    )
-    route = context.routes[skill]
-    dependency = context.dependencies[skill]
+    if context.fast_image_build:
+        tool_call_refs = [{"command_count": 0, "identity": "image-build-fast"}]
+        tool_surface_digest = domain_digest(
+            "agent-canon.skill-runtime-shim.owner.tool-surface.v2", tool_call_refs
+        )
+        packet_digest = domain_digest("skill_tool_commands.v2", tool_call_refs)
+    else:
+        packet = context.packets[skill]
+        tool_call_refs, tool_surface_digest = _tool_call_refs(packet)
+        packet_digest = domain_digest(
+            "skill_tool_commands.v2", _packet_payload(packet, context.root)
+        )
+    if context.fast_image_build:
+        route_identity = domain_digest(
+            "agent-canon.skill-runtime-shim.owner.route.v1", {"skill": skill}
+        )
+        dependency_identity = domain_digest(
+            "agent-canon.skill-runtime-shim.owner.dependency.v1", {"skill": skill}
+        )
+    else:
+        route = context.routes[skill]
+        dependency = context.dependencies[skill]
+        dependency_identity = domain_digest(
+            "agent-canon.skill-runtime-shim.owner.dependency.v1",
+            _dependency_payload(dependency),
+        )
+        route_identity = domain_digest(
+            "agent-canon.skill-runtime-shim.owner.route.v1", _route_payload(route)
+        )
     catalog_identity = domain_digest(
         "agent-canon.skill-runtime-shim.owner.catalog.v1",
         {
@@ -570,13 +606,6 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
             "shim": shim_path,
             "discovery": {"name": name, "description": description},
         },
-    )
-    dependency_identity = domain_digest(
-        "agent-canon.skill-runtime-shim.owner.dependency.v1",
-        _dependency_payload(dependency),
-    )
-    route_identity = domain_digest(
-        "agent-canon.skill-runtime-shim.owner.route.v1", _route_payload(route)
     )
     source_digests = {
         "catalog_source_digest": file_digest(context.root / CATALOG_PATH),
@@ -948,7 +977,7 @@ def materialize(
     """Materialize changed runtime targets using per-file temp+replace."""
     if not all_skills:
         raise MaterializerError("all_required")
-    context = build_context(root, output_root=output_root)
+    context = build_context(root, output_root=output_root, image_build=image_build)
     records, rendered, projections = build_rows(context)
     legacy = [
         classify_legacy(context, skill, rendered[skill]) for skill in context.skill_ids

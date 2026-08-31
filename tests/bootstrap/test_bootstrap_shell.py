@@ -92,12 +92,23 @@ def _run_forced_update_probe(
     calls = tmp_path / "docker.calls"
     replaced = tmp_path / "replaced"
     candidate_id = "sha256:" + "1" * 64
+    source_head = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     docker = tmp_path / "docker"
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
         f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then\n"
+        "  format=\"${4:-}\"\n"
+        "  if [[ \"$format\" == *'.Os'* ]]; then printf '%s\\n' linux; exit 0; fi\n"
+        "  if [[ \"$format\" == *'.Architecture'* ]]; then printf '%s\\n' amd64; exit 0; fi\n"
+        f"  if [[ \"$format\" == *'org.opencontainers.image.revision'* ]]; then printf '%s\\n' {source_head!r}; exit 0; fi\n"
+        "  if [[ \"$format\" == *'.RepoDigests'* ]]; then printf '%s\\n' ghcr.io/iwashita-nozomu/agent-canon@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; exit 0; fi\n"
         "  ref=\"${@: -1}\"\n"
         "  if [[ \"$ref\" == *rollback-* ]]; then\n"
         f"    [[ -f {str(marker)!r} ]] || exit 1\n    printf '%s\\n' {old_id!r}\n"
@@ -109,6 +120,7 @@ def _run_forced_update_probe(
         "if [[ \"$1\" == tag ]]; then\n"
         f"  touch {str(marker)!r}\n  exit {tag_result}\n"
         "fi\n"
+        "if [[ \"$1\" == pull ]]; then\n  exit 0\nfi\n"
         "if [[ \"$1\" == build ]]; then\n"
         f"  [[ -f {str(marker)!r} ]] || exit 91\n"
         f"  exit {build_result}\n"
@@ -127,11 +139,11 @@ AGENT_CANON_STATE_ROOT={str(state_root)!r}
 AGENT_CANON_PRIVATE_LOG_ROOT={str(private_log)!r}
 AGENT_CANON_DOCKER_CMD={str(docker)!r}
 AGENT_CANON_ALLOW_BUILD=1
-{f'AGENT_CANON_FORCE_BUILD={force_build}' if force_build is not None else ''}
+{f'AGENT_CANON_LOCAL_BUILD={force_build}' if force_build is not None else ''}
 export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
 export AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
 export AGENT_CANON_DOCKER_CMD AGENT_CANON_ALLOW_BUILD
-{f'export AGENT_CANON_FORCE_BUILD' if force_build is not None else ''}
+{f'export AGENT_CANON_LOCAL_BUILD' if force_build is not None else ''}
 _agent_canon_replace_resident_locked() {{
   printf '%s\\n' replaced > {str(replaced)!r}
   _agent_canon_commit_pending_rollback_plan
@@ -147,19 +159,20 @@ exit "$rc"
     return completed, calls, marker, old_id, candidate_id
 
 
-def test_same_source_update_reuses_exact_image_without_build(tmp_path: Path) -> None:
-    """A same-source update reuses its exact image reference by default."""
+def test_same_source_update_pulls_exact_oci_image_without_build(tmp_path: Path) -> None:
+    """A default update pulls its exact OCI image and never builds locally."""
     completed, calls, _marker, _old_id, _candidate_id = _run_forced_update_probe(
         tmp_path, build_result="0", force_build=None
     )
     assert completed.returncode == 0, completed.stderr
     operations = calls.read_text(encoding="utf-8").splitlines()
     assert any(operation.startswith("image inspect ") for operation in operations)
+    assert sum(operation.startswith("pull ") for operation in operations) == 1
     assert not any(operation.startswith("build ") for operation in operations)
 
 
-def test_explicit_force_build_rebuilds_same_source_image(tmp_path: Path) -> None:
-    """An explicit FORCE_BUILD request still enters the candidate build path."""
+def test_explicit_local_build_rebuilds_same_source_image(tmp_path: Path) -> None:
+    """An explicit local-build request enters the candidate build path only."""
     completed, calls, _marker, _old_id, _candidate_id = _run_forced_update_probe(
         tmp_path, build_result="0", force_build="1"
     )
@@ -168,10 +181,14 @@ def test_explicit_force_build_rebuilds_same_source_image(tmp_path: Path) -> None
         operation.startswith("build ")
         for operation in calls.read_text(encoding="utf-8").splitlines()
     ) == 1
+    assert not any(
+        operation.startswith("pull ")
+        for operation in calls.read_text(encoding="utf-8").splitlines()
+    )
 
 
-def test_forced_update_retains_same_reference_before_build(tmp_path: Path) -> None:
-    """The active immutable ID is tagged before a same-reference build."""
+def test_local_build_retains_same_reference_before_build(tmp_path: Path) -> None:
+    """The active immutable ID is tagged before an explicit local build."""
     completed, calls, marker, old_id, _candidate_id = _run_forced_update_probe(
         tmp_path, build_result="0"
     )
@@ -185,7 +202,7 @@ def test_forced_update_retains_same_reference_before_build(tmp_path: Path) -> No
     assert "rollback_plan_invalid" not in completed.stderr
 
 
-def test_forced_build_failure_preserves_previous_plan_and_active_image(
+def test_local_build_failure_preserves_previous_plan_and_active_image(
     tmp_path: Path,
 ) -> None:
     """A candidate build failure leaves the old resident metadata untouched."""
@@ -3699,12 +3716,12 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     assert replacement["HostConfig"]["CapDrop"] == security["cap_drop"]
     assert replacement["HostConfig"]["SecurityOpt"] == security["security_opt"]
     calls = calls_path.read_text(encoding="utf-8").splitlines()
-    build_index = next(index for index, call in enumerate(calls) if call.startswith("build\t"))
+    pull_index = next(index for index, call in enumerate(calls) if call.startswith("pull\t"))
     stop_index = next(index for index, call in enumerate(calls) if call.startswith("stop\t"))
     if operation == "install":
-        assert stop_index < build_index
+        assert stop_index < pull_index
     else:
-        assert build_index < stop_index
+        assert pull_index < stop_index
     assert resident["id"] in calls[stop_index]
     assert any(old_image_id in call for call in calls if call.startswith("tag\t"))
     if operation == "install":

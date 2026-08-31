@@ -100,8 +100,29 @@ jobs:
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=pr-${GITHUB_SHA}" \
-            --output type=cacheonly \
+            --load \
             .
+
+      - name: Smoke test native pull-request image
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          image="agent-canon-runtime:pr-${GITHUB_SHA}-${ARCH}"
+          docker run --rm --network none "$image" health
+          docker run --rm --entrypoint /bin/sh --network none "$image" -c '
+            set -eu
+            python3 --version
+            node --version
+            clangd-18 --version
+            python3 -c "import packaging, yaml"
+            python3 -c "from pathlib import Path; import sys; sys.path.insert(0, \"/usr/local/share/agent-canon/runtime\"); from tools.analysis.code.lsp_code_analysis import LspServerSpec; r=Path(\"/usr/local/share/agent-canon/image-dependencies/receipts\"); s=[LspServerSpec.for_language(x, root=Path(\"/workspace\"), receipts=r) for x in (\"c\",\"cpp\")]; assert len({x.record_id for x in s}) == 1"
+            jq -e ".schema and .receipts" /usr/local/share/agent-canon/image-dependencies/plan.json >/dev/null
+            ! command -v npm; ! command -v pip; ! command -v pipx; ! command -v ninja; ! command -v curl; ! command -v gpg
+            ! command -v rustfmt; ! command -v cargo-clippy
+            ! test -e /usr/local/share/agent-canon/toolchains/cargo-target
+            ! test -e /usr/local/share/agent-canon/toolchains/cargo/registry
+            ! test -e /usr/local/share/agent-canon/toolchains/cargo/git
+          '
 
       - name: Build and publish native architecture image
         if: github.event_name != 'pull_request'
@@ -122,6 +143,7 @@ jobs:
       - name: Remove temporary buildx builder and log out
         if: always()
         run: |
+          docker image rm --force "agent-canon-runtime:pr-${GITHUB_SHA}-${ARCH}" >/dev/null 2>&1 || true
           docker buildx rm --force "${BUILDER_NAME}" >/dev/null 2>&1 || true
           docker logout "${REGISTRY}" >/dev/null 2>&1 || true
 

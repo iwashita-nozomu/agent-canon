@@ -2151,53 +2151,69 @@ _agent_canon_image_reference() {
     export AGENT_CANON_IMAGE_REF
     return 0
   fi
-  local source_head manifest_digest control_digest
+  local source_head
   if ! source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD); then
     _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
     return 2
   fi
-  manifest_digest=$(_agent_canon_sha256 "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/host/manifest.toml")
-  control_digest=$(_agent_canon_control_digest)
-  AGENT_CANON_IMAGE_REF="agent-canon-tools:${control_digest:0:16}-${manifest_digest:0:16}-${source_head:0:16}"
+  AGENT_CANON_IMAGE_REF="ghcr.io/iwashita-nozomu/agent-canon:sha-${source_head}"
   export AGENT_CANON_IMAGE_REF
 }
 
 _agent_canon_image() {
   local requested_ref=${1:-}
   _agent_canon_image_reference "$requested_ref"
-  if [[ -n "$requested_ref" ]]; then
-    if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
-      _agent_canon_json_error candidate_image_build_failed "candidate image could not be pulled"
+  if [[ "${AGENT_CANON_LOCAL_BUILD:-0}" == 1 ]]; then
+    local control_digest source_head
+    source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD) || {
+      _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
       return 2
-    fi
-    return 0
-  fi
-  local control_digest source_head
-  if ! source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD); then
-    _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
-    return 2
-  fi
-  control_digest=$(_agent_canon_control_digest)
-  if "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 &&
-     [[ "${AGENT_CANON_FORCE_BUILD:-0}" != 1 ]]; then
-    return 0
-  fi
-  if [[ "${AGENT_CANON_ALLOW_BUILD:-0}" != 1 ]]; then
-    _agent_canon_json_error image_missing "AgentCanon tool image is not installed"
-    return 2
-  fi
-  if [[ "${AGENT_CANON_FORCE_BUILD:-0}" == 1 ]] || \
-     ! "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
+    }
+    control_digest=$(_agent_canon_control_digest)
     if ! "$AGENT_CANON_DOCKER_CMD" build \
       --file "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/Dockerfile" \
       --tag "$AGENT_CANON_IMAGE_REF" \
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$control_digest" \
-      --label "io.agent-canon.source-revision=$source_head" \
+      --label "org.opencontainers.image.revision=$source_head" \
       "$AGENT_CANON_REPOSITORY_ROOT"; then
       _agent_canon_json_error candidate_image_build_failed "candidate image build failed"
       return 2
     fi
+    return 0
+  fi
+  local image_preexisting=0 image_previous_id=
+  if "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
+    image_preexisting=1
+    image_previous_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
+  fi
+  if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
+    _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
+    return 2
+  fi
+  local source_head observed_os observed_arch observed_revision repo_digests expected_arch pulled_image_id
+  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD) || return 2
+  pulled_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
+  observed_os=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Os}}' "$AGENT_CANON_IMAGE_REF")
+  observed_arch=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Architecture}}' "$AGENT_CANON_IMAGE_REF")
+  observed_revision=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$AGENT_CANON_IMAGE_REF")
+  repo_digests=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{join .RepoDigests "\n"}}' "$AGENT_CANON_IMAGE_REF")
+  case "$(uname -m)" in
+    x86_64) expected_arch=amd64 ;;
+    aarch64|arm64) expected_arch=arm64 ;;
+    *) expected_arch=unsupported ;;
+  esac
+  if [[ "$observed_os" != linux || "$observed_arch" != "$expected_arch" ||
+        "$observed_revision" != "$source_head" || ! "$repo_digests" =~ @sha256:[0-9a-f]{64} ]]; then
+    if ((image_preexisting == 1)); then
+      "$AGENT_CANON_DOCKER_CMD" image tag "$image_previous_id" "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 || :
+      [[ "$pulled_image_id" != "$image_previous_id" ]] &&
+        "$AGENT_CANON_DOCKER_CMD" image rm "$pulled_image_id" >/dev/null 2>&1 || :
+    else
+      "$AGENT_CANON_DOCKER_CMD" image rm "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 || :
+    fi
+    _agent_canon_json_error candidate_image_validation_failed "pulled image OCI identity does not match source/platform/digest"
+    return 2
   fi
 }
 
@@ -4238,7 +4254,7 @@ bootstrap_host_entrypoint() {
   fi
   [[ -n "$AGENT_CANON_CONTROL_ROOT" ]] || _agent_canon_json_error control_root_required "--control-parent-root is required"
   [[ ${#command_args[@]} -gt 0 ]] || { _agent_canon_usage >&2; return 64; }
-  local operation=${command_args[0]} image_ref=
+  local operation=${command_args[0]} image_ref= local_build=0
   if [[ "$operation" == sync ]]; then
     local sync_request sync_request_rc
     if sync_request=$(_agent_canon_sync_request_metadata); then
@@ -4316,7 +4332,20 @@ bootstrap_host_entrypoint() {
     if [[ "${command_args[index]}" == --image-ref && $((index + 1)) -lt ${#command_args[@]} ]]; then
       image_ref=${command_args[index+1]}
     fi
+    if [[ "${command_args[index]}" == --local-build ]]; then
+      local_build=1
+    fi
   done
+  if ((local_build == 1 && operation != update)); then
+    _agent_canon_json_error local_build_update_only "--local-build is valid only for update"
+    return 2
+  fi
+  if ((local_build == 1)); then
+    AGENT_CANON_LOCAL_BUILD=1
+    export AGENT_CANON_LOCAL_BUILD
+  else
+    unset AGENT_CANON_LOCAL_BUILD
+  fi
   case "$operation" in
     gc)
       # Docker resource reconciliation is host-owned and serialized with

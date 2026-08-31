@@ -786,6 +786,24 @@ class DependencyModelTests(unittest.TestCase):
         self.assertTrue(dependency_module._image_record_is_safe(cargo))
         self.assertFalse(dependency_module._image_record_is_safe(active))
 
+    def test_canonical_snapshot_computes_source_digest_without_manifest_expectation(self) -> None:
+        """Canonical Cargo records require the lock digest; source digest is observed receipt data."""
+        cargo = parse_record(
+            record(
+                "agent-canon-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://github.com/example/agent-canon.git",
+                source_identity="canonical-snapshot",
+                cargo_lock_sha256="b" * 64,
+                locked=True,
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        self.assertIsNone(cargo.source_tree_sha256)
+        self.assertTrue(dependency_module._image_record_is_safe(cargo))
+
     def test_image_owned_full_plan_publishes_final_binary_only_for_cargo(self) -> None:
         """Image final-binary publication does not run for apt or Rust records."""
         apt = parse_record(
@@ -2597,11 +2615,13 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(
             ids,
             {
+                "pipx",
+                "check-jsonschema",
+                "yamllint",
                 "pyright-language-server",
                 "bash-language-server",
                 "jq",
                 "tree",
-                "clang-format",
                 "clangd-language-server",
                 "rust-toolchain",
                 "agent-canon-cli",
@@ -2633,8 +2653,7 @@ class DependencyModelTests(unittest.TestCase):
 
         self.assertTrue(apt_records)
         self.assertTrue(all(item.platform is None for item in apt_records))
-        self.assertTrue(all(item.source == "ubuntu:22.04" for item in apt_records))
-        self.assertFalse(any(item.source == "ubuntu:24.04" for item in apt_records))
+        self.assertTrue(all(item.source == "ubuntu:24.04" for item in apt_records))
 
     def test_install_identity_accepts_ubuntu22_multiarch(self) -> None:
         """The canonical install gate accepts both supported OCI variants."""
@@ -3682,16 +3701,16 @@ class DependencyModelTests(unittest.TestCase):
         )
         dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
         self.assertFalse((ROOT / ".devcontainer").exists())
-        self.assertIn("node:22.14.0-bullseye-slim@sha256:", dockerfile)
-        self.assertIn("COPY --from=node-provider /usr/local/lib/node_modules", dockerfile)
+        self.assertIn("FROM ubuntu:24.04@sha256:", dockerfile)
+        self.assertNotIn("FROM node:", dockerfile)
+        self.assertIn("--mount=type=bind,source=tools/runtime/dispatch/agent-canon", dockerfile)
         self.assertIn(
-            "COPY tools/repository/workspace/parent_root_side_effects.py "
-            "/opt/agent-canon/tools/repository/workspace/parent_root_side_effects.py",
+            "--mount=type=bind,source=tools/repository/workspace/parent_root_side_effects.py",
             dockerfile,
         )
         self.assertIn("!tools/repository/workspace/parent_root_side_effects.py", dockerignore)
         self.assertIn("dependency_plan.py", dockerfile)
-        self.assertIn("image-install --workspace /opt/agent-canon", dockerfile)
+        self.assertIn("image-install --workspace /src", dockerfile)
         self.assertIn(
             "CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo", dockerfile
         )
@@ -3699,12 +3718,12 @@ class DependencyModelTests(unittest.TestCase):
             "PATH=/usr/local/share/agent-canon/toolchains/cargo/bin", dockerfile
         )
         self.assertIn("--final-binary-dir /usr/local/bin", dockerfile)
-        self.assertIn("rm -rf /opt/agent-canon", dockerfile)
+        self.assertIn("rm -rf /var/lib/apt/lists/*", dockerfile)
         self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)
-        self.assertIn("python3-pip", dockerfile)
+        self.assertNotIn("python3-pip", dockerfile)
         self.assertIn("python3-packaging", dockerfile)
         self.assertIn("build-essential", dockerfile)
-        self.assertIn("ninja-build", dockerfile)
+        self.assertNotIn("ninja-build", dockerfile)
         self.assertNotIn("USER agentcanon", dockerfile)
         self.assertNotIn("AGENT_CANON_RUNTIME_UID", dockerfile)
         self.assertNotIn("AGENT_CANON_RUNTIME_GID", dockerfile)
