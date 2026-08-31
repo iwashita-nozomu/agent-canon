@@ -16,6 +16,7 @@
 !bootstrap/
 !bootstrap/container/
 !bootstrap/container/**
+!bootstrap/host/
 !bootstrap/host/manifest.toml
 !agents/
 !agents/**

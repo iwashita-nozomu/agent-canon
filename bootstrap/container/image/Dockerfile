@@ -79,7 +79,7 @@ RUN --mount=type=bind,source=.,target=/src,readonly \
     cp -a /src/agents /usr/local/share/agent-canon/runtime/; \
     cp -a /src/documents /usr/local/share/agent-canon/runtime/; \
     cp -a /src/schemas /usr/local/share/agent-canon/runtime/; \
-    install -d -m 0755 /usr/local/share/agent-canon/runtime/bootstrap; \
+    install -d -m 0755 /usr/local/share/agent-canon/runtime/bootstrap/host; \
     cp -a /src/bootstrap/host/manifest.toml /usr/local/share/agent-canon/runtime/bootstrap/host/manifest.toml; \
     cp -a /src/.codex /usr/local/share/agent-canon/runtime/; \
     cp -a /src/eval /usr/local/share/agent-canon/runtime/; \

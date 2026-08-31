@@ -2182,9 +2182,10 @@ _agent_canon_image() {
     fi
     return 0
   fi
-  local image_preexisting=0
+  local image_preexisting=0 image_previous_id=
   if "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
     image_preexisting=1
+    image_previous_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
   fi
   if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
     _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
@@ -2203,7 +2204,9 @@ _agent_canon_image() {
   esac
   if [[ "$observed_os" != linux || "$observed_arch" != "$expected_arch" ||
         "$observed_revision" != "$source_head" || ! "$repo_digests" =~ @sha256:[0-9a-f]{64} ]]; then
-    if ((image_preexisting == 0)); then
+    if ((image_preexisting == 1)); then
+      "$AGENT_CANON_DOCKER_CMD" image tag "$image_previous_id" "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 || :
+    else
       "$AGENT_CANON_DOCKER_CMD" image rm "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 || :
     fi
     _agent_canon_json_error candidate_image_validation_failed "pulled image OCI identity does not match source/platform/digest"

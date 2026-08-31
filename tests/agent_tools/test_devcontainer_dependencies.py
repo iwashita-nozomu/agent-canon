@@ -1929,6 +1929,7 @@ class DependencyModelTests(unittest.TestCase):
     def test_apt_executable_ownership_resolves_symlink_across_owner_union(self) -> None:
         parsed = parse_record(
             record(
+                "clang-format",
                 method="apt-package",
                 package="clang-format",
                 version="1.2.3",
