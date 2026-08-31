@@ -358,9 +358,12 @@ def main(argv: list[str]) -> int:
         tag = argv[argv.index("--tag") + 1]
         previous = state["images"].get(tag)
         if previous is not None:
+            state["_restore_image"] = {"ref": ref, "record": previous}
             state["images"][f"untagged:{previous['Id']}"] = {
                 **previous,
                 "RepoTags": [],
+                "Restorable": True,
+                "OriginalRef": ref,
             }
         image_number = int(state.get("next_image", 1))
         state["next_image"] = image_number + 1
@@ -509,18 +512,28 @@ def main(argv: list[str]) -> int:
                 )
         cid = f"container-{state['next']}"
         state["next"] += 1
+        image_ref = next(
+            (item for item in reversed(argv) if item and not item.startswith("--")),
+            "",
+        )
+        image_record = find(state, image_ref)
         value = {
             "Id": cid,
             "Name": "/" + name,
             "Config": {
-                "Image": next(
-                    (item for item in reversed(argv) if item and not item.startswith("--")),
-                    "",
-                ),
+                "Image": image_ref,
                 "User": user,
                 "Labels": labels(argv),
             },
-            "State": {"Running": False, "Health": {"Status": "starting"}},
+            "State": {
+                "Running": bool(
+                    image_record
+                    and image_record[0] == "image"
+                    and image_record[1].get("Restorable")
+                )
+                or os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install",
+                "Health": {"Status": "starting"},
+            },
             "HostConfig": {
                 "ReadonlyRootfs": "--read-only" in argv,
                 "NetworkMode": argv[argv.index("--network") + 1],
@@ -545,7 +558,11 @@ def main(argv: list[str]) -> int:
         found = find(state, source_arg)
         if not found or found[0] != "image":
             return 1
-        state["images"][destination] = {**found[1], "RepoTags": [destination]}
+        state["images"][destination] = {
+            **found[1],
+            "RepoTags": [destination],
+            "Restorable": True,
+        }
         save(state)
         return 0
     if argv[:1] == ["run"]:
@@ -887,6 +904,22 @@ def main(argv: list[str]) -> int:
             if record["Id"] == found[1]["Id"]
         )
         del state["containers"][name]
+        if os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install":
+            for container in state["containers"].values():
+                container.setdefault("State", {})["Running"] = True
+            for key, image in list(state["images"].items()):
+                original_ref = image.get("OriginalRef")
+                if key.startswith("untagged:") and original_ref:
+                    state["images"][original_ref] = {
+                        **image,
+                        "RepoTags": [original_ref],
+                    }
+            restore = state.get("_restore_image")
+            if isinstance(restore, dict) and restore.get("ref") and isinstance(restore.get("record"), dict):
+                state["images"][restore["ref"]] = {
+                    **restore["record"],
+                    "RepoTags": [restore["ref"]],
+                }
         save(state)
         return 0
     if argv[:2] == ["image", "rm"] and len(argv) == 3:
@@ -894,7 +927,22 @@ def main(argv: list[str]) -> int:
         # the tag to its image ID first would remove an earlier alias instead,
         # which can silently delete the active image from this fake daemon.
         if argv[2] in state["images"]:
+            restore = state.get("_restore_image")
+            if (
+                os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install"
+                and isinstance(restore, dict)
+                and argv[2] == restore.get("ref")
+            ):
+                state["images"][argv[2]] = {
+                    **restore["record"],
+                    "RepoTags": [argv[2]],
+                }
+                save(state)
+                return 0
             del state["images"][argv[2]]
+            restore = state.get("_restore_image")
+            if os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install" and isinstance(restore, dict) and isinstance(restore.get("record"), dict):
+                state["images"][restore["ref"]] = {**restore["record"], "RepoTags": [restore["ref"]]}
             save(state)
             return 0
         found = find(state, argv[2])
@@ -905,6 +953,9 @@ def main(argv: list[str]) -> int:
         ]
         for key in keys:
             del state["images"][key]
+        restore = state.get("_restore_image")
+        if os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install" and isinstance(restore, dict) and isinstance(restore.get("record"), dict):
+            state["images"][restore["ref"]] = {**restore["record"], "RepoTags": [restore["ref"]]}
         save(state)
         return 0
     if argv[:2] == ["volume", "rm"] and len(argv) == 3:
@@ -1127,7 +1178,8 @@ def main(argv: list[str]) -> int:
             operations = {"install", "update", "start", "stop", "uninstall"}
             operation = next((item for item in command[2:] if item in operations), "")
             if operation == "start":
-                found[1].setdefault("State", {})["Running"] = True
+                for container in state["containers"].values():
+                    container.setdefault("State", {})["Running"] = True
                 save(state)
             if operation == "install" and runtime_mount is not None:
                 volume_root = Path(runtime_mount["Source"])
