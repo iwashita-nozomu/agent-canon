@@ -2191,8 +2191,9 @@ _agent_canon_image() {
     _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
     return 2
   fi
-  local source_head observed_os observed_arch observed_revision repo_digests expected_arch
+  local source_head observed_os observed_arch observed_revision repo_digests expected_arch pulled_image_id
   source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD) || return 2
+  pulled_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
   observed_os=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Os}}' "$AGENT_CANON_IMAGE_REF")
   observed_arch=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Architecture}}' "$AGENT_CANON_IMAGE_REF")
   observed_revision=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$AGENT_CANON_IMAGE_REF")
@@ -2206,6 +2207,8 @@ _agent_canon_image() {
         "$observed_revision" != "$source_head" || ! "$repo_digests" =~ @sha256:[0-9a-f]{64} ]]; then
     if ((image_preexisting == 1)); then
       "$AGENT_CANON_DOCKER_CMD" image tag "$image_previous_id" "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 || :
+      [[ "$pulled_image_id" != "$image_previous_id" ]] &&
+        "$AGENT_CANON_DOCKER_CMD" image rm "$pulled_image_id" >/dev/null 2>&1 || :
     else
       "$AGENT_CANON_DOCKER_CMD" image rm "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 || :
     fi

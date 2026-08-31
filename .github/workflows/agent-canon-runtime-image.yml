@@ -108,6 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           image="agent-canon-runtime:pr-${GITHUB_SHA}-${ARCH}"
+          docker run --rm --network none "$image" health
           docker run --rm --entrypoint /bin/sh --network none "$image" -c '
             set -eu
             python3 --version
