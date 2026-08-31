@@ -233,6 +233,15 @@ responsibility gap がある場合だけ作ります。use-case 名だけの wra
 そこから evidence-linked に到達する consumer、effect、failure handling、cleanup、contract、docs、tests、
 validation で決めます。
 
+実装開始前に、implementation が導かれる complete target state を固定します。この target state は
+少なくとも `contract`、`responsibility/state/lifecycle`、`failure/recovery`、
+`compatibility/migration`、`cleanup`、`validation` を含みます。implementation sequencing や
+waves は、すでに定義された work の順序だけを決める仕組みであり、target state を後から完成させるための
+段階実装には使いません。したがって「最初の実装」や `initial implementation`、temporary API、
+placeholder route、required behavior の stub / no-op / hard-coded replacement、deferred-later completion
+は認めません。明示的に選択した小さい product scope は target state として扱えますが、その scope 内で
+同じ complete target state を閉じていなければなりません。
+
 同時に、次は scope に含めません。
 
 - selected owner / mechanism に到達しない repository cleanup
@@ -407,7 +416,7 @@ review finding は、具体的な contract / invariant / owner / dependency / fa
 | SEP-06 | KISS の総 semantic surface |
 | SEP-07 | YAGNI と speculative mechanism |
 | SEP-08 | DRY と abstraction admission |
-| SEP-09 | evidence-bounded complete owning unit |
+| SEP-09 | complete target state、evidence-bounded complete owning unit、sequencing-only waves |
 | SEP-10 | compatibility と migration closure |
 | SEP-11 | testability と validation selection |
 | SEP-12 | determinism、idempotency、reproducibility |

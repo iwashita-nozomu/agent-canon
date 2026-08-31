@@ -430,6 +430,7 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 - 各 must-do clause と completion-evidence clause が、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応している
 - request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
+- SEP-09 の complete target state は実装開始前に固定され、implementation sequencing / waves はその work の順序だけを担っている。未完了の target を段階実装として completion に昇格しない
 - LCPが選択された場合は、[`agent-orchestration.md#Local Capability Priority`](../skills/agent-orchestration.md#local-capability-priority) の既存canonical record locatorを完了証拠として引用する
 - validation は `necessary_presence`、`forbidden_presence`、`sufficient_behavior` を区別する。必要なpath・linkの存在や禁止された旧経路の不在をbehavior成立の十分条件へ昇格させず、behaviorの十分条件が要求されない作業に実行テスト・完全一致比較・網羅レビューを追加しない
 - schedule、review、validation、commit / push、shared canon sync、follow-up 判断を含む今回 scope の task が 1 つも未完了で残っていない
@@ -719,6 +720,7 @@ cost を無視して review coverage を優先する run では、research-drive
 ### 5. Implementation
 
 - 実装は `agents/workflows/implementation-waterfall-workflow.md` の gate に従って進める
+- SEP-09 を適用し、implementation は開始前に固定した complete target state から導く。waves は定義済み work の順序だけを決め、target state を後から完成させる段階実装にはしない。禁止事項と scope exception の詳細は SEP-09 を参照し、この workflow は policy を複製しない
 - selected gate の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes`
   でない場合は指示された owner stage へ戻る
 - 実装前に `design_brief.md` の `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、抽象責務と概念 model から実装 slice と downstream side effect が導かれていることを確認してから、そこにある artifact、repo docs、dependency surface、code path を読了する。test plan は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ読了する

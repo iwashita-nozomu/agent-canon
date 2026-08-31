@@ -1391,12 +1391,12 @@ skill_families:
         - ["マークダウン", "体裁"]
         - ["マークダウン", "リンク"]
   - id: mvp-skeleton
-    purpose: Keep MVP, prototype, v0, and thin-slice implementation skeletal by fixing one core loop, stubbing nonessential work, and reporting deferrals.
+    purpose: Define MVP, prototype, v0, and thin-slice work as the smallest complete final product scope with a runnable core path, required failure and cleanup behavior, and acceptance evidence.
     canonical_doc: agents/skills/mvp-skeleton.md
     shim: .codex/personal/skills/mvp-skeleton/SKILL.md
     discovery:
       name: mvp-skeleton
-      description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must prevent overbuilding. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
+      description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must define the smallest complete final product scope. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
     tool_commands:
       required: []
       conditional:

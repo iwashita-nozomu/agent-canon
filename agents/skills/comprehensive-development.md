@@ -43,6 +43,10 @@ handoff には、全原則の checklist ではなく、実際に判断へ影響�
 - evidence-bounded complete owning unit と、scope に含めない unrelated cleanup
 - selected validation、failure classification、cleanup / rollback、remaining external verification
 
+implementation target は SEP-09 の complete target state から導きます。waves はその target state に
+含まれる work の順序だけを定め、未完了の target を段階実装として扱いません。target-state-first の
+詳細な禁止事項と scope exception は SEP-09 を参照し、この skill は同じ policy を再定義しません。
+
 `not applicable`、negative token、原則別 receipt、新しい general-purpose checker は作りません。
 OOP / SOLID specialization は class、state、inheritance、`Protocol`、public object model が material に
 変わる場合だけ選びます。
@@ -50,9 +54,9 @@ OOP / SOLID specialization は class、state、inheritance、`Protocol`、public
 ## Contract-Complete Implementation Basis
 
 この skill が束ねる implementation は、行数、file 数、diff の小ささを completion condition にしません。
-候補の中から、要求された contract、invariant、reachable failure、cleanup、migration、validation を
-閉じる最小の owning unit を選びます。必要な責務を落とした「最小実装」、既存 check を通すだけの
-wrapper / fallback、temporary route、test relaxation は、単純化ではなく未完了として扱います。
+SEP-09 の complete target state を閉じる最小の owning unit を選び、cross-surface の consumer、effect、
+failure、cleanup、migration、validation を同じ handoff に接続します。target state から外れた shortcut
+は単純化ではなく design blocker として、SEP-09 の owner route へ戻します。
 
 material な mechanism decision は、既存の task packet / design trace に次の情報を接続します。
 新しい universal schema や全原則 checklist は作りません。

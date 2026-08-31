@@ -12,20 +12,23 @@ downstream implementation ../../.codex/personal/skills/mvp-skeleton/SKILL.md exp
 ## Reader Map
 
 - Purpose: keeps MVP, prototype, skeleton, or thin-slice work runnable without
-  overbuilding architecture, UI, tests, or features.
+  overbuilding architecture, UI, tests, or features while delivering a complete
+  final product scope.
 - Use When: the request asks for MVP作成, prototype, core runnable path,
   or scope-creep control.
 - Section path: Purpose and MVP Contract define the contract; Scope Sort,
   Overbuild Tripwires, and Frontend Rule are operational rules; Closeout states
   completion evidence.
 - Boundary: MVP scope is a routing and sequencing control, not permission to
-  leave the core path unrunnable.
+  leave the selected final product scope incomplete or the core path unrunnable.
 
 ## Purpose
 
-`mvp-skeleton` keeps MVP work shaped around a skeletal product slice. It owns
-the scope line: one core user, one core loop, one runnable path, one smoke
-check, and an explicit deferred list.
+`mvp-skeleton` defines an MVP or prototype as the smallest complete final product
+scope. It owns the scope line: one core user, one core loop, one runnable path,
+one smoke check, and the required failure handling, cleanup, and acceptance for
+that path. A smaller scope is valid when it is explicitly selected and complete;
+this skill does not create a staged implementation plan.
 
 Route product strategy, growth planning, production hardening, architecture
 design, visual polish, deployment, and comprehensive test strategy to their
@@ -42,7 +45,10 @@ core_user=<who uses the skeletal slice>
 core_loop=<one input-to-useful-output path>
 success_signal=<observable result that proves the core loop>
 runtime_floor=<local run or inspection path that exercises the loop>
-stop_line=<tempting work that must be deferred>
+scope_line=<tempting work that is outside the selected scope>
+failure_recovery=<required failure and recovery behavior for the loop>
+cleanup=<required cleanup or rollback for the loop>
+acceptance=<observable acceptance condition for the selected scope>
 ```
 
 When the core loop is unclear from the request or repo context, ask one concise
@@ -54,11 +60,10 @@ Classify every candidate item before building it:
 
 | Class | Meaning | Default Action |
 | ----- | ------- | -------------- |
-| `required` | Removing it breaks the one core loop. | Implement it. |
-| `stub` | The loop is understandable with hard-coded data, local state, mock output, a placeholder screen, or a no-op integration. | Stub it. |
-| `defer` | The loop still works without it. | Leave it out and report it. |
+| `required` | Removing it breaks the selected final product scope, including its failure, cleanup, or acceptance contract. | Implement it completely. |
+| `excluded` | It is outside the explicitly selected final product scope. | Leave it out; do not promise it as later completion. |
 
-When classification is unclear, choose `defer`.
+When classification is unclear, resolve it against the selected target scope before editing.
 
 ## Overbuild Tripwires
 
@@ -73,7 +78,10 @@ Stop and re-scope before adding:
   points, or broad abstractions
 - elaborate empty states, marketing sections, decorative animation, asset
   libraries, theme systems, or extensive responsive variants
-- tests for deferred behavior instead of one smoke check for the MVP path
+- a stub class, placeholder, hard-coded replacement, or no-op integration for
+  required behavior
+- deferred completion of required failure handling, cleanup, or acceptance
+- tests for excluded behavior instead of one smoke check for the MVP path
 
 ## Frontend Rule
 
@@ -93,8 +101,8 @@ mvp_skeleton=complete
 mvp_core_loop=<one sentence>
 mvp_runtime_floor=<command, URL, or file path>
 mvp_smoke_check=<command or manual check>
-mvp_deferred=<up to five items>
+mvp_excluded=<up to five items>
 ```
 
-Describe deferred items as deliberate scope control. Deferral is the control
-mechanism that keeps the MVP skeletal.
+Describe excluded items as outside the selected final product scope, not as
+unfinished work or a promise of later completion.
