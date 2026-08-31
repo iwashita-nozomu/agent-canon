@@ -538,7 +538,14 @@ _agent_canon_sync_operation() (
   # ignored staging tree.
   AGENT_CANON_REPOSITORY_ROOT=$install_root
   sync_rc=0
-  _agent_canon_install_global_links || sync_rc=$?
+  if _agent_canon_sync_personal_skill_view "$(_agent_canon_container_name)"; then
+    :
+  else
+    sync_rc=$?
+  fi
+  if ((sync_rc == 0)); then
+    _agent_canon_install_global_links || sync_rc=$?
+  fi
   if ((sync_rc != 0)); then
     if ! bootstrap_host_entrypoint "$install_root" \
       --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
@@ -2827,6 +2834,7 @@ _agent_canon_run_controller() {
 _agent_canon_sync_personal_skill_view() {
   local _container=$1
   local source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills"
+  local expected_skill="$source_root/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME/SKILL.md"
   local staging_root="$AGENT_CANON_STATE_ROOT/container-runtime/skill-projection"
   local staging_skills="$staging_root/.codex/personal/skills"
   _agent_canon_volume_copy export skill "$AGENT_CANON_STATE_ROOT/container-runtime"
@@ -2870,6 +2878,11 @@ _agent_canon_sync_personal_skill_view() {
   if [[ -z "$(find "$source_root" -type f -name SKILL.md -print -quit)" ]]; then
     _agent_canon_json_error skill_projection_copy_failed \
       "host personal skill view readback is missing"
+    return 2
+  fi
+  if [[ ! -f "$expected_skill" || -L "$expected_skill" ]]; then
+    _agent_canon_json_error skill_projection_copy_failed \
+      "host empirical prompt skill view readback is missing"
     return 2
   fi
   return 0
@@ -4275,6 +4288,15 @@ _agent_canon_install_global_links() {
   done
   if ((${#failures[@]})); then
     _agent_canon_json_error global_link_collision "global link install preserved collisions: ${failures[*]}"
+  fi
+  local prompt_source="$skill_source_root/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
+  local prompt_link="$home_root/.agents/skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
+  if [[ -d "$prompt_source" && ! -L "$prompt_source" ]] &&
+     [[ ! -L "$prompt_link" ||
+        "$(readlink -f -- "$prompt_link" 2>/dev/null || printf '')" != "$(realpath -e -- "$prompt_source")" ]]; then
+    _agent_canon_json_error legacy_skill_link_readback_failed \
+      "managed canonical prompt skill link was not read back: $prompt_link"
+    return 2
   fi
   _agent_canon_migrate_legacy_prompt_skill
 }

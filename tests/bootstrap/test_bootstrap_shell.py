@@ -2755,8 +2755,9 @@ def test_shell_status_reports_invalid_source_sync_as_unavailable(tmp_path: Path)
     assert json.loads(completed.stdout)["source_sync"] is None
 
 
+@pytest.mark.parametrize("initial_skill_view", ("absent", "stale"))
 def test_shell_source_sync_publishes_up_to_date_updated_and_failure_state(
-    tmp_path: Path,
+    tmp_path: Path, initial_skill_view: str
 ) -> None:
     """The active shell route records each source-sync terminal result."""
     bare = tmp_path / "origin.git"
@@ -2778,17 +2779,51 @@ def test_shell_source_sync_publishes_up_to_date_updated_and_failure_state(
     subprocess.run(["git", "clone", str(bare), str(publisher)], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(publisher), "config", "user.email", "test@example.invalid"], check=True)
     subprocess.run(["git", "-C", str(publisher), "config", "user.name", "AgentCanon Test"], check=True)
+    home = tmp_path / "home"
+    home.mkdir()
+    legacy = home / ".codex" / "skills" / "empirical-prompt-tuning"
+    (legacy / "SKILL.md").parent.mkdir(parents=True)
+    legacy_payload = b"legacy prompt skill\n"
+    (legacy / "SKILL.md").write_bytes(legacy_payload)
+    projection = tmp_path / "projection"
+    generated_skill = projection / ".codex" / "personal" / "skills" / "empirical-prompt-tuning" / "SKILL.md"
+    generated_skill.parent.mkdir(parents=True)
+    generated_skill.write_text("candidate generated skill\n", encoding="utf-8")
+    live_skill = install / ".codex" / "personal" / "skills" / "empirical-prompt-tuning"
+    if initial_skill_view == "stale":
+        live_skill.mkdir(parents=True)
+        (live_skill / "SKILL.md").write_text("stale generated skill\n", encoding="utf-8")
+    events = tmp_path / "projection-events"
 
     def run_sync(candidate_rc: int = 0) -> subprocess.CompletedProcess[str]:
         script = f"""
 source {str(ADAPTER)!r}
 set +e
+HOME={str(home)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
-AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
 AGENT_CANON_RUNTIME_ROOT={str(tmp_path / "runtime")!r}
+AGENT_CANON_STATE_ROOT={str(tmp_path / "runtime" / "container-state")!r}
+AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256={hashlib.sha256(legacy_payload).hexdigest()!r}
+export HOME AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256
 command_args=(sync --install-root {str(install)!r} --remote origin --branch main)
 bootstrap_host_entrypoint() {{ return {candidate_rc}; }}
-_agent_canon_install_global_links() {{ return 0; }}
+_agent_canon_volume_copy() {{
+  test "$1" = export && test "$2" = skill || return 91
+  printf 'personal-skill-view\\n' >> {str(events)!r}
+  mkdir -p "$3/skill-projection"
+  cp -a -- {str(projection)!r}/. "$3/skill-projection/"
+}}
+_agent_canon_install_global_links() {{
+  printf 'global-links\\n' >> {str(events)!r}
+  test -f {str(install)!r}/.codex/personal/skills/empirical-prompt-tuning/SKILL.md || return 92
+  test -f {str(legacy)!r}/SKILL.md || return 93
+  mkdir -p {str(home)!r}/.agents/skills
+  rm -f -- {str(home)!r}/.agents/skills/empirical-prompt-tuning
+  ln -s -- "$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills/empirical-prompt-tuning" {str(home)!r}/.agents/skills/empirical-prompt-tuning
+  _agent_canon_migrate_legacy_prompt_skill
+}}
 _agent_canon_sync_operation
 """
         return subprocess.run(["bash", "-c", script], check=False, capture_output=True, text=True)
@@ -2807,6 +2842,16 @@ _agent_canon_sync_operation
     assert updated_state["status"] == "success"
     assert updated_state["code"] == "updated"
     assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+    assert (live_skill / "SKILL.md").read_text(encoding="utf-8") == "candidate generated skill\n"
+    managed_link = home / ".agents" / "skills" / "empirical-prompt-tuning"
+    assert managed_link.is_symlink()
+    assert managed_link.resolve() == live_skill.resolve()
+    assert "source-staging" not in managed_link.resolve().as_posix()
+    assert not legacy.exists() and not legacy.is_symlink()
+    assert events.read_text(encoding="utf-8").splitlines() == [
+        "personal-skill-view",
+        "global-links",
+    ]
     (publisher / "tracked.txt").write_text("three\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(publisher), "commit", "-am", "three"], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(publisher), "push", "origin", "main"], check=True, capture_output=True)
@@ -2817,6 +2862,70 @@ _agent_canon_sync_operation
     assert failed_state["code"] == "source_sync_candidate_failed"
     assert failed_state["failure"] == "source_sync_candidate_failed"
     assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+
+
+def test_shell_source_sync_projection_failure_rolls_back_runtime(
+    tmp_path: Path,
+) -> None:
+    """A live skill-view failure rolls back the resident before link publication."""
+    bare = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    install = tmp_path / "install"
+    publisher = tmp_path / "publisher"
+    events = tmp_path / "projection-events"
+    subprocess.run(["git", "init", "--bare", str(bare)], check=True, capture_output=True)
+    subprocess.run(["git", "init", str(seed)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.name", "AgentCanon Test"], check=True)
+    (seed / "tracked.txt").write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(seed), "add", "tracked.txt"], check=True)
+    subprocess.run(["git", "-C", str(seed), "commit", "-m", "one"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "branch", "-M", "main"], check=True)
+    subprocess.run(["git", "-C", str(seed), "remote", "add", "origin", str(bare)], check=True)
+    subprocess.run(["git", "-C", str(seed), "push", "origin", "main"], check=True, capture_output=True)
+    subprocess.run(["git", "clone", str(bare), str(install)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(install), "branch", "-M", "main"], check=True)
+    subprocess.run(["git", "clone", str(bare), str(publisher)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(publisher), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(publisher), "config", "user.name", "AgentCanon Test"], check=True)
+    (publisher / "tracked.txt").write_text("two\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(publisher), "commit", "-am", "two"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(publisher), "push", "origin", "main"], check=True, capture_output=True)
+
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path / "runtime")!r}
+command_args=(sync --install-root {str(install)!r} --remote origin --branch main)
+bootstrap_host_entrypoint() {{
+  printf 'bootstrap:%s\\n' "$1" >> {str(events)!r}
+  return 0
+}}
+_agent_canon_sync_personal_skill_view() {{
+  printf 'projection-root:%s\\n' "$AGENT_CANON_REPOSITORY_ROOT" >> {str(events)!r}
+  return 17
+}}
+_agent_canon_install_global_links() {{
+  printf 'global-links\\n' >> {str(events)!r}
+  return 19
+}}
+_agent_canon_sync_operation
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 17
+    event_lines = events.read_text(encoding="utf-8").splitlines()
+    assert event_lines[0].startswith("bootstrap:")
+    assert event_lines[1] == f"projection-root:{install}"
+    assert event_lines[2] == f"bootstrap:{install}"
+    assert all(line != "global-links" for line in event_lines)
+    assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+    state = json.loads((tmp_path / "runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert state["code"] == "sync_global_links_failed"
+    assert not (tmp_path / "runtime/source-staging/agent-canon").exists()
 
 
 def test_source_sync_transports_remote_candidate_from_shallow_source(
@@ -2925,6 +3034,7 @@ bootstrap_host_entrypoint() {{
   test "$(git -C "$1" show HEAD:tracked.txt)" = two
   return {candidate_rc}
 }}
+_agent_canon_sync_personal_skill_view() {{ return 0; }}
 _agent_canon_install_global_links() {{ return 0; }}
 _agent_canon_sync_operation
 """
