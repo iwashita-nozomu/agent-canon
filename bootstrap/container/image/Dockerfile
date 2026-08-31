@@ -34,12 +34,6 @@ LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
       io.agent-canon.run.pids-limit="512" \
       io.agent-canon.run.tmpfs="/tmp"
 
-# Create mount parents before the exact source inputs are bound below.
-RUN install -d -m 0755 /src/bootstrap/container/image /src/tools/runtime/container \
-      /src/tools/analysis/dependencies /src/tools/repository/workspace \
-      /src/tools/runtime/artifacts /src/tools/runtime/dispatch/agent-canon \
-      /workspace /var/lib/agent-canon/runtime /usr/local/share/agent-canon
-
 # BuildKit read-only exact inputs keep unrelated docs/skill changes out of the
 # dependency/Rust layer.  Runtime and build packages share one apt transaction;
 # all build-only package managers and caches are purged before this layer ends.

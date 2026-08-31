@@ -2163,6 +2163,25 @@ _agent_canon_image_reference() {
 _agent_canon_image() {
   local requested_ref=${1:-}
   _agent_canon_image_reference "$requested_ref"
+  if [[ "${AGENT_CANON_LOCAL_BUILD:-0}" == 1 ]]; then
+    local control_digest source_head
+    source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD) || {
+      _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
+      return 2
+    }
+    control_digest=$(_agent_canon_control_digest)
+    if ! "$AGENT_CANON_DOCKER_CMD" build \
+      --file "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/Dockerfile" \
+      --tag "$AGENT_CANON_IMAGE_REF" \
+      --label io.agent-canon.runtime=shared-v1 \
+      --label "io.agent-canon.control-root-digest=$control_digest" \
+      --label "org.opencontainers.image.revision=$source_head" \
+      "$AGENT_CANON_REPOSITORY_ROOT"; then
+      _agent_canon_json_error candidate_image_build_failed "candidate image build failed"
+      return 2
+    fi
+    return 0
+  fi
   if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
     _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
     return 2
@@ -4206,7 +4225,7 @@ bootstrap_host_entrypoint() {
   fi
   [[ -n "$AGENT_CANON_CONTROL_ROOT" ]] || _agent_canon_json_error control_root_required "--control-parent-root is required"
   [[ ${#command_args[@]} -gt 0 ]] || { _agent_canon_usage >&2; return 64; }
-  local operation=${command_args[0]} image_ref=
+  local operation=${command_args[0]} image_ref= local_build=0
   if [[ "$operation" == sync ]]; then
     local sync_request sync_request_rc
     if sync_request=$(_agent_canon_sync_request_metadata); then
@@ -4284,7 +4303,20 @@ bootstrap_host_entrypoint() {
     if [[ "${command_args[index]}" == --image-ref && $((index + 1)) -lt ${#command_args[@]} ]]; then
       image_ref=${command_args[index+1]}
     fi
+    if [[ "${command_args[index]}" == --local-build ]]; then
+      local_build=1
+    fi
   done
+  if ((local_build == 1 && operation != update)); then
+    _agent_canon_json_error local_build_update_only "--local-build is valid only for update"
+    return 2
+  fi
+  if ((local_build == 1)); then
+    AGENT_CANON_LOCAL_BUILD=1
+    export AGENT_CANON_LOCAL_BUILD
+  else
+    unset AGENT_CANON_LOCAL_BUILD
+  fi
   case "$operation" in
     gc)
       # Docker resource reconciliation is host-owned and serialized with
