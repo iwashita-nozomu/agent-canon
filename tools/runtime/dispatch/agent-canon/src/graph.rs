@@ -3409,6 +3409,7 @@ mod tests {
 
     struct GraphFixture {
         root: PathBuf,
+        runtime_root: PathBuf,
         target: PathBuf,
         artifact: PathBuf,
         artifact_value: Value,
@@ -3419,8 +3420,41 @@ mod tests {
         base_oid: String,
     }
 
+    struct GraphFixtureSetupGuard {
+        root: PathBuf,
+        runtime_root: Option<PathBuf>,
+        disarmed: bool,
+    }
+
+    impl GraphFixtureSetupGuard {
+        fn new(root: PathBuf) -> Self {
+            Self {
+                root,
+                runtime_root: None,
+                disarmed: false,
+            }
+        }
+
+        fn disarm(&mut self) {
+            self.disarmed = true;
+        }
+    }
+
+    impl Drop for GraphFixtureSetupGuard {
+        fn drop(&mut self) {
+            if self.disarmed {
+                return;
+            }
+            if let Some(runtime_root) = &self.runtime_root {
+                let _ = fs::remove_dir_all(runtime_root);
+            }
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
     impl Drop for GraphFixture {
         fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.runtime_root);
             let _ = fs::remove_dir_all(&self.root);
         }
     }
@@ -3545,7 +3579,10 @@ mod tests {
             "agent-canon-graph-{}-{counter}-{nanos}",
             std::process::id()
         ));
+        let mut setup_guard = GraphFixtureSetupGuard::new(root.clone());
         fs::create_dir_all(root.join("src")).expect("fixture root");
+        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        setup_guard.runtime_root = Some(runtime_root.clone());
         fixture_git(&root, &["init", "-q"]);
         materialize_standalone_surface_manifest(&root);
         fixture_git(&root, &["config", "user.email", "test@example.invalid"]);
@@ -3730,8 +3767,9 @@ mod tests {
             attempt_id
         ));
         fs::write(&receipt, &receipt_bytes).expect("receipt");
-        GraphFixture {
+        let fixture = GraphFixture {
             root,
+            runtime_root,
             target,
             artifact: artifact_target,
             artifact_value,
@@ -3740,7 +3778,9 @@ mod tests {
             receipt_value,
             receipt_bytes,
             base_oid,
-        }
+        };
+        setup_guard.disarm();
+        fixture
     }
 
     fn graph_args(root: &Path) -> GraphArgs {
@@ -3771,6 +3811,19 @@ mod tests {
 
     fn test_graph_db(root: &Path) -> PathBuf {
         test_graph_root(root).join("graph.sqlite")
+    }
+
+    #[test]
+    fn graph_fixture_drop_removes_source_and_external_runtime_root() {
+        let (root, runtime_root) = {
+            let fixture = graph_fixture();
+            assert!(fixture.root.is_dir());
+            assert!(fixture.runtime_root.is_dir());
+            (fixture.root.clone(), fixture.runtime_root.clone())
+        };
+
+        assert!(!root.exists());
+        assert!(!runtime_root.exists());
     }
 
     #[test]

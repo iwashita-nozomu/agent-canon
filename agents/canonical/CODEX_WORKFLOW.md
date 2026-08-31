@@ -861,6 +861,10 @@ closeout checklist or readiness state.
 - `task_close.py` に渡す stage-specific evidence として、verification、request
   contract、completion coverage、selected validation/static/dependency results、
   review disposition、commit / push、shared canon sync、follow-up 判断を記録する
+- creator-owned temporary files, directories, and containers must have a cleanup
+  receipt naming the exact created paths or resource IDs and an absence readback
+  before `task_close.py`; missing creator-owned cleanup evidence keeps closeout
+  non-terminal
 - `closeout_gate.md` の `review_findings_integrated=yes` は、review reject /
   requested-change への応答として、user request と design intent が保持された
   evidence を要求します。revert / discard が含まれる場合は、撤回、置換、owner

@@ -10,11 +10,11 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -351,74 +351,79 @@ def test_math_wave_emits_separate_nonmath_handoff_without_arch_writer() -> None:
         ]
 
 
-def run_bootstrap(*args: str) -> tuple[subprocess.CompletedProcess[str], Path]:
-    """Run normal bootstrap against an external temporary runtime root."""
-    runtime = Path(tempfile.mkdtemp(prefix="math-intent-runtime-"))
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"),
-            "--owner",
-            "test",
-            "--runtime-root",
-            str(runtime),
-            "--workspace-root",
-            str(PROJECT_ROOT),
-            "--skip-agent-canon-preflight",
-            "--no-language-review-candidates",
-            *args,
-        ],
-        cwd=PROJECT_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    report_dir = next(
-        (
-            Path(line.split("=", 1)[1])
-            for line in result.stdout.splitlines()
-            if line.startswith("REPORT_DIR=")
-        ),
-        runtime / "reports" / "agents",
-    )
-    return result, report_dir
+@contextmanager
+def run_bootstrap(
+    *args: str,
+) -> Iterator[tuple[subprocess.CompletedProcess[str], Path]]:
+    """Run normal bootstrap with creator-owned cleanup of its runtime root."""
+    temporary = tempfile.TemporaryDirectory(prefix="math-intent-runtime-")
+    runtime = Path(temporary.name)
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"),
+                "--owner",
+                "test",
+                "--runtime-root",
+                str(runtime),
+                "--workspace-root",
+                str(PROJECT_ROOT),
+                "--skip-agent-canon-preflight",
+                "--no-language-review-candidates",
+                *args,
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        report_dir = next(
+            (
+                Path(line.split("=", 1)[1])
+                for line in result.stdout.splitlines()
+                if line.startswith("REPORT_DIR=")
+            ),
+            runtime / "reports" / "agents",
+        )
+        yield result, report_dir
+    finally:
+        temporary.cleanup()
+        assert not runtime.exists(), f"temporary runtime remains: {runtime}"
 
 
 def test_normal_math_bootstrap_requires_packet_before_run() -> None:
     """T4 math evidence blocks before a run can spawn without its packet."""
-    result, runtime = run_bootstrap(
+    with run_bootstrap(
         "--task",
         "修正 solver residual の収束と更新式",
         "--task-id",
         "T4",
-    )
-    assert result.returncode == 2
-    assert "math_packet_missing" in result.stdout
-    shutil.rmtree(runtime.parents[2] if runtime.exists() else runtime.parents[1])
+    ) as (result, _runtime):
+        assert result.returncode == 2
+        assert "math_packet_missing" in result.stdout
 
 
 def test_math_owner_skill_requires_packet_without_task_id() -> None:
     """A selected mathematical owner skill activates the packet requirement."""
-    result, runtime = run_bootstrap(
+    with run_bootstrap(
         "--task",
         "修正 solver residual の収束と更新式",
-    )
-    assert result.returncode == 2
-    assert "math_packet_missing" in result.stdout
-    shutil.rmtree(runtime.parents[2] if runtime.exists() else runtime.parents[1])
+    ) as (result, _runtime):
+        assert result.returncode == 2
+        assert "math_packet_missing" in result.stdout
 
 
 def test_t6_math_owner_skill_requires_packet() -> None:
     """T6 carrying a mathematical owner skill requires the packet."""
-    result, runtime = run_bootstrap(
+    with run_bootstrap(
         "--task",
         "computational optimization solver convergence repair",
         "--task-id",
         "T6",
-    )
-    assert result.returncode == 2
-    assert "math_packet_missing" in result.stdout
-    shutil.rmtree(runtime.parents[2] if runtime.exists() else runtime.parents[1])
+    ) as (result, _runtime):
+        assert result.returncode == 2
+        assert "math_packet_missing" in result.stdout
 
 
 def test_proof_tool_task_without_math_route_does_not_require_packet() -> None:
@@ -428,29 +433,27 @@ def test_proof_tool_task_without_math_route_does_not_require_packet() -> None:
         "$lean-algorithm-design theorem graph repair",
         "$formal-proof-workflow Lean theorem graph repair",
     ):
-        result, runtime = run_bootstrap("--task", task)
-        assert result.returncode == 0, result.stdout + result.stderr
-        assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
-        shutil.rmtree(runtime.parents[2])
+        with run_bootstrap("--task", task) as (result, _runtime):
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
 
 
 def test_full_team_non_math_docker_task_does_not_require_packet() -> None:
     """Full-team materialization does not turn a dormant math reviewer into a gate."""
-    result, runtime = run_bootstrap(
+    with run_bootstrap(
         "--task",
         "Docker build and container environment cleanup",
         "--task-id",
         "T4",
         "--full-team",
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
-    shutil.rmtree(runtime.parents[2])
+    ) as (result, _runtime):
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
 
 
 def test_normal_math_bootstrap_materializes_packet_and_reviewer() -> None:
     """A complete T4 packet activates the math reviewer and manifest route."""
-    result, report_dir = run_bootstrap(
+    with run_bootstrap(
         "--task",
         "修正 solver residual の収束と実行速度。$algorithm-proof-exploration は補助で、JIT 境界は症状だが変更しない",
         "--task-id",
@@ -459,28 +462,26 @@ def test_normal_math_bootstrap_materializes_packet_and_reviewer() -> None:
         json.dumps(
             packet(separate_handoff_targets=["architecture/JIT owner"])
         ),
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "MATH_INTENT_ROUTE_STATUS=active" in result.stdout
-    assert "MATH_INTENT_REVIEWER=mathematical_correctness_reviewer" in result.stdout
-    manifest = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
-    assert "mathematical_intent_packet:" in manifest
-    assert "mathematical_correctness_reviewer" in manifest
-    assert "architecture/JIT owner" in manifest
-    assert "math_intent_write_scope: mapped_allowed_paths_only" in manifest
-    assert "math_intent_forbidden_surfaces:" in manifest
-    shutil.rmtree(report_dir.parents[2])
+    ) as (result, report_dir):
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "MATH_INTENT_ROUTE_STATUS=active" in result.stdout
+        assert "MATH_INTENT_REVIEWER=mathematical_correctness_reviewer" in result.stdout
+        manifest = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+        assert "mathematical_intent_packet:" in manifest
+        assert "mathematical_correctness_reviewer" in manifest
+        assert "architecture/JIT owner" in manifest
+        assert "math_intent_write_scope: mapped_allowed_paths_only" in manifest
+        assert "math_intent_forbidden_surfaces:" in manifest
 
 
 def test_normal_non_math_t4_bootstrap_does_not_require_packet() -> None:
     """The conditional route stays absent for an infrastructure-only T4 task."""
-    result, runtime = run_bootstrap(
+    with run_bootstrap(
         "--task",
         "修正 Docker build cache とコンテナ起動",
         "--task-id",
         "T4",
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
-    assert "mathematical_correctness_reviewer" not in result.stdout
-    shutil.rmtree(runtime.parents[2])
+    ) as (result, _runtime):
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
+        assert "mathematical_correctness_reviewer" not in result.stdout

@@ -56,7 +56,9 @@ If a focused command is unavailable in a fresh checkout, report the missing
 owner/route; do not create a fallback that writes into source. Use one task
 temporary directory outside the source checkout and one shared tool image at
 most. Track any image/container created for validation and remove that exact
-resource after evidence is captured.
+resource after evidence is captured. Creator-owned temporary resources also
+require a cleanup receipt naming each exact path or resource ID and an absence
+readback before `task_close.py` can report a terminal result.
 
 ## Validation Failure Response
 
@@ -102,7 +104,7 @@ Intent preservation routes:
 | Python code/tests | targeted `pytest`; `python3 -m pyright`; `python3 -m ruff check ...` |
 | AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; shared-surface sync; workflow/PR checks; strict dependency review as the dependency-header/graph judgment owner; standalone-source tool_drift coverage once; docs check; generated-artifact guard; standalone-source prompt/accumulated evals remain in the existing static-gates owner; derived shared gates exclude AgentCanon development prompt/accumulated eval producers and parent-owned diagnostics; standalone shared gates remain the existing static-gates owner and add no repository-wide project-quality job; derived parent workflows expose the canonical project-quality owner marker and `make ci` command; job names are not an authority; no repository-wide project-quality runner is added to the shared gate |
 | Root bootstrap or runtime lifecycle | `install -> start -> target add -> status -> codex prepare -> tool/exec`; `eval collect -> eval sync` or an explicit pending receipt; `stop -> gc -> uninstall -> resource absence readback` |
-| Python/Rust tool runtime or LSP | targeted tool-dispatch and runtime-artifact tests; schema-v2 parity evidence for argv/cwd/streams/exit/signal/writes |
+| Python/Rust tool runtime or LSP | targeted tool-dispatch and runtime-artifact tests; schema-v2 parity evidence for argv/cwd/streams/exit/signal/writes; creator-owned temporary-path cleanup receipt and absence readback |
 | Docker image or shared container | container contract tests; one labeled shared image build when Docker is available; non-root, read-only source, bounded resource and LSP readback |
 | Target mount or generation | target registry and generation tests; lock, active-task, candidate-health, rollback and atomic-switch evidence |
 | Codex isolated surfaces | bootstrap Codex tests and manifest readback; runtime-local `CODEX_HOME` isolation; collision and foreign-link negative cases |
