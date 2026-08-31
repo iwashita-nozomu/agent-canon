@@ -223,7 +223,14 @@ restores a regular file. Foreign entries and foreign symlinks are preserved or
 reported as collisions. Project hooks and user authentication, session,
 history, cache, plugins, rules, MCP, and TUI/trust settings are outside this
 projection. `codex prepare` remains the separate runtime-local isolated home
-route.
+route. During install/update, the lifecycle also recognizes only the exact
+`~/.codex/skills/empirical-prompt-tuning` directory. It must be non-symlink,
+owned by the current user, contain exactly one regular `SKILL.md`, and match the
+authorized legacy SHA-256. After the canonical generated view and managed
+`~/.agents/skills/empirical-prompt-tuning` link are read back, that exact
+directory is removed. A changed digest, ownership/shape mismatch, symlink, or
+link readback failure is typed and preserves the legacy source. The migration
+never scans or removes `~/.codex/skills/.system` or another user entry.
 
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,
@@ -274,7 +281,9 @@ container, and managed links after checking that no task is active. It retains
 the external state, owner record, and receipts for absence readback; after that
 readback the installation runtime directory may be removed as the final
 task-owned cleanup. Foreign global Codex entries remain untouched; exact
-AgentCanon-managed links are removed or restored as described above.
+AgentCanon-managed links are removed or restored as described above. The
+migrated legacy prompt-skill directory is never restored, and uninstall removes
+only its managed `~/.agents/skills/empirical-prompt-tuning` link.
 
 ## Tool routes and compatibility
 

@@ -135,6 +135,10 @@ TOOL_PATH_ENVIRONMENT_KEYS = frozenset(
 # migrate.  It is intentionally a fixed path; arbitrary source/workspace
 # directories are never scanned or adopted.
 LEGACY_RUNTIME_RELATIVE = Path("workspace") / "agent-canon-runtime" / "host"
+LEGACY_PROMPT_SKILL_NAME = "empirical-prompt-tuning"
+LEGACY_PROMPT_SKILL_SHA256 = (
+    "f2d76d9306b21002ad19040a2fd38bf37a1797469fa2b62e9e9722c680be11bd"
+)
 REQUIRED_LABELS = frozenset(
     {
         "io.agent-canon.runtime=shared-v1",
@@ -3921,6 +3925,108 @@ class BootstrapRuntime:
         target.symlink_to(source, target_is_directory=source.is_dir())
         return True
 
+    def _migrate_legacy_prompt_skill(self) -> dict[str, Any]:
+        """Retire only the known legacy prompt skill after link readback."""
+        if not self._global_home_scope():
+            return {"state": "home_scope_disabled"}
+
+        legacy_skills = self.global_codex_home / "skills"
+        legacy = legacy_skills / LEGACY_PROMPT_SKILL_NAME
+        if not legacy.exists() and not legacy.is_symlink():
+            return {"state": "absent"}
+        if legacy_skills.is_symlink() or not legacy_skills.is_dir():
+            raise BootstrapError(
+                "legacy_skill_collision",
+                f"legacy Codex skills directory is not regular: {legacy_skills}",
+            )
+        if legacy.is_symlink() or not legacy.is_dir():
+            raise BootstrapError(
+                "legacy_skill_collision",
+                f"legacy skill path is not a regular directory: {legacy}",
+            )
+
+        try:
+            entries = list(legacy.iterdir())
+        except OSError as exc:
+            raise BootstrapError(
+                "legacy_skill_readback_failed",
+                f"legacy skill directory could not be read: {legacy}",
+            ) from exc
+        if (
+            len(entries) != 1
+            or entries[0].name != "SKILL.md"
+            or entries[0].is_symlink()
+            or not entries[0].is_file()
+        ):
+            raise BootstrapError(
+                "legacy_skill_shape_mismatch",
+                f"legacy skill must contain exactly one regular SKILL.md: {legacy}",
+            )
+        skill_file = entries[0]
+        for path in (legacy_skills, legacy, skill_file):
+            try:
+                owner = path.stat().st_uid
+            except OSError as exc:
+                raise BootstrapError(
+                    "legacy_skill_readback_failed",
+                    f"legacy skill ownership could not be read: {path}",
+                ) from exc
+            if owner != os.getuid():
+                raise BootstrapError(
+                    "legacy_skill_ownership_mismatch",
+                    f"legacy skill is not owned by the current user: {path}",
+                    evidence={"owner_uid": owner, "expected_uid": os.getuid()},
+                )
+        try:
+            digest = sha256_bytes(_safe_read(skill_file, field="legacy prompt skill"))
+        except BootstrapError:
+            raise
+        if digest != LEGACY_PROMPT_SKILL_SHA256:
+            raise BootstrapError(
+                "legacy_skill_digest_mismatch",
+                f"legacy prompt skill content differs from the authorized source: {skill_file}",
+                evidence={"observed_sha256": digest, "expected_sha256": LEGACY_PROMPT_SKILL_SHA256},
+            )
+
+        link = self.global_agents_home / "skills" / LEGACY_PROMPT_SKILL_NAME
+        source = self.repository_root / ".codex" / "personal" / "skills" / LEGACY_PROMPT_SKILL_NAME
+        source_file = source / "SKILL.md"
+        if (
+            not link.is_symlink()
+            or link.resolve() != source.resolve()
+            or source.is_symlink()
+            or not source.is_dir()
+            or source_file.is_symlink()
+            or not source_file.is_file()
+        ):
+            raise BootstrapError(
+                "legacy_skill_link_readback_failed",
+                f"managed canonical skill link was not read back: {link}",
+            )
+        try:
+            source_digest = sha256_bytes(_safe_read(source_file, field="canonical prompt skill"))
+        except BootstrapError:
+            raise
+        try:
+            shutil.rmtree(legacy)
+        except OSError as exc:
+            raise BootstrapError(
+                "legacy_skill_migration_failed",
+                f"legacy prompt skill directory could not be removed: {legacy}",
+            ) from exc
+        if legacy.exists() or legacy.is_symlink():
+            raise BootstrapError(
+                "legacy_skill_migration_failed",
+                f"legacy prompt skill directory remains after migration: {legacy}",
+            )
+        return {
+            "state": "migrated",
+            "legacy_path": str(legacy),
+            "legacy_sha256": digest,
+            "canonical_path": str(source_file),
+            "canonical_sha256": source_digest,
+        }
+
     def _ensure_personal_codex_config(self) -> dict[str, Any]:
         """Migrate one regular user config into the ignored AgentCanon source path."""
         target = self.global_codex_config
@@ -4158,6 +4264,7 @@ class BootstrapRuntime:
             )
         state["managed_global_links"] = links
         state["managed_codex_config"] = config_record
+        self._migrate_legacy_prompt_skill()
         return links
 
     def _agents_link_readback(self, state: Mapping[str, Any]) -> dict[str, Any]:

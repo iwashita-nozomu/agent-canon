@@ -62,6 +62,12 @@ install / update は先に catalog から ignored な
 directory を `~/.agents/skills/<skill>` へ個別リンクします。この generated view と
 link は編集せず、変更は `agents/skills/<skill>.md` と catalog に加えます。
 
+既存の `~/.codex/skills/empirical-prompt-tuning` は、canonical skill view と
+`~/.agents/skills/empirical-prompt-tuning` のリンクを readback した後にだけ移行します。
+対象は完全一致する非 symlink directory と、認証済み SHA-256 の regular `SKILL.md` だけです。
+内容、所有者、形状、またはリンク readback が違う場合は typed failure として legacy source
+を保持します。`~/.codex/skills/.system` や他の legacy / foreign entry は走査・削除しません。
+
 既存の regular な `~/.codex/config.toml` は内容と mode を保持したまま ignored な
 personal source に移してからリンクします。update はその内容を保持し、uninstall は
 regular file に戻します。project hook、認証、session、history、cache、plugin、rule、
@@ -141,7 +147,9 @@ quarantine と旧 generation 維持、旧 generation も復旧できなければ
 ない、この installation の所有物だけを削除します。`uninstall` は managed image、
 container、links、state を削除しますが、親レポ、foreign な global Codex entry、
 pre-existing Docker resource は削除しません。AgentCanon が所有した exact link だけを
-削除し、personal config は regular file に戻します。uninstall 前に `eval sync`、
+削除し、personal config は regular file に戻します。移行済みの legacy skill は復元せず、
+`~/.agents/skills/empirical-prompt-tuning` の managed link だけを削除します。
+uninstall 前に `eval sync`、
 `status`、archive readback、resource absence を確認してください。`docker system prune`
 は使いません。
 
