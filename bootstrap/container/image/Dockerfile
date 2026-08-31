@@ -130,9 +130,9 @@ RUN set -eux; \
 COPY --from=builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=builder /usr/local/lib/node_modules/pyright /usr/local/lib/node_modules/pyright
 COPY --from=builder /usr/local/lib/node_modules/bash-language-server /usr/local/lib/node_modules/bash-language-server
-COPY --from=builder /usr/local/bin/pyright /usr/local/bin/pyright
-COPY --from=builder /usr/local/bin/pyright-langserver /usr/local/bin/pyright-langserver
-COPY --from=builder /usr/local/bin/bash-language-server /usr/local/bin/bash-language-server
+RUN ln -sfn ../lib/node_modules/pyright/index.js /usr/local/bin/pyright \
+    && ln -sfn ../lib/node_modules/pyright/langserver.index.js /usr/local/bin/pyright-langserver \
+    && ln -sfn ../lib/node_modules/bash-language-server/out/cli.js /usr/local/bin/bash-language-server
 
 # Copy pipx environments and only their public launchers.
 COPY --from=builder /usr/local/share/agent-canon/pipx/venvs/check-jsonschema /usr/local/share/agent-canon/pipx/venvs/check-jsonschema

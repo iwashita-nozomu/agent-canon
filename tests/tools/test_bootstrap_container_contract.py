@@ -120,6 +120,12 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
     assert "/usr/local/bin/pyright" in text
     assert "/usr/local/bin/pyright-langserver" in text
     assert "/usr/local/bin/bash-language-server" in text
+    assert "ln -sfn ../lib/node_modules/pyright/index.js /usr/local/bin/pyright" in text
+    assert "ln -sfn ../lib/node_modules/pyright/langserver.index.js /usr/local/bin/pyright-langserver" in text
+    assert "ln -sfn ../lib/node_modules/bash-language-server/out/cli.js /usr/local/bin/bash-language-server" in text
+    assert "COPY --from=builder /usr/local/bin/pyright" not in text
+    assert "COPY --from=builder /usr/local/bin/pyright-langserver" not in text
+    assert "COPY --from=builder /usr/local/bin/bash-language-server" not in text
     assert "/usr/local/share/agent-canon/pipx/venvs/check-jsonschema" in text
     assert "/usr/local/share/agent-canon/pipx/venvs/yamllint" in text
     assert "/usr/local/share/agent-canon/toolchains/cargo/bin" in text
