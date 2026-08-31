@@ -192,10 +192,12 @@ selection is limited to install/update/sync, and rollback may persist the
 immutable ID used to recreate the resident.
 
 `update` reads only the current AgentCanon checkout. It never fetches,
-checks out, merges, rebases, resets, or pulls Git state. Without `--image-ref`
-it performs one ordinary Docker build; with an immutable `--image-ref` it
-adopts only an already-pulled registry image. A handled build or health
-failure restores the existing v2 generation, container, and image.
+checks out, merges, rebases, resets, or pulls Git state. It pulls the canonical
+`ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` image and validates its
+OCI revision, native platform, and RepoDigest. Only explicit `update
+--local-build` may build locally; pull failure never falls back to a build.
+A handled pull/build or health failure restores the existing v2 generation,
+container, and image.
 `sync` is the one-shot source/update route. It uses `git ls-remote` for
 `origin/main`, treats equal HEAD as a no-op, clones a fresh full-history
 checkout under runtime staging, pulls `:sha-<full-commit>`, verifies the OCI

@@ -119,7 +119,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | --- | --- | --- | --- |
 | `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `tools/runtime/dispatch/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
 | Rust toolchain: `rustup`, `cargo`, `rustc`, `rust-src`, `rust-analyzer` | AgentCanon Rust CLI の build と language-server support。 | `bootstrap/container/image/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
-| `clangd-18` (apt.llvm.org Jammy snapshot) | C/C++ language-server analysis in the shared runtime。 | `bootstrap/container/image/dependencies.toml` (`clangd-language-server`) | upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://apt.llvm.org/> |
+| `clangd-18` (Ubuntu 24.04 Noble package) | C/C++ language-server analysis in the shared runtime。 | `bootstrap/container/image/dependencies.toml` (`clangd-language-server`) | upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/noble/clangd-18> |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
 | `experiment-runner-admitted` | ExperimentRunnerのmerged provider。admitted request/result、UUID visibility、child lifecycleを提供します。 | `agent-canon-environment.toml`, `documents/experiments/gpu-admission-r5-ordered-integration-interface.json` | consumer-provided runtime; AgentCanon does not install or import it |
 | Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/devcontainer.json`, `.devcontainer/gpu-admission/devcontainer.json` の digest-pinned official Feature | upstream: MIT for Node.js core, with bundled third-party notices |
@@ -183,7 +183,7 @@ a binary distribution or container image.
 - Rust license policy: <https://www.rust-lang.org/policies/licenses/>
 - rustfmt license: <https://github.com/rust-lang/rustfmt>
 - rust-analyzer license: <https://github.com/rust-lang/rust-analyzer>
-- LLVM apt repository and package metadata for the current image contract: <https://apt.llvm.org/>
+- Ubuntu 24.04 package metadata for the current image contract: <https://packages.ubuntu.com/noble/clangd-18>
 - LLVM license: <https://llvm.org/LICENSE.txt>
 - jq license: <https://github.com/jqlang/jq>
 - Node.js license: <https://github.com/nodejs/node/blob/main/LICENSE>
