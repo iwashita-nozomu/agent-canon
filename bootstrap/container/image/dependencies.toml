@@ -90,18 +90,6 @@ provides = ["tree"]
 failure_policy = "fail"
 
 [[records]]
-id = "clang-format"
-package = "clang-format"
-method = "apt-package"
-version = "1:14.0-55~exp2"
-source = "ubuntu:22.04"
-executable_owner_packages = ["clang-format", "clang-format-14"]
-verification = { kind = "apt-package", executable = "clang-format", args = ["--version"], output_contains = "Ubuntu clang-format version 14.0.0-1ubuntu1.1" }
-deps = []
-provides = ["clang-format"]
-failure_policy = "fail"
-
-[[records]]
 id = "clangd-language-server"
 package = "clangd-18"
 method = "apt-repository"

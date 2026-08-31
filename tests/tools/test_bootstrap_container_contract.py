@@ -78,7 +78,10 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert 'CMD ["resident"]' in text
     assert "rootless" not in text.lower()
     digests = re.findall(r"@sha256:([0-9a-f]{64})(?:\s|$)", text, re.MULTILINE)
-    assert len(digests) == 2
+    assert len(digests) == 3
+    assert text.index("AS node-provider") < text.index("AS builder") < text.index("AS runtime")
+    assert "--mount=type=cache" not in text
+    assert "FROM ubuntu:22.04@sha256:" in text[text.rfind("FROM ubuntu") :]
     assert "--manifest /opt/agent-canon/bootstrap/container/image/dependencies.toml" in text
     assert "COPY bootstrap/container/image/dependencies.toml" in text
     assert "COPY tools /usr/local/share/agent-canon/runtime/tools" in text
@@ -107,6 +110,47 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "COPY bootstrap/container/dispatch/tool-wrapper.sh" in text
     assert "COPY bootstrap/container/lifecycle/entrypoint.sh" in text
     assert "/.devcontainer/" not in text
+
+
+def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert "COPY --from=builder /usr/local/bin/node /usr/local/bin/node" in text
+    assert "/usr/local/lib/node_modules/pyright" in text
+    assert "/usr/local/lib/node_modules/bash-language-server" in text
+    assert "/usr/local/bin/pyright" in text
+    assert "/usr/local/bin/pyright-langserver" in text
+    assert "/usr/local/bin/bash-language-server" in text
+    assert "/usr/local/share/agent-canon/pipx/venvs/check-jsonschema" in text
+    assert "/usr/local/share/agent-canon/pipx/venvs/yamllint" in text
+    assert "/usr/local/share/agent-canon/toolchains/cargo/bin" in text
+    assert "/usr/local/share/agent-canon/toolchains/rustup" in text
+    assert "/usr/local/share/agent-canon/image-dependencies" in text
+    assert "COPY --from=builder /usr/local/bin/npm" not in text
+    assert "COPY --from=builder /usr/local/bin/npx" not in text
+    assert "COPY --from=builder /usr/local/bin/corepack" not in text
+
+
+def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None:
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    runtime = text[text.index("AS runtime") :]
+    for marker in (
+        "clangd-18 --version",
+        "sha256sum --check --strict",
+        "6084F3CF814B57C1CF12EFD515CF4D18AF4F7421",
+        "clangd-language-server.gpg",
+        "clangd-language-server.list",
+        "apt-get purge -y --auto-remove curl gnupg",
+        "! command -v pytest",
+        "! command -v pip",
+        "! command -v ninja",
+        "! command -v curl",
+        "! command -v gpg",
+        "! command -v clang-format",
+    ):
+        assert marker in runtime
+    assert "python3-pytest" not in runtime
+    assert "python3-pip" not in runtime
+    assert "build-essential" not in runtime
 
 
 def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
@@ -258,7 +302,6 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "bash-language-server",
         "jq",
         "tree",
-        "clang-format",
         "clangd-language-server",
         "rust-toolchain",
         "agent-canon-cli",

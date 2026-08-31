@@ -203,6 +203,19 @@ readback します。`docker system prune` は使用せず、manifest-owned exac
 `bootstrap/container/image/Dockerfile` は旧developer-containerの dependency planning / Python / Rust build 部分だけを再利用します。editor、post-create、GPU、
 Compose、workspace lifecycle は移植せず、旧developer-container surfaceは削除します。
 
+Image は `node-provider -> builder -> runtime` の三段構成です。builder は
+`build-essential`、`curl`、`gnupg`、`ninja`、system `pip`、npm/corepack、
+`rustup-init` と Cargo build を所有し、そこから生成した dependency plan / receipts、
+AgentCanon binary、full Rust components、pipx venvs、Node LSP assets のみを
+fresh Ubuntu runtime へコピーします。Cargo target/registry/git cache、npm/npx/corepack、
+rustup-init は runtime に持ち込みません。cache mount は使用しません。
+
+runtime が保持する system capability は `ca-certificates`、`git`、`jq`、`tree`、
+Python 3 と `packaging`/`tomli`/`yaml`、`pipx`、および固定 digest の `clangd-18` です。
+clangd の apt key、source list、apt lists と transient build tools は同じ runtime
+layer 内で検証後に削除します。pytest、pip、ninja、build-essential、curl、gnupg、
+clang-format は runtime に存在してはなりません。
+
 `bootstrap/container/image/Dockerfile` は次を必須にします。
 
 ```text

@@ -6,33 +6,16 @@
 # downstream implementation ./entrypoint.sh resident runtime and health probe
 # @dependency-end
 
-# The Node provider is copied into the fixed Ubuntu image so npm LSP tools stay
-# image-owned. Both base images are pinned to immutable multi-platform OCI
-# indexes and selected for the target platform; no project checkout is used as
-# an image build input other than the canonical Rust CLI source, public tool
-# assets, and this standalone dependency manifest.
 ARG TARGETPLATFORM
 FROM node:22.14.0-bullseye-slim@sha256:73a9dfbb6c761aebdf4666cce2627635a30d1d4c20f67ff642d01b8f09e709a3 AS node-provider
 
-FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
-
-ENV PYTHONDONTWRITEBYTECODE=1
-
-LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
-      io.agent-canon.runtime="shared-v1" \
-      io.agent-canon.container.max-instances="1" \
-      io.agent-canon.run.read-only-rootfs="true" \
-      io.agent-canon.run.network="none" \
-      io.agent-canon.run.cap-drop="ALL" \
-      io.agent-canon.run.no-new-privileges="true" \
-      io.agent-canon.run.cpus="2" \
-      io.agent-canon.run.memory="4g" \
-      io.agent-canon.run.pids-limit="512" \
-      io.agent-canon.run.tmpfs="/tmp"
-
+# Disposable builder owns compilers, package managers, repository signing
+# tools, rustup-init, and Cargo's build target.
+FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
+ENV PYTHONDONTWRITEBYTECODE=1
 
 RUN set -eux; \
     apt-get update; \
@@ -46,17 +29,12 @@ RUN set -eux; \
       python3 \
       python3-pip \
       python3-packaging \
-      python3-pytest \
       python3-tomli \
-      python3-yaml; \
-    install -d -m 0755 /workspace /var/lib/agent-canon/runtime /usr/local/share/agent-canon; \
-    chmod 1777 /tmp; \
-    printf 'agent-canon-tool-container/v1\n' > /usr/local/share/agent-canon/.agent-canon-tool-container; \
-    chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
-    test "$(stat -c '%a:%u:%g' /usr/local/share/agent-canon/.agent-canon-tool-container)" = '444:0:0'
+      python3-yaml \
+      pipx; \
+    install -d -m 0755 /workspace /var/lib/agent-canon/runtime /usr/local/share/agent-canon
 
-# Node and npm are image-owned capabilities. The provider remains digest
-# pinned while the final image owns the stable executable locations.
+# Node/npm/corepack are builder-only package-management capabilities.
 COPY --from=node-provider /usr/local/bin/node /usr/local/bin/node
 COPY --from=node-provider /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=node-provider /usr/local/bin/npm /usr/local/bin/npm
@@ -79,10 +57,6 @@ RUN set -eux; \
     chmod 0555 /usr/local/bin/rustup-init; \
     /usr/local/bin/rustup-init --version | grep -F '1.28.2' >/dev/null
 
-# The host bootstrap supplies these paths in the repository-root build
-# context. They are copied into a disposable installer workspace and removed
-# in the same layer.  The manifest is explicit: no synthetic developer
-# configuration path is needed by the standalone image installer.
 COPY bootstrap/container/image/dependencies.toml /opt/agent-canon/bootstrap/container/image/dependencies.toml
 COPY tools/runtime/container/devcontainer_dependencies.py /opt/agent-canon/tools/runtime/container/devcontainer_dependencies.py
 COPY tools/analysis/dependencies/dependency_plan.py /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py
@@ -107,35 +81,122 @@ RUN python3 /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py \
     && test -d /usr/local/share/agent-canon/toolchains/cargo \
     && test -d /usr/local/share/agent-canon/toolchains/rustup \
     && test -f /usr/local/share/agent-canon/image-dependencies/plan.json \
+    && test -f /usr/local/share/agent-canon/image-dependencies/receipts/agent-canon-cli.json \
     && install -d -m 0555 /usr/local/share/agent-canon/runtime \
-    && install -m 0444 /opt/agent-canon/bootstrap/container/image/dependencies.toml \
-      /usr/local/share/agent-canon/runtime/dependencies.toml \
+    && install -m 0444 /opt/agent-canon/bootstrap/container/image/dependencies.toml /usr/local/share/agent-canon/runtime/dependencies.toml \
     && printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime \
     && chmod 0444 /usr/local/share/agent-canon/runtime/.agent-canon-runtime \
     && test "$(stat -c '%a:%u:%g' /usr/local/share/agent-canon/runtime/.agent-canon-runtime)" = '444:0:0' \
+    && rm -rf "$AGENT_CANON_CARGO_TARGET_DIR" "$CARGO_HOME/registry" "$CARGO_HOME/git" "$RUSTUP_HOME/downloads" "$RUSTUP_HOME/tmp" /root/.npm /usr/local/bin/rustup-init \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /opt/agent-canon \
-    && test ! -e /opt/agent-canon
+    && test ! -e /opt/agent-canon \
+    && test ! -e "$AGENT_CANON_CARGO_TARGET_DIR" \
+    && test ! -e "$CARGO_HOME/registry" \
+    && test ! -e "$CARGO_HOME/git"
 
-# Public tool assets are layered after the expensive dependency/Rust build so
-# catalog and Python-tool updates do not rebuild the shared toolchain.
+# Fresh Ubuntu runtime contains only retained system capabilities.
+FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc AS runtime
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+ENV PYTHONDONTWRITEBYTECODE=1
+
+LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
+      io.agent-canon.runtime="shared-v1" \
+      io.agent-canon.container.max-instances="1" \
+      io.agent-canon.run.read-only-rootfs="true" \
+      io.agent-canon.run.network="none" \
+      io.agent-canon.run.cap-drop="ALL" \
+      io.agent-canon.run.no-new-privileges="true" \
+      io.agent-canon.run.cpus="2" \
+      io.agent-canon.run.memory="4g" \
+      io.agent-canon.run.pids-limit="512" \
+      io.agent-canon.run.tmpfs="/tmp"
+
+RUN set -eux; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      ca-certificates git jq=1.6-2.1ubuntu3.2 tree=2.0.2-1 python3 \
+      python3-packaging python3-tomli python3-yaml pipx; \
+    install -d -m 0755 /workspace /var/lib/agent-canon/runtime /usr/local/share/agent-canon; \
+    chmod 1777 /tmp; \
+    printf 'agent-canon-tool-container/v1\n' > /usr/local/share/agent-canon/.agent-canon-tool-container; \
+    chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
+    test "$(stat -c '%a:%u:%g' /usr/local/share/agent-canon/.agent-canon-tool-container)" = '444:0:0'
+
+# Copy only node, the two declared JavaScript LSP trees, and their launchers.
+COPY --from=builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=builder /usr/local/lib/node_modules/pyright /usr/local/lib/node_modules/pyright
+COPY --from=builder /usr/local/lib/node_modules/bash-language-server /usr/local/lib/node_modules/bash-language-server
+COPY --from=builder /usr/local/bin/pyright /usr/local/bin/pyright
+COPY --from=builder /usr/local/bin/pyright-langserver /usr/local/bin/pyright-langserver
+COPY --from=builder /usr/local/bin/bash-language-server /usr/local/bin/bash-language-server
+
+# Copy pipx environments and only their public launchers.
+COPY --from=builder /usr/local/share/agent-canon/pipx/venvs/check-jsonschema /usr/local/share/agent-canon/pipx/venvs/check-jsonschema
+COPY --from=builder /usr/local/share/agent-canon/pipx/venvs/yamllint /usr/local/share/agent-canon/pipx/venvs/yamllint
+COPY --from=builder /usr/local/bin/check-jsonschema /usr/local/bin/check-jsonschema
+COPY --from=builder /usr/local/bin/yamllint /usr/local/bin/yamllint
+
+# Keep complete declared Rust components, but no Cargo target/registry/git
+# caches.  The builder cleaned these before copying.
+COPY --from=builder /usr/local/share/agent-canon/toolchains/cargo/bin /usr/local/share/agent-canon/toolchains/cargo/bin
+COPY --from=builder /usr/local/share/agent-canon/toolchains/rustup /usr/local/share/agent-canon/toolchains/rustup
+COPY --from=builder /usr/local/bin/agent-canon /usr/local/bin/agent-canon
+COPY --from=builder /usr/local/share/agent-canon/image-dependencies /usr/local/share/agent-canon/image-dependencies
+COPY --from=builder /usr/local/share/agent-canon/runtime/dependencies.toml /usr/local/share/agent-canon/runtime/dependencies.toml
+COPY --from=builder /usr/local/share/agent-canon/runtime/.agent-canon-runtime /usr/local/share/agent-canon/runtime/.agent-canon-runtime
+
+ENV CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
+    RUSTUP_HOME=/usr/local/share/agent-canon/toolchains/rustup \
+    PIPX_HOME=/usr/local/share/agent-canon/pipx \
+    PIPX_BIN_DIR=/usr/local/bin \
+    PIPX_MAN_DIR=/usr/local/share/man \
+    AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies \
+    PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
+
+# clangd is installed, verified, and cleaned in one runtime layer.  curl,
+# gnupg, the repository key/source, and apt indexes do not survive the layer.
+RUN set -eux; \
+    case "$TARGETOS/$TARGETARCH" in \
+      linux/amd64) llvm_arch=amd64; clangd_sha=05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660 ;; \
+      linux/arm64) llvm_arch=arm64; clangd_sha=c98c785017ed4c0d1e45ee42d78fabe4eda569c28e67d5811da49cec8d528599 ;; \
+      *) echo "unsupported_target_arch=$TARGETOS/$TARGETARCH" >&2; exit 2 ;; \
+    esac; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl gnupg; \
+    temporary="$(mktemp -d)"; \
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output "$temporary/llvm-snapshot.gpg.key" https://apt.llvm.org/llvm-snapshot.gpg.key; \
+    test "$(gpg --show-keys --with-colons "$temporary/llvm-snapshot.gpg.key" | awk -F: '$1 == "fpr" {print toupper($10); exit}')" = '6084F3CF814B57C1CF12EFD515CF4D18AF4F7421'; \
+    gpg --dearmor --output "$temporary/llvm.gpg" "$temporary/llvm-snapshot.gpg.key"; \
+    install -D -m 0644 "$temporary/llvm.gpg" /etc/apt/keyrings/clangd-language-server.gpg; \
+    printf 'deb [arch=%s signed-by=/etc/apt/keyrings/clangd-language-server.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main\n' "$llvm_arch" > /etc/apt/sources.list.d/clangd-language-server.list; \
+    apt-get update; \
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output "$temporary/clangd-18.deb" "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_${llvm_arch}.deb"; \
+    echo "$clangd_sha  $temporary/clangd-18.deb" | sha256sum --check --strict; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$temporary/clangd-18.deb"; \
+    clangd-18 --version | grep -F 'clangd version 18.1.8' >/dev/null; \
+    rm -rf /etc/apt/keyrings/clangd-language-server.gpg /etc/apt/sources.list.d/clangd-language-server.list /var/lib/apt/lists/* "$temporary"; \
+    DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove curl gnupg; \
+    rm -rf /var/lib/apt/lists/*; \
+    test ! -e /etc/apt/keyrings/clangd-language-server.gpg; \
+    test ! -e /etc/apt/sources.list.d/clangd-language-server.list; \
+    test ! -e /usr/bin/curl; \
+    test ! -e /usr/bin/gpg
+
 COPY tools /usr/local/share/agent-canon/runtime/tools
 COPY agents /usr/local/share/agent-canon/runtime/agents
 COPY documents /usr/local/share/agent-canon/runtime/documents
 COPY schemas /usr/local/share/agent-canon/runtime/schemas
 COPY bootstrap/host/manifest.toml /usr/local/share/agent-canon/runtime/bootstrap/host/manifest.toml
-# The generated host view is intentionally excluded from the build context.
-# Reuse the canonical materializer in the image layer so this path is derived
-# from the tracked catalog and canonical skill documents at build time.
 RUN install -d -m 0755 /usr/local/share/agent-canon/runtime/.codex/personal \
     && command -v yamllint \
     && command -v check-jsonschema \
     && test -f /usr/local/share/agent-canon/runtime/schemas/agent-canon/skill-catalog.schema.json \
     && test -f /usr/local/share/agent-canon/runtime/schemas/agent-canon/skill-dependencies.schema.json \
     && test -f /usr/local/share/agent-canon/runtime/schemas/agent-canon/tool-catalog.schema.json \
-    && AGENT_CANON_IMAGE_BUILD=1 python3 \
-      /usr/local/share/agent-canon/runtime/tools/agent/skills/skill_shim_materializer.py \
-      materialize --root /usr/local/share/agent-canon/runtime --all --image-build --format text
+    && AGENT_CANON_IMAGE_BUILD=1 python3 /usr/local/share/agent-canon/runtime/tools/agent/skills/skill_shim_materializer.py materialize --root /usr/local/share/agent-canon/runtime --all --image-build --format text
 COPY .codex/agents /usr/local/share/agent-canon/runtime/.codex/agents
 COPY .codex/config.toml /usr/local/share/agent-canon/runtime/.codex/config.toml
 COPY eval/definitions /usr/local/share/agent-canon/runtime/eval/definitions
@@ -145,7 +206,28 @@ COPY eval/fixtures /usr/local/share/agent-canon/runtime/eval/fixtures
 COPY references /usr/local/share/agent-canon/runtime/references
 COPY templates /usr/local/share/agent-canon/runtime/templates
 COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/
-RUN test -f /usr/local/share/agent-canon/runtime/tools/catalog.yaml \
+
+# Final capability, receipt, import, and absence checks.
+RUN set -eux; \
+    test -x /usr/local/bin/agent-canon; \
+    test -x /usr/local/bin/node; node --version >/dev/null; \
+    pyright --version | grep -F '1.1.411' >/dev/null; pyright-langserver --version >/dev/null; \
+    bash-language-server --version | grep -F '5.6.0' >/dev/null; \
+    check-jsonschema --version | grep -F '0.31.0' >/dev/null; yamllint --version | grep -F '1.35.1' >/dev/null; \
+    command -v jq; command -v tree; command -v clangd-18; \
+    command -v cargo; command -v rustc; command -v rustfmt; command -v clippy-driver; command -v rust-analyzer; \
+    python3 -c 'import packaging, tomli, yaml'; \
+    test -f /usr/local/share/agent-canon/image-dependencies/plan.json; \
+    test -f /usr/local/share/agent-canon/image-dependencies/receipts/agent-canon-cli.json; \
+    test -f /usr/local/share/agent-canon/image-dependencies/receipts/clangd-language-server.json; \
+    test -f /usr/local/share/agent-canon/image-dependencies/receipts/rust-toolchain.json; \
+    test ! -e /usr/local/share/agent-canon/toolchains/cargo-target; \
+    test ! -e /usr/local/share/agent-canon/toolchains/cargo/registry; \
+    test ! -e /usr/local/share/agent-canon/toolchains/cargo/git; \
+    test ! -e /usr/local/bin/rustup-init; \
+    ! command -v pytest; ! command -v pip; ! command -v pip3; ! command -v ninja; ! command -v curl; ! command -v gpg; \
+    ! command -v npm; ! command -v npx; ! command -v corepack; ! command -v clang-format; \
+    test -f /usr/local/share/agent-canon/runtime/tools/catalog.yaml \
     && test -f /usr/local/share/agent-canon/runtime/tools/runtime/dispatch/tool_dispatch.py \
     && test -f /usr/local/share/agent-canon/runtime/tools/bin/agent-canon \
     && test -f /usr/local/share/agent-canon/runtime/tools/fixtures/tool_dispatch/public-command-parity.json \
@@ -172,11 +254,8 @@ ENV AGENT_CANON_CONTROL_PARENT_ROOT=/var/lib/agent-canon \
     AGENT_CANON_MOUNT_REGISTRY=/var/lib/agent-canon/mount-registry.toml \
     AGENT_CANON_IMAGE_MARKER_DIGEST=sha256:fa0a3ed734c6aa712c8446f5ea945470396df6427df761d75b78ed6ea146bcf9 \
     AGENT_CANON_RUNTIME_MARKER_DIGEST=sha256:86eded2c0e3aa36f3fe24e59a54f4eb18b0a152161d889617560a7553947ca13
-
 WORKDIR /workspace
-
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["/usr/local/bin/agent-canon-container-entrypoint", "health"]
-
 ENTRYPOINT ["/usr/local/bin/agent-canon-container-entrypoint"]
 CMD ["resident"]

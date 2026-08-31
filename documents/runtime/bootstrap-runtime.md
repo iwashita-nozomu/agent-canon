@@ -24,6 +24,16 @@ GitHub actions, and arbitrary host commands remain owned by the project or
 host workflow. No project-specific AgentCanon image, container, virtualenv,
 Cargo toolchain, volume, or source checkout is created.
 
+The published image uses a digest-pinned `node-provider -> builder -> runtime`
+pipeline. Build-essential, system pip, npm/corepack, rustup-init, Cargo targets,
+and repository-signing tools exist only in the disposable builder. The fresh
+Ubuntu runtime receives the declared Python/Rust/LSP artifacts, pipx venvs, and
+the exact `clangd-18` package; it excludes pytest, pip, ninja, build-essential,
+curl, gnupg, clang-format, package-manager caches, and Cargo registry/git/target
+caches. No Docker cache mounts are used. The runtime layer verifies the clangd
+apt key and package digest before removing its key, source list, apt indexes, and
+transient installers.
+
 ## Host/container activation boundary
 
 `bootstrap.sh` and `bootstrap/host/lifecycle/entrypoint.sh` are executable by a host that
