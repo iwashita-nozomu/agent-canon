@@ -203,6 +203,27 @@ readback します。`docker system prune` は使用せず、manifest-owned exac
 `bootstrap/container/image/Dockerfile` は旧developer-containerの dependency planning / Python / Rust build 部分だけを再利用します。editor、post-create、GPU、
 Compose、workspace lifecycle は移植せず、旧developer-container surfaceは削除します。
 
+Image は `node-provider -> runtime-base -> builder -> runtime` の四段構成です。
+runtime-base は retained system closure と exact clangd を一度だけ導入し、key/source/
+apt lists と transient installer を同じ layer で削除します。builder はそこへ
+`build-essential`、`curl`、pipx、npm/corepack、`rustup-init` と Cargo build を一時的に
+加え、builder-owned records から生成した dependency plan / receipts、AgentCanon
+binary、full Rust components、pipx venvs、Node LSP assets のみを final runtime へ
+コピーします。system `pip` は不要です。Cargo target/registry/git cache、npm/npx/corepack、
+rustup-init は runtime に持ち込みません。cache mount は使用しません。
+
+この dependency plan / receipts は `--records` で選択した builder-owned records の
+build provenance です。`clangd-language-server` は apt-package capability として
+plan/receipt set に含めますが、インストール元の key/source/package checksum と
+exact package installation は runtime-base が一度だけ所有します。builder の
+image-install は既に導入済みの exact package を再取得せず receipt-bound にします。
+
+runtime が保持する system capability は `ca-certificates`、`git`、`jq`、`tree`、
+Python 3 と `packaging`/`tomli`/`yaml`、pipx-managed venv launchers、および固定 digest の `clangd-18` です。
+clangd の apt key、source list、apt lists と transient build tools は同じ runtime
+layer 内で検証後に削除します。pytest、pip、ninja、build-essential、curl、gnupg、
+clang-format は runtime に存在してはなりません。
+
 `bootstrap/container/image/Dockerfile` は次を必須にします。
 
 ```text

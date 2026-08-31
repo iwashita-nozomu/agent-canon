@@ -79,6 +79,15 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "rootless" not in text.lower()
     digests = re.findall(r"@sha256:([0-9a-f]{64})(?:\s|$)", text, re.MULTILINE)
     assert len(digests) == 2
+    assert (
+        text.index("AS node-provider")
+        < text.index("AS runtime-base")
+        < text.index("AS builder")
+        < text.index("FROM runtime-base AS runtime")
+    )
+    assert text.count("FROM runtime-base AS ") == 2
+    assert "--mount=type=cache" not in text
+    assert "FROM ubuntu:22.04@sha256:" in text[text.rfind("FROM ubuntu") :]
     assert "--manifest /opt/agent-canon/bootstrap/container/image/dependencies.toml" in text
     assert "COPY bootstrap/container/image/dependencies.toml" in text
     assert "COPY tools /usr/local/share/agent-canon/runtime/tools" in text
@@ -107,6 +116,77 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "COPY bootstrap/container/dispatch/tool-wrapper.sh" in text
     assert "COPY bootstrap/container/lifecycle/entrypoint.sh" in text
     assert "/.devcontainer/" not in text
+
+
+def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert "COPY --from=builder /usr/local/bin/node /usr/local/bin/node" in text
+    assert "/usr/local/lib/node_modules/pyright" in text
+    assert "/usr/local/lib/node_modules/bash-language-server" in text
+    assert "/usr/local/bin/pyright" in text
+    assert "/usr/local/bin/pyright-langserver" in text
+    assert "/usr/local/bin/bash-language-server" in text
+    assert "ln -sfn ../lib/node_modules/pyright/index.js /usr/local/bin/pyright" in text
+    assert "ln -sfn ../lib/node_modules/pyright/langserver.index.js /usr/local/bin/pyright-langserver" in text
+    assert "ln -sfn ../lib/node_modules/bash-language-server/out/cli.js /usr/local/bin/bash-language-server" in text
+    assert "COPY --from=builder /usr/local/bin/pyright" not in text
+    assert "COPY --from=builder /usr/local/bin/pyright-langserver" not in text
+    assert "COPY --from=builder /usr/local/bin/bash-language-server" not in text
+    assert "/usr/local/share/agent-canon/pipx/venvs/check-jsonschema" in text
+    assert "/usr/local/share/agent-canon/pipx/venvs/yamllint" in text
+    assert "/usr/local/share/agent-canon/toolchains/cargo/bin" in text
+    assert "/usr/local/share/agent-canon/toolchains/rustup" in text
+    assert "/usr/local/share/agent-canon/image-dependencies" in text
+    assert "COPY --from=builder /usr/local/bin/npm" not in text
+    assert "COPY --from=builder /usr/local/bin/npx" not in text
+    assert "COPY --from=builder /usr/local/bin/corepack" not in text
+    assert "test -x /usr/local/bin/pyright-langserver" in text
+    assert 'langserver="$(readlink -f /usr/local/bin/pyright-langserver)"' in text
+    assert 'node --check "$langserver"' in text
+    assert "pyright-langserver --version" not in text
+
+
+def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None:
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    runtime_base = text[text.index("FROM ubuntu:22.04"): text.index("FROM runtime-base AS builder")]
+    runtime = text[text.index("FROM runtime-base AS runtime") :]
+    for marker in (
+        "clangd-18 --version",
+        "sha256sum --check --strict",
+        "6084F3CF814B57C1CF12EFD515CF4D18AF4F7421",
+        "clangd-language-server.gpg",
+        "clangd-language-server.list",
+        "apt-get purge -y --auto-remove curl gnupg",
+    ):
+        assert marker in runtime_base
+    for marker in (
+        "! command -v pytest",
+        "! command -v pip",
+        "! command -v ninja",
+        "! command -v curl",
+        "! command -v gpg",
+        "! command -v pipx",
+        "test ! -e /usr/bin/pipx",
+        "test ! -d /usr/lib/python3/dist-packages/pipx",
+        "! command -v clang-format",
+    ):
+        assert marker in runtime
+    assert "python3-pytest" not in runtime
+    assert "python3-pip" not in runtime
+    assert "build-essential" not in runtime
+    builder = text[text.index("FROM runtime-base AS builder") : text.index("FROM runtime-base AS runtime")]
+    assert "pipx" in builder
+    assert "python3-pip" not in builder
+    assert "gnupg" not in builder
+    assert "ninja-build" not in builder
+    assert "apt-get update" in builder
+    assert "--records pipx pyright-language-server bash-language-server jq tree clangd-language-server rust-toolchain check-jsonschema yamllint agent-canon-cli" in builder
+    assert "test -f /usr/local/share/agent-canon/image-dependencies/receipts/clangd-language-server.json" in builder
+    assert "clangd-language-server.json" in runtime
+    assert "pipx" not in runtime_base
+    assert "python3-pip" not in runtime_base
+    assert text.count("printf 'deb [arch=%s") == 1
+    assert text.count("clangd-18 --version") == 1
 
 
 def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
@@ -258,7 +338,6 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "bash-language-server",
         "jq",
         "tree",
-        "clang-format",
         "clangd-language-server",
         "rust-toolchain",
         "agent-canon-cli",
@@ -284,6 +363,14 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     assert cli["cargo_lock_sha256"] == lock_digest
     assert cli["source"] == "tools/runtime/dispatch/agent-canon"
     assert all("project" not in str(record).lower() for record in records)
+    clangd = next(record for record in records if record["id"] == "clangd-language-server")
+    assert clangd["method"] == "apt-package"
+    assert clangd["package"] == "clangd-18"
+    assert clangd["source"] == "https://apt.llvm.org/jammy/"
+    assert clangd["executable_owner_packages"] == ["clangd-18"]
+    assert clangd["verification"]["kind"] == "apt-package"
+    assert not any(key.startswith("repository_") for key in clangd)
+    assert 'Path(spec.command[0]).name == "clangd"' in DOCKERFILE.read_text(encoding="utf-8")
 
 
 def test_single_repository_dockerignore_is_deny_by_default() -> None:

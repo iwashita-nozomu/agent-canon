@@ -24,6 +24,21 @@ GitHub actions, and arbitrary host commands remain owned by the project or
 host workflow. No project-specific AgentCanon image, container, virtualenv,
 Cargo toolchain, volume, or source checkout is created.
 
+The published image uses a digest-pinned
+`node-provider -> runtime-base -> builder -> runtime` pipeline. The reusable
+runtime-base installs the retained Ubuntu closure and exact `clangd-18` once,
+then removes its key, source list, apt indexes, and transient installers. The
+disposable builder adds build-essential, curl, pipx, npm/corepack, rustup-init,
+and Cargo build support; system pip, gnupg, and ninja are unnecessary.
+The final runtime receives only declared Python/Rust/LSP artifacts, pipx venvs,
+and builder-owned build receipts/plan. The plan/receipt set includes the
+`clangd-language-server` apt-package capability; runtime-base alone owns its
+key/source/package URL and checksum installation, while the builder binds the
+already-installed exact package to its receipt without re-fetching it. The final
+runtime has no pipx package or command and excludes pytest,
+pip, ninja, build-essential, curl, gnupg, clang-format, package-manager caches,
+and Cargo registry/git/target caches. No Docker cache mounts are used.
+
 ## Host/container activation boundary
 
 `bootstrap.sh` and `bootstrap/host/lifecycle/entrypoint.sh` are executable by a host that
