@@ -13,7 +13,7 @@ import json
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -352,13 +352,40 @@ def test_math_wave_emits_separate_nonmath_handoff_without_arch_writer() -> None:
 
 
 @contextmanager
+def temporary_runtime(
+    cleanup: Callable[[Callable[[], None]], None] | None = None,
+) -> Iterator[Path]:
+    """Own a temporary runtime and preserve body errors over cleanup errors."""
+    temporary = tempfile.TemporaryDirectory(prefix="math-intent-runtime-")
+    runtime = Path(temporary.name)
+    primary_exception: BaseException | None = None
+    try:
+        yield runtime
+    except BaseException as exc:
+        primary_exception = exc
+        raise
+    finally:
+        try:
+            if cleanup is None:
+                temporary.cleanup()
+            else:
+                cleanup(temporary.cleanup)
+            if runtime.exists():
+                raise AssertionError(f"temporary runtime remains: {runtime}")
+        except BaseException as cleanup_exception:
+            if primary_exception is None:
+                raise
+            primary_exception.add_note(
+                f"temporary runtime cleanup failed: {cleanup_exception}"
+            )
+
+
+@contextmanager
 def run_bootstrap(
     *args: str,
 ) -> Iterator[tuple[subprocess.CompletedProcess[str], Path]]:
     """Run normal bootstrap with creator-owned cleanup of its runtime root."""
-    temporary = tempfile.TemporaryDirectory(prefix="math-intent-runtime-")
-    runtime = Path(temporary.name)
-    try:
+    with temporary_runtime() as runtime:
         result = subprocess.run(
             [
                 sys.executable,
@@ -387,9 +414,30 @@ def run_bootstrap(
             runtime / "reports" / "agents",
         )
         yield result, report_dir
-    finally:
-        temporary.cleanup()
-        assert not runtime.exists(), f"temporary runtime remains: {runtime}"
+
+
+def test_temporary_runtime_cleanup_failure_preserves_primary_exception() -> None:
+    """Cleanup diagnostics must not replace an exception from the test body."""
+    def fail_after_cleanup(cleanup: Callable[[], None]) -> None:
+        cleanup()
+        raise RuntimeError("cleanup failed")
+
+    with pytest.raises(ValueError, match="body failed") as raised:
+        with temporary_runtime(cleanup=fail_after_cleanup):
+            raise ValueError("body failed")
+
+    assert any("cleanup failed" in note for note in raised.value.__notes__)
+
+
+def test_temporary_runtime_cleanup_only_failure_is_raised() -> None:
+    """Cleanup failure is raised when the managed body completed normally."""
+    def fail_after_cleanup(cleanup: Callable[[], None]) -> None:
+        cleanup()
+        raise RuntimeError("cleanup failed")
+
+    with pytest.raises(RuntimeError, match="cleanup failed"):
+        with temporary_runtime(cleanup=fail_after_cleanup):
+            pass
 
 
 def test_normal_math_bootstrap_requires_packet_before_run() -> None:

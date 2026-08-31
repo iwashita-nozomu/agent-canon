@@ -37,8 +37,13 @@ use crate::runtime_boundary::resolve_runtime_root_at;
 use serde_json::Value;
 use std::env;
 use std::fs;
+use std::io::{ErrorKind, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[test]
 fn markdown_segmentation_emits_document_sections_and_blocks() {
@@ -889,7 +894,7 @@ fn merge_candidates_exclude_same_file_pairs_by_default() {
 fn merge_candidates_stay_within_responsibility_bucket_on_full_repo_input() {
     let root = unique_temp_dir("semantic-index-merge-buckets");
     fs::create_dir_all(root.join("docs")).unwrap();
-    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir(root.join("src")).unwrap();
     let duplicate =
         "# Duplicate\nshared responsibility vector phrase\n\nshared responsibility vector phrase";
     fs::write(root.join("docs").join("one.md"), duplicate).unwrap();
@@ -992,7 +997,7 @@ fn responsibility_scope_bucket_tracks_manifest_surfaces() {
 fn similar_pairs_can_cross_responsibility_bucket_for_alignment_search() {
     let root = unique_temp_dir("semantic-index-similar-cross-bucket");
     fs::create_dir_all(root.join("docs")).unwrap();
-    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir(root.join("src")).unwrap();
     let duplicate = "# Alignment\nsame exact phrase for code and docs";
     fs::write(root.join("docs").join("alignment.md"), duplicate).unwrap();
     fs::write(root.join("src").join("alignment.py"), duplicate).unwrap();
@@ -1626,24 +1631,45 @@ impl TempDirGuard {
 impl Drop for TempDirGuard {
     fn drop(&mut self) {
         for runtime_root in &self.runtime_roots {
-            let _ = fs::remove_dir_all(runtime_root);
+            if let Err(error) = fs::remove_dir_all(runtime_root) {
+                report_cleanup_failure(runtime_root, &error);
+            }
         }
-        let _ = fs::remove_dir_all(&self.path);
+        if let Err(error) = fs::remove_dir_all(&self.path) {
+            report_cleanup_failure(&self.path, &error);
+        }
     }
 }
 
 fn unique_temp_dir(prefix: &str) -> TempDirGuard {
-    let path = env::temp_dir().join(format!(
-        "{prefix}-{}-{}",
-        std::process::id(),
-        temporary_db_identity()
-    ));
+    let path = loop {
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock before Unix epoch")
+            .as_nanos();
+        let candidate =
+            env::temp_dir().join(format!("{prefix}-{}-{nanos}-{counter}", std::process::id(),));
+        match fs::create_dir(&candidate) {
+            Ok(()) => break candidate,
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!("create test fixture {}: {error}", candidate.display()),
+        }
+    };
     let mut guard = TempDirGuard {
         runtime_roots: Vec::new(),
         path,
     };
-    fs::create_dir_all(&guard.path).unwrap();
     let source_root = guard.path.clone();
     guard.track_runtime_root(&source_root);
     guard
+}
+
+fn report_cleanup_failure(path: &Path, error: &std::io::Error) {
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(
+        stderr,
+        "semantic-index test cleanup failed for {}: {error}",
+        path.display()
+    );
 }
