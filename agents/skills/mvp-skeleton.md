@@ -28,7 +28,8 @@ downstream implementation ../../.codex/personal/skills/mvp-skeleton/SKILL.md exp
 scope. It owns the scope line: one core user, one core loop, one runnable path,
 one smoke check, and the required failure handling, cleanup, and acceptance for
 that path. A smaller scope is valid when it is explicitly selected and complete;
-this skill does not create a staged implementation plan.
+this skill does not define partial completion: waves may sequence the complete
+target state, but no wave is a completed first implementation.
 
 Route product strategy, growth planning, production hardening, architecture
 design, visual polish, deployment, and comprehensive test strategy to their
