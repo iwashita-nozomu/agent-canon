@@ -1718,14 +1718,10 @@ def _validate_method_values(record: DependencyRecord) -> None:
                 f"{record.id}.source_identity must be one of active-source or canonical-snapshot"
             )
         if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
-            for field_name, value in (
-                ("source_tree_sha256", record.source_tree_sha256),
-                ("cargo_lock_sha256", record.cargo_lock_sha256),
-            ):
-                if value is None or SHA256_RE.fullmatch(value) is None:
-                    raise DependencyError(
-                        f"{record.id}.{field_name} is required for canonical-snapshot"
-                    )
+            if record.source_tree_sha256 is not None and SHA256_RE.fullmatch(record.source_tree_sha256) is None:
+                raise DependencyError(f"{record.id}.source_tree_sha256 must be a SHA256 when declared")
+            if record.cargo_lock_sha256 is None or SHA256_RE.fullmatch(record.cargo_lock_sha256) is None:
+                raise DependencyError(f"{record.id}.cargo_lock_sha256 is required for canonical-snapshot")
         elif record.source_tree_sha256 is not None or record.cargo_lock_sha256 is not None:
             raise DependencyError(
                 f"{record.id}: source snapshot digests require canonical-snapshot"
@@ -2437,8 +2433,6 @@ def _image_record_is_safe(record: DependencyRecord) -> bool:
         return (
             record.locked is True
             and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY
-            and record.source_tree_sha256 is not None
-            and SHA256_RE.fullmatch(record.source_tree_sha256) is not None
             and record.cargo_lock_sha256 is not None
             and SHA256_RE.fullmatch(record.cargo_lock_sha256) is not None
         )
@@ -3604,7 +3598,10 @@ class Installer:
             == _repository_packages_payload(record)
             and payload.get("repository_package")
             == _repository_package_payload(record)
-            and payload.get("source_tree_sha256") == record.source_tree_sha256
+            and (
+                record.source_tree_sha256 is None
+                or payload.get("source_tree_sha256") == record.source_tree_sha256
+            )
             and payload.get("cargo_lock_sha256") == record.cargo_lock_sha256
             and (
                 record.method is not Method.CARGO_SOURCE_BUILD
@@ -4599,7 +4596,7 @@ class Installer:
         source = self._cargo_source(record, workspace)
         source_digest, lock_digest = self._cargo_snapshot(source)
         if (
-            source_digest != record.source_tree_sha256
+            (record.source_tree_sha256 is not None and source_digest != record.source_tree_sha256)
             or lock_digest != record.cargo_lock_sha256
         ):
             raise DependencyError(

@@ -786,6 +786,24 @@ class DependencyModelTests(unittest.TestCase):
         self.assertTrue(dependency_module._image_record_is_safe(cargo))
         self.assertFalse(dependency_module._image_record_is_safe(active))
 
+    def test_canonical_snapshot_computes_source_digest_without_manifest_expectation(self) -> None:
+        """Canonical Cargo records require the lock digest; source digest is observed receipt data."""
+        cargo = parse_record(
+            record(
+                "agent-canon-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://github.com/example/agent-canon.git",
+                source_identity="canonical-snapshot",
+                cargo_lock_sha256="b" * 64,
+                locked=True,
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        self.assertIsNone(cargo.source_tree_sha256)
+        self.assertTrue(dependency_module._image_record_is_safe(cargo))
+
     def test_image_owned_full_plan_publishes_final_binary_only_for_cargo(self) -> None:
         """Image final-binary publication does not run for apt or Rust records."""
         apt = parse_record(

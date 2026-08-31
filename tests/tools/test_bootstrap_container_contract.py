@@ -272,12 +272,12 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     cli = next(record for record in records if record["id"] == "agent-canon-cli")
     assert cli["source_identity"] == "canonical-snapshot"
     assert cli["locked"] is True
-    assert len(cli["source_tree_sha256"]) == 64
+    assert "source_tree_sha256" not in cli
     assert len(cli["cargo_lock_sha256"]) == 64
     source_digest, lock_digest = Installer._cargo_snapshot(
         ROOT / "tools/runtime/dispatch/agent-canon"
     )
-    assert cli["source_tree_sha256"] == source_digest
+    assert len(source_digest) == 64
     assert cli["cargo_lock_sha256"] == lock_digest
     assert cli["source"] == "tools/runtime/dispatch/agent-canon"
     assert all("project" not in str(record).lower() for record in records)
