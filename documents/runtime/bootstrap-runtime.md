@@ -24,20 +24,19 @@ GitHub actions, and arbitrary host commands remain owned by the project or
 host workflow. No project-specific AgentCanon image, container, virtualenv,
 Cargo toolchain, volume, or source checkout is created.
 
-The published image uses a digest-pinned
-`node-provider -> runtime-base -> builder -> runtime` pipeline. The reusable
-runtime-base installs the retained Ubuntu closure and exact `clangd-18` once,
-then removes its key, source list, apt indexes, and transient installers. The
-disposable builder adds build-essential, curl, pipx, npm/corepack, rustup-init,
-and Cargo build support; system pip, gnupg, and ninja are unnecessary.
-The final runtime receives only declared Python/Rust/LSP artifacts, pipx venvs,
-and builder-owned build receipts/plan. The plan/receipt set includes the
-`clangd-language-server` apt-package capability; runtime-base alone owns its
-key/source/package URL and checksum installation, while the builder binds the
-already-installed exact package to its receipt without re-fetching it. The final
-runtime has no pipx package or command and excludes pytest,
-pip, ninja, build-essential, curl, gnupg, clang-format, package-manager caches,
-and Cargo registry/git/target caches. No Docker cache mounts are used.
+The published artifact is one digest-pinned Ubuntu 24.04 output image. Runtime
+and build dependencies are installed in one apt transaction/update, followed by
+dependency and asset/materializer layers. Build-essential, curl, pipx, npm,
+`rustup-init`, Cargo build output, and caches are purged before the image is
+committed; the final runtime retains Node, Python 3.12, jq/tree, clangd, Rust
+runtime components, LSP launchers, and immutable dependency plan/receipts.
+CI owns the runtime smoke: it loads the native image, runs entrypoint health,
+then invokes `/bin/sh` to check versions/imports, both C/C++ LSP resolver paths,
+the plan readback, and absence of build providers. Canonical install/sync/update
+pull `ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` and never fall back
+to a local build; only explicit `update --local-build` enables the development
+build route. Rust source digests are observed in receipts; no manually maintained
+source-tree digest is required in the manifest.
 
 ## Host/container activation boundary
 
@@ -172,8 +171,8 @@ invocation; target registration and tool execution remain separate operations.
 
 `install` creates the runtime state directories and adopts the published GHCR
 image when the source was installed by the distribution route. Development
-and CI checkouts may still use the ordinary Docker build from
-`bootstrap/container/image/Dockerfile`; live `sync` never builds locally. The image
+and CI checkouts may build from `bootstrap/container/image/Dockerfile`; live `sync`
+never builds locally. The image
 is one OCI index for `linux/amd64` and `linux/arm64`; Docker selects the native
 variant without a user platform selector. `start` creates or starts at most
 one manifest-owned container. The image contains the Rust CLI, Python tools,
