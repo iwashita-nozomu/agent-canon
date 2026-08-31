@@ -850,11 +850,11 @@ def validate_runtime_identity(
     plan: DependencyPlan,
     identity: RuntimeIdentity | None = None,
 ) -> RuntimeIdentity:
-    """Fail closed on non-Ubuntu22/amd64 before any installer side effect."""
+    """Fail closed on unsupported Ubuntu/runtime platforms before installs."""
     resolved = identity or read_runtime_identity()
-    if resolved.os_id != "ubuntu" or resolved.version_id != "22.04":
+    if resolved.os_id != "ubuntu" or resolved.version_id not in {"22.04", "24.04"}:
         raise DependencyError(
-            "runtime identity requires Ubuntu 22.04: "
+            "runtime identity requires Ubuntu 22.04 or 24.04: "
             f"ID={resolved.os_id} VERSION_ID={resolved.version_id}"
         )
     if resolved.platform not in {"linux/amd64", "linux/arm64"}:
@@ -871,11 +871,13 @@ def validate_runtime_identity(
             raise DependencyError(
                 f"dependency record {record.id} does not support {resolved.platform}"
             )
-        if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY} \
-            and record.source.startswith("ubuntu:") \
-            and record.source != "ubuntu:22.04":
+        if (
+            record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}
+            and record.source.startswith("ubuntu:")
+            and record.source != f"ubuntu:{resolved.version_id}"
+        ):
             raise DependencyError(
-                f"dependency record {record.id} requires canonical source ubuntu:22.04, "
+                f"dependency record {record.id} requires canonical source ubuntu:{resolved.version_id}, "
                 f"got {record.source}"
             )
     return resolved

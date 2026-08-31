@@ -118,7 +118,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | Tool | Purpose | AgentCanon Surface | License Status |
 | --- | --- | --- | --- |
 | `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `tools/runtime/dispatch/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
-| Rust toolchain: `rustup`, `cargo`, `rustc`, `rustfmt`, `clippy`, `rust-analyzer` | AgentCanon Rust CLI の build、format、lint、editor support。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
+| Rust toolchain: `rustup`, `cargo`, `rustc`, `rust-src`, `rust-analyzer` | AgentCanon Rust CLI の build と language-server support。 | `bootstrap/container/image/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
 | `clangd-18` (apt.llvm.org Jammy snapshot) | C/C++ language-server analysis in the shared runtime。 | `bootstrap/container/image/dependencies.toml` (`clangd-language-server`) | upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://apt.llvm.org/> |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
 | `experiment-runner-admitted` | ExperimentRunnerのmerged provider。admitted request/result、UUID visibility、child lifecycleを提供します。 | `agent-canon-environment.toml`, `documents/experiments/gpu-admission-r5-ordered-integration-interface.json` | consumer-provided runtime; AgentCanon does not install or import it |
@@ -132,7 +132,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `git` | source checkout、submodule、branch / PR workflow。 | `.devcontainer/post-create.sh`, update tools | upstream: GPL-2.0 |
 | `cmake` | native tool build。 | `.devcontainer/post-create.sh` | upstream: BSD-3-Clause |
 | `curl` | installer、release asset、license source fetch。 | `.devcontainer/post-create.sh` | upstream: curl license |
-| `python3`, `python3-pip`, `pipx`, `python3-packaging` | Python helper execution、typed project-extra validation、manifest-defined Python CLI の隔離 install、`detect-secrets` install。 | `.devcontainer/Dockerfile`, `.devcontainer/dependencies.toml` | Python: Python Software Foundation License; pipx: MIT; Packaging: Apache-2.0 OR BSD-2-Clause; distro package licenses vary |
+| `python3.12`, `pipx`, `python3-packaging`, `python3-yaml` | Runtime Python helper execution and manifest-defined isolated tool installs。 | `bootstrap/container/image/Dockerfile`, `bootstrap/container/image/dependencies.toml` | Python: Python Software Foundation License; pipx: MIT; Packaging: Apache-2.0 OR BSD-2-Clause; distro package licenses vary |
 | `tar`, `xz-utils`, `ca-certificates`, `build-essential`, `pkg-config` | archive extraction, fixed image capability, native build support。 | `.devcontainer/Dockerfile`, `.devcontainer/dependencies.toml` | distro: verify package copyright files |
 | `texlive-latex-base` (pdfLaTeX) | pdfLaTeX document rendering。 | `.devcontainer/dependencies.toml` (`pdflatex`) | TeX Live: mixed free software; verify distro copyright files |
 | `latexmk` | Academic-writing PDF build orchestration。 | `.devcontainer/dependencies.toml` | upstream: GPL-2.0 |

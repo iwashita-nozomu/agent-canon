@@ -2186,6 +2186,22 @@ _agent_canon_image() {
     _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
     return 2
   fi
+  local source_head observed_os observed_arch observed_revision repo_digests expected_arch
+  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD) || return 2
+  observed_os=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Os}}' "$AGENT_CANON_IMAGE_REF")
+  observed_arch=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Architecture}}' "$AGENT_CANON_IMAGE_REF")
+  observed_revision=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$AGENT_CANON_IMAGE_REF")
+  repo_digests=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{join .RepoDigests "\n"}}' "$AGENT_CANON_IMAGE_REF")
+  case "$(uname -m)" in
+    x86_64) expected_arch=amd64 ;;
+    aarch64|arm64) expected_arch=arm64 ;;
+    *) expected_arch=unsupported ;;
+  esac
+  if [[ "$observed_os" != linux || "$observed_arch" != "$expected_arch" ||
+        "$observed_revision" != "$source_head" || ! "$repo_digests" =~ @sha256:[0-9a-f]{64} ]]; then
+    _agent_canon_json_error candidate_image_validation_failed "pulled image OCI identity does not match source/platform/digest"
+    return 2
+  fi
 }
 
 _agent_canon_write_active_image() {
