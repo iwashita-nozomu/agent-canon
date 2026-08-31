@@ -953,9 +953,18 @@ def main(argv: list[str]) -> int:
             index += 2
         identifier = argv[index]
         command = argv[index + 1 :]
+        controller_start = "start" in command
         found = find(state, identifier)
         if not found:
             return 0
+        if controller_start and found[0] == "container":
+            found[1].setdefault("State", {})["Running"] = True
+            save(state)
+        if controller_start:
+            for container in state["containers"].values():
+                if container.get("Id") == identifier:
+                    container.setdefault("State", {})["Running"] = True
+            save(state)
         runtime_mount = next(
             (
                 mount
@@ -969,7 +978,7 @@ def main(argv: list[str]) -> int:
             volume = state["volumes"].get(runtime_mount.get("Name", ""), {})
             user = str(found[1].get("Config", {}).get("User", ""))
             uid, _, gid = user.partition(":")
-            if (
+            if not controller_start and (
                 volume.get("UID") != int(uid or -1)
                 or volume.get("GID") != int(gid or -1)
                 or volume.get("Mode") != "0700"
@@ -1117,6 +1126,9 @@ def main(argv: list[str]) -> int:
                 return 0
             operations = {"install", "update", "start", "stop", "uninstall"}
             operation = next((item for item in command[2:] if item in operations), "")
+            if operation == "start":
+                found[1].setdefault("State", {})["Running"] = True
+                save(state)
             if operation == "install" and runtime_mount is not None:
                 volume_root = Path(runtime_mount["Source"])
                 runtime_root = volume_root / "runtime"
