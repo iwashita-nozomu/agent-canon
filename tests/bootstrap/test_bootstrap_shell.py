@@ -2313,6 +2313,81 @@ _agent_canon_source_sync_json
     assert (runtime / "source-sync.json").stat().st_mode & 0o777 == 0o600
 
 
+def test_source_sync_lifecycle_lock_orders_overlapping_scheduler_and_manual_publication(
+    tmp_path: Path,
+) -> None:
+    """A stale scheduler terminal record cannot follow a newer manual success."""
+    runtime = tmp_path / "runtime"
+    host_state = runtime / "host-state"
+    host_state.mkdir(parents=True)
+    prior_runtime = runtime / "prior-runtime"
+    prior_runtime.write_text("healthy\n", encoding="utf-8")
+    scheduler_entered = tmp_path / "scheduler-entered"
+    release_scheduler = tmp_path / "release-scheduler"
+    manual_done = tmp_path / "manual-done"
+    failed_record = tmp_path / "failed.json"
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+_agent_canon_sync_operation() {{
+  case "$AGENT_CANON_TEST_SYNC_ROLE" in
+    scheduler)
+      : > {str(scheduler_entered)!r}
+      while [[ ! -e {str(release_scheduler)!r} ]]; do sleep 0.01; done
+      _agent_canon_source_sync_write failed source_sync_candidate_failed /source \\
+        1111111111111111111111111111111111111111 \\
+        2222222222222222222222222222222222222222 origin remote-url main \\
+        2026-08-31T00:00:00Z source_sync_candidate_failed
+      cp -- {str(runtime / 'source-sync.json')!r} {str(failed_record)!r}
+      return 7
+      ;;
+    manual)
+      _agent_canon_source_sync_write success updated /source \\
+        3333333333333333333333333333333333333333 \\
+        4444444444444444444444444444444444444444 origin remote-url main \\
+        2026-08-31T00:00:01Z
+      : > {str(manual_done)!r}
+      ;;
+    isolated)
+      _agent_canon_source_sync_write success up_to_date /source \\
+        3333333333333333333333333333333333333333 \\
+        4444444444444444444444444444444444444444 origin remote-url main \\
+        2026-08-31T00:00:02Z
+      ;;
+  esac
+}}
+AGENT_CANON_TEST_SYNC_ROLE=scheduler _agent_canon_with_source_sync_lock &
+scheduler_pid=$!
+while [[ ! -e {str(scheduler_entered)!r} ]]; do sleep 0.01; done
+AGENT_CANON_TEST_SYNC_ROLE=manual _agent_canon_with_source_sync_lock &
+manual_pid=$!
+sleep 0.05
+[[ ! -e {str(manual_done)!r} ]]
+: > {str(release_scheduler)!r}
+wait "$scheduler_pid"
+scheduler_rc=$?
+wait "$manual_pid"
+manual_rc=$?
+[[ "$scheduler_rc" -eq 7 && "$manual_rc" -eq 0 ]]
+AGENT_CANON_TEST_SYNC_ROLE=isolated _agent_canon_with_source_sync_lock
+_agent_canon_source_sync_json
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 0, completed.stderr
+    failed = json.loads(failed_record.read_text(encoding="utf-8"))
+    assert failed["status"] == "failed"
+    assert failed["failure"] == "source_sync_candidate_failed"
+    final = json.loads(completed.stdout)
+    assert final["status"] == "success"
+    assert final["code"] == "up_to_date"
+    assert final["source_head"] == "3" * 40
+    assert "failure" not in final
+    assert prior_runtime.read_text(encoding="utf-8") == "healthy\n"
+
+
 @pytest.mark.parametrize(
     "invalid_state",
     [

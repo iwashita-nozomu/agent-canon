@@ -575,6 +575,40 @@ _agent_canon_sync_operation() (
   exit 0
 )
 
+_agent_canon_with_source_sync_lock() {
+  local lock_path="$AGENT_CANON_RUNTIME_ROOT/host-state/source-sync.lock"
+  local lock_fd rc unlock_rc
+  if [[ -L "$lock_path" ]]; then
+    _agent_canon_json_error source_sync_lock_invalid "source-sync lock is a symlink"
+    return 2
+  fi
+  if ! command -v flock >/dev/null 2>&1; then
+    _agent_canon_json_error source_sync_lock_unavailable "flock is required for source-sync"
+    return 2
+  fi
+  if ! exec {lock_fd}>"$lock_path"; then
+    _agent_canon_json_error source_sync_lock_unavailable "source-sync lock could not be opened"
+    return 2
+  fi
+  if ! flock -x "$lock_fd"; then
+    exec {lock_fd}>&-
+    _agent_canon_json_error source_sync_lock_unavailable "source-sync lock could not be acquired"
+    return 2
+  fi
+  set +e
+  _agent_canon_sync_operation
+  rc=$?
+  set -e
+  unlock_rc=0
+  flock -u "$lock_fd" || unlock_rc=$?
+  exec {lock_fd}>&-
+  if ((rc == 0 && unlock_rc != 0)); then
+    _agent_canon_json_error source_sync_lock_release_failed "source-sync lock could not be released"
+    return 2
+  fi
+  return "$rc"
+}
+
 _agent_canon_control_digest() {
   printf '%s' "$AGENT_CANON_CONTROL_ROOT" | sha256sum | awk '{print $1}'
 }
@@ -4800,7 +4834,7 @@ bootstrap_host_entrypoint() {
       return "$rc"
       ;;
     sync)
-      _agent_canon_sync_operation
+      _agent_canon_with_source_sync_lock
       return $?
       ;;
     *)
