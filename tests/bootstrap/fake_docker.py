@@ -103,6 +103,46 @@ def find(state: dict, identifier: str) -> tuple[str, dict] | None:
     return None
 
 
+def _preserve_image_object(
+    state: dict, record: dict, *, original_ref: str | None = None
+) -> None:
+    """Keep an image object addressable by ID after removing one tag."""
+    image_id = record.get("Id")
+    if not image_id:
+        return
+    existing = state["images"].get(f"untagged:{image_id}")
+    untagged = {**(existing or record), "RepoTags": []}
+    if original_ref and not untagged.get("OriginalRef"):
+        untagged["OriginalRef"] = original_ref
+    state["images"][f"untagged:{image_id}"] = untagged
+
+
+def _restore_image_alias(
+    state: dict, image_ref: str, *, expected_id: str | None = None
+) -> dict | None:
+    """Reattach a previously untagged image under its original requested ref."""
+    current = state["images"].get(image_ref)
+    if current is not None and (expected_id is None or current.get("Id") == expected_id):
+        return current
+    for key, record in list(state["images"].items()):
+        if not key.startswith("untagged:"):
+            continue
+        if expected_id is not None and record.get("Id") != expected_id:
+            continue
+        if expected_id is None and record.get("OriginalRef") != image_ref:
+            continue
+        if current is not None:
+            _preserve_image_object(state, current, original_ref=image_ref)
+        restored = {
+            **record,
+            "RepoTags": [image_ref],
+            "Restorable": True,
+        }
+        state["images"][image_ref] = restored
+        return restored
+    return None
+
+
 def _formatted_image(record: dict, fmt: str) -> str | None:
     """Return the scalar image fields used by the host shell adapter."""
     if fmt == "{{.Id}}":
@@ -358,13 +398,7 @@ def main(argv: list[str]) -> int:
         tag = argv[argv.index("--tag") + 1]
         previous = state["images"].get(tag)
         if previous is not None:
-            state["_restore_image"] = {"ref": ref, "record": previous}
-            state["images"][f"untagged:{previous['Id']}"] = {
-                **previous,
-                "RepoTags": [],
-                "Restorable": True,
-                "OriginalRef": ref,
-            }
+            _preserve_image_object(state, previous, original_ref=tag)
         image_number = int(state.get("next_image", 1))
         state["next_image"] = image_number + 1
         image_id = (
@@ -388,10 +422,7 @@ def main(argv: list[str]) -> int:
         ref = argv[-1]
         previous = state["images"].get(ref)
         if previous is not None:
-            state["images"][f"untagged:{previous['Id']}"] = {
-                **previous,
-                "RepoTags": [],
-            }
+            _preserve_image_object(state, previous, original_ref=ref)
         image_number = int(state.get("next_image", 1))
         state["next_image"] = image_number + 1
         image_id = f"sha256:{image_number:064x}"
@@ -517,6 +548,15 @@ def main(argv: list[str]) -> int:
             "",
         )
         image_record = find(state, image_ref)
+        expected_id = os.environ.get("AGENT_CANON_EXPECTED_IMAGE_ID")
+        if image_record is None or (
+            expected_id and image_record[1].get("Id") != expected_id
+        ):
+            restored = _restore_image_alias(
+                state, image_ref, expected_id=expected_id or None
+            )
+            if restored is not None:
+                image_record = ("image", restored)
         value = {
             "Id": cid,
             "Name": "/" + name,
@@ -558,6 +598,9 @@ def main(argv: list[str]) -> int:
         found = find(state, source_arg)
         if not found or found[0] != "image":
             return 1
+        previous = state["images"].get(destination)
+        if previous is not None and previous["Id"] != found[1]["Id"]:
+            _preserve_image_object(state, previous, original_ref=destination)
         state["images"][destination] = {
             **found[1],
             "RepoTags": [destination],
@@ -907,19 +950,6 @@ def main(argv: list[str]) -> int:
         if os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install":
             for container in state["containers"].values():
                 container.setdefault("State", {})["Running"] = True
-            for key, image in list(state["images"].items()):
-                original_ref = image.get("OriginalRef")
-                if key.startswith("untagged:") and original_ref:
-                    state["images"][original_ref] = {
-                        **image,
-                        "RepoTags": [original_ref],
-                    }
-            restore = state.get("_restore_image")
-            if isinstance(restore, dict) and restore.get("ref") and isinstance(restore.get("record"), dict):
-                state["images"][restore["ref"]] = {
-                    **restore["record"],
-                    "RepoTags": [restore["ref"]],
-                }
         save(state)
         return 0
     if argv[:2] == ["image", "rm"] and len(argv) == 3:
@@ -927,22 +957,11 @@ def main(argv: list[str]) -> int:
         # the tag to its image ID first would remove an earlier alias instead,
         # which can silently delete the active image from this fake daemon.
         if argv[2] in state["images"]:
-            restore = state.get("_restore_image")
-            if (
-                os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install"
-                and isinstance(restore, dict)
-                and argv[2] == restore.get("ref")
-            ):
-                state["images"][argv[2]] = {
-                    **restore["record"],
-                    "RepoTags": [argv[2]],
-                }
-                save(state)
-                return 0
-            del state["images"][argv[2]]
-            restore = state.get("_restore_image")
-            if os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install" and isinstance(restore, dict) and isinstance(restore.get("record"), dict):
-                state["images"][restore["ref"]] = {**restore["record"], "RepoTags": [restore["ref"]]}
+            image_ref = argv[2]
+            image_record = state["images"][image_ref]
+            del state["images"][image_ref]
+            if not image_ref.startswith("untagged:"):
+                _preserve_image_object(state, image_record, original_ref=image_ref)
             save(state)
             return 0
         found = find(state, argv[2])
@@ -953,9 +972,6 @@ def main(argv: list[str]) -> int:
         ]
         for key in keys:
             del state["images"][key]
-        restore = state.get("_restore_image")
-        if os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION") == "install" and isinstance(restore, dict) and isinstance(restore.get("record"), dict):
-            state["images"][restore["ref"]] = {**restore["record"], "RepoTags": [restore["ref"]]}
         save(state)
         return 0
     if argv[:2] == ["volume", "rm"] and len(argv) == 3:
