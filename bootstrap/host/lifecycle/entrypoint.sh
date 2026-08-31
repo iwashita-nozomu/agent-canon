@@ -2151,53 +2151,21 @@ _agent_canon_image_reference() {
     export AGENT_CANON_IMAGE_REF
     return 0
   fi
-  local source_head manifest_digest control_digest
+  local source_head
   if ! source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD); then
     _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
     return 2
   fi
-  manifest_digest=$(_agent_canon_sha256 "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/host/manifest.toml")
-  control_digest=$(_agent_canon_control_digest)
-  AGENT_CANON_IMAGE_REF="agent-canon-tools:${control_digest:0:16}-${manifest_digest:0:16}-${source_head:0:16}"
+  AGENT_CANON_IMAGE_REF="ghcr.io/iwashita-nozomu/agent-canon:sha-${source_head}"
   export AGENT_CANON_IMAGE_REF
 }
 
 _agent_canon_image() {
   local requested_ref=${1:-}
   _agent_canon_image_reference "$requested_ref"
-  if [[ -n "$requested_ref" ]]; then
-    if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
-      _agent_canon_json_error candidate_image_build_failed "candidate image could not be pulled"
-      return 2
-    fi
-    return 0
-  fi
-  local control_digest source_head
-  if ! source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD); then
-    _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
+  if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
+    _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
     return 2
-  fi
-  control_digest=$(_agent_canon_control_digest)
-  if "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 &&
-     [[ "${AGENT_CANON_FORCE_BUILD:-0}" != 1 ]]; then
-    return 0
-  fi
-  if [[ "${AGENT_CANON_ALLOW_BUILD:-0}" != 1 ]]; then
-    _agent_canon_json_error image_missing "AgentCanon tool image is not installed"
-    return 2
-  fi
-  if [[ "${AGENT_CANON_FORCE_BUILD:-0}" == 1 ]] || \
-     ! "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
-    if ! "$AGENT_CANON_DOCKER_CMD" build \
-      --file "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/Dockerfile" \
-      --tag "$AGENT_CANON_IMAGE_REF" \
-      --label io.agent-canon.runtime=shared-v1 \
-      --label "io.agent-canon.control-root-digest=$control_digest" \
-      --label "io.agent-canon.source-revision=$source_head" \
-      "$AGENT_CANON_REPOSITORY_ROOT"; then
-      _agent_canon_json_error candidate_image_build_failed "candidate image build failed"
-      return 2
-    fi
   fi
 }
 

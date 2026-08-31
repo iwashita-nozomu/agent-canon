@@ -16,8 +16,8 @@ schema_version = 2
 id = "pipx"
 package = "pipx"
 method = "apt-package"
-version = "1.0.0-1"
-source = "ubuntu:22.04"
+version = "1.4.3-1"
+source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["pipx"]
@@ -71,8 +71,8 @@ failure_policy = "fail"
 id = "jq"
 package = "jq"
 method = "apt-package"
-version = "1.6-2.1ubuntu3.2"
-source = "ubuntu:22.04"
+version = "1.7.1-3ubuntu0.24.04.1"
+source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["jq"]
@@ -82,8 +82,8 @@ failure_policy = "fail"
 id = "tree"
 package = "tree"
 method = "apt-package"
-version = "2.0.2-1"
-source = "ubuntu:22.04"
+version = "2.1.1-2"
+source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["tree"]
@@ -93,9 +93,9 @@ failure_policy = "fail"
 id = "clangd-language-server"
 package = "clangd-18"
 method = "apt-package"
-version = "1:18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144"
+version = "1:18.1.3-1ubuntu2"
 platforms = ["linux/amd64", "linux/arm64"]
-source = "https://apt.llvm.org/jammy/"
+source = "ubuntu:24.04"
 executable_owner_packages = ["clangd-18"]
 verification = { kind = "apt-package", executable = "clangd-18", args = ["--version"], output_contains = "clangd version 18.1.8" }
 deps = []
@@ -108,11 +108,11 @@ package = "rust"
 method = "rust-toolchain"
 version = "1.89.0"
 source = "https://static.rust-lang.org"
-components = ["rust-src", "rustfmt", "clippy", "rust-analyzer"]
+components = ["rust-src", "rust-analyzer"]
 checksums = { x86_64 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c", aarch64 = "e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c" }
 verification = { kind = "rust-toolchain" }
 deps = ["rustup-init", "build-essential", "curl"]
-provides = ["rust", "cargo", "rustfmt", "clippy", "rust-analyzer"]
+provides = ["rust", "cargo", "rust-src", "rust-analyzer"]
 failure_policy = "fail"
 
 [[records]]
