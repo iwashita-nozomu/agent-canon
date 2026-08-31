@@ -136,13 +136,14 @@ RUN set -eux; \
     python3 /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py \
       image-install --workspace /opt/agent-canon \
       --manifest /opt/agent-canon/bootstrap/container/image/dependencies.toml \
-      --records pipx pyright-language-server bash-language-server jq tree rust-toolchain check-jsonschema yamllint agent-canon-cli \
+      --records pipx pyright-language-server bash-language-server jq tree clangd-language-server rust-toolchain check-jsonschema yamllint agent-canon-cli \
       --final-binary-dir /usr/local/bin --format text \
     && test -x /usr/local/bin/agent-canon \
     && test -d /usr/local/share/agent-canon/toolchains/cargo \
     && test -d /usr/local/share/agent-canon/toolchains/rustup \
     && test -f /usr/local/share/agent-canon/image-dependencies/plan.json \
     && test -f /usr/local/share/agent-canon/image-dependencies/receipts/agent-canon-cli.json \
+    && test -f /usr/local/share/agent-canon/image-dependencies/receipts/clangd-language-server.json \
     && install -d -m 0555 /usr/local/share/agent-canon/runtime \
     && install -m 0444 /opt/agent-canon/bootstrap/container/image/dependencies.toml /usr/local/share/agent-canon/runtime/dependencies.toml \
     && printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime \
@@ -225,8 +226,10 @@ RUN set -eux; \
     command -v jq; command -v tree; command -v clangd-18; \
     command -v cargo; command -v rustc; command -v rustfmt; command -v clippy-driver; command -v rust-analyzer; \
     python3 -c 'import packaging, tomli, yaml'; \
+    PYTHONPATH=/usr/local/share/agent-canon/runtime python3 -c 'from pathlib import Path; from tools.analysis.code.lsp_code_analysis import LspServerSpec; receipts=Path("/usr/local/share/agent-canon/image-dependencies/receipts"); specs=[LspServerSpec.for_language(language, root=Path("/workspace"), receipts=receipts) for language in ("c", "cpp")]; assert len({spec.command[0] for spec in specs}) == 1 and all(spec.record_id == "clangd-language-server" and Path(spec.command[0]).is_file() and Path(spec.command[0]).name == "clangd" for spec in specs)'; \
     test -f /usr/local/share/agent-canon/image-dependencies/plan.json; \
     test -f /usr/local/share/agent-canon/image-dependencies/receipts/agent-canon-cli.json; \
+    test -f /usr/local/share/agent-canon/image-dependencies/receipts/clangd-language-server.json; \
     test -f /usr/local/share/agent-canon/image-dependencies/receipts/rust-toolchain.json; \
     test ! -e /usr/local/share/agent-canon/toolchains/cargo-target; \
     test ! -e /usr/local/share/agent-canon/toolchains/cargo/registry; \

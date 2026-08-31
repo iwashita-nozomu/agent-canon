@@ -213,11 +213,13 @@ binary、full Rust components、pipx venvs、Node LSP assets のみを final run
 rustup-init は runtime に持ち込みません。cache mount は使用しません。
 
 この dependency plan / receipts は `--records` で選択した builder-owned records の
-build provenance です。`clangd-language-server` は plan/receipt set に含めず、
-runtime-base が package URL/checksum/version を検証して所有します。
+build provenance です。`clangd-language-server` は apt-package capability として
+plan/receipt set に含めますが、インストール元の key/source/package checksum と
+exact package installation は runtime-base が一度だけ所有します。builder の
+image-install は既に導入済みの exact package を再取得せず receipt-bound にします。
 
 runtime が保持する system capability は `ca-certificates`、`git`、`jq`、`tree`、
-Python 3 と `packaging`/`tomli`/`yaml`、`pipx`、および固定 digest の `clangd-18` です。
+Python 3 と `packaging`/`tomli`/`yaml`、pipx-managed venv launchers、および固定 digest の `clangd-18` です。
 clangd の apt key、source list、apt lists と transient build tools は同じ runtime
 layer 内で検証後に削除します。pytest、pip、ninja、build-essential、curl、gnupg、
 clang-format は runtime に存在してはなりません。

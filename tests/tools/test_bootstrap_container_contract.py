@@ -180,9 +180,9 @@ def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None
     assert "gnupg" not in builder
     assert "ninja-build" not in builder
     assert "apt-get update" in builder
-    assert "--records pipx pyright-language-server bash-language-server jq tree rust-toolchain check-jsonschema yamllint agent-canon-cli" in builder
-    assert "clangd-language-server" not in builder
-    assert "clangd-language-server.json" not in runtime
+    assert "--records pipx pyright-language-server bash-language-server jq tree clangd-language-server rust-toolchain check-jsonschema yamllint agent-canon-cli" in builder
+    assert "test -f /usr/local/share/agent-canon/image-dependencies/receipts/clangd-language-server.json" in builder
+    assert "clangd-language-server.json" in runtime
     assert "pipx" not in runtime_base
     assert "python3-pip" not in runtime_base
     assert text.count("printf 'deb [arch=%s") == 1
@@ -363,6 +363,14 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     assert cli["cargo_lock_sha256"] == lock_digest
     assert cli["source"] == "tools/runtime/dispatch/agent-canon"
     assert all("project" not in str(record).lower() for record in records)
+    clangd = next(record for record in records if record["id"] == "clangd-language-server")
+    assert clangd["method"] == "apt-package"
+    assert clangd["package"] == "clangd-18"
+    assert clangd["source"] == "https://apt.llvm.org/jammy/"
+    assert clangd["executable_owner_packages"] == ["clangd-18"]
+    assert clangd["verification"]["kind"] == "apt-package"
+    assert not any(key.startswith("repository_") for key in clangd)
+    assert 'Path(spec.command[0]).name == "clangd"' in DOCKERFILE.read_text(encoding="utf-8")
 
 
 def test_single_repository_dockerignore_is_deny_by_default() -> None:
