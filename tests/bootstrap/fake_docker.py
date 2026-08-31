@@ -107,6 +107,14 @@ def _formatted_image(record: dict, fmt: str) -> str | None:
     """Return the scalar image fields used by the host shell adapter."""
     if fmt == "{{.Id}}":
         return str(record["Id"])
+    if fmt == "{{.Os}}":
+        return str(record.get("Os", "linux"))
+    if fmt == "{{.Architecture}}":
+        return str(record.get("Architecture", "amd64"))
+    if fmt.startswith('{{index .Config.Labels "org.opencontainers.image.revision"}}'):
+        return str(record.get("Config", {}).get("Labels", {}).get("org.opencontainers.image.revision", ""))
+    if ".RepoDigests" in fmt:
+        return "\n".join(record.get("RepoDigests", []))
     return None
 
 
@@ -365,9 +373,32 @@ def main(argv: list[str]) -> int:
             "Id": image_id,
             "RepoTags": [tag],
             "Config": {"Labels": labels(argv)},
+            "Os": "linux",
+            "Architecture": "amd64",
+            "RepoDigests": [f"ghcr.io/iwashita-nozomu/agent-canon@sha256:{'a' * 64}"],
             "SourceRoot": argv[-1],
         }
         state["images"][tag] = record
+        save(state)
+        return 0
+    if argv[:1] == ["pull"]:
+        ref = argv[-1]
+        image_number = int(state.get("next_image", 1))
+        state["next_image"] = image_number + 1
+        image_id = f"sha256:{image_number:064x}"
+        revision = ref.rsplit(":sha-", 1)[-1] if ":sha-" in ref else ""
+        state["images"][ref] = {
+            "Id": image_id,
+            "RepoTags": [ref],
+            "Config": {"Labels": {
+                "org.opencontainers.image.revision": revision,
+                "io.agent-canon.source-revision": revision,
+            }},
+            "Os": "linux",
+            "Architecture": "amd64",
+            "RepoDigests": [f"{ref.split(':', 1)[0]}@sha256:{'a' * 64}"],
+            "SourceRoot": str(Path.cwd()),
+        }
         save(state)
         return 0
     if argv[:2] == ["container", "inspect"]:
@@ -501,11 +532,14 @@ def main(argv: list[str]) -> int:
         save(state)
         print(cid)
         return 0
-    if argv[:1] == ["tag"] and len(argv) == 3:
-        found = find(state, argv[1])
+    if (argv[:1] == ["tag"] and len(argv) == 3) or (
+        argv[:2] == ["image", "tag"] and len(argv) == 4
+    ):
+        source_arg, destination = (argv[1], argv[2]) if argv[0] == "tag" else (argv[2], argv[3])
+        found = find(state, source_arg)
         if not found or found[0] != "image":
             return 1
-        state["images"][argv[2]] = {**found[1], "RepoTags": [argv[2]]}
+        state["images"][destination] = {**found[1], "RepoTags": [destination]}
         save(state)
         return 0
     if argv[:1] == ["run"]:
