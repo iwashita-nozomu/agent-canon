@@ -128,6 +128,10 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
     assert "COPY --from=builder /usr/local/bin/npm" not in text
     assert "COPY --from=builder /usr/local/bin/npx" not in text
     assert "COPY --from=builder /usr/local/bin/corepack" not in text
+    assert "test -x /usr/local/bin/pyright-langserver" in text
+    assert 'langserver="$(readlink -f /usr/local/bin/pyright-langserver)"' in text
+    assert 'node --check "$langserver"' in text
+    assert "pyright-langserver --version" not in text
 
 
 def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None:

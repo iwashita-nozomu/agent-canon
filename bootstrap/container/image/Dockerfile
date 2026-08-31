@@ -123,7 +123,8 @@ RUN set -eux; \
     chmod 1777 /tmp; \
     printf 'agent-canon-tool-container/v1\n' > /usr/local/share/agent-canon/.agent-canon-tool-container; \
     chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
-    test "$(stat -c '%a:%u:%g' /usr/local/share/agent-canon/.agent-canon-tool-container)" = '444:0:0'
+    test "$(stat -c '%a:%u:%g' /usr/local/share/agent-canon/.agent-canon-tool-container)" = '444:0:0'; \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy only node, the two declared JavaScript LSP trees, and their launchers.
 COPY --from=builder /usr/local/bin/node /usr/local/bin/node
@@ -211,7 +212,8 @@ COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/
 RUN set -eux; \
     test -x /usr/local/bin/agent-canon; \
     test -x /usr/local/bin/node; node --version >/dev/null; \
-    pyright --version | grep -F '1.1.411' >/dev/null; pyright-langserver --version >/dev/null; \
+    pyright --version | grep -F '1.1.411' >/dev/null; \
+    test -x /usr/local/bin/pyright-langserver; langserver="$(readlink -f /usr/local/bin/pyright-langserver)"; test -f "$langserver"; node --check "$langserver"; \
     bash-language-server --version | grep -F '5.6.0' >/dev/null; \
     check-jsonschema --version | grep -F '0.31.0' >/dev/null; yamllint --version | grep -F '1.35.1' >/dev/null; \
     command -v jq; command -v tree; command -v clangd-18; \
