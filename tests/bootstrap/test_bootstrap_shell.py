@@ -66,6 +66,7 @@ def _run_forced_update_probe(
     build_result: str,
     tag_result: str = "0",
     existing_plan: str = "",
+    force_build: str | None = "1",
 ) -> tuple[subprocess.CompletedProcess[str], Path, Path, str, str]:
     """Exercise the forced-update ordering with a Docker-only fake."""
     runtime = tmp_path / "runtime"
@@ -126,10 +127,11 @@ AGENT_CANON_STATE_ROOT={str(state_root)!r}
 AGENT_CANON_PRIVATE_LOG_ROOT={str(private_log)!r}
 AGENT_CANON_DOCKER_CMD={str(docker)!r}
 AGENT_CANON_ALLOW_BUILD=1
-AGENT_CANON_FORCE_BUILD=1
+{f'AGENT_CANON_FORCE_BUILD={force_build}' if force_build is not None else ''}
 export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
 export AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
-export AGENT_CANON_DOCKER_CMD AGENT_CANON_ALLOW_BUILD AGENT_CANON_FORCE_BUILD
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_ALLOW_BUILD
+{f'export AGENT_CANON_FORCE_BUILD' if force_build is not None else ''}
 _agent_canon_replace_resident_locked() {{
   printf '%s\\n' replaced > {str(replaced)!r}
   _agent_canon_commit_pending_rollback_plan
@@ -143,6 +145,29 @@ exit "$rc"
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
     return completed, calls, marker, old_id, candidate_id
+
+
+def test_same_source_update_reuses_exact_image_without_build(tmp_path: Path) -> None:
+    """A same-source update reuses its exact image reference by default."""
+    completed, calls, _marker, _old_id, _candidate_id = _run_forced_update_probe(
+        tmp_path, build_result="0", force_build=None
+    )
+    assert completed.returncode == 0, completed.stderr
+    operations = calls.read_text(encoding="utf-8").splitlines()
+    assert any(operation.startswith("image inspect ") for operation in operations)
+    assert not any(operation.startswith("build ") for operation in operations)
+
+
+def test_explicit_force_build_rebuilds_same_source_image(tmp_path: Path) -> None:
+    """An explicit FORCE_BUILD request still enters the candidate build path."""
+    completed, calls, _marker, _old_id, _candidate_id = _run_forced_update_probe(
+        tmp_path, build_result="0", force_build="1"
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert sum(
+        operation.startswith("build ")
+        for operation in calls.read_text(encoding="utf-8").splitlines()
+    ) == 1
 
 
 def test_forced_update_retains_same_reference_before_build(tmp_path: Path) -> None:
@@ -457,6 +482,7 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
         "AGENT_CANON_DOCKER": str(fake_docker),
         "FAKE_DOCKER_STATE": str(state_path),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+        "AGENT_CANON_FORCE_BUILD": "1",
     }
     common = [
         str(BOOTSTRAP),
