@@ -78,8 +78,14 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert 'CMD ["resident"]' in text
     assert "rootless" not in text.lower()
     digests = re.findall(r"@sha256:([0-9a-f]{64})(?:\s|$)", text, re.MULTILINE)
-    assert len(digests) == 3
-    assert text.index("AS node-provider") < text.index("AS builder") < text.index("AS runtime")
+    assert len(digests) == 2
+    assert (
+        text.index("AS node-provider")
+        < text.index("AS runtime-base")
+        < text.index("AS builder")
+        < text.index("FROM runtime-base AS runtime")
+    )
+    assert text.count("FROM runtime-base AS ") == 2
     assert "--mount=type=cache" not in text
     assert "FROM ubuntu:22.04@sha256:" in text[text.rfind("FROM ubuntu") :]
     assert "--manifest /opt/agent-canon/bootstrap/container/image/dependencies.toml" in text
@@ -142,7 +148,8 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
 
 def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    runtime = text[text.index("AS runtime") :]
+    runtime_base = text[text.index("FROM ubuntu:22.04"): text.index("FROM runtime-base AS builder")]
+    runtime = text[text.index("FROM runtime-base AS runtime") :]
     for marker in (
         "clangd-18 --version",
         "sha256sum --check --strict",
@@ -150,17 +157,30 @@ def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None
         "clangd-language-server.gpg",
         "clangd-language-server.list",
         "apt-get purge -y --auto-remove curl gnupg",
+    ):
+        assert marker in runtime_base
+    for marker in (
         "! command -v pytest",
         "! command -v pip",
         "! command -v ninja",
         "! command -v curl",
         "! command -v gpg",
+        "! command -v pipx",
+        "test ! -e /usr/bin/pipx",
+        "test ! -d /usr/lib/python3/dist-packages/pipx",
         "! command -v clang-format",
     ):
         assert marker in runtime
     assert "python3-pytest" not in runtime
     assert "python3-pip" not in runtime
     assert "build-essential" not in runtime
+    builder = text[text.index("FROM runtime-base AS builder") : text.index("FROM runtime-base AS runtime")]
+    assert "pipx" in builder
+    assert "python3-pip" not in builder
+    assert "pipx" not in runtime_base
+    assert "python3-pip" not in runtime_base
+    assert text.count("printf 'deb [arch=%s") == 1
+    assert text.count("clangd-18 --version") == 1
 
 
 def test_dockerfile_publishes_dispatcher_marker_contract() -> None:

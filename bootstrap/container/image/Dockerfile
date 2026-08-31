@@ -9,30 +9,89 @@
 ARG TARGETPLATFORM
 FROM node:22.14.0-bullseye-slim@sha256:73a9dfbb6c761aebdf4666cce2627635a30d1d4c20f67ff642d01b8f09e709a3 AS node-provider
 
-# Disposable builder owns compilers, package managers, repository signing
-# tools, rustup-init, and Cargo's build target.
-FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc AS builder
+# Runtime base owns the retained Ubuntu closure and the one exact clangd
+# installation.  Both builder and final runtime inherit this clean state.
+FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc AS runtime-base
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 ENV PYTHONDONTWRITEBYTECODE=1
 
+LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
+      io.agent-canon.runtime="shared-v1" \
+      io.agent-canon.container.max-instances="1" \
+      io.agent-canon.run.read-only-rootfs="true" \
+      io.agent-canon.run.network="none" \
+      io.agent-canon.run.cap-drop="ALL" \
+      io.agent-canon.run.no-new-privileges="true" \
+      io.agent-canon.run.cpus="2" \
+      io.agent-canon.run.memory="4g" \
+      io.agent-canon.run.pids-limit="512" \
+      io.agent-canon.run.tmpfs="/tmp"
+
 RUN set -eux; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       ca-certificates \
-      curl \
       git \
+      jq=1.6-2.1ubuntu3.2 \
+      tree=2.0.2-1 \
+      python3 \
+      python3-packaging \
+      python3-tomli \
+      python3-yaml; \
+    install -d -m 0755 /workspace /var/lib/agent-canon/runtime /usr/local/share/agent-canon; \
+    chmod 1777 /tmp; \
+    printf 'agent-canon-tool-container/v1\n' > /usr/local/share/agent-canon/.agent-canon-tool-container; \
+    chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
+    test "$(stat -c '%a:%u:%g' /usr/local/share/agent-canon/.agent-canon-tool-container)" = '444:0:0'; \
+    rm -rf /var/lib/apt/lists/*
+
+# clangd is verified and cleaned in this single base layer.  curl, gnupg, the
+# repository key/source, and apt indexes do not survive into either descendant.
+RUN set -eux; \
+    case "$TARGETOS/$TARGETARCH" in \
+      linux/amd64) llvm_arch=amd64; clangd_sha=05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660 ;; \
+      linux/arm64) llvm_arch=arm64; clangd_sha=c98c785017ed4c0d1e45ee42d78fabe4eda569c28e67d5811da49cec8d528599 ;; \
+      *) echo "unsupported_target_arch=$TARGETOS/$TARGETARCH" >&2; exit 2 ;; \
+    esac; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl gnupg; \
+    temporary="$(mktemp -d)"; \
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output "$temporary/llvm-snapshot.gpg.key" https://apt.llvm.org/llvm-snapshot.gpg.key; \
+    test "$(gpg --show-keys --with-colons "$temporary/llvm-snapshot.gpg.key" | awk -F: '$1 == "fpr" {print toupper($10); exit}')" = '6084F3CF814B57C1CF12EFD515CF4D18AF4F7421'; \
+    gpg --dearmor --output "$temporary/llvm.gpg" "$temporary/llvm-snapshot.gpg.key"; \
+    install -D -m 0644 "$temporary/llvm.gpg" /etc/apt/keyrings/clangd-language-server.gpg; \
+    printf 'deb [arch=%s signed-by=/etc/apt/keyrings/clangd-language-server.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main\n' "$llvm_arch" > /etc/apt/sources.list.d/clangd-language-server.list; \
+    apt-get update; \
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output "$temporary/clangd-18.deb" "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_${llvm_arch}.deb"; \
+    echo "$clangd_sha  $temporary/clangd-18.deb" | sha256sum --check --strict; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$temporary/clangd-18.deb"; \
+    clangd-18 --version | grep -F 'clangd version 18.1.8' >/dev/null; \
+    rm -rf /etc/apt/keyrings/clangd-language-server.gpg /etc/apt/sources.list.d/clangd-language-server.list /var/lib/apt/lists/* "$temporary"; \
+    DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove curl gnupg; \
+    rm -rf /var/lib/apt/lists/*; \
+    test ! -e /etc/apt/keyrings/clangd-language-server.gpg; \
+    test ! -e /etc/apt/sources.list.d/clangd-language-server.list; \
+    test ! -e /usr/bin/curl; \
+    test ! -e /usr/bin/gpg
+
+FROM runtime-base AS builder
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+# Disposable builder adds only build/package-manager capabilities to the clean
+# runtime base.  System pip is unnecessary: pipx bootstraps each isolated app.
+
+RUN set -eux; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      curl \
       gnupg \
       build-essential \
       ninja-build \
-      python3 \
-      python3-pip \
-      python3-packaging \
-      python3-tomli \
-      python3-yaml \
-      pipx; \
-    install -d -m 0755 /workspace /var/lib/agent-canon/runtime /usr/local/share/agent-canon
+      pipx
 
 # Node/npm/corepack are builder-only package-management capabilities.
 COPY --from=node-provider /usr/local/bin/node /usr/local/bin/node
@@ -95,38 +154,14 @@ RUN python3 /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py \
     && test ! -e "$CARGO_HOME/registry" \
     && test ! -e "$CARGO_HOME/git"
 
-# Fresh Ubuntu runtime contains only retained system capabilities.
-FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc AS runtime
+# Final runtime inherits the already-clean retained system closure.
+FROM runtime-base AS runtime
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
-ENV PYTHONDONTWRITEBYTECODE=1
 
-LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
-      io.agent-canon.runtime="shared-v1" \
-      io.agent-canon.container.max-instances="1" \
-      io.agent-canon.run.read-only-rootfs="true" \
-      io.agent-canon.run.network="none" \
-      io.agent-canon.run.cap-drop="ALL" \
-      io.agent-canon.run.no-new-privileges="true" \
-      io.agent-canon.run.cpus="2" \
-      io.agent-canon.run.memory="4g" \
-      io.agent-canon.run.pids-limit="512" \
-      io.agent-canon.run.tmpfs="/tmp"
-
-RUN set -eux; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      ca-certificates git jq=1.6-2.1ubuntu3.2 tree=2.0.2-1 python3 \
-      python3-packaging python3-tomli python3-yaml pipx; \
-    install -d -m 0755 /workspace /var/lib/agent-canon/runtime /usr/local/share/agent-canon; \
-    chmod 1777 /tmp; \
-    printf 'agent-canon-tool-container/v1\n' > /usr/local/share/agent-canon/.agent-canon-tool-container; \
-    chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
-    test "$(stat -c '%a:%u:%g' /usr/local/share/agent-canon/.agent-canon-tool-container)" = '444:0:0'; \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy only node, the two declared JavaScript LSP trees, and their launchers.
+# Copy only node, the two declared JavaScript LSP trees, and package-relative
+# launchers.  npm, npx, and corepack are intentionally not copied.
 COPY --from=builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=builder /usr/local/lib/node_modules/pyright /usr/local/lib/node_modules/pyright
 COPY --from=builder /usr/local/lib/node_modules/bash-language-server /usr/local/lib/node_modules/bash-language-server
@@ -134,7 +169,8 @@ RUN ln -sfn ../lib/node_modules/pyright/index.js /usr/local/bin/pyright \
     && ln -sfn ../lib/node_modules/pyright/langserver.index.js /usr/local/bin/pyright-langserver \
     && ln -sfn ../lib/node_modules/bash-language-server/out/cli.js /usr/local/bin/bash-language-server
 
-# Copy pipx environments and only their public launchers.
+# Copy pipx environments and only their public launchers.  The pipx package
+# and executable themselves remain builder-only.
 COPY --from=builder /usr/local/share/agent-canon/pipx/venvs/check-jsonschema /usr/local/share/agent-canon/pipx/venvs/check-jsonschema
 COPY --from=builder /usr/local/share/agent-canon/pipx/venvs/yamllint /usr/local/share/agent-canon/pipx/venvs/yamllint
 COPY --from=builder /usr/local/bin/check-jsonschema /usr/local/bin/check-jsonschema
@@ -151,40 +187,8 @@ COPY --from=builder /usr/local/share/agent-canon/runtime/.agent-canon-runtime /u
 
 ENV CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
     RUSTUP_HOME=/usr/local/share/agent-canon/toolchains/rustup \
-    PIPX_HOME=/usr/local/share/agent-canon/pipx \
-    PIPX_BIN_DIR=/usr/local/bin \
-    PIPX_MAN_DIR=/usr/local/share/man \
     AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies \
     PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
-
-# clangd is installed, verified, and cleaned in one runtime layer.  curl,
-# gnupg, the repository key/source, and apt indexes do not survive the layer.
-RUN set -eux; \
-    case "$TARGETOS/$TARGETARCH" in \
-      linux/amd64) llvm_arch=amd64; clangd_sha=05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660 ;; \
-      linux/arm64) llvm_arch=arm64; clangd_sha=c98c785017ed4c0d1e45ee42d78fabe4eda569c28e67d5811da49cec8d528599 ;; \
-      *) echo "unsupported_target_arch=$TARGETOS/$TARGETARCH" >&2; exit 2 ;; \
-    esac; \
-    apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl gnupg; \
-    temporary="$(mktemp -d)"; \
-    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output "$temporary/llvm-snapshot.gpg.key" https://apt.llvm.org/llvm-snapshot.gpg.key; \
-    test "$(gpg --show-keys --with-colons "$temporary/llvm-snapshot.gpg.key" | awk -F: '$1 == "fpr" {print toupper($10); exit}')" = '6084F3CF814B57C1CF12EFD515CF4D18AF4F7421'; \
-    gpg --dearmor --output "$temporary/llvm.gpg" "$temporary/llvm-snapshot.gpg.key"; \
-    install -D -m 0644 "$temporary/llvm.gpg" /etc/apt/keyrings/clangd-language-server.gpg; \
-    printf 'deb [arch=%s signed-by=/etc/apt/keyrings/clangd-language-server.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main\n' "$llvm_arch" > /etc/apt/sources.list.d/clangd-language-server.list; \
-    apt-get update; \
-    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output "$temporary/clangd-18.deb" "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_${llvm_arch}.deb"; \
-    echo "$clangd_sha  $temporary/clangd-18.deb" | sha256sum --check --strict; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$temporary/clangd-18.deb"; \
-    clangd-18 --version | grep -F 'clangd version 18.1.8' >/dev/null; \
-    rm -rf /etc/apt/keyrings/clangd-language-server.gpg /etc/apt/sources.list.d/clangd-language-server.list /var/lib/apt/lists/* "$temporary"; \
-    DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove curl gnupg; \
-    rm -rf /var/lib/apt/lists/*; \
-    test ! -e /etc/apt/keyrings/clangd-language-server.gpg; \
-    test ! -e /etc/apt/sources.list.d/clangd-language-server.list; \
-    test ! -e /usr/bin/curl; \
-    test ! -e /usr/bin/gpg
 
 COPY tools /usr/local/share/agent-canon/runtime/tools
 COPY agents /usr/local/share/agent-canon/runtime/agents
@@ -227,6 +231,7 @@ RUN set -eux; \
     test ! -e /usr/local/share/agent-canon/toolchains/cargo/registry; \
     test ! -e /usr/local/share/agent-canon/toolchains/cargo/git; \
     test ! -e /usr/local/bin/rustup-init; \
+    ! command -v pipx; test ! -e /usr/bin/pipx; test ! -d /usr/lib/python3/dist-packages/pipx; \
     ! command -v pytest; ! command -v pip; ! command -v pip3; ! command -v ninja; ! command -v curl; ! command -v gpg; \
     ! command -v npm; ! command -v npx; ! command -v corepack; ! command -v clang-format; \
     test -f /usr/local/share/agent-canon/runtime/tools/catalog.yaml \
