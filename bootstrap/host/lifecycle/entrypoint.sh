@@ -32,6 +32,8 @@ AGENT_CANON_HEALTH_ATTEMPTS=120
 AGENT_CANON_PRIVATE_LOG_ROOT=
 AGENT_CANON_TARGET_PRUNE_DIGESTS=
 AGENT_CANON_STATE_VOLUME_NAME=
+AGENT_CANON_LEGACY_PROMPT_SKILL_NAME=empirical-prompt-tuning
+AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256=f2d76d9306b21002ad19040a2fd38bf37a1797469fa2b62e9e9722c680be11bd
 
 _agent_canon_caller_user() {
   local caller_uid caller_gid
@@ -536,7 +538,14 @@ _agent_canon_sync_operation() (
   # ignored staging tree.
   AGENT_CANON_REPOSITORY_ROOT=$install_root
   sync_rc=0
-  _agent_canon_install_global_links || sync_rc=$?
+  if _agent_canon_sync_personal_skill_view "$(_agent_canon_container_name)"; then
+    :
+  else
+    sync_rc=$?
+  fi
+  if ((sync_rc == 0)); then
+    _agent_canon_install_global_links || sync_rc=$?
+  fi
   if ((sync_rc != 0)); then
     if ! bootstrap_host_entrypoint "$install_root" \
       --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
@@ -2825,6 +2834,7 @@ _agent_canon_run_controller() {
 _agent_canon_sync_personal_skill_view() {
   local _container=$1
   local source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills"
+  local expected_skill="$source_root/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME/SKILL.md"
   local staging_root="$AGENT_CANON_STATE_ROOT/container-runtime/skill-projection"
   local staging_skills="$staging_root/.codex/personal/skills"
   _agent_canon_volume_copy export skill "$AGENT_CANON_STATE_ROOT/container-runtime"
@@ -2868,6 +2878,11 @@ _agent_canon_sync_personal_skill_view() {
   if [[ -z "$(find "$source_root" -type f -name SKILL.md -print -quit)" ]]; then
     _agent_canon_json_error skill_projection_copy_failed \
       "host personal skill view readback is missing"
+    return 2
+  fi
+  if [[ ! -f "$expected_skill" || -L "$expected_skill" ]]; then
+    _agent_canon_json_error skill_projection_copy_failed \
+      "host empirical prompt skill view readback is missing"
     return 2
   fi
   return 0
@@ -4112,12 +4127,97 @@ _agent_canon_remove_global_links() {
   fi
 }
 
+_agent_canon_migrate_legacy_prompt_skill() {
+  # This is deliberately an exact path operation.  Do not enumerate the
+  # user's .codex/skills tree: .system and every other entry are foreign to
+  # this migration and must remain untouched.
+  local home_root codex_home legacy_skills legacy skill_file canonical_link canonical_source
+  local observed expected_entry owner_uid
+  home_root=$(realpath -e -- "$HOME")
+  [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
+  codex_home="$home_root/.codex"
+  if [[ -L "$codex_home" || ( -e "$codex_home" && ! -d "$codex_home" ) ]]; then
+    _agent_canon_json_error legacy_skill_collision \
+      "global Codex home is not a regular directory: $codex_home"
+    return 2
+  fi
+  [[ -d "$codex_home" ]] || return 0
+  legacy_skills="$codex_home/skills"
+  legacy="$legacy_skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
+  if [[ ! -e "$legacy" && ! -L "$legacy" ]]; then
+    return 0
+  fi
+  if [[ ! -d "$legacy_skills" || -L "$legacy_skills" ]]; then
+    _agent_canon_json_error legacy_skill_collision \
+      "legacy Codex skills directory is not regular: $legacy_skills"
+    return 2
+  fi
+  if [[ ! -d "$legacy" || -L "$legacy" ]]; then
+    _agent_canon_json_error legacy_skill_collision \
+      "legacy skill path is not a regular directory: $legacy"
+    return 2
+  fi
+  if [[ ! -f "$legacy/SKILL.md" || -L "$legacy/SKILL.md" ]]; then
+    _agent_canon_json_error legacy_skill_shape_mismatch \
+      "legacy skill must contain one regular SKILL.md: $legacy"
+    return 2
+  fi
+  expected_entry=$(find "$legacy" -mindepth 1 -maxdepth 1 -printf '%f\n')
+  if [[ "$expected_entry" != SKILL.md ]]; then
+    _agent_canon_json_error legacy_skill_shape_mismatch \
+      "legacy skill must contain exactly one regular SKILL.md: $legacy"
+    return 2
+  fi
+  owner_uid=$(id -u)
+  if [[ "$(stat -c '%u' -- "$legacy_skills")" != "$owner_uid" ||
+        "$(stat -c '%u' -- "$legacy")" != "$owner_uid" ||
+        "$(stat -c '%u' -- "$legacy/SKILL.md")" != "$owner_uid" ]]; then
+    _agent_canon_json_error legacy_skill_ownership_mismatch \
+      "legacy skill is not owned by the current user: $legacy"
+    return 2
+  fi
+  observed=$(_agent_canon_sha256 "$legacy/SKILL.md")
+  if [[ "$observed" != "$AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256" ]]; then
+    _agent_canon_json_error legacy_skill_digest_mismatch \
+      "legacy prompt skill content differs from the authorized source: $legacy/SKILL.md"
+    return 2
+  fi
+
+  canonical_source="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
+  canonical_link="$home_root/.agents/skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
+  if [[ ! -L "$canonical_link" ||
+        "$(readlink -f -- "$canonical_link" 2>/dev/null || printf '')" != "$(realpath -e -- "$canonical_source")" ||
+        ! -d "$canonical_source" || -L "$canonical_source" ||
+        ! -f "$canonical_source/SKILL.md" || -L "$canonical_source/SKILL.md" ]]; then
+    _agent_canon_json_error legacy_skill_link_readback_failed \
+      "managed canonical skill link was not read back: $canonical_link"
+    return 2
+  fi
+
+  if ! rm -rf -- "$legacy"; then
+    _agent_canon_json_error legacy_skill_migration_failed \
+      "legacy prompt skill directory could not be removed: $legacy"
+    return 2
+  fi
+  if [[ -e "$legacy" || -L "$legacy" ]]; then
+    _agent_canon_json_error legacy_skill_migration_failed \
+      "legacy prompt skill directory remains after migration: $legacy"
+    return 2
+  fi
+}
+
 _agent_canon_install_global_links() {
   local home_root
   home_root=$(realpath -e -- "$HOME")
   [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
+  local codex_home="$home_root/.codex"
+  if [[ -L "$codex_home" || ( -e "$codex_home" && ! -d "$codex_home" ) ]]; then
+    _agent_canon_json_error global_link_collision \
+      "global Codex home is not a regular directory: $codex_home"
+    return 2
+  fi
   local source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal"
-  local skill_source_root="$AGENT_CANON_REPOSITORY_ROOT/agents/skills"
+  local skill_source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills"
   local manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
   local config_target="$home_root/.codex/config.toml"
   local config_source="$source_root/config.toml"
@@ -4189,6 +4289,16 @@ _agent_canon_install_global_links() {
   if ((${#failures[@]})); then
     _agent_canon_json_error global_link_collision "global link install preserved collisions: ${failures[*]}"
   fi
+  local prompt_source="$skill_source_root/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
+  local prompt_link="$home_root/.agents/skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
+  if [[ -d "$prompt_source" && ! -L "$prompt_source" ]] &&
+     [[ ! -L "$prompt_link" ||
+        "$(readlink -f -- "$prompt_link" 2>/dev/null || printf '')" != "$(realpath -e -- "$prompt_source")" ]]; then
+    _agent_canon_json_error legacy_skill_link_readback_failed \
+      "managed canonical prompt skill link was not read back: $prompt_link"
+    return 2
+  fi
+  _agent_canon_migrate_legacy_prompt_skill
 }
 
 bootstrap_host_entrypoint() {

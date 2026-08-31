@@ -126,6 +126,7 @@ skill_dependencies:
     - report-writing
     - test-design
     - comprehensive-development
+    - empirical-prompt-tuning
   python-review:
     responsibility_group: review
     required_prerequisites: []
@@ -187,6 +188,7 @@ skill_dependencies:
     - adaptive-improvement-loop
     - research-workflow
     - wiki-publication
+    - empirical-prompt-tuning
   result-visualize:
     responsibility_group: evidence
     required_prerequisites: []
@@ -878,6 +880,17 @@ skill_dependencies:
     parallel_independent:
     - environment-cleanup
     - code-cleanup
+  empirical-prompt-tuning:
+    responsibility_group: workflow
+    required_prerequisites: []
+    routing_candidates:
+    - agent-orchestration
+    - adaptive-improvement-loop
+    successors: []
+    order_constraints: []
+    parallel_independent:
+    - change-review
+    - result-artifact-writeout
   agent-learning:
     responsibility_group: runtime
     required_prerequisites: []

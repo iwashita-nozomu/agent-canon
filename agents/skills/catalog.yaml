@@ -2133,3 +2133,30 @@ skill_families:
     routing:
       stage_policy: active
       reason: canonical skill, catalog, route, generated shim, host config, graph, or readback cleanup is in scope
+  - id: empirical-prompt-tuning
+    purpose: Improve reusable agent instructions through fresh evaluation on frozen baseline and hold-out scenarios until qualitative and quantitative evidence converges.
+    canonical_doc: agents/skills/empirical-prompt-tuning.md
+    shim: .codex/personal/skills/empirical-prompt-tuning/SKILL.md
+    discovery:
+      name: empirical-prompt-tuning
+      description: "Use when a reusable skill, prompt, or instruction surface needs fresh empirical evaluation against frozen baseline and hold-out scenarios, followed by evidence-based iteration to convergence."
+    tool_commands:
+      required: []
+      conditional:
+      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml"]}
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: reusable prompt or skill evaluation with frozen scenarios and iterative convergence is in scope
+      triggers:
+        - ["empirical-prompt-tuning"]
+        - ["empirical", "prompt", "tuning"]
+        - ["prompt", "evaluation"]
+        - ["skill", "evaluation"]
+        - ["fresh", "evaluator"]
+        - ["baseline", "hold-out"]
+        - ["プロンプト", "評価"]
+        - ["スキル", "評価"]
+        - ["反復", "収束"]

@@ -221,6 +221,197 @@ def runtime(
     )
 
 
+def _legacy_skill_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    payload: bytes = b"legacy prompt skill\n",
+) -> tuple[BootstrapRuntime, Path, Path, Path]:
+    """Build one exact migration fixture without touching the developer HOME."""
+    control = tmp_path / "home"
+    control.mkdir()
+    monkeypatch.setenv("HOME", str(control))
+    manager = BootstrapRuntime(
+        control,
+        control / "runtime",
+        repository_root=REPOSITORY_ROOT,
+        docker=DockerAdapter(str(Path(__file__).with_name("fake_docker.py"))),
+    )
+    canonical_root = tmp_path / "canonical"
+    canonical_source = (
+        canonical_root / ".codex" / "personal" / "skills" / "empirical-prompt-tuning"
+    )
+    canonical_source.mkdir(parents=True)
+    (canonical_source / "SKILL.md").write_text("canonical shim\n", encoding="utf-8")
+    agents_root = canonical_root / ".codex" / "agents"
+    agents_root.mkdir(parents=True)
+    (agents_root / "reviewer.toml").write_text("name = 'reviewer'\n", encoding="utf-8")
+    manager.repository_root = canonical_root
+    legacy = control / ".codex" / "skills" / "empirical-prompt-tuning"
+    (legacy / "SKILL.md").parent.mkdir(parents=True)
+    (legacy / "SKILL.md").write_bytes(payload)
+    link = control / ".agents" / "skills" / "empirical-prompt-tuning"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(canonical_source, target_is_directory=True)
+    return manager, legacy, link, canonical_source
+
+
+def test_legacy_prompt_skill_migrates_only_after_exact_link_readback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The known legacy source is removed only after content and link checks."""
+    payload = b"legacy prompt skill\n"
+    monkeypatch.setattr(
+        bootstrap_runtime_module,
+        "LEGACY_PROMPT_SKILL_SHA256",
+        sha256_bytes(payload),
+    )
+    manager, legacy, link, _canonical = _legacy_skill_fixture(
+        tmp_path, monkeypatch, payload=payload
+    )
+
+    result = manager._migrate_legacy_prompt_skill()
+
+    assert result["state"] == "migrated"
+    assert not legacy.exists() and not legacy.is_symlink()
+    assert link.is_symlink()
+    assert link.resolve() == (manager.repository_root / ".codex/personal/skills/empirical-prompt-tuning").resolve()
+    # A repeated update is an idempotent no-op after the exact old path is gone.
+    assert manager._migrate_legacy_prompt_skill() == {"state": "absent"}
+
+
+def test_legacy_prompt_skill_digest_mismatch_is_typed_and_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Changed legacy content remains available for recovery."""
+    manager, legacy, _link, _canonical = _legacy_skill_fixture(
+        tmp_path, monkeypatch, payload=b"foreign content\n"
+    )
+
+    with pytest.raises(BootstrapError, match="legacy_skill_digest_mismatch"):
+        manager._migrate_legacy_prompt_skill()
+    assert legacy.is_dir() and (legacy / "SKILL.md").read_bytes() == b"foreign content\n"
+
+
+def test_legacy_prompt_skill_extra_file_is_typed_and_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An extra entry prevents deletion even when SKILL.md is authorized."""
+    manager, legacy, _link, _canonical = _legacy_skill_fixture(tmp_path, monkeypatch)
+    extra = legacy / "README.txt"
+    extra.write_text("foreign\n", encoding="utf-8")
+
+    with pytest.raises(BootstrapError, match="legacy_skill_shape_mismatch"):
+        manager._migrate_legacy_prompt_skill()
+    assert (legacy / "SKILL.md").read_bytes() == b"legacy prompt skill\n"
+    assert extra.read_text(encoding="utf-8") == "foreign\n"
+
+
+def test_legacy_prompt_skill_ownership_mismatch_is_typed_and_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An ownership mismatch fails closed before the legacy source is removed."""
+    manager, legacy, _link, _canonical = _legacy_skill_fixture(tmp_path, monkeypatch)
+    expected_uid = os.getuid()
+    monkeypatch.setattr(bootstrap_runtime_module.os, "getuid", lambda: expected_uid + 1)
+
+    with pytest.raises(BootstrapError, match="legacy_skill_ownership_mismatch"):
+        manager._migrate_legacy_prompt_skill()
+    assert legacy.is_dir() and (legacy / "SKILL.md").is_file()
+
+
+def test_legacy_prompt_skill_install_creates_link_before_migration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Global-link convergence creates the canonical user link before retirement."""
+    payload = b"legacy prompt skill\n"
+    monkeypatch.setattr(
+        bootstrap_runtime_module,
+        "LEGACY_PROMPT_SKILL_SHA256",
+        sha256_bytes(payload),
+    )
+    manager, legacy, link, canonical = _legacy_skill_fixture(
+        tmp_path, monkeypatch, payload=payload
+    )
+
+    state: dict[str, Any] = {}
+    manager._ensure_global_links(state)
+
+    assert not legacy.exists() and not legacy.is_symlink()
+    assert link.is_symlink() and link.resolve() == canonical.resolve()
+    assert any(
+        entry.get("target") == str(link)
+        for entry in state["managed_global_links"]
+        if isinstance(entry, dict)
+    )
+
+
+def test_legacy_prompt_skill_symlink_collision_and_system_tree_are_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exact legacy path is fail-closed and the system skill tree is untouched."""
+    manager, legacy, _link, _canonical = _legacy_skill_fixture(tmp_path, monkeypatch)
+    target = tmp_path / "foreign"
+    target.mkdir()
+    (target / "SKILL.md").write_text("foreign\n", encoding="utf-8")
+    (legacy / "SKILL.md").unlink()
+    legacy.rmdir()
+    legacy.symlink_to(target, target_is_directory=True)
+
+    system = manager.global_codex_home / "skills" / ".system"
+    system.mkdir(parents=True)
+    sentinel = system / "SKILL.md"
+    sentinel.write_text("system\n", encoding="utf-8")
+    foreign = manager.global_codex_home / "skills" / "foreign"
+    foreign.mkdir()
+    foreign_sentinel = foreign / "SKILL.md"
+    foreign_sentinel.write_text("foreign\n", encoding="utf-8")
+
+    with pytest.raises(BootstrapError, match="legacy_skill_collision"):
+        manager._migrate_legacy_prompt_skill()
+    assert legacy.is_symlink() and legacy.resolve() == target.resolve()
+    assert sentinel.read_text(encoding="utf-8") == "system\n"
+    assert foreign_sentinel.read_text(encoding="utf-8") == "foreign\n"
+
+
+def test_uninstall_removes_only_managed_migrated_skill_link(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Uninstall does not restore the retired legacy path or remove system skills."""
+    payload = b"legacy prompt skill\n"
+    monkeypatch.setattr(
+        bootstrap_runtime_module,
+        "LEGACY_PROMPT_SKILL_SHA256",
+        sha256_bytes(payload),
+    )
+    manager, legacy, link, _canonical = _legacy_skill_fixture(
+        tmp_path, monkeypatch, payload=payload
+    )
+    manager._migrate_legacy_prompt_skill()
+    system = manager.global_codex_home / "skills" / ".system"
+    system.mkdir(parents=True)
+    sentinel = system / "SKILL.md"
+    sentinel.write_text("system\n", encoding="utf-8")
+    foreign = manager.global_codex_home / "skills" / "foreign"
+    foreign.mkdir()
+    foreign_sentinel = foreign / "SKILL.md"
+    foreign_sentinel.write_text("foreign\n", encoding="utf-8")
+    state: dict[str, Any] = {
+        "managed_global_links": [
+            {"surface": "skills", "target": str(link), "source": str(link.resolve())}
+        ],
+        "managed_codex_config": None,
+        "managed_agents_link": None,
+    }
+
+    manager._remove_global_links(state)
+
+    assert not link.exists() and not link.is_symlink()
+    assert not legacy.exists() and not legacy.is_symlink()
+    assert sentinel.read_text(encoding="utf-8") == "system\n"
+    assert foreign_sentinel.read_text(encoding="utf-8") == "foreign\n"
+
+
 def test_explicit_roots_reject_escape_and_symlink_without_rootless_policy(
     tmp_path: Path,
 ) -> None:

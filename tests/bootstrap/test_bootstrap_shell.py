@@ -33,6 +33,266 @@ def test_host_entrypoint_has_no_python_fallback() -> None:
     assert "AGENT_CANON_DOCKER_RPC" not in controller
 
 
+def _run_shell_legacy_migration(
+    tmp_path: Path,
+    *,
+    payload: bytes = b"legacy prompt skill\n",
+    expected_digest: str | None = None,
+    shape: str = "directory",
+    extra_file: bool = False,
+    fake_owner: bool = False,
+) -> tuple[subprocess.CompletedProcess[str], Path, Path, Path, Path, Path]:
+    """Run the host migration against a fully isolated home and source root."""
+    home = tmp_path / "home"
+    repository = tmp_path / "repository"
+    home.mkdir()
+    source = repository / ".codex" / "personal" / "skills" / "empirical-prompt-tuning"
+    source.mkdir(parents=True)
+    (source / "SKILL.md").write_text("canonical\n", encoding="utf-8")
+    legacy = home / ".codex" / "skills" / "empirical-prompt-tuning"
+    legacy.parent.mkdir(parents=True)
+    if shape == "symlink":
+        target = tmp_path / "foreign-target"
+        target.mkdir()
+        (target / "SKILL.md").write_bytes(payload)
+        legacy.symlink_to(target, target_is_directory=True)
+    else:
+        (legacy / "SKILL.md").parent.mkdir(parents=True)
+        (legacy / "SKILL.md").write_bytes(payload)
+        if extra_file:
+            (legacy / "README.txt").write_text("foreign\n", encoding="utf-8")
+    link = home / ".agents" / "skills" / "empirical-prompt-tuning"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(source, target_is_directory=True)
+    system_sentinel = home / ".codex" / "skills" / ".system" / "SKILL.md"
+    system_sentinel.parent.mkdir(parents=True)
+    system_sentinel.write_text("system\n", encoding="utf-8")
+    foreign_sentinel = home / ".codex" / "skills" / "foreign" / "SKILL.md"
+    foreign_sentinel.parent.mkdir(parents=True)
+    foreign_sentinel.write_text("foreign\n", encoding="utf-8")
+
+    expected = expected_digest or hashlib.sha256(payload).hexdigest()
+    fake_bin = tmp_path / "fake-bin"
+    path_setup = ""
+    if fake_owner:
+        fake_bin.mkdir(exist_ok=True)
+        fake_stat = fake_bin / "stat"
+        fake_stat.write_text(
+            "#!/usr/bin/env bash\nprintf '9999\\n'\n", encoding="utf-8"
+        )
+        fake_stat.chmod(0o755)
+        path_setup = f"export PATH={str(fake_bin)!r}:$PATH"
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+HOME={str(home)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256={expected!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT
+export AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256
+{path_setup}
+_agent_canon_migrate_legacy_prompt_skill
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    return result, home, legacy, link, system_sentinel, foreign_sentinel
+
+
+def test_shell_install_creates_canonical_link_before_exact_migration(
+    tmp_path: Path,
+) -> None:
+    """Install links the materialized skill, then removes only the exact legacy path."""
+    home = tmp_path / "home"
+    repository = tmp_path / "repository"
+    state = tmp_path / "state"
+    home.mkdir()
+    source = repository / ".codex" / "personal" / "skills" / "empirical-prompt-tuning"
+    source.mkdir(parents=True)
+    (source / "SKILL.md").write_text("canonical\n", encoding="utf-8")
+    agents = repository / ".codex" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "reviewer.toml").write_text("name = 'reviewer'\n", encoding="utf-8")
+    payload = b"legacy prompt skill\n"
+    legacy = home / ".codex" / "skills" / "empirical-prompt-tuning"
+    (legacy / "SKILL.md").parent.mkdir(parents=True)
+    (legacy / "SKILL.md").write_bytes(payload)
+    system_sentinel = home / ".codex" / "skills" / ".system" / "SKILL.md"
+    system_sentinel.parent.mkdir(parents=True)
+    system_sentinel.write_text("system\n", encoding="utf-8")
+    foreign_sentinel = home / ".codex" / "skills" / "foreign" / "SKILL.md"
+    foreign_sentinel.parent.mkdir(parents=True)
+    foreign_sentinel.write_text("foreign\n", encoding="utf-8")
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+HOME={str(home)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_STATE_ROOT={str(state)!r}
+AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256={hashlib.sha256(payload).hexdigest()!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256
+_agent_canon_install_global_links
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    link = home / ".agents" / "skills" / "empirical-prompt-tuning"
+    assert not legacy.exists() and not legacy.is_symlink()
+    assert link.is_symlink() and link.resolve() == source.resolve()
+    assert system_sentinel.read_text(encoding="utf-8") == "system\n"
+    assert foreign_sentinel.read_text(encoding="utf-8") == "foreign\n"
+
+
+@pytest.mark.parametrize(
+    ("case", "code"),
+    (
+        ("digest", "legacy_skill_digest_mismatch"),
+        ("symlink", "legacy_skill_collision"),
+        ("extra", "legacy_skill_shape_mismatch"),
+        ("ownership", "legacy_skill_ownership_mismatch"),
+    ),
+)
+def test_shell_migration_failures_preserve_legacy_and_foreign_skills(
+    tmp_path: Path, case: str, code: str
+) -> None:
+    """Every migration refusal leaves the old source and foreign trees intact."""
+    kwargs: dict[str, object] = {}
+    if case == "digest":
+        kwargs["expected_digest"] = "0" * 64
+    elif case == "symlink":
+        kwargs["shape"] = "symlink"
+    elif case == "extra":
+        kwargs["extra_file"] = True
+    elif case == "ownership":
+        kwargs["fake_owner"] = True
+    result, _home, legacy, _link, system_sentinel, foreign_sentinel = (
+        _run_shell_legacy_migration(tmp_path, **kwargs)
+    )
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == code
+    assert legacy.exists() or legacy.is_symlink()
+    assert system_sentinel.read_text(encoding="utf-8") == "system\n"
+    assert foreign_sentinel.read_text(encoding="utf-8") == "foreign\n"
+
+
+def test_shell_migration_rejects_symlinked_codex_parent_without_deletion(
+    tmp_path: Path,
+) -> None:
+    """A symlinked Codex home cannot redirect deletion into a foreign tree."""
+    home = tmp_path / "home"
+    foreign_codex = tmp_path / "foreign-codex"
+    repository = tmp_path / "repository"
+    home.mkdir()
+    (foreign_codex / "skills" / "empirical-prompt-tuning").mkdir(parents=True)
+    source = repository / ".codex" / "personal" / "skills" / "empirical-prompt-tuning"
+    source.mkdir(parents=True)
+    (foreign_codex / "skills" / "empirical-prompt-tuning" / "SKILL.md").write_text(
+        "legacy\n", encoding="utf-8"
+    )
+    (source / "SKILL.md").write_text("canonical\n", encoding="utf-8")
+    (home / ".agents" / "skills").mkdir(parents=True)
+    (home / ".codex").symlink_to(foreign_codex, target_is_directory=True)
+    (home / ".agents" / "skills" / "empirical-prompt-tuning").symlink_to(
+        source, target_is_directory=True
+    )
+    legacy_file = foreign_codex / "skills" / "empirical-prompt-tuning" / "SKILL.md"
+    expected_digest = hashlib.sha256(legacy_file.read_bytes()).hexdigest()
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+HOME={str(home)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256={expected_digest!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT
+export AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256
+_agent_canon_migrate_legacy_prompt_skill
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "legacy_skill_collision"
+    assert legacy_file.read_text(encoding="utf-8") == "legacy\n"
+    assert (home / ".codex").is_symlink()
+
+
+def test_shell_migration_is_idempotent_after_exact_deletion(tmp_path: Path) -> None:
+    """A second update sees the retired path absent and performs no action."""
+    result, home, legacy, link, _system, _foreign = _run_shell_legacy_migration(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert not legacy.exists() and link.is_symlink()
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+HOME={str(home)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(tmp_path / 'repository')!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT
+_agent_canon_migrate_legacy_prompt_skill
+"""
+    repeat = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert repeat.returncode == 0, repeat.stderr
+    assert not legacy.exists() and link.is_symlink()
+
+
+def test_shell_uninstall_removes_only_managed_skill_link(tmp_path: Path) -> None:
+    """Uninstall removes the recorded canonical link, not legacy/system/foreign entries."""
+    home = tmp_path / "home"
+    repository = tmp_path / "repository"
+    state = tmp_path / "state"
+    source = repository / ".codex" / "personal" / "skills" / "empirical-prompt-tuning"
+    foreign_source = tmp_path / "foreign-source"
+    source.mkdir(parents=True)
+    foreign_source.mkdir()
+    (source / "SKILL.md").write_text("canonical\n", encoding="utf-8")
+    (foreign_source / "SKILL.md").write_text("foreign\n", encoding="utf-8")
+    managed_link = home / ".agents" / "skills" / "empirical-prompt-tuning"
+    foreign_link = home / ".agents" / "skills" / "foreign"
+    managed_link.parent.mkdir(parents=True)
+    managed_link.symlink_to(source, target_is_directory=True)
+    foreign_link.symlink_to(foreign_source, target_is_directory=True)
+    system_sentinel = home / ".codex" / "skills" / ".system" / "SKILL.md"
+    system_sentinel.parent.mkdir(parents=True)
+    system_sentinel.write_text("system\n", encoding="utf-8")
+    state.mkdir()
+    manifest = state / "global-links.tsv"
+    manifest.write_text(
+        "schema\tagent-canon.global-links.v1\n"
+        f"link\t{managed_link}\t{source}\n",
+        encoding="utf-8",
+    )
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+HOME={str(home)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_STATE_ROOT={str(state)!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_STATE_ROOT
+_agent_canon_remove_global_links
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert not managed_link.exists() and not managed_link.is_symlink()
+    assert foreign_link.is_symlink() and foreign_link.resolve() == foreign_source.resolve()
+    assert system_sentinel.read_text(encoding="utf-8") == "system\n"
+
+
 def test_update_transaction_has_candidate_restore_path() -> None:
     """Host update retains the previous image until candidate finalization."""
     text = ADAPTER.read_text(encoding="utf-8")
@@ -2495,8 +2755,9 @@ def test_shell_status_reports_invalid_source_sync_as_unavailable(tmp_path: Path)
     assert json.loads(completed.stdout)["source_sync"] is None
 
 
+@pytest.mark.parametrize("initial_skill_view", ("absent", "stale"))
 def test_shell_source_sync_publishes_up_to_date_updated_and_failure_state(
-    tmp_path: Path,
+    tmp_path: Path, initial_skill_view: str
 ) -> None:
     """The active shell route records each source-sync terminal result."""
     bare = tmp_path / "origin.git"
@@ -2518,17 +2779,51 @@ def test_shell_source_sync_publishes_up_to_date_updated_and_failure_state(
     subprocess.run(["git", "clone", str(bare), str(publisher)], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(publisher), "config", "user.email", "test@example.invalid"], check=True)
     subprocess.run(["git", "-C", str(publisher), "config", "user.name", "AgentCanon Test"], check=True)
+    home = tmp_path / "home"
+    home.mkdir()
+    legacy = home / ".codex" / "skills" / "empirical-prompt-tuning"
+    (legacy / "SKILL.md").parent.mkdir(parents=True)
+    legacy_payload = b"legacy prompt skill\n"
+    (legacy / "SKILL.md").write_bytes(legacy_payload)
+    projection = tmp_path / "projection"
+    generated_skill = projection / ".codex" / "personal" / "skills" / "empirical-prompt-tuning" / "SKILL.md"
+    generated_skill.parent.mkdir(parents=True)
+    generated_skill.write_text("candidate generated skill\n", encoding="utf-8")
+    live_skill = install / ".codex" / "personal" / "skills" / "empirical-prompt-tuning"
+    if initial_skill_view == "stale":
+        live_skill.mkdir(parents=True)
+        (live_skill / "SKILL.md").write_text("stale generated skill\n", encoding="utf-8")
+    events = tmp_path / "projection-events"
 
     def run_sync(candidate_rc: int = 0) -> subprocess.CompletedProcess[str]:
         script = f"""
 source {str(ADAPTER)!r}
 set +e
+HOME={str(home)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
-AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
 AGENT_CANON_RUNTIME_ROOT={str(tmp_path / "runtime")!r}
+AGENT_CANON_STATE_ROOT={str(tmp_path / "runtime" / "container-state")!r}
+AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256={hashlib.sha256(legacy_payload).hexdigest()!r}
+export HOME AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256
 command_args=(sync --install-root {str(install)!r} --remote origin --branch main)
 bootstrap_host_entrypoint() {{ return {candidate_rc}; }}
-_agent_canon_install_global_links() {{ return 0; }}
+_agent_canon_volume_copy() {{
+  test "$1" = export && test "$2" = skill || return 91
+  printf 'personal-skill-view\\n' >> {str(events)!r}
+  mkdir -p "$3/skill-projection"
+  cp -a -- {str(projection)!r}/. "$3/skill-projection/"
+}}
+_agent_canon_install_global_links() {{
+  printf 'global-links\\n' >> {str(events)!r}
+  test -f {str(install)!r}/.codex/personal/skills/empirical-prompt-tuning/SKILL.md || return 92
+  test -f {str(legacy)!r}/SKILL.md || return 93
+  mkdir -p {str(home)!r}/.agents/skills
+  rm -f -- {str(home)!r}/.agents/skills/empirical-prompt-tuning
+  ln -s -- "$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills/empirical-prompt-tuning" {str(home)!r}/.agents/skills/empirical-prompt-tuning
+  _agent_canon_migrate_legacy_prompt_skill
+}}
 _agent_canon_sync_operation
 """
         return subprocess.run(["bash", "-c", script], check=False, capture_output=True, text=True)
@@ -2547,6 +2842,16 @@ _agent_canon_sync_operation
     assert updated_state["status"] == "success"
     assert updated_state["code"] == "updated"
     assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+    assert (live_skill / "SKILL.md").read_text(encoding="utf-8") == "candidate generated skill\n"
+    managed_link = home / ".agents" / "skills" / "empirical-prompt-tuning"
+    assert managed_link.is_symlink()
+    assert managed_link.resolve() == live_skill.resolve()
+    assert "source-staging" not in managed_link.resolve().as_posix()
+    assert not legacy.exists() and not legacy.is_symlink()
+    assert events.read_text(encoding="utf-8").splitlines() == [
+        "personal-skill-view",
+        "global-links",
+    ]
     (publisher / "tracked.txt").write_text("three\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(publisher), "commit", "-am", "three"], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(publisher), "push", "origin", "main"], check=True, capture_output=True)
@@ -2557,6 +2862,70 @@ _agent_canon_sync_operation
     assert failed_state["code"] == "source_sync_candidate_failed"
     assert failed_state["failure"] == "source_sync_candidate_failed"
     assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+
+
+def test_shell_source_sync_projection_failure_rolls_back_runtime(
+    tmp_path: Path,
+) -> None:
+    """A live skill-view failure rolls back the resident before link publication."""
+    bare = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    install = tmp_path / "install"
+    publisher = tmp_path / "publisher"
+    events = tmp_path / "projection-events"
+    subprocess.run(["git", "init", "--bare", str(bare)], check=True, capture_output=True)
+    subprocess.run(["git", "init", str(seed)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.name", "AgentCanon Test"], check=True)
+    (seed / "tracked.txt").write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(seed), "add", "tracked.txt"], check=True)
+    subprocess.run(["git", "-C", str(seed), "commit", "-m", "one"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "branch", "-M", "main"], check=True)
+    subprocess.run(["git", "-C", str(seed), "remote", "add", "origin", str(bare)], check=True)
+    subprocess.run(["git", "-C", str(seed), "push", "origin", "main"], check=True, capture_output=True)
+    subprocess.run(["git", "clone", str(bare), str(install)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(install), "branch", "-M", "main"], check=True)
+    subprocess.run(["git", "clone", str(bare), str(publisher)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(publisher), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(publisher), "config", "user.name", "AgentCanon Test"], check=True)
+    (publisher / "tracked.txt").write_text("two\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(publisher), "commit", "-am", "two"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(publisher), "push", "origin", "main"], check=True, capture_output=True)
+
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path / "runtime")!r}
+command_args=(sync --install-root {str(install)!r} --remote origin --branch main)
+bootstrap_host_entrypoint() {{
+  printf 'bootstrap:%s\\n' "$1" >> {str(events)!r}
+  return 0
+}}
+_agent_canon_sync_personal_skill_view() {{
+  printf 'projection-root:%s\\n' "$AGENT_CANON_REPOSITORY_ROOT" >> {str(events)!r}
+  return 17
+}}
+_agent_canon_install_global_links() {{
+  printf 'global-links\\n' >> {str(events)!r}
+  return 19
+}}
+_agent_canon_sync_operation
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 17
+    event_lines = events.read_text(encoding="utf-8").splitlines()
+    assert event_lines[0].startswith("bootstrap:")
+    assert event_lines[1] == f"projection-root:{install}"
+    assert event_lines[2] == f"bootstrap:{install}"
+    assert all(line != "global-links" for line in event_lines)
+    assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+    state = json.loads((tmp_path / "runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert state["code"] == "sync_global_links_failed"
+    assert not (tmp_path / "runtime/source-staging/agent-canon").exists()
 
 
 def test_source_sync_transports_remote_candidate_from_shallow_source(
@@ -2665,6 +3034,7 @@ bootstrap_host_entrypoint() {{
   test "$(git -C "$1" show HEAD:tracked.txt)" = two
   return {candidate_rc}
 }}
+_agent_canon_sync_personal_skill_view() {{ return 0; }}
 _agent_canon_install_global_links() {{ return 0; }}
 _agent_canon_sync_operation
 """
