@@ -697,6 +697,35 @@ class RouteToolTest(unittest.TestCase):
                 self.assertNotIn("refactor-loop", decision["matched_skills"])
                 self.assertNotIn("refactor-loop", decision["active_skills"])
 
+    def test_prompt_routes_explicit_grilling_interview(self) -> None:
+        """Explicit grilling requests activate the read-only interview skill."""
+        for prompt in (
+            "grill me on this deployment plan",
+            "$grilling: stress-test this decision before implementation",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("grilling", decision["matched_skills"])
+                self.assertIn("grilling", decision["active_skills"])
+                self.assertIn("agent-orchestration", decision["related_skill_candidates"])
+
+    def test_prompt_does_not_route_grilling_for_ordinary_implementation(self) -> None:
+        """Ordinary implementation language remains outside the grilling route."""
+        result = self.run_route(
+            "--prompt",
+            "Implement the deployment plan and run the focused smoke test.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("grilling", decision["matched_skills"])
+        self.assertNotIn("grilling", decision["active_skills"])
+
     def test_repository_topic_clone_routes_repository_kind_as_decorator(self) -> None:
         """Parent, dependency, and standalone clones share one generic owner."""
         scenarios = (
