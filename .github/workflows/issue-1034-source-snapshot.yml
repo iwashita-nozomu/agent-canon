@@ -21,11 +21,11 @@ jobs:
         run: |
           git rev-parse HEAD
           git status --short --branch
-          tar --exclude=.git -czf "${RUNNER_TEMP}/agent-canon-1034-source.tar.gz" .
+          tar -czf "${RUNNER_TEMP}/agent-canon-1034-source-with-git.tar.gz" .
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: agent-canon-1034-source
-          path: ${{ runner.temp }}/agent-canon-1034-source.tar.gz
+          name: agent-canon-1034-source-with-git
+          path: ${{ runner.temp }}/agent-canon-1034-source-with-git.tar.gz
           if-no-files-found: error
           retention-days: 1
