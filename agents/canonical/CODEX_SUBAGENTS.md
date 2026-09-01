@@ -218,7 +218,18 @@ structured handoff または、coordination/resumption が必要な場合の dur
 から導出します。
 
 - `role_scope`: その role が判断する subdomain、stage、risk class。
-- `allowed_paths`: 対象 file / directory / glob の bounded list。repo root や `/workspace` は workspace identity として扱い、編集候補、検索 hit、checker finding、changed path を seed にし、responsibility search、reuse survey、stale-surface scan、dependency header graph の再帰展開結果である `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。
+- `reuse_survey`: `allowed_paths` や responsibility slice を決める前に
+  共有する既存 asset context。known な current+historical asset paths、capability、
+  disposition (`reuse`/`extend`/`restore`/`consolidate`/`replace`/`delete`/
+  `reject`)、reason、test paths を含められます。この advisory/shared context
+  の不在は dispatch または write を block しません。
+- `allowed_paths`: 上記の known asset context と tests から導く対象 file /
+  directory / glob の bounded list。context がある場合は独立した token 候補から
+  path を選びません。context がない場合も既存 route は継続し、dispatch / write を
+  block しません。repo root や `/workspace` は workspace identity として扱い、
+  編集候補、検索 hit、checker finding、changed path を seed にし、responsibility
+  search、reuse survey、stale-surface scan、dependency header graph の再帰展開結果
+  である `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。
 - `required_artifacts`: checker output、structured dashboard、dependency-expanded scope、design / implementation packet、または review packet。context artifact を先に渡します。dependency-expanded scope が必要な場合は `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file <hits>` または changed-path 相当の dependency review output を handoff に含めます。
 - `canon_refs`: 必要な AgentCanon / project canon の節。
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
@@ -243,6 +254,12 @@ structured handoff または、coordination/resumption が必要な場合の dur
 - `tool_evidence`: `dynamic_skill_routing` の候補、`tool_catalog_matches`、実行済み
   tool packet の結果。
 - `tool_reuse_ledger` と `pre_edit_rejection_prediction`: selected write-capable implementer には、既存 tool を使うか拒否した理由と `tool_rejection_preflight.py` の結果または pending blocker を渡します。
+
+The worker prompt begins with the parent-selected `reuse_survey` assets and
+test paths when known; for split or extraction work, the splitter inspects
+current and git-history assets before acting on `allowed_paths` or forming a
+narrower slice. Every child receives the same known asset context. This
+advisory context is not a machine-enforced admission gate.
 
 role 分割が妥当でも、coverage map なしに広い `requested_scope` を狭い input packet へ潰す場合は routing defect として扱います。例えば数値 algorithm review は `scientific_computing_reviewer` を subdomain 別に分けてもよいですが、parent は全体の `requested_scope` を持ち続け、各 agent には solver / optimizer / functional などの担当 path list、contract-check summary、`covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` を渡します。Python API / typing review は `python_reviewer` に分け、数学 canon は担当 work packet に必要な節と、外した canon 節の理由を添えます。
 
@@ -387,6 +404,15 @@ repo-changing run は `team_manifest.yaml` に
 `surface_route_seed`、`responsibility_search`、`reuse_survey`、
 `stale_surface_scan`、`dependency_expansion`、`handoff_scope` の順に並べた
 packet flow として扱います。
+
+この flow では、責務 slice や `allowed_paths` を決める前に
+splitter が一つの shared current+historical asset universe を調べます。split /
+extraction または suspected predecessor の現行欠落なら `git log`、`-S`、deleted
+paths、prior PR / Issue、predecessor tests を調べ、それぞれを exact disposition
+へ写します。bounded non-split edit では historical scan は要求しません。
+同じ asset に触れる slices は merge し、選択した asset context と tests を
+全 child に同一のまま渡します。asset context が未提供でも dispatch、write、
+slice formation を機械的に拒否しません。
 
 implementation surface router、検索結果、checker finding、変更済み path は
 seed です。responsibility search、reuse survey、stale-surface scan、

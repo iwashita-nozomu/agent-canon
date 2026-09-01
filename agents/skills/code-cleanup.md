@@ -31,9 +31,20 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 
 ## Route
 
-1. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
-2. approved mechanism を `refactor-loop` へ渡し、同じ契約の behavior-preserving change として実装する。
-3. `change-review` で current snapshot、reachable path、contract、witness を readback する。
+1. split / extraction または suspected predecessor の現行欠落を検出したら、
+   current module/helper/type/test/docs と `git log`、`-S`、deleted paths、prior
+   PR / Issue、predecessor tests から一つの shared current+historical asset
+   universe を作り、decomposition / prototyping より先に調べる。bounded
+   non-split edit では historical scan を必須にしない。
+2. known な asset path、capability、disposition、reason、test paths は既存の
+   `reuse_survey` に advisory context として記録する。context の不在は
+   dispatch や write を block しない。
+3. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
+   responsibility slices と known な `allowed_paths` はこの asset universe から導き、
+   同じ asset に触れる slices を一つへ merge する。
+4. approved mechanism を `refactor-loop` へ渡し、同じ known asset context と
+   tests を各 child に伝播して behavior-preserving change として実装する。
+5. `change-review` で current snapshot、reachable path、contract、witness を readback する。
 
 ## Tool Commands
 

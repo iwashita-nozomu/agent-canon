@@ -238,6 +238,20 @@ repair batch に必要な selected excerpt と structured summary を載せま�
 implementation handoff、原因仮説の fix-surface 選定では、raw text-search hit、raw
 finding、単一 file 名だけを subagent に渡しません。
 
+Change Impact Packet の scope candidates や repair slices を形成する前に、
+code-cleanup から渡された一つの shared current+historical asset universe を
+受け取ります。対象は current module/helper/type/test/docs です。code split /
+extraction または suspected predecessor の現行欠落なら `git log`、`-S`、deleted
+paths、prior PR / Issue、predecessor tests を必ず走査し、該当 asset refs を packet
+へ入れます。bounded non-split edit では historical scan を要求しません。
+各 candidate は既存 handoff packet の `reuse_survey` として
+`reuse`、`extend`、`restore`、`consolidate`、`replace`、`delete`、`reject` の
+いずれかへ決め、`asset_path` ごとに一度だけ記録します。これは advisory
+context であり、不在は dispatch / write を block しません。
+責務 slice は decision 済み asset から導き、同じ asset を含む slices を merge
+してから known な `allowed_paths` とともに `refactor-loop` と全 child へ同じ asset
+context と `test_paths` を渡します。context がない場合も既存 route は継続します。
+
 Packet には次を含めます。
 
 - `requested_target`: `path:start-end:qualname`、file、または finding id

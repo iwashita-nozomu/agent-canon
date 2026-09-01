@@ -157,6 +157,15 @@ logへ on-demand に検索します。stable preference は対象 owner への�
 
 raw text search の hit だけで編集対象を決めません。
 検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を作ります。write-capable child handoff は `agents/task_catalog.yaml#workflow_activation_policy` が要求する typed route だけで materialize します。空の unresolved-decision set は即時に選択 route へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request も同じ typed route で扱います。
+asset reuse investigation は decomposition / prototyping より前に行います。
+split / extraction または suspected predecessor の現行欠落では splitter が
+current module/helper/type/test/docs と `git log`、`-S`、deleted paths、prior PR /
+Issue、predecessor tests を調査します。bounded non-split edit には historical
+scan を一律適用しません。known な asset path、capability、disposition、reason、
+test paths は既存 `reuse_survey` に advisory context として載せ、選択した asset
+と test context から slice を導きます。同一 asset に触れる slice を merge してから
+child handoff に同じ known context を渡します。context の不在は dispatch または
+writing を block しません。
 bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。#335 の既存 tool 先行実行は維持しますが、結果の解釈や修正に入る前に、生成された compact `SKILL.md` を `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` で `file_eof=true` まで読みます。Skill が委譲する場合だけ、canonical owner document の必要な見出しを `section_eof=true` まで読みます。canonical ファイル全体の EOF は要求しません。`implementation_read=ready` はこの条件を満たしたときだけ使い、可視 prefix や既知 path だけでは unlock しません。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ### Skill read admission
@@ -356,7 +365,9 @@ dependency surface は task に応じて次を見ます。
 - `scripts/`
 
 既存実装がある場合は、その module を拡張または再利用します。
-新規追加は、既存ライブラリや既存実装で足りない理由を reuse survey に残してから選びます。
+新規追加は、既存ライブラリや既存実装で足りない理由を既存の reuse survey に残してから選びます。
+reuse survey は prose/status だけでなく、known な asset と test context を持つ advisory
+handoff context です。worker は選択済み asset と tests から読み始めます。
 
 ### File Dependency Manifest
 
@@ -724,6 +735,10 @@ cost を無視して review coverage を優先する run では、research-drive
 - selected gate の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes`
   でない場合は指示された owner stage へ戻る
 - 実装前に `design_brief.md` の `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、`Design-To-Implementation Trace` を読み、抽象責務と概念 model から実装 slice と downstream side effect が導かれていることを確認してから、そこにある artifact、repo docs、dependency surface、code path を読了する。test plan は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ読了する
+- 実装前に既存 handoff の `reuse_survey` を読み、known な selected asset とその
+  tests を worker の開始 context にする。split / extraction では splitter の
+  current+git-history 調査結果と、同一 asset を触る slices の consolidation を
+  全 child に同じまま渡す。
 - selected design review がある場合だけ、実装前に `design_review.md` を読み、
   `Design Artifact Under Review` が現在の `design_brief.md` を指し normalized decision が
   承認であることを確認する。設計を修正した後は selected Gate 6 で現行設計を

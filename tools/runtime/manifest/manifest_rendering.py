@@ -459,7 +459,8 @@ PRE_HANDOFF_SCOPE_STATUS = "seed_then_expand_before_handoff"
 
 PRE_HANDOFF_SCOPE_HANDOFF_RULE = (
     "allowed_paths と write_scope は surface-route seed、responsibility search、"
-    "reuse survey、stale-surface scan、dependency expansion から導く handoff 制約"
+    "reuse survey、stale-surface scan、dependency expansion から導く handoff 制約。"
+    "known な reuse survey asset context から重複する責務 slice を統合する"
 )
 
 PRE_HANDOFF_GATE_STATUS_SOURCE = (
@@ -611,6 +612,7 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "contract_complete_implementation_policy",
     "standard_wave_sequence",
     "pre_handoff_scope_policy",
+    "reuse_survey",
     "pre_handoff_gate_status",
     "default_quality_check_policy",
     "subagent_lifecycle_policy",
@@ -630,6 +632,21 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "next_review_gate",
     "checkout_identity",
 )
+
+REUSE_SURVEY_PROMPT_INSTRUCTION = (
+    "For code split/extraction or a missing suspected predecessor, the splitter must "
+    "investigate current and git-history assets before decomposition or prototyping. "
+    "Carry the existing optional reuse_survey with known current/historical asset "
+    "paths, dispositions, reasons, and test paths; derive allowed_paths and "
+    "responsibility slices from the same known context, consolidate overlapping "
+    "responsibility/asset slices before child prompts, and pass that context to "
+    "applicable writers and children. Missing context is non-blocking."
+)
+
+REUSE_SURVEY_PROMPT_ROLES = frozenset(
+    {"designer", "implementer", "integration_executor", "change_reviewer"}
+)
+REUSE_SURVEY_PROMPT_FAMILIES = frozenset({"owner_bounded_change", "scoped_change"})
 
 EVALUATOR_PROMPT_MUST_INCLUDE = (
     "current_scenario_packet",
@@ -2253,6 +2270,20 @@ def manifest_prompt_contract_lines(
     return lines
 
 
+def reuse_survey_prompt_instruction(
+    role: Role,
+    workflow_family: dict[str, object] | None,
+) -> str:
+    """Return optional reuse context guidance for applicable role prompts."""
+    if workflow_family is None:
+        return ""
+    if workflow_family.get("id") not in REUSE_SURVEY_PROMPT_FAMILIES:
+        return ""
+    if role.id not in REUSE_SURVEY_PROMPT_ROLES:
+        return ""
+    return REUSE_SURVEY_PROMPT_INSTRUCTION
+
+
 def manifest_write_policy_lines(
     spec: RunBundleSpec,
     role: Role,
@@ -2503,6 +2534,11 @@ def render_subagent_prompt_packet(
         lines.append(f"{indent}  {key}:")
         for value in _as_prompt_entry_tuple(prompt.get(key), f"subagent_prompt.{key}"):
             lines.append(f"{indent}    - {value!r}")
+        if (
+            key == "workflow_focus"
+            and workflow_family.get("id") in REUSE_SURVEY_PROMPT_FAMILIES
+        ):
+            lines.append(f"{indent}    - {REUSE_SURVEY_PROMPT_INSTRUCTION!r}")
     return lines
 
 
@@ -2525,12 +2561,14 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         if role.id in {"implementer", "integration_executor"}
         else ""
     )
+    reuse_instruction = reuse_survey_prompt_instruction(role, workflow_family)
     return (
         f"You are the {role.id} role for {family_name}. Start from structured context artifacts and the "
         "owned role_document_packet named in the handoff; load cross_cutting_document_packet "
         "entries only when the selected route or review gate makes them active, otherwise mark "
         f"them not_applicable. Use allowed_paths and do_not_read as ownership boundaries. {write_scope}. "
         f"{writer_target} "
+        f"{reuse_instruction} "
         "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
@@ -2573,12 +2611,14 @@ def compact_role_prompt_contract(
         if role.id in {"implementer", "integration_executor"}
         else ""
     )
+    reuse_instruction = reuse_survey_prompt_instruction(role, workflow_family)
     return (
         f"{role.id} for {family_name}; {write_scope}; use structured context artifacts, "
         "role-specific packet, common packet only when active, allowed paths, "
         "subagent startup route when present, repo tool route fields, and the listed "
         "output fields."
         f" Include checkout_identity in every handoff where Git state matters;{writer_target}."
+        f" {reuse_instruction}"
     )
 
 
@@ -2597,6 +2637,8 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
         common.extend(("write_policy", "allowed_files_or_directories"))
     if role.id in {"implementer", "integration_executor"}:
         common.append("writer_target")
+    if role.id in REUSE_SURVEY_PROMPT_ROLES:
+        common.append("reuse_survey")
     if role.id == "designer":
         common.extend(
             (
