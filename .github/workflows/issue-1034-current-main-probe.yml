@@ -1,0 +1,123 @@
+# Diagnostic-only workflow for Issue #1034. The branch is reset after evidence capture.
+name: Issue 1034 Current Main Graph Probe
+
+on:
+  push:
+    branches:
+      - diagnostic/1034-current-main-graph
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-1034-current-main-graph
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
+      ISSUE_1034_SOURCE_HEAD: ff63216af172727619fd022a9ccbf7997eefff94
+      ISSUE_1034_HOST_PROBE_DIR: ${{ github.workspace }}/.runtime/container-runtime/reports/issue-1034-current-main
+      ISSUE_1034_CONTAINER_PROBE_DIR: /var/lib/agent-canon/runtime/reports/issue-1034-current-main
+    steps:
+      - name: Checkout exact current main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ env.ISSUE_1034_SOURCE_HEAD }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dashboard dependencies
+        run: python3 -m pip install --upgrade pyyaml tomli
+
+      - name: Start shared tool runtime
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${ISSUE_1034_SOURCE_HEAD}"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+
+      - name: Capture graph build and status independently
+        id: graph
+        run: |
+          set -u
+          mkdir -p "${ISSUE_1034_HOST_PROBE_DIR}"
+
+          set +e
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- sh -c \
+            'mkdir -p "$1"; agent-canon graph build --root . --profile default --format json > "$1/graph-build.json" 2> "$1/graph-build.stderr"' \
+            sh "${ISSUE_1034_CONTAINER_PROBE_DIR}"
+          build_exit=$?
+          printf '%s\n' "${build_exit}" > "${ISSUE_1034_HOST_PROBE_DIR}/graph-build.exit"
+
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- sh -c \
+            'mkdir -p "$1"; agent-canon graph status --root . --profile default --format json > "$1/graph-status.json" 2> "$1/graph-status.stderr"' \
+            sh "${ISSUE_1034_CONTAINER_PROBE_DIR}"
+          status_exit=$?
+          printf '%s\n' "${status_exit}" > "${ISSUE_1034_HOST_PROBE_DIR}/graph-status.exit"
+          set -e
+
+          printf 'source_head=%s\nbuild_exit=%s\nstatus_exit=%s\n' \
+            "$(git rev-parse HEAD)" "${build_exit}" "${status_exit}" \
+            | tee "${ISSUE_1034_HOST_PROBE_DIR}/probe-summary.txt"
+
+      - name: Run accumulated eval producers
+        id: evals
+        continue-on-error: true
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            eval collect --root "${GITHUB_WORKSPACE}" \
+            --run-id "issue-1034-current-main-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Generate runtime dashboard
+        id: dashboard
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p "${ISSUE_1034_HOST_PROBE_DIR}"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- python3 \
+            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
+            --root . --runtime-root /var/lib/agent-canon/runtime \
+            --out "${ISSUE_1034_CONTAINER_PROBE_DIR}/agent-runtime-dashboard.md"
+
+      - name: Record downstream outcomes
+        if: always()
+        run: |
+          mkdir -p "${ISSUE_1034_HOST_PROBE_DIR}"
+          printf 'eval_outcome=%s\ndashboard_outcome=%s\n' \
+            '${{ steps.evals.outcome }}' '${{ steps.dashboard.outcome }}' \
+            | tee "${ISSUE_1034_HOST_PROBE_DIR}/downstream-outcomes.txt"
+
+      - name: Upload exact-main probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1034-current-main-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.ISSUE_1034_HOST_PROBE_DIR }}
+
+      - name: Enforce exact-main dashboard contract
+        if: always()
+        run: |
+          set -euo pipefail
+          test "$(cat "${ISSUE_1034_HOST_PROBE_DIR}/graph-build.exit")" = 0
+          test "$(cat "${ISSUE_1034_HOST_PROBE_DIR}/graph-status.exit")" = 0
+          test '${{ steps.evals.outcome }}' = success
+          test '${{ steps.dashboard.outcome }}' = success
+          test -s "${ISSUE_1034_HOST_PROBE_DIR}/agent-runtime-dashboard.md"
+
+      - name: Release shared tool runtime
+        if: always()
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" stop || true
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
