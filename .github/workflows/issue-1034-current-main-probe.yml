@@ -46,7 +46,7 @@ jobs:
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
-      - name: Capture complete graph receipts and migration inputs
+      - name: Capture complete graph failures and migration inputs
         run: |
           set -euo pipefail
           mkdir -p "${ISSUE_1034_PROBE_DIR}"
@@ -71,12 +71,38 @@ jobs:
             exec --root "${GITHUB_WORKSPACE}" -- \
             agent-canon graph status --root . --profile default --format json
 
-          printf '%s\n' "$(git rev-parse HEAD)" >"${ISSUE_1034_PROBE_DIR}/source-head.txt"
+          python3 - "${ISSUE_1034_PROBE_DIR}" "${AGENT_CANON_RUNTIME_ROOT}/container-state" <<'PY'
+          import json
+          import shutil
+          import sys
+          from pathlib import Path, PurePosixPath
 
-          runtime_capture="${AGENT_CANON_RUNTIME_ROOT}/container-runtime"
-          test -d "${runtime_capture}"
-          tar -C "${AGENT_CANON_RUNTIME_ROOT}" -czf \
-            "${ISSUE_1034_PROBE_DIR}/container-runtime.tar.gz" container-runtime
+          probe = Path(sys.argv[1])
+          state_root = Path(sys.argv[2])
+          container_root = PurePosixPath("/var/lib/agent-canon/runtime")
+
+          def host_path(container_path: str) -> Path:
+              value = PurePosixPath(container_path)
+              try:
+                  relative = value.relative_to(container_root)
+              except ValueError as exc:
+                  raise RuntimeError(f"unexpected runtime path: {container_path}") from exc
+              return state_root.joinpath(*relative.parts)
+
+          for name in ("graph-build", "graph-status"):
+              envelope = json.loads((probe / f"{name}.stderr").read_text(encoding="utf-8"))
+              receipt = host_path(envelope["evidence"]["receipt_path"])
+              payload = json.loads(receipt.read_text(encoding="utf-8"))
+              shutil.copyfile(receipt, probe / f"{name}.receipt.json")
+              details = payload["details"]
+              for stream in ("stdout", "stderr"):
+                  source = host_path(details[f"{stream}_log"])
+                  shutil.copyfile(source, probe / f"{name}.full-{stream}.log")
+          PY
+
+          printf '%s\n' "$(git rev-parse HEAD)" >"${ISSUE_1034_PROBE_DIR}/source-head.txt"
+          printf '%s\n' "$(git rev-parse refs/remotes/origin/issue-1034-pr985-head)" \
+            >"${ISSUE_1034_PROBE_DIR}/pr985-head.txt"
 
           git archive --format=tar.gz --output="${ISSUE_1034_PROBE_DIR}/source-current.tar.gz" HEAD
           git archive --format=tar.gz --output="${ISSUE_1034_PROBE_DIR}/source-pr985-base.tar.gz" \
@@ -110,6 +136,14 @@ jobs:
           set -euo pipefail
           test "$(cat "${ISSUE_1034_PROBE_DIR}/graph-build.exit")" = 1
           test "$(cat "${ISSUE_1034_PROBE_DIR}/graph-status.exit")" = 2
+          python3 - "${ISSUE_1034_PROBE_DIR}/graph-build.full-stdout.log" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert payload["unresolved_count"] == 532, payload["unresolved_count"]
+          assert payload["ambiguous_count"] == 0, payload["ambiguous_count"]
+          PY
 
       - name: Release shared tool runtime
         if: always()
