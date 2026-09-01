@@ -71,34 +71,35 @@ jobs:
             exec --root "${GITHUB_WORKSPACE}" -- \
             agent-canon graph status --root . --profile default --format json
 
-          python3 - "${ISSUE_1034_PROBE_DIR}" "${AGENT_CANON_RUNTIME_ROOT}/container-state" <<'PY'
+          container="$(docker ps \
+            --filter 'label=io.agent-canon.runtime=shared-v1' \
+            --format '{{.Names}}' | head -n 1)"
+          test -n "${container}"
+          printf '%s\n' "${container}" >"${ISSUE_1034_PROBE_DIR}/container-name.txt"
+
+          for name in graph-build graph-status; do
+            receipt_path="$(python3 - "${ISSUE_1034_PROBE_DIR}/${name}.stderr" <<'PY'
           import json
-          import shutil
           import sys
-          from pathlib import Path, PurePosixPath
-
-          probe = Path(sys.argv[1])
-          state_root = Path(sys.argv[2])
-          container_root = PurePosixPath("/var/lib/agent-canon/runtime")
-
-          def host_path(container_path: str) -> Path:
-              value = PurePosixPath(container_path)
-              try:
-                  relative = value.relative_to(container_root)
-              except ValueError as exc:
-                  raise RuntimeError(f"unexpected runtime path: {container_path}") from exc
-              return state_root.joinpath(*relative.parts)
-
-          for name in ("graph-build", "graph-status"):
-              envelope = json.loads((probe / f"{name}.stderr").read_text(encoding="utf-8"))
-              receipt = host_path(envelope["evidence"]["receipt_path"])
-              payload = json.loads(receipt.read_text(encoding="utf-8"))
-              shutil.copyfile(receipt, probe / f"{name}.receipt.json")
-              details = payload["details"]
-              for stream in ("stdout", "stderr"):
-                  source = host_path(details[f"{stream}_log"])
-                  shutil.copyfile(source, probe / f"{name}.full-{stream}.log")
+          from pathlib import Path
+          print(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["evidence"]["receipt_path"])
           PY
+          )"
+            docker cp "${container}:${receipt_path}" \
+              "${ISSUE_1034_PROBE_DIR}/${name}.receipt.json"
+            for stream in stdout stderr; do
+              log_path="$(python3 - "${ISSUE_1034_PROBE_DIR}/${name}.receipt.json" "${stream}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          print(payload["details"][f"{sys.argv[2]}_log"])
+          PY
+          )"
+              docker cp "${container}:${log_path}" \
+                "${ISSUE_1034_PROBE_DIR}/${name}.full-${stream}.log"
+            done
+          done
 
           printf '%s\n' "$(git rev-parse HEAD)" >"${ISSUE_1034_PROBE_DIR}/source-head.txt"
           printf '%s\n' "$(git rev-parse refs/remotes/origin/issue-1034-pr985-head)" \
