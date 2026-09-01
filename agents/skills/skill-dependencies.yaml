@@ -532,6 +532,14 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent: []
+  grilling:
+    responsibility_group: workflow
+    required_prerequisites: []
+    routing_candidates:
+    - agent-orchestration
+    successors: []
+    order_constraints: []
+    parallel_independent: []
   long-form-writing:
     responsibility_group: documents
     required_prerequisites:

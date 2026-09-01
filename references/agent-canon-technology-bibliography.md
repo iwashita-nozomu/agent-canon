@@ -80,6 +80,33 @@ implementation authority.
 | Reflexion: Language Agents with Verbal Reinforcement Learning | <https://arxiv.org/abs/2303.11366> | Agent-learning and retrospective loops | Verbal feedback can be stored and reused to improve future agent behavior. | Feedback quality is task-dependent; memory must not become user preference without evidence. | Use as background for agent-side learning logs. |
 | Toolformer: Language Models Can Teach Themselves to Use Tools | <https://arxiv.org/abs/2302.04761> | Tool-selection evals and routing repair | Models can learn when to call tools, what arguments to pass, and how to incorporate results. | Paper is about training-time self-supervision, not a guarantee for runtime agents. | Use as conceptual support for measured tool-selection evals. |
 | Tree of Thoughts: Deliberate Problem Solving with Large Language Models | <https://arxiv.org/abs/2305.10601> | Plan alternatives, branch review, and escalation | Exploring multiple candidate "thought" units can improve tasks needing planning/search. | Expensive and not required for small deterministic edits. | Use as background for high-risk branching and review waves. |
+| Matt Pocock `grilling` skill | <https://github.com/mattpocock/skills/blob/6654f6b60cd9d5be8b54c6fafe44346dabeb3b76/skills/productivity/grilling/SKILL.md> (source snapshot); <https://github.com/mattpocock/skills/blob/6654f6b60cd9d5be8b54c6fafe44346dabeb3b76/LICENSE> (MIT license) | `agents/skills/grilling.md` | A design tree can be explored by asking the settled dependency frontier in rounds, recommending an answer for each question, finding environment facts through the agent, and waiting for user decisions before action. | The upstream file is prompt guidance; AgentCanon adds only explicit routing, read-only authority, and existing handoff boundaries. | Adopt the pinned behavior as an attributed public skill; do not vendor a second source copy or invent a new protocol. |
+
+The following MIT notice applies to the adapted `grilling` skill above:
+
+```text
+MIT License
+
+Copyright (c) 2026 Matt Pocock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Semantic Indexing And Embeddings
 

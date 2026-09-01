@@ -1277,6 +1277,30 @@ skill_families:
         - ["問題点", "出して", "直"]
         - ["ユーザー主導", "デバッグ"]
         - ["ユーザー主導", "リファクタ"]
+  - id: grilling
+    purpose: Route an explicit, read-only design-tree interview that stress-tests a plan, decision, or idea before implementation.
+    canonical_doc: agents/skills/grilling.md
+    shim: .codex/personal/skills/grilling/SKILL.md
+    discovery:
+      name: grilling
+      description: "Use when the user explicitly asks to grill a plan, decision, or idea; ask the settled prerequisite frontier in rounds with recommendations, inspect facts through the agent, and wait for shared understanding before any action."
+    tool_commands:
+      required: []
+      conditional:
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: user explicitly requests a read-only design-tree grilling interview
+      triggers:
+        - ["grilling"]
+        - ["grill", "me"]
+        - ["grill", "this"]
+        - ["grill", "plan"]
+        - ["grill", "idea"]
+        - ["グリル", "して"]
   - id: long-form-writing
     visualization_owner: code-visualization
     visualization_role: adapter
