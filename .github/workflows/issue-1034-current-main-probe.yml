@@ -20,8 +20,7 @@ jobs:
       AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
       AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
       ISSUE_1034_SOURCE_HEAD: ff63216af172727619fd022a9ccbf7997eefff94
-      ISSUE_1034_HOST_PROBE_DIR: ${{ github.workspace }}/.runtime/container-runtime/reports/issue-1034-current-main
-      ISSUE_1034_CONTAINER_PROBE_DIR: /var/lib/agent-canon/runtime/reports/issue-1034-current-main
+      ISSUE_1034_PROBE_DIR: ${{ github.workspace }}/.runtime/issue-1034-current-main
     steps:
       - name: Checkout exact current main
         uses: actions/checkout@v4
@@ -45,76 +44,103 @@ jobs:
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
-      - name: Capture graph build and status independently
-        id: graph
-        run: |
-          set -u
-          mkdir -p "${ISSUE_1034_HOST_PROBE_DIR}"
-
-          set +e
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- sh -c \
-            'mkdir -p "$1"; agent-canon graph build --root . --profile default --format json > "$1/graph-build.json" 2> "$1/graph-build.stderr"' \
-            sh "${ISSUE_1034_CONTAINER_PROBE_DIR}"
-          build_exit=$?
-          printf '%s\n' "${build_exit}" > "${ISSUE_1034_HOST_PROBE_DIR}/graph-build.exit"
-
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- sh -c \
-            'mkdir -p "$1"; agent-canon graph status --root . --profile default --format json > "$1/graph-status.json" 2> "$1/graph-status.stderr"' \
-            sh "${ISSUE_1034_CONTAINER_PROBE_DIR}"
-          status_exit=$?
-          printf '%s\n' "${status_exit}" > "${ISSUE_1034_HOST_PROBE_DIR}/graph-status.exit"
-          set -e
-
-          printf 'source_head=%s\nbuild_exit=%s\nstatus_exit=%s\n' \
-            "$(git rev-parse HEAD)" "${build_exit}" "${status_exit}" \
-            | tee "${ISSUE_1034_HOST_PROBE_DIR}/probe-summary.txt"
-
-      - name: Run accumulated eval producers
-        id: evals
-        continue-on-error: true
-        run: |
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            eval collect --root "${GITHUB_WORKSPACE}" \
-            --run-id "issue-1034-current-main-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-
-      - name: Generate runtime dashboard
-        id: dashboard
-        continue-on-error: true
+      - name: Capture exact graph and dashboard tool results
+        id: probe
         run: |
           set -euo pipefail
-          mkdir -p "${ISSUE_1034_HOST_PROBE_DIR}"
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- python3 \
-            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
-            --root . --runtime-root /var/lib/agent-canon/runtime \
-            --out "${ISSUE_1034_CONTAINER_PROBE_DIR}/agent-runtime-dashboard.md"
+          mkdir -p "${ISSUE_1034_PROBE_DIR}"
 
-      - name: Record downstream outcomes
-        if: always()
-        run: |
-          mkdir -p "${ISSUE_1034_HOST_PROBE_DIR}"
-          printf 'eval_outcome=%s\ndashboard_outcome=%s\n' \
-            '${{ steps.evals.outcome }}' '${{ steps.dashboard.outcome }}' \
-            | tee "${ISSUE_1034_HOST_PROBE_DIR}/downstream-outcomes.txt"
+          capture_receipt() {
+            name="$1"
+            shift
+            receipt="${ISSUE_1034_PROBE_DIR}/${name}.receipt.json"
+            set +e
+            "$@" >"${receipt}"
+            command_exit=$?
+            set -e
+            printf '%s\n' "${command_exit}" >"${ISSUE_1034_PROBE_DIR}/${name}.command-exit"
+            python3 - "${receipt}" "${ISSUE_1034_PROBE_DIR}/${name}" <<'PY'
+          import json
+          import shutil
+          import sys
+          from pathlib import Path
+
+          receipt_path = Path(sys.argv[1])
+          output_prefix = Path(sys.argv[2])
+          payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+          details = payload.get("details") if isinstance(payload, dict) else None
+          details = details if isinstance(details, dict) else {}
+          for stream in ("stdout", "stderr"):
+              destination = output_prefix.with_suffix(f".{stream}.log")
+              log_value = details.get(f"{stream}_log")
+              source = Path(log_value) if isinstance(log_value, str) else None
+              if source is not None and source.is_file():
+                  shutil.copyfile(source, destination)
+              else:
+                  preview = details.get(f"{stream}_preview", "")
+                  destination.write_text(str(preview), encoding="utf-8")
+          summary = {
+              "operation": payload.get("operation"),
+              "status": payload.get("status"),
+              "code": payload.get("code"),
+              "tool_exit_code": details.get("exit_code"),
+              "stdout_bytes": details.get("stdout_bytes"),
+              "stdout_digest": details.get("stdout_digest"),
+              "stdout_truncated": details.get("stdout_truncated"),
+              "stderr_bytes": details.get("stderr_bytes"),
+              "stderr_digest": details.get("stderr_digest"),
+              "stderr_truncated": details.get("stderr_truncated"),
+          }
+          output_prefix.with_suffix(".summary.json").write_text(
+              json.dumps(summary, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          }
+
+          capture_receipt graph-build \
+            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- \
+            agent-canon graph build --root . --profile default --format json
+
+          capture_receipt graph-status \
+            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- \
+            agent-canon graph status --root . --profile default --format json
+
+          capture_receipt dashboard \
+            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            tool run --root "${GITHUB_WORKSPACE}" generate-agent-runtime-dashboard -- --root .
+
+          printf 'source_head=%s\n' "$(git rev-parse HEAD)" >"${ISSUE_1034_PROBE_DIR}/source-head.txt"
 
       - name: Upload exact-main probe evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: issue-1034-current-main-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ env.ISSUE_1034_HOST_PROBE_DIR }}
+          path: ${{ env.ISSUE_1034_PROBE_DIR }}
 
-      - name: Enforce exact-main dashboard contract
+      - name: Enforce exact-main graph and dashboard contract
         if: always()
         run: |
           set -euo pipefail
-          test "$(cat "${ISSUE_1034_HOST_PROBE_DIR}/graph-build.exit")" = 0
-          test "$(cat "${ISSUE_1034_HOST_PROBE_DIR}/graph-status.exit")" = 0
-          test '${{ steps.evals.outcome }}' = success
-          test '${{ steps.dashboard.outcome }}' = success
-          test -s "${ISSUE_1034_HOST_PROBE_DIR}/agent-runtime-dashboard.md"
+          python3 - "${ISSUE_1034_PROBE_DIR}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          failures = []
+          for name in ("graph-build", "graph-status", "dashboard"):
+              command_exit = int((root / f"{name}.command-exit").read_text().strip())
+              summary = json.loads((root / f"{name}.summary.json").read_text())
+              tool_exit = summary.get("tool_exit_code")
+              if command_exit != 0 or tool_exit not in (None, 0):
+                  failures.append({"name": name, "command_exit": command_exit, "tool_exit": tool_exit})
+          if failures:
+              raise SystemExit(json.dumps(failures, sort_keys=True))
+          PY
 
       - name: Release shared tool runtime
         if: always()
