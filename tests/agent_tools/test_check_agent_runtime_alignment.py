@@ -43,6 +43,11 @@ from tools.agent.orchestration.packets import (  # noqa: E402
 )
 from tools.agent.orchestration.team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
 from tools.repository.workspace.workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
+from tools.runtime.manifest.manifest_rendering import (  # noqa: E402
+    COMMON_PROMPT_MUST_INCLUDE,
+    render_subagent_prompt_packet,
+    role_prompt_must_include,
+)
 
 
 def task_catalog_from_raw(raw: dict[str, object]) -> TaskCatalog:
@@ -453,6 +458,44 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         catalog = task_catalog_from_raw(loaded_task_catalog_raw())
 
         self.assertEqual(workflow_topology_policy_violations(catalog), ())
+
+    def test_splitter_writer_reuse_survey_context_projects_for_both_change_routes(self) -> None:
+        """Both applicable workflow prompts carry the same optional reuse context."""
+        catalog = loaded_task_catalog_raw()
+        families = cast(list[dict[str, object]], catalog["workflow_families"])
+        by_id = {str(family["id"]): family for family in families}
+        instruction_markers = (
+            "current/historical asset paths",
+            "consolidate overlapping responsibility/asset slices",
+            "Missing context is non-blocking",
+        )
+        rendered: dict[str, str] = {}
+        for family_id in ("owner_bounded_change", "scoped_change"):
+            rendered[family_id] = "\n".join(
+                render_subagent_prompt_packet(by_id[family_id], indent="  ")
+            )
+            for marker in instruction_markers:
+                self.assertIn(marker, rendered[family_id])
+            self.assertIn("reuse_survey", rendered[family_id])
+        self.assertGreater(
+            rendered["owner_bounded_change"].count(
+                "consolidate overlapping responsibility/asset slices"
+            ),
+            0,
+        )
+        self.assertGreater(
+            rendered["scoped_change"].count(
+                "consolidate overlapping responsibility/asset slices"
+            ),
+            0,
+        )
+        self.assertIn("reuse_survey", COMMON_PROMPT_MUST_INCLUDE)
+        config = load_team_config()
+        for role_id in ("designer", "implementer"):
+            self.assertIn(
+                "reuse_survey",
+                role_prompt_must_include(resolve_role(config, role_id)),
+            )
 
     def test_workflow_topology_policy_rejects_always_on_delivery_reviewer(self) -> None:
         """A catalog-owned role move is not rejected by a duplicate role table."""

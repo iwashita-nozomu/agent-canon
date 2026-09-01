@@ -398,6 +398,13 @@ handoff, the parent records a pre-edit investigation packet with explicit owner
 and scope. This is the required evidence that repo investigation happened
 before implementation.
 
+Asset reuse context is carried through the existing `reuse_survey` handoff field
+when the splitter has investigated candidate assets. The survey may record
+exact candidate paths, capabilities, dispositions, reasons, and test paths for
+current or historical assets. A known selected asset and its tests become
+starting context for every child; missing advisory reuse context does not block
+dispatch or writing.
+
 - `request_clause_ids`: user clauses covered by the edit
 - `workflow_and_skills`: selected workflow, active skills, deferred dynamic
   wave triggers
@@ -408,8 +415,10 @@ before implementation.
   blocker
 - `responsibility_search`: structured semantic-index / deterministic search / tool-catalog
   result paths, not broad raw text-search dumps
-- `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and
-  why reuse / extension / deletion / new implementation was selected
+- `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and,
+  when known, exact current+historical candidate paths, capability,
+  disposition (`reuse`/`extend`/`restore`/`consolidate`/`replace`/`delete`/
+  `reject`), reason, and test paths that inform the selected surface
 - `semantic_responsibility_contract`: run-local contract path, policy reference,
   delta actions, obligation owners, and hard-edge closure readback
 - `stale_surface_scan`: obsolete mirror, generated artifact, legacy wrapper,
@@ -463,6 +472,9 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
   current stage, and integration executor owner
 - `read_before_work`: exact files or sections to read within role-owned
   surfaces
+- `reuse_survey`: the parent-selected advisory asset context; when present, the
+  worker starts from selected assets and their tests before forming or editing a
+  slice
 - `context_artifacts`: router output, dashboard summary, checker finding
   packet, dependency scope, design trace, or report summary paths
 - `subagent_startup_route`: private internal startup route path from
@@ -489,6 +501,13 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
   `design_issue_blocker` with evidence and returns to the design/review gate
   instead of absorbing the issue with local fallback, wrapper, helper, branch,
   compatibility route, test relaxation, or docs overwrite
+
+The fresh capsule carries the same known selected asset context to every child.
+For a split, extraction, or missing suspected predecessor, the splitter must
+investigate current and git-history assets before decomposition or prototyping;
+the resulting survey and tests are shared context. A reviewer may request
+missing reuse evidence, but absent advisory context does not hard-fail dispatch
+or writing.
 
 For theorem-driven, algorithm, or implementation handoffs, the capsule also
 includes a `Target Binding Packet`. This prevents a subagent from proving,

@@ -335,6 +335,23 @@ format成功を、完成形の十分条件や全責務の証明へ自動昇格�
 変わる判断をrouting packetまたはtool artifactで示します。判断が変わらない
 確認は重複確認として削除し、warningだけの確認はcompletion gateに昇格させません。
 
+### Asset Reuse Context
+
+For a code split / extraction or a missing suspected predecessor, the splitter
+investigates one shared current+historical asset universe before decomposition
+or prototyping. The existing handoff `reuse_survey` may carry the known asset
+paths, capabilities, dispositions, reasons, and test paths; this is advisory
+shared context and is not a second packet schema or a dispatch/write gate.
+
+For those cases, the shared universe includes the current module, helper, type,
+test, and documentation surfaces plus `git log`, `-S`, deleted paths, prior PR /
+Issue, and predecessor tests. Historical discovery is mandatory for those cases
+and is not a universal precondition for a bounded non-split edit. Derive
+responsibility slices from the investigated universe, merge slices touching the
+same asset, and derive `allowed_paths` / write scope from that same known asset
+context when it is available. Pass the same known asset context and tests to
+every child; absent advisory context remains non-blocking.
+
 ### Checkout Identity Readback
 
 Git 状態に関係する agent / work unit は、`checkout_identity` を一つの観測ブロック

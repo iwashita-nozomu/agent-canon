@@ -60,6 +60,11 @@ def test_workspace_write_requires_bounded_allowed_paths() -> None:
         _packet(authority="workspace-write", allowed_paths=("../outside",))
 
 
+def test_workspace_write_does_not_require_advisory_reuse_context() -> None:
+    packet = _packet(authority="workspace-write", allowed_paths=("tools",))
+    assert packet.authority == "workspace-write"
+
+
 def test_effective_runtime_readback_is_required() -> None:
     packet = _packet()
     with pytest.raises(DirectLunaBlocker) as captured:

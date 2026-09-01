@@ -31,3 +31,29 @@ def test_logical_roles_and_skills_keep_separate_owners() -> None:
     assert topology["communication_skill"] == "direct-luna-communication"
     assert topology["projection_policy"]["new_logical_role_may_add_physical_profile"] is False
     assert (ROOT / "agents/skills/direct-luna-communication.md").is_file()
+
+
+def test_cleanup_historical_asset_universe_precedes_slice_formation() -> None:
+    cleanup = " ".join((ROOT / "agents/skills/code-cleanup.md").read_text().split())
+    dependency = " ".join(
+        (ROOT / "agents/skills/dependency-analysis.md").read_text().split()
+    )
+    refactor = " ".join((ROOT / "agents/skills/refactor-loop.md").read_text().split())
+
+    cleanup_asset = cleanup.index("shared current+historical asset universe")
+    cleanup_dependency = cleanup.index("`dependency-analysis`")
+    assert cleanup_asset < cleanup_dependency
+    assert "git log" in cleanup
+    assert "predecessor tests" in cleanup
+
+    dependency_asset = dependency.index("shared current+historical asset universe")
+    dependency_scope = dependency.index("各 candidate は既存")
+    assert dependency_asset < dependency_scope
+    assert "同じ asset context" in dependency[dependency_asset:]
+
+    refactor_asset = refactor.index("Before target or slice formation")
+    refactor_target = refactor.index("refactor-loop の対象 file")
+    assert refactor_asset < refactor_target
+    assert "merge slices touching the same asset" in refactor[refactor_asset:]
+    assert "pass the same known asset context" in refactor[refactor_asset:]
+    assert "existing `reuse_survey`" in refactor[refactor_asset:]

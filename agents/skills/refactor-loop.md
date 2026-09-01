@@ -128,6 +128,19 @@ the design trace before accepting a path or dependency-direction change.
 
 ## Required Contract
 
+Before target or slice formation, consume the single shared asset universe and
+known reuse dispositions in the existing `reuse_survey` passed by
+`code-cleanup -> dependency-analysis`. The
+universe covers current module/helper/type/test/docs; for code split / extraction
+or a missing suspected predecessor it must also cover `git log`, `-S`, deleted
+paths, prior PR / Issue, and predecessor tests. That historical scan is not a
+universal gate for bounded non-split edits. Each asset has one disposition:
+`reuse`, `extend`, `restore`, `consolidate`, `replace`, `delete`, or `reject`,
+with its reason and test paths when known. Derive responsibility slices from
+these assets, merge slices touching the same asset, and pass the same known
+asset context to every child. Missing advisory context does not block dispatch
+or writing.
+
 1. refactor-loop の対象 file は、最初に user が指した file だけで固定しません。
    まず依存解析で requested object / file から到達する依存 file、依存元 file、
    関連 test / docs / validation command を展開し、その dependency-expanded scope 全体を候補集合に
