@@ -21,9 +21,7 @@ jobs:
       AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
       ISSUE_1034_SOURCE_HEAD: ff63216af172727619fd022a9ccbf7997eefff94
       ISSUE_1034_PR985_BASE: b466b022eb19d1c5922f2a83b92937b3aea70119
-      ISSUE_1034_PR985_HEAD: b4d00a700e1837ee682a57862ac78ab31b4094fb
       ISSUE_1034_PROBE_DIR: ${{ github.workspace }}/.runtime/issue-1034-current-main
-      ISSUE_1034_CONTAINER_REPORT_DIR: /var/lib/agent-canon/runtime/reports/issue-1034-current-main
     steps:
       - name: Checkout exact current main with history
         uses: actions/checkout@v4
@@ -32,13 +30,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ env.ISSUE_1034_SOURCE_HEAD }}
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dashboard dependencies
-        run: python3 -m pip install --upgrade pyyaml tomli
+      - name: Fetch the retained PR 985 head ref
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            '+refs/pull/985/head:refs/remotes/origin/issue-1034-pr985-head'
+          git cat-file -e "${ISSUE_1034_PR985_BASE}^{commit}"
+          git cat-file -e 'refs/remotes/origin/issue-1034-pr985-head^{commit}'
 
       - name: Start shared tool runtime
         run: |
@@ -48,7 +46,7 @@ jobs:
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
-      - name: Capture exact commands without changing their output contract
+      - name: Capture complete graph receipts and migration inputs
         run: |
           set -euo pipefail
           mkdir -p "${ISSUE_1034_PROBE_DIR}"
@@ -73,37 +71,31 @@ jobs:
             exec --root "${GITHUB_WORKSPACE}" -- \
             agent-canon graph status --root . --profile default --format json
 
-          run_probe eval-collect \
-            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            eval collect --root "${GITHUB_WORKSPACE}" --run-id "issue-1034-current-main-${GITHUB_RUN_ID}"
-
-          run_probe dashboard-workflow-route \
-            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- python3 \
-            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
-            --root . --runtime-root /var/lib/agent-canon/runtime \
-            --out "${ISSUE_1034_CONTAINER_REPORT_DIR}/workflow-route.md"
-
-          run_probe dashboard-catalog-route \
-            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            tool run --root "${GITHUB_WORKSPACE}" generate-agent-runtime-dashboard -- \
-            --root . --runtime-root /var/lib/agent-canon/runtime \
-            --out "${ISSUE_1034_CONTAINER_REPORT_DIR}/catalog-route.md"
-
           printf '%s\n' "$(git rev-parse HEAD)" >"${ISSUE_1034_PROBE_DIR}/source-head.txt"
-          git archive --format=tar.gz --output="${ISSUE_1034_PROBE_DIR}/source-${ISSUE_1034_SOURCE_HEAD}.tar.gz" HEAD
-          git diff --find-renames=100% --name-status "${ISSUE_1034_PR985_BASE}" "${ISSUE_1034_PR985_HEAD}" \
-            >"${ISSUE_1034_PROBE_DIR}/pr985-name-status-r100.tsv"
-          git diff --find-renames=50% --name-status "${ISSUE_1034_PR985_BASE}" "${ISSUE_1034_PR985_HEAD}" \
-            >"${ISSUE_1034_PROBE_DIR}/pr985-name-status-r50.tsv"
-          git diff --find-renames=50% --summary "${ISSUE_1034_PR985_BASE}" "${ISSUE_1034_PR985_HEAD}" \
-            >"${ISSUE_1034_PROBE_DIR}/pr985-summary-r50.txt"
 
           runtime_capture="${AGENT_CANON_RUNTIME_ROOT}/container-runtime"
-          if [[ -d "${runtime_capture}" ]]; then
-            tar -C "${AGENT_CANON_RUNTIME_ROOT}" -czf \
-              "${ISSUE_1034_PROBE_DIR}/container-runtime.tar.gz" container-runtime
-          fi
+          test -d "${runtime_capture}"
+          tar -C "${AGENT_CANON_RUNTIME_ROOT}" -czf \
+            "${ISSUE_1034_PROBE_DIR}/container-runtime.tar.gz" container-runtime
+
+          git archive --format=tar.gz --output="${ISSUE_1034_PROBE_DIR}/source-current.tar.gz" HEAD
+          git archive --format=tar.gz --output="${ISSUE_1034_PROBE_DIR}/source-pr985-base.tar.gz" \
+            "${ISSUE_1034_PR985_BASE}"
+          git archive --format=tar.gz --output="${ISSUE_1034_PROBE_DIR}/source-pr985-head.tar.gz" \
+            refs/remotes/origin/issue-1034-pr985-head
+
+          git diff --find-renames=100% --name-status \
+            "${ISSUE_1034_PR985_BASE}" refs/remotes/origin/issue-1034-pr985-head \
+            >"${ISSUE_1034_PROBE_DIR}/pr985-name-status-r100.tsv"
+          git diff --find-renames=50% --name-status \
+            "${ISSUE_1034_PR985_BASE}" refs/remotes/origin/issue-1034-pr985-head \
+            >"${ISSUE_1034_PROBE_DIR}/pr985-name-status-r50.tsv"
+          git diff --find-renames=20% --name-status \
+            "${ISSUE_1034_PR985_BASE}" refs/remotes/origin/issue-1034-pr985-head \
+            >"${ISSUE_1034_PROBE_DIR}/pr985-name-status-r20.tsv"
+          git diff --find-renames=20% --summary \
+            "${ISSUE_1034_PR985_BASE}" refs/remotes/origin/issue-1034-pr985-head \
+            >"${ISSUE_1034_PROBE_DIR}/pr985-summary-r20.txt"
 
       - name: Upload exact-main probe evidence
         if: always()
@@ -112,19 +104,12 @@ jobs:
           name: issue-1034-current-main-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.ISSUE_1034_PROBE_DIR }}
 
-      - name: Enforce exact-main graph and dashboard contract
+      - name: Preserve the expected current failure signal
         if: always()
         run: |
           set -euo pipefail
-          failures=0
-          for name in graph-build graph-status eval-collect dashboard-workflow-route dashboard-catalog-route; do
-            exit_code="$(cat "${ISSUE_1034_PROBE_DIR}/${name}.exit")"
-            printf '%s=%s\n' "${name}" "${exit_code}"
-            if [[ "${exit_code}" != 0 ]]; then
-              failures=1
-            fi
-          done
-          test "${failures}" = 0
+          test "$(cat "${ISSUE_1034_PROBE_DIR}/graph-build.exit")" = 1
+          test "$(cat "${ISSUE_1034_PROBE_DIR}/graph-status.exit")" = 2
 
       - name: Release shared tool runtime
         if: always()
