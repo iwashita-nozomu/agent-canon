@@ -38,27 +38,32 @@ jobs:
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
-      - name: Capture exact graph build and status
+      - name: Capture complete exact graph build and status
         id: graph
         run: |
-          set -uo pipefail
+          set -euo pipefail
           out="${RUNNER_TEMP}/issue-1034-diagnosis"
+          runtime_report="${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/issue-1034-diagnosis"
           mkdir -p "${out}"
           git rev-parse HEAD | tee "${out}/git-head.txt"
           git rev-parse HEAD^{tree} | tee "${out}/git-tree.txt"
           git status --porcelain=v1 | tee "${out}/git-status.txt"
 
-          set +e
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph build --root . --profile default --format json \
-            >"${out}/graph-build.json" 2>"${out}/graph-build.stderr"
-          build_exit=$?
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph status --root . --profile default --format json \
-            >"${out}/graph-status.json" 2>"${out}/graph-status.stderr"
-          status_exit=$?
-          set -e
+            exec --root "${GITHUB_WORKSPACE}" -- bash -lc '
+              set +e
+              out=/var/lib/agent-canon/runtime/reports/issue-1034-diagnosis
+              mkdir -p "${out}"
+              agent-canon graph build --root . --profile default --format json >"${out}/graph-build.json" 2>"${out}/graph-build.stderr"
+              printf "%s\n" "$?" >"${out}/build-exit.txt"
+              agent-canon graph status --root . --profile default --format json >"${out}/graph-status.json" 2>"${out}/graph-status.stderr"
+              printf "%s\n" "$?" >"${out}/status-exit.txt"
+              exit 0
+            '
 
+          cp -a "${runtime_report}/." "${out}/"
+          build_exit="$(cat "${out}/build-exit.txt")"
+          status_exit="$(cat "${out}/status-exit.txt")"
           printf 'build_exit=%s\nstatus_exit=%s\n' "${build_exit}" "${status_exit}" | tee "${out}/exit-codes.txt"
           cat "${out}/graph-build.json"
           cat "${out}/graph-build.stderr" >&2
