@@ -1,0 +1,31 @@
+name: Issue 1034 source snapshot
+
+on:
+  push:
+    branches:
+      - fix/1034-source-graph-unresolved-targets
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Package exact checkout
+        run: |
+          git rev-parse HEAD
+          git status --short --branch
+          tar --exclude=.git -czf "${RUNNER_TEMP}/agent-canon-1034-source.tar.gz" .
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-canon-1034-source
+          path: ${{ runner.temp }}/agent-canon-1034-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
