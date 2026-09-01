@@ -1,4 +1,4 @@
-name: Issue 1034 source snapshot
+name: Issue 1034 exact-main graph diagnosis
 
 on:
   push:
@@ -9,23 +9,94 @@ permissions:
   contents: read
 
 jobs:
-  snapshot:
+  diagnose:
     runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
+      ISSUE_1034_BASE_SHA: ff63216af172727619fd022a9ccbf7997eefff94
     steps:
-      - name: Checkout branch
+      - name: Checkout exact current-main baseline
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.ISSUE_1034_BASE_SHA }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Package exact checkout
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dashboard dependencies
+        run: python3 -m pip install --upgrade pyyaml tomli
+
+      - name: Start shared tool runtime
         run: |
-          git rev-parse HEAD
-          git status --short --branch
-          tar -czf "${RUNNER_TEMP}/agent-canon-1034-source-with-git.tar.gz" .
-      - name: Upload source snapshot
+          set -euo pipefail
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+
+      - name: Capture exact graph build and status
+        id: graph
+        run: |
+          set -uo pipefail
+          out="${RUNNER_TEMP}/issue-1034-diagnosis"
+          mkdir -p "${out}"
+          git rev-parse HEAD | tee "${out}/git-head.txt"
+          git rev-parse HEAD^{tree} | tee "${out}/git-tree.txt"
+          git status --porcelain=v1 | tee "${out}/git-status.txt"
+
+          set +e
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph build --root . --profile default --format json \
+            >"${out}/graph-build.json" 2>"${out}/graph-build.stderr"
+          build_exit=$?
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph status --root . --profile default --format json \
+            >"${out}/graph-status.json" 2>"${out}/graph-status.stderr"
+          status_exit=$?
+          set -e
+
+          printf 'build_exit=%s\nstatus_exit=%s\n' "${build_exit}" "${status_exit}" | tee "${out}/exit-codes.txt"
+          cat "${out}/graph-build.json"
+          cat "${out}/graph-build.stderr" >&2
+          cat "${out}/graph-status.json"
+          cat "${out}/graph-status.stderr" >&2
+          echo "build_exit=${build_exit}" >> "${GITHUB_OUTPUT}"
+          echo "status_exit=${status_exit}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run dashboard path when graph is complete
+        if: steps.graph.outputs.build_exit == '0' && steps.graph.outputs.status_exit == '0'
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/issue-1034-diagnosis"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            eval collect --root "${GITHUB_WORKSPACE}" \
+            --run-id "issue-1034-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            >"${out}/eval-collect.stdout" 2>"${out}/eval-collect.stderr"
+          report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-runtime-dashboard")"
+          mkdir -p "${report_dir}"
+          dashboard_path="${report_dir}/issue-1034-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          container_dashboard="/var/lib/agent-canon/runtime/reports/agent-runtime-dashboard/issue-1034-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- python3 \
+            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
+            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_dashboard}"
+          cp "${dashboard_path}" "${out}/dashboard.md"
+
+      - name: Upload diagnosis
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agent-canon-1034-source-with-git
-          path: ${{ runner.temp }}/agent-canon-1034-source-with-git.tar.gz
+          name: issue-1034-exact-main-graph-diagnosis
+          path: ${{ runner.temp }}/issue-1034-diagnosis
           if-no-files-found: error
           retention-days: 1
+
+      - name: Release shared tool runtime
+        if: always()
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" stop || true
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
