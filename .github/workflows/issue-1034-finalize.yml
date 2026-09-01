@@ -1,0 +1,277 @@
+name: Issue 1034 final exact-main verification
+
+on:
+  push:
+    branches:
+      - fix/1034-source-graph-unresolved-targets
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  ISSUE_NUMBER: "1034"
+  ISSUE_BRANCH: fix/1034-source-graph-unresolved-targets
+  AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
+
+jobs:
+  exact-main-dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Freeze exact current main
+        id: source
+        run: |
+          set -euo pipefail
+          branch_head="$(git rev-parse HEAD)"
+          git fetch --no-tags origin main
+          main_sha="$(git rev-parse origin/main)"
+          printf 'branch_head=%s\nmain_sha=%s\n' "${branch_head}" "${main_sha}" | tee -a "${GITHUB_OUTPUT}"
+          git checkout --detach "${main_sha}"
+          test "$(git rev-parse HEAD)" = "${main_sha}"
+          git status --short --branch
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dashboard dependencies
+        run: python3 -m pip install --upgrade pyyaml tomli
+
+      - name: Start shared tool runtime
+        run: |
+          set -euo pipefail
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+
+      - name: Build and read back canonical graph
+        id: graph
+        run: |
+          set +e
+          report_dir="${RUNNER_TEMP}/issue-1034-final"
+          mkdir -p "${report_dir}"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph build --root . --profile default --format json \
+            >"${report_dir}/graph-build.json" 2>"${report_dir}/graph-build.stderr"
+          build_rc=$?
+          status_rc=125
+          if [ "${build_rc}" -eq 0 ]; then
+            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+              exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph status --root . --profile default --format json \
+              >"${report_dir}/graph-status.json" 2>"${report_dir}/graph-status.stderr"
+            status_rc=$?
+          else
+            : >"${report_dir}/graph-status.json"
+            printf 'skipped because graph build failed\n' >"${report_dir}/graph-status.stderr"
+          fi
+          printf 'build_rc=%s\nstatus_rc=%s\n' "${build_rc}" "${status_rc}" | tee "${report_dir}/graph-exit-codes.txt" -a "${GITHUB_OUTPUT}"
+          if [ "${build_rc}" -ne 0 ]; then
+            exit "${build_rc}"
+          fi
+          exit "${status_rc}"
+
+      - name: Run accumulated eval producers
+        id: evals
+        run: |
+          set -euo pipefail
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            eval collect --root "${GITHUB_WORKSPACE}" \
+            --run-id "issue-1034-final-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Generate runtime dashboard
+        id: dashboard
+        run: |
+          set -euo pipefail
+          report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-runtime-dashboard")"
+          mkdir -p "${report_dir}"
+          dashboard_path="${report_dir}/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          container_dashboard="/var/lib/agent-canon/runtime/reports/agent-runtime-dashboard/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- python3 \
+            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
+            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_dashboard}"
+          test -s "${dashboard_path}"
+          cat "${dashboard_path}" >> "${GITHUB_STEP_SUMMARY}"
+          printf 'dashboard_path=%s\n' "${dashboard_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build evidence and Issue comment
+        if: always()
+        id: evidence
+        env:
+          MAIN_SHA: ${{ steps.source.outputs.main_sha }}
+          GRAPH_BUILD_RC: ${{ steps.graph.outputs.build_rc }}
+          GRAPH_STATUS_RC: ${{ steps.graph.outputs.status_rc }}
+          GRAPH_RESULT: ${{ steps.graph.outcome }}
+          EVAL_RESULT: ${{ steps.evals.outcome }}
+          DASHBOARD_RESULT: ${{ steps.dashboard.outcome }}
+        run: |
+          set -euo pipefail
+          report_dir="${RUNNER_TEMP}/issue-1034-final"
+          mkdir -p "${report_dir}"
+          python3 - "${report_dir}" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          from typing import Any
+
+          report_dir = Path(sys.argv[1])
+
+          def load_json(path: Path) -> Any:
+              if not path.exists():
+                  return None
+              text = path.read_text(encoding="utf-8").strip()
+              if not text:
+                  return None
+              try:
+                  return json.loads(text)
+              except json.JSONDecodeError:
+                  return None
+
+          def first_key(value: Any, key: str) -> Any:
+              if isinstance(value, dict):
+                  if key in value:
+                      return value[key]
+                  for child in value.values():
+                      found = first_key(child, key)
+                      if found is not None:
+                          return found
+              elif isinstance(value, list):
+                  for child in value:
+                      found = first_key(child, key)
+                      if found is not None:
+                          return found
+              return None
+
+          build = load_json(report_dir / "graph-build.json")
+          status = load_json(report_dir / "graph-status.json")
+          unresolved_count = first_key(build, "unresolved_count")
+          ambiguous_count = first_key(build, "ambiguous_count")
+          graph_result = os.environ.get("GRAPH_RESULT", "unknown")
+          eval_result = os.environ.get("EVAL_RESULT", "unknown")
+          dashboard_result = os.environ.get("DASHBOARD_RESULT", "unknown")
+          build_rc = os.environ.get("GRAPH_BUILD_RC", "not-run")
+          status_rc = os.environ.get("GRAPH_STATUS_RC", "not-run")
+          main_sha = os.environ.get("MAIN_SHA", "unknown")
+          overall = (
+              "pass"
+              if graph_result == "success"
+              and eval_result == "success"
+              and dashboard_result == "success"
+              and unresolved_count == 0
+              and (ambiguous_count in (0, None))
+              else "fail"
+          )
+
+          stderr = (report_dir / "graph-build.stderr").read_text(encoding="utf-8", errors="replace") if (report_dir / "graph-build.stderr").exists() else ""
+          stderr_excerpt = "\n".join(stderr.splitlines()[:40])
+          summary = {
+              "overall": overall,
+              "main_sha": main_sha,
+              "graph_build_rc": build_rc,
+              "graph_status_rc": status_rc,
+              "graph_outcome": graph_result,
+              "eval_outcome": eval_result,
+              "dashboard_outcome": dashboard_result,
+              "unresolved_count": unresolved_count,
+              "ambiguous_count": ambiguous_count,
+              "graph_build": build,
+              "graph_status": status,
+          }
+          (report_dir / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+          lines = [
+              "## #1034 exact current-main final verification",
+              "",
+              f"- exact `origin/main`: `{main_sha}`",
+              f"- graph build: `{graph_result}` (exit `{build_rc}`)",
+              f"- graph status/readback: exit `{status_rc}`",
+              f"- unresolved_count: `{unresolved_count}`",
+              f"- ambiguous_count: `{ambiguous_count}`",
+              f"- accumulated eval collection: `{eval_result}`",
+              f"- dashboard render plus non-empty readback: `{dashboard_result}`",
+              f"- overall: `{overall}`",
+              f"- run: `{os.environ.get('GITHUB_RUN_ID', 'unknown')}` attempt `{os.environ.get('GITHUB_RUN_ATTEMPT', 'unknown')}`",
+              "",
+              "### Evidence boundary",
+              "",
+              "The runner explicitly fetched and detached at current `origin/main`; the diagnostic workflow files on the Issue branch were therefore excluded from the graph input. It then used the same bootstrap/runtime, `agent-canon graph build`, `agent-canon graph status`, accumulated-eval collection, dashboard producer, non-empty file readback, and artifact upload sequence as the scheduled/manual dashboard workflow. The pull-request compatibility-only skip path was not counted as verification.",
+              "",
+              "The complete graph build/status JSON, stderr, exit codes, summary, and rendered dashboard are retained in workflow artifact `issue-1034-final-exact-main-verification`.",
+          ]
+          if overall == "pass":
+              lines += [
+                  "",
+                  "### Scope reconciliation",
+                  "",
+                  "The historical `unresolved_count=532` observation is not reproduced on exact current main. Because current source-derived declarations close without unresolved or ambiguous targets and the downstream dashboard path publishes successfully, no `retarget`, `remove`, or parser change is justified. Adding compatibility paths, basename recovery, or silent ignore would create an unneeded second authority and is intentionally not done. The Issue is resolved as a current-state verification/no-op rather than by reopening the completed deep-layout migration.",
+              ]
+          else:
+              lines += [
+                  "",
+                  "### Remaining defect",
+                  "",
+                  "The current-main path did not satisfy the full gate. The Issue remains `in progress` with `need verification`; no declaration has been silently dropped or guessed. The attached raw output is the frozen inventory input for the required `retarget | remove | parser defect` classification.",
+              ]
+              if stderr_excerpt:
+                  lines += ["", "### Graph stderr excerpt", "", "```text", stderr_excerpt, "```"]
+          (report_dir / "issue-comment.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print(json.dumps(summary, indent=2, ensure_ascii=False))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"overall={overall}\n")
+          PY
+          cat "${report_dir}/issue-comment.md"
+
+      - name: Comment Issue 1034
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --body-file "${RUNNER_TEMP}/issue-1034-final/issue-comment.md"
+
+      - name: Upload exact-main evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1034-final-exact-main-verification
+          path: |
+            ${{ runner.temp }}/issue-1034-final
+            ${{ steps.dashboard.outputs.dashboard_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Reconcile Issue state when current main is healthy
+        if: always() && steps.evidence.outputs.overall == 'pass'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh issue edit "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" \
+            --add-label "ready for review" \
+            --remove-label "in progress" \
+            --remove-label "need verification"
+          gh issue close "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --reason completed \
+            --comment "Exact current main passed graph build/status and full dashboard artifact publication. No source change or PR is required; closing as current-state verified."
+
+      - name: Remove diagnostic-only branch diff after healthy verification
+        if: always() && steps.evidence.outputs.overall == 'pass'
+        env:
+          EXPECTED_BRANCH_HEAD: ${{ steps.source.outputs.branch_head }}
+        run: |
+          set -euo pipefail
+          git checkout -B "${ISSUE_BRANCH}" origin/main
+          git push --force-with-lease="refs/heads/${ISSUE_BRANCH}:${EXPECTED_BRANCH_HEAD}" \
+            origin "HEAD:refs/heads/${ISSUE_BRANCH}"
+
+      - name: Release shared tool runtime
+        if: always()
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" stop || true
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
