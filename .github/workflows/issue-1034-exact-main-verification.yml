@@ -1,0 +1,321 @@
+name: Issue 1034 exact current-main graph and dashboard verification
+
+on:
+  push:
+    branches:
+      - fix/1034-exact-main-graph-verification
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: issue-1034-exact-main-verification
+  cancel-in-progress: true
+
+env:
+  AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark Issue in progress
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit 1034 --repo "${GITHUB_REPOSITORY}" --add-label "in progress" --add-label "need verification"
+          gh issue edit 1034 --repo "${GITHUB_REPOSITORY}" --remove-label "ready for review" || true
+
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Freeze exact current main
+        id: source
+        run: |
+          set -euo pipefail
+          branch_head="$(git rev-parse HEAD)"
+          git fetch --no-tags origin main
+          main_sha="$(git rev-parse origin/main)"
+          git checkout --detach "${main_sha}"
+          test "$(git rev-parse HEAD)" = "${main_sha}"
+          printf 'branch_head=%s\nmain_sha=%s\n' "${branch_head}" "${main_sha}" | tee -a "${GITHUB_OUTPUT}"
+          git status --short --branch
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dashboard dependencies
+        run: python3 -m pip install --upgrade pyyaml tomli
+
+      - name: Start shared tool runtime
+        run: |
+          set -euo pipefail
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+
+      - name: Build and read back canonical graph
+        id: graph
+        run: |
+          set +e
+          report_dir="${RUNNER_TEMP}/issue-1034"
+          mkdir -p "${report_dir}"
+
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph build --root . --profile default --format json \
+            >"${report_dir}/graph-build.json" 2>"${report_dir}/graph-build.stderr"
+          build_rc=$?
+
+          status_rc=125
+          if [ "${build_rc}" -eq 0 ]; then
+            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+              exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph status --root . --profile default --format json \
+              >"${report_dir}/graph-status.json" 2>"${report_dir}/graph-status.stderr"
+            status_rc=$?
+          else
+            : >"${report_dir}/graph-status.json"
+            printf 'skipped because graph build failed\n' >"${report_dir}/graph-status.stderr"
+          fi
+
+          printf 'build_rc=%s\nstatus_rc=%s\n' "${build_rc}" "${status_rc}" | tee "${report_dir}/graph-exit-codes.txt" -a "${GITHUB_OUTPUT}"
+          exit 0
+
+      - name: Run accumulated eval producers
+        id: evals
+        if: steps.graph.outputs.build_rc == '0' && steps.graph.outputs.status_rc == '0'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            eval collect --root "${GITHUB_WORKSPACE}" \
+            --run-id "issue-1034-exact-main-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Generate runtime dashboard
+        id: dashboard
+        if: steps.graph.outputs.build_rc == '0' && steps.graph.outputs.status_rc == '0' && steps.evals.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-runtime-dashboard")"
+          mkdir -p "${report_dir}"
+          dashboard_path="${report_dir}/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          container_dashboard="/var/lib/agent-canon/runtime/reports/agent-runtime-dashboard/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- python3 \
+            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
+            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_dashboard}"
+          test -s "${dashboard_path}"
+          cat "${dashboard_path}" >> "${GITHUB_STEP_SUMMARY}"
+          printf 'dashboard_path=%s\n' "${dashboard_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build exact-main evidence
+        id: evidence
+        if: always()
+        env:
+          MAIN_SHA: ${{ steps.source.outputs.main_sha }}
+          GRAPH_BUILD_RC: ${{ steps.graph.outputs.build_rc }}
+          GRAPH_STATUS_RC: ${{ steps.graph.outputs.status_rc }}
+          EVAL_OUTCOME: ${{ steps.evals.outcome }}
+          DASHBOARD_OUTCOME: ${{ steps.dashboard.outcome }}
+        run: |
+          set -euo pipefail
+          report_dir="${RUNNER_TEMP}/issue-1034"
+          mkdir -p "${report_dir}"
+          python3 - "${report_dir}" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          from typing import Any
+
+          report_dir = Path(sys.argv[1])
+
+          def load_json(path: Path) -> Any:
+              if not path.exists():
+                  return None
+              text = path.read_text(encoding="utf-8", errors="replace").strip()
+              if not text:
+                  return None
+              try:
+                  return json.loads(text)
+              except json.JSONDecodeError:
+                  return None
+
+          def find_first(value: Any, key: str) -> Any:
+              if isinstance(value, dict):
+                  if key in value:
+                      return value[key]
+                  for child in value.values():
+                      found = find_first(child, key)
+                      if found is not None:
+                          return found
+              elif isinstance(value, list):
+                  for child in value:
+                      found = find_first(child, key)
+                      if found is not None:
+                          return found
+              return None
+
+          def identity_values(value: Any) -> dict[str, Any]:
+              keys = (
+                  "source_head",
+                  "source_sha",
+                  "source_tree",
+                  "source_tree_sha",
+                  "source_digest",
+                  "source_fingerprint",
+                  "config_digest",
+                  "configuration_digest",
+                  "config_fingerprint",
+                  "profile",
+                  "tool_version",
+                  "graph_schema_version",
+              )
+              return {key: find_first(value, key) for key in keys if find_first(value, key) is not None}
+
+          build = load_json(report_dir / "graph-build.json")
+          status = load_json(report_dir / "graph-status.json")
+          unresolved_count = find_first(build, "unresolved_count")
+          ambiguous_count = find_first(build, "ambiguous_count")
+          build_identity = identity_values(build)
+          status_identity = identity_values(status)
+          identity_mismatches = {
+              key: {"build": build_identity[key], "status": status_identity[key]}
+              for key in sorted(build_identity.keys() & status_identity.keys())
+              if build_identity[key] != status_identity[key]
+          }
+
+          build_rc = os.environ.get("GRAPH_BUILD_RC", "not-run")
+          status_rc = os.environ.get("GRAPH_STATUS_RC", "not-run")
+          eval_outcome = os.environ.get("EVAL_OUTCOME", "skipped")
+          dashboard_outcome = os.environ.get("DASHBOARD_OUTCOME", "skipped")
+          main_sha = os.environ.get("MAIN_SHA", "unknown")
+          overall = (
+              "pass"
+              if build_rc == "0"
+              and status_rc == "0"
+              and unresolved_count == 0
+              and ambiguous_count in (0, None)
+              and not identity_mismatches
+              and eval_outcome == "success"
+              and dashboard_outcome == "success"
+              else "fail"
+          )
+
+          summary = {
+              "overall": overall,
+              "main_sha": main_sha,
+              "graph_build_rc": build_rc,
+              "graph_status_rc": status_rc,
+              "unresolved_count": unresolved_count,
+              "ambiguous_count": ambiguous_count,
+              "build_identity": build_identity,
+              "status_identity": status_identity,
+              "identity_mismatches": identity_mismatches,
+              "eval_outcome": eval_outcome,
+              "dashboard_outcome": dashboard_outcome,
+              "graph_build": build,
+              "graph_status": status,
+          }
+          (report_dir / "summary.json").write_text(
+              json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+
+          lines = [
+              "## #1034 exact current-main verification",
+              "",
+              f"- exact `origin/main`: `{main_sha}`",
+              f"- graph build exit: `{build_rc}`",
+              f"- graph status/readback exit: `{status_rc}`",
+              f"- unresolved_count: `{unresolved_count}`",
+              f"- ambiguous_count: `{ambiguous_count}`",
+              f"- build/status identity mismatches: `{len(identity_mismatches)}`",
+              f"- accumulated eval collection: `{eval_outcome}`",
+              f"- dashboard render and non-empty readback: `{dashboard_outcome}`",
+              f"- overall: `{overall}`",
+              f"- workflow run: `{os.environ.get('GITHUB_RUN_ID', 'unknown')}` attempt `{os.environ.get('GITHUB_RUN_ATTEMPT', 'unknown')}`",
+              "",
+              "### Verification boundary",
+              "",
+              "The runner fetched `origin/main` and detached at that exact SHA before starting AgentCanon. The Issue-only workflow file was therefore excluded from the graph input. The run used the same bootstrap/runtime, graph build/status, accumulated-eval collection, dashboard producer, non-empty dashboard readback, and artifact publication sequence as the scheduled/manual dashboard workflow. A pull-request compatibility-only success was not used as evidence.",
+              "",
+              "Complete graph build/status JSON, stderr, exit codes, identity readback, and the rendered dashboard are retained in workflow artifact `issue-1034-exact-main-verification`.",
+          ]
+          if overall == "pass":
+              lines += [
+                  "",
+                  "### Scope reconciliation",
+                  "",
+                  "The historical `unresolved_count=532` failure is not reproduced on exact current main. Current tracked declarations close with no unresolved targets, graph status reads back successfully without source/config/tool identity disagreement, and the downstream dashboard artifact is generated. No `retarget`, `remove`, or parser modification is justified. No compatibility tree, basename fallback, or silent-ignore path was introduced.",
+              ]
+          else:
+              lines += [
+                  "",
+                  "### Remaining work",
+                  "",
+                  "The exact current-main path did not close the full gate. No declaration was silently dropped or guessed. The raw output is frozen as the input for the required `retarget | remove | parser defect` classification, and the Issue remains implementation-active.",
+              ]
+          (report_dir / "issue-comment.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"overall={overall}\n")
+          print(json.dumps(summary, indent=2, ensure_ascii=False))
+          PY
+          cat "${report_dir}/issue-comment.md"
+
+      - name: Comment Issue 1034
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment 1034 --repo "${GITHUB_REPOSITORY}" --body-file "${RUNNER_TEMP}/issue-1034/issue-comment.md"
+
+      - name: Upload exact-main verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1034-exact-main-verification
+          path: |
+            ${{ runner.temp }}/issue-1034
+            ${{ steps.dashboard.outputs.dashboard_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Release shared tool runtime
+        if: always()
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" stop || true
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
+
+      - name: Remove diagnostic-only branch diff when main is healthy
+        if: steps.evidence.outputs.overall == 'pass'
+        env:
+          EXPECTED_BRANCH_HEAD: ${{ steps.source.outputs.branch_head }}
+          MAIN_SHA: ${{ steps.source.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          git checkout --detach "${MAIN_SHA}"
+          git push --force-with-lease="refs/heads/fix/1034-exact-main-graph-verification:${EXPECTED_BRANCH_HEAD}" \
+            origin "${MAIN_SHA}:refs/heads/fix/1034-exact-main-graph-verification"
+
+      - name: Complete healthy Issue
+        if: steps.evidence.outputs.overall == 'pass'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh issue edit 1034 --repo "${GITHUB_REPOSITORY}" --add-label "ready for review"
+          gh issue edit 1034 --repo "${GITHUB_REPOSITORY}" --remove-label "in progress" || true
+          gh issue edit 1034 --repo "${GITHUB_REPOSITORY}" --remove-label "need verification" || true
+          gh issue close 1034 --repo "${GITHUB_REPOSITORY}" --reason completed \
+            --comment "Exact current main passed graph build/status identity readback and full dashboard artifact publication. No source repair or PR is required; closing as current-state verified."
+
+      - name: Fail closed when verification does not pass
+        if: steps.evidence.outputs.overall != 'pass'
+        run: exit 1
