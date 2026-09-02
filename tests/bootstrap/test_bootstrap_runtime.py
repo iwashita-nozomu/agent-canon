@@ -781,6 +781,27 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     control.mkdir()
     target.mkdir()
     private_log.mkdir()
+    exchange = runtime_root / "exchange"
+    codex_home = runtime_root / "codex-home"
+    spool = runtime_root / "spool"
+    archive = runtime_root / "archive"
+    cache = runtime_root / "cache"
+    for path in (exchange, codex_home, spool, archive, cache):
+        path.mkdir(parents=True)
+        path.chmod(0o700)
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(exchange))
+    monkeypatch.setenv("AGENT_CANON_HOST_CODEX_HOME_ROOT", str(codex_home))
+    monkeypatch.setenv("AGENT_CANON_HOST_SPOOL_ROOT", str(spool))
+    monkeypatch.setenv("AGENT_CANON_HOST_ARCHIVE_ROOT", str(archive))
+    monkeypatch.setenv("AGENT_CANON_HOST_CACHE_ROOT", str(cache))
+    monkeypatch.setenv("AGENT_CANON_PRIVATE_LOG_ROOT", str(private_log))
+    monkeypatch.setenv("AGENT_CANON_HOST_PRIVATE_LOG", str(private_log))
+    monkeypatch.setattr(
+        BootstrapRuntime,
+        "private_log_root",
+        property(lambda _manager: private_log),
+    )
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     digest = "target-structured"
@@ -801,9 +822,7 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     manager._write_mounts(state)
     manager._write_mount_manifest(state)
     manager._write_state(state)
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
-    monkeypatch.setenv("AGENT_CANON_PRIVATE_LOG_ROOT", str(private_log))
 
     output_root = runtime_root / "reports"
     environment = {
