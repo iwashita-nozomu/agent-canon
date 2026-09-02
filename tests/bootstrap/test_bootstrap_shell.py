@@ -118,6 +118,40 @@ _agent_canon_install_global_links
     assert "global_link_collision" not in result.stderr
 
 
+def test_shell_install_preserves_foreign_codex_config_symlink(tmp_path: Path) -> None:
+    """A foreign config symlink is typed and never dereferenced or replaced."""
+    home = tmp_path / "home"
+    repository = tmp_path / "repository"
+    state = tmp_path / "state"
+    foreign = tmp_path / "foreign-config.toml"
+    source = repository / ".codex" / "personal" / "skills"
+    source.mkdir(parents=True)
+    (source / "current" / "SKILL.md").parent.mkdir(parents=True)
+    (source / "current" / "SKILL.md").write_text("current\n", encoding="utf-8")
+    foreign.write_text("model = 'foreign'\n", encoding="utf-8")
+    config = home / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True)
+    config.symlink_to(foreign)
+    state.mkdir(parents=True)
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+HOME={str(home)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_STATE_ROOT={str(state)!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
+_agent_canon_install_global_links
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "config_link_collision"
+    assert config.is_symlink() and config.resolve() == foreign.resolve()
+    assert not (repository / ".codex" / "personal" / "config.toml").exists()
+
+
 def test_update_transaction_has_candidate_restore_path() -> None:
     """Host update retains the previous image until candidate finalization."""
     text = ADAPTER.read_text(encoding="utf-8")
@@ -2973,8 +3007,8 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     git_wrapper.write_text(
         "#!/usr/bin/env bash\n"
         "for argument in \"$@\"; do\n"
-        "  if [[ \"$argument\" == fetch ]]; then\n"
-        f"    printf '%s\\n' git-fetch >> {str(events)!r}\n"
+        "  if [[ \"$argument\" == pull ]]; then\n"
+        f"    printf '%s\\n' git-pull >> {str(events)!r}\n"
         "    break\n"
         "  fi\n"
         "done\n"
@@ -3026,7 +3060,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     assert replacement["State"]["Health"]["Status"] == fixture["expected"]["health"]
     if operation == "install":
         assert events.read_text(encoding="utf-8").splitlines()[:2] == [
-            "git-fetch",
+            "git-pull",
             "docker",
         ]
         source_sync = json.loads(

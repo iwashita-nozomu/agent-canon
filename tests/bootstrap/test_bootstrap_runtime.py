@@ -1821,6 +1821,35 @@ def test_source_sync_reader_uses_nested_directory_path() -> None:
     assert 'return Path(SOURCE_SYNC_DESTINATION) / "source-sync.json"' in source
 
 
+def test_container_control_uses_host_passed_state_volume(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Container control writes state below the mounted host runtime only."""
+    repository = tmp_path / "image-source"
+    (repository / "bootstrap" / "host").mkdir(parents=True)
+    (repository / "bootstrap" / "host" / "manifest.toml").write_bytes(
+        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
+    )
+    control = tmp_path / "state-volume"
+    control.mkdir()
+    mounted_runtime = control / "runtime"
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    args = build_parser().parse_args(
+        [
+            "--container-control",
+            "--repository-root",
+            str(repository),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(mounted_runtime),
+            "status",
+        ]
+    )
+    manager = bootstrap_runtime_module._runtime_from_args(args)
+    assert manager.paths.runtime_root == mounted_runtime
+    assert manager.paths.state == mounted_runtime / "state.json"
+    assert not (repository / ".runtime").exists()
+
+
 
 def test_eval_precondition_failure_creates_no_spool_or_exchange(
     tmp_path: Path, fake_docker: DockerAdapter

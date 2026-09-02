@@ -639,19 +639,27 @@ def validate_roots(
     *,
     source_root: Path | None = None,
 ) -> tuple[Path, Path]:
-    """Validate the control root and bind runtime state to the source root.
+    """Validate roots for the host or the mounted container control plane.
 
-    ``runtime_root`` remains a parse-only compatibility argument.  The source
-    checkout is the sole owner of lifecycle state, so callers cannot redirect
-    it into a workspace or a second checkout.
+    Host callers use the source-owned ``.runtime`` default.  Container control
+    receives its state directory through the host adapter and must use that
+    mounted path; otherwise controller writes would land in the image source
+    tree and be invisible to the host lifecycle.
     """
     control = _existing_no_symlink(
         Path(control_parent_root), field="control-parent-root"
     )
-    source = _normalize_absolute_path(Path(source_root or runtime_root))
-    runtime = _validate_new_path(
-        source / ".runtime", field="runtime-root", beneath=source
-    )
+    if _container_control():
+        runtime = _validate_new_path(
+            _normalize_absolute_path(Path(runtime_root)),
+            field="runtime-root",
+            beneath=control,
+        )
+    else:
+        source = _normalize_absolute_path(Path(source_root or runtime_root))
+        runtime = _validate_new_path(
+            source / ".runtime", field="runtime-root", beneath=source
+        )
     return control, runtime
 
 
@@ -4769,7 +4777,12 @@ class BootstrapRuntime:
 
 def _runtime_from_args(args: argparse.Namespace) -> BootstrapRuntime:
     repository_root = Path(args.repository_root).resolve()
-    runtime_root = repository_root / ".runtime"
+    requested_runtime = getattr(args, "runtime_root", None)
+    runtime_root = (
+        Path(requested_runtime).resolve()
+        if requested_runtime
+        else repository_root / ".runtime"
+    )
     return BootstrapRuntime(
         Path(args.control_parent_root),
         runtime_root,

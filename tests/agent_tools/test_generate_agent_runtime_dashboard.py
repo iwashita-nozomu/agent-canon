@@ -32,6 +32,7 @@ from eval.producers.generate_agent_runtime_dashboard import (  # noqa: E402
     read_issue_publication_receipts,
     read_issue_worker_handoffs,
     render_dashboard,
+    SOURCE_SYNC_STATE_PATH,
     token_usage_lines,
     token_usage_next_action,
     tool_source_path_candidates,
@@ -56,6 +57,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         else:
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
         self._runtime_temp.cleanup()
+
+    def test_dashboard_default_source_sync_path_is_nested_mount(self) -> None:
+        """The default reader names the directory-mounted source-sync file."""
+        self.assertEqual(
+            SOURCE_SYNC_STATE_PATH,
+            Path("/var/lib/agent-canon/source-sync/source-sync.json"),
+        )
 
     def test_issue_worker_reads_only_explicit_candidates(self) -> None:
         """Counts and selection misses do not synthesize Issue candidates."""

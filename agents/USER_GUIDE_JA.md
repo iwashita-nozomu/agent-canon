@@ -141,8 +141,8 @@ quarantine と旧 generation 維持、旧 generation も復旧できなければ
 ない、この installation の所有物だけを削除します。`uninstall` は managed image、
 container、links、state を削除しますが、親レポ、foreign な global Codex entry、
 pre-existing Docker resource は削除しません。AgentCanon が所有した exact link だけを
-削除し、personal config は regular file に戻します。移行済みの legacy skill は復元せず、
-`~/.agents/skills/empirical-prompt-tuning` の managed link だけを削除します。
+削除し、personal config は regular file に戻します。legacy の per-skill farm は列挙せず、
+`~/.agents/skills` の AgentCanon-owned directory link だけを削除します。
 uninstall 前に `eval sync`、
 `status`、archive readback、resource absence を確認してください。`docker system prune`
 は使いません。

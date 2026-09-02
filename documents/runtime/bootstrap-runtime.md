@@ -151,13 +151,13 @@ host sync transition.
 
 ### Install source transition
 
-The public sync path has one source transition after argument parsing and
-under `replacement.lock`: `git -C <install-root> pull --ff-only origin main`.
-The result of that command is the Git admission. Detached and shallow source
-checkouts are accepted when Git accepts the pull; no branch switch, remote-ref
-comparison, working-tree cleanliness check, candidate checkout, or source
-staging is performed. HEAD and tree values in the source-sync receipt are
-telemetry only.
+The public `install` and `sync` paths have one source transition after argument
+parsing and under `replacement.lock`: `git -C <install-root> pull --ff-only
+origin main`. The result of that command is the Git admission. Detached and
+shallow source checkouts are accepted when Git accepts the pull; no branch
+switch, remote-ref comparison, working-tree cleanliness check, candidate
+checkout, or source staging is performed. HEAD and tree values in the
+source-sync receipt are telemetry only.
 
 After a successful pull, sync pulls the exact GHCR image and replaces the
 resident. Image unavailability is reported before the old resident is stopped;

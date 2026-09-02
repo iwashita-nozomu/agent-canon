@@ -3344,6 +3344,30 @@ _agent_canon_install_locked() {
   # named resident after ownership readback, then clear generated state before
   # building the candidate.  The EXIT trap restores the captured state if any
   # later phase fails.
+  local source_before source_head source_tree sync_code=updated
+  AGENT_CANON_SYNC_SOURCE_ROOT=$AGENT_CANON_REPOSITORY_ROOT
+  AGENT_CANON_SYNC_REMOTE=origin
+  AGENT_CANON_SYNC_BRANCH=main
+  AGENT_CANON_SYNC_REMOTE_URL=unknown
+  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
+  AGENT_CANON_SYNC_SOURCE_TREE=unknown
+  source_before=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
+  if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" pull --ff-only origin main; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync pull failed"
+    return 2
+  fi
+  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || source_head=unknown
+  source_tree=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD^{tree} 2>/dev/null) || source_tree=unknown
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  [[ "$source_before" == "$source_head" ]] && sync_code=up_to_date
+  _agent_canon_source_sync_write success "$sync_code" "$AGENT_CANON_REPOSITORY_ROOT" \
+    "$source_head" "$source_tree" origin unknown main \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" || {
+      _agent_canon_json_error source_sync_state_write_failed \
+        "source-sync state could not be atomically published"
+      return 2
+    }
   local old_container=$(_agent_canon_container_name)
   local old_container_id= old_image_ref= old_image_id=
   local old_container_present=0
@@ -3835,7 +3859,11 @@ _agent_canon_install_global_links() {
   # is canonical and the target is recreated as its symlink.
   if [[ -e "$config_target" || -L "$config_target" ]]; then
     resolved=$(readlink -f -- "$config_target" 2>/dev/null || printf '')
-    if [[ -L "$config_target" && "$resolved" == "$(realpath -m -- "$config_source")" ]]; then
+    if [[ -L "$config_target" && "$resolved" != "$(realpath -m -- "$config_source")" ]]; then
+      _agent_canon_json_error config_link_collision \
+        "global Codex config is a foreign symlink: $config_target"
+      return 2
+    elif [[ -L "$config_target" ]]; then
       mode=$(stat -c '%a' -- "$config_source")
     elif [[ -f "$config_target" ]]; then
       if [[ ! -e "$config_source" ]]; then
@@ -3891,7 +3919,8 @@ _agent_canon_uninstall_locked() {
     image_ref=$("$AGENT_CANON_DOCKER_CMD" container inspect \
       --format '{{.Config.Image}}' "$container" 2>/dev/null || printf '')
     if [[ -n "${AGENT_CANON_ACTIVE_IMAGE_ID:-}" ]]; then
-      _agent_canon_validate_existing_container "$container"
+      _agent_canon_validate_existing_container "$container" \
+        "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0
     fi
     "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$container" >/dev/null
     "$AGENT_CANON_DOCKER_CMD" rm "$container" >/dev/null
@@ -4188,7 +4217,8 @@ bootstrap_host_entrypoint() {
       if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
         _agent_canon_use_active_image "$container"
         current_ref=$AGENT_CANON_IMAGE_REF
-        _agent_canon_validate_existing_container "$container"
+        _agent_canon_validate_existing_container "$container" \
+          "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0
         if ! _agent_canon_run_controller "$container" stop >/dev/null; then
           _agent_canon_json_error stop_state_transition_failed "resident state could not enter stopped state"
         fi
