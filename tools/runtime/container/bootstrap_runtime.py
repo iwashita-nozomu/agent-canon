@@ -1567,6 +1567,48 @@ class BootstrapRuntime:
         """Return the one fixed pre-source-owned runtime migration path."""
         return self.paths.control_parent_root / LEGACY_RUNTIME_RELATIVE
 
+    def _read_legacy_runtime_state(self, legacy: Path) -> dict[str, Any]:
+        """Read the fixed legacy state without applying current-root mapping."""
+        if legacy.is_symlink() or not legacy.is_dir():
+            raise BootstrapError(
+                "legacy_runtime_invalid", f"legacy runtime is not a directory: {legacy}"
+            )
+        try:
+            state = json.loads(
+                _safe_read(legacy / STATE_FILE, field="legacy runtime state").decode("utf-8")
+            )
+            owner = json.loads(
+                _safe_read(legacy / OWNER_FILE, field="legacy runtime owner").decode("utf-8")
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise BootstrapError(
+                "legacy_runtime_invalid", "legacy runtime state or owner is not valid JSON"
+            ) from exc
+        if not isinstance(state, dict) or state.get("schema") not in {
+            SCHEMA_STATE,
+            "agent-canon.bootstrap-state.v1",
+        }:
+            raise BootstrapError("legacy_runtime_invalid", "legacy runtime state schema is unsupported")
+        if not isinstance(owner, dict) or owner.get("schema") != "agent-canon.bootstrap-owner.v1":
+            raise BootstrapError("legacy_runtime_invalid", "legacy runtime owner schema is unsupported")
+        expected_root = legacy.resolve()
+        for record, name in ((state, "state"), (owner, "owner")):
+            if record.get("control_root_digest") != self.control_digest:
+                raise BootstrapError(
+                    "legacy_runtime_invalid", f"legacy runtime {name} belongs to another control root"
+                )
+            recorded_source = record.get("repository_root")
+            if not recorded_source or Path(str(recorded_source)).resolve() != self.repository_root:
+                raise BootstrapError(
+                    "legacy_runtime_invalid", f"legacy runtime {name} belongs to another source root"
+                )
+            recorded_runtime = record.get("runtime_root")
+            if not recorded_runtime or Path(str(recorded_runtime)).resolve() != expected_root:
+                raise BootstrapError(
+                    "legacy_runtime_invalid", f"legacy runtime {name} points at a different root"
+                )
+        return state
+
     def _ensure_layout(self) -> None:
         _ensure_directory(self.paths.runtime_root)
         self._enforce_private_directory(self.paths.runtime_root)
@@ -1787,26 +1829,13 @@ class BootstrapRuntime:
             )
         if not (legacy / STATE_FILE).is_file() or not (legacy / OWNER_FILE).is_file():
             return
-        old = BootstrapRuntime(
-            self.paths.control_parent_root,
-            legacy,
-            repository_root=self.repository_root,
-            manifest_path=self.manifest_path,
-            docker=self.docker,
-        )
-        old_state = old._read_state(allow_manifest_drift=True)
-        recorded_runtime = old_state.get("runtime_root")
-        if recorded_runtime and Path(str(recorded_runtime)).resolve() != legacy.resolve():
-            raise BootstrapError(
-                "legacy_runtime_invalid", "legacy runtime state points at a different root"
-            )
+        old_state = self._read_legacy_runtime_state(legacy)
         self._preflight_runtime_reset(legacy, old_state)
         current_state: dict[str, Any] | None = None
         if self.paths.state.exists():
             current_state = self._read_state(allow_manifest_drift=True)
             self._preflight_runtime_reset(self.paths.runtime_root, current_state)
-        old._stop_owned_container(old_state)
-        old._write_state(old_state)
+        self._stop_owned_container(old_state)
         if current_state is not None:
             self._stop_owned_container(current_state)
         self._legacy_runtime_expected_running = bool(
@@ -1839,12 +1868,7 @@ class BootstrapRuntime:
             self._verify_registry_mount(state, str(container["Id"]))
         if legacy.is_symlink() or not legacy.is_dir():
             raise BootstrapError("legacy_runtime_invalid", f"legacy runtime changed: {legacy}")
-        owner = json.loads(_safe_read(legacy / OWNER_FILE, field="legacy runtime owner"))
-        if not isinstance(owner, dict) or owner.get("control_root_digest") != self.control_digest:
-            raise BootstrapError("legacy_runtime_invalid", "legacy runtime owner changed")
-        owner_source = owner.get("repository_root")
-        if owner_source and Path(str(owner_source)).resolve() != self.repository_root:
-            raise BootstrapError("legacy_runtime_invalid", "legacy runtime source owner changed")
+        self._read_legacy_runtime_state(legacy)
         shutil.rmtree(legacy)
         legacy_parent = legacy.parent
         if (

@@ -300,23 +300,35 @@ def test_default_source_runtime_rebuilds_without_copying_legacy_state(
     legacy = tmp_path / "workspace" / "agent-canon-runtime" / "host"
     (legacy / "unknown.sqlite").parent.mkdir(parents=True)
     (legacy / "unknown.sqlite").write_text("do not copy\n", encoding="utf-8")
-    legacy_manager = BootstrapRuntime(
-        tmp_path,
-        legacy,
-        repository_root=repository,
-        docker=fake_docker,
-    )
-    with legacy_manager.locked():
-        state = legacy_manager._new_state()
-        state["state"] = "installed"
-        state["resources"] = legacy_manager._resource_records()
-        legacy_manager._write_state(state)
 
     manager = BootstrapRuntime(
         tmp_path,
         repository / ".runtime",
         repository_root=repository,
         docker=fake_docker,
+    )
+    legacy_state = manager._new_state()
+    legacy_state.update(
+        {
+            "runtime_root": str(legacy),
+            "repository_root": str(repository),
+            "state": "installed",
+            "resources": manager._resource_records(),
+        }
+    )
+    (legacy / "state.json").write_text(json.dumps(legacy_state), encoding="utf-8")
+    (legacy / "owner.json").write_text(
+        json.dumps(
+            {
+                "schema": "agent-canon.bootstrap-owner.v1",
+                "control_root_digest": manager.control_digest,
+                "control_parent_root": str(tmp_path),
+                "runtime_root": str(legacy),
+                "repository_root": str(repository),
+                "manifest_digest": manager.manifest_digest,
+            }
+        ),
+        encoding="utf-8",
     )
     with manager.locked():
         manager._prepare_legacy_runtime_reset()
