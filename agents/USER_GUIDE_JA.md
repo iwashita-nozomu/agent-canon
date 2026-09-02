@@ -49,30 +49,24 @@ control root は必須です。runtime root を指定した場合も control roo
 hook、設定リンクを作ります。これは global link とは別の実行用経路です。衝突する既存
 パスは fail closed で、uninstall が削除できるのはこの installation が作成したリンクだけです。
 
-control root に `$HOME` を明示した場合、install / update は次の分割リンクも管理します。
+control root に `$HOME` を明示した場合、install / update は次のリンクを管理します。
 
 ```text
-~/.agents/skills/<skill>       -> ~/agent-canon/.codex/personal/skills/<skill>
+~/.agents/skills               -> ~/agent-canon/.codex/personal/skills
 ~/.codex/agents/<role>.toml   -> ~/agent-canon/.codex/agents/<role>.toml
 ~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
 ```
 
-install / update は先に catalog から ignored な
-`~/agent-canon/.codex/personal/skills/<skill>/SKILL.md` view を生成し、その
-directory を `~/.agents/skills/<skill>` へ個別リンクします。この generated view と
-link は編集せず、変更は `agents/skills/<skill>.md` と catalog に加えます。
-
-既存の `~/.codex/skills/empirical-prompt-tuning` は、canonical skill view と
-`~/.agents/skills/empirical-prompt-tuning` のリンクを readback した後にだけ移行します。
-対象は完全一致する非 symlink directory と、認証済み SHA-256 の regular `SKILL.md` だけです。
-内容、所有者、形状、またはリンク readback が違う場合は typed failure として legacy source
-を保持します。`~/.codex/skills/.system` や他の legacy / foreign entry は走査・削除しません。
+install / update は ignored な `~/agent-canon/.codex/personal/skills/` を
+`~/.agents/skills` へディレクトリ単位でリンクします。旧skill farmの列挙や期待値照合は
+せず、変更は `agents/skills/<skill>.md` と catalog に加えます。uninstall が削除するのは
+AgentCanon所有のディレクトリリンクだけです。
 
 既存の regular な `~/.codex/config.toml` は内容と mode を保持したまま ignored な
 personal source に移してからリンクします。update はその内容を保持し、uninstall は
 regular file に戻します。project hook、認証、session、history、cache、plugin、rule、
 MCP、TUI/trust 設定はリンクしません。install / update 後は新しい Codex session を
-起動し、global link と runtime-local manifest の target を readback してください。
+起動してください。
 
 ## Tool を呼ぶ
 

@@ -83,6 +83,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
   codex-home/
   tasks/<task-id>/{tmp,locks,reports,logs,receipts}
   container-runtime/  # 01777 exchange only; no control state or credentials
+  source-sync/source-sync.json  # host-written, resident read-only view
   spool/
 
 <install-root>/.runtime/cache/{cargo,pycache,semantic-index,tool-metadata}/
@@ -120,7 +121,11 @@ capability を受けた場合だけ source を変更します。
 経路は `cwd -> bootstrap.sh -> install root -> control root ->
 <install-root>/.runtime/ -> resident container` です。`install` は検証済み image と
 resident を作り、`update` は同じ resident を current checkout へ更新し、`status` は
-`.runtime/` の active image と resident health を読み返します。`gc --dry-run` は
+`.runtime/` の active image と resident health を読み返します。`sync` は
+`replacement.lock` を一度だけ取得し、`git -C <install-root> pull --ff-only origin main`
+の成功後に source-sync state、exact GHCR image、resident、global links、timer を順に更新
+します。Git は detached/shallow checkout を含め、pull が受理した結果だけを信頼します。
+`gc --dry-run` は
 `.runtime/` の準備・作成・chmod をせずに同じ identity/ownership read を行い、`gc` は
 replacement lock の下で stale な owned Docker resource だけを exact ID/reference で
 削除します。resident controller の既存 `runtime.gc/state GC` も継続して呼び出し、host
@@ -388,14 +393,15 @@ manifest-managed link を作ります。resident は image 内の canonical sour
 live AgentCanon checkout の `<install-root>/.codex/...` にします。従って host
 Codex が読む config は `CODEX_HOME/config.toml`、skills/agents はそれぞれの
 runtime-local surface から live checkout を参照します。加えて、control root に `$HOME` を明示した
-install/update は `~/.codex/personal/skills/<skill>`、`~/.codex/agents/<role>.toml`、および
-`~/.codex/config.toml` を個別に管理します。最後のリンク先は AgentCanon checkout
+install/update は `~/.agents/skills` を AgentCanon checkout 内の ignored な
+`~/.codex/personal/skills` へディレクトリ単位でリンクし、`~/.codex/agents/<role>.toml` と
+`~/.codex/config.toml` は個別に管理します。最後のリンク先は AgentCanon checkout
 内の ignored な personal source で、既存の regular config は bytes と mode を保持
 して移行し、uninstall で regular file に戻します。hooks、認証、session、history、
-cache、plugin、rule、MCP、TUI/trust はこの投影に含めません。同名 pre-existing path
-は foreign entry として保持または typed collision にし、uninstall は自分が作った
-exact linkだけを削除します。receipt には surface、source、target、created 状態を
-記録します。
+cache、plugin、rule、MCP、TUI/trust はこの投影に含めません。skills は個別列挙・digest・
+expected-target readback を行わず、旧farmをディレクトリlinkへ置換します。uninstall は
+その AgentCanon-owned directory link だけを削除します。Host shell が global link を
+所有し、resident Python はこの投影を書きません。
 
 `bootstrap.sh ... codex --project-root <path>` は process-local にこの isolated
 `CODEX_HOME` を指定して project root で Codex を起動します。Template に
@@ -426,12 +432,9 @@ source treeを汚しません。non-force push後にremote ref/tree/blob digest�
 finalizeします。`exec` 成功後の private feedback sync も同じく resident は request
 だけを作り、Host shellが credentialed adapterを一度だけ実行します。
 
-`sync` のcandidate checkoutはruntimeのignored `source-staging/`でimage healthを
-確認し、live checkoutをfast-forwardするまでglobal skill/agent/config linkを投影
-しません。live fast-forward後だけlive sourceからリンクを更新し、stagingを削除
-します。rollbackは停止前にcurrent mount manifestを検証し、Hostが旧imageを作成
-した後にresident state ownerが旧target setとgeneration pointerを一つのlocked state
-更新として復元し、Hostが完全なbind mount集合をreadbackします。
+`sync` は候補 checkout、remote-ref照合、local build、source rollback、二つ目のlockを
+持ちません。image取得に失敗した場合は旧residentを停止せず、resident更新に失敗した
+場合もGitは戻しません。rollbackは既存resident state ownerのrollbackだけを対象にします。
 
 local bare remoteを使い、collect -> spool -> clone -> commit -> push -> fetch ->
 ref/tree/blob readback -> duplicate no-op / conflict failureをE2E testします。

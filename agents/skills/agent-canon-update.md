@@ -120,6 +120,17 @@ shared image and at most one resident tool container; task directories and
 exact target mounts provide isolation. Never create a project/task-specific
 AgentCanon image, container, virtualenv, Cargo toolchain, or volume.
 
+`sync` is the automatic-update route. It acquires `replacement.lock` once and
+runs `git -C <install-root> pull --ff-only origin main`; a successful Git pull
+is sufficient source admission, including for detached or shallow checkouts.
+It then writes `.runtime/source-sync/source-sync.json`, pulls the exact GHCR
+image, updates the resident, and refreshes the host-owned links and timer.
+There is no candidate checkout, remote-ref comparison, local build, Git
+rollback, or second source-sync lock. If the image or resident phase fails, the
+source remains at the pulled commit and the existing resident rollback route
+handles only resident state. A missing systemd user manager is a warning and
+leaves manual `sync` available.
+
 The container is for AgentCanon Python, Rust, and LSP tools. Project Docker,
 project `test/testrunner.sh`, GPU, Git, GitHub, and Codex host launch remain in
 their owning environment. Rootful/rootless Docker mode is not a branch; the
@@ -136,13 +147,14 @@ Run:
 
 `prepare` writes only manifest-managed links beneath runtime-local isolated
 `codex-home/`; it remains separate from the global link lifecycle. When the
-explicit control root is `$HOME`, install/update also manage per-skill,
-per-agent, and personal `~/.codex/config.toml` links. The regular config is
+explicit control root is `$HOME`, install/update manage one `~/.agents/skills`
+directory link, per-agent, and personal `~/.codex/config.toml` links. The regular config is
 migrated byte-for-byte to the ignored personal source and restored on
 uninstall. Hooks, authentication, sessions, history, cache, plugins, rules,
-MCP, and TUI/trust state remain outside the link set. Collisions fail closed;
-uninstall removes only exact links owned by this installation. After update,
-launch a new session and read back the global links and runtime-local manifest.
+MCP, and TUI/trust state remain outside the link set. The host shell owns
+global link projection; the resident does not enumerate or validate global
+skills. Uninstall removes the AgentCanon-owned skills directory link only.
+After update, launch a new session.
 
 ## Tool and compatibility route
 

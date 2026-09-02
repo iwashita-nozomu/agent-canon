@@ -351,7 +351,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            source_sync = root / "source-sync.json"
+            source_sync = root / "source-sync" / "source-sync.json"
+            source_sync.parent.mkdir(parents=True)
             source_sync.write_text(
                 json.dumps(
                     {

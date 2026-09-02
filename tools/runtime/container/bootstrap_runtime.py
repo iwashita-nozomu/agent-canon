@@ -72,7 +72,7 @@ CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
-SOURCE_SYNC_DESTINATION = "/var/lib/agent-canon/source-sync.json"
+SOURCE_SYNC_DESTINATION = "/var/lib/agent-canon/source-sync"
 SOURCE_SYNC_CODE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 SOURCE_SYNC_IDENTITY_RE = re.compile(r"^(?:unknown|[0-9a-f]{40})$")
 SOURCE_SYNC_TIMESTAMP_RE = re.compile(
@@ -135,10 +135,6 @@ TOOL_PATH_ENVIRONMENT_KEYS = frozenset(
 # migrate.  It is intentionally a fixed path; arbitrary source/workspace
 # directories are never scanned or adopted.
 LEGACY_RUNTIME_RELATIVE = Path("workspace") / "agent-canon-runtime" / "host"
-LEGACY_PROMPT_SKILL_NAME = "empirical-prompt-tuning"
-LEGACY_PROMPT_SKILL_SHA256 = (
-    "f2d76d9306b21002ad19040a2fd38bf37a1797469fa2b62e9e9722c680be11bd"
-)
 REQUIRED_LABELS = frozenset(
     {
         "io.agent-canon.runtime=shared-v1",
@@ -643,30 +639,19 @@ def validate_roots(
     *,
     source_root: Path | None = None,
 ) -> tuple[Path, Path]:
-    """Validate explicit roots; effective host UID 0 is intentionally allowed."""
+    """Validate the control root and bind runtime state to the source root.
+
+    ``runtime_root`` remains a parse-only compatibility argument.  The source
+    checkout is the sole owner of lifecycle state, so callers cannot redirect
+    it into a workspace or a second checkout.
+    """
     control = _existing_no_symlink(
         Path(control_parent_root), field="control-parent-root"
     )
-    runtime_path = Path(runtime_root)
-    if source_root is not None:
-        source = _normalize_absolute_path(Path(source_root))
-        runtime_path = _normalize_absolute_path(runtime_path)
-        if runtime_path == source / ".runtime":
-            runtime = _validate_new_path(
-                runtime_path, field="runtime-root", beneath=runtime_path.parent
-            )
-        else:
-            runtime = _validate_new_path(
-                runtime_path, field="runtime-root", beneath=control
-            )
-    else:
-        runtime = _validate_new_path(
-            runtime_path, field="runtime-root", beneath=control
-        )
-    if runtime == control:
-        raise BootstrapError(
-            "runtime_root_escape", "runtime root must be a child of control root"
-        )
+    source = _normalize_absolute_path(Path(source_root or runtime_root))
+    runtime = _validate_new_path(
+        source / ".runtime", field="runtime-root", beneath=source
+    )
     return control, runtime
 
 
@@ -1434,19 +1419,13 @@ class RuntimePaths:
     def source_sync(self) -> Path:
         """Return source/image correspondence state."""
         if _container_control():
-            return Path(SOURCE_SYNC_DESTINATION)
-        return self.runtime_root / "source-sync.json"
+            return Path(SOURCE_SYNC_DESTINATION) / "source-sync.json"
+        return self.runtime_root / "source-sync" / "source-sync.json"
 
     @property
     def docker_config(self) -> Path:
         """Return the temporary registry authentication directory."""
         return self.runtime_root / "docker-config"
-
-    @property
-    def scheduler_root(self) -> Path:
-        """Return rendered scheduler units below the runtime root."""
-        return self.runtime_root / "scheduler" / "systemd" / "user"
-
 
 class BootstrapRuntime:
     """Persistent, lock-serialized lifecycle with one Docker container."""
@@ -1484,21 +1463,6 @@ class BootstrapRuntime:
         self._legacy_runtime_expected_running = False
 
     @property
-    def global_agents_home(self) -> Path:
-        """Return the explicit control-root ``~/.agents`` directory."""
-        return self.paths.control_parent_root / ".agents"
-
-    @property
-    def global_codex_home(self) -> Path:
-        """Return the explicit control-root ``~/.codex`` directory."""
-        return self.paths.control_parent_root / ".codex"
-
-    @property
-    def global_codex_config(self) -> Path:
-        """Return the user's regular Codex config path managed by the link lifecycle."""
-        return self.global_codex_home / "config.toml"
-
-    @property
     def private_log_root(self) -> Path:
         """Return the log checkout sibling of the source install.
 
@@ -1512,15 +1476,10 @@ class BootstrapRuntime:
         return self.repository_root.parent / "agent-canon-log"
 
     @property
-    def personal_codex_config(self) -> Path:
-        """Return AgentCanon's ignored, persistent personal-config source."""
-        return self.repository_root / ".codex" / "personal" / "config.toml"
-
-    @property
     def source_sync_read_path(self) -> Path:
         """Return the host-owned source-sync path visible to this controller."""
         if self._container_control():
-            return Path(SOURCE_SYNC_DESTINATION)
+            return Path(SOURCE_SYNC_DESTINATION) / "source-sync.json"
         return self.paths.source_sync
 
     def _read_source_sync_state(self) -> dict[str, Any] | None:
@@ -1584,10 +1543,6 @@ class BootstrapRuntime:
         ):
             return None
         return value
-
-    def _global_home_scope(self) -> bool:
-        """Return whether global projection is explicitly bound to the real HOME."""
-        return self.paths.control_parent_root == Path.home().resolve()
 
     @staticmethod
     def _container_control() -> bool:
@@ -1716,9 +1671,6 @@ class BootstrapRuntime:
             "resources": {},
             "managed_paths": [],
             "managed_links": [],
-            "managed_agents_link": None,
-            "managed_global_links": [],
-            "managed_codex_config": None,
             "updated_at": _now(),
         }
 
@@ -1845,11 +1797,6 @@ class BootstrapRuntime:
         if self.paths.state.exists():
             current_state = self._read_state(allow_manifest_drift=True)
             self._preflight_runtime_reset(self.paths.runtime_root, current_state)
-        try:
-            old.scheduler_disable()
-        except BootstrapError as exc:
-            if exc.code != "systemd_user_unavailable":
-                raise
         old._stop_owned_container(old_state)
         old._write_state(old_state)
         if current_state is not None:
@@ -1882,11 +1829,6 @@ class BootstrapRuntime:
                     "runtime_reset_unhealthy", "fresh runtime has no healthy container"
                 )
             self._verify_registry_mount(state, str(container["Id"]))
-        try:
-            self.scheduler_enable()
-        except BootstrapError as exc:
-            if exc.code != "systemd_user_unavailable":
-                raise
         if legacy.is_symlink() or not legacy.is_dir():
             raise BootstrapError("legacy_runtime_invalid", f"legacy runtime changed: {legacy}")
         owner = json.loads(_safe_read(legacy / OWNER_FILE, field="legacy runtime owner"))
@@ -2158,8 +2100,6 @@ class BootstrapRuntime:
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
             result = self._adopt_registry_image_locked(state, image_ref, image_record, source_head)
-            self._ensure_global_links(state)
-            self._write_state(state)
         self.codex_prepare()
         return result
 
@@ -2680,8 +2620,6 @@ class BootstrapRuntime:
                         image_record,
                         source_head,
                     )
-                    self._ensure_global_links(state)
-                    self._write_state(state)
                 else:
                     self._materialize_skill_view()
                     self._image(state)
@@ -2697,8 +2635,6 @@ class BootstrapRuntime:
                         CONTAINER_RUNTIME_DIR,
                     ]
                     self._write_mounts(state)
-                    self._write_state(state)
-                    self._ensure_global_links(state)
                     self._write_state(state)
                     result = self._result(
                         self._receipt(
@@ -2720,91 +2656,8 @@ class BootstrapRuntime:
             self._prepare_legacy_runtime_reset()
             result = self._install_locked(image_ref)
         self.codex_prepare()
-        if not self._container_control():
-            try:
-                self.scheduler_enable()
-            except BootstrapError as exc:
-                if exc.code != "systemd_user_unavailable":
-                    raise
         self._finalize_legacy_runtime_reset()
         return result
-
-    def _systemctl(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-        """Run one user-systemd lifecycle command without a daemon wrapper."""
-        result = subprocess.run(
-            ["systemctl", "--user", *args],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if check and result.returncode:
-            raise BootstrapError("systemd_user_unavailable", "systemd user manager is unavailable")
-        return result
-
-    def _scheduler_paths(self) -> tuple[Path, Path]:
-        config_root = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-        root = config_root / "systemd" / "user"
-        return root / "agent-canon-sync.service", root / "agent-canon-sync.timer"
-
-    def scheduler_enable(self) -> dict[str, Any]:
-        """Install and enable the one-shot user timer when systemd is available."""
-        self._systemctl("show-environment")
-        template_root = self.repository_root / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
-        service_template = template_root / "agent-canon-sync.service.in"
-        timer_template = template_root / "agent-canon-sync.timer.in"
-        if not service_template.is_file() or not timer_template.is_file():
-            raise BootstrapError("scheduler_template_missing", "systemd scheduler templates are missing")
-        service_path, timer_path = self._scheduler_paths()
-        service_path.parent.mkdir(parents=True, exist_ok=True)
-        replacements = {
-            "@BOOTSTRAP@": str(self.repository_root / "bootstrap.sh"),
-            "@CONTROL_ROOT@": str(self.paths.control_parent_root),
-            "@RUNTIME_ROOT@": str(self.paths.runtime_root),
-            "@INSTALL_ROOT@": str(self.repository_root),
-            "@REMOTE@": "origin",
-            "@BRANCH@": str(self.manifest.get("registry", {}).get("source_branch", "main")),
-            "@ON_BOOT@": str(self.manifest.get("update", {}).get("sync_on_boot_delay_seconds", 300)),
-            "@INTERVAL@": str(self.manifest.get("update", {}).get("sync_interval_seconds", 900)),
-        }
-        for template, destination in ((service_template, service_path), (timer_template, timer_path)):
-            text = template.read_text(encoding="utf-8")
-            for token, value in replacements.items():
-                text = text.replace(token, value)
-            destination.write_text(text, encoding="utf-8")
-            os.chmod(destination, 0o644)
-        self._systemctl("daemon-reload")
-        self._systemctl("enable", "--now", "agent-canon-sync.timer")
-        return {"code": "scheduler_enabled", "timer": str(timer_path)}
-
-    def scheduler_disable(self) -> dict[str, Any]:
-        """Disable the exact AgentCanon timer if user systemd is available."""
-        self._systemctl("disable", "--now", "agent-canon-sync.timer")
-        return {"code": "scheduler_disabled"}
-
-    def scheduler_status(self) -> dict[str, Any]:
-        """Read the exact timer state without creating an alternate scheduler."""
-        result = self._systemctl("show", "agent-canon-sync.timer", "--property=ActiveState,UnitFileState", check=False)
-        if result.returncode:
-            raise BootstrapError("systemd_user_unavailable", "AgentCanon timer is not available")
-        return {"code": "scheduler_status", "output": result.stdout.strip()}
-
-    def scheduler_uninstall(self) -> dict[str, Any]:
-        """Disable and remove only the managed user units."""
-        try:
-            self.scheduler_disable()
-        except BootstrapError as exc:
-            if exc.code != "systemd_user_unavailable":
-                raise
-        service_path, timer_path = self._scheduler_paths()
-        for path in (service_path, timer_path):
-            if path.is_symlink():
-                raise BootstrapError("scheduler_path_rejected", f"scheduler path is a symlink: {path}")
-            path.unlink(missing_ok=True)
-        try:
-            self._systemctl("daemon-reload")
-        except BootstrapError:
-            pass
-        return {"code": "scheduler_uninstalled"}
 
     def _update_locked(self, state: dict[str, Any], operation: str) -> dict[str, Any]:
         """Reconcile current checkout/image inputs with existing v2 lifecycle state."""
@@ -2823,8 +2676,6 @@ class BootstrapRuntime:
         image = resources.get("image", {}) if isinstance(resources, dict) else {}
         if image.get("owned") is not True:
             self._materialize_skill_view()
-            self._write_state(state)
-            self._ensure_global_links(state)
             self._write_state(state)
             return self._result(
                 self._receipt(
@@ -2855,8 +2706,6 @@ class BootstrapRuntime:
                 state["state"] = "ready"
             else:
                 state["state"] = "installed"
-            self._write_state(state)
-            self._ensure_global_links(state)
             self._write_state(state)
             return self._result(
                 self._receipt(
@@ -2978,8 +2827,6 @@ class BootstrapRuntime:
                     image_record,
                     source_head,
                 )
-                self._ensure_global_links(state)
-                self._write_state(state)
             elif fresh_result is not None:
                 result = fresh_result
             else:
@@ -3157,9 +3004,6 @@ class BootstrapRuntime:
                         "docker_container": self._container_summary(inspected),
                         "runtime_bytes": _dir_bytes(self.paths.runtime_root),
                         "manifest_drift": manifest_drift,
-                        "managed_agents_link": self._agents_link_readback(state),
-                        "managed_global_links": self._global_links_readback(state),
-                        "managed_codex_config": state.get("managed_codex_config"),
                         "source_sync": self._read_source_sync_state(),
                     },
                     state=state,
@@ -3836,485 +3680,6 @@ class BootstrapRuntime:
         skill_files = sorted(skills.glob("*/SKILL.md"))
         if not skill_files or any(path.is_symlink() or not path.is_file() for path in skill_files):
             raise BootstrapError("source_adapters_invalid", "personal skill adapters failed readback")
-
-    def _ensure_agents_link(self, state: dict[str, Any]) -> dict[str, str]:
-        """Migrate the legacy root link to a real per-skill-link directory."""
-        link = self.global_agents_home
-        source = self.repository_root / ".codex" / "personal"
-        legacy_source = self.repository_root / ".agents"
-        previous = state.get("managed_agents_link")
-        created_root = bool(previous.get("created_root")) if isinstance(previous, dict) else False
-        created_skills = bool(previous.get("created_skills")) if isinstance(previous, dict) else False
-        if link.is_symlink():
-            if link.resolve() not in {source.resolve(), legacy_source.resolve()}:
-                raise BootstrapError(
-                    "agents_link_collision",
-                    f"global .agents path is a foreign symlink: {link}",
-                )
-            link.unlink()
-            link.mkdir(mode=0o700)
-            created_root = True
-        elif link.exists():
-            if not link.is_dir():
-                raise BootstrapError(
-                    "agents_link_collision",
-                    f"global .agents path is not a directory: {link}",
-                )
-        else:
-            _ensure_directory(link)
-            created_root = True
-
-        skills = link / "skills"
-        source_skills = source / "skills"
-        if skills.is_symlink():
-            if skills.resolve() != source_skills.resolve():
-                raise BootstrapError(
-                    "skills_link_collision",
-                    f"global skills directory is a foreign symlink: {skills}",
-                )
-            skills.unlink()
-            skills.mkdir(mode=0o700)
-            created_skills = True
-        elif skills.exists():
-            if not skills.is_dir():
-                raise BootstrapError(
-                    "skills_link_collision",
-                    f"global skills path is not a directory: {skills}",
-                )
-        else:
-            _ensure_directory(skills)
-            created_skills = True
-        record = {
-            "path": str(link),
-            "target": str(source),
-            "owned": "true",
-            "mode": "split-directory",
-            "created_root": created_root,
-            "created_skills": created_skills,
-        }
-        state["managed_agents_link"] = record
-        return record
-
-    def _validate_global_sources(self) -> None:
-        """Validate the source files that are projected into the user's Codex home."""
-        self._validate_source_adapters()
-        agents = self.repository_root / ".codex" / "agents"
-        if agents.is_symlink() or not agents.is_dir():
-            raise BootstrapError(
-                "source_codex_agents_invalid",
-                "tracked .codex/agents is missing or not regular",
-            )
-        role_files = sorted(agents.glob("*.toml"))
-        if not role_files or any(path.is_symlink() or not path.is_file() for path in role_files):
-            raise BootstrapError(
-                "source_codex_agents_invalid",
-                "tracked .codex agent role files failed readback",
-            )
-
-    @staticmethod
-    def _ensure_exact_link(target: Path, source: Path, *, collision_code: str) -> bool:
-        """Create one exact symlink, returning whether this call created it."""
-        _ensure_directory(target.parent)
-        if target.exists() or target.is_symlink():
-            if target.is_symlink() and target.resolve() == source.resolve():
-                return False
-            raise BootstrapError(
-                collision_code,
-                f"managed Codex path already exists: {target}",
-            )
-        target.symlink_to(source, target_is_directory=source.is_dir())
-        return True
-
-    def _migrate_legacy_prompt_skill(self) -> dict[str, Any]:
-        """Retire only the known legacy prompt skill after link readback."""
-        if not self._global_home_scope():
-            return {"state": "home_scope_disabled"}
-
-        legacy_skills = self.global_codex_home / "skills"
-        legacy = legacy_skills / LEGACY_PROMPT_SKILL_NAME
-        if not legacy.exists() and not legacy.is_symlink():
-            return {"state": "absent"}
-        if legacy_skills.is_symlink() or not legacy_skills.is_dir():
-            raise BootstrapError(
-                "legacy_skill_collision",
-                f"legacy Codex skills directory is not regular: {legacy_skills}",
-            )
-        if legacy.is_symlink() or not legacy.is_dir():
-            raise BootstrapError(
-                "legacy_skill_collision",
-                f"legacy skill path is not a regular directory: {legacy}",
-            )
-
-        try:
-            entries = list(legacy.iterdir())
-        except OSError as exc:
-            raise BootstrapError(
-                "legacy_skill_readback_failed",
-                f"legacy skill directory could not be read: {legacy}",
-            ) from exc
-        if (
-            len(entries) != 1
-            or entries[0].name != "SKILL.md"
-            or entries[0].is_symlink()
-            or not entries[0].is_file()
-        ):
-            raise BootstrapError(
-                "legacy_skill_shape_mismatch",
-                f"legacy skill must contain exactly one regular SKILL.md: {legacy}",
-            )
-        skill_file = entries[0]
-        for path in (legacy_skills, legacy, skill_file):
-            try:
-                owner = path.stat().st_uid
-            except OSError as exc:
-                raise BootstrapError(
-                    "legacy_skill_readback_failed",
-                    f"legacy skill ownership could not be read: {path}",
-                ) from exc
-            if owner != os.getuid():
-                raise BootstrapError(
-                    "legacy_skill_ownership_mismatch",
-                    f"legacy skill is not owned by the current user: {path}",
-                    evidence={"owner_uid": owner, "expected_uid": os.getuid()},
-                )
-        try:
-            digest = sha256_bytes(_safe_read(skill_file, field="legacy prompt skill"))
-        except BootstrapError:
-            raise
-        if digest != LEGACY_PROMPT_SKILL_SHA256:
-            raise BootstrapError(
-                "legacy_skill_digest_mismatch",
-                f"legacy prompt skill content differs from the authorized source: {skill_file}",
-                evidence={"observed_sha256": digest, "expected_sha256": LEGACY_PROMPT_SKILL_SHA256},
-            )
-
-        link = self.global_agents_home / "skills" / LEGACY_PROMPT_SKILL_NAME
-        source = self.repository_root / ".codex" / "personal" / "skills" / LEGACY_PROMPT_SKILL_NAME
-        source_file = source / "SKILL.md"
-        if (
-            not link.is_symlink()
-            or link.resolve() != source.resolve()
-            or source.is_symlink()
-            or not source.is_dir()
-            or source_file.is_symlink()
-            or not source_file.is_file()
-        ):
-            raise BootstrapError(
-                "legacy_skill_link_readback_failed",
-                f"managed canonical skill link was not read back: {link}",
-            )
-        try:
-            source_digest = sha256_bytes(_safe_read(source_file, field="canonical prompt skill"))
-        except BootstrapError:
-            raise
-        try:
-            shutil.rmtree(legacy)
-        except OSError as exc:
-            raise BootstrapError(
-                "legacy_skill_migration_failed",
-                f"legacy prompt skill directory could not be removed: {legacy}",
-            ) from exc
-        if legacy.exists() or legacy.is_symlink():
-            raise BootstrapError(
-                "legacy_skill_migration_failed",
-                f"legacy prompt skill directory remains after migration: {legacy}",
-            )
-        return {
-            "state": "migrated",
-            "legacy_path": str(legacy),
-            "legacy_sha256": digest,
-            "canonical_path": str(source_file),
-            "canonical_sha256": source_digest,
-        }
-
-    def _ensure_personal_codex_config(self) -> dict[str, Any]:
-        """Migrate one regular user config into the ignored AgentCanon source path."""
-        target = self.global_codex_config
-        source = self.personal_codex_config
-        _ensure_directory(self.global_codex_home)
-        _ensure_directory(source.parent)
-        source_exists = source.exists() or source.is_symlink()
-        target_exists = target.exists() or target.is_symlink()
-        if source.is_symlink() or (source_exists and not source.is_file()):
-            raise BootstrapError(
-                "personal_config_collision",
-                f"personal Codex source is not a regular file: {source}",
-            )
-        if target.is_symlink():
-            if target.resolve() != source.resolve():
-                raise BootstrapError(
-                    "config_link_collision",
-                    f"global Codex config is a foreign symlink: {target}",
-                )
-            if not source.is_file():
-                raise BootstrapError(
-                    "personal_config_missing",
-                    f"managed Codex config target is missing: {source}",
-                )
-            return {
-                "target": str(target),
-                "source": str(source),
-                "managed": True,
-                "created_source": False,
-                "migrated": False,
-                "restore_mode": None,
-            }
-        if target_exists and not target.is_file():
-            raise BootstrapError(
-                "config_link_collision",
-                f"global Codex config is not a regular file: {target}",
-            )
-
-        created_source = False
-        migrated = False
-        restore_mode: int | None = None
-        if source.is_file():
-            source_bytes = _safe_read(source, field="personal Codex source")
-            if target.is_file() and _safe_read(target, field="user Codex config") != source_bytes:
-                raise BootstrapError(
-                    "personal_config_collision",
-                    "regular user config differs from the existing AgentCanon personal source",
-                )
-            if target.is_file():
-                restore_mode = stat.S_IMODE(target.stat().st_mode)
-        elif target.is_file():
-            source_bytes = _safe_read(target, field="user Codex config")
-            source_mode = stat.S_IMODE(target.stat().st_mode)
-            _atomic_bytes(source, source_bytes, mode=source_mode)
-            source.chmod(source_mode)
-            created_source = True
-            migrated = True
-            restore_mode = source_mode
-        else:
-            _atomic_bytes(source, b"")
-            created_source = True
-        if target.is_file():
-            target.unlink()
-        self._ensure_exact_link(target, source, collision_code="config_link_collision")
-        return {
-            "target": str(target),
-            "source": str(source),
-            "managed": True,
-            "created_source": created_source,
-            "migrated": migrated,
-            "restore_mode": restore_mode,
-        }
-
-    def _preflight_global_links(self) -> None:
-        """Check every global collision before changing any home path."""
-        self._validate_global_sources()
-        agents_home = self.global_agents_home
-        source_agents = self.repository_root / ".agents"
-        source_skills = self.repository_root / ".codex" / "personal" / "skills"
-        legacy_root_link = agents_home.is_symlink() and agents_home.resolve() == source_agents.resolve()
-        if agents_home.is_symlink() and not legacy_root_link:
-            raise BootstrapError(
-                "agents_link_collision",
-                f"global .agents path is a foreign symlink: {agents_home}",
-            )
-        if agents_home.exists() and not agents_home.is_dir():
-            raise BootstrapError(
-                "agents_link_collision",
-                f"global .agents path is not a directory: {agents_home}",
-            )
-        if agents_home.is_dir() and not agents_home.is_symlink():
-            skills_home = agents_home / "skills"
-            if skills_home.is_symlink() and skills_home.resolve() != source_skills.resolve():
-                raise BootstrapError(
-                    "skills_link_collision",
-                    f"global skills directory is a foreign symlink: {skills_home}",
-                )
-            if skills_home.exists() and not skills_home.is_dir():
-                raise BootstrapError(
-                    "skills_link_collision",
-                    f"global skills path is not a directory: {skills_home}",
-                )
-
-        codex_home = self.global_codex_home
-        if codex_home.is_symlink() or (codex_home.exists() and not codex_home.is_dir()):
-            raise BootstrapError(
-                "config_link_collision",
-                f"global Codex home is not a regular directory: {codex_home}",
-            )
-        agents_root = codex_home / "agents"
-        if agents_root.is_symlink() or (agents_root.exists() and not agents_root.is_dir()):
-            raise BootstrapError(
-                "agents_link_collision",
-                f"global Codex agents directory is not regular: {agents_root}",
-            )
-
-        source_config = self.personal_codex_config
-        if source_config.is_symlink() or (source_config.exists() and not source_config.is_file()):
-            raise BootstrapError(
-                "personal_config_collision",
-                f"personal Codex source is not a regular file: {source_config}",
-            )
-        target_config = self.global_codex_config
-        if target_config.is_symlink():
-            if target_config.resolve() != source_config.resolve() or not source_config.is_file():
-                raise BootstrapError(
-                    "config_link_collision",
-                    f"global Codex config is a foreign or missing-source symlink: {target_config}",
-                )
-        elif target_config.exists() and not target_config.is_file():
-            raise BootstrapError(
-                "config_link_collision",
-                f"global Codex config is not a regular file: {target_config}",
-            )
-        elif target_config.is_file() and source_config.is_file():
-            if _safe_read(target_config, field="user Codex config") != _safe_read(
-                source_config, field="personal Codex source"
-            ):
-                raise BootstrapError(
-                    "personal_config_collision",
-                    "regular user config differs from the existing AgentCanon personal source",
-                )
-
-        skills_root = agents_home / "skills"
-        for source in sorted((self.repository_root / ".codex" / "agents").glob("*.toml")):
-            target = agents_root / source.name
-            if target.is_symlink():
-                if target.resolve() != source.resolve():
-                    raise BootstrapError(
-                        "agents_link_collision",
-                        f"global Codex agent path is foreign: {target}",
-                    )
-            elif target.exists():
-                raise BootstrapError(
-                    "agents_link_collision",
-                    f"global Codex agent path already exists: {target}",
-                )
-        for source in sorted(source_skills.iterdir()):
-            if not source.is_dir() or source.is_symlink():
-                continue
-            target = skills_root / source.name
-            if target.is_symlink():
-                if target.resolve() != source.resolve():
-                    raise BootstrapError(
-                        "skills_link_collision",
-                        f"global skill path is foreign: {target}",
-                    )
-            elif target.exists() and not legacy_root_link:
-                raise BootstrapError(
-                    "skills_link_collision",
-                    f"global skill path already exists: {target}",
-                )
-
-    def _ensure_global_links(self, state: dict[str, Any]) -> list[dict[str, str]]:
-        """Converge split global Codex links while preserving foreign entries."""
-        if not self._global_home_scope():
-            state["managed_global_links"] = []
-            state["managed_codex_config"] = None
-            state["managed_agents_link"] = None
-            return []
-        self._preflight_global_links()
-        self._ensure_agents_link(state)
-        config_record = self._ensure_personal_codex_config()
-        previous_config = state.get("managed_codex_config")
-        if (
-            isinstance(previous_config, dict)
-            and config_record.get("restore_mode") is None
-            and isinstance(previous_config.get("restore_mode"), int)
-        ):
-            config_record["restore_mode"] = previous_config["restore_mode"]
-        agents_root = self.global_codex_home / "agents"
-        if agents_root.is_symlink():
-            raise BootstrapError(
-                "agents_link_collision",
-                f"global Codex agents directory is a symlink: {agents_root}",
-            )
-        _ensure_directory(agents_root)
-        skills_root = self.global_agents_home / "skills"
-        source_skills = self.repository_root / ".codex" / "personal" / "skills"
-        desired: list[tuple[str, Path, Path, str]] = [
-            ("config", self.global_codex_config, self.personal_codex_config, "config_link_collision"),
-        ]
-        for source in sorted((self.repository_root / ".codex" / "agents").glob("*.toml")):
-            desired.append(
-                (
-                    "agents",
-                    agents_root / source.name,
-                    source,
-                    "agents_link_collision",
-                )
-            )
-        for source in sorted(source_skills.iterdir()):
-            if source.is_dir() and not source.is_symlink():
-                desired.append(
-                    (
-                        "skills",
-                        skills_root / source.name,
-                        source,
-                        "skills_link_collision",
-                    )
-                )
-        links: list[dict[str, str]] = []
-        for surface, target, source, collision_code in desired:
-            created = self._ensure_exact_link(
-                target, source, collision_code=collision_code
-            )
-            links.append(
-                {
-                    "surface": surface,
-                    "target": str(target),
-                    "source": str(source),
-                    "managed": "true",
-                    "created": "true" if created else "false",
-                }
-            )
-        state["managed_global_links"] = links
-        state["managed_codex_config"] = config_record
-        self._migrate_legacy_prompt_skill()
-        return links
-
-    def _agents_link_readback(self, state: Mapping[str, Any]) -> dict[str, Any]:
-        if not self._global_home_scope():
-            return {"state": "home_scope_disabled", "home_scope": False}
-        record = state.get("managed_agents_link")
-        if not isinstance(record, dict):
-            return {"path": str(self.global_agents_home), "state": "absent"}
-        path = Path(str(record["path"]))
-        target = Path(str(record["target"]))
-        return {
-            "path": str(path),
-            "target": str(target),
-            "exists": path.exists() or path.is_symlink(),
-            "exact": path.is_symlink() and path.resolve() == target.resolve(),
-            "split": path.is_dir() and not path.is_symlink() and (path / "skills").is_dir(),
-        }
-
-    def _global_links_readback(self, state: Mapping[str, Any]) -> dict[str, Any]:
-        """Read back a bounded summary of the exact global-link inventory."""
-        if not self._global_home_scope():
-            return {
-                "count": 0,
-                "exact_count": 0,
-                "all_exact": True,
-                "surfaces": {},
-                "home_scope": False,
-            }
-        surfaces: dict[str, dict[str, int]] = {}
-        entries = state.get("managed_global_links", [])
-        if not isinstance(entries, list):
-            return {"count": 0, "exact_count": 0, "all_exact": True, "surfaces": {}}
-        for entry in entries:
-            if not isinstance(entry, dict):
-                continue
-            target = Path(str(entry.get("target", "")))
-            source = Path(str(entry.get("source", "")))
-            surface = str(entry.get("surface", "unknown"))
-            exact = target.is_symlink() and target.resolve() == source.resolve()
-            bucket = surfaces.setdefault(surface, {"count": 0, "exact_count": 0})
-            bucket["count"] += 1
-            bucket["exact_count"] += int(exact)
-        count = sum(bucket["count"] for bucket in surfaces.values())
-        exact_count = sum(bucket["exact_count"] for bucket in surfaces.values())
-        return {
-            "count": count,
-            "exact_count": exact_count,
-            "all_exact": count == exact_count,
-            "surfaces": surfaces,
-        }
 
     def _managed_links(self) -> list[dict[str, str]]:
         projection_root: Path | None = None
@@ -5346,87 +4711,8 @@ class BootstrapRuntime:
                 )
             )
 
-    def _restore_personal_codex_config(self, state: Mapping[str, Any]) -> None:
-        """Restore a regular config from the exact managed personal source link."""
-        record = state.get("managed_codex_config")
-        if not isinstance(record, dict):
-            return
-        target = Path(str(record.get("target", "")))
-        source = Path(str(record.get("source", "")))
-        if not target.is_symlink():
-            return
-        if target.resolve() != source.resolve():
-            return
-        if not source.is_file() or source.is_symlink():
-            raise BootstrapError(
-                "personal_config_missing",
-                f"managed Codex config source is unavailable: {source}",
-            )
-        payload = _safe_read(source, field="personal Codex source")
-        recorded_mode = record.get("restore_mode")
-        mode = (
-            int(recorded_mode)
-            if isinstance(recorded_mode, int) and 0 <= recorded_mode <= 0o777
-            else stat.S_IMODE(source.stat().st_mode)
-        )
-        temporary = target.with_name(
-            f".{target.name}.{os.getpid()}.{secrets.token_hex(8)}.restore"
-        )
-        _atomic_bytes(temporary, payload, mode=mode)
-        temporary.chmod(mode)
-        os.replace(temporary, target)
-        os.chmod(target, mode)
-
-    def _remove_global_links(self, state: dict[str, Any]) -> None:
-        """Remove only exact links and restore the personal config file."""
-        if not self._global_home_scope():
-            state["managed_global_links"] = []
-            state["managed_codex_config"] = None
-            state["managed_agents_link"] = None
-            return
-        for entry in state.get("managed_global_links", []):
-            if not isinstance(entry, dict):
-                continue
-            if entry.get("surface") == "config":
-                continue
-            target = Path(str(entry.get("target", "")))
-            source = Path(str(entry.get("source", "")))
-            if target.is_symlink() and target.resolve() == source.resolve():
-                target.unlink()
-        self._restore_personal_codex_config(state)
-        agents_record = state.get("managed_agents_link")
-        if isinstance(agents_record, dict):
-            agents_path = Path(str(agents_record.get("path", "")))
-            agents_target = Path(str(agents_record.get("target", "")))
-            if agents_path.is_symlink() and agents_path.resolve() == agents_target.resolve():
-                agents_path.unlink()
-            skills_path = agents_path / "skills"
-            if (
-                bool(agents_record.get("created_skills"))
-                and skills_path.is_dir()
-                and not skills_path.is_symlink()
-                and not any(skills_path.iterdir())
-            ):
-                skills_path.rmdir()
-            if (
-                bool(agents_record.get("created_root"))
-                and agents_path.is_dir()
-                and not agents_path.is_symlink()
-                and not any(agents_path.iterdir())
-            ):
-                agents_path.rmdir()
-        for directory in (
-            self.global_codex_home / "agents",
-        ):
-            if directory.is_dir() and not directory.is_symlink() and not any(directory.iterdir()):
-                directory.rmdir()
-        state["managed_global_links"] = []
-        state["managed_codex_config"] = None
-        state["managed_agents_link"] = None
-
     def uninstall(self) -> dict[str, Any]:
         """Remove exact owned Docker resources and managed Codex links."""
-        self.scheduler_uninstall()
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
             before = state["state"]
@@ -5437,7 +4723,6 @@ class BootstrapRuntime:
             self._clear_exchange_in_container(state)
             self._stop_owned_container(state)
             self._remove_exchange()
-            self._remove_global_links(state)
             for entry in state.get("managed_links", []):
                 target = Path(entry["target"])
                 if (
@@ -5485,13 +4770,6 @@ class BootstrapRuntime:
 def _runtime_from_args(args: argparse.Namespace) -> BootstrapRuntime:
     repository_root = Path(args.repository_root).resolve()
     runtime_root = repository_root / ".runtime"
-    if args.runtime_root:
-        supplied = Path(args.runtime_root)
-        legacy_default = (
-            Path(args.control_parent_root).resolve() / LEGACY_RUNTIME_RELATIVE
-        )
-        if supplied.absolute() != legacy_default:
-            runtime_root = supplied
     return BootstrapRuntime(
         Path(args.control_parent_root),
         runtime_root,
@@ -6352,10 +5630,6 @@ def build_parser() -> argparse.ArgumentParser:
         default="source",
         help=argparse.SUPPRESS,
     )
-    scheduler = sub.add_parser("scheduler")
-    scheduler_sub = scheduler.add_subparsers(dest="scheduler_operation", required=True)
-    for scheduler_operation in ("enable", "disable", "status", "uninstall"):
-        scheduler_sub.add_parser(scheduler_operation)
     gc_parser = sub.add_parser("gc")
     gc_parser.add_argument("--dry-run", action="store_true")
     target = sub.add_parser("target")
@@ -6423,15 +5697,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         return runtime.install(image_ref=args.image_ref)
     if operation == "update":
         return runtime.update(image_ref=args.image_ref)
-    if operation == "scheduler":
-        if args.scheduler_operation == "enable":
-            return runtime.scheduler_enable()
-        if args.scheduler_operation == "disable":
-            return runtime.scheduler_disable()
-        if args.scheduler_operation == "status":
-            return runtime.scheduler_status()
-        if args.scheduler_operation == "uninstall":
-            return runtime.scheduler_uninstall()
     if operation == "start":
         return runtime.start()
     if operation == "status":

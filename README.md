@@ -104,7 +104,7 @@ When the explicit control root is `$HOME`, `install` and `update` also converge
 these user-facing links:
 
 ```text
-~/.agents/skills/<skill>       -> ~/agent-canon/.codex/personal/skills/<skill>
+~/.agents/skills               -> ~/agent-canon/.codex/personal/skills
 ~/.codex/agents/<role>.toml   -> ~/agent-canon/.codex/agents/<role>.toml
 ~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
 ```
@@ -208,8 +208,9 @@ container, bootstrap, or archive changes.
 
 AgentCanon is licensed under Apache License 2.0. See [LICENSE](LICENSE) and
 [the licensing policy](documents/agent-canon/agent-canon-licensing-policy.md).
-`install` and `update` own the split links beneath the explicit
-`<control-parent-root>/.agents` and `<control-parent-root>/.codex` paths. They do
-not replace a foreign entry and preserve personal entries in those directories.
-The global Codex config is one managed link to the ignored personal source;
+`install` and `update` own the AgentCanon skills directory link beneath the
+explicit `<control-parent-root>/.agents` path, plus per-file agent and config
+links beneath `.codex`. The skills directory is replaced as one AgentCanon
+view; individual skills are not enumerated or expected-target checked. The
+global Codex config is one managed link to the ignored personal source;
 project-scoped hooks and settings remain project-owned.
