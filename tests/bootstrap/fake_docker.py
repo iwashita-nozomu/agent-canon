@@ -229,6 +229,38 @@ def _formatted_container(record: dict, fmt: str) -> str | None:
     return None
 
 
+def _read_root_owned_bind_as_user(mount: dict, user: str) -> str | None:
+    """Read the source-sync bind with Docker's root-owned mount metadata."""
+    uid_text, separator, gid_text = user.partition(":")
+    if not separator:
+        gid_text = uid_text
+    try:
+        uid = int(uid_text)
+        gid = int(gid_text)
+        owner_uid = int(mount.get("OwnerUID", 0))
+        owner_gid = int(mount.get("OwnerGID", 0))
+    except ValueError:
+        return None
+
+    source = Path(mount["Source"])
+    state = source / "source-sync.json"
+    if not source.is_dir() or source.is_symlink() or not state.is_file() or state.is_symlink():
+        return None
+
+    def allows(mode: int, owner_bit: int, group_bit: int, other_bit: int) -> bool:
+        if uid == owner_uid:
+            return bool(mode & owner_bit)
+        if gid == owner_gid:
+            return bool(mode & group_bit)
+        return bool(mode & other_bit)
+
+    if not allows(source.stat().st_mode, 0o100, 0o010, 0o001):
+        return None
+    if not allows(state.stat().st_mode, 0o400, 0o040, 0o004):
+        return None
+    return state.read_text(encoding="utf-8")
+
+
 def _materialize_skill_exchange(state: dict, container: dict) -> None:
     """Model resident materializer output in the writable runtime exchange."""
     volume_mount = next(
@@ -525,16 +557,17 @@ def main(argv: list[str]) -> int:
                 source = str(volume_path(source))
             if os.environ.get("FAKE_DOCKER_CANONICALIZE_MOUNTS") == "1":
                 source = str(Path(source).resolve())
-            parsed_mounts.append(
-                {
-                    "Type": mount_type,
-                    "Source": source,
-                    "Name": name_value,
-                    "Destination": values["dst"],
-                    "RW": "readonly" not in argv[index + 1],
-                    "Mode": "ro" if "readonly" in argv[index + 1] else "rw",
-                }
-            )
+            mount_record = {
+                "Type": mount_type,
+                "Source": source,
+                "Name": name_value,
+                "Destination": values["dst"],
+                "RW": "readonly" not in argv[index + 1],
+                "Mode": "ro" if "readonly" in argv[index + 1] else "rw",
+            }
+            if values["dst"] == "/var/lib/agent-canon/source-sync":
+                mount_record.update({"OwnerUID": 0, "OwnerGID": 0})
+            parsed_mounts.append(mount_record)
             if values["dst"] == "/var/lib/agent-canon/mount-registry.toml":
                 mount_snapshots[values["dst"]] = (
                     Path(source).read_text(encoding="utf-8")
@@ -857,6 +890,10 @@ def main(argv: list[str]) -> int:
             return 1
         if not marked and any(backing.iterdir()):
             return 1
+        if marked:
+            legacy_source_sync = backing / "source-sync.json"
+            if legacy_source_sync.is_file() or legacy_source_sync.is_symlink():
+                legacy_source_sync.unlink()
         if not marked and legacy is not None and legacy.is_dir():
             runtime_backing.mkdir(parents=True, exist_ok=True)
             for name in ("state.json", "owner.json"):
@@ -1057,6 +1094,24 @@ def main(argv: list[str]) -> int:
             probe.unlink()
             volume["ResidentWriteReadback"] = True
             save(state)
+        if command == ["cat", "/var/lib/agent-canon/source-sync/source-sync.json"]:
+            source_sync_mount = next(
+                (
+                    mount
+                    for mount in found[1].get("Mounts", [])
+                    if mount["Destination"] == "/var/lib/agent-canon/source-sync"
+                ),
+                None,
+            )
+            if source_sync_mount is None:
+                return 1
+            content = _read_root_owned_bind_as_user(
+                source_sync_mount, str(found[1].get("Config", {}).get("User", ""))
+            )
+            if content is None:
+                return 1
+            sys.stdout.write(content)
+            return 0
         if command[:2] == [
             "python3",
             "/usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py",
