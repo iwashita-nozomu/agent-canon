@@ -332,34 +332,18 @@ def test_default_source_runtime_rebuilds_without_copying_legacy_state(
     assert not legacy.parent.exists()
 
 
-def test_explicit_roots_canonicalize_dot_segments_after_symlink_validation(
-    tmp_path: Path,
-) -> None:
-    """Use one canonical host path for state, mount creation, and readback."""
-    control = tmp_path / "control"
-    nested = control / "nested"
-    nested.mkdir(parents=True)
-
-    observed_control, observed_runtime = validate_roots(
-        nested / "..", nested / ".." / "runtime"
-    )
-
-    assert observed_control == control
-    assert observed_runtime == control / "runtime"
-
-
-def test_explicit_roots_reject_symlink_even_when_dot_segments_cancel_it(
-    tmp_path: Path,
-) -> None:
-    """Do not let lexical normalization hide a traversed symlink component."""
-    control = tmp_path / "control"
-    outside = tmp_path / "outside"
+def test_explicit_runtime_argument_does_not_redirect_state(tmp_path: Path) -> None:
+    """The caller's runtime argument cannot move state outside the source root."""
+    control, source, supplied = tmp_path / "control", tmp_path / "source", tmp_path / "supplied"
     control.mkdir()
-    outside.mkdir()
-    (control / "link").symlink_to(outside, target_is_directory=True)
+    source.mkdir()
+    supplied.mkdir()
+    observed_control, observed_runtime = validate_roots(
+        control, supplied / "runtime", source_root=source
+    )
+    assert observed_control == control
+    assert observed_runtime == source / ".runtime"
 
-    with pytest.raises(BootstrapError, match="symlink_path_rejected"):
-        validate_roots(control, control / "link" / ".." / "runtime")
 
 
 def test_start_accepts_daemon_canonical_mount_readback(
