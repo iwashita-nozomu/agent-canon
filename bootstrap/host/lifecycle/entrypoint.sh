@@ -111,6 +111,7 @@ _agent_canon_source_sync_write() {
   [[ ! -L "$AGENT_CANON_RUNTIME_ROOT" && ! -L "$state_root" &&
      ! -L "$state_root/source-sync.json" ]] || return 65
   mkdir -p -- "$state_root" || return 66
+  chmod 755 -- "$state_root" || return 66
   tmp=$(mktemp "$state_root/.source-sync.json.XXXXXX") || return 66
   local escaped_root escaped_remote_url escaped_failure
   escaped_root=$(_agent_canon_json_escape "$source_root")
@@ -129,7 +130,7 @@ _agent_canon_source_sync_write() {
     rm -f -- "$tmp"
     return 66
   fi
-  if ! chmod 600 -- "$tmp"; then
+  if ! chmod 644 -- "$tmp"; then
     rm -f -- "$tmp"
     return 66
   fi
@@ -184,7 +185,7 @@ _agent_canon_ensure_source_sync_state() {
     [[ -f "$state_path" && ! -L "$state_path" ]] ||
       _agent_canon_json_error source_sync_state_invalid \
         "source-sync state must be a regular file"
-    chmod 600 -- "$state_path" ||
+    chmod 644 -- "$state_path" ||
       _agent_canon_json_error source_sync_state_invalid \
         "source-sync state permissions could not be restricted"
     return 0
@@ -744,6 +745,9 @@ marker_tmp="$root/.agent-canon-marker-check.$$"
 printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" > "$marker_tmp"
 cmp -s "$marker" "$marker_tmp" || exit 50
 rm -f "$marker_tmp"
+if [ -f "$root/source-sync.json" ] || [ -L "$root/source-sync.json" ]; then
+  rm -f "$root/source-sync.json"
+fi
 if [ "$marked" = 0 ]; then
   for file in state.json owner.json; do
     if [ -e "$legacy/$file" ] || [ -L "$legacy/$file" ]; then
@@ -1825,7 +1829,6 @@ _agent_canon_scheduler_locked() {
       timer_text=$(<"$AGENT_CANON_REPOSITORY_ROOT/bootstrap/host/scheduler/systemd/user/agent-canon-sync.timer.in")
       service_text=${service_text//@BOOTSTRAP@/$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh}
       service_text=${service_text//@CONTROL_ROOT@/$AGENT_CANON_CONTROL_ROOT}
-      service_text=${service_text//@RUNTIME_ROOT@/$AGENT_CANON_RUNTIME_ROOT}
       service_text=${service_text//@INSTALL_ROOT@/$AGENT_CANON_REPOSITORY_ROOT}
       timer_text=${timer_text//@ON_BOOT@/300}
       timer_text=${timer_text//@INTERVAL@/900}

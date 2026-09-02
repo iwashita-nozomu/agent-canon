@@ -28,9 +28,10 @@ COMMON=(--control-parent-root "$CONTROL")
 "$BOOTSTRAP" "${COMMON[@]}" target add --root "$TARGET" --mode read-only
 ```
 
-The control root is explicit on every call. Unless `--runtime-root` is
-provided, bootstrap stores its reconstructible state in the install root's
-ignored `.runtime/`. A target is not discovered by scanning the parent
+The control root is explicit on every call. Bootstrap stores its
+reconstructible state in the install root's ignored `.runtime/`; the historical
+`--runtime-root` option is accepted only for migration-compatible parsing and
+does not select storage. A target is not discovered by scanning the parent
 workspace.
 
 ## Tool commands

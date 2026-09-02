@@ -995,6 +995,11 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
         (volume_root / directory).mkdir(parents=True)
     for relative, content in preserved_files.items():
         (volume_root / relative).write_text(content, encoding="utf-8")
+    legacy_source_sync = volume_root / "source-sync.json"
+    legacy_source_sync.write_text("legacy-source-sync\n", encoding="utf-8")
+    preserved_sibling = volume_root / "preserved-sibling"
+    preserved_sibling.mkdir()
+    (preserved_sibling / "content.txt").write_text("keep\n", encoding="utf-8")
     for directory in (
         volume_root,
         volume_root / "runtime",
@@ -1053,6 +1058,8 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
     assert result.returncode == 0, result.stderr
     for relative, content in preserved_files.items():
         assert (volume_root / relative).read_text(encoding="utf-8") == content
+    assert not legacy_source_sync.exists()
+    assert (preserved_sibling / "content.txt").read_text(encoding="utf-8") == "keep\n"
     assert (volume_root / "exchange").is_dir()
     assert (volume_root / "private-log").is_dir()
     for directory in (
@@ -2085,6 +2092,66 @@ test "$before" = "$(< {str(runtime / "source-sync/source-sync.json")!r})"
 """
     completed = subprocess.run(["bash", "-c", script], check=False, capture_output=True, text=True)
     assert completed.returncode == 0, completed.stderr
+    source_sync = runtime / "source-sync"
+    assert source_sync.stat().st_mode & 0o777 == 0o755
+    assert (source_sync / "source-sync.json").stat().st_mode & 0o777 == 0o644
+
+
+def test_fake_resident_reads_root_owned_source_sync_bind_as_configured_user(
+    tmp_path: Path,
+) -> None:
+    """A root-owned bind remains readable by the resident's configured user."""
+    source_sync = tmp_path / "source-sync"
+    source_sync.mkdir()
+    state = source_sync / "source-sync.json"
+    state.write_text('{"status":"success"}\n', encoding="utf-8")
+    source_sync.chmod(0o755)
+    state.chmod(0o644)
+    docker_state = tmp_path / "docker-state.json"
+    docker_state.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {
+                    "resident": {
+                        "Id": "container-1",
+                        "Config": {"User": "1000:1000"},
+                        "Mounts": [
+                            {
+                                "Type": "bind",
+                                "Source": str(source_sync),
+                                "Destination": "/var/lib/agent-canon/source-sync",
+                                "RW": False,
+                                "Mode": "ro",
+                                "OwnerUID": 0,
+                                "OwnerGID": 0,
+                            }
+                        ],
+                    }
+                },
+                "volumes": {},
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            str(ROOT / "tests/bootstrap/fake_docker.py"),
+            "exec",
+            "--workdir",
+            "/",
+            "resident",
+            "cat",
+            "/var/lib/agent-canon/source-sync/source-sync.json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(docker_state)},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == '{"status":"success"}\n'
 
 
 def test_target_mount_manifest_is_strict_and_reused_on_create() -> None:
@@ -3884,6 +3951,9 @@ def test_scheduler_template_invokes_shell_bootstrap() -> None:
         encoding="utf-8"
     )
     assert "ExecStart=@BOOTSTRAP@" in text
+    assert "sync --install-root @INSTALL_ROOT@" in text
+    assert "--runtime-root" not in text
+    assert "@RUNTIME_ROOT@" not in text
     assert "python3" not in text
 
 
