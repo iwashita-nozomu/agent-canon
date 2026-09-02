@@ -344,6 +344,7 @@ def test_explicit_runtime_argument_does_not_redirect_state(tmp_path: Path) -> No
     assert observed_control == control
     assert observed_runtime == source / ".runtime"
 
+
 def test_start_accepts_daemon_canonical_mount_readback(
     tmp_path: Path,
     fake_docker: DockerAdapter,
