@@ -672,7 +672,6 @@ def main(argv: list[str]) -> int:
                 (backing / "host-mounts.tsv").unlink(missing_ok=True)
             elif copy_direction == "import":
                 destinations = {
-                    "source-sync": backing / "source-sync.json",
                     "mount-registry": backing / "mount-registry.toml",
                     "host-mounts": backing / "host-mounts.tsv",
                     "private-log": backing / "private-log",
@@ -681,7 +680,7 @@ def main(argv: list[str]) -> int:
                 destination = destinations.get(kind)
                 if source is None or destination is None or not source.exists() or source.is_symlink():
                     return 1
-                if kind in {"source-sync", "mount-registry", "host-mounts"}:
+                if kind in {"mount-registry", "host-mounts"}:
                     if destination.is_symlink() or destination.is_file():
                         destination.unlink()
                     shutil.copy2(source, destination)
@@ -1159,7 +1158,7 @@ def main(argv: list[str]) -> int:
                 runtime_root = volume_root / "runtime"
                 host_install = Path(exec_environment.get("AGENT_CANON_HOST_INSTALL_ROOT", ""))
                 private_log = host_install.parent / "agent-canon-log"
-                source_sync_source = host_install / ".runtime" / "source-sync.json"
+                source_sync_source = host_install / ".runtime" / "source-sync"
                 registry_source = host_install / ".runtime" / "container-state" / "mounts.toml"
                 plan = volume_root / "exchange" / "rollback-plan.tsv"
                 plan_lines = [
@@ -1167,7 +1166,7 @@ def main(argv: list[str]) -> int:
                     f"image-id\t{current_id}",
                     f"image-ref\t{current_ref}",
                     f"mount\tmount\t{runtime_root}\t/var/lib/agent-canon/runtime\tfalse",
-                    f"mount\tmount\t{source_sync_source}\t/var/lib/agent-canon/source-sync.json\ttrue",
+                    f"mount\tmount\t{source_sync_source}\t/var/lib/agent-canon/source-sync\ttrue",
                     f"mount\tmount\t{private_log}\t/var/lib/agent-canon/private-log\ttrue",
                     f"mount\tmount\t{registry_source}\t/var/lib/agent-canon/mount-registry.toml\ttrue",
                 ]

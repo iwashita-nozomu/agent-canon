@@ -27,13 +27,11 @@ AGENT_CANON_CODEX_HOME_DESTINATION=/var/lib/agent-canon/codex-home
 AGENT_CANON_PRIVATE_LOG_DESTINATION=/var/lib/agent-canon/private-log
 AGENT_CANON_MOUNT_REGISTRY_DESTINATION=/var/lib/agent-canon/mount-registry.toml
 AGENT_CANON_HOST_MOUNTS_DESTINATION=/var/lib/agent-canon/host-mounts.tsv
-AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync.json
+AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync
 AGENT_CANON_HEALTH_ATTEMPTS=120
 AGENT_CANON_PRIVATE_LOG_ROOT=
 AGENT_CANON_TARGET_PRUNE_DIGESTS=
 AGENT_CANON_STATE_VOLUME_NAME=
-AGENT_CANON_LEGACY_PROMPT_SKILL_NAME=empirical-prompt-tuning
-AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256=f2d76d9306b21002ad19040a2fd38bf37a1797469fa2b62e9e9722c680be11bd
 
 _agent_canon_caller_user() {
   local caller_uid caller_gid
@@ -109,8 +107,9 @@ _agent_canon_source_sync_write() {
        "$remote_url" != *'"'* && "$remote_url" != *'\'* ) ]] || return 64
   [[ "$updated_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || return 64
 
-  local state_root=$AGENT_CANON_RUNTIME_ROOT state_path tmp
-  [[ ! -L "$state_root" && ! -L "$state_root/source-sync.json" ]] || return 65
+  local state_root=$AGENT_CANON_RUNTIME_ROOT/source-sync state_path tmp
+  [[ ! -L "$AGENT_CANON_RUNTIME_ROOT" && ! -L "$state_root" &&
+     ! -L "$state_root/source-sync.json" ]] || return 65
   mkdir -p -- "$state_root" || return 66
   tmp=$(mktemp "$state_root/.source-sync.json.XXXXXX") || return 66
   local escaped_root escaped_remote_url escaped_failure
@@ -149,7 +148,7 @@ _agent_canon_source_sync_write() {
 }
 
 _agent_canon_source_sync_json() {
-  local state_path="$AGENT_CANON_RUNTIME_ROOT/source-sync.json" state
+  local state_path="$AGENT_CANON_RUNTIME_ROOT/source-sync/source-sync.json" state
   if [[ ! -f "$state_path" || -L "$state_path" ]]; then
     printf 'null'
     return 0
@@ -172,7 +171,15 @@ _agent_canon_source_sync_json() {
 }
 
 _agent_canon_ensure_source_sync_state() {
-  local state_path="$AGENT_CANON_RUNTIME_ROOT/source-sync.json"
+  local state_dir="$AGENT_CANON_RUNTIME_ROOT/source-sync"
+  local state_path="$state_dir/source-sync.json"
+  local legacy_path="$AGENT_CANON_RUNTIME_ROOT/source-sync.json"
+  mkdir -p -- "$state_dir"
+  if [[ ! -e "$state_path" && ! -L "$state_path" && -f "$legacy_path" && ! -L "$legacy_path" ]]; then
+    mv -f -- "$legacy_path" "$state_path" ||
+      _agent_canon_json_error source_sync_state_migration_failed \
+        "legacy source-sync state could not be moved into the canonical directory"
+  fi
   if [[ -e "$state_path" || -L "$state_path" ]]; then
     [[ -f "$state_path" && ! -L "$state_path" ]] ||
       _agent_canon_json_error source_sync_state_invalid \
@@ -198,91 +205,6 @@ _agent_canon_ensure_source_sync_state() {
       "initial source-sync state could not be atomically published"
 }
 
-_agent_canon_sync_request_metadata() {
-  local install_request=${AGENT_CANON_REPOSITORY_ROOT:-} remote=origin branch=main
-  local sync_index=1 token install_root git_root remote_url source_head source_tree
-  while ((sync_index < ${#command_args[@]})); do
-    token=${command_args[sync_index]}
-    case "$token" in
-      sync) ;;
-      --install-root=*)
-        install_request=${token#--install-root=}
-        ;;
-      --install-root)
-        ((sync_index += 1))
-        if ((sync_index >= ${#command_args[@]})); then
-          _agent_canon_json_error argument_missing "--install-root requires a value"
-          return 2
-        fi
-        install_request=${command_args[sync_index]}
-        ;;
-      --remote=*) remote=${token#--remote=} ;;
-      --remote)
-        ((sync_index += 1))
-        if ((sync_index >= ${#command_args[@]})); then
-          _agent_canon_json_error argument_missing "--remote requires a value"
-          return 2
-        fi
-        remote=${command_args[sync_index]}
-        ;;
-      --branch=*) branch=${token#--branch=} ;;
-      --branch)
-        ((sync_index += 1))
-        if ((sync_index >= ${#command_args[@]})); then
-          _agent_canon_json_error argument_missing "--branch requires a value"
-          return 2
-        fi
-        branch=${command_args[sync_index]}
-        ;;
-      *)
-        _agent_canon_json_error argument_invalid "unsupported source-sync argument"
-        return 2
-        ;;
-    esac
-    ((sync_index += 1))
-  done
-  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ ]] || {
-    _agent_canon_json_error argument_invalid "source-sync remote is invalid"
-    return 2
-  }
-  [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || {
-    _agent_canon_json_error argument_invalid "source-sync branch is invalid"
-    return 2
-  }
-  if ! install_root=$(realpath -e -- "$install_request" 2>/dev/null); then
-    _agent_canon_json_error install_root_invalid "source-sync install root is not a directory"
-    return 2
-  fi
-  [[ -d "$install_root" && ! -L "$install_root" ]] || {
-    _agent_canon_json_error install_root_invalid "source-sync install root must be a regular directory"
-    return 2
-  }
-  if ! git_root=$(git -C "$install_root" rev-parse --show-toplevel 2>/dev/null); then
-    _agent_canon_json_error install_root_not_git "source-sync install root is not a Git checkout"
-    return 2
-  fi
-  if ! git_root=$(realpath -e -- "$git_root" 2>/dev/null); then
-    _agent_canon_json_error install_root_not_git "source-sync Git root is unavailable"
-    return 2
-  fi
-  if ! remote_url=$(git -C "$git_root" remote get-url "$remote" 2>/dev/null); then
-    _agent_canon_json_error source_remote_unavailable "source-sync remote URL is unavailable"
-    return 2
-  fi
-  [[ -n "$remote_url" && "$remote_url" != *$'\n'* && "$remote_url" != *$'\r'* ]] || {
-    _agent_canon_json_error source_remote_unavailable "source-sync remote URL is invalid"
-    return 2
-  }
-  if ! source_head=$(git -C "$git_root" rev-parse --verify HEAD 2>/dev/null) ||
-     ! source_tree=$(git -C "$git_root" rev-parse --verify HEAD^{tree} 2>/dev/null) ||
-     [[ ! "$source_head" =~ ^[0-9a-f]{40}$ || ! "$source_tree" =~ ^[0-9a-f]{40}$ ]]; then
-    _agent_canon_json_error source_sync_git_failed "source-sync Git identity is incomplete"
-    return 2
-  fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$git_root" "$remote" "$branch" "$remote_url" "$source_head" "$source_tree"
-}
-
 _agent_canon_source_sync_failure() {
   local code=$1 detail=$2 write_rc=0
   if [[ "${AGENT_CANON_SYNC_SKIP_STATE:-0}" != 1 ]]; then
@@ -303,320 +225,99 @@ _agent_canon_source_sync_failure() {
   _agent_canon_json_error "$code" "$detail"
 }
 
-_agent_canon_install_source_admission() (
-  # Install consumes the caller's checkout.  SourceSync refreshes the exact
-  # remote-tracking ref and admits only an exact commit match; it never
-  # changes the caller's branch, worktree, or generated runtime state.
-  set +e
-  AGENT_CANON_SYNC_SKIP_STATE=1
-  local install_root=${1:-$AGENT_CANON_REPOSITORY_ROOT}
-  local remote=origin branch=main
-  local remote_url source_head source_tree remote_head
-  AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
-  AGENT_CANON_SYNC_REMOTE=$remote
-  AGENT_CANON_SYNC_BRANCH=$branch
-  AGENT_CANON_SYNC_REMOTE_URL=unknown
-  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
-  AGENT_CANON_SYNC_SOURCE_TREE=unknown
-
-  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null); then
-    _agent_canon_source_sync_failure source_sync_git_failed "source checkout HEAD is unavailable"
-    exit 2
-  fi
-  if ! remote_url=$(git -C "$install_root" remote get-url "$remote" 2>/dev/null); then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync remote URL is unavailable"
-    exit 2
-  fi
-  AGENT_CANON_SYNC_REMOTE_URL=$remote_url
-  if ! git -C "$install_root" fetch "$remote" "+refs/heads/$branch:refs/remotes/$remote/$branch"; then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
-    exit 2
-  fi
-  if ! remote_head=$(git -C "$install_root" rev-parse --verify "refs/remotes/$remote/$branch" 2>/dev/null); then
-    _agent_canon_source_sync_failure source_remote_unavailable "fetched source branch is unavailable"
-    exit 2
-  fi
-  [[ "$source_head" =~ ^[0-9a-f]{40}$ && "$remote_head" =~ ^[0-9a-f]{40}$ ]] || {
-    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-    _agent_canon_source_sync_failure source_sync_git_failed "source commit identity is invalid"
-    exit 2
-  }
-  [[ "$source_head" == "$remote_head" ]] || {
-    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-    _agent_canon_source_sync_failure source_sync_commit_mismatch \
-      "source HEAD does not match refs/remotes/origin/main"
-    exit 2
-  }
-  # Tree identity is receipt telemetry only.  It is deliberately not part of
-  # install admission, so an unavailable tree never blocks reconstruction.
-  source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null) || source_tree=unknown
-  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
-  printf 'up_to_date\t%s\t%s\t%s\n' "$source_head" "$source_tree" "$remote_url"
-  exit 0
-)
-
 _agent_canon_sync_operation() (
-  # The source-sync transaction is host-only, so keep its result-state
-  # transition here and never ask the resident Python controller to publish a
-  # second source-sync record.
+  # SourceSync is deliberately a single host transaction.  Git owns source
+  # advancement; resident/image/link failures never roll it back.
   set +e
-  local install_root=${AGENT_CANON_REPOSITORY_ROOT:-} remote=origin branch=main
-  local sync_index=0 sync_before sync_after candidate_commit staging_root sync_rc=0
-  local source_head=unknown source_tree=unknown remote_url=unknown
-  AGENT_CANON_SYNC_SOURCE_ROOT=${AGENT_CANON_REPOSITORY_ROOT:-/}
-  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
-  AGENT_CANON_SYNC_SOURCE_TREE=unknown
-  AGENT_CANON_SYNC_REMOTE=$remote
-  AGENT_CANON_SYNC_REMOTE_URL=$remote_url
-  AGENT_CANON_SYNC_BRANCH=$branch
-
+  local install_root=${AGENT_CANON_REPOSITORY_ROOT:-}
+  local source_before=unknown source_head=unknown source_tree=unknown
+  local sync_code=updated candidate_image_ref candidate_image_id rc=0
+  local sync_index=1 sync_token
   while ((sync_index < ${#command_args[@]})); do
-    case "${command_args[sync_index]}" in
+    sync_token=${command_args[sync_index]}
+    case "$sync_token" in
       sync) ;;
-      --install-root=*) install_root=${command_args[sync_index]#--install-root=} ;;
+      --install-root=*) install_root=${sync_token#--install-root=} ;;
       --install-root)
         ((sync_index += 1))
-        if ((sync_index >= ${#command_args[@]})); then
+        [[ "$sync_index" -lt "${#command_args[@]}" ]] || {
           _agent_canon_source_sync_failure argument_missing "--install-root requires a value"
           exit 2
-        fi
+        }
         install_root=${command_args[sync_index]}
         ;;
-      --remote=*) remote=${command_args[sync_index]#--remote=} ;;
-      --remote)
-        ((sync_index += 1))
-        if ((sync_index >= ${#command_args[@]})); then
-          _agent_canon_source_sync_failure argument_missing "--remote requires a value"
-          exit 2
-        fi
-        remote=${command_args[sync_index]}
-        ;;
-      --branch=*) branch=${command_args[sync_index]#--branch=} ;;
-      --branch)
-        ((sync_index += 1))
-        if ((sync_index >= ${#command_args[@]})); then
-          _agent_canon_source_sync_failure argument_missing "--branch requires a value"
-          exit 2
-        fi
-        branch=${command_args[sync_index]}
-        ;;
       *)
-        _agent_canon_source_sync_failure argument_invalid "unsupported source-sync argument"
+        _agent_canon_source_sync_failure argument_invalid "unsupported sync argument"
         exit 2
         ;;
     esac
     ((sync_index += 1))
   done
-  AGENT_CANON_SYNC_REMOTE=$remote
-  AGENT_CANON_SYNC_BRANCH=$branch
-  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ ]] || {
-    _agent_canon_source_sync_failure argument_invalid "source-sync remote is invalid"
-    exit 2
-  }
-  [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || {
-    _agent_canon_source_sync_failure argument_invalid "source-sync branch is invalid"
-    exit 2
-  }
-  if ! install_root=$(CDPATH= cd -- "$install_root" && pwd -P); then
+  AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
+  AGENT_CANON_SYNC_REMOTE=origin
+  AGENT_CANON_SYNC_BRANCH=main
+  AGENT_CANON_SYNC_REMOTE_URL=unknown
+  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
+  AGENT_CANON_SYNC_SOURCE_TREE=unknown
+  [[ -d "$install_root" && ! -L "$install_root" ]] || {
     _agent_canon_source_sync_failure install_root_invalid "source-sync install root is not a directory"
     exit 2
-  fi
-  AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
-
-  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null); then
-    _agent_canon_source_sync_failure source_sync_git_failed "source checkout HEAD is unavailable"
-    exit 2
-  fi
-  if ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
-    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-    _agent_canon_source_sync_failure source_sync_git_failed "source checkout tree is unavailable"
-    exit 2
-  fi
-  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
-  sync_before=$source_head
-  if ! remote_url=$(git -C "$install_root" remote get-url "$remote" 2>/dev/null); then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync remote URL is unavailable"
-    exit 2
-  fi
-  AGENT_CANON_SYNC_REMOTE_URL=$remote_url
-  if ! git -C "$install_root" fetch "$remote" "+refs/heads/$branch:refs/remotes/$remote/$branch"; then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
-    exit 2
-  fi
-  if ! sync_after=$(git -C "$install_root" rev-parse --verify "$remote/$branch" 2>/dev/null); then
-    _agent_canon_source_sync_failure source_remote_unavailable "fetched source branch is unavailable"
-    exit 2
-  fi
-  [[ "$sync_after" =~ ^[0-9a-f]{40}$ ]] || {
-    _agent_canon_source_sync_failure source_sync_git_failed "fetched source branch identity is invalid"
-    exit 2
   }
-  if [[ "$sync_before" == "$sync_after" ]]; then
-    if ! _agent_canon_source_sync_write success up_to_date "$install_root" \
-      "$source_head" "$source_tree" "$remote" "$remote_url" "$branch" \
-      "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
-      _agent_canon_json_error source_sync_state_write_failed \
-        "source-sync success state could not be atomically published"
-      exit 2
-    fi
-    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"sync","code":"up_to_date","changed":false}\n'
-    exit 0
-  fi
-
-  candidate_commit=$sync_after
-  staging_root="$AGENT_CANON_RUNTIME_ROOT/source-staging/agent-canon"
-  if [[ -e "$staging_root" || -L "$staging_root" ]]; then
-    rm -rf -- "$staging_root"
-  fi
-  if ! mkdir -p "$(dirname "$staging_root")"; then
-    _agent_canon_source_sync_failure source_sync_staging_failed "source-sync staging directory could not be created"
+  source_before=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) || :
+  if ! git -C "$install_root" pull --ff-only origin main; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync pull failed"
     exit 2
   fi
-  if ! git clone --no-hardlinks "$install_root" "$staging_root"; then
-    rm -rf -- "$staging_root"
-    _agent_canon_source_sync_failure source_sync_clone_failed "source-sync candidate clone failed"
-    exit 2
-  fi
-  # A local clone of a shallow source can carry only the checked-out commit;
-  # the freshly fetched remote-tracking candidate may not be present in its
-  # object store. Transport the intended branch into staging from the original
-  # remote before asking Git to detach at the candidate. The live checkout is
-  # not touched by this fetch and remains unchanged until candidate validation
-  # has completed.
-  if ! git -C "$staging_root" fetch --no-tags -- "$remote_url" \
-    "+refs/heads/$branch:refs/remotes/$remote/$branch" >/dev/null; then
-    rm -rf -- "$staging_root"
-    _agent_canon_source_sync_failure source_sync_candidate_fetch_failed \
-      "source-sync candidate fetch failed"
-    exit 2
-  fi
-  if ! git -C "$staging_root" checkout --detach "$candidate_commit" >/dev/null; then
-    rm -rf -- "$staging_root"
-    _agent_canon_source_sync_failure source_sync_git_failed "source-sync candidate checkout failed"
-    exit 2
-  fi
-  if AGENT_CANON_SUPPRESS_GLOBAL_LINKS=1 bootstrap_host_entrypoint "$staging_root" \
-    --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
-    --runtime-root "$AGENT_CANON_RUNTIME_ROOT" update; then
-    :
-  else
-    sync_rc=$?
-    rm -rf -- "$staging_root"
-    _agent_canon_source_sync_failure source_sync_candidate_failed \
-      "source-sync candidate runtime update failed"
-    exit "$sync_rc"
-  fi
-  if ! git -C "$install_root" merge --ff-only "$remote/$branch"; then
-    if ! bootstrap_host_entrypoint "$install_root" \
-      --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
-      --runtime-root "$AGENT_CANON_RUNTIME_ROOT" rollback; then
-      rm -rf -- "$staging_root"
-      _agent_canon_source_sync_failure sync_rollback_failed \
-        "source-sync live merge and resident rollback both failed"
-      exit 2
-    fi
-    rm -rf -- "$staging_root"
-    _agent_canon_source_sync_failure sync_live_merge_failed \
-      "source-sync live source fast-forward failed; resident was restored"
-    exit 2
-  fi
-  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null); then
-    _agent_canon_source_sync_failure source_sync_git_failed "merged source checkout HEAD is unavailable"
-    exit 2
-  fi
-  if ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
-    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-    _agent_canon_source_sync_failure source_sync_git_failed "merged source checkout tree is unavailable"
-    exit 2
-  fi
+  source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) || source_head=unknown
+  source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null) || source_tree=unknown
   AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
   AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
-  # Projection is a live-source operation. The candidate checkout may build
-  # and replace the resident, but it must never leave links pointing into the
-  # ignored staging tree.
-  AGENT_CANON_REPOSITORY_ROOT=$install_root
-  sync_rc=0
-  if _agent_canon_sync_personal_skill_view "$(_agent_canon_container_name)"; then
-    :
-  else
-    sync_rc=$?
-  fi
-  if ((sync_rc == 0)); then
-    _agent_canon_install_global_links || sync_rc=$?
-  fi
-  if ((sync_rc != 0)); then
-    if ! bootstrap_host_entrypoint "$install_root" \
-      --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
-      --runtime-root "$AGENT_CANON_RUNTIME_ROOT" rollback; then
-      rm -rf -- "$staging_root"
-      _agent_canon_source_sync_failure sync_rollback_failed \
-        "source-sync live link projection and resident rollback both failed"
-      exit 2
-    fi
-    rm -rf -- "$staging_root"
-    _agent_canon_source_sync_failure sync_global_links_failed \
-      "source-sync live link projection failed; resident was restored"
-    exit "$sync_rc"
-  fi
-  rm -rf -- "$staging_root"
-  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null); then
-    _agent_canon_source_sync_failure source_sync_git_failed "updated source checkout HEAD is unavailable"
-    exit 2
-  fi
-  if ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
-    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-    _agent_canon_source_sync_failure source_sync_git_failed "updated source checkout tree is unavailable"
-    exit 2
-  fi
-  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
-  if ! _agent_canon_source_sync_write success updated "$install_root" \
-    "$source_head" "$source_tree" "$remote" "$remote_url" "$branch" \
+  [[ "$source_before" == "$source_head" ]] && sync_code=up_to_date
+  if ! _agent_canon_source_sync_write success "$sync_code" "$install_root" \
+    "$source_head" "$source_tree" origin unknown main \
     "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
     _agent_canon_json_error source_sync_state_write_failed \
-      "source-sync updated state could not be atomically published"
+      "source-sync state could not be atomically published"
     exit 2
   fi
-  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"sync","code":"updated","commit":"%s"}\n' \
-    "$candidate_commit"
+  AGENT_CANON_REPOSITORY_ROOT=$install_root
+  unset AGENT_CANON_LOCAL_BUILD
+  _agent_canon_image_reference ""
+  candidate_image_ref=$AGENT_CANON_IMAGE_REF
+  if _agent_canon_image ""; then
+    :
+  else
+    rc=$?
+    ((rc != 0)) || rc=2
+    _agent_canon_source_sync_failure source_image_unavailable \
+      "source advanced but the exact GHCR image could not be pulled"
+    exit "$rc"
+  fi
+  candidate_image_ref=$AGENT_CANON_IMAGE_REF
+  if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+    --format '{{.Id}}' "$candidate_image_ref"); then
+    _agent_canon_source_sync_failure source_image_unavailable \
+      "source advanced but the exact GHCR image could not be inspected"
+    exit 2
+  fi
+  if _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id" update; then
+    :
+  else
+    rc=$?
+    ((rc != 0)) || rc=2
+    _agent_canon_source_sync_failure resident_update_failed \
+      "source advanced but resident replacement failed"
+    exit "$rc"
+  fi
+  # Scheduler rendering is the final host phase.  A missing user manager is a
+  # warning/manual-sync condition and cannot invalidate the source update.
+  if ! _agent_canon_scheduler_locked enable; then
+    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","code":"systemd_user_unavailable","detail":"automatic sync remains manual"}\n' >&2
+  fi
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"sync","code":"%s","commit":"%s"}\n' \
+    "$sync_code" "$source_head"
   exit 0
 )
-
-_agent_canon_with_source_sync_lock() {
-  local lock_path="$AGENT_CANON_RUNTIME_ROOT/host-state/source-sync.lock"
-  local lock_fd rc unlock_rc
-  if [[ -L "$lock_path" ]]; then
-    _agent_canon_json_error source_sync_lock_invalid "source-sync lock is a symlink"
-    return 2
-  fi
-  if ! command -v flock >/dev/null 2>&1; then
-    _agent_canon_json_error source_sync_lock_unavailable "flock is required for source-sync"
-    return 2
-  fi
-  if ! exec {lock_fd}>"$lock_path"; then
-    _agent_canon_json_error source_sync_lock_unavailable "source-sync lock could not be opened"
-    return 2
-  fi
-  if ! flock -x "$lock_fd"; then
-    exec {lock_fd}>&-
-    _agent_canon_json_error source_sync_lock_unavailable "source-sync lock could not be acquired"
-    return 2
-  fi
-  set +e
-  _agent_canon_sync_operation
-  rc=$?
-  set -e
-  unlock_rc=0
-  flock -u "$lock_fd" || unlock_rc=$?
-  exec {lock_fd}>&-
-  if ((rc == 0 && unlock_rc != 0)); then
-    _agent_canon_json_error source_sync_lock_release_failed "source-sync lock could not be released"
-    return 2
-  fi
-  return "$rc"
-}
 
 _agent_canon_control_digest() {
   printf '%s' "$AGENT_CANON_CONTROL_ROOT" | sha256sum | awk '{print $1}'
@@ -648,7 +349,7 @@ _agent_canon_validate_new_path() {
 }
 
 _agent_canon_validate_roots() {
-  local control runtime default_runtime legacy_runtime
+  local control default_runtime
   if ! control=$(realpath -e -- "$AGENT_CANON_CONTROL_ROOT" 2>/dev/null); then
     control=
   fi
@@ -660,20 +361,10 @@ _agent_canon_validate_roots() {
   AGENT_CANON_PRIVATE_LOG_ROOT="$(dirname -- "$AGENT_CANON_REPOSITORY_ROOT")/agent-canon-log"
   _agent_canon_validate_new_path "$default_runtime" "default runtime root"
   _agent_canon_validate_new_path "$AGENT_CANON_PRIVATE_LOG_ROOT" "private log root"
-  runtime=$(realpath -m -- "$AGENT_CANON_RUNTIME_ROOT")
-  legacy_runtime=$(realpath -m -- "$AGENT_CANON_CONTROL_ROOT/workspace/agent-canon-runtime/host")
-  if [[ "$runtime" == "$legacy_runtime" ]]; then
-    # The historical default is migration input only.  New state belongs to
-    # the source-owned runtime and must never be created under workspace/.
-    runtime=$default_runtime
-  fi
-  if [[ "$runtime" != "$default_runtime" ]]; then
-    case "$runtime" in
-      "$control"/*) ;;
-      *) _agent_canon_json_error runtime_root_escape "explicit runtime root must be beneath control parent root" ;;
-    esac
-  fi
-  AGENT_CANON_RUNTIME_ROOT=$runtime
+  # --runtime-root is retained only so older launchers continue to parse.  A
+  # source checkout owns its runtime, and no caller can redirect state into a
+  # workspace or another checkout.
+  AGENT_CANON_RUNTIME_ROOT=$default_runtime
   export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
 }
 
@@ -1430,7 +1121,7 @@ _agent_canon_volume_copy() {
        "$host_path" != *$'\t'* && "$host_path" != *,* ]] ||
       _agent_canon_json_error volume_copy_invalid "volume copy host path is invalid"
   fi
-  [[ "$kind" == source-sync || "$kind" == mount-registry || "$kind" == host-mounts ||
+  [[ "$kind" == mount-registry || "$kind" == host-mounts ||
      "$kind" == private-log || "$kind" == codex-home || "$kind" == projection ||
      "$kind" == skill || "$kind" == eval || "$kind" == private-feedback ]] ||
     _agent_canon_json_error volume_copy_invalid "volume copy kind is not allowlisted"
@@ -1554,7 +1245,6 @@ validate_codex_links() {
 elif [ "$direction" = import ]; then
   input=/agent-canon-copy-input
   case "$kind" in
-    source-sync) destination="$root/source-sync.json"; mode=600; expected=file ;;
     mount-registry) destination="$root/mount-registry.toml"; mode=444; expected=file ;;
     host-mounts) destination="$root/host-mounts.tsv"; mode=600; expected=file ;;
     private-log) destination="$root/private-log"; mode=700; expected=directory ;;
@@ -1691,8 +1381,6 @@ fi' )
 }
 
 _agent_canon_import_host_inputs() {
-  _agent_canon_volume_copy import source-sync \
-    "$AGENT_CANON_RUNTIME_ROOT/source-sync.json"
   _agent_canon_volume_copy import mount-registry \
     "$AGENT_CANON_STATE_ROOT/mounts.toml"
   _agent_canon_volume_copy import host-mounts \
@@ -1792,6 +1480,25 @@ _agent_canon_publish_controller_projection() {
     fi
   done
   rmdir "$staging" 2>/dev/null || true
+}
+
+_agent_canon_sync_personal_skill_view() {
+  # The resident materializer exports one complete skill tree.  Keep the
+  # host-side source directory as the only source for the global directory
+  # link; do not enumerate or validate individual skill links.
+  local container=$1
+  local personal_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal"
+  local exchange_root="$AGENT_CANON_STATE_ROOT/container-runtime"
+  local exported_skills="$exchange_root/skill-projection/.codex/personal/skills"
+  _agent_canon_volume_copy export skill "$exchange_root"
+  [[ -d "$exported_skills" && ! -L "$exported_skills" ]] ||
+    _agent_canon_json_error skill_projection_copy_failed \
+      "resident skill projection is unavailable"
+  mkdir -p "$personal_root"
+  rm -rf -- "$personal_root/skills"
+  mv -- "$exported_skills" "$personal_root/skills" ||
+    _agent_canon_json_error skill_projection_copy_failed \
+      "host personal skill directory could not be published"
 }
 
 _agent_canon_prepare_clean_install() {
@@ -2105,7 +1812,7 @@ _agent_canon_container_exec() {
     "$container" "$@"
 }
 
-_agent_canon_scheduler() {
+_agent_canon_scheduler_locked() {
   local action=${1:-status}
   local service_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
   local service_path=$service_dir/agent-canon-sync.service
@@ -2120,22 +1827,33 @@ _agent_canon_scheduler() {
       service_text=${service_text//@CONTROL_ROOT@/$AGENT_CANON_CONTROL_ROOT}
       service_text=${service_text//@RUNTIME_ROOT@/$AGENT_CANON_RUNTIME_ROOT}
       service_text=${service_text//@INSTALL_ROOT@/$AGENT_CANON_REPOSITORY_ROOT}
-      service_text=${service_text//@REMOTE@/origin}
-      service_text=${service_text//@BRANCH@/main}
       timer_text=${timer_text//@ON_BOOT@/300}
       timer_text=${timer_text//@INTERVAL@/900}
       printf '%s\n' "$service_text" > "$service_path"
       printf '%s\n' "$timer_text" > "$timer_path"
-      systemctl --user daemon-reload
-      systemctl --user enable --now agent-canon-sync.timer
+      if ! command -v systemctl >/dev/null 2>&1 ||
+         ! systemctl --user daemon-reload >/dev/null 2>&1 ||
+         ! systemctl --user enable --now agent-canon-sync.timer >/dev/null 2>&1; then
+        printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"scheduler","code":"systemd_user_unavailable","detail":"automatic sync remains manual"}\n' >&2
+        return 0
+      fi
       printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"scheduler","code":"scheduler_enabled"}\n'
       ;;
     disable)
-      systemctl --user disable --now agent-canon-sync.timer
+      if ! command -v systemctl >/dev/null 2>&1 ||
+         ! systemctl --user disable --now agent-canon-sync.timer >/dev/null 2>&1; then
+        printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"scheduler","code":"systemd_user_unavailable","detail":"automatic sync remains manual"}\n' >&2
+        return 0
+      fi
       printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"scheduler","code":"scheduler_disabled"}\n'
       ;;
     status)
-      systemctl --user show agent-canon-sync.timer --property=ActiveState,UnitFileState
+      if ! command -v systemctl >/dev/null 2>&1; then
+        printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"scheduler","code":"systemd_user_unavailable"}\n'
+        return 0
+      fi
+      systemctl --user show agent-canon-sync.timer --property=ActiveState,UnitFileState ||
+        printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"scheduler","code":"systemd_user_unavailable"}\n'
       ;;
     uninstall)
       if ! systemctl --user disable --now agent-canon-sync.timer 2>/dev/null; then
@@ -2151,6 +1869,15 @@ _agent_canon_scheduler() {
       _agent_canon_json_error unsupported_operation "unsupported scheduler operation: $action"
       ;;
   esac
+}
+
+_agent_canon_scheduler() {
+  local action=${1:-status}
+  if [[ "$action" == status ]]; then
+    _agent_canon_scheduler_locked "$action"
+    return $?
+  fi
+  _agent_canon_with_replacement_lock _agent_canon_scheduler_locked "$action"
 }
 
 _agent_canon_image_reference() {
@@ -2477,7 +2204,7 @@ _agent_canon_write_rollback_plan() {
     printf 'image-id\t%s\n' "$image_id"
     printf 'image-ref\t%s\n' "$rollback_ref"
     printf 'mount\tmount\t%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION"
-    printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION"
+    printf 'mount\tmount\t%s\t%s\tfalse\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync" "$AGENT_CANON_SOURCE_SYNC_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION"
     if [[ -f "$AGENT_CANON_STATE_ROOT/mounts.tsv" && ! -L "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]]; then
@@ -2547,7 +2274,7 @@ _agent_canon_read_rollback_plan() {
       mount)
         [[ "$value" == mount && -n "$source" && "$source" = /* && ! -L "$source" &&
            ( -d "$source" ||
-             ("$destination" == "$AGENT_CANON_SOURCE_SYNC_DESTINATION" && -f "$source") ||
+             ("$destination" == "$AGENT_CANON_SOURCE_SYNC_DESTINATION" && -d "$source") ||
              ("$destination" == "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION" && -f "$source") ) &&
            -n "$destination" && ("$ro" == true || "$ro" == false) ]] ||
           _agent_canon_json_error rollback_plan_invalid "rollback plan mount is invalid"
@@ -2655,6 +2382,10 @@ _agent_canon_validate_existing_container() {
     return 2
   fi
   printf 'volume:%s\t%s\ttrue\n' "$state_volume" "$AGENT_CANON_VOLUME_DESTINATION" > "$expected_mounts"
+  if [[ "$require_source_sync" == 1 ]]; then
+    printf '%s\t%s\tfalse\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync" \
+      "$AGENT_CANON_SOURCE_SYNC_DESTINATION" >> "$expected_mounts"
+  fi
   if [[ -f "$mount_manifest" && ! -L "$mount_manifest" ]]; then
     local kind digest source destination mode
     while IFS=$'\t' read -r kind digest source destination mode; do
@@ -2773,6 +2504,7 @@ _agent_canon_ensure_container() {
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$(_agent_canon_control_digest)" \
       --mount "type=volume,src=$AGENT_CANON_STATE_VOLUME_NAME,dst=$AGENT_CANON_VOLUME_DESTINATION" \
+      --mount "type=bind,src=$AGENT_CANON_RUNTIME_ROOT/source-sync,dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly" \
       "${target_mount_args[@]}" \
       "$AGENT_CANON_IMAGE_REF" >/dev/null; then
       _agent_canon_json_error candidate_ensure_failed "resident container could not be created"
@@ -2829,63 +2561,6 @@ _agent_canon_run_controller() {
   cat "$error_file" >&2
   rm -f -- "$output_file" "$error_file"
   return "$rc"
-}
-
-_agent_canon_sync_personal_skill_view() {
-  local _container=$1
-  local source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills"
-  local expected_skill="$source_root/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME/SKILL.md"
-  local staging_root="$AGENT_CANON_STATE_ROOT/container-runtime/skill-projection"
-  local staging_skills="$staging_root/.codex/personal/skills"
-  _agent_canon_volume_copy export skill "$AGENT_CANON_STATE_ROOT/container-runtime"
-  if [[ "$staging_root" != "$AGENT_CANON_STATE_ROOT/container-runtime/skill-projection" ]]; then
-    _agent_canon_json_error skill_projection_path_invalid "skill projection staging path is invalid"
-    return 2
-  fi
-  if [[ -L "$AGENT_CANON_STATE_ROOT/container-runtime" ]]; then
-    _agent_canon_json_error skill_projection_path_invalid "skill projection exchange is a symlink"
-    return 2
-  fi
-  if [[ -L "$source_root" ]]; then
-    _agent_canon_json_error skill_projection_path_invalid "personal skill source is a symlink"
-    return 2
-  fi
-  if [[ ! -d "$staging_skills" || -L "$staging_skills" ]]; then
-    _agent_canon_json_error skill_projection_copy_failed \
-      "resident personal skill view was not materialized"
-    return 2
-  fi
-  if find "$staging_skills" -type l -print -quit | grep -q .; then
-    _agent_canon_json_error skill_projection_copy_failed \
-      "resident personal skill view contains a symlink"
-    return 2
-  fi
-  if ! find "$staging_skills" -type f -name SKILL.md -print -quit | grep -q .; then
-    _agent_canon_json_error skill_projection_copy_failed \
-      "resident personal skill view contains no generated skills"
-    return 2
-  fi
-  if ! mkdir -p -- "$source_root"; then
-    _agent_canon_json_error skill_projection_copy_failed \
-      "host personal skill view could not be created"
-    return 2
-  fi
-  if ! cp -a -- "$staging_skills/." "$source_root/"; then
-    _agent_canon_json_error skill_projection_copy_failed \
-      "host personal skill view could not be published"
-    return 2
-  fi
-  if [[ -z "$(find "$source_root" -type f -name SKILL.md -print -quit)" ]]; then
-    _agent_canon_json_error skill_projection_copy_failed \
-      "host personal skill view readback is missing"
-    return 2
-  fi
-  if [[ ! -f "$expected_skill" || -L "$expected_skill" ]]; then
-    _agent_canon_json_error skill_projection_copy_failed \
-      "host empirical prompt skill view readback is missing"
-    return 2
-  fi
-  return 0
 }
 
 _agent_canon_restore_candidate_failure() {
@@ -3332,7 +3007,7 @@ _agent_canon_replace_resident_locked() {
       rc=$?
     fi
   fi
-  if ((rc == 0)) && [[ -n "${AGENT_CANON_REPOSITORY_ROOT:-}" ]]; then
+  if ((rc == 0)); then
     if _agent_canon_sync_personal_skill_view "$candidate"; then
       :
     else
@@ -3669,6 +3344,30 @@ _agent_canon_install_locked() {
   # named resident after ownership readback, then clear generated state before
   # building the candidate.  The EXIT trap restores the captured state if any
   # later phase fails.
+  local source_before source_head source_tree sync_code=updated
+  AGENT_CANON_SYNC_SOURCE_ROOT=$AGENT_CANON_REPOSITORY_ROOT
+  AGENT_CANON_SYNC_REMOTE=origin
+  AGENT_CANON_SYNC_BRANCH=main
+  AGENT_CANON_SYNC_REMOTE_URL=unknown
+  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
+  AGENT_CANON_SYNC_SOURCE_TREE=unknown
+  source_before=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
+  if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" pull --ff-only origin main; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync pull failed"
+    return 2
+  fi
+  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || source_head=unknown
+  source_tree=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD^{tree} 2>/dev/null) || source_tree=unknown
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  [[ "$source_before" == "$source_head" ]] && sync_code=up_to_date
+  _agent_canon_source_sync_write success "$sync_code" "$AGENT_CANON_REPOSITORY_ROOT" \
+    "$source_head" "$source_tree" origin unknown main \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" || {
+      _agent_canon_json_error source_sync_state_write_failed \
+        "source-sync state could not be atomically published"
+      return 2
+    }
   local old_container=$(_agent_canon_container_name)
   local old_container_id= old_image_ref= old_image_id=
   local old_container_present=0
@@ -4091,6 +3790,9 @@ _agent_canon_remove_global_links() {
   local home_root
   home_root=$(realpath -e -- "$HOME")
   [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
+  local skills_link="$home_root/.agents/skills"
+  # The manifest owns the complete directory link. Never traverse it while
+  # removing legacy per-skill records: doing so would delete canonical source.
   local manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
   [[ -f "$manifest" && ! -L "$manifest" ]] || return 0
   local key target source mode digest resolved config_tmp
@@ -4101,6 +3803,7 @@ _agent_canon_remove_global_links() {
         [[ "$target" == agent-canon.global-links.v1 && -z "$source$mode$digest" ]] ||
           _agent_canon_json_error global_links_manifest_invalid "global link manifest schema is invalid" ;;
       link)
+        [[ "$target" != "$skills_link"/* ]] || continue
         [[ -L "$target" && -n "$source" && -z "$mode$digest" ]] || continue
         resolved=$(readlink -f -- "$target" 2>/dev/null || printf '')
         if [[ "$resolved" == "$source" ]]; then
@@ -4127,124 +3830,57 @@ _agent_canon_remove_global_links() {
   fi
 }
 
-_agent_canon_migrate_legacy_prompt_skill() {
-  # This is deliberately an exact path operation.  Do not enumerate the
-  # user's .codex/skills tree: .system and every other entry are foreign to
-  # this migration and must remain untouched.
-  local home_root codex_home legacy_skills legacy skill_file canonical_link canonical_source
-  local observed expected_entry owner_uid
-  home_root=$(realpath -e -- "$HOME")
-  [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
-  codex_home="$home_root/.codex"
-  if [[ -L "$codex_home" || ( -e "$codex_home" && ! -d "$codex_home" ) ]]; then
-    _agent_canon_json_error legacy_skill_collision \
-      "global Codex home is not a regular directory: $codex_home"
-    return 2
-  fi
-  [[ -d "$codex_home" ]] || return 0
-  legacy_skills="$codex_home/skills"
-  legacy="$legacy_skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
-  if [[ ! -e "$legacy" && ! -L "$legacy" ]]; then
-    return 0
-  fi
-  if [[ ! -d "$legacy_skills" || -L "$legacy_skills" ]]; then
-    _agent_canon_json_error legacy_skill_collision \
-      "legacy Codex skills directory is not regular: $legacy_skills"
-    return 2
-  fi
-  if [[ ! -d "$legacy" || -L "$legacy" ]]; then
-    _agent_canon_json_error legacy_skill_collision \
-      "legacy skill path is not a regular directory: $legacy"
-    return 2
-  fi
-  if [[ ! -f "$legacy/SKILL.md" || -L "$legacy/SKILL.md" ]]; then
-    _agent_canon_json_error legacy_skill_shape_mismatch \
-      "legacy skill must contain one regular SKILL.md: $legacy"
-    return 2
-  fi
-  expected_entry=$(find "$legacy" -mindepth 1 -maxdepth 1 -printf '%f\n')
-  if [[ "$expected_entry" != SKILL.md ]]; then
-    _agent_canon_json_error legacy_skill_shape_mismatch \
-      "legacy skill must contain exactly one regular SKILL.md: $legacy"
-    return 2
-  fi
-  owner_uid=$(id -u)
-  if [[ "$(stat -c '%u' -- "$legacy_skills")" != "$owner_uid" ||
-        "$(stat -c '%u' -- "$legacy")" != "$owner_uid" ||
-        "$(stat -c '%u' -- "$legacy/SKILL.md")" != "$owner_uid" ]]; then
-    _agent_canon_json_error legacy_skill_ownership_mismatch \
-      "legacy skill is not owned by the current user: $legacy"
-    return 2
-  fi
-  observed=$(_agent_canon_sha256 "$legacy/SKILL.md")
-  if [[ "$observed" != "$AGENT_CANON_LEGACY_PROMPT_SKILL_SHA256" ]]; then
-    _agent_canon_json_error legacy_skill_digest_mismatch \
-      "legacy prompt skill content differs from the authorized source: $legacy/SKILL.md"
-    return 2
-  fi
-
-  canonical_source="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
-  canonical_link="$home_root/.agents/skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
-  if [[ ! -L "$canonical_link" ||
-        "$(readlink -f -- "$canonical_link" 2>/dev/null || printf '')" != "$(realpath -e -- "$canonical_source")" ||
-        ! -d "$canonical_source" || -L "$canonical_source" ||
-        ! -f "$canonical_source/SKILL.md" || -L "$canonical_source/SKILL.md" ]]; then
-    _agent_canon_json_error legacy_skill_link_readback_failed \
-      "managed canonical skill link was not read back: $canonical_link"
-    return 2
-  fi
-
-  if ! rm -rf -- "$legacy"; then
-    _agent_canon_json_error legacy_skill_migration_failed \
-      "legacy prompt skill directory could not be removed: $legacy"
-    return 2
-  fi
-  if [[ -e "$legacy" || -L "$legacy" ]]; then
-    _agent_canon_json_error legacy_skill_migration_failed \
-      "legacy prompt skill directory remains after migration: $legacy"
-    return 2
-  fi
-}
-
 _agent_canon_install_global_links() {
   local home_root
   home_root=$(realpath -e -- "$HOME")
   [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
   local codex_home="$home_root/.codex"
-  if [[ -L "$codex_home" || ( -e "$codex_home" && ! -d "$codex_home" ) ]]; then
-    _agent_canon_json_error global_link_collision \
-      "global Codex home is not a regular directory: $codex_home"
-    return 2
-  fi
   local source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal"
-  local skill_source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills"
+  local skill_source_root="$source_root/skills"
   local manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
-  local config_target="$home_root/.codex/config.toml"
+  local config_target="$codex_home/config.toml"
   local config_source="$source_root/config.toml"
+  local skills_link="$home_root/.agents/skills"
   local link source resolved mode digest
-  local failures=()
-  mkdir -p "$home_root/.agents/skills" "$home_root/.codex/agents" "$source_root"
+  mkdir -p "$home_root/.agents" "$codex_home/agents" "$source_root" "$skill_source_root"
   : > "$manifest"
   printf 'schema\tagent-canon.global-links.v1\n' >> "$manifest"
+
+  # AgentCanon owns the complete skills view. Replace the old per-skill farm as
+  # one path, so stale links cannot block a successful source pull.
+  if [[ -e "$skills_link" || -L "$skills_link" ]]; then
+    rm -rf -- "$skills_link"
+  fi
+  ln -s -- "$skill_source_root" "$skills_link"
+  printf 'link\t%s\t%s\n' "$skills_link" "$skill_source_root" >> "$manifest"
+
+  # A personal config is the one remaining file view.  Preserve it only when
+  # the AgentCanon source has not been created yet; thereafter the source file
+  # is canonical and the target is recreated as its symlink.
   if [[ -e "$config_target" || -L "$config_target" ]]; then
     resolved=$(readlink -f -- "$config_target" 2>/dev/null || printf '')
-    if [[ -L "$config_target" && "$resolved" == "$config_source" ]]; then
-      mode=$(stat -c '%a' -- "$config_source")
+    if [[ -L "$config_target" && "$resolved" != "$(realpath -m -- "$config_source")" ]]; then
+      _agent_canon_json_error config_link_collision \
+        "global Codex config is a foreign symlink: $config_target"
+      return 2
     elif [[ -L "$config_target" ]]; then
-      failures+=("$config_target")
+      mode=$(stat -c '%a' -- "$config_source")
     elif [[ -f "$config_target" ]]; then
-      if [[ -e "$config_source" && ! -f "$config_source" ]]; then
-        failures+=("$config_target")
-      else
-        if ! cp --preserve=mode,timestamps -- "$config_target" "$config_source"; then
-          failures+=("$config_target")
-        fi
+      if [[ ! -e "$config_source" ]]; then
+        cp --preserve=mode,timestamps -- "$config_target" "$config_source" || {
+          _agent_canon_json_error global_link_install_failed \
+            "personal Codex config could not be copied into AgentCanon source"
+          return 2
+        }
         mode=$(stat -c '%a' -- "$config_target")
-        rm -f -- "$config_target"
-        ln -s -- "$config_source" "$config_target"
       fi
+      rm -rf -- "$config_target"
+      ln -s -- "$config_source" "$config_target"
     else
-      failures+=("$config_target")
+      rm -rf -- "$config_target"
+      [[ -f "$config_source" ]] || printf '# AgentCanon personal Codex configuration.\n' > "$config_source"
+      mode=$(stat -c '%a' -- "$config_source")
+      ln -s -- "$config_source" "$config_target"
     fi
   else
     if [[ ! -f "$config_source" ]]; then
@@ -4258,47 +3894,152 @@ _agent_canon_install_global_links() {
     digest=$(_agent_canon_sha256 "$config_source")
     printf 'config\t%s\t%s\t%s\t%s\n' "$config_target" "$config_source" "$mode" "$digest" >> "$manifest"
   fi
-  for source in "$skill_source_root"/*; do
-    [[ -d "$source" && ! -L "$source" ]] || continue
-    link="$home_root/.agents/skills/${source##*/}"
-    if [[ -L "$link" ]]; then
-      resolved=$(readlink -f -- "$link" 2>/dev/null || printf '')
-      [[ "$resolved" == "$(realpath -e -- "$source")" ]] || { failures+=("$link"); continue; }
-    elif [[ -e "$link" ]]; then
-      failures+=("$link")
-      continue
-    else
-      ln -s -- "$source" "$link"
-    fi
-    printf 'link\t%s\t%s\n' "$link" "$source" >> "$manifest"
-  done
   for source in "$AGENT_CANON_REPOSITORY_ROOT/.codex/agents"/*.toml; do
     [[ -f "$source" && ! -L "$source" ]] || continue
     link="$home_root/.codex/agents/${source##*/}"
     if [[ -L "$link" ]]; then
       resolved=$(readlink -f -- "$link" 2>/dev/null || printf '')
-      [[ "$resolved" == "$(realpath -e -- "$source")" ]] || { failures+=("$link"); continue; }
+      [[ "$resolved" == "$(realpath -e -- "$source")" ]] || continue
     elif [[ -e "$link" ]]; then
-      failures+=("$link")
       continue
     else
       ln -s -- "$source" "$link"
     fi
     printf 'link\t%s\t%s\n' "$link" "$source" >> "$manifest"
   done
-  if ((${#failures[@]})); then
-    _agent_canon_json_error global_link_collision "global link install preserved collisions: ${failures[*]}"
+}
+
+_agent_canon_uninstall_locked() {
+  local container=$(_agent_canon_container_name)
+  local image_ref image_owner state_root
+  image_ref=
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
+    _agent_canon_use_active_image "$container"
+    image_ref=$AGENT_CANON_IMAGE_REF
+    image_ref=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+      --format '{{.Config.Image}}' "$container" 2>/dev/null || printf '')
+    if [[ -n "${AGENT_CANON_ACTIVE_IMAGE_ID:-}" ]]; then
+      _agent_canon_validate_existing_container "$container" \
+        "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0
+    fi
+    "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$container" >/dev/null
+    "$AGENT_CANON_DOCKER_CMD" rm "$container" >/dev/null
+  elif [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]]; then
+    _agent_canon_read_active_image
+    image_ref=$AGENT_CANON_IMAGE_REF
   fi
-  local prompt_source="$skill_source_root/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
-  local prompt_link="$home_root/.agents/skills/$AGENT_CANON_LEGACY_PROMPT_SKILL_NAME"
-  if [[ -d "$prompt_source" && ! -L "$prompt_source" ]] &&
-     [[ ! -L "$prompt_link" ||
-        "$(readlink -f -- "$prompt_link" 2>/dev/null || printf '')" != "$(realpath -e -- "$prompt_source")" ]]; then
-    _agent_canon_json_error legacy_skill_link_readback_failed \
-      "managed canonical prompt skill link was not read back: $prompt_link"
-    return 2
+  image_owner=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+    --format '{{index .Config.Labels "io.agent-canon.control-root-digest"}}' \
+    "$image_ref" 2>/dev/null || printf '')
+  if [[ "$image_owner" == "$(_agent_canon_control_digest)" ]]; then
+    "$AGENT_CANON_DOCKER_CMD" image rm "$image_ref" >/dev/null ||
+      _agent_canon_json_error uninstall_image_remove_failed "Docker could not remove the owned image"
   fi
-  _agent_canon_migrate_legacy_prompt_skill
+  local state_volume="agent-canon-runtime-$(_agent_canon_control_digest)"
+  local volume_owner
+  if volume_owner=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
+    --format '{{index .Labels "io.agent-canon.control-root-digest"}}' \
+    "$state_volume" 2>/dev/null); then
+    [[ "$volume_owner" == "$(_agent_canon_control_digest)" ]] ||
+      _agent_canon_json_error uninstall_volume_ownership_mismatch \
+        "controller state volume is owned by another control root"
+    "$AGENT_CANON_DOCKER_CMD" volume rm "$state_volume" >/dev/null ||
+      _agent_canon_json_error uninstall_volume_remove_failed \
+        "Docker could not remove the owned controller state volume"
+  fi
+  _agent_canon_remove_global_links
+  state_root="$AGENT_CANON_RUNTIME_ROOT/container-state"
+  [[ ! -d "$state_root" || -L "$state_root" ]] || rm -rf -- "$state_root"
+  [[ ! -d "$AGENT_CANON_RUNTIME_ROOT/host-state" || -L "$AGENT_CANON_RUNTIME_ROOT/host-state" ]] ||
+    rm -rf -- "$AGENT_CANON_RUNTIME_ROOT/host-state"
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"uninstall","code":"owned_resources_released","container":"%s"}\n' "$container"
+}
+
+_agent_canon_rollback_locked() {
+  local rollback_image_id rollback_image_ref current_image_ref current_image_id rollback_container rollback_candidate rollback_rc=0
+  local current_mounts_backup
+  rollback_container=$(_agent_canon_container_name)
+  _agent_canon_read_rollback_plan
+  [[ -f "$AGENT_CANON_STATE_ROOT/mounts.tsv" && ! -L "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]] ||
+    _agent_canon_json_error rollback_target_manifest_missing "current target mount manifest is unavailable"
+  current_mounts_backup=$(mktemp "$AGENT_CANON_STATE_ROOT/.rollback-current-mounts.XXXXXX")
+  cp -- "$AGENT_CANON_STATE_ROOT/mounts.tsv" "$current_mounts_backup"
+  rollback_image_id=$AGENT_CANON_ROLLBACK_IMAGE_ID
+  rollback_image_ref=$AGENT_CANON_ROLLBACK_IMAGE_REF
+  _agent_canon_use_active_image "$rollback_container"
+  current_image_ref=$AGENT_CANON_IMAGE_REF
+  current_image_id=$AGENT_CANON_ACTIVE_IMAGE_ID
+  if [[ -n "$current_image_id" ]]; then
+    AGENT_CANON_IMAGE_REF=$current_image_ref
+    export AGENT_CANON_IMAGE_REF
+    _agent_canon_validate_existing_container "$rollback_container" \
+      "$AGENT_CANON_STATE_ROOT/mounts.tsv"
+    "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$rollback_container" >/dev/null ||
+      _agent_canon_json_error rollback_failed "current resident could not be stopped"
+    "$AGENT_CANON_DOCKER_CMD" rm "$rollback_container" >/dev/null ||
+      _agent_canon_json_error rollback_failed "current resident could not be removed"
+  fi
+  [[ -n "$current_image_id" ]] ||
+    _agent_canon_json_error rollback_unavailable "current resident is missing"
+  AGENT_CANON_IMAGE_REF=$rollback_image_id
+  AGENT_CANON_EXPECTED_IMAGE_ID=$rollback_image_id
+  export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
+  rollback_candidate=$(_agent_canon_ensure_container) ||
+    _agent_canon_json_error rollback_failed "previous resident could not be started"
+  AGENT_CANON_CURRENT_IMAGE_ID=$current_image_id
+  AGENT_CANON_CURRENT_IMAGE_REF=$current_image_ref
+  AGENT_CANON_RESTORE_IMAGE_ID=$rollback_image_id
+  AGENT_CANON_RESTORE_IMAGE_REF=$rollback_image_ref
+  AGENT_CANON_ROLLBACK_MOUNTS_FILE="$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv"
+  export AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF \
+    AGENT_CANON_RESTORE_IMAGE_ID AGENT_CANON_RESTORE_IMAGE_REF AGENT_CANON_ROLLBACK_MOUNTS_FILE
+  if ! _agent_canon_run_controller "$rollback_candidate" rollback >/dev/null; then
+    unset AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF \
+      AGENT_CANON_RESTORE_IMAGE_ID AGENT_CANON_RESTORE_IMAGE_REF
+    AGENT_CANON_ROLLBACK_MOUNTS_FILE="$AGENT_CANON_STATE_ROOT/mounts.tsv"
+    AGENT_CANON_RESTORE_TARGETS_FILE="$AGENT_CANON_STATE_ROOT/mounts.tsv"
+    AGENT_CANON_CURRENT_IMAGE_ID=$current_image_id
+    export AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE AGENT_CANON_CURRENT_IMAGE_ID
+    _agent_canon_restore_candidate_failure "$rollback_candidate" "$current_image_id" "$rollback_image_id" ||
+      _agent_canon_json_error rollback_failed "rollback state transition and current resident restoration failed"
+    unset AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE
+    rm -f -- "$current_mounts_backup"
+    _agent_canon_json_error rollback_failed "rollback state transition failed after previous resident creation"
+  fi
+  _agent_canon_publish_controller_projection ||
+    _agent_canon_json_error rollback_failed "rollback manifest projection failed"
+  unset AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF \
+    AGENT_CANON_RESTORE_IMAGE_ID AGENT_CANON_RESTORE_IMAGE_REF
+  AGENT_CANON_IMAGE_REF=$rollback_image_id
+  export AGENT_CANON_IMAGE_REF
+  if ! _agent_canon_validate_existing_container "$rollback_candidate" \
+    "$AGENT_CANON_STATE_ROOT/mounts.tsv"; then
+    AGENT_CANON_ROLLBACK_MOUNTS_FILE="$current_mounts_backup"
+    AGENT_CANON_RESTORE_TARGETS_FILE="$AGENT_CANON_STATE_ROOT/mounts.tsv"
+    AGENT_CANON_CURRENT_IMAGE_ID=$current_image_id
+    export AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE AGENT_CANON_CURRENT_IMAGE_ID
+    _agent_canon_restore_candidate_failure "$rollback_candidate" "$current_image_id" "$rollback_image_id" ||
+      _agent_canon_json_error rollback_failed "rollback mount readback and current resident restoration failed"
+    unset AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE
+    rm -f -- "$current_mounts_backup"
+    _agent_canon_json_error rollback_failed "rollback resident mount readback failed"
+  fi
+  _agent_canon_run_controller "$rollback_candidate" start >/dev/null || rollback_rc=1
+  ((rollback_rc == 0)) && _agent_canon_record_active_container "$rollback_candidate" || rollback_rc=$?
+  if ((rollback_rc != 0)); then
+    AGENT_CANON_IMAGE_REF=$current_image_id
+    AGENT_CANON_ROLLBACK_MOUNTS_FILE="$current_mounts_backup"
+    AGENT_CANON_RESTORE_TARGETS_FILE="$AGENT_CANON_STATE_ROOT/mounts.tsv"
+    AGENT_CANON_CURRENT_IMAGE_ID=$current_image_id
+    export AGENT_CANON_IMAGE_REF AGENT_CANON_ROLLBACK_MOUNTS_FILE \
+      AGENT_CANON_RESTORE_TARGETS_FILE AGENT_CANON_CURRENT_IMAGE_ID
+    _agent_canon_restore_candidate_failure "$rollback_candidate" "$current_image_id" "$rollback_image_id" ||
+      _agent_canon_json_error rollback_failed "previous and current resident restoration failed"
+  fi
+  rm -f -- "$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv" "$current_mounts_backup"
+  unset AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE \
+    AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"rollback","code":"previous_generation_restored"}\n'
 }
 
 bootstrap_host_entrypoint() {
@@ -4366,35 +4107,25 @@ bootstrap_host_entrypoint() {
   [[ ${#command_args[@]} -gt 0 ]] || { _agent_canon_usage >&2; return 64; }
   local operation=${command_args[0]} image_ref= local_build=0
   if [[ "$operation" == sync ]]; then
-    local sync_request sync_request_rc
-    if sync_request=$(_agent_canon_sync_request_metadata); then
-      :
-    else
-      sync_request_rc=$?
-      return "$sync_request_rc"
+    local sync_root_index=1
+    while ((sync_root_index < ${#command_args[@]})); do
+      case "${command_args[sync_root_index]}" in
+        --install-root=*) repository_request=${command_args[sync_root_index]#--install-root=} ;;
+        --install-root)
+          ((sync_root_index += 1))
+          [[ "$sync_root_index" -lt "${#command_args[@]}" ]] ||
+            _agent_canon_json_error argument_missing "--install-root requires a value"
+          repository_request=${command_args[sync_root_index]}
+          ;;
+      esac
+      ((sync_root_index += 1))
+    done
+    if ! AGENT_CANON_REPOSITORY_ROOT=$(CDPATH= cd -- "$repository_request" && pwd -P); then
+      _agent_canon_json_error repository_root_invalid "sync install root is not an existing directory"
     fi
-    local sync_root sync_remote sync_branch sync_remote_url sync_head sync_tree
-    IFS=$'\t' read -r sync_root sync_remote sync_branch sync_remote_url sync_head sync_tree <<<"$sync_request"
-    AGENT_CANON_REPOSITORY_ROOT=$sync_root
-    AGENT_CANON_SYNC_INITIAL_REMOTE=$sync_remote
-    AGENT_CANON_SYNC_INITIAL_BRANCH=$sync_branch
-    AGENT_CANON_SYNC_INITIAL_REMOTE_URL=$sync_remote_url
-    AGENT_CANON_SYNC_INITIAL_HEAD=$sync_head
-    AGENT_CANON_SYNC_INITIAL_TREE=$sync_tree
   fi
   [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
   _agent_canon_validate_roots
-  local source_sync_alignment=
-  if [[ "$operation" == install ]]; then
-    local source_sync_rc
-    if source_sync_alignment=$(_agent_canon_install_source_admission \
-      "$AGENT_CANON_REPOSITORY_ROOT"); then
-      :
-    else
-      source_sync_rc=$?
-      return "$source_sync_rc"
-    fi
-  fi
   AGENT_CANON_DOCKER_CMD=${AGENT_CANON_DOCKER:-docker}
   export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
   if ! command -v "$AGENT_CANON_DOCKER_CMD" >/dev/null 2>&1 &&
@@ -4419,17 +4150,6 @@ bootstrap_host_entrypoint() {
     return $?
   fi
   _agent_canon_prepare_host_runtime
-  if [[ -n "$source_sync_alignment" ]]; then
-    local source_sync_code source_sync_head source_sync_tree source_sync_remote_url
-    IFS=$'\t' read -r source_sync_code source_sync_head source_sync_tree source_sync_remote_url \
-      <<<"$source_sync_alignment"
-    if ! _agent_canon_source_sync_write success "$source_sync_code" \
-      "$AGENT_CANON_REPOSITORY_ROOT" "$source_sync_head" "$source_sync_tree" origin \
-      "$source_sync_remote_url" main "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
-      _agent_canon_json_error source_sync_state_write_failed \
-        "aligned source-sync state could not be atomically published"
-    fi
-  fi
   if [[ "$operation" == update ]]; then
     # mounts.tsv is the host-owned projection consumed before the resident
     # controller runs.  Drop only syntactically valid target rows whose
@@ -4497,7 +4217,8 @@ bootstrap_host_entrypoint() {
       if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
         _agent_canon_use_active_image "$container"
         current_ref=$AGENT_CANON_IMAGE_REF
-        _agent_canon_validate_existing_container "$container"
+        _agent_canon_validate_existing_container "$container" \
+          "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0
         if ! _agent_canon_run_controller "$container" stop >/dev/null; then
           _agent_canon_json_error stop_state_transition_failed "resident state could not enter stopped state"
         fi
@@ -4515,67 +4236,8 @@ bootstrap_host_entrypoint() {
       return 0
       ;;
     uninstall)
-      local container=$(_agent_canon_container_name)
-      local image_ref image_owner state_root
-      image_ref=
-      if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
-        _agent_canon_use_active_image "$container"
-        image_ref=$AGENT_CANON_IMAGE_REF
-        if ! image_ref=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-          --format '{{.Config.Image}}' "$container" 2>/dev/null); then
-          image_ref=
-        fi
-        if [[ -n "${AGENT_CANON_ACTIVE_IMAGE_ID:-}" ]]; then
-          _agent_canon_validate_existing_container "$container"
-        fi
-        "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$container" >/dev/null
-        "$AGENT_CANON_DOCKER_CMD" rm "$container" >/dev/null
-      elif [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]]; then
-        _agent_canon_read_active_image
-        image_ref=$AGENT_CANON_IMAGE_REF
-      fi
-      if ! image_owner=$("$AGENT_CANON_DOCKER_CMD" image inspect \
-        --format '{{index .Config.Labels "io.agent-canon.control-root-digest"}}' \
-        "$image_ref" 2>/dev/null); then
-        image_owner=
-      fi
-      if [[ "$image_owner" == "$(_agent_canon_control_digest)" ]]; then
-        if ! "$AGENT_CANON_DOCKER_CMD" image rm "$image_ref" >/dev/null; then
-          _agent_canon_json_error uninstall_image_remove_failed "Docker could not remove the owned image"
-        fi
-      fi
-      local state_volume="agent-canon-runtime-$(_agent_canon_control_digest)"
-      local volume_owner
-      if volume_owner=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
-        --format '{{index .Labels "io.agent-canon.control-root-digest"}}' \
-        "$state_volume" 2>/dev/null); then
-        [[ "$volume_owner" == "$(_agent_canon_control_digest)" ]] ||
-          _agent_canon_json_error uninstall_volume_ownership_mismatch \
-            "controller state volume is owned by another control root"
-        if ! "$AGENT_CANON_DOCKER_CMD" volume rm "$state_volume" >/dev/null; then
-          _agent_canon_json_error uninstall_volume_remove_failed \
-            "Docker could not remove the owned controller state volume"
-        fi
-        if "$AGENT_CANON_DOCKER_CMD" volume inspect "$state_volume" >/dev/null 2>&1; then
-          _agent_canon_json_error uninstall_volume_remove_failed \
-            "owned controller state volume remains after removal"
-        fi
-      fi
-      if _agent_canon_remove_global_links; then
-        :
-      else
-        local link_cleanup_rc=$?
-        return "$link_cleanup_rc"
-      fi
-      state_root="$AGENT_CANON_RUNTIME_ROOT/container-state"
-      if [[ -d "$state_root" && ! -L "$state_root" ]]; then
-        rm -rf -- "$state_root"
-      fi
-      if [[ -d "$AGENT_CANON_RUNTIME_ROOT/host-state" && ! -L "$AGENT_CANON_RUNTIME_ROOT/host-state" ]]; then
-        rm -rf -- "$AGENT_CANON_RUNTIME_ROOT/host-state"
-      fi
-      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"uninstall","code":"owned_resources_released","container":"%s"}\n' "$container"
-      return 0
+      _agent_canon_with_replacement_lock _agent_canon_uninstall_locked
+      return $?
       ;;
     scheduler)
       _agent_canon_scheduler "${command_args[1]:-status}"
@@ -4600,120 +4262,8 @@ bootstrap_host_entrypoint() {
       return $?
       ;;
     rollback)
-      local rollback_image_id rollback_image_ref current_image_ref current_image_id rollback_container rollback_candidate rollback_rc=0
-      local current_mounts_backup
-      rollback_container=$(_agent_canon_container_name)
-      _agent_canon_read_rollback_plan
-      [[ -f "$AGENT_CANON_STATE_ROOT/mounts.tsv" && ! -L "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]] ||
-        _agent_canon_json_error rollback_target_manifest_missing "current target mount manifest is unavailable"
-      # Keep the recovery manifest under the state mount.  The resident sees
-      # container-state at /var/lib/agent-canon/runtime; files made in the
-      # outer runtime directory are not available to its state-only restore.
-      current_mounts_backup=$(mktemp "$AGENT_CANON_STATE_ROOT/.rollback-current-mounts.XXXXXX")
-      cp -- "$AGENT_CANON_STATE_ROOT/mounts.tsv" "$current_mounts_backup"
-      rollback_image_id=$AGENT_CANON_ROLLBACK_IMAGE_ID
-      rollback_image_ref=$AGENT_CANON_ROLLBACK_IMAGE_REF
-      _agent_canon_use_active_image "$rollback_container"
-      current_image_ref=$AGENT_CANON_IMAGE_REF
-      current_image_id=$AGENT_CANON_ACTIVE_IMAGE_ID
-      if [[ -n "$current_image_id" ]]; then
-        AGENT_CANON_IMAGE_REF=$current_image_ref
-        export AGENT_CANON_IMAGE_REF
-        # The resident that is about to be stopped must match the currently
-        # active mount generation.  AGENT_CANON_ROLLBACK_MOUNTS_FILE points at
-        # the previous plan after it was read, so pass the live manifest
-        # explicitly and never validate the current container against the
-        # rollback mounts.
-        _agent_canon_validate_existing_container "$rollback_container" \
-          "$AGENT_CANON_STATE_ROOT/mounts.tsv"
-        if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$rollback_container" >/dev/null; then
-          _agent_canon_json_error rollback_failed "current resident could not be stopped"
-        fi
-        if ! "$AGENT_CANON_DOCKER_CMD" rm "$rollback_container" >/dev/null; then
-          _agent_canon_json_error rollback_failed "current resident could not be removed"
-        fi
-      fi
-      [[ -n "$current_image_id" ]] ||
-        _agent_canon_json_error rollback_unavailable "current resident is missing"
-      AGENT_CANON_IMAGE_REF=$rollback_image_id
-      AGENT_CANON_EXPECTED_IMAGE_ID=$rollback_image_id
-      export AGENT_CANON_IMAGE_REF
-      export AGENT_CANON_EXPECTED_IMAGE_ID
-      if ! rollback_candidate=$(_agent_canon_ensure_container); then
-        _agent_canon_json_error rollback_failed "previous resident could not be started"
-      fi
-      # Apply the previous target set and generation pointers only after the
-      # host has created the previous image.  This state-only transition is
-      # atomic under the resident lock and is followed by complete mount
-      # readback against the newly written live manifest.
-      AGENT_CANON_CURRENT_IMAGE_ID=$current_image_id
-      AGENT_CANON_CURRENT_IMAGE_REF=$current_image_ref
-      AGENT_CANON_RESTORE_IMAGE_ID=$rollback_image_id
-      AGENT_CANON_RESTORE_IMAGE_REF=$rollback_image_ref
-      AGENT_CANON_ROLLBACK_MOUNTS_FILE="$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv"
-      export AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF AGENT_CANON_RESTORE_IMAGE_ID AGENT_CANON_RESTORE_IMAGE_REF AGENT_CANON_ROLLBACK_MOUNTS_FILE
-      if ! _agent_canon_run_controller "$rollback_candidate" rollback >/dev/null; then
-        unset AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF AGENT_CANON_RESTORE_IMAGE_ID AGENT_CANON_RESTORE_IMAGE_REF
-        AGENT_CANON_ROLLBACK_MOUNTS_FILE="$AGENT_CANON_STATE_ROOT/mounts.tsv"
-        AGENT_CANON_RESTORE_TARGETS_FILE="$AGENT_CANON_STATE_ROOT/mounts.tsv"
-        AGENT_CANON_CURRENT_IMAGE_ID=$current_image_id
-        export AGENT_CANON_ROLLBACK_MOUNTS_FILE
-        export AGENT_CANON_RESTORE_TARGETS_FILE AGENT_CANON_CURRENT_IMAGE_ID
-        if ! _agent_canon_restore_candidate_failure "$rollback_candidate" "$current_image_id" "$rollback_image_id"; then
-          _agent_canon_json_error rollback_failed "rollback state transition and current resident restoration failed"
-        fi
-        unset AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE
-        rm -f -- "$current_mounts_backup"
-        _agent_canon_json_error rollback_failed "rollback state transition failed after previous resident creation"
-      fi
-      if ! _agent_canon_publish_controller_projection; then
-        _agent_canon_json_error rollback_failed "rollback manifest projection failed"
-      fi
-      unset AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF AGENT_CANON_RESTORE_IMAGE_ID AGENT_CANON_RESTORE_IMAGE_REF
-      AGENT_CANON_IMAGE_REF=$rollback_image_id
-      export AGENT_CANON_IMAGE_REF
-      if ! _agent_canon_validate_existing_container "$rollback_candidate" \
-        "$AGENT_CANON_STATE_ROOT/mounts.tsv"; then
-        AGENT_CANON_ROLLBACK_MOUNTS_FILE="$current_mounts_backup"
-        AGENT_CANON_RESTORE_TARGETS_FILE="$AGENT_CANON_STATE_ROOT/mounts.tsv"
-        AGENT_CANON_CURRENT_IMAGE_ID=$current_image_id
-        export AGENT_CANON_ROLLBACK_MOUNTS_FILE
-        export AGENT_CANON_RESTORE_TARGETS_FILE AGENT_CANON_CURRENT_IMAGE_ID
-        if ! _agent_canon_restore_candidate_failure "$rollback_candidate" "$current_image_id" "$rollback_image_id"; then
-          _agent_canon_json_error rollback_failed "rollback mount readback and current resident restoration failed"
-        fi
-        unset AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE
-        rm -f -- "$current_mounts_backup"
-        _agent_canon_json_error rollback_failed "rollback resident mount readback failed"
-      fi
-      if ! _agent_canon_run_controller "$rollback_candidate" start >/dev/null; then
-        rollback_rc=1
-      fi
-      if ((rollback_rc == 0)); then
-        _agent_canon_record_active_container "$rollback_candidate" || rollback_rc=$?
-      fi
-      if ((rollback_rc != 0)); then
-        if [[ -n "$current_image_id" ]]; then
-          AGENT_CANON_IMAGE_REF=$current_image_id
-          AGENT_CANON_ROLLBACK_MOUNTS_FILE="$current_mounts_backup"
-          AGENT_CANON_RESTORE_TARGETS_FILE="$AGENT_CANON_STATE_ROOT/mounts.tsv"
-          AGENT_CANON_CURRENT_IMAGE_ID=$current_image_id
-          export AGENT_CANON_IMAGE_REF
-          export AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE AGENT_CANON_CURRENT_IMAGE_ID
-          if ! _agent_canon_restore_candidate_failure "$rollback_candidate" "$current_image_id" "$rollback_image_id"; then
-            _agent_canon_json_error rollback_failed "previous and current resident restoration failed"
-          fi
-        else
-          _agent_canon_json_error rollback_failed "previous resident state restoration failed"
-        fi
-      fi
-      # The resident rewrites rollback-plan.tsv for the opposite generation;
-      # retaining it makes target-only rollback reversible without a second
-      # rollback protocol.
-      rm -f -- "$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv"
-      rm -f -- "$current_mounts_backup"
-      unset AGENT_CANON_ROLLBACK_MOUNTS_FILE AGENT_CANON_RESTORE_TARGETS_FILE AGENT_CANON_CURRENT_IMAGE_ID AGENT_CANON_CURRENT_IMAGE_REF
-      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"rollback","code":"previous_generation_restored"}\n'
+      _agent_canon_with_replacement_lock _agent_canon_rollback_locked
+      return $?
       return 0
       ;;
     target)
@@ -4873,7 +4423,6 @@ bootstrap_host_entrypoint() {
       _agent_canon_run_controller "$codex_container" codex prepare || codex_prepare_rc=$?
       ((codex_prepare_rc == 0)) || return "$codex_prepare_rc"
       _agent_canon_volume_copy export codex-home "$AGENT_CANON_STATE_ROOT/codex-home"
-      _agent_canon_sync_personal_skill_view "$codex_container"
       if [[ "$codex_action" == prepare ]]; then
         return 0
       fi
@@ -4972,7 +4521,7 @@ bootstrap_host_entrypoint() {
       return "$rc"
       ;;
     sync)
-      _agent_canon_with_source_sync_lock
+      _agent_canon_with_replacement_lock _agent_canon_sync_operation
       return $?
       ;;
     *)

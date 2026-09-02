@@ -59,13 +59,21 @@ evidence.
   root. General eval/report/SQLite/log/
   analysis artifacts remain outside the source checkout; the artifact output
   boundary does not permit `.runtime` as a source-local exception.
-- When the explicit control root is `$HOME`, install/update also manage split
-  `~/.agents/skills/<skill>`, `~/.codex/agents/<role>.toml`, and
+- When the explicit control root is `$HOME`, install/update manage one
+  `~/.agents/skills` directory link, `~/.codex/agents/<role>.toml`, and
   `~/.codex/config.toml` links. The last points to the ignored personal config
   source under the AgentCanon checkout; existing regular config bytes and mode
   are migrated losslessly and restored on uninstall. Project hooks and
   authentication, session, history, cache, plugins, rules, MCP, and TUI/trust
   state remain outside this link set. `codex prepare` remains runtime-local.
+- `sync` acquires `replacement.lock` once, runs exactly `git -C
+  <install-root> pull --ff-only origin main`, publishes
+  `.runtime/source-sync/source-sync.json`, and then pulls the exact GHCR image.
+  Detached and shallow checkouts are accepted when Git accepts the pull. No
+  remote-ref comparison, candidate checkout, local build, Git rollback, or
+  secondary source-sync lock is allowed. If image/resident replacement fails,
+  the source remains advanced and the old resident is kept or restored by the
+  existing replacement route.
 - Eval collection is append-only and is handed to the repository-qualified
   `iwashita-nozomu/agent-canon-log` archive through the host adapter. Never
   write archive output back into the AgentCanon source tree.
