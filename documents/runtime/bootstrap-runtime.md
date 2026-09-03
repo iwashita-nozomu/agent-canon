@@ -49,9 +49,9 @@ resident is healthy. Target sources are exported by the controller as a strict
 Git credentials, or network capability is mounted into the resident. The
 credential-free `container-state` subtree is the only runtime state mount;
 host-only Docker config and archive credentials remain outside it. Systemd
-units and source synchronization remain host shell/Git operations. Sync pulls
-the persistent install root forward with `git pull --ff-only origin main`,
-publishes the source state, then selects the env-key image and replaces the
+units and source synchronization remain host shell/Git operations. Sync fetches
+`origin/main` and force-checks out local `main` at `FETCH_HEAD`, publishes the
+source state, then selects the env-key image and replaces the
 resident only when the environment or required mounts changed. Source advancement is never rolled back when a later image, resident,
 link, or systemd phase fails. Product code verification remains in the
 project's own Docker test runner.

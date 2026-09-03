@@ -275,8 +275,12 @@ _agent_canon_sync_operation() (
     exit 2
   }
   source_before=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) || :
-  if ! git -C "$install_root" pull --ff-only origin main; then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync pull failed"
+  if ! git -C "$install_root" fetch origin main; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
+    exit 2
+  fi
+  if ! git -C "$install_root" checkout --force -B main FETCH_HEAD; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync checkout failed"
     exit 2
   fi
   source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) || source_head=unknown
@@ -3350,8 +3354,12 @@ _agent_canon_install_locked() {
   AGENT_CANON_SYNC_SOURCE_HEAD=unknown
   AGENT_CANON_SYNC_SOURCE_TREE=unknown
   source_before=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
-  if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" pull --ff-only origin main; then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync pull failed"
+  if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" fetch origin main; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
+    return 2
+  fi
+  if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" checkout --force -B main FETCH_HEAD; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync checkout failed"
     return 2
   fi
   source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || source_head=unknown

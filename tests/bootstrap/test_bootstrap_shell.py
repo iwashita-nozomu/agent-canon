@@ -2050,13 +2050,13 @@ printf '%s\\n' "$AGENT_CANON_TARGET_PRUNE_DIGESTS"
     )
 
 
-def test_sync_uses_pull_without_candidate_or_source_admission() -> None:
-    """The source transaction trusts one ff-only pull result."""
+def test_sync_uses_forced_main_checkout_without_candidate_admission() -> None:
+    """The source transaction fetches and force-checks out remote main."""
     text = ADAPTER.read_text(encoding="utf-8")
-    assert 'git -C "$install_root" pull --ff-only origin main' in text
+    assert 'git -C "$install_root" fetch origin main' in text
+    assert 'git -C "$install_root" checkout --force -B main FETCH_HEAD' in text
     assert "source-staging" not in text
     assert 'git clone --no-hardlinks "$install_root"' not in text
-    assert 'git -C "$install_root" fetch' not in text
     assert 'git -C "$install_root" merge --ff-only' not in text
     assert "_agent_canon_with_source_sync_lock" not in text
     assert "_agent_canon_sync_request_metadata" not in text
@@ -3050,8 +3050,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     ]
     repository = tmp_path / "agent-canon"
     # Both routes use a local origin.  Install deliberately exercises a
-    # detached checkout whose HEAD already matches origin/main; source
-    # admission must not require a branch name or a clean worktree.
+    # detached checkout; SourceSync must leave it on local main.
     control = tmp_path
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
@@ -3159,10 +3158,10 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     git_wrapper.write_text(
         "#!/usr/bin/env bash\n"
         "for argument in \"$@\"; do\n"
-        "  if [[ \"$argument\" == pull ]]; then\n"
-        f"    printf '%s\\n' git-pull >> {str(events)!r}\n"
-        "    break\n"
-        "  fi\n"
+        "  case \"$argument\" in\n"
+        f"    fetch) printf '%s\\n' git-fetch >> {str(events)!r} ;;\n"
+        f"    checkout) printf '%s\\n' git-checkout >> {str(events)!r} ;;\n"
+        "  esac\n"
         "done\n"
         "exec /usr/bin/git \"$@\"\n",
         encoding="utf-8",
@@ -3198,6 +3197,12 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     receipts = [json.loads(line) for line in completed.stdout.splitlines() if line.startswith("{")]
     assert receipts[-1]["status"] == "ok"
     assert receipts[-1]["operation"] == operation
+    if operation == "install":
+        assert events.read_text(encoding="utf-8").splitlines()[:3] == [
+            "git-fetch",
+            "git-checkout",
+            "docker",
+        ]
     result = json.loads(state_path.read_text(encoding="utf-8"))
     assert resident["id"] not in {
         record["Id"] for record in result["containers"].values()
@@ -3211,10 +3216,6 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     assert result["images"][replacement["Config"]["Image"]]["Id"] != old_image_id
     assert replacement["State"]["Health"]["Status"] == fixture["expected"]["health"]
     if operation == "install":
-        assert events.read_text(encoding="utf-8").splitlines()[:2] == [
-            "git-pull",
-            "docker",
-        ]
         source_sync = json.loads(
             (runtime / "source-sync" / "source-sync.json").read_text(encoding="utf-8")
         )
@@ -3256,10 +3257,10 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     if operation == "install":
         assert subprocess.run(
             ["git", "-C", str(repository), "symbolic-ref", "--quiet", "--short", "HEAD"],
-            check=False,
+            check=True,
             capture_output=True,
             text=True,
-        ).returncode != 0
+        ).stdout.strip() == "main"
         assert subprocess.run(
             ["git", "-C", str(repository), "rev-parse", "HEAD"],
             check=True,
@@ -4056,12 +4057,13 @@ def test_rollback_validates_current_mounts_before_previous_plan() -> None:
 
 
 def test_sync_never_projects_links_from_staging() -> None:
-    """Sync pulls live source and projects links only after image replacement."""
+    """Sync updates live source and projects links only after image replacement."""
     text = ADAPTER.read_text(encoding="utf-8")
     sync = text.split('_agent_canon_sync_operation() (', 1)[1].split(
         '_agent_canon_scheduler_locked enable', 1
     )[0]
-    assert 'git -C "$install_root" pull --ff-only origin main' in sync
+    assert 'git -C "$install_root" fetch origin main' in sync
+    assert 'git -C "$install_root" checkout --force -B main FETCH_HEAD' in sync
     assert '_agent_canon_source_sync_write success' in sync
     assert '_agent_canon_image ""' in sync
     assert '_agent_canon_replace_resident_locked' in sync

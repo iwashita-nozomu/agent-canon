@@ -1761,6 +1761,9 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
     manager.install()
     manager.start()
     old_state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    persisted_state = dict(old_state)
+    persisted_state["repository_root"] = str(tmp_path / "old-agent-canon")
+    manager.paths.state.write_text(json.dumps(persisted_state), encoding="utf-8")
 
     changed_manifest = tmp_path / "changed-manifest.toml"
     changed_manifest.write_text(
@@ -1784,6 +1787,7 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
     rebound = json.loads(changed.paths.state.read_text(encoding="utf-8"))
     assert updated["code"] == "updated"
     assert rebound["manifest_digest"] == changed.manifest_digest
+    assert rebound["repository_root"] == str(REPOSITORY_ROOT)
 
 
 def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
