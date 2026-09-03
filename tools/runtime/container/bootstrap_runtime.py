@@ -1757,16 +1757,6 @@ class BootstrapRuntime:
                     "requested_control_root_digest": self.control_digest,
                 },
             )
-        recorded_source = value.get("repository_root")
-        if recorded_source and Path(str(recorded_source)).resolve() != self.repository_root:
-            raise BootstrapError(
-                "source_runtime_owned_elsewhere",
-                "runtime is owned by another AgentCanon source root",
-                evidence={
-                    "owner_source_root": recorded_source,
-                    "requested_source_root": str(self.repository_root),
-                },
-            )
         return value
 
     def _preflight_runtime_reset(
@@ -1874,6 +1864,7 @@ class BootstrapRuntime:
 
     def _write_state(self, state: dict[str, Any]) -> None:
         state["schema"], state["updated_at"] = SCHEMA_STATE, _now()
+        state["repository_root"] = str(self.repository_root)
         _atomic_json(self.paths.state, state)
         _atomic_json(
             self.paths.owner,
