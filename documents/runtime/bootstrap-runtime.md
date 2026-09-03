@@ -188,12 +188,13 @@ environment key, reuses an exact local `:env-<key>` image when possible, and
 otherwise pulls or builds that environment once. A handled pull/build or
 health failure restores the existing v2 generation, container, and image.
 `sync` is the one-shot source/update route. Under `replacement.lock`, it runs
-`git -C <install-root> pull --ff-only origin main`, publishes the resulting
-source state, selects `:env-<key>`, and updates the resident only when the
-environment or required mounts changed. Detached and shallow checkouts are
-accepted when Git accepts the pull. Image or resident failure never rolls back
-the source checkout; the previous resident is kept or restored according to
-the existing runtime replacement route.
+`git -C <install-root> fetch origin main` followed by
+`git -C <install-root> checkout --force -B main FETCH_HEAD`, leaving the
+installed checkout on local `main` at the fetched remote revision. It publishes
+the resulting source state, selects `:env-<key>`, and updates the resident only
+when the environment or required mounts changed. Image or resident failure
+never rolls back the source checkout; the previous resident is kept or restored
+according to the existing runtime replacement route.
 `main` and `latest` are discovery labels only and are never runtime identity.
 
 On Linux and WSL with a usable systemd user manager, the host `install` enables the
