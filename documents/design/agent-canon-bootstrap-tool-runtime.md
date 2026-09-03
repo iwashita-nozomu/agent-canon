@@ -208,9 +208,10 @@ readback します。`docker system prune` は使用せず、manifest-owned exac
 `bootstrap/container/image/Dockerfile` は旧developer-containerの dependency planning / Python / Rust build 部分だけを再利用します。editor、post-create、GPU、
 Compose、workspace lifecycle は移植せず、旧developer-container surfaceは削除します。
 
-Image は digest-pinned Ubuntu 24.04 の一つの output image です。runtime と build
-provider は一つの apt transaction/update で導入し、dependency layer と asset /
-materializer layer に分けます。build-essential、curl、pipx、npm、`rustup-init` と
+Image は digest-pinned Ubuntu 24.04 の一つの output image です。bootstrap package
+transaction は一度だけ apt update を行い、manifest-owned dependency を同じ
+dependency layer へ導入してから asset / materializer layer を作ります。
+build-essential、curl、pipx、npm、`rustup-init` と
 Cargo build の後、npm/pipx/build provider と cache を同じ layer で purge します。
 runtime は Node runtime、Python 3.12、jq/tree、clangd、AgentCanon binary、pipx
 venv launchers、dependency plan/receipts を保持しますが、npm executable や build

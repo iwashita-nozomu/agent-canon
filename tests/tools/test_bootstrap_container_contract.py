@@ -99,9 +99,13 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
     assert "clippy" not in text
 
 
-def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None:
+def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    assert "clangd-18" in text
+    manifest = DEPENDENCIES.read_text(encoding="utf-8")
+    assert "clangd-18" in manifest
+    apt_bootstrap = text.split("apt-get install", 1)[1].split(";", 1)[0]
+    for package in ("pipx", "jq", "tree", "clangd-18"):
+        assert package not in apt_bootstrap
     assert "apt-get purge -y --auto-remove npm pipx build-essential curl" in text
     assert "python3.12" in text
     assert "nodejs" in text and "npm" in text
@@ -288,8 +292,13 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     assert clangd["executable_owner_packages"] == ["clangd-18"]
     assert clangd["verification"]["kind"] == "apt-package"
     assert not any(key.startswith("repository_") for key in clangd)
+    jq = next(record for record in records if record["id"] == "jq")
+    tree = next(record for record in records if record["id"] == "tree")
+    assert jq["verification"]["executable"] == "jq"
+    assert tree["verification"]["executable"] == "tree"
     rust = next(record for record in records if record["id"] == "rust-toolchain")
     assert rust["components"] == ["rust-src", "rust-analyzer"]
+    assert rust["verification"]["executable"] == "rustc"
 
 
 def test_single_repository_dockerignore_is_deny_by_default() -> None:

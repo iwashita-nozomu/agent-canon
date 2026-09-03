@@ -122,7 +122,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `clangd-18` (Ubuntu 24.04 Noble package) | C/C++ language-server analysis in the shared runtime。 | `bootstrap/container/image/dependencies.toml` (`clangd-language-server`) | upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/noble/clangd-18> |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
 | `experiment-runner-admitted` | ExperimentRunnerのmerged provider。admitted request/result、UUID visibility、child lifecycleを提供します。 | `agent-canon-environment.toml`, `documents/experiments/gpu-admission-r5-ordered-integration-interface.json` | consumer-provided runtime; AgentCanon does not install or import it |
-| Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/devcontainer.json`, `.devcontainer/gpu-admission/devcontainer.json` の digest-pinned official Feature | upstream: MIT for Node.js core, with bundled third-party notices |
+| Node.js | manifest-selected npm tools の runtime。 | Ubuntu 24.04 apt package in `bootstrap/container/image/Dockerfile` | upstream: MIT for Node.js core, with bundled third-party notices |
 | `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/dependencies.toml` | upstream: Artistic-2.0 |
 | Codex CLI: `@openai/codex` | local Codex runtime entrypoint。 | `.devcontainer/dependencies.toml` | upstream: Apache-2.0 |
 | GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/repository/github/github_publish.py` | upstream: MIT |
@@ -132,7 +132,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `git` | source checkout、submodule、branch / PR workflow。 | `.devcontainer/post-create.sh`, update tools | upstream: GPL-2.0 |
 | `cmake` | native tool build。 | `.devcontainer/post-create.sh` | upstream: BSD-3-Clause |
 | `curl` | installer、release asset、license source fetch。 | `.devcontainer/post-create.sh` | upstream: curl license |
-| `python3.12`, `pipx`, `python3-packaging`, `python3-yaml` | Runtime Python helper execution and manifest-defined isolated tool installs。 | `bootstrap/container/image/Dockerfile`, `bootstrap/container/image/dependencies.toml` | Python: Python Software Foundation License; pipx: MIT; Packaging: Apache-2.0 OR BSD-2-Clause; distro package licenses vary |
+| `python3.12`, `pipx`, `python3-packaging`, `python3-yaml` | Runtime Python helper execution and manifest-defined isolated tool installs。`pipx` command/package is a build-only provider and is purged; generated `check-jsonschema` / `yamllint` launchers and their venvs remain runtime assets。 | `bootstrap/container/image/Dockerfile`, `bootstrap/container/image/dependencies.toml` | Python: Python Software Foundation License; pipx: MIT; Packaging: Apache-2.0 OR BSD-2-Clause; distro package licenses vary |
 | `tar`, `xz-utils`, `ca-certificates`, `build-essential`, `pkg-config` | archive extraction, fixed image capability, native build support。 | `.devcontainer/Dockerfile`, `.devcontainer/dependencies.toml` | distro: verify package copyright files |
 | `texlive-latex-base` (pdfLaTeX) | pdfLaTeX document rendering。 | `.devcontainer/dependencies.toml` (`pdflatex`) | TeX Live: mixed free software; verify distro copyright files |
 | `latexmk` | Academic-writing PDF build orchestration。 | `.devcontainer/dependencies.toml` | upstream: GPL-2.0 |

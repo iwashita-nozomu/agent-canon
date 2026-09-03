@@ -168,6 +168,7 @@ BASE_CAPABILITIES = frozenset(
     }
 )
 NPM_GLOBAL_PREFIX = "/usr/local"
+PIPX_BIN_DIR = "/usr/local/bin"
 NPM_ENV_EXECUTABLE = "/usr/bin/env"
 NPM_SYSTEM_BIN_DIRS = (
     "/usr/local/bin",
@@ -1309,7 +1310,11 @@ def _parse_verification(
             "output_contains",
         },
         VerificationKind.ABSOLUTE_EXECUTABLE: {"path", "args", "output_contains"},
-        VerificationKind.RUST_TOOLCHAIN: set(),
+        VerificationKind.RUST_TOOLCHAIN: {
+            "executable",
+            "args",
+            "output_contains",
+        },
         VerificationKind.LEAN_TOOLCHAIN: set(),
         VerificationKind.CARGO_BINARY: {"path", "args", "output_contains"},
         VerificationKind.BROWSER_EXECUTABLE: {
@@ -1387,6 +1392,25 @@ def _parse_verification(
                 f"{record_id}.verification requires executable, args, and output_contains"
             )
         if Path(executable).name != executable or executable in SHELL_EXECUTABLES:
+            raise DependencyError(
+                f"{record_id}.verification.executable must be one command name"
+            )
+    elif kind is VerificationKind.RUST_TOOLCHAIN:
+        record_owned_fields = {"executable", "args", "output_contains"}
+        provided_record_owned_fields = record_owned_fields & value.keys()
+        if provided_record_owned_fields not in (set(), record_owned_fields):
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and output_contains"
+            )
+        if provided_record_owned_fields and (
+            executable is None or not args or output_contains is None
+        ):
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and output_contains"
+            )
+        if executable is not None and (
+            Path(executable).name != executable or executable in SHELL_EXECUTABLES
+        ):
             raise DependencyError(
                 f"{record_id}.verification.executable must be one command name"
             )
@@ -2678,8 +2702,8 @@ def image_install_plan(
         receipts = staging / "receipts"
         completed = Installer(
             runner,
-            image_owned=production,
-            image_owned_root=target.parent if production else None,
+            image_owned=True,
+            image_owned_root=target.parent,
         ).install(
             plan,
             workspace=workspace,
@@ -2789,6 +2813,10 @@ def image_verify_plan(
             raise DependencyError(
                 f"image-verify rebuild-required: unreadable receipt: {record_id}"
             ) from exc
+        if receipt_payload.get("status") != "installed":
+            raise DependencyError(
+                f"image-verify rebuild-required: receipt is not image-installed: {record_id}"
+            )
         if not Installer._receipt_matches(receipt, plan, record):
             raise DependencyError(
                 f"image-verify rebuild-required: stale receipt: {record_id}"
@@ -2796,21 +2824,9 @@ def image_verify_plan(
         try:
             if production and record.method is Method.CARGO_SOURCE_BUILD:
                 installer._verify_final_binary_receipt(receipt_payload, record)
-            else:
-                installer.verify(
-                    record,
-                    workspace=workspace,
-                    expected_source_identity=Installer._receipt_source_identity(receipt),
-                    strict_executables=True,
-                    allow_network=False,
-                )
-            bindings = receipt_payload.get("executable_bindings")
-            if bindings and (
-                installer._executable_bindings(record, workspace=workspace) != bindings
-            ):
-                raise DependencyError(
-                    f"image-verify rebuild-required: executable drift: {record_id}"
-                )
+            installer._verify_installed_receipt(
+                record, receipt_payload, workspace=workspace
+            )
         except (DependencyError, OSError, subprocess.CalledProcessError) as exc:
             if "rebuild-required" in str(exc):
                 raise
@@ -2959,9 +2975,13 @@ def _receipt_path(receipts: Path, record_id: str) -> Path:
     return receipts / f"{record_id}.json"
 
 
-def _executable_binding_names(record: DependencyRecord) -> tuple[str, ...]:
+def _executable_binding_names(
+    record: DependencyRecord, *, image_owned: bool = False
+) -> tuple[str, ...]:
     """Return manifest-provided executable names requiring receipt bindings."""
-    if record.method is Method.NPM_GLOBAL:
+    if record.method is Method.NPM_GLOBAL or (
+        record.method is Method.PIPX and image_owned
+    ):
         names = tuple(
             name
             for name in record.provides
@@ -2972,28 +2992,30 @@ def _executable_binding_names(record: DependencyRecord) -> tuple[str, ...]:
         return tuple(dict.fromkeys(names))
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
         return (record.verification.executable,) if record.verification.executable else ()
-    if record.method is Method.RUST_TOOLCHAIN and "rust-analyzer" in record.components:
-        return ("rust-analyzer",)
+    if record.method is Method.RUST_TOOLCHAIN:
+        names = ("cargo",) if image_owned and "cargo" in record.provides else ()
+        if image_owned and record.verification.executable:
+            names += (record.verification.executable,)
+        if "rust-analyzer" in record.components:
+            names += ("rust-analyzer",)
+        return tuple(dict.fromkeys(names))
     return ()
 
 
-def _configured_executable_path(record: DependencyRecord, executable: str) -> Path:
+def _configured_executable_path(
+    record: DependencyRecord, executable: str, *, image_owned: bool = False
+) -> Path:
     """Return the manifest-owned lexical command path, never consulting PATH."""
-    if executable not in _executable_binding_names(record):
+    if executable not in _executable_binding_names(record, image_owned=image_owned):
         raise DependencyError(
             f"{record.id}: executable is not provided by the manifest record: {executable}"
         )
     if record.method is Method.NPM_GLOBAL:
         return Path(NPM_GLOBAL_PREFIX) / "bin" / executable
+    elif record.method is Method.PIPX and image_owned:
+        return Path(PIPX_BIN_DIR) / executable
     elif record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
-        candidates = (
-            Path("/usr/bin") / executable,
-            Path("/usr/local/bin") / executable,
-        )
-        return next(
-            (path for path in candidates if path.is_file() or path.is_symlink()),
-            candidates[0],
-        )
+        return Path("/usr/bin") / executable
     elif record.method is Method.RUST_TOOLCHAIN:
         home = Path(os.environ.get("HOME", str(Path.home())))
         cargo_home = Path(os.environ.get("CARGO_HOME", str(home / ".cargo")))
@@ -3010,6 +3032,8 @@ def _current_executable_path(record: DependencyRecord, executable: str) -> Path:
     candidate = _configured_executable_path(record, executable)
     if record.method is Method.NPM_GLOBAL:
         allowed_root = Path(NPM_GLOBAL_PREFIX).resolve()
+    elif record.method is Method.PIPX:
+        allowed_root = Path(PIPX_BIN_DIR).resolve()
     elif record.method is Method.RUST_TOOLCHAIN:
         home = Path(os.environ.get("HOME", str(Path.home())))
         cargo_home = Path(os.environ.get("CARGO_HOME", str(home / ".cargo")))
@@ -3060,6 +3084,8 @@ def _expected_executable_path(record: DependencyRecord, executable: str) -> Path
         )
     if record.method is Method.NPM_GLOBAL:
         return Path(NPM_GLOBAL_PREFIX) / "bin" / executable
+    if record.method is Method.PIPX:
+        return Path(PIPX_BIN_DIR) / executable
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
         return Path("/usr/bin") / executable
     if record.method is Method.RUST_TOOLCHAIN:
@@ -3187,6 +3213,15 @@ class Installer:
         if callable(checker):
             return bool(checker(path))
         return path.is_file() and os.access(path, os.X_OK)
+
+    @staticmethod
+    def _image_npm_toolchain() -> NpmToolchain:
+        """Return the fixed Node/npm paths installed by the image bootstrap."""
+        return NpmToolchain(
+            node=Path("/usr/bin/node"),
+            npm=Path("/usr/bin/npm"),
+            path=os.pathsep.join(NPM_TRUSTED_BIN_DIRS),
+        )
 
     def _resolve_apt_executable_binding(
         self,
@@ -3405,7 +3440,7 @@ class Installer:
         records: Sequence[str] | None = None,
         final_binary_dir: Path | None = None,
     ) -> tuple[str, ...]:
-        """Install records in order, resuming only after live receipt verification."""
+        """Install records in order; image receipts defer live checks to image verify."""
         self._install_workspace = workspace.resolve()
         if self._image_owned:
             if self._image_owned_root is None:
@@ -3482,6 +3517,9 @@ class Installer:
                 receipt, plan, record
             )
             repair = receipt.exists()
+            if receipt_matches and self._image_owned:
+                completed.append(record.id)
+                continue
             if receipt_matches:
                 try:
                     self.verify(
@@ -3508,19 +3546,29 @@ class Installer:
                 receipt.unlink(missing_ok=True)
             try:
                 self.install_record(record, workspace=workspace, repair=repair)
-                source_identity = self.verify(
-                    record,
-                    workspace=workspace,
-                    strict_executables=True,
-                    allow_network=False,
-                )
+                if self._image_owned:
+                    source_identity = (
+                        record.source_identity
+                        if record.method is Method.CARGO_SOURCE_BUILD
+                        and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY
+                        else None
+                    )
+                else:
+                    source_identity = self.verify(
+                        record,
+                        workspace=workspace,
+                        strict_executables=True,
+                        allow_network=False,
+                    )
                 if active_source:
                     # There is no reusable receipt for an active mounted
                     # source.  Keep the next startup on the Cargo build path.
                     receipt.unlink(missing_ok=True)
                 else:
-                    executable_bindings = self._executable_bindings(
-                        record, workspace=workspace
+                    executable_bindings = (
+                        self._structural_executable_bindings(record)
+                        if self._image_owned
+                        else self._executable_bindings(record, workspace=workspace)
                     )
                     final_binary_path = None
                     if (
@@ -3568,7 +3616,9 @@ class Installer:
         bindings = payload.get("executable_bindings")
         if not isinstance(bindings, dict):
             return False
-        expected_bindings = set(_executable_binding_names(record))
+        expected_bindings = set(
+            _executable_binding_names(record, image_owned=payload.get("status") == "installed")
+        )
         if set(bindings) != expected_bindings or any(
             not isinstance(value, dict)
             or value.get("provided") != name
@@ -3586,7 +3636,7 @@ class Installer:
         return (
             payload.get("schema") == "agent-canon.tool-dependency-receipt"
             and payload.get("record_id") == record.id
-            and payload.get("status") == "pass"
+            and payload.get("status") in {"installed", "pass"}
             and payload.get("owner") == "image-installer"
             and payload.get("phase") == "image-install"
             and payload.get("manifest_version") == record.version
@@ -3643,6 +3693,84 @@ class Installer:
             }
         return bindings
 
+    def _structural_executable_bindings(
+        self, record: DependencyRecord
+    ) -> dict[str, dict[str, str]]:
+        """Record manifest-owned paths without probing the just-built image."""
+        self._active_record = record
+        self._active_phase = "image-install"
+        self._active_owner = "image-installer"
+        bindings: dict[str, dict[str, str]] = {}
+        for executable in _executable_binding_names(record, image_owned=True):
+            path = _configured_executable_path(record, executable, image_owned=True)
+            bindings[executable] = {
+                "provided": executable,
+                "lexical_path": str(path),
+                "absolute_path": str(path),
+                "verification_output": (
+                    f"{STRUCTURAL_BINDING_OUTPUT_PREFIX}:"
+                    f"{record.method.value}:{executable}"
+                ),
+            }
+        return bindings
+
+    def _verify_installed_receipt(
+        self,
+        record: DependencyRecord,
+        payload: Mapping[str, Any],
+        *,
+        workspace: Path,
+    ) -> str | None:
+        """Probe one receipt-bound runtime executable without its package manager."""
+        spec = record.verification
+        bindings = payload.get("executable_bindings")
+        expected_names = _executable_binding_names(record, image_owned=True)
+        if not isinstance(bindings, dict) or set(bindings) != set(expected_names):
+            raise DependencyError(f"{record.id}: installed executable bindings are stale")
+        for name in expected_names:
+            binding = bindings[name]
+            expected_path = _configured_executable_path(
+                record, name, image_owned=True
+            )
+            if (
+                not isinstance(binding, dict)
+                or binding.get("provided") != name
+                or binding.get("lexical_path") != str(expected_path)
+                or binding.get("absolute_path") != str(expected_path)
+            ):
+                raise DependencyError(
+                    f"{record.id}: installed executable binding is stale: {name}"
+                )
+            if not self._path_is_regular_executable(expected_path):
+                raise DependencyError(
+                    f"{record.id}: installed executable is missing or not executable: {name}"
+                )
+        if spec.kind is VerificationKind.CARGO_BINARY:
+            absolute = payload.get("binary_path")
+        elif spec.executable is not None:
+            binding = bindings.get(spec.executable)
+            if not isinstance(binding, dict):
+                raise DependencyError(f"{record.id}: installed executable binding is missing")
+            absolute = binding.get("absolute_path")
+        else:
+            return None
+        if not isinstance(absolute, str) or not Path(absolute).is_absolute():
+            raise DependencyError(f"{record.id}: installed executable binding is invalid")
+        result = self._capture(
+            [absolute, *spec.args],
+            workspace=workspace,
+            operation="verify-declared-executable",
+            phase="image-verify",
+            owner="typed-verifier",
+            record_id=record.id,
+            tool_paths=False,
+            env={"PATH": os.pathsep.join(NPM_SYSTEM_BIN_DIRS)},
+        )
+        if spec.output_contains is None:
+            return self._verification_output(result, record.id)
+        self._require_output(result, spec.output_contains, record.id)
+        return self._verification_output(result, record.id)
+
     @staticmethod
     def _receipt_bindings(path: Path) -> dict[str, dict[str, str]]:
         """Read validated executable bindings from one receipt."""
@@ -3693,7 +3821,7 @@ class Installer:
             source_identity = record.source_identity
         payload = {
             "schema": "agent-canon.tool-dependency-receipt",
-            "status": "pass",
+            "status": "installed" if self._image_owned else "pass",
             "owner": "image-installer",
             "phase": "image-install",
             "record_id": record.id,
@@ -3912,7 +4040,11 @@ class Installer:
                 privileged=True,
             )
         elif method is Method.NPM_GLOBAL:
-            toolchain = resolve_npm_toolchain(workspace)
+            toolchain = (
+                self._image_npm_toolchain()
+                if self._image_owned
+                else resolve_npm_toolchain(workspace)
+            )
             npm_args = [
                 "install",
                 "--global",
@@ -3965,7 +4097,7 @@ class Installer:
                 workspace=workspace,
                 env=tool_env,
             )
-            if repair:
+            if repair and not self._image_owned:
                 installed = self._capture(
                     ["rustup", "toolchain", "list"],
                     workspace=workspace,
@@ -4526,7 +4658,6 @@ class Installer:
             )
             if tool == "rust-analyzer":
                 self._require_output(result, f"rust-analyzer {record.version}", record.id)
-
     @staticmethod
     def _rust_toolchain_matches(line: str, version: str) -> bool:
         """Match rustup's optional host-triple suffix for one exact version."""
@@ -5029,21 +5160,26 @@ def resolve_verified_executable(
     record = plan.by_id().get(record_id)
     if record is None:
         raise DependencyError(f"dependency record is not present: {record_id}")
-    if executable not in _executable_binding_names(record):
-        raise DependencyError(
-            f"{record_id}: requested executable is not manifest-provided: {executable}"
-        )
     receipt = _receipt_path(receipts, record_id)
     try:
         payload = json.loads(receipt.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
         raise DependencyError(f"{record_id}: executable receipt is unreadable") from exc
+    image_owned_receipt = payload.get("status") == "installed"
+    if executable not in _executable_binding_names(
+        record, image_owned=image_owned_receipt
+    ):
+        raise DependencyError(
+            f"{record_id}: requested executable is not manifest-provided: {executable}"
+        )
     bindings = payload.get("executable_bindings")
     binding = bindings.get(executable) if isinstance(bindings, dict) else None
-    expected_bindings = set(_executable_binding_names(record))
+    expected_bindings = set(
+        _executable_binding_names(record, image_owned=image_owned_receipt)
+    )
     if (
         payload.get("schema") != "agent-canon.tool-dependency-receipt"
-        or payload.get("status") != "pass"
+        or payload.get("status") not in {"installed", "pass"}
         or payload.get("record_id") != record_id
         or payload.get("manifest_version") != record.version
         or payload.get("plan_fingerprint") != plan.fingerprint
@@ -5079,6 +5215,23 @@ def resolve_verified_executable(
     ):
         raise DependencyError(f"{record_id}: executable receipt binding is stale")
     installer = Installer()
+    if payload.get("status") == "installed":
+        observed = installer._verify_installed_receipt(
+            record, payload, workspace=workspace
+        )
+        return VerifiedExecutable(
+            record_id=record.id,
+            manifest_version=record.version,
+            executable=executable,
+            absolute_path=binding["absolute_path"],
+            record_fingerprint=record.fingerprint(),
+            plan_fingerprint=plan.fingerprint,
+            verification_output=(
+                observed
+                if executable == record.verification.executable and observed is not None
+                else binding["verification_output"]
+            ),
+        )
     installer.verify(
         record,
         workspace=workspace,
