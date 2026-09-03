@@ -288,7 +288,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             [(item.before, item.after) for item in dependency.order_constraints],
             [
                 ("dependency-analysis", "code-visualization"),
-                ("dependency-analysis", "dependency-module-change"),
                 ("dependency-analysis", "refactor-loop"),
             ],
         )
@@ -299,14 +298,12 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 "refactor-loop",
                 "dependency-analysis",
                 "code-visualization",
-                "dependency-module-change",
             ),
             rules,
         )
         dependency_index = selected.index("dependency-analysis")
         for downstream in (
             "code-visualization",
-            "dependency-module-change",
             "refactor-loop",
         ):
             self.assertLess(dependency_index, selected.index(downstream))

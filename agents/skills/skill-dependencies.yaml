@@ -623,9 +623,6 @@ skill_dependencies:
       after: code-visualization
       reason: source dependency facts precede graph projection
     - before: dependency-analysis
-      after: dependency-module-change
-      reason: cross-module dependency analysis precedes dependency module lifecycle when both are selected
-    - before: dependency-analysis
       after: refactor-loop
       reason: cross-module dependency resolution precedes decomposition and refactor handoff when both skills are selected
     parallel_independent:
