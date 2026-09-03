@@ -123,13 +123,13 @@ AgentCanon image, container, virtualenv, Cargo toolchain, or volume.
 `sync` is the automatic-update route. It acquires `replacement.lock` once and
 runs `git -C <install-root> pull --ff-only origin main`; a successful Git pull
 is sufficient source admission, including for detached or shallow checkouts.
-It then writes `.runtime/source-sync/source-sync.json`, pulls the exact GHCR
-image, updates the resident, and refreshes the host-owned links and timer.
-There is no candidate checkout, remote-ref comparison, local build, Git
-rollback, or second source-sync lock. If the image or resident phase fails, the
-source remains at the pulled commit and the existing resident rollback route
-handles only resident state. A missing systemd user manager is a warning and
-leaves manual `sync` available.
+It then writes `.runtime/source-sync/source-sync.json`, selects the shared
+`:env-<key>` image through `environment_key.sh`, and reuses the resident when
+the environment and source/cache mounts are current. Otherwise it pulls or
+builds the environment once, updates the resident, and refreshes host-owned
+links and the timer. There is no candidate checkout, remote-ref comparison,
+Git rollback, or second source-sync lock. A missing systemd user manager is a
+warning and leaves manual `sync` available.
 
 The container is for AgentCanon Python, Rust, and LSP tools. Project Docker,
 project `test/testrunner.sh`, GPU, Git, GitHub, and Codex host launch remain in

@@ -1112,10 +1112,11 @@ def main(argv: list[str]) -> int:
                 return 1
             sys.stdout.write(content)
             return 0
-        if command[:2] == [
-            "python3",
-            "/usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py",
-        ]:
+        if (
+            len(command) >= 2
+            and command[0] == "python3"
+            and command[1].endswith("tools/runtime/container/bootstrap_runtime.py")
+        ):
             failed_operation = os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", "")
             if failed_operation and failed_operation in command[2:]:
                 return int(os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_RC", "41"))
@@ -1222,6 +1223,7 @@ def main(argv: list[str]) -> int:
                     f"image-ref\t{current_ref}",
                     f"mount\tmount\t{runtime_root}\t/var/lib/agent-canon/runtime\tfalse",
                     f"mount\tmount\t{source_sync_source}\t/var/lib/agent-canon/source-sync\ttrue",
+                    f"mount\tmount\t{host_install}\t/opt/agent-canon/source\tfalse",
                     f"mount\tmount\t{private_log}\t/var/lib/agent-canon/private-log\ttrue",
                     f"mount\tmount\t{registry_source}\t/var/lib/agent-canon/mount-registry.toml\ttrue",
                 ]

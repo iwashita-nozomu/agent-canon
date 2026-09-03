@@ -68,12 +68,14 @@ evidence.
   state remain outside this link set. `codex prepare` remains runtime-local.
 - `sync` acquires `replacement.lock` once, runs exactly `git -C
   <install-root> pull --ff-only origin main`, publishes
-  `.runtime/source-sync/source-sync.json`, and then pulls the exact GHCR image.
-  Detached and shallow checkouts are accepted when Git accepts the pull. No
-  remote-ref comparison, candidate checkout, local build, Git rollback, or
-  secondary source-sync lock is allowed. If image/resident replacement fails,
-  the source remains advanced and the old resident is kept or restored by the
-  existing replacement route.
+  `.runtime/source-sync/source-sync.json`, and selects the shared
+  `:env-<key>` image through `bootstrap/container/image/environment_key.sh`.
+  An exact local image and resident with current source/cache mounts are
+  reused; otherwise the image is pulled or built once and the resident is
+  replaced. Detached and shallow checkouts are accepted when Git accepts the
+  pull. No remote-ref comparison, candidate checkout, Git rollback, or
+  secondary source-sync lock is allowed. Source-mounted Rust tools are then
+  compiled by the container's generic `tools/**/Cargo.toml` scan into cache/bin.
   For caller compatibility, sync also accepts and ignores historical
   `--remote` and `--branch` arguments; the operation always uses `origin main`.
 - Eval collection is append-only and is handed to the repository-qualified

@@ -17,6 +17,7 @@ AGENT_CANON_CONTAINER_MEMORY=4g
 AGENT_CANON_CONTAINER_PIDS=512
 AGENT_CANON_CONTAINER_NETWORK=none
 AGENT_CANON_VOLUME_DESTINATION=/var/lib/agent-canon
+AGENT_CANON_SOURCE_DESTINATION=/opt/agent-canon/source
 AGENT_CANON_LEGACY_STATE_DESTINATION=/var/lib/agent-canon-legacy-state
 AGENT_CANON_RUNTIME_DESTINATION=/var/lib/agent-canon/runtime
 AGENT_CANON_EXCHANGE_DESTINATION=/var/lib/agent-canon/exchange
@@ -1899,12 +1900,15 @@ _agent_canon_image_reference() {
     export AGENT_CANON_IMAGE_REF
     return 0
   fi
-  local source_head
-  if ! source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD); then
-    _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
+  local environment_key key_script
+  key_script="$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/environment_key.sh"
+  if ! environment_key=$(bash "$key_script" "$AGENT_CANON_REPOSITORY_ROOT"); then
+    _agent_canon_json_error environment_key_failed "AgentCanon environment key could not be derived"
     return 2
   fi
-  AGENT_CANON_IMAGE_REF="ghcr.io/iwashita-nozomu/agent-canon:sha-${source_head}"
+  AGENT_CANON_ENVIRONMENT_KEY=$environment_key
+  AGENT_CANON_IMAGE_REF="ghcr.io/iwashita-nozomu/agent-canon:env-${environment_key}"
+  export AGENT_CANON_ENVIRONMENT_KEY
   export AGENT_CANON_IMAGE_REF
 }
 
@@ -1912,55 +1916,26 @@ _agent_canon_image() {
   local requested_ref=${1:-}
   _agent_canon_image_reference "$requested_ref"
   if [[ "${AGENT_CANON_LOCAL_BUILD:-0}" == 1 ]]; then
-    local control_digest source_head
-    source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD) || {
-      _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
-      return 2
-    }
+    local control_digest
     control_digest=$(_agent_canon_control_digest)
     if ! "$AGENT_CANON_DOCKER_CMD" build \
       --file "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/Dockerfile" \
       --tag "$AGENT_CANON_IMAGE_REF" \
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$control_digest" \
-      --label "org.opencontainers.image.revision=$source_head" \
       "$AGENT_CANON_REPOSITORY_ROOT"; then
       _agent_canon_json_error candidate_image_build_failed "candidate image build failed"
       return 2
     fi
     return 0
   fi
-  local image_preexisting=0 image_previous_id=
+  # An environment image is content-addressed by the controlled Dockerfile
+  # inputs.  A local exact tag is therefore reusable across source checkouts.
   if "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
-    image_preexisting=1
-    image_previous_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
+    return 0
   fi
   if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then
     _agent_canon_json_error candidate_image_pull_failed "candidate image could not be pulled"
-    return 2
-  fi
-  local source_head observed_os observed_arch observed_revision repo_digests expected_arch pulled_image_id
-  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD) || return 2
-  pulled_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
-  observed_os=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Os}}' "$AGENT_CANON_IMAGE_REF")
-  observed_arch=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Architecture}}' "$AGENT_CANON_IMAGE_REF")
-  observed_revision=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$AGENT_CANON_IMAGE_REF")
-  repo_digests=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{join .RepoDigests "\n"}}' "$AGENT_CANON_IMAGE_REF")
-  case "$(uname -m)" in
-    x86_64) expected_arch=amd64 ;;
-    aarch64|arm64) expected_arch=arm64 ;;
-    *) expected_arch=unsupported ;;
-  esac
-  if [[ "$observed_os" != linux || "$observed_arch" != "$expected_arch" ||
-        "$observed_revision" != "$source_head" || ! "$repo_digests" =~ @sha256:[0-9a-f]{64} ]]; then
-    if ((image_preexisting == 1)); then
-      "$AGENT_CANON_DOCKER_CMD" image tag "$image_previous_id" "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 || :
-      [[ "$pulled_image_id" != "$image_previous_id" ]] &&
-        "$AGENT_CANON_DOCKER_CMD" image rm "$pulled_image_id" >/dev/null 2>&1 || :
-    else
-      "$AGENT_CANON_DOCKER_CMD" image rm "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1 || :
-    fi
-    _agent_canon_json_error candidate_image_validation_failed "pulled image OCI identity does not match source/platform/digest"
     return 2
   fi
 }
@@ -2217,6 +2192,7 @@ _agent_canon_write_rollback_plan() {
     printf 'image-ref\t%s\n' "$rollback_ref"
     printf 'mount\tmount\t%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION"
     printf 'mount\tmount\t%s\t%s\tfalse\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync" "$AGENT_CANON_SOURCE_SYNC_DESTINATION"
+    printf 'mount\tmount\t%s\t%s\tfalse\n' "$AGENT_CANON_REPOSITORY_ROOT" "$AGENT_CANON_SOURCE_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION"
     if [[ -f "$AGENT_CANON_STATE_ROOT/mounts.tsv" && ! -L "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]]; then
@@ -2296,7 +2272,7 @@ _agent_canon_read_rollback_plan() {
             [[ "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ && "$value" == mount ]] ||
               _agent_canon_json_error rollback_plan_invalid "rollback target destination is invalid"
             printf 'target\t%s\t%s\t%s\tread-only\n' "$digest" "$source" "$destination" >> "$previous_mounts" ;;
-          /var/lib/agent-canon/*) ;;
+          /var/lib/agent-canon/*|/opt/agent-canon/source) ;;
           *) _agent_canon_json_error rollback_plan_invalid "rollback destination is invalid" ;;
         esac ;;
       *) _agent_canon_json_error rollback_plan_invalid "rollback plan contains an unknown key: $key" ;;
@@ -2398,6 +2374,8 @@ _agent_canon_validate_existing_container() {
     printf '%s\t%s\tfalse\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync" \
       "$AGENT_CANON_SOURCE_SYNC_DESTINATION" >> "$expected_mounts"
   fi
+  printf '%s\t%s\tfalse\n' "$AGENT_CANON_REPOSITORY_ROOT" \
+    "$AGENT_CANON_SOURCE_DESTINATION" >> "$expected_mounts"
   if [[ -f "$mount_manifest" && ! -L "$mount_manifest" ]]; then
     local kind digest source destination mode
     while IFS=$'\t' read -r kind digest source destination mode; do
@@ -2418,7 +2396,7 @@ _agent_canon_validate_existing_container() {
   fi
   "$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{range .Mounts}}{{if eq .Type "volume"}}{{printf "volume:%s\t%s\t%t\n" .Name .Destination .RW}}{{else}}{{printf "%s\t%s\t%t\n" .Source .Destination .RW}}{{end}}{{end}}' \
-    "$container" | sed '/^$/d' | sort > "$observed_mounts"
+  "$container" | sed '/^$/d' | sort > "$observed_mounts"
   if [[ "$require_source_sync" == 0 ]]; then
     local filtered_mounts
     filtered_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts-filtered.XXXXXX")
@@ -2516,6 +2494,7 @@ _agent_canon_ensure_container() {
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$(_agent_canon_control_digest)" \
       --mount "type=volume,src=$AGENT_CANON_STATE_VOLUME_NAME,dst=$AGENT_CANON_VOLUME_DESTINATION" \
+      --mount "type=bind,src=$AGENT_CANON_REPOSITORY_ROOT,dst=$AGENT_CANON_SOURCE_DESTINATION,readonly" \
       --mount "type=bind,src=$AGENT_CANON_RUNTIME_ROOT/source-sync,dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly" \
       "${target_mount_args[@]}" \
       "$AGENT_CANON_IMAGE_REF" >/dev/null; then
@@ -2563,9 +2542,9 @@ _agent_canon_run_controller() {
   output_file=$(mktemp "$temporary_root/.bootstrap.stdout.XXXXXX")
   error_file=$(mktemp "$temporary_root/.bootstrap.stderr.XXXXXX")
   _agent_canon_container_exec "$container" \
-    python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
+    python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
     --container-control \
-    --repository-root /usr/local/share/agent-canon/runtime \
+    --repository-root /opt/agent-canon/source \
     --control-parent-root /var/lib/agent-canon \
     --runtime-root /var/lib/agent-canon/runtime \
     "$@" >"$output_file" 2>"$error_file" || rc=$?
@@ -2573,6 +2552,12 @@ _agent_canon_run_controller() {
   cat "$error_file" >&2
   rm -f -- "$output_file" "$error_file"
   return "$rc"
+}
+
+_agent_canon_compile_tools() {
+  local container=$1
+  _agent_canon_container_exec "$container" \
+    /usr/local/bin/agent-canon-container-entrypoint compile
 }
 
 _agent_canon_restore_candidate_failure() {
@@ -2586,9 +2571,9 @@ _agent_canon_restore_candidate_failure() {
   restore_error=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stderr.XXXXXX")
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
     if _agent_canon_container_exec "$container" \
-      python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
+      python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
       --container-control \
-      --repository-root /usr/local/share/agent-canon/runtime \
+      --repository-root /opt/agent-canon/source \
       --control-parent-root /var/lib/agent-canon \
       --runtime-root /var/lib/agent-canon/runtime \
       restore >"$restore_output" 2>"$restore_error"; then
@@ -2760,6 +2745,7 @@ _agent_canon_replace_resident_locked() {
   local old_image_id old_image_ref old_container candidate restored rc
   local old_container_present=0 current_resident_valid=0 clean_install=0 old_quiesced=0
   local old_container_removed=0 old_container_id old_container_runtime old_container_control stale_target_pruned=
+  local resident_reused=0
   if [[ "$clean_install_prepared" != 1 ]]; then
     AGENT_CANON_CLEAN_INSTALL_ACTIVE=0
     AGENT_CANON_CLEAN_INSTALL_SUCCESS=0
@@ -2895,22 +2881,8 @@ _agent_canon_replace_resident_locked() {
       AGENT_CANON_IMAGE_REF=$candidate_image_ref
       AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
       export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
-      if candidate=$(_agent_canon_ensure_container); then
-        :
-      else
-        rc=$?
-        return "$rc"
-      fi
-      if _agent_canon_record_active_container "$candidate"; then
-        :
-      else
-        rc=$?
-        return "$rc"
-      fi
-      _agent_canon_discard_pending_rollback_plan
-      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"%s","code":"up_to_date","changed":false}\n' \
-        "$replacement_operation"
-      return 0
+      candidate=$old_container
+      resident_reused=1
     fi
     AGENT_CANON_IMAGE_REF=$old_image_ref
     AGENT_CANON_EXPECTED_IMAGE_ID=$old_image_id
@@ -2919,7 +2891,8 @@ _agent_canon_replace_resident_locked() {
     unset AGENT_CANON_EXPECTED_IMAGE_ID AGENT_CANON_ACTIVE_IMAGE_ID
   fi
 
-  AGENT_CANON_IMAGE_REF=$candidate_image_ref
+  if ((resident_reused == 0)); then
+    AGENT_CANON_IMAGE_REF=$candidate_image_ref
   AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
   AGENT_CANON_PREVIOUS_IMAGE_ID=$old_image_id
   export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_ID
@@ -3006,11 +2979,19 @@ _agent_canon_replace_resident_locked() {
     fi
     return "$candidate_rc"
   fi
+  fi
   rc=0
-  if _agent_canon_run_controller "$candidate" "$replacement_operation"; then
+  if _agent_canon_compile_tools "$candidate"; then
     :
   else
     rc=$?
+  fi
+  if ((rc == 0)); then
+    if _agent_canon_run_controller "$candidate" "$replacement_operation"; then
+      :
+    else
+      rc=$?
+    fi
   fi
   if ((rc == 0)); then
     if _agent_canon_publish_controller_projection; then
@@ -3057,7 +3038,7 @@ _agent_canon_replace_resident_locked() {
       return 2
     fi
   fi
-  if ((rc != 0)) && [[ -n "$old_image_id" ]]; then
+  if ((rc != 0 && resident_reused == 0)) && [[ -n "$old_image_id" ]]; then
     if ! _agent_canon_restore_candidate_failure "$candidate" "$old_image_id" "$candidate_image_id"; then
       _agent_canon_json_error rollback_failed "candidate failure recovery was incomplete"
       return 2
@@ -3066,6 +3047,10 @@ _agent_canon_replace_resident_locked() {
   unset AGENT_CANON_PREVIOUS_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_REF
   if ((clean_install == 1)) && ((rc == 0)); then
     AGENT_CANON_CLEAN_INSTALL_SUCCESS=1
+  fi
+  if ((resident_reused == 1 && rc == 0)); then
+    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"%s","code":"up_to_date","changed":false}\n' \
+      "$replacement_operation"
   fi
   return "$rc"
 }
@@ -4178,7 +4163,7 @@ bootstrap_host_entrypoint() {
       local_build=1
     fi
   done
-  if ((local_build == 1 && operation != update)); then
+  if ((local_build == 1)) && [[ "$operation" != update ]]; then
     _agent_canon_json_error local_build_update_only "--local-build is valid only for update"
     return 2
   fi
@@ -4504,9 +4489,9 @@ bootstrap_host_entrypoint() {
       error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
       rc=0
       _agent_canon_container_exec "$container" \
-        python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
+        python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
         --container-control \
-        --repository-root /usr/local/share/agent-canon/runtime \
+        --repository-root /opt/agent-canon/source \
         --control-parent-root /var/lib/agent-canon \
         --runtime-root /var/lib/agent-canon/runtime \
         "${command_args[@]}" >"$output_file" 2>"$error_file" || rc=$?
