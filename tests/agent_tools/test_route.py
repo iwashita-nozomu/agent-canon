@@ -2204,40 +2204,6 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("md-style-check", decision["matched_skills"])
         self.assertIn("agent-learning", decision["matched_skills"])
 
-    def test_prompt_defers_cross_module_dependency_analysis(self) -> None:
-        """Only explicit multi-root dependency language activates the deferred route."""
-        prompts = (
-            "Resolve cross-module dependencies before implementation.",
-            "複数のモジュール間の依存を解決してから実装する。",
-            "A dependency repository consumer must be updated with the module.",
-            "Change lib-a API, update app-b, then advance parent pins.",
-            "source submodule API changed; update parent gitlink pin",
-        )
-        for prompt in prompts:
-            with self.subTest(prompt=prompt):
-                result = self.run_route("--prompt", prompt, "--format", "json")
-
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                decision = json.loads(result.stdout)
-                self.assertIn("dependency-analysis", decision["matched_skills"])
-                self.assertIn("dependency-analysis", decision["deferred_skills"])
-                self.assertNotIn("dependency-analysis", decision["active_skills"])
-
-    def test_prompt_keeps_single_module_and_clone_fast_paths(self) -> None:
-        """A single module or standalone clone must not activate cross-module analysis."""
-        prompts = (
-            "Update the single module dependency and its tests.",
-            "Prepare a standalone repository topic clone.",
-            "Update one submodule in isolation.",
-        )
-        for prompt in prompts:
-            with self.subTest(prompt=prompt):
-                result = self.run_route("--prompt", prompt, "--format", "json")
-
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                decision = json.loads(result.stdout)
-                self.assertNotIn("dependency-analysis", decision["matched_skills"])
-
     def test_comprehensive_tasks_project_cross_module_handoff_guidance(self) -> None:
         """T11/T12 inherit the conditional dependency-resolution prompt."""
         config = load_team_config()

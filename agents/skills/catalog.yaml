@@ -1529,31 +1529,6 @@ skill_families:
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
-    routing:
-      stage_policy: deferred
-      reason: cross-module or cross-repository dependency resolution is needed before decomposition or implementation handoff
-      triggers:
-        - ["cross-module", "dependency"]
-        - ["cross-module", "dependencies"]
-        - ["cross-repository", "dependency"]
-        - ["cross-repository", "dependencies"]
-        - ["multi-module", "dependency"]
-        - ["multi-module", "dependencies"]
-        - ["multi-submodule", "dependency"]
-        - ["multi-submodule", "dependencies"]
-        - ["dependencies", "across", "modules"]
-        - ["dependencies", "between", "modules"]
-        - ["dependencies", "between", "repositories"]
-        - ["dependencies", "between", "submodules"]
-        - ["dependency", "repository", "consumer"]
-        - ["dependencies", "repository", "consumer"]
-        - ["複数", "モジュール", "依存"]
-        - ["複数", "サブモジュール", "依存"]
-        - ["モジュール間", "依存"]
-        - ["サブモジュール間", "依存"]
-        - ["依存", "リポジトリ", "consumer"]
-        - ["api", "parent", "pin"]
-        - ["source", "submodule", "api", "changed", "parent", "gitlink", "pin"]
   - id: worktree-start
     purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
     canonical_doc: agents/skills/worktree-start.md

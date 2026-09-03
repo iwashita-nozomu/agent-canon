@@ -61,6 +61,7 @@ skill_dependencies:
     - agent-log-analysis
     - runtime-log-repair
     - repository-topic-clone
+    - dependency-module-change
     - agent-learning
   start-repository:
     responsibility_group: intake
@@ -350,8 +351,10 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent:
+    - task-routing
     - agent-canon-update
     - structure-refactor
+    - dependency-analysis
   pr-processing:
     responsibility_group: lifecycle
     required_prerequisites: []
@@ -624,6 +627,7 @@ skill_dependencies:
       reason: source dependency facts precede graph projection
     parallel_independent:
     - tool-finding-report
+    - dependency-module-change
     - structure-refactor
     - comprehensive-development
   worktree-start:
