@@ -1920,6 +1920,8 @@ def test_container_update_preserves_tasks_without_image_replacement(
     )
     manager._ensure_layout()
     manager._write_state(state)
+    plan = exchange / "rollback-plan.tsv"
+    plan.write_text("stale rollback plan\n", encoding="utf-8")
     args = build_parser().parse_args(
         [
             "--container-control",
@@ -1934,12 +1936,18 @@ def test_container_update_preserves_tasks_without_image_replacement(
     after_refresh = json.loads(manager.paths.state.read_text(encoding="utf-8"))
     assert after_refresh["active_task_count"] == 1
     assert after_refresh["tasks"] == {"active": {"state": "active"}}
+    assert not plan.exists()
 
     monkeypatch.setenv("AGENT_CANON_PREVIOUS_IMAGE_ID", "sha256:" + "b" * 64)
+    monkeypatch.setenv("AGENT_CANON_PREVIOUS_IMAGE_REF", "agent-canon-tools:previous")
     run(args)
     after_replacement = json.loads(manager.paths.state.read_text(encoding="utf-8"))
     assert after_replacement["active_task_count"] == 0
     assert after_replacement["tasks"] == {}
+    assert plan.is_file()
+    plan_text = plan.read_text(encoding="utf-8")
+    assert "image-id\tsha256:" + "b" * 64 in plan_text
+    assert "image-ref\tagent-canon-tools:previous" in plan_text
 
 
 

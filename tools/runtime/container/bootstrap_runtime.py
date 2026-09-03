@@ -5262,6 +5262,8 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             runtime._write_mounts(state)
             runtime._write_mount_manifest(state)
             runtime._write_state(state)
+            if operation in {"install", "update"}:
+                _container_materialize_rollback_plan(runtime, state)
             result = runtime._result(
                 runtime._receipt(
                     operation,
