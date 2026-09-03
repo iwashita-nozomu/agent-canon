@@ -1,0 +1,424 @@
+name: Issue 1041 repository inventory
+
+on:
+  push:
+    branches:
+      - audit/1041-repository-line-inventory
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout AgentCanon
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Checkout project template
+        run: git clone --depth 1 https://github.com/iwashita-nozomu/project_template.git ../project_template
+
+      - name: Build deterministic line and duplication inventory
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import csv
+          import hashlib
+          import itertools
+          import json
+          import os
+          import re
+          import subprocess
+          from collections import Counter, defaultdict
+          from pathlib import Path, PurePosixPath
+          from typing import Iterable
+
+          OUT = Path("issue-1041-inventory")
+          OUT.mkdir(exist_ok=True)
+          REPOSITORIES = (
+              ("agent-canon", Path.cwd()),
+              ("project_template", Path.cwd().parent / "project_template"),
+          )
+          LOCK_NAMES = {
+              "Cargo.lock",
+              "package-lock.json",
+              "pnpm-lock.yaml",
+              "poetry.lock",
+              "uv.lock",
+              "yarn.lock",
+          }
+          SOURCE_EXTENSIONS = {
+              ".c", ".cc", ".cpp", ".cs", ".go", ".h", ".hpp", ".java",
+              ".js", ".jsx", ".kt", ".lua", ".m", ".php", ".py", ".rb",
+              ".rs", ".scala", ".sh", ".swift", ".ts", ".tsx", ".zig",
+          }
+          DOC_EXTENSIONS = {".adoc", ".md", ".mdx", ".rst", ".txt"}
+          CONFIG_EXTENSIONS = {
+              ".cfg", ".ini", ".json", ".jsonl", ".toml", ".xml", ".yaml", ".yml",
+          }
+          PATH_TOKEN_RE = re.compile(
+              r"(?<![A-Za-z0-9_.-])(?:\.{0,2}/)?[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+(?![A-Za-z0-9_.-])"
+          )
+
+          def run(repo: Path, *args: str) -> str:
+              return subprocess.check_output(args, cwd=repo, text=True).strip()
+
+          def tracked_paths(repo: Path) -> list[str]:
+              raw = subprocess.check_output(("git", "ls-files", "-z"), cwd=repo)
+              return [part.decode("utf-8") for part in raw.split(b"\0") if part]
+
+          def physical_lines(text: str) -> int:
+              if not text:
+                  return 0
+              return text.count("\n") + int(not text.endswith("\n"))
+
+          def classify(path: str) -> str:
+              pure = PurePosixPath(path)
+              parts = set(pure.parts)
+              suffix = pure.suffix.lower()
+              name = pure.name
+              if name in LOCK_NAMES:
+                  return "third_party_lock"
+              if "tests" in parts or "test" in parts or name.startswith("test_") or name.endswith("_test.py"):
+                  return "test"
+              if "fixtures" in parts or "snapshots" in parts:
+                  return "fixture"
+              if suffix in SOURCE_EXTENSIONS:
+                  return "source"
+              if suffix in DOC_EXTENSIONS:
+                  return "documentation"
+              if suffix in CONFIG_EXTENSIONS or name.startswith("."):
+                  return "configuration"
+              return "other_text"
+
+          def normalized_text(text: str) -> str:
+              # Preserve semantics and indentation; ignore CRLF, trailing space, and blank-only lines.
+              lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+              return "\n".join(line.rstrip() for line in lines if line.strip())
+
+          def line_fingerprint(text: str) -> set[int]:
+              values: set[int] = set()
+              for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+                  line = raw_line.strip()
+                  if len(line) < 12:
+                      continue
+                  digest = hashlib.blake2b(line.encode("utf-8"), digest_size=8).digest()
+                  values.add(int.from_bytes(digest, "big"))
+              return values
+
+          records: list[dict[str, object]] = []
+          texts: dict[str, str] = {}
+          fingerprints: dict[str, set[int]] = {}
+          tracked_sets: dict[str, set[str]] = {}
+          repo_heads: dict[str, str] = {}
+          repo_trees: dict[str, str] = {}
+
+          for repo_name, repo_root in REPOSITORIES:
+              repo_heads[repo_name] = run(repo_root, "git", "rev-parse", "HEAD")
+              repo_trees[repo_name] = run(repo_root, "git", "rev-parse", "HEAD^{tree}")
+              paths = tracked_paths(repo_root)
+              tracked_sets[repo_name] = set(paths)
+              for path in paths:
+                  absolute = repo_root / path
+                  key = f"{repo_name}:{path}"
+                  if not absolute.is_file():
+                      records.append(
+                          {
+                              "repository": repo_name,
+                              "path": path,
+                              "category": "non_regular_or_gitlink",
+                              "bytes": 0,
+                              "physical_lines": 0,
+                              "nonblank_lines": 0,
+                              "exact_sha256": "",
+                              "normalized_sha256": "",
+                              "inbound_path_references": 0,
+                          }
+                      )
+                      continue
+                  data = absolute.read_bytes()
+                  if b"\0" in data:
+                      records.append(
+                          {
+                              "repository": repo_name,
+                              "path": path,
+                              "category": "binary",
+                              "bytes": len(data),
+                              "physical_lines": 0,
+                              "nonblank_lines": 0,
+                              "exact_sha256": hashlib.sha256(data).hexdigest(),
+                              "normalized_sha256": "",
+                              "inbound_path_references": 0,
+                          }
+                      )
+                      continue
+                  try:
+                      text = data.decode("utf-8")
+                  except UnicodeDecodeError:
+                      records.append(
+                          {
+                              "repository": repo_name,
+                              "path": path,
+                              "category": "non_utf8",
+                              "bytes": len(data),
+                              "physical_lines": 0,
+                              "nonblank_lines": 0,
+                              "exact_sha256": hashlib.sha256(data).hexdigest(),
+                              "normalized_sha256": "",
+                              "inbound_path_references": 0,
+                          }
+                      )
+                      continue
+                  normalized = normalized_text(text)
+                  texts[key] = text
+                  fingerprints[key] = line_fingerprint(text)
+                  records.append(
+                      {
+                          "repository": repo_name,
+                          "path": path,
+                          "category": classify(path),
+                          "bytes": len(data),
+                          "physical_lines": physical_lines(text),
+                          "nonblank_lines": sum(bool(line.strip()) for line in text.splitlines()),
+                          "exact_sha256": hashlib.sha256(data).hexdigest(),
+                          "normalized_sha256": hashlib.sha256(normalized.encode("utf-8")).hexdigest(),
+                          "inbound_path_references": 0,
+                      }
+                  )
+
+          record_by_key = {f"{r['repository']}:{r['path']}": r for r in records}
+          inbound = Counter()
+          outbound = defaultdict(set)
+          for source_key, text in texts.items():
+              repo_name, source_path = source_key.split(":", 1)
+              source_parent = PurePosixPath(source_path).parent
+              tracked = tracked_sets[repo_name]
+              for token in PATH_TOKEN_RE.findall(text):
+                  clean = token.rstrip(".,:;)]}'\"")
+                  candidates = [PurePosixPath(clean)]
+                  if clean.startswith("./") or clean.startswith("../"):
+                      candidates.append(source_parent / clean)
+                  else:
+                      candidates.append(source_parent / clean)
+                  for candidate in candidates:
+                      normalized_parts: list[str] = []
+                      escaped = False
+                      for part in candidate.parts:
+                          if part in ("", "."):
+                              continue
+                          if part == "..":
+                              if not normalized_parts:
+                                  escaped = True
+                                  break
+                              normalized_parts.pop()
+                          else:
+                              normalized_parts.append(part)
+                      if escaped:
+                          continue
+                      target_path = "/".join(normalized_parts)
+                      if target_path in tracked:
+                          target_key = f"{repo_name}:{target_path}"
+                          if target_key != source_key:
+                              inbound[target_key] += 1
+                              outbound[source_key].add(target_key)
+                          break
+          for key, count in inbound.items():
+              record_by_key[key]["inbound_path_references"] = count
+
+          def grouped(field: str, *, minimum_lines: int = 1) -> list[dict[str, object]]:
+              buckets: dict[str, list[str]] = defaultdict(list)
+              for record in records:
+                  digest = str(record[field])
+                  if digest and int(record["physical_lines"]) >= minimum_lines:
+                      buckets[digest].append(f"{record['repository']}:{record['path']}")
+              result = []
+              for digest, members in buckets.items():
+                  if len(members) < 2:
+                      continue
+                  result.append(
+                      {
+                          "digest": digest,
+                          "members": sorted(members),
+                          "member_count": len(members),
+                          "duplicated_lines": sum(int(record_by_key[m]["physical_lines"]) for m in members[1:]),
+                      }
+                  )
+              return sorted(result, key=lambda row: (-int(row["duplicated_lines"]), row["members"]))
+
+          exact_groups = grouped("exact_sha256")
+          exact_members = {member for group in exact_groups for member in group["members"]}
+          normalized_groups = [
+              group
+              for group in grouped("normalized_sha256")
+              if not all(member in exact_members for member in group["members"])
+          ]
+
+          inverted: dict[int, list[str]] = defaultdict(list)
+          for key, values in fingerprints.items():
+              if 25 <= len(values) <= 5000:
+                  for value in values:
+                      inverted[value].append(key)
+          intersections: Counter[tuple[str, str]] = Counter()
+          for members in inverted.values():
+              if 2 <= len(members) <= 12:
+                  for left, right in itertools.combinations(sorted(members), 2):
+                      intersections[(left, right)] += 1
+          near_duplicates: list[dict[str, object]] = []
+          for (left, right), intersection in intersections.items():
+              left_values = fingerprints[left]
+              right_values = fingerprints[right]
+              minimum = min(len(left_values), len(right_values))
+              if intersection < 20 or minimum == 0:
+                  continue
+              containment = intersection / minimum
+              union = len(left_values) + len(right_values) - intersection
+              jaccard = intersection / union if union else 1.0
+              if containment < 0.65 and jaccard < 0.50:
+                  continue
+              near_duplicates.append(
+                  {
+                      "left": left,
+                      "right": right,
+                      "shared_line_fingerprints": intersection,
+                      "containment": round(containment, 6),
+                      "jaccard": round(jaccard, 6),
+                      "smaller_physical_lines": min(
+                          int(record_by_key[left]["physical_lines"]),
+                          int(record_by_key[right]["physical_lines"]),
+                      ),
+                  }
+              )
+          near_duplicates.sort(
+              key=lambda row: (-float(row["containment"]), -int(row["smaller_physical_lines"]), row["left"], row["right"])
+          )
+
+          category_totals: dict[str, Counter[str]] = defaultdict(Counter)
+          top_level_totals: dict[str, Counter[str]] = defaultdict(Counter)
+          for record in records:
+              repository = str(record["repository"])
+              category = str(record["category"])
+              top_level = str(record["path"]).split("/", 1)[0]
+              category_totals[repository][category] += int(record["physical_lines"])
+              top_level_totals[repository][top_level] += int(record["physical_lines"])
+
+          primary_categories = {
+              "source", "test", "fixture", "documentation", "configuration", "other_text"
+          }
+          primary_totals = {
+              repository: sum(
+                  int(record["physical_lines"])
+                  for record in records
+                  if record["repository"] == repository and record["category"] in primary_categories
+              )
+              for repository, _ in REPOSITORIES
+          }
+
+          large_files = sorted(
+              (
+                  record
+                  for record in records
+                  if int(record["physical_lines"]) > 0 and record["category"] != "third_party_lock"
+              ),
+              key=lambda row: (-int(row["physical_lines"]), str(row["repository"]), str(row["path"])),
+          )[:250]
+          unreferenced_large = [
+              record
+              for record in large_files
+              if int(record["inbound_path_references"]) == 0 and int(record["physical_lines"]) >= 200
+          ]
+
+          fieldnames = list(records[0])
+          with (OUT / "inventory.csv").open("w", encoding="utf-8", newline="") as handle:
+              writer = csv.DictWriter(handle, fieldnames=fieldnames)
+              writer.writeheader()
+              writer.writerows(sorted(records, key=lambda row: (str(row["repository"]), str(row["path"]))))
+          with (OUT / "near-duplicates.csv").open("w", encoding="utf-8", newline="") as handle:
+              writer = csv.DictWriter(
+                  handle,
+                  fieldnames=(
+                      "left", "right", "shared_line_fingerprints", "containment", "jaccard", "smaller_physical_lines"
+                  ),
+              )
+              writer.writeheader()
+              writer.writerows(near_duplicates)
+
+          report = {
+              "schema": "agent-canon.issue-1041.repository-inventory.v1",
+              "repositories": {
+                  name: {"head": repo_heads[name], "tree": repo_trees[name], "primary_physical_lines": primary_totals[name]}
+                  for name, _ in REPOSITORIES
+              },
+              "category_lines": {name: dict(sorted(values.items())) for name, values in category_totals.items()},
+              "top_level_lines": {name: dict(values.most_common()) for name, values in top_level_totals.items()},
+              "exact_duplicate_groups": exact_groups,
+              "normalized_duplicate_groups": normalized_groups,
+              "near_duplicates": near_duplicates,
+              "largest_files": large_files,
+              "large_files_without_exact_path_reference": unreferenced_large,
+          }
+          (OUT / "inventory.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+          lines = [
+              "# Issue 1041 repository inventory",
+              "",
+              "## Identity",
+          ]
+          for name, _ in REPOSITORIES:
+              lines.append(
+                  f"- `{name}`: head `{repo_heads[name]}`, tree `{repo_trees[name]}`, primary physical lines `{primary_totals[name]:,}`"
+              )
+          lines.extend(("", "## Category totals"))
+          for name, values in category_totals.items():
+              lines.append(f"### {name}")
+              for category, count in values.most_common():
+                  lines.append(f"- `{category}`: {count:,}")
+          lines.extend(("", "## Top-level totals"))
+          for name, values in top_level_totals.items():
+              lines.append(f"### {name}")
+              for top_level, count in values.most_common():
+                  lines.append(f"- `{top_level}`: {count:,}")
+          lines.extend(
+              (
+                  "",
+                  "## Duplicate signals",
+                  f"- exact groups: {len(exact_groups):,}; removable-copy line upper bound: {sum(int(g['duplicated_lines']) for g in exact_groups):,}",
+                  f"- normalized groups: {len(normalized_groups):,}; removable-copy line upper bound: {sum(int(g['duplicated_lines']) for g in normalized_groups):,}",
+                  f"- near-duplicate pairs meeting threshold: {len(near_duplicates):,}",
+                  "",
+                  "## Largest files",
+              )
+          )
+          for record in large_files[:60]:
+              lines.append(
+                  f"- {int(record['physical_lines']):,} lines; refs={int(record['inbound_path_references'])}: `{record['repository']}:{record['path']}` ({record['category']})"
+              )
+          lines.extend(("", "## Highest exact duplicate groups"))
+          for group in exact_groups[:40]:
+              lines.append(
+                  f"- upper-bound {int(group['duplicated_lines']):,} lines: " + ", ".join(f"`{member}`" for member in group["members"])
+              )
+          lines.extend(("", "## Highest near-duplicate pairs"))
+          for row in near_duplicates[:60]:
+              lines.append(
+                  f"- containment={float(row['containment']):.3f}, smaller={int(row['smaller_physical_lines']):,}: `{row['left']}` ↔ `{row['right']}`"
+              )
+          lines.extend(("", "## Large files without exact path-token references"))
+          for record in unreferenced_large[:60]:
+              lines.append(
+                  f"- {int(record['physical_lines']):,} lines: `{record['repository']}:{record['path']}` ({record['category']})"
+              )
+          summary = "\n".join(lines) + "\n"
+          (OUT / "summary.md").write_text(summary, encoding="utf-8")
+          print(summary)
+          PY
+
+      - name: Upload inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1041-repository-inventory
+          path: issue-1041-inventory
+          if-no-files-found: error
