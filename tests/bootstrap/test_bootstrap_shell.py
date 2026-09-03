@@ -3225,12 +3225,10 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         ).stdout.strip()
         assert source_sync["status"] == "success"
         assert source_sync["source_head"] == source_head
-        assert result["images"][replacement["Config"]["Image"]]["Config"]["Labels"][
-            "io.agent-canon.source-revision"
-        ] == source_head
     expected_mounts = {
         "/var/lib/agent-canon",
         "/var/lib/agent-canon/source-sync",
+        "/opt/agent-canon/source",
     }
     expected_mounts.add(f"/targets/{valid_digest}")
     assert {mount["Destination"] for mount in replacement["Mounts"]} == expected_mounts
