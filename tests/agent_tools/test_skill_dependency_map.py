@@ -277,7 +277,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertNotIn("sync", " ".join(archive_commands[0]))
         self.assertNotIn("status", " ".join(archive_commands[0]))
 
-    def test_cross_module_resolution_precedes_refactor_without_parallel_relation(self) -> None:
+    def test_cross_module_prompt_order_keeps_lifecycle_parallel(self) -> None:
         """The conditional dependency route orders only selected downstream skills."""
         rules = load_skill_route_rules(PROJECT_ROOT)
         by_skill = {rule.skill: rule for rule in rules}
@@ -288,25 +288,30 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             [(item.before, item.after) for item in dependency.order_constraints],
             [
                 ("dependency-analysis", "code-visualization"),
-                ("dependency-analysis", "refactor-loop"),
             ],
         )
         self.assertNotIn("dependency-module-change", dependency.parallel_independent)
         self.assertNotIn("dependency-analysis", module_change.parallel_independent)
         selected = derive_skill_invocation_order(
             (
-                "refactor-loop",
                 "dependency-analysis",
                 "code-visualization",
             ),
             rules,
         )
         dependency_index = selected.index("dependency-analysis")
-        for downstream in (
-            "code-visualization",
-            "refactor-loop",
-        ):
-            self.assertLess(dependency_index, selected.index(downstream))
+        self.assertLess(dependency_index, selected.index("code-visualization"))
+
+        orchestration = " ".join(
+            (PROJECT_ROOT / "agents/skills/agent-orchestration.md")
+            .read_text(encoding="utf-8")
+            .split()
+        )
+        condition = orchestration.index("involved Git roots / modules")
+        activation = orchestration.index("deferred / candidate")
+        decomposition = orchestration.index("decomposition、prototype、worker")
+        self.assertLess(condition, activation)
+        self.assertLess(activation, decomposition)
 
     def test_tool_resolution_edges_are_readback_complete(self) -> None:
         """Every resolved tool ID from command packets is represented as a tool-resolution edge."""
