@@ -2064,8 +2064,8 @@ def test_sync_uses_pull_without_candidate_or_source_admission() -> None:
 @pytest.mark.parametrize(
     "compatibility_args",
     (
-        ("--remote", "origin", "--branch", "main"),
-        ("--remote=origin", "--branch=main"),
+        ("--remote", "legacy-remote", "--branch", "feature"),
+        ("--remote=legacy-remote", "--branch=feature"),
     ),
 )
 def test_sync_accepts_legacy_dotfiles_argv_but_keeps_fixed_git_target(
