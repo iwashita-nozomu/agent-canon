@@ -868,6 +868,138 @@ class DependencyModelTests(unittest.TestCase):
                     receipts=image_root / "missing-receipts",
                 )
 
+    def test_image_install_is_install_only_and_writes_structural_receipts(self) -> None:
+        """Image install does not invoke package managers or live probes."""
+        apt = parse_record(
+            record(
+                "apt-tool",
+                method="apt-package",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "apt-tool",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        npm = parse_record(
+            record("node-tool", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        pipx = parse_record(
+            record("python-tool", method="pipx"),
+            path=Path("fixture.toml"),
+            index=2,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (apt, npm, pipx)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            init_authentic_git(root)
+            image_root = root / "image-root"
+            runner = FakeRunner()
+            Installer(runner, image_owned=True, image_owned_root=image_root).install(
+                plan,
+                workspace=root,
+                receipts=image_root / "receipts",
+            )
+            for record_id in ("apt-tool", "node-tool", "python-tool"):
+                payload = json.loads(
+                    (image_root / "receipts" / f"{record_id}.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(payload["status"], "installed")
+                self.assertTrue(
+                    Installer._receipt_matches(
+                        image_root / "receipts" / f"{record_id}.json",
+                        plan,
+                        plan.by_id()[record_id],
+                    )
+                )
+            commands = [call[:2] for call in runner.calls]
+            self.assertNotIn(("npm", "ls"), commands)
+            self.assertNotIn(("pipx", "runpip"), commands)
+            self.assertFalse(any(Path(call[0]).name == "dpkg-query" for call in runner.calls))
+            apt_payload = json.loads(
+                (image_root / "receipts" / "apt-tool.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                apt_payload["executable_bindings"]["apt-tool"]["absolute_path"],
+                "/usr/bin/apt-tool",
+            )
+            self.assertEqual(
+                json.loads(
+                    (image_root / "receipts" / "node-tool.json").read_text(
+                        encoding="utf-8"
+                    )
+                )["executable_bindings"]["node-tool"]["absolute_path"],
+                "/usr/local/bin/node-tool",
+            )
+            self.assertEqual(
+                json.loads(
+                    (image_root / "receipts" / "python-tool.json").read_text(
+                        encoding="utf-8"
+                    )
+                )["executable_bindings"]["python-tool"]["absolute_path"],
+                "/usr/local/bin/python-tool",
+            )
+
+    def test_installed_receipt_verification_direct_probes_without_rewriting(self) -> None:
+        """Image verification uses one absolute executable probe and preserves receipts."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = root / "dependencies.toml"
+            write_manifest(manifest, [record("node-tool", method="npm-global")])
+            parsed = parse_record(
+                record("node-tool", method="npm-global"),
+                path=manifest,
+                index=0,
+            )
+            plan = build_plan((loaded_manifest(manifest, (parsed,)),))
+            image_root = root / "image-root"
+            image_root.mkdir()
+            install_runner = FakeRunner()
+            Installer(
+                install_runner, image_owned=True, image_owned_root=root
+            ).install(
+                plan,
+                workspace=root,
+                receipts=image_root / "receipts",
+            )
+            receipt = image_root / "receipts" / "node-tool.json"
+            before = receipt.read_bytes()
+            verify_runner = FakeRunner()
+            installer = Installer(verify_runner)
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            installer._verify_installed_receipt(
+                parsed, payload, workspace=root
+            )
+            self.assertEqual(receipt.read_bytes(), before)
+            self.assertIn(("/usr/local/bin/node-tool", "--version"), verify_runner.calls)
+            self.assertFalse(
+                any(
+                    call[:2] == ("npm", "ls") or call[:2] == ("pipx", "runpip")
+                    for call in verify_runner.calls
+                )
+            )
+            with mock.patch.object(
+                dependency_module,
+                "Installer",
+                lambda: Installer(verify_runner),
+            ):
+                resolved = dependency_module.resolve_verified_executable(
+                    root,
+                    image_root / "receipts",
+                    "node-tool",
+                    "node-tool",
+                    manifest=manifest,
+                )
+            self.assertEqual(resolved.absolute_path, "/usr/local/bin/node-tool")
+            self.assertEqual(receipt.read_bytes(), before)
+
     def test_image_install_failure_does_not_publish_target_and_freezes_tree(self) -> None:
         parsed = parse_record(
             record("image-tool", method="apt-package"),
@@ -3702,6 +3834,9 @@ class DependencyModelTests(unittest.TestCase):
         dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
         self.assertFalse((ROOT / ".devcontainer").exists())
         self.assertIn("FROM ubuntu:24.04@sha256:", dockerfile)
+        self.assertEqual(dockerfile.count("\nFROM ") + dockerfile.startswith("FROM "), 1)
+        self.assertEqual(dockerfile.count("\nRUN ") + dockerfile.startswith("RUN "), 2)
+        self.assertNotIn("ARG TARGETVARIANT", dockerfile)
         self.assertNotIn("FROM node:", dockerfile)
         self.assertIn("--mount=type=bind,source=tools/runtime/dispatch/agent-canon", dockerfile)
         self.assertIn(
@@ -3723,6 +3858,9 @@ class DependencyModelTests(unittest.TestCase):
         self.assertNotIn("python3-pip", dockerfile)
         self.assertIn("python3-packaging", dockerfile)
         self.assertIn("build-essential", dockerfile)
+        apt_bootstrap = dockerfile.split("apt-get install", 1)[1].split(";", 1)[0]
+        for package in ("pipx", "jq", "tree", "clangd-18"):
+            self.assertNotIn(package, apt_bootstrap)
         self.assertNotIn("ninja-build", dockerfile)
         self.assertNotIn("USER agentcanon", dockerfile)
         self.assertNotIn("AGENT_CANON_RUNTIME_UID", dockerfile)

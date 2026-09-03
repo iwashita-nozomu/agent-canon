@@ -10,7 +10,6 @@ FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG TARGETVARIANT
 ENV PYTHONDONTWRITEBYTECODE=1 \
     CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
     RUSTUP_HOME=/usr/local/share/agent-canon/toolchains/rustup \
@@ -34,9 +33,7 @@ LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
       io.agent-canon.run.pids-limit="512" \
       io.agent-canon.run.tmpfs="/tmp"
 
-# BuildKit read-only exact inputs keep unrelated docs/skill changes out of the
-# dependency/Rust layer.  Runtime and build packages share one apt transaction;
-# all build-only package managers and caches are purged before this layer ends.
+# Install bootstrap packages and manifest-owned dependencies in one image layer.
 RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=/src/bootstrap/container/image/dependencies.toml,readonly \
     --mount=type=bind,source=tools/runtime/container/devcontainer_dependencies.py,target=/src/tools/runtime/container/devcontainer_dependencies.py,readonly \
     --mount=type=bind,source=tools/analysis/dependencies/dependency_plan.py,target=/src/tools/analysis/dependencies/dependency_plan.py,readonly \
@@ -46,9 +43,8 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     set -eux; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      ca-certificates git jq=1.7.1-3ubuntu0.24.04.2 tree=2.1.1-2ubuntu3.24.04.2 \
-      nodejs=18.19.1+dfsg-6ubuntu5 npm=9.2.0~ds1-2 clangd-18=1:18.1.3-1ubuntu1 \
-      python3.12 python3-packaging python3-yaml pipx=1.4.3-1 build-essential curl; \
+      ca-certificates git nodejs=18.19.1+dfsg-6ubuntu5 npm=9.2.0~ds1-2 \
+      python3.12 python3-packaging python3-yaml build-essential curl; \
     case "$TARGETOS/$TARGETARCH" in \
       linux/amd64) rustup_target=x86_64-unknown-linux-gnu; rustup_sha=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c ;; \
       linux/arm64) rustup_target=aarch64-unknown-linux-gnu; rustup_sha=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c ;; \

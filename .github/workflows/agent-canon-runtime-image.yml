@@ -31,41 +31,20 @@ jobs:
           - arch: amd64
             runs_on: ubuntu-24.04
             platform: linux/amd64
-            runner_arch: X64
-            uname: x86_64
           - arch: arm64
             runs_on: ubuntu-24.04-arm
             platform: linux/arm64
-            runner_arch: ARM64
-            uname: aarch64
     runs-on: ${{ matrix.runs_on }}
     env:
       ARCH: ${{ matrix.arch }}
       BUILDER_NAME: agent-canon-runtime-${{ github.run_id }}-${{ matrix.arch }}
       EXPECTED_PLATFORM: ${{ matrix.platform }}
-      EXPECTED_RUNNER_ARCH: ${{ matrix.runner_arch }}
-      EXPECTED_UNAME: ${{ matrix.uname }}
 
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
           persist-credentials: false
-
-      - name: Verify native runner
-        env:
-          ACTUAL_RUNNER_ARCH: ${{ runner.arch }}
-        run: |
-          set -euo pipefail
-          actual_uname="$(uname -m)"
-          if [ "${ACTUAL_RUNNER_ARCH}" != "${EXPECTED_RUNNER_ARCH}" ]; then
-            echo "runner.arch=${ACTUAL_RUNNER_ARCH}; expected ${EXPECTED_RUNNER_ARCH}" >&2
-            exit 1
-          fi
-          if [ "${actual_uname}" != "${EXPECTED_UNAME}" ]; then
-            echo "uname -m=${actual_uname}; expected ${EXPECTED_UNAME}" >&2
-            exit 1
-          fi
 
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
@@ -87,45 +66,7 @@ jobs:
             --use
           docker buildx inspect --bootstrap "${BUILDER_NAME}"
 
-      - name: Build native architecture image for pull request
-        if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
-          docker buildx build \
-            --builder "${BUILDER_NAME}" \
-            --network host \
-            --file bootstrap/container/image/Dockerfile \
-            --platform "${EXPECTED_PLATFORM}" \
-            --tag "agent-canon-runtime:pr-${GITHUB_SHA}-${ARCH}" \
-            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --label "org.opencontainers.image.version=pr-${GITHUB_SHA}" \
-            --load \
-            .
-
-      - name: Smoke test native pull-request image
-        if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
-          image="agent-canon-runtime:pr-${GITHUB_SHA}-${ARCH}"
-          docker run --rm --network none "$image" health
-          docker run --rm --entrypoint /bin/sh --network none "$image" -c '
-            set -eu
-            python3 --version
-            node --version
-            clangd-18 --version
-            python3 -c "import packaging, yaml"
-            python3 -c "from pathlib import Path; import sys; sys.path.insert(0, \"/usr/local/share/agent-canon/runtime\"); from tools.analysis.code.lsp_code_analysis import LspServerSpec; r=Path(\"/usr/local/share/agent-canon/image-dependencies/receipts\"); s=[LspServerSpec.for_language(x, root=Path(\"/workspace\"), receipts=r) for x in (\"c\",\"cpp\")]; assert len({x.record_id for x in s}) == 1"
-            jq -e ".schema and .receipts" /usr/local/share/agent-canon/image-dependencies/plan.json >/dev/null
-            ! command -v npm; ! command -v pip; ! command -v pipx; ! command -v ninja; ! command -v curl; ! command -v gpg
-            ! command -v rustfmt; ! command -v cargo-clippy
-            ! test -e /usr/local/share/agent-canon/toolchains/cargo-target
-            ! test -e /usr/local/share/agent-canon/toolchains/cargo/registry
-            ! test -e /usr/local/share/agent-canon/toolchains/cargo/git
-          '
-
-      - name: Build and publish native architecture image
-        if: github.event_name != 'pull_request'
+      - name: Build native architecture image
         run: |
           set -euo pipefail
           docker buildx build \
@@ -137,13 +78,41 @@ jobs:
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=sha-${GITHUB_SHA}" \
-            --push \
+            --load \
             .
+
+      - name: Verify native architecture image
+        run: |
+          set -euo pipefail
+          image="${IMAGE_NAME}:sha-${GITHUB_SHA}-${ARCH}"
+          docker run --rm --network none --workdir /usr/local/share/agent-canon/runtime \
+            --env PYTHONPATH=/usr/local/share/agent-canon/runtime --entrypoint python3 "$image" \
+            /usr/local/share/agent-canon/runtime/tools/runtime/container/devcontainer_dependencies.py \
+            image-verify \
+            --workspace /usr/local/share/agent-canon/runtime \
+            --manifest /usr/local/share/agent-canon/runtime/dependencies.toml
+          docker run --rm --network none "$image" health
+          docker run --rm --entrypoint /bin/sh --network none "$image" -c '
+            set -eu
+            python3 -c "import packaging, yaml"
+            python3 -c "from pathlib import Path; import sys; sys.path.insert(0, \"/usr/local/share/agent-canon/runtime\"); from tools.analysis.code.lsp_code_analysis import LspServerSpec; r=Path(\"/usr/local/share/agent-canon/image-dependencies/receipts\"); s=[LspServerSpec.for_language(x, root=Path(\"/workspace\"), receipts=r) for x in (\"c\",\"cpp\")]; assert len({x.record_id for x in s}) == 1"
+            ! command -v npm; ! command -v pip; ! command -v pipx; ! command -v ninja; ! command -v curl; ! command -v gpg
+            ! command -v rustfmt; ! command -v cargo-clippy
+            ! test -e /usr/local/share/agent-canon/toolchains/cargo-target
+            ! test -e /usr/local/share/agent-canon/toolchains/cargo/registry
+            ! test -e /usr/local/share/agent-canon/toolchains/cargo/git
+          '
+
+      - name: Push verified native architecture image
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          docker push "${IMAGE_NAME}:sha-${GITHUB_SHA}-${ARCH}"
 
       - name: Remove temporary buildx builder and log out
         if: always()
         run: |
-          docker image rm --force "agent-canon-runtime:pr-${GITHUB_SHA}-${ARCH}" >/dev/null 2>&1 || true
+          docker image rm --force "${IMAGE_NAME}:sha-${GITHUB_SHA}-${ARCH}" >/dev/null 2>&1 || true
           docker buildx rm --force "${BUILDER_NAME}" >/dev/null 2>&1 || true
           docker logout "${REGISTRY}" >/dev/null 2>&1 || true
 

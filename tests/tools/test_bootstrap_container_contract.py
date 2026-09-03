@@ -99,9 +99,13 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
     assert "clippy" not in text
 
 
-def test_runtime_clangd_install_is_verified_and_build_tools_are_absent() -> None:
+def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    assert "clangd-18" in text
+    manifest = DEPENDENCIES.read_text(encoding="utf-8")
+    assert "clangd-18" in manifest
+    apt_bootstrap = text.split("apt-get install", 1)[1].split(";", 1)[0]
+    for package in ("pipx", "jq", "tree", "clangd-18"):
+        assert package not in apt_bootstrap
     assert "apt-get purge -y --auto-remove npm pipx build-essential curl" in text
     assert "python3.12" in text
     assert "nodejs" in text and "npm" in text
