@@ -40,6 +40,7 @@ from tools.agent.orchestration.team_config import (  # noqa: E402
     load_team_config,
 )
 from tools.agent.orchestration.implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
+from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
 
 
 class RouteToolTest(unittest.TestCase):
@@ -2202,6 +2203,39 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-learning", decision["skills"])
         self.assertIn("md-style-check", decision["matched_skills"])
         self.assertIn("agent-learning", decision["matched_skills"])
+
+    def test_comprehensive_tasks_project_cross_module_handoff_guidance(self) -> None:
+        """T11/T12 inherit the conditional dependency-resolution prompt."""
+        config = load_team_config()
+        catalog = load_task_catalog(config)
+        family = next(
+            family
+            for family in catalog.workflow_families
+            if family["id"] == "comprehensive_development"
+        )
+        rendered = "\n".join(
+            # The family packet is the existing task-manifest projection for T11/T12.
+            render_subagent_prompt_packet(family, indent="  ")
+        )
+        self.assertIn("involved Git-root/module count", rendered)
+        self.assertIn("dependency-repository consumer", rendered)
+        self.assertIn("dependency DAG", rendered)
+        for marker in (
+            "involved-root identities",
+            "edge kinds",
+            "topological order",
+            "dependency scope / reuse facts",
+            "common validation obligations",
+            "role / module's `allowed_paths`",
+            "`do_not_read`",
+            "write scope",
+            "exact validation commands",
+        ):
+            self.assertIn(marker, rendered)
+        self.assertEqual(
+            [task["family"] for task in catalog.tasks if task["id"] in ("T11", "T12")],
+            ["comprehensive_development", "comprehensive_development"],
+        )
 
     def test_prompt_route_invalid_catalog_fails_structured(self) -> None:
         """Invalid catalog routing should return a structured router error."""

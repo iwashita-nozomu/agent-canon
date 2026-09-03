@@ -48,6 +48,18 @@ generic lifecycle または operation-level approval carve-out には含めま�
 です。共有 checkout の raw `git checkout`、branch/worktree、reset/restore/clean/stash
 などは従来どおり protected Git route として明示 authority を必要とします。
 
+複数の involved Git roots / modules、または dependency repository consumer を含む
+変更では、decomposition、prototype、write handoff より前に
+`dependency-analysis` を選び、cross-module の dependency DAG、scope、repair
+batches、reuse survey、validation route、allowed paths を解決します。gitlink / pin
+と code / build / API edge を混同せず、source repository の変更・publication から
+dependent repository の更新・検証・publication、parent の pin / projection・検証へ
+topological order で進めます。未解決 edge / cycle は design / order issue として
+保持します。単一 module に dependency-repository consumer がない場合はこの分岐を
+起動せず、既存の clone / gitlink / pin lifecycleだけを適用します。ここでの
+`prepare`、`merge-main`、`cleanup`、identity、publication、projection の挙動は
+変更しません。
+
 ```bash
 python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <path> --branch <branch> \
