@@ -277,6 +277,26 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertNotIn("sync", " ".join(archive_commands[0]))
         self.assertNotIn("status", " ".join(archive_commands[0]))
 
+    def test_cross_module_resolution_precedes_refactor_without_parallel_relation(self) -> None:
+        """The conditional dependency route orders only the selected pair."""
+        rules = load_skill_route_rules(PROJECT_ROOT)
+        by_skill = {rule.skill: rule for rule in rules}
+        dependency = by_skill["dependency-analysis"]
+        module_change = by_skill["dependency-module-change"]
+
+        self.assertEqual(
+            [(item.before, item.after) for item in dependency.order_constraints],
+            [("dependency-analysis", "refactor-loop")],
+        )
+        self.assertNotIn("dependency-module-change", dependency.parallel_independent)
+        self.assertNotIn("dependency-analysis", module_change.parallel_independent)
+        selected = derive_skill_invocation_order(
+            ("refactor-loop", "dependency-analysis"), rules
+        )
+        self.assertLess(
+            selected.index("dependency-analysis"), selected.index("refactor-loop")
+        )
+
     def test_tool_resolution_edges_are_readback_complete(self) -> None:
         """Every resolved tool ID from command packets is represented as a tool-resolution edge."""
         graph = build_graph(PROJECT_ROOT)

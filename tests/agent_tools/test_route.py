@@ -40,6 +40,7 @@ from tools.agent.orchestration.team_config import (  # noqa: E402
     load_team_config,
 )
 from tools.agent.orchestration.implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
+from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
 
 
 class RouteToolTest(unittest.TestCase):
@@ -2202,6 +2203,59 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-learning", decision["skills"])
         self.assertIn("md-style-check", decision["matched_skills"])
         self.assertIn("agent-learning", decision["matched_skills"])
+
+    def test_prompt_defers_cross_module_dependency_analysis(self) -> None:
+        """Only explicit multi-root dependency language activates the deferred route."""
+        prompts = (
+            "Resolve cross-module dependencies before implementation.",
+            "複数のモジュール間の依存を解決してから実装する。",
+            "A dependency repository consumer must be updated with the module.",
+        )
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("dependency-analysis", decision["matched_skills"])
+                self.assertIn("dependency-analysis", decision["deferred_skills"])
+                self.assertNotIn("dependency-analysis", decision["active_skills"])
+
+    def test_prompt_keeps_single_module_and_clone_fast_paths(self) -> None:
+        """A single module or standalone clone must not activate cross-module analysis."""
+        prompts = (
+            "Update the single module dependency and its tests.",
+            "Prepare a standalone repository topic clone.",
+            "Update one submodule in isolation.",
+        )
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertNotIn("dependency-analysis", decision["matched_skills"])
+
+    def test_comprehensive_tasks_project_cross_module_handoff_guidance(self) -> None:
+        """T11/T12 inherit the conditional dependency-resolution prompt."""
+        config = load_team_config()
+        catalog = load_task_catalog(config)
+        family = next(
+            family
+            for family in catalog.workflow_families
+            if family["id"] == "comprehensive_development"
+        )
+        rendered = "\n".join(
+            # The family packet is the existing task-manifest projection for T11/T12.
+            render_subagent_prompt_packet(family, indent="  ")
+        )
+        self.assertIn("involved Git-root/module count", rendered)
+        self.assertIn("dependency-repository consumer", rendered)
+        self.assertIn("dependency DAG", rendered)
+        self.assertEqual(
+            [task["family"] for task in catalog.tasks if task["id"] in ("T11", "T12")],
+            ["comprehensive_development", "comprehensive_development"],
+        )
 
     def test_prompt_route_invalid_catalog_fails_structured(self) -> None:
         """Invalid catalog routing should return a structured router error."""

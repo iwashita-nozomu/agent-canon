@@ -1501,12 +1501,12 @@ skill_families:
     visualization_role: adapter
     tool_id: agent_canon.visualization.adapter.dependency_manifest
     argument_schema: agent_canon.visualization.arguments.dependency_manifest.v1
-    purpose: Run dependency manifest and code-dependency tools, then package change impact and repair-planning context for editing, review, or subagent handoff.
+    purpose: Run dependency manifest and code-dependency tools, and conditionally resolve cross-module or cross-repository edges before decomposition, prototyping, or write handoff while packaging change impact and repair-planning context.
     canonical_doc: agents/skills/dependency-analysis.md
     shim: .codex/personal/skills/dependency-analysis/SKILL.md
     discovery:
       name: dependency-analysis
-      description: "Use when checking, validating, or diagnosing repository dependency manifests, expanding code/header/search dependencies into a change-impact packet, or preparing repair-planning and subagent handoff context before editing, review, or closeout."
+      description: "Use when checking, validating, or diagnosing repository dependency manifests, expanding code/header/search dependencies into a change-impact packet, resolving involved cross-module or dependency-repository consumer edges before decomposition or write handoff, or preparing repair-planning and subagent handoff context before editing, review, or closeout."
     tool_commands:
       required: []
       conditional:
@@ -1529,6 +1529,52 @@ skill_families:
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: deferred
+      reason: cross-module or cross-repository dependency resolution is needed before decomposition or implementation handoff
+      triggers:
+        - ["cross-module", "dependency"]
+        - ["cross-module", "dependencies"]
+        - ["cross module", "dependency"]
+        - ["cross module", "dependencies"]
+        - ["cross-repository", "dependency"]
+        - ["cross-repository", "dependencies"]
+        - ["cross repository", "dependency"]
+        - ["cross repository", "dependencies"]
+        - ["multi-module", "dependency"]
+        - ["multi-module", "dependencies"]
+        - ["multi module", "dependency"]
+        - ["multi module", "dependencies"]
+        - ["multiple modules", "dependency"]
+        - ["multiple modules", "dependencies"]
+        - ["multi-submodule", "dependency"]
+        - ["multi-submodule", "dependencies"]
+        - ["multi submodule", "dependency"]
+        - ["multi submodule", "dependencies"]
+        - ["multiple submodules", "dependency"]
+        - ["multiple submodules", "dependencies"]
+        - ["dependency", "across", "modules"]
+        - ["dependency", "between", "modules"]
+        - ["dependency", "across", "submodules"]
+        - ["dependency", "between", "submodules"]
+        - ["dependencies", "across", "modules"]
+        - ["dependencies", "between", "modules"]
+        - ["dependencies", "across", "repositories"]
+        - ["dependencies", "between", "repositories"]
+        - ["dependencies", "across", "submodules"]
+        - ["dependencies", "between", "submodules"]
+        - ["dependency", "repository", "consumer"]
+        - ["dependencies", "repository", "consumer"]
+        - ["module", "consumer", "another", "repository"]
+        - ["依存", "モジュール間"]
+        - ["依存", "リポジトリ間"]
+        - ["複数", "モジュール", "依存"]
+        - ["複数", "サブモジュール", "依存"]
+        - ["複数", "リポジトリ", "依存"]
+        - ["クロスモジュール", "依存"]
+        - ["クロスリポジトリ", "依存"]
+        - ["サブモジュール間", "依存"]
+        - ["依存", "リポジトリ", "consumer"]
   - id: worktree-start
     purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
     canonical_doc: agents/skills/worktree-start.md
