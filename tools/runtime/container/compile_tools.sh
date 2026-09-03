@@ -22,7 +22,7 @@ trap cleanup EXIT
 
 mkdir -p -- "$compiled_bin_dir" "$cargo_target_dir" "$cargo_home"
 if [[ -d "$seed_cargo_home" ]]; then
-    cp -R -n -- "$seed_cargo_home/." "$cargo_home/"
+    cp -R --update=none -- "$seed_cargo_home/." "$cargo_home/"
 fi
 
 # The source tree is the only tool inventory. Cargo metadata supplies binary
