@@ -2220,6 +2220,18 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("involved Git-root/module count", rendered)
         self.assertIn("dependency-repository consumer", rendered)
         self.assertIn("dependency DAG", rendered)
+        for marker in (
+            "involved-root identities",
+            "edge kinds",
+            "topological order",
+            "dependency scope / reuse facts",
+            "common validation obligations",
+            "role / module's `allowed_paths`",
+            "`do_not_read`",
+            "write scope",
+            "exact validation commands",
+        ):
+            self.assertIn(marker, rendered)
         self.assertEqual(
             [task["family"] for task in catalog.tasks if task["id"] in ("T11", "T12")],
             ["comprehensive_development", "comprehensive_development"],

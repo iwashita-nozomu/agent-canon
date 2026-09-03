@@ -249,8 +249,9 @@ paths、prior PR / Issue、predecessor tests を必ず走査し、該当 asset r
 いずれかへ決め、`asset_path` ごとに一度だけ記録します。これは advisory
 context であり、不在は dispatch / write を block しません。
 責務 slice は decision 済み asset から導き、同じ asset を含む slices を merge
-してから known な `allowed_paths` とともに `refactor-loop` と全 child へ同じ asset
-context と `test_paths` を渡します。context がない場合も既存 route は継続します。
+してから、同じ asset context と `test_paths` を `refactor-loop` と全 child へ渡します。
+known な `allowed_paths` は各 child の role / module に応じて個別に導出し、context が
+ない場合も既存 route は継続します。
 
 ### Conditional cross-module resolution
 
@@ -271,9 +272,12 @@ Change Impact Packet の既存 `dependency_dag`、`dependency_scope`、
 未解決 edge または cycle は実装を進める理由ではなく、design / order issue として
 残します。実行順は source repository change / publication、dependent repository
 update / validation / publication、parent gitlink pin / projection / validation
-の topological order とします。選択した依存 context、責務 slice、validation、
-allowed paths は全 child に同じ内容で渡し、child ごとの再調査や別の依存解釈を
-作りません。
+の topological order とします。involved-root identities、edge kinds、topological
+order、dependency scope / reuse facts、common validation obligations は全 child に
+同一の shared context として渡します。各 child の role / module に固有の
+`allowed_paths`、`do_not_read`、write scope、exact validation commands は、その
+shared context と child owner から個別に導出します。child ごとの再調査や別の
+依存解釈を作りません。
 
 Packet には次を含めます。
 
