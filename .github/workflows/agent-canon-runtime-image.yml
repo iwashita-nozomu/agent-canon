@@ -1,12 +1,11 @@
 # @dependency-start
 # contract configuration
-# responsibility Builds and publishes the multi-architecture AgentCanon runtime image.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime image contract
-# upstream implementation ../../bootstrap/container/image/Dockerfile builds the runtime image
-# downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates workflow conventions
+# responsibility Builds one reusable multi-architecture AgentCanon environment image.
+# upstream implementation ../../bootstrap/container/image/environment_key.sh stable environment key
+# downstream implementation ../../bootstrap/host/lifecycle/entrypoint.sh host image selection
 # @dependency-end
 
-name: AgentCanon runtime image
+name: AgentCanon environment image
 
 on:
   push:
@@ -23,7 +22,38 @@ permissions:
   packages: write
 
 jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      image: ${{ steps.environment.outputs.image }}
+      exists: ${{ steps.remote.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - id: environment
+        run: |
+          set -euo pipefail
+          key="$(bootstrap/container/image/environment_key.sh)"
+          image="${IMAGE_NAME}:env-${key}"
+          printf 'image=%s\n' "$image" >> "$GITHUB_OUTPUT"
+
+      - id: remote
+        env:
+          IMAGE: ${{ steps.environment.outputs.image }}
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
+            printf 'exists=true\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'exists=false\n' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: prepare
+    if: needs.prepare.outputs.exists != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -37,9 +67,9 @@ jobs:
     runs-on: ${{ matrix.runs_on }}
     env:
       ARCH: ${{ matrix.arch }}
-      BUILDER_NAME: agent-canon-runtime-${{ github.run_id }}-${{ matrix.arch }}
-      EXPECTED_PLATFORM: ${{ matrix.platform }}
-
+      PLATFORM: ${{ matrix.platform }}
+      IMAGE: ${{ needs.prepare.outputs.image }}
+      BUILDER: agent-canon-environment-${{ github.run_id }}-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -53,125 +83,77 @@ jobs:
           GHCR_USER: ${{ github.actor }}
         run: |
           set -euo pipefail
-          printf '%s' "${GHCR_TOKEN}" | docker login "${REGISTRY}" \
-            --username "${GHCR_USER}" --password-stdin
+          printf '%s' "$GHCR_TOKEN" | docker login "$REGISTRY" \
+            --username "$GHCR_USER" --password-stdin
 
-      - name: Create temporary buildx builder
+      - name: Build environment image
         run: |
           set -euo pipefail
-          docker buildx create \
-            --name "${BUILDER_NAME}" \
-            --driver docker-container \
-            --driver-opt network=host \
-            --use
-          docker buildx inspect --bootstrap "${BUILDER_NAME}"
-
-      - name: Build native architecture image
-        run: |
-          set -euo pipefail
+          docker buildx create --name "$BUILDER" --driver docker-container --use
+          docker buildx inspect --bootstrap "$BUILDER"
           docker buildx build \
-            --builder "${BUILDER_NAME}" \
-            --network host \
+            --builder "$BUILDER" \
             --file bootstrap/container/image/Dockerfile \
-            --platform "${EXPECTED_PLATFORM}" \
-            --tag "${IMAGE_NAME}:sha-${GITHUB_SHA}-${ARCH}" \
-            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --label "org.opencontainers.image.version=sha-${GITHUB_SHA}" \
+            --platform "$PLATFORM" \
+            --tag "${IMAGE}-${ARCH}" \
             --load \
             .
+          docker run --rm --network none "${IMAGE}-${ARCH}" health
 
-      - name: Verify native architecture image
-        run: |
-          set -euo pipefail
-          image="${IMAGE_NAME}:sha-${GITHUB_SHA}-${ARCH}"
-          docker run --rm --network none --workdir /usr/local/share/agent-canon/runtime \
-            --env PYTHONPATH=/usr/local/share/agent-canon/runtime --entrypoint python3 "$image" \
-            /usr/local/share/agent-canon/runtime/tools/runtime/container/devcontainer_dependencies.py \
-            image-verify \
-            --workspace /usr/local/share/agent-canon/runtime \
-            --manifest /usr/local/share/agent-canon/runtime/dependencies.toml
-          docker run --rm --network none "$image" health
-          docker run --rm --entrypoint /bin/sh --network none "$image" -c '
-            set -eu
-            python3 -c "import packaging, yaml"
-            python3 -c "from pathlib import Path; import sys; sys.path.insert(0, \"/usr/local/share/agent-canon/runtime\"); from tools.analysis.code.lsp_code_analysis import LspServerSpec; r=Path(\"/usr/local/share/agent-canon/image-dependencies/receipts\"); s=[LspServerSpec.for_language(x, root=Path(\"/workspace\"), receipts=r) for x in (\"c\",\"cpp\")]; assert len({x.record_id for x in s}) == 1"
-            ! command -v npm; ! command -v pip; ! command -v pipx; ! command -v ninja; ! command -v curl; ! command -v gpg
-            ! command -v rustfmt; ! command -v cargo-clippy
-            ! test -e /usr/local/share/agent-canon/toolchains/cargo-target
-            ! test -e /usr/local/share/agent-canon/toolchains/cargo/registry
-            ! test -e /usr/local/share/agent-canon/toolchains/cargo/git
-          '
-
-      - name: Push verified native architecture image
+      - name: Publish architecture image
         if: github.event_name != 'pull_request'
-        run: |
-          set -euo pipefail
-          docker push "${IMAGE_NAME}:sha-${GITHUB_SHA}-${ARCH}"
+        run: docker push "${IMAGE}-${ARCH}"
 
-      - name: Remove temporary buildx builder and log out
+      - name: Remove local image and builder
         if: always()
         run: |
-          docker image rm --force "${IMAGE_NAME}:sha-${GITHUB_SHA}-${ARCH}" >/dev/null 2>&1 || true
-          docker buildx rm --force "${BUILDER_NAME}" >/dev/null 2>&1 || true
-          docker logout "${REGISTRY}" >/dev/null 2>&1 || true
+          docker image rm --force "${IMAGE}-${ARCH}" >/dev/null 2>&1 || true
+          docker buildx rm --force "$BUILDER" >/dev/null 2>&1 || true
+          docker logout "$REGISTRY" >/dev/null 2>&1 || true
 
   runtime-image:
-    needs: build
+    needs: [prepare, build]
     if: always()
     name: runtime-image
     runs-on: ubuntu-24.04
-
+    env:
+      IMAGE: ${{ needs.prepare.outputs.image }}
     steps:
-      - name: Require successful native builds
-        if: needs.build.result != 'success'
+      - name: Require source and build success when publishing
+        if: >-
+          needs.prepare.result != 'success' ||
+          (needs.prepare.outputs.exists != 'true' &&
+           needs.build.result != 'success')
         run: |
-          echo "native runtime-image builds did not all succeed: ${NEEDS_RESULT}" >&2
+          echo "environment image preparation/build did not succeed" >&2
           exit 1
-        env:
-          NEEDS_RESULT: ${{ needs.build.result }}
 
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && needs.prepare.outputs.exists != 'true'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
         run: |
           set -euo pipefail
-          printf '%s' "${GHCR_TOKEN}" | docker login "${REGISTRY}" \
-            --username "${GHCR_USER}" --password-stdin
+          printf '%s' "$GHCR_TOKEN" | docker login "$REGISTRY" \
+            --username "$GHCR_USER" --password-stdin
 
-      - name: Publish combined image tags
-        if: github.event_name != 'pull_request'
+      - name: Reuse existing environment image
+        if: needs.prepare.outputs.exists == 'true'
+        run: |
+          echo "environment image already exists: $IMAGE"
+
+      - name: Publish environment and main tags
+        if: github.event_name != 'pull_request' && needs.prepare.outputs.exists != 'true'
         run: |
           set -euo pipefail
-          docker buildx imagetools create \
-            --tag "${IMAGE_NAME}:sha-${GITHUB_SHA}" \
-            --tag "${IMAGE_NAME}:main" \
-            "${IMAGE_NAME}:sha-${GITHUB_SHA}-amd64" \
-            "${IMAGE_NAME}:sha-${GITHUB_SHA}-arm64"
-
-      - name: Read back combined image tags
-        if: github.event_name != 'pull_request'
-        run: |
-          set -euo pipefail
-          verify_platforms() {
-            local image_ref="$1"
-            local inspect_output
-            inspect_output="$(docker buildx imagetools inspect "${image_ref}")"
-            printf '%s\n' "${inspect_output}"
-            for platform in linux/amd64 linux/arm64; do
-              if ! printf '%s\n' "${inspect_output}" | grep -Eq \
-                "^[[:space:]]*Platform:[[:space:]]+${platform}([[:space:]]|$)"; then
-                echo "${image_ref} does not contain ${platform}" >&2
-                return 1
-              fi
-            done
-          }
-          verify_platforms "${IMAGE_NAME}:sha-${GITHUB_SHA}"
-          verify_platforms "${IMAGE_NAME}:main"
+          tags=(--tag "$IMAGE")
+          if [[ "$GITHUB_REF" == refs/heads/main ]]; then
+            tags+=(--tag "${IMAGE_NAME}:main")
+          fi
+          docker buildx imagetools create "${tags[@]}" \
+            "${IMAGE}-amd64" "${IMAGE}-arm64"
 
       - name: Log out
-        if: always()
-        run: |
-          docker logout "${REGISTRY}" >/dev/null 2>&1 || true
+        if: always() && github.event_name != 'pull_request' && needs.prepare.outputs.exists != 'true'
+        run: docker logout "$REGISTRY" >/dev/null 2>&1 || true

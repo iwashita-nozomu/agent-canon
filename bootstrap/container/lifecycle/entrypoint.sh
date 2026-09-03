@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract environment
-# responsibility Starts one resident AgentCanon tool process or performs its read-only health probe.
+# responsibility Starts one resident AgentCanon tool process, compiles source-mounted Rust tools, or performs its read-only health probe.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md resident container lifecycle
 # downstream implementation ./Dockerfile shared tool image and Docker healthcheck
 # @dependency-end
 
 set -euo pipefail
+
+compile_tools() {
+    exec /opt/agent-canon/source/tools/runtime/container/compile_tools.sh
+}
 
 health() {
     return 0
@@ -27,11 +31,18 @@ case "${1:-}" in
         }
         exec /usr/local/bin/agent-canon-tool "$@"
         ;;
+    compile)
+        [[ "$#" -eq 1 ]] || {
+            echo "usage: $0 compile" >&2
+            exit 64
+        }
+        compile_tools
+        ;;
     resident)
         exec sleep infinity
         ;;
     *)
-        echo "usage: $0 health | resident | tool run <catalog-id> -- [args...]" >&2
+        echo "usage: $0 health | resident | compile | tool run <catalog-id> -- [args...]" >&2
         exit 64
         ;;
 esac

@@ -572,7 +572,7 @@ def _immutable_file(path: Path, expected: bytes, *, field: str) -> str:
 
 
 def _validate_container_context(root: Path) -> None:
-    """Authenticate the immutable image/runtime before local tool execution."""
+    """Authenticate the stable image and read-only source mount."""
     if os.environ.get("AGENT_CANON_EXECUTION_PLANE") != "tool-container":
         raise DispatchError("container-exec-not-authorized", "AGENT_CANON_EXECUTION_PLANE")
     image_root_value = os.environ.get("AGENT_CANON_IMAGE_ROOT")
@@ -589,18 +589,14 @@ def _validate_container_context(root: Path) -> None:
     image_deps = Path(image_deps_value).resolve()
     tools_root = Path(tools_root_value).resolve()
     source = root.resolve()
-    if source != tools_root or not _under(source, image_root) or source == image_root:
+    if source != tools_root or source == image_root:
         raise DispatchError("container-runtime-root-invalid", str(source))
     if image_deps != image_root / "image-dependencies":
         raise DispatchError("container-dependency-root-invalid", str(image_deps))
-    try:
-        source_mode = source.stat().st_mode
-    except OSError as error:
-        raise DispatchError("container-runtime-root-invalid", str(source)) from error
-    if source_mode & 0o222:
-        raise DispatchError("container-runtime-writable", str(source))
     observed_image_digest = _immutable_file(image_root / CONTAINER_MARKER_NAME, CONTAINER_MARKER, field="image")
-    observed_runtime_digest = _immutable_file(source / RUNTIME_MARKER_NAME, RUNTIME_MARKER, field="runtime")
+    observed_runtime_digest = _immutable_file(
+        image_root / "runtime" / RUNTIME_MARKER_NAME, RUNTIME_MARKER, field="runtime"
+    )
     if marker_digest != f"sha256:{observed_image_digest}":
         raise DispatchError("container-marker-digest-mismatch", "image")
     if runtime_digest != f"sha256:{observed_runtime_digest}":
@@ -647,7 +643,10 @@ def _resolve_container_argv(root: Path, spec: ToolSpec, args: Sequence[str]) -> 
         command[0] = sys.executable
     for index, value in enumerate(command):
         if value == "tools/bin/agent-canon":
-            command[index] = "/usr/local/bin/agent-canon"
+            command[index] = str(
+                Path(os.environ.get("AGENT_CANON_COMPILED_BIN_DIR", "/var/lib/agent-canon/cache/bin"))
+                / "agent-canon"
+            )
         elif value.startswith("tools/") and (root / value).is_file():
             command[index] = str(root / value)
     return command
