@@ -247,6 +247,15 @@ _agent_canon_sync_operation() (
         }
         install_root=${command_args[sync_index]}
         ;;
+      --remote=*) ;;
+      --branch=*) ;;
+      --remote|--branch)
+        ((sync_index += 1))
+        [[ "$sync_index" -lt "${#command_args[@]}" ]] || {
+          _agent_canon_source_sync_failure argument_missing "$sync_token requires a value"
+          exit 2
+        }
+        ;;
       *)
         _agent_canon_source_sync_failure argument_invalid "unsupported sync argument"
         exit 2
