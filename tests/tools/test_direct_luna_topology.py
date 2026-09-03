@@ -40,11 +40,12 @@ def test_cleanup_historical_asset_universe_precedes_slice_formation() -> None:
     )
     refactor = " ".join((ROOT / "agents/skills/refactor-loop.md").read_text().split())
 
-    cleanup_asset = cleanup.index("shared current+historical asset universe")
+    cleanup_asset = cleanup.index("file/worker slice より先に")
     cleanup_dependency = cleanup.index("`dependency-analysis`")
     assert cleanup_asset < cleanup_dependency
     assert "git log" in cleanup
     assert "predecessor tests" in cleanup
+    assert "関連 design docs" in cleanup
 
     dependency_asset = dependency.index("shared current+historical asset universe")
     dependency_scope = dependency.index("各 candidate は既存")
@@ -57,3 +58,38 @@ def test_cleanup_historical_asset_universe_precedes_slice_formation() -> None:
     assert "merge slices touching the same asset" in refactor[refactor_asset:]
     assert "pass the same known asset context" in refactor[refactor_asset:]
     assert "existing `reuse_survey`" in refactor[refactor_asset:]
+
+
+def test_reuse_admission_is_fail_closed_on_the_existing_handoff_path() -> None:
+    cleanup = " ".join((ROOT / "agents/skills/code-cleanup.md").read_text().split())
+    communication = " ".join(
+        (ROOT / "agents/skills/direct-luna-communication.md").read_text().split()
+    )
+
+    for field in (
+        "asset_path",
+        "asset_origin",
+        "capability",
+        "disposition",
+        "reason",
+        "test_paths",
+    ):
+        assert field in cleanup
+        assert field in communication
+    for disposition in (
+        "reuse",
+        "extend",
+        "restore",
+        "consolidate",
+        "replace",
+        "delete",
+        "reject",
+    ):
+        assert disposition in cleanup
+        assert disposition in communication
+
+    assert "write handoff へ進めない" in cleanup
+    assert "workspace-write` fails closed" in communication
+    assert "direct_luna_handoff_packet_v1" in communication
+    assert "new search tool" not in communication
+    assert "asset registry" not in communication
