@@ -173,16 +173,20 @@ def test_health_failure_restores_old_runtime_and_image(tmp_path: Path, monkeypat
     assert after["resources"]["container"]["id"]
 
 
-def test_active_task_rejected_before_build(tmp_path: Path) -> None:
+def test_active_task_is_cleared_by_forced_rebuild(tmp_path: Path) -> None:
     manager, docker = _runtime(tmp_path)
     manager.install()
     state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
     state["active_task_count"] = 1
     manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
     builds = sum(command[1] == "build" for command in docker.commands)
-    with pytest.raises(BootstrapError, match="mount_update_blocked"):
-        manager.update()
-    assert sum(command[1] == "build" for command in docker.commands) == builds
+    updated = manager.update()
+    assert updated["code"] == "updated"
+    assert sum(command[1] == "build" for command in docker.commands) == builds + 1
+    after = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert after["active_task_count"] == 0
+    assert after["tasks"] == {}
+    assert after["manifest_digest"] == manager.manifest_digest
 
 
 def test_owned_image_filter_argv_and_failure_are_typed(
