@@ -43,6 +43,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     --mount=type=bind,source=tools/analysis/dependencies/dependency_plan.py,target=/src/tools/analysis/dependencies/dependency_plan.py,readonly \
     --mount=type=bind,source=tools/repository/workspace/parent_root_side_effects.py,target=/src/tools/repository/workspace/parent_root_side_effects.py,readonly \
     --mount=type=bind,source=tools/runtime/artifacts/runtime_artifacts.py,target=/src/tools/runtime/artifacts/runtime_artifacts.py,readonly \
+    --mount=type=bind,source=tools,target=/src/all-tools,readonly \
     set -eux; \
     export CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo; \
     export PATH="$CARGO_HOME/bin:$PATH"; \
@@ -62,13 +63,14 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
       image-install --workspace /src \
       --manifest /src/bootstrap/container/image/dependencies.toml \
       --final-binary-dir /usr/local/bin --format text; \
+    bash -ceu 'shopt -s globstar nullglob; for manifest in /src/all-tools/**/Cargo.toml; do cargo fetch --locked --manifest-path "$manifest"; done'; \
     install -d -m 0755 /usr/local/share/agent-canon/runtime; \
     install -m 0444 /src/bootstrap/container/image/dependencies.toml /usr/local/share/agent-canon/runtime/dependencies.toml; \
     printf 'agent-canon-tool-container/v1\n' > /usr/local/share/agent-canon/.agent-canon-tool-container; \
     chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
     printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
     chmod 0444 /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
-    rm -rf /var/lib/agent-canon/cache/cargo-target "$CARGO_HOME/registry" "$CARGO_HOME/git" /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init; \
+    rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init; \
     DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove npm pipx; \
     rm -rf /var/lib/apt/lists/*
 

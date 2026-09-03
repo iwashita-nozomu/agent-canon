@@ -13,6 +13,7 @@ cache_root=${AGENT_CANON_CACHE_ROOT:-/var/lib/agent-canon/cache}
 compiled_bin_dir=${AGENT_CANON_COMPILED_BIN_DIR:-$cache_root/bin}
 cargo_target_dir=${CARGO_TARGET_DIR:-${AGENT_CANON_CARGO_TARGET_DIR:-$cache_root/cargo-target}}
 cargo_home=${CARGO_HOME:-$cache_root/cargo}
+seed_cargo_home=/usr/local/share/agent-canon/toolchains/cargo
 temporary=
 cleanup() {
     [[ -z "$temporary" ]] || rm -f -- "$temporary"
@@ -20,6 +21,9 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p -- "$compiled_bin_dir" "$cargo_target_dir" "$cargo_home"
+if [[ -d "$seed_cargo_home" ]]; then
+    cp -R -n -- "$seed_cargo_home/." "$cargo_home/"
+fi
 
 # The source tree is the only tool inventory. Cargo metadata supplies binary
 # names, so this route has no list of tool directories or tool names to drift.
