@@ -2210,6 +2210,8 @@ class RouteToolTest(unittest.TestCase):
             "Resolve cross-module dependencies before implementation.",
             "複数のモジュール間の依存を解決してから実装する。",
             "A dependency repository consumer must be updated with the module.",
+            "Change lib-a API, update app-b, then advance parent pins.",
+            "source submodule API changed; update parent gitlink pin",
         )
         for prompt in prompts:
             with self.subTest(prompt=prompt):

@@ -61,7 +61,6 @@ skill_dependencies:
     - agent-log-analysis
     - runtime-log-repair
     - repository-topic-clone
-    - dependency-module-change
     - agent-learning
   start-repository:
     responsibility_group: intake
@@ -351,25 +350,8 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent:
-    - task-routing
     - agent-canon-update
     - structure-refactor
-  dependency-analysis:
-    responsibility_group: analysis
-    required_prerequisites:
-    - agent-orchestration
-    - task-routing
-    routing_candidates: []
-    successors:
-    - code-visualization
-    order_constraints:
-    - before: dependency-analysis
-      after: refactor-loop
-      reason: cross-module dependency resolution precedes decomposition and refactor handoff when both skills are selected
-    parallel_independent:
-    - tool-finding-report
-    - structure-refactor
-    - comprehensive-development
   pr-processing:
     responsibility_group: lifecycle
     required_prerequisites: []
@@ -628,6 +610,28 @@ skill_dependencies:
     - structure-refactor
     - long-form-writing
     - md-style-check
+  dependency-analysis:
+    responsibility_group: analysis
+    required_prerequisites:
+    - agent-orchestration
+    - task-routing
+    routing_candidates: []
+    successors:
+    - code-visualization
+    order_constraints:
+    - before: dependency-analysis
+      after: code-visualization
+      reason: source dependency facts precede graph projection
+    - before: dependency-analysis
+      after: dependency-module-change
+      reason: cross-module dependency analysis precedes dependency module lifecycle when both are selected
+    - before: dependency-analysis
+      after: refactor-loop
+      reason: cross-module dependency resolution precedes decomposition and refactor handoff when both skills are selected
+    parallel_independent:
+    - tool-finding-report
+    - structure-refactor
+    - comprehensive-development
   worktree-start:
     responsibility_group: lifecycle
     required_prerequisites: []
