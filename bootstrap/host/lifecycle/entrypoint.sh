@@ -1915,6 +1915,12 @@ _agent_canon_image_reference() {
 _agent_canon_image() {
   local requested_ref=${1:-}
   _agent_canon_image_reference "$requested_ref"
+  # An environment image is content-addressed by the controlled Dockerfile
+  # inputs. A local exact tag is reusable across source checkouts, including
+  # when a caller requested the optional local-build route.
+  if "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
+    return 0
+  fi
   if [[ "${AGENT_CANON_LOCAL_BUILD:-0}" == 1 ]]; then
     local control_digest
     control_digest=$(_agent_canon_control_digest)
@@ -1927,11 +1933,6 @@ _agent_canon_image() {
       _agent_canon_json_error candidate_image_build_failed "candidate image build failed"
       return 2
     fi
-    return 0
-  fi
-  # An environment image is content-addressed by the controlled Dockerfile
-  # inputs.  A local exact tag is therefore reusable across source checkouts.
-  if "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
     return 0
   fi
   if ! "$AGENT_CANON_DOCKER_CMD" pull "$AGENT_CANON_IMAGE_REF"; then

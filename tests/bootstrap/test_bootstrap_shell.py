@@ -225,6 +225,7 @@ def _run_forced_update_probe(
         f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then\n"
         "  format=\"${4:-}\"\n"
+        f"  [[ {force_build!r} != 1 || -n \"$format\" ]] || exit 1\n"
         "  if [[ \"$format\" == *'.Os'* ]]; then printf '%s\\n' linux; exit 0; fi\n"
         "  if [[ \"$format\" == *'.Architecture'* ]]; then printf '%s\\n' amd64; exit 0; fi\n"
         f"  if [[ \"$format\" == *'org.opencontainers.image.revision'* ]]; then printf '%s\\n' {source_head!r}; exit 0; fi\n"
