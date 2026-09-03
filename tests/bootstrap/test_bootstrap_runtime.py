@@ -1908,6 +1908,7 @@ def test_container_update_preserves_tasks_without_image_replacement(
         property(lambda _manager: private_log),
     )
     monkeypatch.setattr(BootstrapRuntime, "_materialize_skill_view", lambda _manager: {})
+    monkeypatch.setattr(BootstrapRuntime, "_prune_stale_targets", lambda _manager, _state: [])
     monkeypatch.setattr(BootstrapRuntime, "_write_mounts", lambda *_args: None)
     monkeypatch.setattr(BootstrapRuntime, "_write_mount_manifest", lambda *_args: None)
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
@@ -1916,6 +1917,13 @@ def test_container_update_preserves_tasks_without_image_replacement(
         state="ready",
         active_task_count=1,
         tasks={"active": {"state": "active"}},
+        targets={
+            "target-a": {
+                "host_root": str(tmp_path / "target-a"),
+                "root": "/targets/target-a",
+                "mode": "read-only",
+            }
+        },
         resources=manager._resource_records(),
     )
     manager._ensure_layout()
@@ -1948,6 +1956,12 @@ def test_container_update_preserves_tasks_without_image_replacement(
     plan_text = plan.read_text(encoding="utf-8")
     assert "image-id\tsha256:" + "b" * 64 in plan_text
     assert "image-ref\tagent-canon-tools:previous" in plan_text
+    assert "mount\tmount\t" + str(tmp_path / "target-a") + "\t/targets/target-a\ttrue" in plan_text
+
+    legacy_state = json.loads(json.dumps(after_replacement))
+    legacy_state["generations"][legacy_state["rollback_generation"]].pop("targets")
+    bootstrap_runtime_module._container_materialize_rollback_plan(manager, legacy_state)
+    assert "mount\tmount\t" + str(tmp_path / "target-a") + "\t/targets/target-a\ttrue" in plan.read_text(encoding="utf-8")
 
 
 

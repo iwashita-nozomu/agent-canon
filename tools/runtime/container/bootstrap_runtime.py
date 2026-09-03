@@ -4854,7 +4854,7 @@ def _container_materialize_rollback_plan(
         or any(character in image_ref for character in "\x00\t\n\r")
     ):
         raise BootstrapError("rollback_plan_invalid", "rollback image identity is incomplete")
-    targets = previous.get("targets", {})
+    targets = previous.get("targets", state.get("targets", {}))
     if not isinstance(targets, Mapping):
         raise BootstrapError("rollback_plan_invalid", "rollback target snapshot is invalid")
     lines = [
@@ -5237,6 +5237,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                     state.setdefault("generations", {})[previous_generation] = {
                         "image_id": previous_image_id,
                         "image_ref": os.environ.get("AGENT_CANON_PREVIOUS_IMAGE_REF"),
+                        "targets": json.loads(_json(state.get("targets", {}))),
                         "state": "rollback",
                     }
                     state.setdefault("generations", {})[current_generation] = {
