@@ -1310,7 +1310,11 @@ def _parse_verification(
             "output_contains",
         },
         VerificationKind.ABSOLUTE_EXECUTABLE: {"path", "args", "output_contains"},
-        VerificationKind.RUST_TOOLCHAIN: set(),
+        VerificationKind.RUST_TOOLCHAIN: {
+            "executable",
+            "args",
+            "output_contains",
+        },
         VerificationKind.LEAN_TOOLCHAIN: set(),
         VerificationKind.CARGO_BINARY: {"path", "args", "output_contains"},
         VerificationKind.BROWSER_EXECUTABLE: {
@@ -1388,6 +1392,25 @@ def _parse_verification(
                 f"{record_id}.verification requires executable, args, and output_contains"
             )
         if Path(executable).name != executable or executable in SHELL_EXECUTABLES:
+            raise DependencyError(
+                f"{record_id}.verification.executable must be one command name"
+            )
+    elif kind is VerificationKind.RUST_TOOLCHAIN:
+        record_owned_fields = {"executable", "args", "output_contains"}
+        provided_record_owned_fields = record_owned_fields & value.keys()
+        if provided_record_owned_fields not in (set(), record_owned_fields):
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and output_contains"
+            )
+        if provided_record_owned_fields and (
+            executable is None or not args or output_contains is None
+        ):
+            raise DependencyError(
+                f"{record_id}.verification requires executable, args, and output_contains"
+            )
+        if executable is not None and (
+            Path(executable).name != executable or executable in SHELL_EXECUTABLES
+        ):
             raise DependencyError(
                 f"{record_id}.verification.executable must be one command name"
             )
@@ -2679,8 +2702,8 @@ def image_install_plan(
         receipts = staging / "receipts"
         completed = Installer(
             runner,
-            image_owned=production,
-            image_owned_root=target.parent if production else None,
+            image_owned=True,
+            image_owned_root=target.parent,
         ).install(
             plan,
             workspace=workspace,
@@ -2790,34 +2813,20 @@ def image_verify_plan(
             raise DependencyError(
                 f"image-verify rebuild-required: unreadable receipt: {record_id}"
             ) from exc
+        if receipt_payload.get("status") != "installed":
+            raise DependencyError(
+                f"image-verify rebuild-required: receipt is not image-installed: {record_id}"
+            )
         if not Installer._receipt_matches(receipt, plan, record):
             raise DependencyError(
                 f"image-verify rebuild-required: stale receipt: {record_id}"
             )
         try:
-            if receipt_payload.get("status") == "installed":
-                if production and record.method is Method.CARGO_SOURCE_BUILD:
-                    installer._verify_final_binary_receipt(receipt_payload, record)
-                installer._verify_installed_receipt(
-                    record, receipt_payload, workspace=workspace
-                )
-            elif production and record.method is Method.CARGO_SOURCE_BUILD:
+            if production and record.method is Method.CARGO_SOURCE_BUILD:
                 installer._verify_final_binary_receipt(receipt_payload, record)
-            else:
-                installer.verify(
-                    record,
-                    workspace=workspace,
-                    expected_source_identity=Installer._receipt_source_identity(receipt),
-                    strict_executables=True,
-                    allow_network=False,
-                )
-                bindings = receipt_payload.get("executable_bindings")
-                if bindings and (
-                    installer._executable_bindings(record, workspace=workspace) != bindings
-                ):
-                    raise DependencyError(
-                        f"image-verify rebuild-required: executable drift: {record_id}"
-                    )
+            installer._verify_installed_receipt(
+                record, receipt_payload, workspace=workspace
+            )
         except (DependencyError, OSError, subprocess.CalledProcessError) as exc:
             if "rebuild-required" in str(exc):
                 raise
@@ -2985,9 +2994,11 @@ def _executable_binding_names(
         return (record.verification.executable,) if record.verification.executable else ()
     if record.method is Method.RUST_TOOLCHAIN:
         names = ("cargo",) if image_owned and "cargo" in record.provides else ()
+        if image_owned and record.verification.executable:
+            names += (record.verification.executable,)
         if "rust-analyzer" in record.components:
             names += ("rust-analyzer",)
-        return names
+        return tuple(dict.fromkeys(names))
     return ()
 
 
@@ -3712,11 +3723,28 @@ class Installer:
     ) -> str | None:
         """Probe one receipt-bound runtime executable without its package manager."""
         spec = record.verification
+        bindings = payload.get("executable_bindings")
+        expected_names = _executable_binding_names(record, image_owned=True)
+        if not isinstance(bindings, dict) or set(bindings) != set(expected_names):
+            raise DependencyError(f"{record.id}: installed executable bindings are stale")
+        for name in expected_names:
+            binding = bindings[name]
+            expected_path = _configured_executable_path(
+                record, name, image_owned=True
+            )
+            if (
+                not isinstance(binding, dict)
+                or binding.get("provided") != name
+                or binding.get("lexical_path") != str(expected_path)
+                or binding.get("absolute_path") != str(expected_path)
+            ):
+                raise DependencyError(
+                    f"{record.id}: installed executable binding is stale: {name}"
+                )
         if spec.kind is VerificationKind.CARGO_BINARY:
             absolute = payload.get("binary_path")
         elif spec.executable is not None:
-            bindings = payload.get("executable_bindings")
-            binding = bindings.get(spec.executable) if isinstance(bindings, dict) else None
+            binding = bindings.get(spec.executable)
             if not isinstance(binding, dict):
                 raise DependencyError(f"{record.id}: installed executable binding is missing")
             absolute = binding.get("absolute_path")
@@ -4626,7 +4654,6 @@ class Installer:
             )
             if tool == "rust-analyzer":
                 self._require_output(result, f"rust-analyzer {record.version}", record.id)
-
     @staticmethod
     def _rust_toolchain_matches(line: str, version: str) -> bool:
         """Match rustup's optional host-triple suffix for one exact version."""

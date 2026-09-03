@@ -122,7 +122,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `clangd-18` (Ubuntu 24.04 Noble package) | C/C++ language-server analysis in the shared runtime。 | `bootstrap/container/image/dependencies.toml` (`clangd-language-server`) | upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/noble/clangd-18> |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
 | `experiment-runner-admitted` | ExperimentRunnerのmerged provider。admitted request/result、UUID visibility、child lifecycleを提供します。 | `agent-canon-environment.toml`, `documents/experiments/gpu-admission-r5-ordered-integration-interface.json` | consumer-provided runtime; AgentCanon does not install or import it |
-| Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/devcontainer.json`, `.devcontainer/gpu-admission/devcontainer.json` の digest-pinned official Feature | upstream: MIT for Node.js core, with bundled third-party notices |
+| Node.js | manifest-selected npm tools の runtime。 | Ubuntu 24.04 apt package in `bootstrap/container/image/Dockerfile` | upstream: MIT for Node.js core, with bundled third-party notices |
 | `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/dependencies.toml` | upstream: Artistic-2.0 |
 | Codex CLI: `@openai/codex` | local Codex runtime entrypoint。 | `.devcontainer/dependencies.toml` | upstream: Apache-2.0 |
 | GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/repository/github/github_publish.py` | upstream: MIT |

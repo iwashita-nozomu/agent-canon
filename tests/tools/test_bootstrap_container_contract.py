@@ -292,8 +292,13 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     assert clangd["executable_owner_packages"] == ["clangd-18"]
     assert clangd["verification"]["kind"] == "apt-package"
     assert not any(key.startswith("repository_") for key in clangd)
+    jq = next(record for record in records if record["id"] == "jq")
+    tree = next(record for record in records if record["id"] == "tree")
+    assert jq["verification"]["executable"] == "jq"
+    assert tree["verification"]["executable"] == "tree"
     rust = next(record for record in records if record["id"] == "rust-toolchain")
     assert rust["components"] == ["rust-src", "rust-analyzer"]
+    assert rust["verification"]["executable"] == "rustc"
 
 
 def test_single_repository_dockerignore_is_deny_by_default() -> None:

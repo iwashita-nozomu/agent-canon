@@ -121,8 +121,6 @@ jobs:
     if: always()
     name: runtime-image
     runs-on: ubuntu-24.04
-    env:
-      BUILDER_NAME: agent-canon-runtime-${{ github.run_id }}-merge
 
     steps:
       - name: Require successful native builds
@@ -142,17 +140,6 @@ jobs:
           set -euo pipefail
           printf '%s' "${GHCR_TOKEN}" | docker login "${REGISTRY}" \
             --username "${GHCR_USER}" --password-stdin
-
-      - name: Create temporary buildx builder
-        if: github.event_name != 'pull_request'
-        run: |
-          set -euo pipefail
-          docker buildx create \
-            --name "${BUILDER_NAME}" \
-            --driver docker-container \
-            --driver-opt network=host \
-            --use
-          docker buildx inspect --bootstrap "${BUILDER_NAME}"
 
       - name: Publish combined image tags
         if: github.event_name != 'pull_request'
@@ -184,8 +171,7 @@ jobs:
           verify_platforms "${IMAGE_NAME}:sha-${GITHUB_SHA}"
           verify_platforms "${IMAGE_NAME}:main"
 
-      - name: Remove temporary buildx builder and log out
+      - name: Log out
         if: always()
         run: |
-          docker buildx rm --force "${BUILDER_NAME}" >/dev/null 2>&1 || true
           docker logout "${REGISTRY}" >/dev/null 2>&1 || true

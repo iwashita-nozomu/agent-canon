@@ -24,15 +24,17 @@ GitHub actions, and arbitrary host commands remain owned by the project or
 host workflow. No project-specific AgentCanon image, container, virtualenv,
 Cargo toolchain, volume, or source checkout is created.
 
-The published artifact is one digest-pinned Ubuntu 24.04 output image. Runtime
-and build dependencies are installed in one apt transaction/update, followed by
-dependency and asset/materializer layers. Build-essential, curl, pipx, npm,
+The published artifact is one digest-pinned Ubuntu 24.04 output image. The
+bootstrap package transaction performs one apt update, then manifest-owned
+dependencies are installed in the same dependency layer before the asset and
+materializer layer. Build-essential, curl, pipx, npm,
 `rustup-init`, Cargo build output, and caches are purged before the image is
 committed; the final runtime retains Node, Python 3.12, jq/tree, clangd, Rust
 runtime components, LSP launchers, and immutable dependency plan/receipts.
-CI owns the runtime smoke: it loads the native image, runs entrypoint health,
-then invokes `/bin/sh` to check versions/imports, both C/C++ LSP resolver paths,
-the plan readback, and absence of build providers. Canonical install/sync/update
+CI owns the runtime smoke: it loads the native image, invokes the image verifier
+against the runtime workspace and manifest, runs entrypoint health, then invokes
+`/bin/sh` to check imports, both C/C++ LSP resolver paths, and absence of build
+providers. Canonical install/sync/update
 pull `ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` and never fall back
 to a local build; only explicit `update --local-build` enables the development
 build route. Rust source digests are observed in receipts; no manually maintained

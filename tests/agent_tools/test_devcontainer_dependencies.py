@@ -661,14 +661,16 @@ class DependencyModelTests(unittest.TestCase):
                     runner=FakeRunner(),
                 )
             receipts_path.chmod(0o555)
-            with self.assertRaisesRegex(DependencyError, "rebuild-required"):
+            self.assertEqual(
                 image_verify_plan(
                     plan,
                     workspace=root,
                     records=("image-tool",),
                     _test_image_root=image_root,
                     runner=FakeRunner(fail_on="dpkg-query"),
-                )
+                ),
+                ("image-tool",),
+            )
             with self.assertRaisesRegex(DependencyError, "already exists"):
                 image_install_plan(
                     plan,
@@ -1000,6 +1002,176 @@ class DependencyModelTests(unittest.TestCase):
             self.assertEqual(resolved.absolute_path, "/usr/local/bin/node-tool")
             self.assertEqual(receipt.read_bytes(), before)
 
+    def test_image_verify_rejects_pass_receipts(self) -> None:
+        """Image verification accepts only image-owned installed receipts."""
+        parsed = parse_record(
+            record("image-tool", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "24.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-root"
+            image_install_plan(
+                plan,
+                workspace=root,
+                _test_image_root=image_root,
+                runner=FakeRunner(),
+                identity=identity,
+            )
+            receipt = image_root / "receipts" / "image-tool.json"
+            receipt.chmod(0o644)
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["status"] = "pass"
+            receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            receipt.chmod(0o444)
+            with self.assertRaisesRegex(DependencyError, "receipt is not image-installed"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                )
+
+    def test_image_verify_rejects_tampered_installed_binding_path(self) -> None:
+        """Installed receipts cannot redirect image verification to another path."""
+        parsed = parse_record(
+            record(
+                "image-tool",
+                method="apt-package",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "image-tool",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "24.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-root"
+            image_install_plan(
+                plan,
+                workspace=root,
+                _test_image_root=image_root,
+                runner=FakeRunner(),
+                identity=identity,
+            )
+            receipt = image_root / "receipts" / "image-tool.json"
+            receipt.chmod(0o644)
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["executable_bindings"]["image-tool"]["absolute_path"] = (
+                "/tmp/not-image-tool"
+            )
+            receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            receipt.chmod(0o444)
+            with self.assertRaisesRegex(DependencyError, "installed executable binding is stale"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                )
+
+    def test_installed_tool_receipts_probe_jq_tree_and_rustc_directly(self) -> None:
+        """Manifest executable fields provide direct image verification for tools."""
+        records = (
+            parse_record(
+                record(
+                    "jq",
+                    method="apt-package",
+                    verification={
+                        "kind": "apt-package",
+                        "executable": "jq",
+                        "args": ["--version"],
+                        "output_contains": "jq-1.7.1",
+                    },
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            ),
+            parse_record(
+                record(
+                    "tree",
+                    method="apt-package",
+                    verification={
+                        "kind": "apt-package",
+                        "executable": "tree",
+                        "args": ["--version"],
+                        "output_contains": "tree v2.1.1",
+                    },
+                ),
+                path=Path("fixture.toml"),
+                index=1,
+            ),
+            parse_record(
+                record(
+                    "rust-toolchain",
+                    method="rust-toolchain",
+                    components=["rust-src", "rust-analyzer"],
+                    verification={
+                        "kind": "rust-toolchain",
+                        "executable": "rustc",
+                        "args": ["--version"],
+                        "output_contains": "rustc 1.89.0",
+                    },
+                ),
+                path=Path("fixture.toml"),
+                index=2,
+            ),
+        )
+        outputs = {
+            "jq": "jq-1.7.1\n",
+            "tree": "tree v2.1.1\n",
+            "rustc": "rustc 1.89.0\n",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer = Installer(FakeRunner(), image_owned=True, image_owned_root=root)
+            for item in records:
+                payload = {
+                    "status": "installed",
+                    "executable_bindings": installer._structural_executable_bindings(item),
+                }
+                with mock.patch.object(
+                    installer,
+                    "_capture",
+                    return_value=subprocess.CompletedProcess(
+                        (item.verification.executable or "",),
+                        0,
+                        outputs[item.verification.executable or ""],
+                        "",
+                    ),
+                ) as capture:
+                    installer._verify_installed_receipt(item, payload, workspace=root)
+                self.assertEqual(capture.call_args.args[0][0], payload["executable_bindings"][item.verification.executable]["absolute_path"])
+
+    def test_build_only_pipx_provider_has_no_live_probe(self) -> None:
+        """The purged pipx provider is executable-less by design."""
+        parsed = parse_record(
+            record("pipx", method="apt-package", provides=["pipx"]),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer = Installer(FakeRunner(), image_owned=True, image_owned_root=root)
+            payload = {
+                "status": "installed",
+                "executable_bindings": installer._structural_executable_bindings(parsed),
+            }
+            with mock.patch.object(installer, "_capture") as capture:
+                self.assertIsNone(
+                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+                )
+            capture.assert_not_called()
+
     def test_image_install_failure_does_not_publish_target_and_freezes_tree(self) -> None:
         parsed = parse_record(
             record("image-tool", method="apt-package"),
@@ -1194,8 +1366,7 @@ class DependencyModelTests(unittest.TestCase):
                     ),
                     ("repo",),
                 )
-                verify.assert_called_once()
-                self.assertFalse(verify.call_args.kwargs["allow_network"])
+                verify.assert_not_called()
 
     def test_image_commands_accept_records_without_root_override(self) -> None:
         args = build_parser().parse_args(

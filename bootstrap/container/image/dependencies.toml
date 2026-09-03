@@ -13,6 +13,8 @@ schema_version = 2
 # CLI, editor integrations, GPU tooling, and lifecycle helpers.
 
 [[records]]
+# pipx is a build-only provider; its dependent launchers are verified below
+# and the package itself is removed before the runtime image is published.
 id = "pipx"
 package = "pipx"
 method = "apt-package"
@@ -73,7 +75,7 @@ package = "jq"
 method = "apt-package"
 version = "1.7.1-3ubuntu0.24.04.2"
 source = "ubuntu:24.04"
-verification = { kind = "apt-package" }
+verification = { kind = "apt-package", executable = "jq", args = ["--version"], output_contains = "jq-1.7.1" }
 deps = []
 provides = ["jq"]
 failure_policy = "fail"
@@ -84,7 +86,7 @@ package = "tree"
 method = "apt-package"
 version = "2.1.1-2ubuntu3.24.04.2"
 source = "ubuntu:24.04"
-verification = { kind = "apt-package" }
+verification = { kind = "apt-package", executable = "tree", args = ["--version"], output_contains = "tree v2.1.1" }
 deps = []
 provides = ["tree"]
 failure_policy = "fail"
@@ -110,7 +112,7 @@ version = "1.89.0"
 source = "https://static.rust-lang.org"
 components = ["rust-src", "rust-analyzer"]
 checksums = { x86_64 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c", aarch64 = "e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c" }
-verification = { kind = "rust-toolchain" }
+verification = { kind = "rust-toolchain", executable = "rustc", args = ["--version"], output_contains = "rustc 1.89.0" }
 deps = ["rustup-init", "build-essential", "curl"]
 provides = ["rust", "cargo", "rust-src", "rust-analyzer"]
 failure_policy = "fail"
