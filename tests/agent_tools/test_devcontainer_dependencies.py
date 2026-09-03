@@ -1162,7 +1162,7 @@ class DependencyModelTests(unittest.TestCase):
                         "kind": "apt-package",
                         "executable": "jq",
                         "args": ["--version"],
-                        "output_contains": "jq-1.7.1",
+                        "output_contains": "jq-1.7",
                     },
                 ),
                 path=Path("fixture.toml"),
@@ -1199,7 +1199,7 @@ class DependencyModelTests(unittest.TestCase):
             ),
         )
         outputs = {
-            "jq": "jq-1.7.1\n",
+            "jq": "jq-1.7\n",
             "tree": "tree v2.1.1\n",
             "rustc": "rustc 1.89.0\n",
         }

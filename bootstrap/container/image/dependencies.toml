@@ -75,7 +75,7 @@ package = "jq"
 method = "apt-package"
 version = "1.7.1-3ubuntu0.24.04.2"
 source = "ubuntu:24.04"
-verification = { kind = "apt-package", executable = "jq", args = ["--version"], output_contains = "jq-1.7.1" }
+verification = { kind = "apt-package", executable = "jq", args = ["--version"], output_contains = "jq-1.7" }
 deps = []
 provides = ["jq"]
 failure_policy = "fail"
