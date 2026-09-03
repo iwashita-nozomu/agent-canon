@@ -3609,7 +3609,6 @@ class BootstrapRuntime:
     def _materialize_skill_view(self) -> dict[str, Any]:
         """Generate the ignored project-local skill view before image/link use."""
         if self._container_control():
-            self._validate_source_adapters()
             # The resident owns the materializer write.  Generate into the
             # writable container-runtime exchange, then let the host adapter
             # export that exact generated tree to the live checkout.  The
@@ -3671,19 +3670,6 @@ class BootstrapRuntime:
                 os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
             else:
                 os.environ["AGENT_CANON_PARENT_ROOT"] = previous
-
-    def _validate_source_adapters(self) -> None:
-        """Read back the ignored personal skill view before runtime convergence."""
-        source = self.repository_root / ".codex" / "personal"
-        skills = source / "skills"
-        if source.is_symlink() or not source.is_dir() or skills.is_symlink() or not skills.is_dir():
-            raise BootstrapError(
-                "source_adapters_invalid",
-                "ignored .codex/personal/skills is missing or not regular",
-            )
-        skill_files = sorted(skills.glob("*/SKILL.md"))
-        if not skill_files or any(path.is_symlink() or not path.is_file() for path in skill_files):
-            raise BootstrapError("source_adapters_invalid", "personal skill adapters failed readback")
 
     def _managed_links(self) -> list[dict[str, str]]:
         projection_root: Path | None = None
