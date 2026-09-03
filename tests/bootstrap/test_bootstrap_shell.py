@@ -279,15 +279,15 @@ exit "$rc"
     return completed, calls, marker, old_id, candidate_id
 
 
-def test_same_source_update_pulls_exact_oci_image_without_build(tmp_path: Path) -> None:
-    """A default update pulls its exact OCI image and never builds locally."""
+def test_same_source_update_reuses_existing_environment_image(tmp_path: Path) -> None:
+    """A default update reuses an existing environment image without I/O."""
     completed, calls, _marker, _old_id, _candidate_id = _run_forced_update_probe(
         tmp_path, build_result="0", force_build=None
     )
     assert completed.returncode == 0, completed.stderr
     operations = calls.read_text(encoding="utf-8").splitlines()
     assert any(operation.startswith("image inspect ") for operation in operations)
-    assert sum(operation.startswith("pull ") for operation in operations) == 1
+    assert not any(operation.startswith("pull ") for operation in operations)
     assert not any(operation.startswith("build ") for operation in operations)
 
 
@@ -631,9 +631,9 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     ]
     runtime = repository / ".runtime"
 
-    def run(operation: str) -> subprocess.CompletedProcess[str]:
+    def run(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            [*common, operation],
+            [*common, *args],
             check=False,
             capture_output=True,
             text=True,
@@ -739,7 +739,7 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     )
     assert smoke.returncode == 0, smoke.stderr
     active_ref, image_a = active_image()
-    first = run("update")
+    first = run("update", "--local-build")
     assert first.returncode == 0, first.stderr
     assert not first.stderr
     updated_ref, image_b = active_image()
@@ -751,7 +751,7 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     assert rollback_id_a == image_a
     assert docker_state["images"][rollback_ref_a]["Id"] == image_a
 
-    second = run("update")
+    second = run("update", "--local-build")
     assert second.returncode == 0, second.stderr
     assert not second.stderr
     updated_ref, image_c = active_image()

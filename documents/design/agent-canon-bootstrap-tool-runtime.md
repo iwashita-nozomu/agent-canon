@@ -123,8 +123,9 @@ capability を受けた場合だけ source を変更します。
 resident を作り、`update` は同じ resident を current checkout へ更新し、`status` は
 `.runtime/` の active image と resident health を読み返します。`sync` は
 `replacement.lock` を一度だけ取得し、`git -C <install-root> pull --ff-only origin main`
-の成功後に source-sync state、exact GHCR image、resident、global links、timer を順に更新
-します。Git は detached/shallow checkout を含め、pull が受理した結果だけを信頼します。
+の成功後に source-sync state と env-key image を選び、必要な場合だけ resident、
+global links、timer を更新します。Git は detached/shallow checkout を含め、pull が
+受理した結果だけを信頼します。
 `gc --dry-run` は
 `.runtime/` の準備・作成・chmod をせずに同じ identity/ownership read を行い、`gc` は
 replacement lock の下で stale な owned Docker resource だけを exact ID/reference で
@@ -187,8 +188,10 @@ stderr を結果に残します。`bootstrap/container/image/Dockerfile` と
 mapping は Host/caller の責務であり、`tests/tools/test_bootstrap_container_contract.py`
 で契約化しています。AgentCanon は user 作成、`--user` 指定、UID/GID readback を行いません。
 container name と label
-は同じ effective UID に対する共有 runtime を1個に制限し、control-root
-digest と manifest digest が一致しない adopt を拒否します。
+は同じ effective UID に対する共有 runtime を1個に制限します。環境 image は
+`ghcr.io/iwashita-nozomu/agent-canon:env-<key>` で選び、key は
+`bootstrap/container/image/environment_key.sh` が Dockerfile とその
+`source=` bind inputs の Git tree identity から導出します。
 
 `bootstrap/host/manifest.toml` は current、rollback、in-use、pre-existing、gc-eligible を区別します。
 target add/remove が成功すると resident state owner は同じ
@@ -220,10 +223,10 @@ provider は保持しません。Docker cache mount は使用しません。
 dependency plan / receipts は manifest の declared records と観測した Rust source
 digest、exact Cargo.lock digest、binary digest/version を build provenance として
 保存します。Rust source digest は手動の manifest expectation ではありません。
-CI が image を build/load/run し、entrypoint health、実 executable/import、LSP
-resolver、plan と build-provider absence を検証します。canonical install/sync/update
-は `ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` を pull し、明示的な
-`update --local-build` だけが開発用 local build route です。
+CI が image を build/load/run し、entrypoint health を検証します。canonical
+install/sync/update は env key image を再利用し、source-only 更新では
+source-mounted tool compile だけを writable cache に行います。Dockerfile または
+その bind input が変わったときだけ新しい環境 image を作ります。
 
 `bootstrap/container/image/Dockerfile` は次を必須にします。
 
@@ -240,6 +243,12 @@ tmpfs /tmp
 
 Python / Rust dependency は image に一度だけ入れ、project / task ごとの image、
 container、venv、Cargo toolchain、volume を作りません。
+
+Resident は AgentCanon source checkout を `/opt/agent-canon/source` に read-only
+で、runtime state volume の cache を `/var/lib/agent-canon/cache` に writable
+で mount します。source-mounted `tools/**/Cargo.toml` を走査する compile route
+が必要な Rust tool だけを cache/bin に更新し、source-only 更新では environment
+image を再構築しません。
 
 ## Mount Registry And Generation Transaction
 

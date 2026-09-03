@@ -24,29 +24,23 @@ GitHub actions, and arbitrary host commands remain owned by the project or
 host workflow. No project-specific AgentCanon image, container, virtualenv,
 Cargo toolchain, volume, or source checkout is created.
 
-The published artifact is one digest-pinned Ubuntu 24.04 output image. The
-bootstrap package transaction performs one apt update, then manifest-owned
-dependencies are installed in the same dependency layer before the asset and
-materializer layer. Build-essential, curl, pipx, npm,
-`rustup-init`, Cargo build output, and caches are purged before the image is
-committed; the final runtime retains Node, Python 3.12, jq/tree, clangd, Rust
-runtime components, LSP launchers, and immutable dependency plan/receipts.
-CI owns the runtime smoke: it loads the native image, invokes the image verifier
-against the runtime workspace and manifest, runs entrypoint health, then invokes
-`/bin/sh` to check imports, both C/C++ LSP resolver paths, and absence of build
-providers. Canonical install/sync/update
-pull `ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` and never fall back
-to a local build; only explicit `update --local-build` enables the development
-build route. Rust source digests are observed in receipts; no manually maintained
-source-tree digest is required in the manifest.
+The published artifact is one digest-pinned Ubuntu 24.04 output image. Its
+stable tag is `ghcr.io/iwashita-nozomu/agent-canon:env-<key>`, where the shared
+shell key owner hashes the Dockerfile and its `source=` bind inputs by
+repository-relative Git tree identity. The key is independent of checkout
+path and source commit ID. CI builds both architectures only when that tag is
+absent; pull requests build for verification without publishing. A source-only
+update reuses the environment image and recompiles only source-mounted Rust
+tools into the writable cache.
 
 ## Host/container activation boundary
 
 `bootstrap.sh` and `bootstrap/host/lifecycle/entrypoint.sh` are executable by a host that
 has Docker and Git but no Python package environment. They never import or
-execute AgentCanon Python directly. Lifecycle and tool operations first build
-or adopt the image, create/start exactly one resident container with
-`--network none`, then invoke the Python controller through `docker exec`.
+execute AgentCanon Python directly. Lifecycle and tool operations first select
+the env-key image, create/start exactly one resident container with
+`--network none`, mount the source checkout read-only at
+`/opt/agent-canon/source`, and invoke source-mounted tools through `docker exec`.
 
 The controller never issues Docker operations. The host shell owns the fixed
 Docker lifecycle transaction and invokes the controller only after the
@@ -57,8 +51,8 @@ credential-free `container-state` subtree is the only runtime state mount;
 host-only Docker config and archive credentials remain outside it. Systemd
 units and source synchronization remain host shell/Git operations. Sync pulls
 the persistent install root forward with `git pull --ff-only origin main`,
-publishes the source state, then pulls the exact GHCR image and replaces the
-resident. Source advancement is never rolled back when a later image, resident,
+publishes the source state, then selects the env-key image and replaces the
+resident only when the environment or required mounts changed. Source advancement is never rolled back when a later image, resident,
 link, or systemd phase fails. Product code verification remains in the
 project's own Docker test runner.
 
@@ -161,10 +155,11 @@ switch, remote-ref comparison, working-tree cleanliness check, candidate
 checkout, or source staging is performed. HEAD and tree values in the
 source-sync receipt are telemetry only.
 
-After a successful pull, sync pulls the exact GHCR image and replaces the
-resident. Image unavailability is reported before the old resident is stopped;
-later resident failure uses the existing runtime rollback only. Git is never
-rolled back by sync. Foreign or unlabeled Docker resources remain untouched.
+After a successful pull, sync selects the `:env-<key>` image and reuses the
+resident when its environment and source/cache mounts are current. Image
+unavailability is reported before the old resident is stopped; later resident
+failure uses the existing runtime rollback only. Git is never rolled back by
+sync. Foreign or unlabeled Docker resources remain untouched.
 
 ## What is installed and where
 
@@ -185,24 +180,22 @@ image remains outside uninstall.
 After install, update, or rollback readback, `host-state/active-image.tsv`
 atomically records the exact resident `Config.Image` reference and immutable
 image ID. Ordinary `start`, `status`, `target`, `tool`, and Codex routes consume
-that record; they do not recompute a source-derived image tag. Candidate image
+that record; they do not recompute an image tag. Candidate image
 selection is limited to install/update/sync, and rollback may persist the
 immutable ID used to recreate the resident.
 
 `update` reads only the current AgentCanon checkout. It never fetches,
-checks out, merges, rebases, resets, or pulls Git state. It pulls the canonical
-`ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` image and validates its
-OCI revision, native platform, and RepoDigest. Only explicit `update
---local-build` may build locally; pull failure never falls back to a build.
-A handled pull/build or health failure restores the existing v2 generation,
-container, and image.
+checks out, merges, rebases, resets, or pulls Git state. It selects the
+environment key, reuses an exact local `:env-<key>` image when possible, and
+otherwise pulls or builds that environment once. A handled pull/build or
+health failure restores the existing v2 generation, container, and image.
 `sync` is the one-shot source/update route. Under `replacement.lock`, it runs
 `git -C <install-root> pull --ff-only origin main`, publishes the resulting
-source state, pulls `:sha-<full-commit>`, verifies the OCI revision, RepoDigest,
-and native platform, then updates the resident and global links. Detached and
-shallow checkouts are accepted when Git accepts the pull. Image or resident
-failure never rolls back the source checkout; the previous resident is kept or
-restored according to the existing runtime replacement route.
+source state, selects `:env-<key>`, and updates the resident only when the
+environment or required mounts changed. Detached and shallow checkouts are
+accepted when Git accepts the pull. Image or resident failure never rolls back
+the source checkout; the previous resident is kept or restored according to
+the existing runtime replacement route.
 `main` and `latest` are discovery labels only and are never runtime identity.
 
 On Linux and WSL with a usable systemd user manager, the host `install` enables the

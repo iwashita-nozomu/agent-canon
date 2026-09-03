@@ -73,9 +73,11 @@ It reuses dependency planning and installs the configured Python, Rust, and
 LSP tools once. It does not contain editor post-create behavior, project
 dependencies, project tests, GPU setup, or a Compose workspace lifecycle.
 
-`install` invokes the ordinary Docker build for the manifest-owned image and
-records its result. It does not enumerate containers or hash the full source
-tree before the build. `start` creates or starts at most one resident container
+`install` and `update` select the environment image from
+`bootstrap/container/image/environment_key.sh`, which hashes only the
+Dockerfile and its generic `source=` bind inputs by Git tree identity. An exact
+local `:env-<key>` image and resident with the source/cache mounts are reused;
+only a missing image or changed environment replaces it. `start` creates or starts at most one resident container
 per effective owner and control-root digest. Docker labels and manifest
 readback prevent a second bootstrap installation from adopting or deleting
 another installation. A matching pre-existing image tag is adopted by exact ID
@@ -87,6 +89,10 @@ target, tool, and Codex routes consume that state; only install/update/sync
 select a new candidate image reference.
 The runtime uses one image/container across registered projects; task
 separation is provided by exact target mounts and runtime-root task directories.
+The source checkout is mounted read-only at `/opt/agent-canon/source`; the
+runtime state volume provides the writable `/var/lib/agent-canon/cache`. After
+the resident is available, source-mounted Rust tools are compiled by the
+directory-scanning compile route into `cache/bin`.
 
 The default limits are:
 
