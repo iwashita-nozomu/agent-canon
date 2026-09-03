@@ -260,7 +260,9 @@ class FakeRunner:
         path_text = str(path)
         if path_text in self.non_executable_paths:
             return False
-        return path_text in self.virtual_executables or path_text.startswith("/usr/bin/")
+        return path_text in self.virtual_executables or path_text.startswith(
+            ("/usr/bin/", "/usr/local/bin/")
+        )
 
     def run(
         self,
@@ -1079,6 +1081,76 @@ class DependencyModelTests(unittest.TestCase):
                     runner=FakeRunner(),
                 )
 
+    def test_installed_receipt_rejects_missing_secondary_binding(self) -> None:
+        """A deleted secondary provider cannot satisfy an installed receipt."""
+        parsed = parse_record(
+            record(
+                "pyright-language-server",
+                package="pyright",
+                provides=["pyright", "pyright-langserver"],
+                verification={
+                    "kind": "npm-package",
+                    "executable": "pyright",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer = Installer(FakeRunner(), image_owned=True, image_owned_root=root)
+            payload = {
+                "status": "installed",
+                "executable_bindings": installer._structural_executable_bindings(parsed),
+            }
+            with mock.patch.object(
+                installer,
+                "_path_is_regular_executable",
+                side_effect=lambda path: path.name != "pyright-langserver",
+            ):
+                with self.assertRaisesRegex(
+                    DependencyError,
+                    "installed executable is missing or not executable: pyright-langserver",
+                ):
+                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+
+    def test_installed_receipt_rejects_non_executable_secondary_binding(self) -> None:
+        """A non-executable secondary provider cannot satisfy an installed receipt."""
+        parsed = parse_record(
+            record(
+                "pyright-language-server",
+                package="pyright",
+                provides=["pyright", "pyright-langserver"],
+                verification={
+                    "kind": "npm-package",
+                    "executable": "pyright",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer = Installer(FakeRunner(), image_owned=True, image_owned_root=root)
+            payload = {
+                "status": "installed",
+                "executable_bindings": installer._structural_executable_bindings(parsed),
+            }
+            with mock.patch.object(
+                installer,
+                "_path_is_regular_executable",
+                side_effect=lambda path: path.name != "pyright-langserver",
+            ):
+                with self.assertRaisesRegex(
+                    DependencyError,
+                    "installed executable is missing or not executable: pyright-langserver",
+                ):
+                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+
     def test_installed_tool_receipts_probe_jq_tree_and_rustc_directly(self) -> None:
         """Manifest executable fields provide direct image verification for tools."""
         records = (
@@ -1149,7 +1221,12 @@ class DependencyModelTests(unittest.TestCase):
                         "",
                     ),
                 ) as capture:
-                    installer._verify_installed_receipt(item, payload, workspace=root)
+                    with mock.patch.object(
+                        installer, "_path_is_regular_executable", return_value=True
+                    ):
+                        installer._verify_installed_receipt(
+                            item, payload, workspace=root
+                        )
                 self.assertEqual(capture.call_args.args[0][0], payload["executable_bindings"][item.verification.executable]["absolute_path"])
 
     def test_build_only_pipx_provider_has_no_live_probe(self) -> None:

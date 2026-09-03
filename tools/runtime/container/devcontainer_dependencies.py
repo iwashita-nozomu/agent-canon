@@ -3741,6 +3741,10 @@ class Installer:
                 raise DependencyError(
                     f"{record.id}: installed executable binding is stale: {name}"
                 )
+            if not self._path_is_regular_executable(expected_path):
+                raise DependencyError(
+                    f"{record.id}: installed executable is missing or not executable: {name}"
+                )
         if spec.kind is VerificationKind.CARGO_BINARY:
             absolute = payload.get("binary_path")
         elif spec.executable is not None:
