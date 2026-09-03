@@ -1,0 +1,40 @@
+name: Issue 1041 source snapshots
+
+on:
+  push:
+    branches:
+      - audit/1041-repository-line-inventory
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout AgentCanon
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Checkout project template
+        run: git clone --depth 1 https://github.com/iwashita-nozomu/project_template.git ../project_template
+
+      - name: Package tracked source snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir issue-1041-source-snapshots
+          git archive --format=tar.gz --output=issue-1041-source-snapshots/agent-canon.tar.gz HEAD
+          git -C ../project_template archive --format=tar.gz --output="$PWD/issue-1041-source-snapshots/project_template.tar.gz" HEAD
+          {
+            printf 'agent-canon %s %s\n' "$(git rev-parse HEAD)" "$(git rev-parse 'HEAD^{tree}')"
+            printf 'project_template %s %s\n' "$(git -C ../project_template rev-parse HEAD)" "$(git -C ../project_template rev-parse 'HEAD^{tree}')"
+          } > issue-1041-source-snapshots/identity.txt
+
+      - name: Upload source snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1041-source-snapshots
+          path: issue-1041-source-snapshots
+          if-no-files-found: error
