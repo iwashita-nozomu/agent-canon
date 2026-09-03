@@ -140,7 +140,8 @@ jobs:
 
       - name: Reuse existing environment image
         if: needs.prepare.outputs.exists == 'true'
-        run: echo "environment image already exists: $IMAGE"
+        run: |
+          echo "environment image already exists: $IMAGE"
 
       - name: Publish environment and main tags
         if: github.event_name != 'pull_request' && needs.prepare.outputs.exists != 'true'
