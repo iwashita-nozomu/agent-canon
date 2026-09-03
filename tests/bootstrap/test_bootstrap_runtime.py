@@ -1908,6 +1908,7 @@ def test_container_update_preserves_tasks_without_image_replacement(
         property(lambda _manager: private_log),
     )
     monkeypatch.setattr(BootstrapRuntime, "_materialize_skill_view", lambda _manager: {})
+    monkeypatch.setattr(BootstrapRuntime, "_prune_stale_targets", lambda _manager, _state: [])
     monkeypatch.setattr(BootstrapRuntime, "_write_mounts", lambda *_args: None)
     monkeypatch.setattr(BootstrapRuntime, "_write_mount_manifest", lambda *_args: None)
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
@@ -1916,10 +1917,19 @@ def test_container_update_preserves_tasks_without_image_replacement(
         state="ready",
         active_task_count=1,
         tasks={"active": {"state": "active"}},
+        targets={
+            "target-a": {
+                "host_root": str(tmp_path / "target-a"),
+                "root": "/targets/target-a",
+                "mode": "read-only",
+            }
+        },
         resources=manager._resource_records(),
     )
     manager._ensure_layout()
     manager._write_state(state)
+    plan = exchange / "rollback-plan.tsv"
+    plan.write_text("stale rollback plan\n", encoding="utf-8")
     args = build_parser().parse_args(
         [
             "--container-control",
@@ -1934,12 +1944,24 @@ def test_container_update_preserves_tasks_without_image_replacement(
     after_refresh = json.loads(manager.paths.state.read_text(encoding="utf-8"))
     assert after_refresh["active_task_count"] == 1
     assert after_refresh["tasks"] == {"active": {"state": "active"}}
+    assert not plan.exists()
 
     monkeypatch.setenv("AGENT_CANON_PREVIOUS_IMAGE_ID", "sha256:" + "b" * 64)
+    monkeypatch.setenv("AGENT_CANON_PREVIOUS_IMAGE_REF", "agent-canon-tools:previous")
     run(args)
     after_replacement = json.loads(manager.paths.state.read_text(encoding="utf-8"))
     assert after_replacement["active_task_count"] == 0
     assert after_replacement["tasks"] == {}
+    assert plan.is_file()
+    plan_text = plan.read_text(encoding="utf-8")
+    assert "image-id\tsha256:" + "b" * 64 in plan_text
+    assert "image-ref\tagent-canon-tools:previous" in plan_text
+    assert "mount\tmount\t" + str(tmp_path / "target-a") + "\t/targets/target-a\ttrue" in plan_text
+
+    legacy_state = json.loads(json.dumps(after_replacement))
+    legacy_state["generations"][legacy_state["rollback_generation"]].pop("targets")
+    bootstrap_runtime_module._container_materialize_rollback_plan(manager, legacy_state)
+    assert "mount\tmount\t" + str(tmp_path / "target-a") + "\t/targets/target-a\ttrue" in plan.read_text(encoding="utf-8")
 
 
 
