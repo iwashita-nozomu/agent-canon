@@ -1724,7 +1724,7 @@ class BootstrapRuntime:
             "updated_at": _now(),
         }
 
-    def _read_state(self, *, allow_manifest_drift: bool = False) -> dict[str, Any]:
+    def _read_state(self) -> dict[str, Any]:
         try:
             raw = _safe_read(self.paths.state, field="state")
         except BootstrapError as exc:
@@ -1766,14 +1766,6 @@ class BootstrapRuntime:
                     "owner_source_root": recorded_source,
                     "requested_source_root": str(self.repository_root),
                 },
-            )
-        if (
-            value.get("manifest_digest") != self.manifest_digest
-            and not allow_manifest_drift
-        ):
-            raise BootstrapError(
-                "manifest_mismatch",
-                "runtime manifest digest differs from selected manifest",
             )
         return value
 
@@ -1833,7 +1825,7 @@ class BootstrapRuntime:
         self._preflight_runtime_reset(legacy, old_state)
         current_state: dict[str, Any] | None = None
         if self.paths.state.exists():
-            current_state = self._read_state(allow_manifest_drift=True)
+            current_state = self._read_state()
             self._preflight_runtime_reset(self.paths.runtime_root, current_state)
         self._stop_owned_container(old_state)
         if current_state is not None:
@@ -1850,7 +1842,7 @@ class BootstrapRuntime:
         legacy = self._legacy_runtime_pending_cleanup
         if legacy is None:
             return
-        state = self._read_state(allow_manifest_drift=True)
+        state = self._read_state()
         if self._legacy_runtime_expected_running:
             if state.get("state") == "uninstalled":
                 raise BootstrapError(
@@ -2020,12 +2012,6 @@ class BootstrapRuntime:
         """Adopt one already-pulled immutable image without invoking Docker build."""
         if state.get("state") == "uninstalled":
             raise BootstrapError("not_installed", "install must complete before registry image adoption")
-        if state.get("active_task_count", 0):
-            raise BootstrapError(
-                "mount_update_blocked",
-                "active tasks prevent registry image adoption",
-                evidence={"active_task_count": state.get("active_task_count", 0)},
-            )
         stale = self._prune_stale_targets(state)
         if stale:
             self._write_mounts(state)
@@ -2065,6 +2051,8 @@ class BootstrapRuntime:
                 state["state"] = "ready"
             else:
                 state["state"] = "installed"
+            state.update(active_task_count=0, tasks={})
+            state["manifest_digest"] = self.manifest_digest
             self._write_state(state)
             return self._result(
                 self._receipt(
@@ -2130,7 +2118,7 @@ class BootstrapRuntime:
         """Adopt an already-pulled registry image; this route never builds locally."""
         self._materialize_skill_view()
         with self.locked():
-            state = self._read_state(allow_manifest_drift=True)
+            state = self._read_state()
             result = self._adopt_registry_image_locked(state, image_ref, image_record, source_head)
         self.codex_prepare()
         return result
@@ -2605,7 +2593,7 @@ class BootstrapRuntime:
         """Install while the caller owns the lifecycle lock."""
         result: dict[str, Any] | None = None
         with contextlib.nullcontext():
-            state = self._read_state(allow_manifest_drift=True)
+            state = self._read_state()
             if state.get("state") == "uninstalled":
                 stale = self._prune_stale_targets(state)
                 if stale:
@@ -2622,8 +2610,6 @@ class BootstrapRuntime:
                 # codex_prepare runs after the lifecycle lock is released.
                 pass
             else:
-                if state.get("manifest_digest") != self.manifest_digest:
-                    state = self._new_state()
                 before = state["state"]
                 if image_ref:
                     image_record = self.docker.inspect_image(image_ref)
@@ -2693,12 +2679,6 @@ class BootstrapRuntime:
 
     def _update_locked(self, state: dict[str, Any], operation: str) -> dict[str, Any]:
         """Reconcile current checkout/image inputs with existing v2 lifecycle state."""
-        if state.get("active_task_count", 0):
-            raise BootstrapError(
-                "mount_update_blocked",
-                "active tasks prevent update; candidate build was not started",
-                evidence={"active_task_count": state.get("active_task_count", 0)},
-            )
         stale = self._prune_stale_targets(state)
         if stale:
             self._write_mounts(state)
@@ -2729,7 +2709,6 @@ class BootstrapRuntime:
         try:
             self._materialize_skill_view()
             self._image(state, force_build=True)
-            state["manifest_digest"] = self.manifest_digest
             state["state"] = "maintenance_pending"
             self._write_state(state)
             self._stop_owned_container(state)
@@ -2738,6 +2717,8 @@ class BootstrapRuntime:
                 state["state"] = "ready"
             else:
                 state["state"] = "installed"
+            state.update(active_task_count=0, tasks={})
+            state["manifest_digest"] = self.manifest_digest
             self._write_state(state)
             return self._result(
                 self._receipt(
@@ -2804,7 +2785,7 @@ class BootstrapRuntime:
         """Reconcile only the current checkout; never acquires a Git revision."""
         with self.locked():
             self._prepare_legacy_runtime_reset()
-            state = self._read_state(allow_manifest_drift=True)
+            state = self._read_state()
             fresh_reset = self._legacy_runtime_pending_cleanup is not None
             if state.get("state") == "uninstalled" and not fresh_reset:
                 raise BootstrapError("not_installed", "install must complete before update")
@@ -3006,7 +2987,7 @@ class BootstrapRuntime:
     def status(self) -> dict[str, Any]:
         """Return state plus Docker inspect readback."""
         with self.locked():
-            state = self._read_state(allow_manifest_drift=True)
+            state = self._read_state()
             manifest_drift = state.get("manifest_digest") != self.manifest_digest
             if manifest_drift:
                 container = state.get("resources", {}).get("container", {})
@@ -3120,7 +3101,7 @@ class BootstrapRuntime:
     def stop(self) -> dict[str, Any]:
         """Stop and remove only the owned container after admission drains."""
         with self.locked():
-            state = self._read_state(allow_manifest_drift=True)
+            state = self._read_state()
             before = state["state"]
             if state.get("active_task_count", 0):
                 raise BootstrapError(
@@ -4480,7 +4461,7 @@ class BootstrapRuntime:
                 "only a successful source-unchanged collection may be published",
             )
         with self.locked():
-            state = self._read_state(allow_manifest_drift=True)
+            state = self._read_state()
         if collection.get("manifest_digest") != state.get("manifest_digest"):
             raise BootstrapError(
                 "eval_collection_generation_mismatch",
@@ -4746,7 +4727,7 @@ class BootstrapRuntime:
     def uninstall(self) -> dict[str, Any]:
         """Remove exact owned Docker resources and managed Codex links."""
         with self.locked():
-            state = self._read_state(allow_manifest_drift=True)
+            state = self._read_state()
             before = state["state"]
             if state.get("active_task_count", 0):
                 raise BootstrapError(
@@ -5223,7 +5204,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     runtime = _runtime_from_args(args)
     if operation in {"install", "update", "start", "stop", "uninstall"}:
         with runtime.locked():
-            state = runtime._read_state(allow_manifest_drift=True)
+            state = runtime._read_state()
             if operation in {"install", "update"}:
                 runtime._prune_stale_targets(state)
             before = str(state.get("state"))
@@ -5288,6 +5269,8 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                     }
                     state["rollback_generation"] = previous_generation
                     state["current_generation"] = current_generation
+                state.update(active_task_count=0, tasks={})
+                state["manifest_digest"] = runtime.manifest_digest
             elif operation == "start":
                 state["state"] = "ready"
             elif operation == "stop":
@@ -5322,7 +5305,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
         return result
     if operation == "rollback":
         with runtime.locked():
-            state = runtime._read_state(allow_manifest_drift=True)
+            state = runtime._read_state()
             before = str(state.get("state"))
             resources = state.setdefault("resources", _container_resource_state(runtime))
             image = resources.setdefault("image", {})
@@ -5388,7 +5371,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             )
     if operation == "restore":
         with runtime.locked():
-            state = runtime._read_state(allow_manifest_drift=True)
+            state = runtime._read_state()
             before = str(state.get("state"))
             resources = state.setdefault("resources", _container_resource_state(runtime))
             image = resources.setdefault("image", {})
@@ -5442,7 +5425,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             )
     if operation == "status":
         with runtime.locked():
-            state = runtime._read_state(allow_manifest_drift=True)
+            state = runtime._read_state()
             return runtime._result(
                 runtime._receipt(
                     "status",
