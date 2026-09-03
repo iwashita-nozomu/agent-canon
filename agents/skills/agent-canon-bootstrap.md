@@ -74,6 +74,8 @@ evidence.
   secondary source-sync lock is allowed. If image/resident replacement fails,
   the source remains advanced and the old resident is kept or restored by the
   existing replacement route.
+  For caller compatibility, sync also accepts and ignores historical
+  `--remote` and `--branch` arguments; the operation always uses `origin main`.
 - Eval collection is append-only and is handed to the repository-qualified
   `iwashita-nozomu/agent-canon-log` archive through the host adapter. Never
   write archive output back into the AgentCanon source tree.

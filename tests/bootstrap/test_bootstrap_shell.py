@@ -2061,6 +2061,90 @@ def test_sync_uses_pull_without_candidate_or_source_admission() -> None:
     assert "_agent_canon_sync_request_metadata" not in text
 
 
+@pytest.mark.parametrize(
+    "compatibility_args",
+    (
+        ("--remote", "legacy-remote", "--branch", "feature"),
+        ("--remote=legacy-remote", "--branch=feature"),
+    ),
+)
+def test_sync_accepts_legacy_dotfiles_argv_but_keeps_fixed_git_target(
+    tmp_path: Path, compatibility_args: tuple[str, ...]
+) -> None:
+    """Legacy caller flags are syntax-only and cannot change the fixed pull."""
+    repository = tmp_path / "agent-canon"
+    repository.mkdir()
+    runtime = tmp_path / "runtime"
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    git_log = tmp_path / "git-argv"
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        """#!/usr/bin/env bash
+set -eu
+if [[ "${3:-}" == rev-parse ]]; then
+  if [[ "${5:-}" == 'HEAD^{tree}' ]]; then
+    printf '%s\\n' 2222222222222222222222222222222222222222
+  else
+    printf '%s\\n' 1111111111111111111111111111111111111111
+  fi
+elif [[ "${3:-}" == pull ]]; then
+  printf '%s\\n' "${@:3}" > "$GIT_LOG"
+else
+  printf 'unexpected git argv: %s\\n' "$*" >&2
+  exit 1
+fi
+""",
+        encoding="utf-8",
+    )
+    fake_git.chmod(0o755)
+    fake_docker = fake_bin / "docker"
+    fake_docker.write_text(
+        """#!/usr/bin/env bash
+set -eu
+if [[ "$1:$2" == image:inspect ]]; then
+  printf '%s\\n' sha256:fake-image
+else
+  printf 'unexpected docker argv: %s\\n' "$*" >&2
+  exit 1
+fi
+""",
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+    shell_args = " ".join(repr(argument) for argument in compatibility_args)
+    script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_DOCKER={str(fake_docker)!r}
+PATH={str(fake_bin)!r}:$PATH
+GIT_LOG={str(git_log)!r}
+export AGENT_CANON_DOCKER PATH GIT_LOG
+_agent_canon_validate_roots() {{
+  AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+  AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / 'private-log')!r}
+  export AGENT_CANON_RUNTIME_ROOT
+  export AGENT_CANON_PRIVATE_LOG_ROOT
+}}
+_agent_canon_with_replacement_lock() {{ "$@"; }}
+_agent_canon_image_reference() {{ AGENT_CANON_IMAGE_REF=ghcr.io/example/agent-canon:fixed; }}
+_agent_canon_image() {{ AGENT_CANON_IMAGE_REF=ghcr.io/example/agent-canon:fixed; return 0; }}
+_agent_canon_replace_resident_locked() {{ return 0; }}
+_agent_canon_scheduler_locked() {{ return 0; }}
+bootstrap_host_entrypoint {str(repository)!r} --control-parent-root {str(tmp_path)!r} \
+  sync --install-root {str(repository)!r} {shell_args}
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert git_log.read_text(encoding="utf-8").splitlines() == [
+        "pull",
+        "--ff-only",
+        "origin",
+        "main",
+    ]
+
+
 def test_source_sync_state_is_a_read_only_directory_mount() -> None:
     """The source-sync directory remains visible after atomic nested-file replace."""
     text = ADAPTER.read_text(encoding="utf-8")
