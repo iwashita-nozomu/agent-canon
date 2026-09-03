@@ -79,7 +79,7 @@ SOURCE_SYNC_TIMESTAMP_RE = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
 )
 CODEX_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
-TOOL_SOURCE_DESTINATION = "/usr/local/share/agent-canon/runtime"
+TOOL_SOURCE_DESTINATION = "/opt/agent-canon/source"
 TOOL_ENVIRONMENT_KEYS = frozenset(
     {
         "PATH",
@@ -237,7 +237,7 @@ def _validate_tool_plane_argv(
     executable = argv[0]
     if executable in {"agent-canon", "agent-canon-tool"}:
         return
-    image_tool_root = "/usr/local/share/agent-canon/runtime/tools/"
+    image_tool_root = f"{TOOL_SOURCE_DESTINATION}/tools/"
     if executable in {"python3", "bash"} and len(argv) > 1:
         script = argv[1]
         if script.startswith(image_tool_root):
@@ -3064,7 +3064,7 @@ class BootstrapRuntime:
             cwd=CONTAINER_RUNTIME_DESTINATION,
             argv=[
                 "python3",
-                "/usr/local/share/agent-canon/runtime/tools/runtime/archive/"
+                f"{TOOL_SOURCE_DESTINATION}/tools/runtime/archive/"
                 "runtime_exchange_cleanup.py",
             ],
         )
@@ -4260,14 +4260,14 @@ class BootstrapRuntime:
                 image = state.get("resources", {}).get("image", {})
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
-                canon_root = "/usr/local/share/agent-canon/runtime"
+                canon_root = TOOL_SOURCE_DESTINATION
                 container_runtime = "/var/lib/agent-canon/exchange"
                 exchange_runtime = (
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )
                 command = [
                     "python3",
-                    "/usr/local/share/agent-canon/runtime/eval/producers/run_accumulated_agent_evals.py",
+                    f"{TOOL_SOURCE_DESTINATION}/eval/producers/run_accumulated_agent_evals.py",
                     "--root",
                     canon_root,
                     "--target-root",
@@ -5269,7 +5269,8 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                     }
                     state["rollback_generation"] = previous_generation
                     state["current_generation"] = current_generation
-                state.update(active_task_count=0, tasks={})
+                if previous_image_id:
+                    state.update(active_task_count=0, tasks={})
                 state["manifest_digest"] = runtime.manifest_digest
             elif operation == "start":
                 state["state"] = "ready"

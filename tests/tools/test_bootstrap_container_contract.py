@@ -24,7 +24,6 @@ except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
 from tools.runtime.dispatch import tool_dispatch
-from tools.runtime.container.devcontainer_dependencies import Installer
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +33,7 @@ ENTRYPOINT = CONTAINER / "lifecycle" / "entrypoint.sh"
 DEPENDENCIES = CONTAINER / "image" / "dependencies.toml"
 ROOT_DOCKERIGNORE = ROOT / ".dockerignore"
 WRAPPER = CONTAINER / "dispatch" / "tool-wrapper.sh"
+COMPILE_TOOLS = ROOT / "tools" / "runtime" / "container" / "compile_tools.sh"
 
 
 def test_legacy_agent_canon_devcontainer_surface_is_absent() -> None:
@@ -79,11 +79,15 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "rootless" not in text.lower()
     digests = re.findall(r"@sha256:([0-9a-f]{64})(?:\s|$)", text, re.MULTILINE)
     assert len(digests) == 1
-    assert "--mount=type=bind,source=.,target=/src,readonly" in text
+    assert "--mount=type=bind,source=.,target=/src,readonly" not in text
     assert text.count("apt-get update") == 1
     assert "nodejs" in text and "npm" in text
     assert "apt-get purge" in text
-    assert "materialize --root /usr/local/share/agent-canon/runtime --all --image-build" in text
+    assert "materialize" not in text
+    assert "AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source" in text
+    assert "AGENT_CANON_CACHE_ROOT=/var/lib/agent-canon/cache" in text
+    assert "AGENT_CANON_COMPILED_BIN_DIR=/var/lib/agent-canon/cache/bin" in text
+    assert "CARGO_TARGET_DIR=/var/lib/agent-canon/cache/cargo-target" in text
     assert "test -x" not in text
     assert "command -v" not in text
     assert "HEALTHCHECK" in text
@@ -95,6 +99,7 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
     assert "/usr/local/share/agent-canon/image-dependencies" in text
     assert "/usr/local/share/agent-canon/toolchains/cargo" in text
+    assert "build-essential" in text
     assert "rustfmt" not in text
     assert "clippy" not in text
 
@@ -106,7 +111,8 @@ def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
     apt_bootstrap = text.split("apt-get install", 1)[1].split(";", 1)[0]
     for package in ("pipx", "jq", "tree", "clangd-18"):
         assert package not in apt_bootstrap
-    assert "apt-get purge -y --auto-remove npm pipx build-essential curl" in text
+    assert "apt-get purge -y --auto-remove npm pipx" in text
+    assert "build-essential curl" in text
     assert "python3.12" in text
     assert "nodejs" in text and "npm" in text
     assert "test -x" not in text
@@ -124,7 +130,7 @@ def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
     assert "chmod 0444" in text
     assert "AGENT_CANON_IMAGE_ROOT=/usr/local/share/agent-canon" in text
     assert "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies" in text
-    assert "AGENT_CANON_RUNTIME_TOOLS_ROOT=/usr/local/share/agent-canon/runtime" in text
+    assert "AGENT_CANON_RUNTIME_TOOLS_ROOT=/opt/agent-canon/source" in text
     assert f"AGENT_CANON_IMAGE_MARKER_DIGEST={image_digest}" in text
     assert f"AGENT_CANON_RUNTIME_MARKER_DIGEST={runtime_digest}" in text
 
@@ -204,10 +210,11 @@ def test_entrypoint_is_executable_and_has_strict_health_dispatch() -> None:
     assert "health|--healthcheck)" in text
     assert '[[ "${uid}" == "0" ]]' not in text
     assert 'exec /usr/local/bin/agent-canon-tool "$@"' in text
-    assert 'usage: $0 health | resident | tool run <catalog-id> -- [args...]' in text
+    assert 'usage: $0 health | resident | compile | tool run <catalog-id> -- [args...]' in text
     assert 'exec "$@"' not in text
     assert "sleep infinity" in text
     assert "resident)" in text
+    assert "compile)" in text
     subprocess.run(["bash", "-n", str(ENTRYPOINT)], check=True)
 
 
@@ -240,9 +247,23 @@ def test_typed_tool_wrapper_rejects_arbitrary_dispatch() -> None:
     assert "tool_dispatch.py" in text
     assert "--container-exec" in text
     assert "AGENT_CANON_EXECUTION_PLANE=tool-container" in text
-    assert "--root /usr/local/share/agent-canon/runtime" in text
+    assert "--root /opt/agent-canon/source" in text
     assert "usage: agent-canon tool run" in text
     assert '[[ "${1:-}" != "tool" || "${2:-}" != "run" ]]' in text
+
+
+def test_compile_route_traverses_source_manifests_and_publishes_atomically() -> None:
+    """Rust compilation is source-derived and never names an individual tool."""
+    text = COMPILE_TOOLS.read_text(encoding="utf-8")
+    assert COMPILE_TOOLS.stat().st_mode & stat.S_IXUSR
+    assert "shopt -s globstar nullglob" in text
+    assert 'for manifest in "${manifests[@]}"' in text
+    assert 'manifests=("$source_root"/tools/**/Cargo.toml)' in text
+    assert "cargo metadata" in text
+    assert "cargo build --manifest-path \"$manifest\" --locked --release" in text
+    assert 'mv -f -- "$temporary" "$compiled_bin_dir/$binary"' in text
+    assert "agent-canon-cli" not in text
+    assert "tools/runtime/dispatch/agent-canon" not in text
 
 
 def test_dependency_manifest_is_python_rust_lsp_only() -> None:
@@ -262,7 +283,6 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "tree",
         "clangd-language-server",
         "rust-toolchain",
-        "agent-canon-cli",
     }
     assert not ids & {"github-cli", "codex-cli"}
     assert {record["method"] for record in records} <= {
@@ -271,19 +291,7 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "npm-global",
         "pipx",
         "rust-toolchain",
-        "cargo-source-build",
     }
-    cli = next(record for record in records if record["id"] == "agent-canon-cli")
-    assert cli["source_identity"] == "canonical-snapshot"
-    assert cli["locked"] is True
-    assert "source_tree_sha256" not in cli
-    assert len(cli["cargo_lock_sha256"]) == 64
-    source_digest, lock_digest = Installer._cargo_snapshot(
-        ROOT / "tools/runtime/dispatch/agent-canon"
-    )
-    assert len(source_digest) == 64
-    assert cli["cargo_lock_sha256"] == lock_digest
-    assert cli["source"] == "tools/runtime/dispatch/agent-canon"
     assert all("project" not in str(record).lower() for record in records)
     clangd = next(record for record in records if record["id"] == "clangd-language-server")
     assert clangd["method"] == "apt-package"

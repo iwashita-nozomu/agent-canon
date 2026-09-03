@@ -1881,6 +1881,63 @@ def test_container_control_uses_host_passed_state_volume(tmp_path: Path, monkeyp
     assert not (repository / ".runtime").exists()
 
 
+def test_container_update_preserves_tasks_without_image_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A source-only refresh keeps active work; image replacement clears it."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    exchange = control / "exchange"
+    private_log = control / "private-log"
+    control.mkdir()
+    exchange.mkdir()
+    exchange.chmod(0o700)
+    private_log.mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(exchange))
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_NAME", "agent-canon-test")
+    monkeypatch.setenv("AGENT_CANON_IMAGE_ID", "sha256:" + "a" * 64)
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "container-test")
+    monkeypatch.setattr(
+        BootstrapRuntime,
+        "private_log_root",
+        property(lambda _manager: private_log),
+    )
+    monkeypatch.setattr(BootstrapRuntime, "_materialize_skill_view", lambda _manager: {})
+    monkeypatch.setattr(BootstrapRuntime, "_write_mounts", lambda *_args: None)
+    monkeypatch.setattr(BootstrapRuntime, "_write_mount_manifest", lambda *_args: None)
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
+    state = manager._new_state()
+    state.update(
+        state="ready",
+        active_task_count=1,
+        tasks={"active": {"state": "active"}},
+        resources=manager._resource_records(),
+    )
+    manager._ensure_layout()
+    manager._write_state(state)
+    args = build_parser().parse_args(
+        [
+            "--container-control",
+            "--repository-root", str(REPOSITORY_ROOT),
+            "--control-parent-root", str(control),
+            "--runtime-root", str(runtime_root),
+            "update",
+        ]
+    )
+
+    run(args)
+    after_refresh = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert after_refresh["active_task_count"] == 1
+    assert after_refresh["tasks"] == {"active": {"state": "active"}}
+
+    monkeypatch.setenv("AGENT_CANON_PREVIOUS_IMAGE_ID", "sha256:" + "b" * 64)
+    run(args)
+    after_replacement = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert after_replacement["active_task_count"] == 0
+    assert after_replacement["tasks"] == {}
+
+
 
 def test_eval_precondition_failure_creates_no_spool_or_exchange(
     tmp_path: Path, fake_docker: DockerAdapter
