@@ -122,10 +122,11 @@ capability を受けた場合だけ source を変更します。
 <install-root>/.runtime/ -> resident container` です。`install` は検証済み image と
 resident を作り、`update` は同じ resident を current checkout へ更新し、`status` は
 `.runtime/` の active image と resident health を読み返します。`sync` は
-`replacement.lock` を一度だけ取得し、`git -C <install-root> pull --ff-only origin main`
-の成功後に source-sync state と env-key image を選び、必要な場合だけ resident、
-global links、timer を更新します。Git は detached/shallow checkout を含め、pull が
-受理した結果だけを信頼します。
+`replacement.lock` を一度だけ取得し、`git -C <install-root> fetch origin main` に
+続けて `git -C <install-root> checkout --force -B main FETCH_HEAD` を実行します。
+その後 source-sync state と env-key image を選び、必要な場合だけ resident、global
+links、timer を更新します。これにより installed checkout は常に local `main` の
+fetched remote revision に揃います。
 `gc --dry-run` は
 `.runtime/` の準備・作成・chmod をせずに同じ identity/ownership read を行い、`gc` は
 replacement lock の下で stale な owned Docker resource だけを exact ID/reference で

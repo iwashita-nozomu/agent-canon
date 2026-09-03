@@ -148,14 +148,12 @@ host sync transition.
 ### Install source transition
 
 The public `install` and `sync` paths have one source transition after argument
-parsing and under `replacement.lock`: `git -C <install-root> pull --ff-only
-origin main`. The result of that command is the Git admission. Detached and
-shallow source checkouts are accepted when Git accepts the pull; no branch
-switch, remote-ref comparison, working-tree cleanliness check, candidate
-checkout, or source staging is performed. HEAD and tree values in the
-source-sync receipt are telemetry only.
+parsing and under `replacement.lock`: `git -C <install-root> fetch origin main`
+followed by `git -C <install-root> checkout --force -B main FETCH_HEAD`. Git
+command or network failure is the only source transition failure; the final
+HEAD and tree values in the source-sync receipt are telemetry.
 
-After a successful pull, sync selects the `:env-<key>` image and reuses the
+After a successful source transition, sync selects the `:env-<key>` image and reuses the
 resident when its environment and source/cache mounts are current. Image
 unavailability is reported before the old resident is stopped; later resident
 failure uses the existing runtime rollback only. Git is never rolled back by

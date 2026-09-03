@@ -2072,7 +2072,7 @@ def test_sync_uses_forced_main_checkout_without_candidate_admission() -> None:
 def test_sync_accepts_legacy_dotfiles_argv_but_keeps_fixed_git_target(
     tmp_path: Path, compatibility_args: tuple[str, ...]
 ) -> None:
-    """Legacy caller flags are syntax-only and cannot change the fixed pull."""
+    """Legacy caller flags are syntax-only and cannot change fixed source sync."""
     repository = tmp_path / "agent-canon"
     repository.mkdir()
     runtime = tmp_path / "runtime"
@@ -2089,8 +2089,8 @@ if [[ "${3:-}" == rev-parse ]]; then
   else
     printf '%s\\n' 1111111111111111111111111111111111111111
   fi
-elif [[ "${3:-}" == pull ]]; then
-  printf '%s\\n' "${@:3}" > "$GIT_LOG"
+elif [[ "${3:-}" == fetch || "${3:-}" == checkout ]]; then
+  printf '%s\\n' "${@:3}" >> "$GIT_LOG"
 else
   printf 'unexpected git argv: %s\\n' "$*" >&2
   exit 1
@@ -2139,10 +2139,14 @@ bootstrap_host_entrypoint {str(repository)!r} --control-parent-root {str(tmp_pat
     )
     assert result.returncode == 0, result.stderr
     assert git_log.read_text(encoding="utf-8").splitlines() == [
-        "pull",
-        "--ff-only",
+        "fetch",
         "origin",
         "main",
+        "checkout",
+        "--force",
+        "-B",
+        "main",
+        "FETCH_HEAD",
     ]
 
 
