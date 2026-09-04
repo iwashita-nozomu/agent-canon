@@ -85,7 +85,7 @@ clone scan, a fixed rule-of-three threshold, a new checker, or a dedicated recei
 identifies the repeated sites, the shared responsibility dimensions, the synchronization/authority/
 drift risk, and the selected SEP-03 or SEP-08 clause that supports the decision.
 
-When a new helper, module, script, parser, state, or publisher surrounds an existing CLI, library, or
+When a new or modified helper, module, script, parser, state, or publisher surrounds an existing CLI, library, or
 toolchain, consume the existing `reuse_survey` provider comparison and exact gap. Block manual
 reimplementation of provider-owned phases, and return `design_issue_blocker` when the comparison or
 gap is absent. Apply the prospective compound-responsibility-name stop in [命名規約](../../documents/rule/naming.md).
