@@ -434,6 +434,7 @@ workflow_families:
         - Define milestone and chunk boundaries before implementation; chunks are not user-facing completion.
         - Use hypothesis-validation workflow to justify the selected refactor or feature surface before moving code.
         - For refactors, require behavior contract, allowed structural delta, forbidden semantic delta, files to remove or move, and path mapping before editing.
+        - For deletion/refactor handoffs, consume code-cleanup's line/block semantic and caller/dataflow mapping; filename, symbol, search hit, and diff size are not deletion proof.
         - Sweep stale references after renames or structure changes before closeout.
       reviewer_prompt:
         - Block hidden semantic changes, incomplete path mapping, stale docs, and parallel durable truth surfaces.
@@ -483,6 +484,7 @@ workflow_families:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide hypotheses; owner-local receipts establish correspondence, while the parent owns transport, integration, and remote readback without approval authority.
         - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Prefer existing dependency surfaces and canonical environment helpers over ad hoc setup.
+        - For a new surface around an existing CLI, library, or toolchain, pass the existing reuse_survey provider comparison and exact gap to worker/reviewer; delegate covered phases and apply naming.md before handoff.
         - Do not create repo-local virtual environments on host runtime; use the canonical environment policy.
         - Keep Docker, CI, lock/dependency, and runtime-doc changes consistent.
       reviewer_prompt:

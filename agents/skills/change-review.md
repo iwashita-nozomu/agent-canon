@@ -85,6 +85,16 @@ clone scan, a fixed rule-of-three threshold, a new checker, or a dedicated recei
 identifies the repeated sites, the shared responsibility dimensions, the synchronization/authority/
 drift risk, and the selected SEP-03 or SEP-08 clause that supports the decision.
 
+When a new helper, module, script, parser, state, or publisher surrounds an existing CLI, library, or
+toolchain, consume the existing `reuse_survey` provider comparison and exact gap. Block manual
+reimplementation of provider-owned phases, and return `design_issue_blocker` when the comparison or
+gap is absent. Apply the prospective compound-responsibility-name stop in [命名規約](../../documents/rule/naming.md).
+For deletion or refactor review, consume the `code-cleanup` semantic mapping: read each candidate line or
+block and map its meaning, invariant, state transition, side effect, I/O, and reachable callers/consumers.
+Names, symbols, search hits, and diff size locate code but do not prove deletion. Whole-file deletion is
+valid only when every contribution is unreachable, delegated, or preserved; numerical code requires
+equations, units, stopping, convergence, and failure semantics to be reconstructed before architecture or JIT changes.
+
 ## Code Comment Review
 
 Use [コメント規約](../../documents/conventions/common/03_comments.md) as the canonical meaning and
