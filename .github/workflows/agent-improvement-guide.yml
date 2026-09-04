@@ -29,7 +29,7 @@ jobs:
   guide:
     runs-on: ubuntu-latest
     env:
-      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ runner.temp }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

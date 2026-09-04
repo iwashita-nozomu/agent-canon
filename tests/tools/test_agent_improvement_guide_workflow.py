@@ -119,13 +119,19 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             text,
         )
         self.assertNotIn("Setup Python", text)
+        self.assertIn("AGENT_CANON_CONTROL_PARENT_ROOT: ${{ runner.temp }}", text)
         self.assertIn(
             'cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"',
             text,
         )
+        guide_path_lines = [
+            line for line in text.splitlines() if "guide_path=" in line
+        ]
+        self.assertTrue(guide_path_lines)
+        self.assertNotIn("../", guide_path_lines[0])
         self.assertIn(
-            '"${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"',
-            text,
+            'guide_path="${guide_dir}/agent-improvement-guide-',
+            guide_path_lines[0],
         )
         self.assertNotIn(".runtime/container-state", text)
         self.assertNotIn("docker ", text)
