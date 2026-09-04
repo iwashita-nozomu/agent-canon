@@ -111,7 +111,7 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             text,
         )
         self.assertIn(
-            'guide_dir="${RUNNER_TEMP}/agent-improvement-guide"',
+            'guide_dir="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"',
             text,
         )
         self.assertIn(
@@ -124,7 +124,7 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             text,
         )
         self.assertIn(
-            '"${RUNNER_TEMP}/agent-improvement-guide"',
+            '"${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"',
             text,
         )
         self.assertNotIn(".runtime/container-state", text)

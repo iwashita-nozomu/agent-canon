@@ -556,7 +556,7 @@ def improvement_guide_trigger_findings(
             findings.append(Finding("error", path, "improvement_guide_internal_exec_forbidden"))
         if 'tool export guide --destination "${guide_dir}"' not in guide_run:
             findings.append(Finding("error", path, "improvement_guide_export_route_required"))
-        if 'guide_dir="${RUNNER_TEMP}/agent-improvement-guide"' not in guide_run:
+        if 'guide_dir="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"' not in guide_run:
             findings.append(Finding("error", path, "improvement_guide_host_destination_required"))
 
     runtime = re.search(
