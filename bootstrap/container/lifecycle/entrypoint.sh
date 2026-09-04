@@ -8,8 +8,8 @@
 
 set -euo pipefail
 
-compile_tools() {
-    exec /opt/agent-canon/source/tools/runtime/container/compile_tools.sh
+compile() {
+    exec /opt/agent-canon/source/tools/runtime/container/compile.sh
 }
 
 health() {
@@ -36,7 +36,7 @@ case "${1:-}" in
             echo "usage: $0 compile" >&2
             exit 64
         }
-        compile_tools
+        compile
         ;;
     resident)
         exec sleep infinity
