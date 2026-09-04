@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Checks AgentCanon PR readiness including source-owned dependency completeness.
 # upstream design ../../../README.md shared automation index
-# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
+# upstream design ../../../../agents/skills/agent-canon-update.md shared canon PR workflow
 # upstream design ../../../../documents/design/source-owned-dependency-validation.md source-owned PR acceptance contract
 # upstream design ../../../../documents/design/dependency-manifest-design.md manifest DSL projection
 # upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
@@ -517,5 +517,5 @@ emit_generated_completeness_receipt
 echo ""
 
 echo "AGENT_CANON_PR_CHECK=pass"
-echo "AGENT_CANON_PR_PROPAGATION_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
+echo "AGENT_CANON_PR_PROPAGATION_WORKFLOW=agents/skills/agent-canon-update.md"
 echo "NEXT_ACTION=Open_or_update_AgentCanon_PR_then_read_back_merged_main"

@@ -5,7 +5,7 @@
 contract skill
 responsibility Documents agent-orchestration for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../workflows/hypothesis-validation-workflow.md analysis-prioritized overlay routing
+upstream design ./dependency-analysis.md cause and fix-surface investigation route
 upstream design ../COMMUNICATION_PROTOCOL.md pre-edit investigation and fresh subagent context packets
 upstream design agent-orchestration.execution-contract.toml machine-readable execution contract
 upstream design ./skill-dependencies.yaml typed public-skill prerequisites, successors, ordering, and parallel relations
@@ -753,10 +753,11 @@ route を止める根拠に非数理エラーだけを使いません。
 - 投稿論文や thesis chapter の draft では `paper-writing` を優先します
 - paper draft ではない scholarly note や broader academic text では `academic-writing` を使います
 - scope が paper draft と broader academic prose をまたぐなら、`paper-writing` を優先し、必要なときだけ `academic-writing` を追加します
-- PR body、PR evidence comment、status update、decision brief、presentation narrative、PPT storyboard、または tool、JSON / JSONL、hook、eval、checker、experiment、review、audit の結果から reader-facing report を作る場合は `report-writing` を使います。report output は user が HTML、browser view、dashboard、web page、external browser publication を明示しない限り Markdown を既定にします。PPT / deck が scope に入る場合は visual asset plan と slide-production workflow も明示します。raw machine result を保存、コピー、蓄積する場合は `result-artifact-writeout` も併用します
+- PR body、PR evidence comment、status update、decision brief、presentation narrative、PPT storyboard、または tool、JSON / JSONL、hook、eval、checker、experiment、review、audit の結果から reader-facing report を作る場合は `report-writing` を使います。report output は user が HTML、browser view、dashboard、web page、external browser publication を明示しない限り Markdown を既定にします。PPT / deck が scope に入る場合は visual asset plan と `slides` Skill も明示します。raw machine result を保存、コピー、蓄積する場合は `result-artifact-writeout` も併用します
 - HTML output、HTML report、browser-readable page、dashboard、local preview server、external browser publication が明示された場合は `html-output` を使います
 - HTML の experiment / Eval artifact が明示された場合は `html-output` を直接使います。新しい実行・再実行が必要な場合だけ `experiment-lifecycle`、reader-facing claim が必要な場合だけ `report-writing` を追加します
 - report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合、または primary figure / table / ponchi-e / slide / section / slice、source map、source-to-slide map、invalid interpretation boundary を先に決める必要がある場合は `structure-planning` を足します
+- Terra の有効化経路は三つだけです。`--enable terra` の明示指定、全設定 role を求める `--full-team`、または `comprehensive_development` family の typed route です。通常の bounded/scoped route は Terra を選択しません。bounded task で owner contradiction の evidence が見つかった場合も、自動推測や別の route-result JSON relay を追加せず、agent-orchestration が `--enable terra` を明示して再ルートします。prompt 文面やキーワードから Terra を推測しません
 - tool、checker、hook、static analysis を走らせて問題を探す、full finding packet と mechanical priority order を作る、implementation / refactor planning に渡す場合は `tool-finding-report` を使います。before / after impact 比較は明示された場合だけ追加します。raw result を保存する場合は `result-artifact-writeout`、reader-facing narrative を作る場合は `report-writing` も併用します。reader-facing narrative が非自明な finding packet、priority policy、metric / count contract、source map を持つ場合は `structure-planning` も併用します
 - README、workflow、guide、migration、specification docs は一般説明 prose adapter を正にしつつ、evidence-backed status、evaluation、audit、review、decision、recommendation section を含む場合は `report-writing` を overlay として足します
 - research-backed implementation、benchmark、external research、prior art、公式
@@ -774,7 +775,8 @@ route を止める根拠に非数理エラーだけを使いません。
   reviewer より前の math-intent stage で選びます。数学 evidence のない infrastructure-only
   request はこの route を選びません
 - GPU / CUDA / JAX / XLA / IREE 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、ExperimentRunner Python 実行、JAX preallocation 無効化、GPU validation blocker が scope にある場合は `gpu-execution` を使います
-- 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因仮説を扱う場合は `agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
+- 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因調査と fix-surface の判断は同 skill の cause-investigation route に接続し、別 workflow 文書を overlay として作りません
+- 完了した local branch を base へ戻す必要がある場合だけ `integration` を足します。GitHub Issue/PR の publication・remote merge は `pr-processing`、checkout drift と cleanup は `worktree-health` が所有します
 - Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します。substantive な文書変更は `prose-reasoning-graph` と `structure-planning` も併用します
 - skill / tool / workflow / hook / eval の蓄積ログ分析、routing miss、selection gap、弱い skill の調査が scope にある場合は `agent-log-analysis` を足します
 - AgentCanon source、bootstrap/runtime、skill、eval/archive、または AgentCanon source PR が scope にある場合は `agent-canon-update` を足します。親repoはAgentCanon sourceをvendor/submoduleとして更新しません

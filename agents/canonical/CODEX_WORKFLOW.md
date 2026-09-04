@@ -4,10 +4,11 @@ contract agent-runtime
 responsibility Documents Codex Workflow for this repository.
 upstream design ../../ROOT_AGENTS.md common consumer root instruction base
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract
-upstream design ../workflows/agent-canon-pr-workflow.md standalone source PR workflow
+upstream design ../skills/agent-canon-update.md standalone source update owner
+upstream design ../skills/pr-processing.md source PR publication owner
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet route
 upstream implementation ../../tools/agent/skills/skill_document_reader.py bounded Skill read and EOF admission
-downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
+downstream design ../skills/tokens.md token and resource-aware routing
 downstream design ../../templates/agents/closeout_gate.md closeout gate contract
 upstream design ../../documents/design/dependency-manifest-design.md dependency manifest design
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
@@ -39,7 +40,7 @@ downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces c
 1. read-only worktree check で、必要なら別の AgentCanon source clone を使うかを分類する。AgentCanon source はこの repository か、親の `workspace/agent-canondevelop/<qualified-task>/agent-canon` にある独立 clone だけを扱う。更新が必要なら current checkout を保持し、standalone topic branch / PR workflow に入る。source branch の dirty / unpushed / divergent state は evidence として保持し、detached state は source owner identity repair へ route する
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
 1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
-1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
+1. 実装を伴う task では `$codex-task-workflow` と、選択された task-family Skill を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
 1. 必要なら `.codex/personal/skills/` から該当 skill を読む
@@ -58,7 +59,7 @@ Cross-Cutting Packet:
 - `documents/codex/AGENTS_COORDINATION.md`
 - `documents/conventions/coding-conventions-python.md`
 - `documents/operations/notes-lifecycle.md`
-- `agents/workflows/agent-learning-workflow.md`
+- `agents/skills/agent-learning.md`
 - `documents/runtime/runtime-profiles-and-check-matrix.md`
 - `documents/rule/dependency-module-changes.md`
 - `documents/notes/guardrails/README.md`
@@ -71,7 +72,7 @@ Cross-Cutting Packet:
 
 task 開始時は read-only worktree check で、現在の AgentCanon source clone と親の作業領域を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合は standalone topic branch / PR route に入ります。
 
-- AgentCanon source/runtime変更は standalone cloneから `agents/workflows/agent-canon-pr-workflow.md` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへlive root view、vendor、submodule pinを同期しません。consumer root `AGENTS.md` は、親が明示 composer で common `ROOT_AGENTS.md` と consumer-specific text を合成して通常 file として管理します。
+- AgentCanon source/runtime変更は standalone cloneから `$agent-canon-update` と `$pr-processing` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへlive root view、vendor、submodule pinを同期しません。consumer root `AGENTS.md` は、親が明示 composer で common `ROOT_AGENTS.md` と consumer-specific text を合成して通常 file として管理します。
 - 親で source の変更が必要な場合は、親の ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` に clone し、完了時に exact clone path を削除します。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
 - standalone AgentCanon source branch が remote main と divergeしている場合はfail-closedとし、source branchのrebase/merge判断、AgentCanon PR、merge後main readbackを完了してから実装へ戻ります。
 - `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。親から起動したときは AgentCanon source clone の存在、runtime root の containment、source-unchanged readbackを確認します。`skipped_source_canon` は AgentCanon source checkout がこの task の owner でない場合だけ妥当です。
@@ -313,7 +314,7 @@ Codex の goal は session runtime state として使い、repository に mirror
 
 When the user asks to reduce token usage, or current session evidence shows
 repeated context loading, duplicate agent decisions, oversized tool output, or
-retry loops, apply `agents/workflows/token-efficient-codex-workflow.md`.
+retry loops, apply `$tokens`.
 
 - Start from the project model and topology config. Runtime evidence owns any
   later task/profile classification or profile change.
@@ -527,8 +528,6 @@ checked and cited.
   - `academic-writing`
 - Markdown diff:
   - `md-style-check`
-- legacy worktree cleanup / drift diagnosis:
-  - `worktree-start`
 - worktree drift and cleanup:
   - `worktree-health`
 - experiment inner loop:
@@ -730,7 +729,7 @@ cost を無視して review coverage を優先する run では、research-drive
 
 ### 5. Implementation
 
-- 実装は `agents/workflows/implementation-waterfall-workflow.md` の gate に従って進める
+- 実装は `$codex-task-workflow` と選択された task-family Skill の owner route に従って進める
 - SEP-09 を適用し、implementation は開始前に固定した complete target state から導く。waves は定義済み work の順序だけを決め、target state を後から完成させる段階実装にはしない。禁止事項と scope exception の詳細は SEP-09 を参照し、この workflow は policy を複製しない
 - selected gate の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes`
   でない場合は指示された owner stage へ戻る

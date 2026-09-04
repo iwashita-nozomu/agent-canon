@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents the canonical standalone AgentCanon GitHub remote.
-downstream design ../../agents/workflows/agent-canon-pr-workflow.md consumes branch/PR evidence.
+downstream design ../../agents/skills/agent-canon-update.md consumes branch/PR evidence.
 downstream implementation ../../bootstrap.sh validates the source checkout locally.
 @dependency-end
 -->

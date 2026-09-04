@@ -4,7 +4,7 @@ contract workflow
 responsibility Documents Branch Scope と Git ワークフロー for this repository.
 upstream design README.md durable document index
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md consumes commit correctness closeout contract
-downstream design ../../agents/workflows/agent-canon-pr-workflow.md consumes branch, commit, and PR scope split contract
+downstream design ../../agents/skills/agent-canon-update.md consumes branch, commit, and PR scope split contract
 downstream design ../../agents/skills/codex-task-workflow.md exposes commit correctness workflow guidance
 downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes commit correctness runtime guidance
 downstream design ../../agents/skills/pr-processing.md exposes PR merge scope review
@@ -94,7 +94,7 @@ validation route を同じ entrypoint で再実行できることを指します
 - 履歴を読みやすく保つため、ローカル整理には `rebase` を使って構いません。
 - 統合時の安全性と文脈保持を優先する場合は `merge` を選びます。
 - 別 branch と同じファイルを触っている場合は、先に `documents/notes/branches/` と `documents/notes/worktrees/` で衝突リスクを明示します。
-- file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、`agents/workflows/main-integration-workflow.md` の手順で統合します。
+- file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、`agents/skills/integration.md` の手順で統合します。
 - 構成変更がある branch は、`main` 側で file 単位に拾い直して close してはいけません。
 - 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`python3 tools/validation/ci/checks/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - integration branch が妥当なら、`main` へは `git merge --ff-only integrate/<topic>-YYYYMMDD` で持ち帰ります。

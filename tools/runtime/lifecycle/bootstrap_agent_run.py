@@ -237,6 +237,7 @@ class BootstrapRunContext:
     workflow_family_name: str | None
     workflow_active_spawn_budget: int | None
     workflow_max_write_subagents: int | None
+    adversarial_required: bool = False
     math_intent_route: str | None = None
     issue_worker_candidate: Mapping[str, object] | None = None
     repository_roots: object | None = None
@@ -515,6 +516,7 @@ def resolve_bootstrap_context(
     workflow_family_name: str | None = None
     workflow_active_spawn_budget: int | None = None
     workflow_max_write_subagents: int | None = None
+    adversarial_required = False
     if args.task_id is not None:
         task_spec = resolve_task_spec(catalog, args.task_id)
         workflow_family_id = str(task_spec["family"])
@@ -526,6 +528,9 @@ def resolve_bootstrap_context(
                 workflow_family_id,
             )
         )
+        # The comprehensive family is the catalog-owned cross-owner route.
+        # Bounded routes enable Terra explicitly through --enable terra.
+        adversarial_required = workflow_family_id == "comprehensive_development"
         task_default_specialists = default_specialists_for_task(
             config=config,
             catalog=catalog,
@@ -609,6 +614,7 @@ def resolve_bootstrap_context(
         workflow_family_name=workflow_family_name,
         workflow_active_spawn_budget=workflow_active_spawn_budget,
         workflow_max_write_subagents=workflow_max_write_subagents,
+        adversarial_required=adversarial_required,
         math_intent_route=math_route,
         issue_worker_candidate=issue_worker_candidate,
         repository_roots=repository_roots,
@@ -626,7 +632,9 @@ def selected_review_roles(roles: tuple[Role, ...]) -> tuple[str, ...]:
     return tuple(
         role.id
         for role in roles
-        if role.id.endswith("_reviewer") or role.id in fixed_review_roles
+        if role.id.endswith("_reviewer")
+        or role.id in fixed_review_roles
+        or "adversarial_contradiction_validation" in role.owns
     )
 
 
@@ -728,6 +736,10 @@ def emit_bootstrap_output(
         )
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={context.workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={context.workflow_max_write_subagents}")
+        print(
+            "ADVERSARIAL_REQUIRED="
+            + ("yes" if context.adversarial_required else "no")
+        )
         print("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no")
         print("DYNAMIC_SUBAGENT_EXPANSION=allowed")
         print("DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger")
@@ -1244,6 +1256,7 @@ def main(
         catalog=catalog,
         workflow_family_id=context.workflow_family_id,
         issue_worker_candidate=context.issue_worker_candidate,
+        adversarial_required=context.adversarial_required,
     )
     try:
         agent_type_selections = validate_agent_type_selections(

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks GitHub workflow and PR template conventions.
-# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
+# upstream design ../../../../agents/skills/agent-canon-update.md PR evidence rules
 # upstream design ../../../../README.md AgentCanon surface index
 # upstream design ../../../../.github/AGENTS.md GitHub agent entrypoint
 # upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
@@ -786,9 +786,7 @@ def check_github_support_surfaces(root: Path) -> list[Finding]:
 
 def check_pr_flow_docs(root: Path) -> list[Finding]:
     """Check that the standalone source PR lane binds ownership and readback."""
-    workflow_path = (
-        root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
-    )
+    workflow_path = root / "agents" / "skills" / "agent-canon-update.md"
     return require_text(
         workflow_path,
         [

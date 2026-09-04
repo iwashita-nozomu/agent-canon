@@ -4,7 +4,7 @@
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
 # upstream design ../../../../documents/design/source-owned-dependency-validation.md source-owned dependency receipt and review authority
 # upstream design ../../../../documents/design/dependency-manifest-design.md dependency manifest DSL and graph semantics
-# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
+# upstream design ../../../../agents/skills/agent-canon-update.md PR validation contract
 # upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
 # upstream design ../../../../agents/TASK_WORKFLOWS.md workflow routing contract
 # upstream design ../../../../agents/skills/agent-orchestration.md orchestration routing contract
@@ -111,7 +111,7 @@ CONTRACTS = (
         name="github_pr_flow",
         tool="tools/validation/ci/checks/check_github_workflows.py",
         links=(
-            LinkCheck("agents/workflows/agent-canon-pr-workflow.md"),
+            LinkCheck("agents/skills/agent-canon-update.md"),
             LinkCheck(".github/AGENTS.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
@@ -259,7 +259,7 @@ CONTRACTS = (
         name="agent_canon_pr_check",
         tool="tools/validation/ci/checks/check_agent_canon_pr.sh",
         links=(
-            LinkCheck("agents/workflows/agent-canon-pr-workflow.md"),
+            LinkCheck("agents/skills/agent-canon-update.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
             LinkCheck("tools/analysis/dependencies/run_repo_dependency_review.sh"),

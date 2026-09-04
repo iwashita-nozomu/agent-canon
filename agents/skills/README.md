@@ -49,6 +49,7 @@ or copy the universal omission/granularity policy into adapter entries.
 - 人間が skill を明示する場合は plain text ではなく `$skill-name` を使います。
 - 例: `$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
 - 新しい public skill を追加するときは `catalog.yaml` と対応文書を同時に更新します。
+- 発表資料、token効率、ローカルbranch統合は、それぞれ `$slides`、`$tokens`、`$integration` の正本へルーティングします。旧workflow文書を手順の正本にしません。
 - Workflow-routed internal routine は `agents/internal-routines/` に置きます。
 
 ## Skill Visibility Naming
@@ -172,7 +173,7 @@ in the Codex host runtime.
 - docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、`structure-planning` の `visual_plan` で Mermaid 図を既定の primary visual 候補にします。
 - report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ `html-output` を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
 - 既存の experiment / Eval artifact を HTML で表示するときは `html-output` を直接使います。新しい実行・再実行が必要な場合だけ `experiment-lifecycle`、reader-facing な解釈や claim が必要な場合だけ `report-writing` を追加し、中間 wrapper skill は作りません。
-- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log を調査するときだけ `worktree-start` を使います。新規作業の kickoff や worktree 再開には使わず、scope drift や cleanup 判断は `worktree-health` を使います。
+- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の調査とcleanup判断は `worktree-health` に集約します。
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは `computational-optimization` を使い、数学契約と検証契約を実装や実験の前に固定します。
 - GPU / CUDA / JAX / XLA / IREE backend 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、JAX preallocation 無効化、GPU validation blocker を扱うときは `gpu-execution` を使い、Python 実行は ExperimentRunner に委譲します。
 - JIT-canonical IR、生成済み Lean 実装定義、theorem graph overlay から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。

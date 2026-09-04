@@ -2019,6 +2019,15 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn(
                 f"WORKFLOW_MAX_WRITE_SUBAGENTS={expected_write}", result.stdout
             )
+            self.assertIn("ADVERSARIAL_REQUIRED=yes", result.stdout)
+            self.assertIn("terra:terra_terra:terra", result.stdout)
+            self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
+            start_declaration = next(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("START_DECLARATION=")
+            )
+            self.assertIn("terra", start_declaration)
             self.assertIn("$comprehensive-development", result.stdout)
             self.assertIn("LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer", result.stdout)
 
@@ -2031,6 +2040,54 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("comprehensive_development", manifest_text)
             self.assertIn(f"active_subagents: {expected_active}", manifest_text)
             self.assertIn(f"max_write_subagents: {expected_write}", manifest_text)
+            terra_start = manifest_text.index("  - id: terra")
+            terra_end = manifest_text.find("\n  - id: ", terra_start + 1)
+            terra_block = manifest_text[terra_start:terra_end]
+            self.assertIn("mode: read_only", terra_block)
+            monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertRegex(monitoring_text, r"review=.*terra")
+
+    def test_bootstrap_bounded_route_keeps_terra_inactive(self) -> None:
+        """T1's ordinary typed route has no implicit cross-owner Terra wave."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "local bounded fix",
+                    "--task-id",
+                    "T1",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    "test-bootstrap-bounded-terra",
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("ADVERSARIAL_REQUIRED=no", result.stdout)
+            self.assertNotIn("terra:terra_terra:terra", result.stdout)
+            self.assertNotIn("terra", next(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("START_DECLARATION=")
+            ))
 
 
     def test_empty_registry_does_not_materialize_configured_candidates(self) -> None:
@@ -2559,7 +2616,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("/notes/guardrails/README.md", result.stdout)
             self.assertNotIn("/docker/README.md", result.stdout)
             self.assertIn(
-                "/agents/workflows/implementation-waterfall-workflow.md", result.stdout
+                "/agents/skills/codex-task-workflow.md", result.stdout
             )
             self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
@@ -2582,7 +2639,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("/notes/guardrails/README.md", manifest_text)
             self.assertNotIn("/docker/README.md", manifest_text)
             self.assertIn(
-                "/agents/workflows/implementation-waterfall-workflow.md", manifest_text
+                "/agents/skills/codex-task-workflow.md", manifest_text
             )
 
     def test_bootstrap_custom_report_root_writes_active_run_baseline_there(

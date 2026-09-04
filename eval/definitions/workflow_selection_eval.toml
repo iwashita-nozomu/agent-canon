@@ -312,7 +312,7 @@ subjects = [
 [[case_groups]]
 id = "agent-canon-update"
 description = "AgentCanon submodule and pin work should route to the update route."
-expected_workflows = ["agent-canon-update-route", "agent-canon-pr-workflow"]
+expected_workflows = ["agent-canon-update-route", "agent-canon-update"]
 expected_skills = ["agent-canon-update"]
 expected_tools = ["agent-canon-cli"]
 limit = 25
@@ -334,7 +334,7 @@ subjects = [
 [[case_groups]]
 id = "pr-processing"
 description = "GitHub PR queues, checks, and review processing should route to PR processing."
-expected_workflows = ["agent-canon-pr-workflow"]
+expected_workflows = ["agent-canon-update"]
 expected_skills = ["pr-processing"]
 limit = 25
 prompt_templates = [

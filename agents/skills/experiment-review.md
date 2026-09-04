@@ -5,6 +5,8 @@ contract skill
 responsibility Documents experiment-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design experiment-lifecycle.md experiment lifecycle workflow
+upstream design research-workflow.md research claim and comparison boundary
+upstream design ../../documents/experiments/experiment-critical-review.md critical evidence review
 @dependency-end
 -->
 
@@ -37,6 +39,26 @@ GPU/JAX 環境の所有境界、artifact / visualization.py renderer / README �
 - `visualization.py` は artifact reader/renderer であり、formal run launcher や config 正本に
   なっていない
 
+## Evidence Review
+
+数値が改善していても、次の境界が崩れていれば claim を受理しません。
+
+- 比較対象と case set が一致し、failure を都合よく除外していない
+- 平均だけでなく、case 数、success rate、failure kind、代表値、ばらつき、baseline 差分が
+  claim の強さに見合っている
+- 実験 code が equation、assumptions、parameter、method contract と一致している
+- correctness、numerical stability、performance、failure pattern を別々に解釈している
+- 改善指標の裏で悪化した指標、case mix、failure-onset、environment noise を見落としていない
+- figure / table の軸、単位、scale、denominator、missingness、baseline が読み取れ、計算式と
+  source artifact に辿れる
+- 観測事実、支持された解釈、推測、missing evidence、overclaim risk、limitation を分けている
+- toy-only、単一 difficulty 帯、baseline 未比較から scalability、superiority、広い theorem
+  を主張していない
+
+正式な report をレビューする場合は、`report-writing` が選んだ本文構成と
+`documents/experiments/experiment-report-style.md` を参照します。ここでは reader-facing
+文章を再作成せず、結果と claim の対応だけを判定します。
+
 ## Suggested Static Search
 
 ```bash
@@ -52,4 +74,5 @@ git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREAL
 - `follow-up`: README / visualization.py renderer explanation gap, optional artifact schema gap,
   weak visualization coverage.
 - `no findings`: state the remaining unchecked surfaces, especially whether an
-  actual formal run was intentionally skipped.
+  actual formal run was intentionally skipped, and whether the claim was limited
+  to the observed population.

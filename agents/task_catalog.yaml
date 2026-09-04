@@ -185,7 +185,7 @@ role_topology_defaults: &standard_role_topology
         - prompt_config_reviewer
     - id: cross_owner_integration
       stage_class: reviewer
-      activation: conditional_cross_owner_evidence
+      activation: explicit_enable_or_full_team_or_comprehensive_family
       role_ids:
         - terra
     - id: design
@@ -313,7 +313,7 @@ workflow_families:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide hypotheses; owner-local receipts establish correspondence, while the parent owns transport, integration, and remote readback without approval authority.
         - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Keep the diff tied to the assigned responsibility boundary. Test design is a conditional post-implementation stage, not a default pre-implementation gate; activate it only when an explicit unresolved oracle, specification, regression, or failure-mode risk remains outside static analysis, checkers, and targeted validation.
-        - When fix-surface selection is non-obvious, run hypothesis-validation workflow before implementation.
+        - When fix-surface selection is non-obvious, use dependency-analysis to investigate competing causes and select the owning surface before implementation.
         - Prefer existing names, helpers, tests, and docs over new surfaces; record why reuse is insufficient before proposing new files.
         - Begin the worker prompt from known selected assets and tests, propagate the same context to every child, and merge slices that touch the same asset.
         - Treat one fix, chunk, or checkpoint as internal progress until every active clause and planned work unit is complete.
@@ -357,7 +357,7 @@ workflow_families:
       purpose: Prompt packet for research-backed implementation, experiment, benchmark, report, and academic-writing tasks.
       prompt_preamble:
         - Treat this template repository as the default implementation starting point; external sources inform the work but do not replace repo-local artifacts.
-        - Emit the skill call sequence with literature-survey before research-workflow when primary sources, prior art, official docs, or source-backed implementation claims are used; carry the source packet and adoption/exclusion decisions into design, implementation, benchmark, and report handoffs.
+        - Emit the Skill call sequence with literature-survey before research-workflow when primary sources, prior art, official docs, or source-backed implementation claims are used; carry the source packet and adoption/exclusion decisions into design, implementation, benchmark, and report handoffs.
         - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, research_notes.md, cited sources, and team_manifest.yaml only when the selected research or coordination route requires them.
         - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
         - When mathematical or numerical correction evidence is present, resolve the canonical math_intent_route ID `mathematical_correction` before generic design, benchmark, or scientific-computing review, then create the computational-optimization math-intent packet. The packet must bind math_object/problem, variables/domains/units, objective/residual, constraints, equations/definitions, assumptions/approximations, derivation, iteration_map/update_map, invariants/limits/stopping_scalar/failure_semantics, equation_to_code_map, mathematical_definition_paths, mathematical_oracle_paths, mathematical_documentation_paths, math_oracle/counterexample, mapped allowed write paths equal to that union, forbidden non-math surfaces, and separate handoff targets.
@@ -366,7 +366,7 @@ workflow_families:
         - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Use primary sources or official docs for external claims, and record search terms, source class, limitations, and contradictory evidence.
         - Treat literature-survey as the source packet owner and research-workflow as the outer loop owner; do not let implementation, experiment, report, or follow-up branches close source-backed claims without source packet evidence, limitations, and adoption/exclusion decisions.
-        - Use hypothesis-validation workflow when analysis must decide the code or document surface to modify before the experiment or implementation slice.
+        - Use dependency-analysis when analysis must decide the code or document surface to modify before the experiment or implementation slice.
         - Keep experiment protocol, code change, runtime flag change, and report interpretation separated unless one explicit clause authorizes combining them.
         - Preserve provenance: commands, seeds, environment, raw result paths, and rerun instructions.
       reviewer_prompt:
@@ -432,7 +432,7 @@ workflow_families:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide hypotheses; owner-local receipts establish correspondence, while the parent owns transport, integration, and remote readback without approval authority.
         - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Define milestone and chunk boundaries before implementation; chunks are not user-facing completion.
-        - Use hypothesis-validation workflow to justify the selected refactor or feature surface before moving code.
+        - Use dependency-analysis to justify the selected refactor or feature surface before moving code.
         - For refactors, require behavior contract, allowed structural delta, forbidden semantic delta, files to remove or move, and path mapping before editing.
         - For deletion/refactor handoffs, carry code-cleanup's line/block semantic and caller/dataflow mapping content itself; a completion claim without mapping content is insufficient, and filename, symbol, search hit, and diff size are not deletion proof.
         - Sweep stale references after renames or structure changes before closeout.

@@ -255,6 +255,11 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         """Ordinals follow the existing order function and #461 report order."""
         graph = build_graph(PROJECT_ROOT)
         rules = load_skill_route_rules(PROJECT_ROOT)
+        research_rule = next(
+            rule for rule in rules if rule.skill == "research-workflow"
+        )
+        self.assertIn("literature-survey", research_rule.required_prerequisites)
+        self.assertEqual(research_rule.order_constraints, ())
         skill_ids = tuple(item["display_label"] for item in graph["skills"])
         expected_order = derive_skill_invocation_order(skill_ids, rules)
         observed_order = tuple(

@@ -48,7 +48,7 @@ upstream design ../contracts/github-first-module-and-devcontainer-policy.md envi
 
 - partial run を正式結果として扱わないことを確認します。
 - run 条件、出力先、比較条件を先に固定します。
-- `agents/workflows/experiment-workflow.md` と `agents/workflows/research-workflow.md` を見直します。
+- `agents/skills/experiment-lifecycle.md` と `agents/skills/research-workflow.md` を見直します。
 
 ## agent 運用が分からない
 

@@ -1529,31 +1529,6 @@ skill_families:
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
-  - id: worktree-start
-    purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
-    canonical_doc: agents/skills/worktree-start.md
-    shim: .codex/personal/skills/worktree-start/SKILL.md
-    discovery:
-      name: worktree-start
-      description: "Legacy cleanup only. Use when inspecting or retiring stale WORKTREE_SCOPE.md/action-log state; do not use to create, recreate, resume, or move work into a git worktree."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "git", "argv": ["worktree"]}
-      - {"tool_id": "worktree-scope-lint", "operation_id": "default", "argv_suffix": ["--current"]}
-      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
-      - {"executable": "git", "argv": ["worktree", "list", "--porcelain"]}
-      - {"executable": "bash", "argv": ["tools/validation/documentation/checks/check_worktree_scopes.sh"]}
-      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "..."]}
-      - {"executable": "bash", "argv": ["tools/repository/worktree/worktree_start.sh", "--current"]}
-      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "<kind>", "--request-clause-id", "R1", "--message", "<what changed>", "--next", "<next>"]}
-      - {"executable": "python3", "argv": ["tools/repository/workspace/worktree_start.py", "--current"]}
-      - {"executable": "python3", "argv": ["tools/experiments/registry/sync_experiment_registry_context.py", "--topic", "<topic>", "--branch", "<branch>"]}
-      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "cleanup", "--message", "<legacy worktree state>", "--next", "<carry-over or remove>"]}
-      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "edit", "--request-clause-id", "R1", "--message", "...", "--next", "..."]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: worktree-health
     purpose: Review worktree scope, drift, and cleanup readiness.
     canonical_doc: agents/skills/worktree-health.md
@@ -2184,3 +2159,81 @@ skill_families:
         - ["プロンプト", "評価"]
         - ["スキル", "評価"]
         - ["反復", "収束"]
+  - id: slides
+    purpose: Produce presentation decks from a fixed template with readable claims, equations, images, and references.
+    canonical_doc: agents/skills/slides.md
+    shim: .codex/personal/skills/slides/SKILL.md
+    discovery:
+      name: slides
+      description: "Use when authoring or revising a presentation, slide deck, or presentation-oriented Markdown deck."
+    tool_commands:
+      required: []
+      conditional: []
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: an explicitly requested presentation artifact needs a canonical deck owner
+      triggers:
+        - ["slide"]
+        - ["slides"]
+        - ["slide", "deck"]
+        - ["presentation"]
+        - ["presentation", "deck"]
+        - ["PPT"]
+        - ["PPTX"]
+        - ["スライド"]
+        - ["プレゼン"]
+  - id: tokens
+    purpose: Make token budgets, role footprints, and efficiency decisions from equivalent runtime evidence.
+    canonical_doc: agents/skills/tokens.md
+    shim: .codex/personal/skills/tokens/SKILL.md
+    discovery:
+      name: tokens
+      description: "Use when token budget, role footprint, context reuse, or token-efficiency evidence is an explicit decision."
+    tool_commands:
+      required: []
+      conditional:
+      - {"tool_id": "compare-codex-token-footprints", "operation_id": "default"}
+      - {"tool_id": "evaluate-codex-agent-roles", "operation_id": "default"}
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: token budget or efficiency is an explicit runtime decision or evidence-backed claim
+      triggers:
+        - ["token"]
+        - ["tokens"]
+        - ["token", "budget"]
+        - ["token", "efficiency"]
+        - ["context", "reuse", "tokens"]
+        - ["トークン"]
+        - ["トークン", "削減"]
+        - ["トークン", "効率"]
+  - id: integration
+    purpose: Integrate a completed local branch into its base while preserving conflict evidence and branch readback.
+    canonical_doc: agents/skills/integration.md
+    shim: .codex/personal/skills/integration/SKILL.md
+    discovery:
+      name: integration
+      description: "Use when a completed local branch must be integrated into its base or a conflict must be resolved."
+    tool_commands:
+      required: []
+      conditional:
+      - {"tool_id": "conflict-preservation", "operation_id": "default"}
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: a completed branch integration or conflict-resolution operation is explicitly in scope
+      triggers:
+        - ["branch", "integrate"]
+        - ["branch", "merge"]
+        - ["merge", "conflict"]
+        - ["conflict", "resolve"]
+        - ["integrate", "branch"]
+        - ["ブランチ", "統合"]
+        - ["コンフリクト", "解消"]

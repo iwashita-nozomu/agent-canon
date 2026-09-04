@@ -35,7 +35,7 @@ body:
     id: affected_surface
     attributes:
       label: 影響する surface/path
-      placeholder: "agents/workflows/...、tools/...、.codex/..."
+      placeholder: "agents/skills/...、agents/workflows/README.md、tools/...、.codex/..."
     validations:
       required: true
   - type: markdown

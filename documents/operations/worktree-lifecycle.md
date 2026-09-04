@@ -45,7 +45,7 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 - `python3 tools/repository/workspace/worktree_scope_lint.py --current` で stale scope の placeholder と kickoff 欄を確認します。`bash tools/repository/worktree/worktree_start.sh --current` は cleanup diagnostic 以外では使いません。
 - `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash tools/validation/documentation/checks/check_worktree_scopes.sh` を実行します。
 - dirty state、conflict risk、scope drift の兆候があれば、編集前に action log に残します。
-- `main` へ戻す場合も integration worktree は切らず、`agents/workflows/main-integration-workflow.md` の current-checkout branch 手順を使います。
+- `main` へ戻す場合も integration worktree は切らず、`agents/skills/integration.md` の current-checkout branch 手順を使います。
 
 ## ルール
 

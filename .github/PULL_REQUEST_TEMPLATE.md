@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Owns the concise standalone AgentCanon PR evidence fields.
-upstream design ../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR identity and publication route
+upstream design ../agents/skills/agent-canon-update.md AgentCanon PR identity and publication route
 upstream design AGENTS.md GitHub subtree boundary
 upstream design ../templates/documents/github/README.md canonical GitHub template source
 downstream implementation ../tools/validation/ci/checks/check_github_workflows.py validates the evidence fields and workflow conventions
