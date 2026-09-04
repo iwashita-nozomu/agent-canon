@@ -85,7 +85,6 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "materialize" not in text
     assert "AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source" in text
     assert "AGENT_CANON_CACHE_ROOT=/var/lib/agent-canon/cache" in text
-    assert "AGENT_CANON_COMPILED_BIN_DIR=/var/lib/agent-canon/cache/bin" in text
     assert "CARGO_TARGET_DIR=/var/lib/agent-canon/cache/cargo-target" in text
     assert "test -x" not in text
     assert "command -v" not in text

@@ -644,7 +644,8 @@ def _resolve_container_argv(root: Path, spec: ToolSpec, args: Sequence[str]) -> 
     for index, value in enumerate(command):
         if value == "tools/bin/agent-canon":
             command[index] = str(
-                Path(os.environ.get("AGENT_CANON_COMPILED_BIN_DIR", "/var/lib/agent-canon/cache/bin"))
+                Path(os.environ.get("AGENT_CANON_CACHE_ROOT", "/var/lib/agent-canon/cache"))
+                / "bin"
                 / "agent-canon"
             )
         elif value.startswith("tools/") and (root / value).is_file():
