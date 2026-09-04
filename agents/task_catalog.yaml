@@ -484,12 +484,12 @@ workflow_families:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide hypotheses; owner-local receipts establish correspondence, while the parent owns transport, integration, and remote readback without approval authority.
         - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
         - Prefer existing dependency surfaces and canonical environment helpers over ad hoc setup.
-        - For a new or modified surface around an existing CLI, library, or toolchain, pass the existing reuse_survey provider comparison and exact gap to worker/reviewer; delegate covered phases and apply naming.md before handoff.
+        - For a new or modified surface around an existing CLI, library, or toolchain, pass the existing reuse_survey provider comparison, exact provider input/output boundary, selected command/options, and exact gap to worker/reviewer; delegate covered phases and apply naming.md before handoff.
         - Do not create repo-local virtual environments on host runtime; use the canonical environment policy.
         - Keep Docker, CI, lock/dependency, and runtime-doc changes consistent.
       reviewer_prompt:
         - Block environment changes without a code requirement, rollback path, or validation evidence.
-        - Require the existing reuse_survey provider comparison and exact gap; block provider-owned phase reimplementation and compound names under naming.md.
+        - Require the existing reuse_survey provider comparison, exact provider input/output boundary, selected command/options, and exact gap; block provider-owned phase reimplementation and compound names under naming.md.
         - Verify docs, CI, Docker packs, and local developer commands remain aligned.
     capacity_request:
       schema_id: task_catalog_capacity_request_v1

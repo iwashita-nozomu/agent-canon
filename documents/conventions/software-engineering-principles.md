@@ -228,8 +228,9 @@ responsibility gap がある場合だけ作ります。use-case 名だけの wra
 既存の CLI、library、toolchain が所有する処理の周囲に新規または変更する helper、module、script、parser、state、
 publisher を提案する場合は、設計・handoff 前に既存の `reuse_survey` を使い、bounded な local help、
 local docs、official primary source の readback で provider capability を比較します。provider-owned
-phase と正確な未充足 responsibility gap を対応付け、覆われた phase は provider に委譲します。新規
-責務名の制限は [命名規約](../rule/naming.md) を参照し、ここでは重複した命名規約を定義しません。
+phase と正確な未充足 responsibility gap を対応付けます。comparison には provider の正確な input / output
+boundary と選択した command / options を含め、phase 名だけでは判断しません。覆われた phase は provider
+に委譲します。新規責務名の制限は [命名規約](../rule/naming.md) を参照し、ここでは重複した命名規約を定義しません。
 
 ## 4. 変更単位と完全性
 
