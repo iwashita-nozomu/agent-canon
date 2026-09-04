@@ -111,7 +111,7 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             text,
         )
         self.assertIn(
-            'guide_dir="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"',
+            'guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"',
             text,
         )
         self.assertIn(
@@ -119,7 +119,7 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             text,
         )
         self.assertNotIn("Setup Python", text)
-        self.assertIn("AGENT_CANON_CONTROL_PARENT_ROOT: ${{ runner.temp }}", text)
+        self.assertNotIn("AGENT_CANON_CONTROL_PARENT_ROOT: ${{ runner.temp }}", text)
         self.assertIn(
             'cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"',
             text,
@@ -132,6 +132,14 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         self.assertIn(
             'guide_path="${guide_dir}/agent-improvement-guide-',
             guide_path_lines[0],
+        )
+        self.assertIn(
+            'guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"',
+            text,
+        )
+        self.assertIn(
+            'guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"',
+            text.split("Release shared tool runtime")[1],
         )
         self.assertNotIn(".runtime/container-state", text)
         self.assertNotIn("docker ", text)

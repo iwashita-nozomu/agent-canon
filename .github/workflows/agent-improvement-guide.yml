@@ -29,7 +29,7 @@ jobs:
   guide:
     runs-on: ubuntu-latest
     env:
-      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ runner.temp }}
+      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,7 +61,7 @@ jobs:
       - name: Generate improvement guide
         id: guide
         run: |
-          guide_dir="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"
+          guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"
           guide_path="${guide_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
@@ -82,9 +82,10 @@ jobs:
       - name: Release shared tool runtime
         if: always()
         run: |
+          guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"
           if [[ -n "${AGENT_CANON_CANDIDATE_SOURCE:-}" ]]; then
             "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" stop || true
             "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" uninstall || true
           fi
           rm -rf -- "${AGENT_CANON_CANDIDATE_BARE:-}" "${AGENT_CANON_CANDIDATE_SOURCE:-}" \
-            "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"
+            "${guide_dir}"
