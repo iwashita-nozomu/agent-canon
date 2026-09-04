@@ -191,7 +191,7 @@ mapping は Host/caller の責務であり、`tests/tools/test_bootstrap_contain
 container name と label
 は同じ effective UID に対する共有 runtime を1個に制限します。環境 image は
 `ghcr.io/iwashita-nozomu/agent-canon:env-<key>` で選び、key は
-`bootstrap/container/image/environment_key.sh` が Dockerfile とその
+`bootstrap/container/image/digest.sh` が Dockerfile とその
 `source=` bind inputs の Git tree identity から導出します。
 
 `bootstrap/host/manifest.toml` は current、rollback、in-use、pre-existing、gc-eligible を区別します。

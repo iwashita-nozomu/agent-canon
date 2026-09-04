@@ -125,7 +125,7 @@ runs `git -C <install-root> fetch origin main` followed by
 `git -C <install-root> checkout --force -B main FETCH_HEAD`; this leaves the
 installed checkout on local `main` at the fetched remote revision. It then
 writes `.runtime/source-sync/source-sync.json`, selects the shared
-`:env-<key>` image through `environment_key.sh`, and reuses the resident when
+`:env-<key>` image through `digest.sh`, and reuses the resident when
 the environment and source/cache mounts are current. Otherwise it pulls or
 builds the environment once, updates the resident, and refreshes host-owned
 links and the timer. There is no candidate checkout, remote-ref comparison,

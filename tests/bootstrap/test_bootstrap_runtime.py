@@ -1885,7 +1885,7 @@ def test_container_control_uses_host_passed_state_volume(tmp_path: Path, monkeyp
     assert not (repository / ".runtime").exists()
 
 
-def test_container_update_preserves_tasks_without_image_replacement(
+def test_reconciliation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A source-only refresh keeps active work; image replacement clears it."""

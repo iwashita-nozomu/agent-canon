@@ -1,7 +1,7 @@
 # @dependency-start
 # contract configuration
 # responsibility Builds one reusable multi-architecture AgentCanon environment image.
-# upstream implementation ../../bootstrap/container/image/environment_key.sh stable environment key
+# upstream implementation ../../bootstrap/container/image/digest.sh stable environment key
 # downstream implementation ../../bootstrap/host/lifecycle/entrypoint.sh host image selection
 # @dependency-end
 
@@ -36,7 +36,7 @@ jobs:
       - id: environment
         run: |
           set -euo pipefail
-          key="$(bootstrap/container/image/environment_key.sh)"
+          key="$(bootstrap/container/image/digest.sh)"
           image="${IMAGE_NAME}:env-${key}"
           printf 'image=%s\n' "$image" >> "$GITHUB_OUTPUT"
 

@@ -74,7 +74,7 @@ LSP tools once. It does not contain editor post-create behavior, project
 dependencies, project tests, GPU setup, or a Compose workspace lifecycle.
 
 `install` and `update` select the environment image from
-`bootstrap/container/image/environment_key.sh`, which hashes only the
+`bootstrap/container/image/digest.sh`, which hashes only the
 Dockerfile and its generic `source=` bind inputs by Git tree identity. An exact
 local `:env-<key>` image and resident with the source/cache mounts are reused;
 only a missing image or changed environment replaces it. `start` creates or starts at most one resident container

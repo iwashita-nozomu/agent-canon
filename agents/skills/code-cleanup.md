@@ -39,12 +39,25 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 2. known な asset path、capability、disposition、reason、test paths は既存の
    `reuse_survey` に advisory context として記録する。context の不在は
    dispatch や write を block しない。
-3. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
+3. 削除、置換、移動の候補は filename、symbol、search hit、行数では決めない。候補を行または
+   block ごとに読み、各寄与を数学的・domain 上の意味、invariant、state transition、side effect、I/O、
+   reachable caller / consumer として既存 handoff または review context に対応付ける。この mapping は
+   streaming とし、重複・unreachable・委譲済みで semantic / caller / effect の寄与が残らない行や
+   block は同じ pass で削除する。全 file の監査や追加 review を待たない。名前が誤解を招くときは
+   definition、caller、dataflow、history、consumer をたどり、全寄与が unreachable、canonical owner
+   へ委譲済み、または replacement に保存済みと確認できた場合だけ file 全体を削除する。削除した
+   責務を wrapper、fallback、compatibility branch、snapshot、test として戻すのは、active caller
+   または contract が要求する場合に限る。
+4. 数値コードを削除・置換する前に equations、units、state、stopping rule、convergence contract、
+   failure semantics を復元する。未解決の数学的意味は既存の semantic math owner に戻し、architecture、
+   compiler、JIT の変更で吸収しない。
+5. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
    responsibility slices と known な `allowed_paths` はこの asset universe から導き、
    同じ asset に触れる slices を一つへ merge する。
-4. approved mechanism を `refactor-loop` へ渡し、同じ known asset context と
+6. approved mechanism を `refactor-loop` へ渡し、同じ known asset context と
    tests を各 child に伝播して behavior-preserving change として実装する。
-5. `change-review` で current snapshot、reachable path、contract、witness を readback する。
+7. `change-review` で current snapshot、reachable path、contract、witness を readback する。targeted
+   validation は各行ではなく owning-unit boundary で一度だけ実行する。
 
 ## Tool Commands
 

@@ -69,7 +69,7 @@ evidence.
 - `sync` acquires `replacement.lock` once, runs exactly `git -C
   <install-root> pull --ff-only origin main`, publishes
   `.runtime/source-sync/source-sync.json`, and selects the shared
-  `:env-<key>` image through `bootstrap/container/image/environment_key.sh`.
+  `:env-<key>` image through `bootstrap/container/image/digest.sh`.
   An exact local image and resident with current source/cache mounts are
   reused; otherwise the image is pulled or built once and the resident is
   replaced. Detached and shallow checkouts are accepted when Git accepts the
