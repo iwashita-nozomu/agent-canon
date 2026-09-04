@@ -434,7 +434,7 @@ workflow_families:
         - Define milestone and chunk boundaries before implementation; chunks are not user-facing completion.
         - Use hypothesis-validation workflow to justify the selected refactor or feature surface before moving code.
         - For refactors, require behavior contract, allowed structural delta, forbidden semantic delta, files to remove or move, and path mapping before editing.
-        - For deletion/refactor handoffs, consume code-cleanup's line/block semantic and caller/dataflow mapping; filename, symbol, search hit, and diff size are not deletion proof.
+        - For deletion/refactor handoffs, carry code-cleanup's line/block semantic and caller/dataflow mapping content itself; a completion claim without mapping content is insufficient, and filename, symbol, search hit, and diff size are not deletion proof.
         - Sweep stale references after renames or structure changes before closeout.
       reviewer_prompt:
         - Block hidden semantic changes, incomplete path mapping, stale docs, and parallel durable truth surfaces.

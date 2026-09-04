@@ -90,8 +90,8 @@ toolchain, consume the existing `reuse_survey` provider comparison, exact provid
 selected command/options, and exact gap. Phase labels alone are insufficient. Block manual reimplementation
 of provider-owned phases, and return `design_issue_blocker` when the comparison or gap is absent. Apply the
 prospective compound-responsibility-name stop in [命名規約](../../documents/rule/naming.md).
-For deletion or refactor review, consume the `code-cleanup` semantic mapping: read each candidate line or
-block. Names, symbols, search hits, and diff size are not deletion proof; numerical meaning must be
+For deletion or refactor review, require the `$code-cleanup` line/block mapping content itself; a claim-only
+handoff without mapping rows/content is insufficient. Names, symbols, search hits, and diff size are not deletion proof; numerical meaning must be
 reconstructed before architecture or JIT changes.
 
 ## Code Comment Review
