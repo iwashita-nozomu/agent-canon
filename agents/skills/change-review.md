@@ -92,7 +92,7 @@ of provider-owned phases, and return `design_issue_blocker` when the comparison 
 prospective compound-responsibility-name stop in [命名規約](../../documents/rule/naming.md).
 For deletion or refactor review, require the `$code-cleanup` line/block mapping content itself; a claim-only
 handoff without mapping rows/content is insufficient. Names, symbols, search hits, and diff size are not deletion proof; numerical meaning must be
-reconstructed before architecture or JIT changes.
+reconstructed before architecture or JIT changes. Follow the streaming cleanup route: do not demand speculative safety reimplementation or per-line validation without an active caller or contract.
 
 ## Code Comment Review
 

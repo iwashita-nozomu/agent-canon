@@ -438,6 +438,7 @@ workflow_families:
         - Sweep stale references after renames or structure changes before closeout.
       reviewer_prompt:
         - Block hidden semantic changes, incomplete path mapping, stale docs, and parallel durable truth surfaces.
+        - For cleanup reviews, follow code-cleanup's streaming route; do not demand speculative safety reimplementation or per-line validation.
         - Verify every chunk maps back to the umbrella completion boundary.
     capacity_request:
       schema_id: task_catalog_capacity_request_v1
