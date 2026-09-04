@@ -40,7 +40,8 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    `reuse_survey` に advisory context として記録する。context の不在は
    dispatch や write を block しない。
 3. 削除、置換、移動の候補は filename、symbol、search hit、行数では決めない。候補を行または
-   block ごとに読み、各寄与を既存 handoff または review context に対応付ける。この mapping は
+   block ごとに読み、各寄与を数学的・domain 上の意味、invariant、state transition、side effect、I/O、
+   reachable caller / consumer として既存 handoff または review context に対応付ける。この mapping は
    streaming とし、重複・unreachable・委譲済みで semantic / caller / effect の寄与が残らない行や
    block は同じ pass で削除する。全 file の監査や追加 review を待たない。名前が誤解を招くときは
    definition、caller、dataflow、history、consumer をたどり、全寄与が unreachable、canonical owner
