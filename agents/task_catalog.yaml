@@ -489,6 +489,7 @@ workflow_families:
         - Keep Docker, CI, lock/dependency, and runtime-doc changes consistent.
       reviewer_prompt:
         - Block environment changes without a code requirement, rollback path, or validation evidence.
+        - Require the existing reuse_survey provider comparison and exact gap; block provider-owned phase reimplementation and compound names under naming.md.
         - Verify docs, CI, Docker packs, and local developer commands remain aligned.
     capacity_request:
       schema_id: task_catalog_capacity_request_v1
