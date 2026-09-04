@@ -459,15 +459,29 @@ def select_roles(
     catalog: TaskCatalog | None = None,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
+    adversarial_required: bool = False,
 ) -> tuple[Role, ...]:
     """Return the active roles for one run."""
+    # Explicit Terra enablement is an adversarial request even on a bounded
+    # family.  The typed cross-owner fact is an independent implicit route.
+    terra_requested = adversarial_required or "terra" in enabled_specialists
     if full_team:
         all_roles = config.always_on_roles + config.specialist_roles
         if workflow_family_id == "skill_evaluation":
             return tuple(role for role in all_roles if role.id == "skill_evaluator")
-        return tuple(role for role in all_roles if role.id != "skill_evaluator")
+        return tuple(
+            role
+            for role in all_roles
+            if role.id != "skill_evaluator"
+        )
     always_on_roles = workflow_always_on_roles(config, catalog, workflow_family_id)
-    selected_specialist_names = list(enabled_specialists)
+    selected_specialist_names = [
+        role_id
+        for role_id in enabled_specialists
+        if role_id != "terra" or terra_requested
+    ]
+    if terra_requested and "terra" not in selected_specialist_names:
+        selected_specialist_names.append("terra")
     # T15 is publisher-only, but its publisher is conditional on an explicit
     # typed candidate.  Do not turn the task default into a global initial
     # wave or activate this role for unrelated workflow families.

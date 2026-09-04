@@ -54,7 +54,7 @@ Do not invoke `structure-planning`, Mermaid, semantic-index, or prose-graph tool
 
 ## Output formats
 
-Markdown is the default reader-facing format. Use `html-output` only when HTML/browser output is explicitly requested. Use the slide-production workflow for requested deck/PPT artifacts. Neither HTML serving nor slide production is implied by writing a report.
+Markdown is the default reader-facing format. Use `html-output` only when HTML/browser output is explicitly requested. Use `$slides` for requested deck/PPT artifacts. Neither HTML serving nor slide production is implied by writing a report.
 
 ## Review route
 

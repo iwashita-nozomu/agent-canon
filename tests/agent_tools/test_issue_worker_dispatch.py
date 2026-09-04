@@ -26,6 +26,7 @@ from tools.repository.github import issue_worker_dispatch  # noqa: E402
 from tools.runtime.lifecycle.bootstrap_agent_run import main as bootstrap_main  # noqa: E402
 from tools.runtime.authority.checkout_identity import CheckoutIdentity  # noqa: E402
 from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
+    recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
     workflow_spawn_budget,
 )
@@ -178,6 +179,84 @@ def test_t15_without_explicit_candidate_has_no_initial_publisher() -> None:
         agent_root=PROJECT_ROOT / ".codex" / "agents",
         workflow_family_id="issue_worker_publication",
     ) == ()
+
+
+def test_adversarial_cross_owner_selection_materializes_terra_wave() -> None:
+    """An explicit Terra enablement reaches the conditional cross-owner stage."""
+    config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
+    catalog = load_task_catalog(config, PROJECT_ROOT)
+    roles = select_roles(
+        config,
+        ["terra"],
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id="comprehensive_development",
+    )
+    active_subagents, _ = workflow_spawn_budget(catalog, "comprehensive_development")
+    initial_wave = recommended_initial_subagent_wave(
+        roles,
+        active_subagents,
+        catalog,
+        agent_root=PROJECT_ROOT / ".codex" / "agents",
+    )
+    waves = recommended_dynamic_expansion_wave_slots(
+        roles,
+        active_subagents,
+        initial_wave,
+        catalog,
+        agent_root=PROJECT_ROOT / ".codex" / "agents",
+    )
+
+    assert "terra" in {role.id for role in roles}
+    assert any(slot.role_id == "terra" for wave in waves for slot in wave)
+
+
+def test_bounded_routes_do_not_materialize_terra_without_explicit_enablement() -> None:
+    """Ordinary T1/T2/T3-shaped routes retain no cross-owner Terra wave."""
+    config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
+    catalog = load_task_catalog(config, PROJECT_ROOT)
+    for family in ("owner_bounded_change", "scoped_change"):
+        roles = select_roles(
+            config,
+            [],
+            full_team=False,
+            catalog=catalog,
+            workflow_family_id=family,
+        )
+        active_subagents, _ = workflow_spawn_budget(catalog, family)
+        initial_wave = recommended_initial_subagent_wave(
+            roles,
+            active_subagents,
+            catalog,
+            agent_root=PROJECT_ROOT / ".codex" / "agents",
+        )
+        waves = recommended_dynamic_expansion_wave_slots(
+            roles,
+            active_subagents,
+            initial_wave,
+            catalog,
+            agent_root=PROJECT_ROOT / ".codex" / "agents",
+        )
+        assert "terra" not in {role.id for role in roles}
+        assert all(slot.role_id != "terra" for wave in waves for slot in wave)
+
+    full_roles = select_roles(
+        config,
+        [],
+        full_team=True,
+        catalog=catalog,
+        workflow_family_id="owner_bounded_change",
+    )
+    assert "terra" in {role.id for role in full_roles}
+
+    explicit_bounded_roles = select_roles(
+        config,
+        ["terra"],
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id="scoped_change",
+    )
+    assert "terra" in {role.id for role in explicit_bounded_roles}
 
 
 def test_runtime_context_defaults_to_the_source_checkout(

@@ -41,9 +41,8 @@ method note、symbol-dense claim-heavy explanation の文書を、共通 graph/D
 
 ## Core References
 
-- `agents/workflows/academic-writing-workflow.md`
-- `agents/workflows/paper-writing-workflow.md`
-- `agents/workflows/long-form-writing-workflow.md`
+- `agents/skills/paper-writing.md` (paper-specific overlay)
+- `agents/skills/long-form-writing.md` (general prose boundary)
 - `documents/conventions/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/literature-survey.md`
@@ -119,6 +118,23 @@ python3 tools/analysis/documents/doc_start.py \
 - 一般の README、workflow、migration 文書なら `long-form-writing` を使います
 - 文献調査自体が主タスクなら `literature-survey` を先に使います
 - experiment report の evidence traceability は report review を優先します
+
+## Review Outcomes
+
+- `rewrite_required`: claim contract、logic chain、または definition order が崩れている
+- `notation_fix_required`: 記号、略語、technical term、unit、または index に未定義や不整合がある
+- `logic_fix_required`: 支持されていない inference や飛躍がある
+- `approved`: reader flow、notation discipline、logic continuity、information completeness が揃っている
+
+## Evidence Basis
+
+このSkillの構成判断は、次の外部ガイドをrepo向けに要約したものです。
+
+- [Ten simple rules for structuring papers | PLOS Computational Biology](https://doi.org/10.1371/journal.pcbi.1005619)
+- [Creating a Roadmap | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/creating-a-roadmap.pdf)
+- [Flow in Scholarly Writing | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/Flow-Handout.pdf)
+- [Reverse Outlining | John S. Knight Institute](https://knight.as.cornell.edu/reverse-outlining)
+- [Writing Tips | MIT OpenCourseWare](https://ocw.mit.edu/courses/8-06-quantum-physics-iii-spring-2016/e498e7c0d2db9e3846df12bfdac3e10e_MIT8_06S16_TermPaper.pdf)
 
 ## Runtime Contract Clauses
 

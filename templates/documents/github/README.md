@@ -5,7 +5,7 @@ responsibility Owns canonical GitHub Issue/PR template sources and their checked
 upstream design ../../../.github/AGENTS.md GitHub subtree runtime boundary.
 upstream design ../../../documents/operations/issue-label-taxonomy.md issue taxonomy and routing contract.
 upstream design ../../../agents/evals/README.md eval evidence and issue capture contract.
-upstream design ../../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR workflow.
+upstream design ../../../agents/skills/agent-canon-update.md AgentCanon PR workflow.
 downstream implementation ./issue/config.yml GitHub Issue configuration source.
 downstream implementation ./issue/agentcanon-maintenance.yml maintenance Issue Form source.
 downstream implementation ./issue/eval-capture.yml eval Issue Form source.

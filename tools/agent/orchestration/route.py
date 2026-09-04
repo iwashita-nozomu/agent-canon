@@ -257,7 +257,6 @@ AREA_DATA: tuple[AreaData, ...] = (
         (
             "agent-canon-bootstrap",
             "agent-canon-update",
-            "agent-canon-pr-workflow",
         ),
     ),
     (

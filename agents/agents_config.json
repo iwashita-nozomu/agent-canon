@@ -1871,7 +1871,7 @@
         ],
         "source_refs": [
           "agentcanon:templates/agents/design_brief.md#section:implementation-source-packet",
-          "agentcanon:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
+          "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
@@ -1895,7 +1895,7 @@
         ],
         "source_refs": [
           "agentcanon:templates/agents/design_brief.md#section:design-side-effect-map",
-          "agentcanon:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
+          "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",

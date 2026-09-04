@@ -50,7 +50,7 @@ forbidden_route = [
 ]
 linked_rules = [
   "documents/design/api-surface-traversal-policy.md",
-  "agents/workflows/hypothesis-validation-workflow.md",
+  "agents/skills/dependency-analysis.md",
 ]
 
 [[eval]]

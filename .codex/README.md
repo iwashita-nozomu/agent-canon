@@ -45,7 +45,7 @@ downstream design ./hooks/hook_dispatcher.py RETIRED_HOOK_ROUTES assigns former 
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します
 - `/goal <objective>` を使う task でも goal は session runtime state に留め、repository へ mirror file を作りません。durable lifecycle evidence が必要な場合は run bundle の `schedule.md` / `work_log.md` を使います
-- token 消費を見直す場合は `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、既存 session / role metric から重複 fan-out、再読、過大 tool output を特定します。task 名や見積もり規模から profile / agent mode を先に固定しません
+- token 消費を見直す場合は `agents/skills/tokens.md` を overlay とし、既存 session / role metric から重複 fan-out、再読、過大 tool output を特定します。task 名や見積もり規模から profile / agent mode を先に固定しません
 
 ## Goal And Plan Mode
 

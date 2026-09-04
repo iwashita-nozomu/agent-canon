@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests agent run path comparison behavior.
 # upstream implementation ../../eval/checkers/compare_agent_run_paths.py compares runs  # noqa: E501
-# upstream design ../../agents/workflows/adaptive-improvement-workflow.md compares reruns  # noqa: E501
+# upstream design ../../agents/skills/adaptive-improvement-loop.md compares reruns  # noqa: E501
 # @dependency-end
 """Tests for two-run execution path comparison."""
 

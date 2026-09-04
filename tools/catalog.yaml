@@ -773,7 +773,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/github_publish.md
-      - agents/workflows/agent-canon-pr-workflow.md
+      - agents/skills/pr-processing.md
       - documents/agent-canon/agent-canon-github-remote.md
     tests:
       - tests/agent_tools/test_github_publish.py
@@ -927,7 +927,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - eval/definitions/README.md
-      - agents/workflows/agent-canon-pr-workflow.md
+      - agents/skills/agent-eval-accumulation.md
       - documents/runtime/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_run_accumulated_agent_evals.py
@@ -1449,7 +1449,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/workflows/agent-canon-pr-workflow.md
+      - agents/skills/agent-canon-update.md
     tests:
       - tests/tools/test_check_github_workflows.py
 
@@ -1602,7 +1602,7 @@ entries:
       pr_check: false
     docs:
       - documents/agent-canon/agent-canon-update-route.md
-      - agents/workflows/agent-canon-pr-workflow.md
+      - agents/skills/agent-canon-update.md
     tests:
       - tests/agent_tools/test_github_publish.py
 
@@ -1621,7 +1621,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/workflows/agent-canon-pr-workflow.md
+      - agents/skills/agent-canon-update.md
     tests:
       - tests/tools/test_check_github_workflows.py
 
@@ -2614,7 +2614,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/experiments/result-log-retention-and-visualization.md
-      - agents/workflows/experiment-workflow.md
+      - agents/skills/experiment-lifecycle.md
     tests:
       - tests/tools/test_save_experiment_result_annex.py
 

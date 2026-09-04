@@ -50,7 +50,7 @@ downstream design documents/runtime/private-feedback-knowledge.md private knowle
 - OOP、class、state、inheritance、`Protocol`、SOLID の専門判断は `documents/conventions/object-oriented-design.md` に置く。
 - 個別 tool の使い方は `tools/` と tool document に置く。
 - skill の実行契約は `agents/skills/` と `.codex/personal/skills/` に置く。
-- workflow の手順は `agents/workflows/` に置く。
+- task の手順は `agents/skills/` に置き、`agents/workflows/` には reader index と bibliography だけを置く。
 - validation matrix と policy は `documents/` に置く。
 - 対話から得た raw observation は runtime logs/evidence/Issue/failures の owner に置き、
   独立した再発防止知識や修正 feedback は private `agent-canon-log` に置く。source treeへ本文を複製しない。

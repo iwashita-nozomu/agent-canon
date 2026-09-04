@@ -1,7 +1,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks GitHub workflow and PR template conventions.
-# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
+# upstream design ../../../../agents/skills/agent-canon-update.md PR evidence rules
 # upstream design ../../../../README.md AgentCanon surface index
 # upstream design ../../../../.github/AGENTS.md GitHub agent entrypoint
 # upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
@@ -521,9 +521,8 @@ def improvement_guide_trigger_findings(
             "improvement_guide_candidate_export_required",
         ),
         (
-            r'echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=\$\{candidate_source\}/\.runtime/container-state" '
-            r'>> "\$\{GITHUB_ENV\}"',
-            "improvement_guide_guide_runtime_export_required",
+            r"AGENT_CANON_CANDIDATE_BARE=%s\\n.*\$\{GITHUB_ENV\}",
+            "improvement_guide_candidate_bare_export_required",
         ),
     )
     for pattern, message in candidate_requirements:
@@ -531,11 +530,10 @@ def improvement_guide_trigger_findings(
             findings.append(Finding("error", path, message))
     if "AGENT_CANON_RUNTIME_ROOT" in workflow_text:
         findings.append(Finding("error", path, "improvement_guide_runtime_env_forbidden"))
-    if not re.search(
-        r'\$\{AGENT_CANON_GUIDE_RUNTIME_ROOT\}/reports/',
-        workflow_text,
-    ):
-        findings.append(Finding("error", path, "improvement_guide_report_runtime_required"))
+    if "AGENT_CANON_GUIDE_RUNTIME_ROOT" in workflow_text or ".runtime/container-state" in workflow_text:
+        findings.append(Finding("error", path, "improvement_guide_host_runtime_path_forbidden"))
+    if re.search(r"(?m)^\s*docker(?:\s|$)", workflow_text):
+        findings.append(Finding("error", path, "improvement_guide_direct_docker_forbidden"))
     if re.search(r"(?m)\bgit\s+[^\n]*\bpush\s+origin\b", workflow_text):
         findings.append(Finding("error", path, "improvement_guide_origin_push_forbidden"))
 
@@ -556,6 +554,10 @@ def improvement_guide_trigger_findings(
             findings.append(Finding("error", path, "improvement_guide_catalog_route_required"))
         if "exec --root" in guide_run and "generate_agent_improvement_guide.py" in guide_run:
             findings.append(Finding("error", path, "improvement_guide_internal_exec_forbidden"))
+        if 'tool export guide --destination "${guide_dir}"' not in guide_run:
+            findings.append(Finding("error", path, "improvement_guide_export_route_required"))
+        if 'guide_dir="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"' not in guide_run:
+            findings.append(Finding("error", path, "improvement_guide_host_destination_required"))
 
     runtime = re.search(
         r"(?ms)^      - name: Start shared tool runtime\s*\n"
@@ -600,6 +602,8 @@ def improvement_guide_trigger_findings(
         for line in all_bootstrap_lines
     ):
         findings.append(Finding("error", path, "improvement_guide_cleanup_candidate_source_required"))
+    if 'rm -rf -- "${AGENT_CANON_CANDIDATE_BARE:-}" "${AGENT_CANON_CANDIDATE_SOURCE:-}"' not in workflow_text:
+        findings.append(Finding("error", path, "improvement_guide_candidate_cleanup_required"))
     return findings
 
 
@@ -786,19 +790,27 @@ def check_github_support_surfaces(root: Path) -> list[Finding]:
 
 def check_pr_flow_docs(root: Path) -> list[Finding]:
     """Check that the standalone source PR lane binds ownership and readback."""
-    workflow_path = (
-        root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
-    )
+    workflow_path = root / "agents" / "skills" / "agent-canon-update.md"
     return require_text(
         workflow_path,
         [
             "standalone source repository",
-            "workspace/agent-canondevelop/<qualified-task>/agent-canon",
-            "iwashita-nozomu/agent-canon#<number>",
-            "source branch, PR, merge, and main readback",
-            "source status/content is unchanged",
-            "task-owned containers/images/runtime paths are absent",
-            "no AgentCanon vendor/submodule/root projection",
+            "qualified development clone",
+            "repository-qualified Issue identity",
+            "source branch",
+            "PR",
+            "required review",
+            "CI",
+            "green",
+            "resulting",
+            "main readback",
+            "source status",
+            "content unchanged",
+            "transient resources",
+            "persistent shared runtime",
+            "submodule",
+            "vendor checkout",
+            "root projection",
         ],
     )
 

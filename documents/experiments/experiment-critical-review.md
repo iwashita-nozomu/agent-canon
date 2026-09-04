@@ -12,9 +12,9 @@ downstream design ../design/algorithm-implementation-boundary.md algorithm bound
 この文書は、実験コード、結果レポート、図表、結論の妥当性を批判的にレビューするための正本です。
 個別の実験 topic に依存しない review 観点をまとめ、`experiment_reviewer`、`report_reviewer`、`change_reviewer` が共通に参照できる形にします。
 
-実験全体の標準手順は [experiment-workflow.md](../../agents/workflows/experiment-workflow.md) を参照してください。
+実験全体の標準手順は [experiment-lifecycle.md](../../agents/skills/experiment-lifecycle.md) を参照してください。
 レポート本文の構成は [experiment-report-style.md](experiment-report-style.md) を参照してください。
-問い、比較対象、逐次改造の流れは [research-workflow.md](../../agents/workflows/research-workflow.md) を参照してください。
+問い、比較対象、逐次改造の流れは [research-workflow.md](../../agents/skills/research-workflow.md) を参照してください。
 数理境界と実装境界の対応は [algorithm-implementation-boundary.md](../design/algorithm-implementation-boundary.md) の Boundary Map で確認します。
 
 ## この文書の読み方

@@ -36,8 +36,8 @@ research workflow, and adaptive backlog tuning.
 - `agents/skills/research-workflow.md`
 - `agents/internal-routines/critical-review.md`
 - `agents/internal-routines/report-review.md`
-- `agents/workflows/experiment-workflow.md`
-- `agents/workflows/research-workflow.md`
+- `agents/skills/experiment-lifecycle.md`
+- `agents/skills/research-workflow.md`
 - `templates/agents/experiment_change_loop.md`
 
 ## Inputs

@@ -1219,12 +1219,14 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     runtime = tmp_path / "runtime"
     stage = tmp_path / "stage"
     codex_stage = tmp_path / "codex-stage"
+    guide_stage = tmp_path / "guide-stage"
     volume_root = tmp_path / "volume"
     fake_install = tmp_path / "fake-install"
     control.mkdir()
     runtime.mkdir()
     stage.mkdir()
     codex_stage.mkdir()
+    guide_stage.mkdir()
     (fake_install / ".codex" / "personal" / "skills" / "managed").mkdir(parents=True)
     (fake_install / ".codex" / "config.toml").write_text("config\n", encoding="utf-8")
     (fake_install / ".codex" / "personal" / "skills" / "managed" / "SKILL.md").write_text(
@@ -1308,6 +1310,64 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert (stage / "mounts.toml").read_text(encoding="utf-8").startswith(
         'schema = "agent-canon.mount-registry.v2"'
     )
+    guide_source = volume_root / "runtime" / "reports" / "agent-improvement-guide"
+    guide_source.mkdir(parents=True)
+    (guide_source / "agent-improvement-guide-123-1.md").write_text(
+        "# guide\n", encoding="utf-8"
+    )
+    guide_export = subprocess.run(
+        [
+            "bash",
+            "-c",
+            common + f"_agent_canon_volume_copy export guide {str(guide_stage)!r}",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_VOLUME_NAME": volume_name,
+            "FAKE_VOLUME_ROOT": str(volume_root),
+        },
+    )
+    assert guide_export.returncode == 0, guide_export.stderr
+    assert (guide_stage / "agent-improvement-guide-123-1.md").read_text(
+        encoding="utf-8"
+    ) == "# guide\n"
+    outside = tmp_path / "outside-guide"
+    outside.mkdir()
+    sentinel = outside / "sentinel"
+    sentinel.write_text("untouched\n", encoding="utf-8")
+    (fake_install / ".runtime").mkdir()
+    rejected = subprocess.run(
+        [
+            "bash",
+            "-c",
+            " ".join(
+                (
+                    f"source {str(ADAPTER)!r};",
+                    "_agent_canon_prepare_host_runtime() {",
+                    f"AGENT_CANON_STATE_ROOT={str(runtime)!r};",
+                    f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r};",
+                    "export AGENT_CANON_STATE_ROOT AGENT_CANON_STATE_VOLUME_NAME;",
+                    "};",
+                    "_agent_canon_use_active_image() { :; };",
+                    "_agent_canon_ensure_container() { printf fake-container; };",
+                    "_agent_canon_rewrite_target_args() { :; };",
+                    f"bootstrap_host_entrypoint {str(fake_install)!r}",
+                    f"--control-parent-root {str(control)!r}",
+                    "tool export guide --destination",
+                    str(outside),
+                )
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert rejected.returncode == 2
+    assert json.loads(rejected.stderr)["code"] == "volume_copy_destination_invalid"
+    assert sentinel.read_text(encoding="utf-8") == "untouched\n"
     codex_export = subprocess.run(
         ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
         check=False,

@@ -35,7 +35,7 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 
 ## Core References
 
-- `agents/workflows/research-workflow.md`
+- `agents/skills/research-workflow.md`
 - `agents/workflows/workflow-references.md`
 - `references/README.md`
 - 必要なら対象 topic の既存 `documents/notes/themes/*.md`
@@ -97,14 +97,16 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 - 研究全体の outer loop は `research-workflow` を使います
 - 実験結果の批判的評価は critical review を使います
 - reader-facing な report の確認は report review を使います
-- repo-wide な workflow や review policy の外部根拠索引は `agents/workflows/workflow-references.md` に残します
+- repo-wide な workflow や review policy の外部根拠索引は `agents/workflows/workflow-references.md` に残します。
+  この索引は source bibliography であり、検索手順の正本ではありません。
 
 ## Runtime Contract Clauses
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
 1. Read `agents/skills/literature-survey.md`.
-1. Read `agents/workflows/workflow-references.md`.
+1. Read `agents/workflows/workflow-references.md` only when the task needs the
+   repository-wide external-rule bibliography; it is not an execution procedure.
 1. Fix the question, scope, and exclusion criteria before searching.
 1. Before web search, PDF download, or citation lookup, inspect existing `references/`, `documents/notes/`, `documents/`, and topic reports for the same source or claim. Reuse or update the existing source note instead of creating a parallel truth surface.
 1. Prefer primary sources, surveys, benchmark comparison papers, and official docs over tertiary summaries.

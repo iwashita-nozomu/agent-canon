@@ -50,7 +50,10 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 
 ## Core References
 
-- `agents/workflows/long-form-writing-workflow.md`
+- `agents/skills/academic-writing.md` (scholarly prose boundary)
+- `agents/skills/paper-writing.md` (paper-specific overlay)
+- `agents/skills/structure-planning.md` (structural decision owner)
+- `agents/skills/prose-reasoning-graph.md` (optional graph diagnostics)
 - `documents/conventions/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 
@@ -109,6 +112,21 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 - 実験 report の review policy は report review を優先します
 - Markdown の体裁だけなら `md-style-check` を使います
 - 文書が短くても、責務が一般説明 prose ならこの adapter を使います。文書が長くても、責務が report、paper、academic note なら対応する adapter を使います
+
+## Review Outcomes
+
+- `rewrite_required`: summary statement、section order、前提順、または重要な欠落が残る
+- `consistency_fix_required`: 他文書、entrypoint、または canonical route との食い違いが残る
+- `approved`: reader flow、information completeness、canon alignment が揃っている
+
+## Evidence Basis
+
+このSkillの構成判断は、次の外部ガイドをrepo向けに要約したものです。
+
+- [Reverse Outlining | John S. Knight Institute](https://knight.as.cornell.edu/reverse-outlining)
+- [Creating a Roadmap | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/creating-a-roadmap.pdf)
+- [Higher Order Concerns | Purdue OWL](https://owl.purdue.edu/owl/subject_specific_writing/professional_technical_writing/prioritizing_your_concerns_for_effective_business_writing/index.html)
+- [Scannable content | Microsoft Style Guide](https://learn.microsoft.com/en-us/style-guide/scannable-content/)
 
 ## Runtime Contract Clauses
 

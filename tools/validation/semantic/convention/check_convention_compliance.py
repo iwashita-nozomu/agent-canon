@@ -10,8 +10,8 @@
 # upstream design ../../../../agents/skills/codex-task-workflow.md implementation workflow skill
 # upstream design ../../../../agents/skills/subagent-bootstrap.md subagent handoff skill
 # upstream design ../../../../agents/skills/tool-finding-report.md tool warning closeout skill
-# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
-# upstream design ../../../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
+# upstream design ../../../../agents/skills/agent-canon-update.md AgentCanon PR essence workflow
+# upstream design ../../../../agents/skills/pr-processing.md PR queue cleanup body update workflow
 # upstream design ../../../../agents/skills/md-style-check.md Markdown small-edit skill route
 # upstream design ../../../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
@@ -270,12 +270,6 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "prose-reasoning-graph",
         "structure-planning",
     ),
-    "agents/workflows/long-form-writing-workflow.md": (
-        "$structure-planning",
-        "$prose-reasoning-graph",
-        "$md-style-check",
-        "structure_contract=skipped",
-    ),
     "documents/conventions/REVIEW_PROCESS.md": (
         "structure-planning",
         "prose-reasoning-graph",
@@ -497,21 +491,9 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
         "design_issue_blocker",
         "implementation shortcut",
     ),
-    "agents/workflows/comprehensive-refactoring-workflow.md": (
-        "compatibility-preservation drift",
-        "duplicate implementation",
-        "canonical owner",
-        "Removal and Caller Migration Plan",
-    ),
 }
 REFACTOR_SEQUENCE_MARKERS = {
     "agents/skills/refactor-loop.md": (
-        "two-stage refactor",
-        "forced migration",
-        "usage-surface repair",
-        "return-gate validation",
-    ),
-    "agents/workflows/comprehensive-refactoring-workflow.md": (
         "two-stage refactor",
         "forced migration",
         "usage-surface repair",
@@ -727,7 +709,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "implementation stage gate",
-                    "agents/workflows/implementation-waterfall-workflow.md",
+                    "agents/skills/codex-task-workflow.md",
                 ),
                 (
                     "active design packet schema",

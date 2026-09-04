@@ -163,17 +163,13 @@ OpenAI / Codex の current product evidence をこの文書へ source-by-source 
 
 - [references/README.md](../../references/README.md)
   - reference 置き場の入口です。
-- [agents/workflows/research-workflow.md](research-workflow.md)
-  - 研究・実験改造の正本です。
-- [agents/workflows/implementation-waterfall-workflow.md](implementation-waterfall-workflow.md)
-  - 実装パスのウォーターフォール正本です。
+- [agents/skills/research-workflow.md](../skills/research-workflow.md)
+  - 研究・実験改造の Skill 正本です。
+- [agents/skills/codex-task-workflow.md](../skills/codex-task-workflow.md)
+  - repository task execution の Skill 正本です。
 - [documents/experiments/experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md)
   - 批判的レビュー観点の正本です。
 - [references/workflow/implementation-waterfall.md](../../references/workflow/implementation-waterfall.md)
-  - 実装ウォーターフォール化の文献メモです。
+  - 実装段階設計に関する文献メモです。
 - [agents/README.md](../README.md)
   - agent canon の入口です。
-
-## Convention Compliance Gate
-
-Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

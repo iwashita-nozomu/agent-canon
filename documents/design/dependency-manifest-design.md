@@ -624,7 +624,7 @@ Responsibilities:
 - delegate the normal scan to the canonical LSP `scan-legacy` report
 - keep output independent from manifest upstream/downstream edges
 - support explicit path lists and `--changed`
-- provide pre-edit evidence for `agents/workflows/hypothesis-validation-workflow.md`
+- provide pre-edit evidence for `agents/skills/dependency-analysis.md`
 - require `--lexical-only` for the compatibility extractor and fail closed when
   the canonical LSP server is unavailable
 

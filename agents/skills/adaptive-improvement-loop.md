@@ -17,18 +17,17 @@ upstream design ../canonical/skills.md skill canon registry
 - Section path: Purpose, Use When, and Core References set scope; Operating
   Rules and Required Records are the mandatory checklist; Boundary limits local
   improvisation.
-- Boundary: individual runs do not count as accepted results without backlog,
-  evidence, and review closure.
+- Boundary: individual runs are evidence for a backlog decision; they do not
+  replace the iteration record, next action, or closeout owned by this skill.
 
 実験開始前の plan は question、comparison、observables、evidence targets、protocol、resource、
-operational stop condition を宣言するだけです。`supported`、`rejected`、
-`inconclusive`、`approved` は run 後の結果解釈または iteration 遷移として記録し、
-plan の completion や run 開始条件にはしません。
+operational stop condition を宣言するだけです。結果の解釈や iteration の遷移は run 後の
+evidence に基づいて記録し、plan の completion や run 開始条件には結果を仮定しません。
 
 ## Purpose
 
-実験、調査、チューニング、比較検証をまとめて回しながら、改善 backlog を iteration 単位で潰していく outer loop を定めます。
-実装 pass は waterfall に固定し、改善全体だけを agile に扱います。
+実験、調査、チューニング、比較検証をまとめて回しながら、改善 backlog を iteration 単位で
+扱う outer loop を定めます。各変更はその責務を持つ owner の実装・検証 route に委譲します。
 
 ## Use When
 
@@ -39,38 +38,41 @@ plan の completion や run 開始条件にはしません。
 
 ## Core References
 
-- `agents/workflows/adaptive-improvement-workflow.md`
-- `agents/workflows/research-workflow.md`
-- `agents/workflows/experiment-workflow.md`
-- `agents/workflows/implementation-waterfall-workflow.md`
 - `agents/skills/research-workflow.md`
 - `agents/skills/experiment-lifecycle.md`
+- `agents/skills/comprehensive-development.md`
+- `agents/skills/codex-task-workflow.md`
 
 ## Operating Rules
 
-- 最初に今回の `Objective`、`Exit Criteria`、`Stop Budget`、`Improvement Backlog` を固定します。durable lifecycle evidence が必要な run では、work unit を run bundle の `schedule.md`、iteration result と next action を `work_log.md` に直接記録します。
-- user が goal-driven intent を示したが exact objective を渡していない場合は、parent が conservative な objective draft を作り、read-only subagent fan-out、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
-- 各 iteration の開始前と closeout 前に `schedule.md` の open work、`work_log.md` の next action、validation evidence を読み返します。open work がある間は次 backlog iteration へ進み、user-facing completion にしません。
-- outer loop は agile、repo に持ち帰る各 change pass は waterfall にします。
+- 最初に今回の `Objective`、`Exit Criteria`、`Stop Budget`、`Improvement Backlog` を固定します。durable lifecycle evidence が必要な run では、work unit、iteration result、next action を owner-selected run artifact に記録します。
+- user が goal-driven intent を示したが exact objective を渡していない場合は、objective の整理と実行 topology をそれぞれの owner に引き継ぎ、この skill で role や spawn 条件を再定義しません。
+- 各 iteration の開始前と closeout 前に iteration record と validation evidence を読み返します。未完了の作業は次の backlog action として記録し、現在の extension の closeout と user-facing completion を混同しません。
+- outer loop は backlog と観測に応じて進め、repo に持ち帰る各 change pass は選択された owner
+  route に従います。
 - Goal-driven iteration では `plan -> implementation -> evidence -> next-action` の短い loop を使い、次 slice が実装可能になったら planning を止めて編集へ戻ります。
-- 1 iteration につき 1 extension、1 waterfall run-id、1 change pass、1 decision state にします。
-- iteration 数は進捗カウンタであり、終了条件ではありません。loop は backlog と exit criteria で継続判断し、達成 evidence なしに完了扱いしません。
+- 1 iteration につき 1 extension、1 run identity、1 change pass、1 iteration decision を対応させます。
+- iteration 数は進捗カウンタであり、終了条件ではありません。loop は backlog と exit criteria
+  で継続判断し、objective に対する evidence を iteration record に残してから完了を記録します。
 - `Improvement Backlog:` を持ち、次に試す候補を優先順で管理します。
-- skill を使う run では `python3 eval/producers/evaluate_skill_workflow_prompts.py --manifest eval/definitions/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`EVAL_RUN_ID` と `EVAL_ACCUMULATED_REPORT` を evidence にします。
-- skill/workflow prompt を改善する場合は、変更前にテスト対象ごとの eval を `eval/definitions/skill_workflow_prompt_eval.toml` に固定します。
-- prompt 修正前後で同じ eval を実行し、`EVAL_STATUS=pass` を evidence にします。詳細 report は `.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に `<eval_run_id>-<status>-<skill-slug>.md` として蓄積し、既存 report を上書きしません。
-- eval drift が出た場合は、脱線した skill/workflow prompt を修正し、同じ eval を rerun します。no eval deviation になるまで loop を閉じません。
-- agent 行動を改善する場合は、skill invocation、stage / subagent routing、tool gate、accumulated prompt eval、review feedback、subagent lifecycle、diff-check、static-analysis feedback、execution path comparison を `workflow_monitor.py --behavior-event` で run bundle に蓄積します。
-- 利用中に得られた user / reviewer feedback は、raw prose のまま放置せず `workflow_monitor.py --runtime-feedback "source=<...> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op> ..."` で構造化し、同じ iteration 内で対象 skill prompt、workflow prompt、eval、private knowledge / feedback のいずれかへ還元します。
-- `action=prompt_repair` または `action=eval_update` の feedback は、対応する `eval/definitions/skill_workflow_prompt_eval.toml` の entry を先に更新または確認し、prompt repair 後に同じ eval を rerun します。
-- static analysis が workflow / skill / prompt の弱さを示した場合は、結果を `static_analysis_feedback=applied|recorded` として監視し、還元先の skill / workflow / eval を明示します。未処理の `static_analysis_feedback=pending` を残して loop を閉じません。
-- 同じ goal に対して 2 回の実行経路があり得る場合は、`eval/checkers/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` で `execution_path`、`route_efficiency`、`static_analysis_feedback` を比較します。`route_efficiency=inefficient` または `selected_inefficient_route=yes` が出た場合は、agent behavior eval が fail するようにし、非効率経路を選ばないよう skill / workflow prompt を修正します。
-- コード改善 iteration では、`agents/workflows/hypothesis-validation-workflow.md` を overlay にし、`Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`Hypothesis Decision` を run 後の iteration artifact に残します。`Hypothesis Decision` が `supported` でない場合は、同じ pass を拡張せず次仮説へ戻します。
-- closeout 前に `python3 eval/producers/evaluate_agent_run.py --report-dir <run> --behavior-manifest eval/definitions/agent_behavior_eval.toml --write` を実行し、`AGENT_EVALUATION_STATUS=pass` まで workflow artifact または prompt を修正します。
-- 2 つ目の extension に進む前に、直前 extension の selected `waterfall-gate-check`、selected review gate（final review は活性化された場合のみ）、`task-close`、commit / push を完了させます。
+- 各 code-improvement iteration の前に、依存関係、既存実装、到達可能性、原因候補を調べ、
+  `Observation`、`Cause Search`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、
+  `Disconfirming Evidence`、`Support Evidence` を記録します。原因が未確定なら実装へ進まず、
+  `dependency-analysis` または `change-review` の調査へ戻します。
+- behavior event と active-skill calibration は `$agent-learning`、登録済み eval の実行と
+  duplicate audit は `$agent-eval-accumulation`、path / token / role footprint の比較は
+  `$tokens`、runtime feedback の event 構造化は `workflow_monitor.py` が所有します。この
+  skill は各 owner の evidence を iteration decision と next action に消費し、command、
+  schema、role、duplicate の定義を再定義しません。
+- コード改善 iteration では、原因調査の記録を同じ iteration artifact に残し、run 後に
+  `Hypothesis Decision` と次の選択を記録します。原因の証拠が不足する場合は、同じ pass を
+  拡張せず原因調査へ戻します。
+- 2 つ目の extension に進む前に、直前 extension の owner-selected validation、review、
+  closeout、commit / push の結果を記録し、未完了の作業を次の action として引き継ぎます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
-- `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`direction_rethink_required` が残る限り loop を閉じません。
-- open backlog、未達 exit criteria、または next action が残る限り loop を閉じません。
+- post-run の未解決事項は、iteration decision と次の action または stop reason に明記します。
+- backlog を残す場合は次の iteration に引き継ぎ、現在の extension を閉じたことと backlog 全体を
+  完了したことを混同しません。
 - 改善を採用しないときも、`What We Learned:` を note に残します。
 
 ## Required Records
@@ -82,8 +84,9 @@ plan の completion や run 開始条件にはしません。
 - `Improvement Backlog:`
 - `Iteration Goal:`
 - `Extension:`
-- `Waterfall Run ID:`
+- `Run ID:`
 - `Candidate Change:`
+- `Cause Search:`
 - `Expected Effect:`
 - `Validation Plan:`
 - `Hypothesis:`
@@ -93,53 +96,81 @@ plan の completion や run 開始条件にはしません。
 - `Support Evidence:`
 - `Hypothesis Decision:`
 - `Decision:`
-- `Next Backlog Item:`
-- `Skill/Workflow Eval Manifest:`
-- `Prompt Eval Command:`
-- `Prompt Eval Result:`
-- `Behavior Eval Manifest:`
-- `Behavior Event Log:`
-- `Static Analysis Feedback Target:`
-- `Two-Run Path Comparison:`
-- `Execution Path Efficiency Decision:`
-- `Agent Behavior Eval Result:`
+- `Next Best Backlog Item Or Stop Reason:`
+- `What Improved:`
+- `What Did Not Improve:`
+- `What We Learned:`
+- `Notes Promotion Decision:`
+- `Extension Decision:`（各 `Extension` ごとに一つ）
+- `Prompt Eval Evidence:`
+- `Behavior Eval Evidence:`
+- `Behavior Event Evidence:`
+- `Static Analysis Feedback:`
+- `Path Comparison Evidence:`
+- `Execution Path Decision:`
+- `Agent Behavior Decision:`
 - `Iteration State Readback:`
 
 ## Boundary
 
 - 外部調査そのものは `literature-survey` を追加します。
 - 単一 run の実行と rerun 分岐は `experiment-lifecycle` を使います。
-- repo-wide な feature delivery には使わず、`implementation-waterfall-workflow.md` を使います。
+- repo-wide な feature delivery には使わず、`comprehensive-development` と
+  `codex-task-workflow` の implementation route を使います。
+- role selection、required roles、topology、spawn budget は `$agent-orchestration` と
+  `agents/task_catalog.yaml` が所有します。この skill は選択済み role を利用し、role list や
+  重複判定を再定義しません。
+- behavior event / calibration は `$agent-learning`、登録済み eval と duplicate audit は
+  `$agent-eval-accumulation`、token / path comparison は `$tokens`、runtime feedback の構造化は
+  `workflow_monitor.py` に委譲します。この skill は返された evidence の iteration 解釈と
+  next action だけを所有します。
+
+## Iteration Closeout
+
+各 extension を閉じるときは、既存の `Decision`、`Next Action`、`Iteration State Readback` と
+同じ artifact に、次の結果を一度だけ記録します。
+
+- `What Improved:` 今回の extension で観測された改善
+- `What Did Not Improve:` 改善しなかった指標、条件、または反証
+- `What We Learned:` 次の選択に使える学び
+- `Next Best Backlog Item Or Stop Reason:` 次の backlog item、または停止理由
+- `Notes Promotion Decision:` topic note / shared knowledge へ持ち上げるか、その理由
+- `Extension Decision:` extension の観測結果、未解決事項、次の action または stop reason を記録
+
+closeout は extension 単位で行い、未解決の next action や post-run decision を次の action または
+stop reason として残します。role の構成、評価 producer の実行、runtime feedback の構造化、または
+artifact の配置はそれぞれの owner に委譲し、この record には結果と handoff だけを残します。
 
 ## Runtime Contract Clauses
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
 1. Read `agents/skills/adaptive-improvement-loop.md`.
-1. Read `agents/workflows/adaptive-improvement-workflow.md`.
-1. Read `agents/workflows/research-workflow.md`.
-1. Read `agents/workflows/experiment-workflow.md`.
-1. If the user gives goal-driven intent without an exact objective, draft a conservative objective and use read-only pre-goal subagents before implementation when explicit spawn authorization exists. If authorization is absent, record the pre-goal handoff plan and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` before requesting or waiting for authorization.
-1. When durable lifecycle evidence is required, record work units in run-bundle `schedule.md` and record iteration evidence plus next action in `work_log.md`; do not create a repository mirror of session goal state.
-1. For skill/workflow prompt tuning, freeze one eval per tested skill/workflow in `eval/definitions/skill_workflow_prompt_eval.toml` before changing the prompt under test.
-1. Run `python3 eval/producers/evaluate_skill_workflow_prompts.py --manifest eval/definitions/skill_workflow_prompt_eval.toml` before and after prompt repair.
-1. If the eval reports drift, repair the relevant skill/workflow prompt and rerun the same eval until `EVAL_STATUS=pass`.
-1. When user or reviewer feedback is observed during actual use, record it with `python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <run> --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op>"`, then update the targeted skill prompt, workflow prompt, eval, or private log knowledge/feedback in the same iteration.
-1. For agent behavior tuning, record skill invocation, subagent routing, tool gate, prompt eval, review feedback, subagent lifecycle, diff-check, static-analysis feedback, and execution path comparison events with `python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <run> --behavior-event "..."`.
-1. If static analysis exposes a skill/workflow weakness, record `static_analysis_feedback=applied|recorded` with the prompt or eval target that received the feedback. Do not close the loop while `static_analysis_feedback=pending` remains.
-1. When two executions can take different paths, run `python3 eval/checkers/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` and feed its `execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`, and `static_analysis_feedback` tokens into workflow monitoring.
-1. If `route_efficiency=inefficient` or `selected_inefficient_route=yes` appears, repair the skill/workflow prompt and behavior eval until the inefficient route no longer passes.
-1. For code-improvement iterations, add `agents/workflows/hypothesis-validation-workflow.md` as an overlay and record `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and the post-run `Hypothesis Decision`.
-1. If `Hypothesis Decision` is `rejected` or `inconclusive`, return to hypothesis selection instead of widening the current implementation pass.
-1. Before closeout, run `python3 eval/producers/evaluate_agent_run.py --report-dir <run> --behavior-manifest eval/definitions/agent_behavior_eval.toml --write` and repair workflow artifacts or prompts until `AGENT_EVALUATION_STATUS=pass`.
-1. Keep the outer loop agile and backlog-driven, but keep each repo-changing pass inside `agents/workflows/implementation-waterfall-workflow.md`.
+1. Read `agents/skills/research-workflow.md` when external evidence or claim scope is in scope.
+1. Read `agents/skills/experiment-lifecycle.md` for one run or fresh rerun.
+1. If the user gives goal-driven intent without an exact objective, hand objective clarification and
+   execution topology to their canonical owners; do not create role or spawn rules here.
+1. When durable lifecycle evidence is required, record work units, iteration evidence, and next action
+   in the owner-selected run artifact; do not create a repository mirror of session goal state.
+1. Delegate behavior events and active-skill calibration to `$agent-learning`, registered eval
+   execution and duplicate audit to `$agent-eval-accumulation`, path and token comparison to `$tokens`,
+   and runtime feedback event construction to `workflow_monitor.py`.
+1. Consume those owners' returned evidence in `Decision`, `Next Best Backlog Item Or Stop Reason`,
+   and the iteration readback; do not recreate their commands, schemas, duplicate definitions, or
+   acceptance gates here.
+1. For code-improvement iterations, record `Observation`, `Cause Search`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and the post-run `Hypothesis Decision` in the iteration artifact; if cause evidence is incomplete, return to `$dependency-analysis` or `$change-review` before editing.
+1. If the cause or candidate change is not supported by the observed evidence, return to hypothesis
+   selection or cause search instead of widening the current implementation pass.
+1. Before closeout, consume behavior, eval, path, and token evidence from their owners; do not redefine
+   required roles or duplicate their measurement gates in this skill.
+1. Keep the outer loop backlog-driven, and route each repo-changing pass through
+   `$comprehensive-development` or `$codex-task-workflow`; do not create a second procedure surface.
 1. For goal-driven work, use the fast `plan -> implementation -> evidence -> next-action` loop; once the next cohesive slice is implementation-ready, stop broad planning and edit.
 1. Fix `Question`, `Comparison Target`, `Exit Criteria`, `Stop Budget`, and `Improvement Backlog` before choosing the next iteration.
-1. Keep one extension, one waterfall run id, one change pass, and one decision state at a time.
+1. Keep one extension, one run identity, one change pass, and one iteration decision at a time.
 1. Treat the iteration number as progress metadata, not as a completion condition; only explicit achieved criteria close the loop.
-1. Before moving to a second extension, finish the previous extension's selected waterfall gate checks, selected review gate (final review only when activated), `task-close`, commit, and push.
-1. Do not close the loop while `report_rewrite_required`, `extra_validation_required`, `rerun_required`, or `direction_rethink_required` remains.
-1. Do not close the loop while `schedule.md` has open work, `work_log.md` records a next action, or required validation evidence remains incomplete.
-1. Whenever this run uses skills, run `python3 eval/producers/evaluate_skill_workflow_prompts.py --manifest eval/definitions/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` and record `EVAL_RUN_ID` plus `EVAL_ACCUMULATED_REPORT`.
-1. Do not close a skill/workflow improvement loop while prompt eval drift remains; accumulated reports live under `.agent-canon/log-archive/eval-results/skill-workflow-prompt/` and must not be overwritten.
-1. Do not close an agent behavior improvement loop while behavior eval feedback actions remain open.
+1. Before moving to a second extension, record the previous extension's owner-selected validation,
+   review, closeout, commit, and push results.
+1. At iteration closeout, record `What Improved`, `What Did Not Improve`, `What We Learned`, `Next Best
+   Backlog Item Or Stop Reason`, `Notes Promotion Decision`, and one `Extension Decision` for each
+   extension alongside the existing iteration state readback.

@@ -11,8 +11,8 @@ upstream design ../README.md notes lifecycle index
 このディレクトリには、`main` から辿れる形で残しておきたい実験メモを置きます。
 1 回の run に対応する一次 report は `experiments/report/` に置き、このディレクトリは複数 run をまたぐ要約、比較、知見整理に使います。
 
-研究の問い、比較設計、claim 更新は [agents/workflows/research-workflow.md](../../../agents/workflows/research-workflow.md) を参照してください。
-準備、実装、静的チェック、実行、結果レポートの標準手順は [agents/workflows/experiment-workflow.md](../../../agents/workflows/experiment-workflow.md) を参照してください。
+研究の問い、比較設計、claim 更新は [agents/skills/research-workflow.md](../../../agents/skills/research-workflow.md) を参照してください。
+準備、実装、静的チェック、実行、結果レポートの標準手順は [agents/skills/experiment-lifecycle.md](../../../agents/skills/experiment-lifecycle.md) を参照してください。
 批判的レビューの観点は AgentCanon standalone では
 `documents/experiments/experiment-critical-review.md`、template roots では
 `vendor/agent-canon/documents/experiments/experiment-critical-review.md` を参照してください。
