@@ -17,7 +17,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AGENT_CANON_CARGO_TARGET_DIR=/var/lib/agent-canon/cache/cargo-target \
     AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source \
     AGENT_CANON_CACHE_ROOT=/var/lib/agent-canon/cache \
-    AGENT_CANON_COMPILED_BIN_DIR=/var/lib/agent-canon/cache/bin \
     PIPX_HOME=/usr/local/share/agent-canon/pipx \
     PIPX_BIN_DIR=/usr/local/bin \
     PIPX_MAN_DIR=/usr/local/share/man \

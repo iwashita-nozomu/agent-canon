@@ -33,7 +33,6 @@ ENTRYPOINT = CONTAINER / "lifecycle" / "entrypoint.sh"
 DEPENDENCIES = CONTAINER / "image" / "dependencies.toml"
 ROOT_DOCKERIGNORE = ROOT / ".dockerignore"
 WRAPPER = CONTAINER / "dispatch" / "tool-wrapper.sh"
-COMPILE_TOOLS = ROOT / "tools" / "runtime" / "container" / "compile_tools.sh"
 
 
 def test_legacy_agent_canon_devcontainer_surface_is_absent() -> None:
@@ -86,7 +85,6 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "materialize" not in text
     assert "AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source" in text
     assert "AGENT_CANON_CACHE_ROOT=/var/lib/agent-canon/cache" in text
-    assert "AGENT_CANON_COMPILED_BIN_DIR=/var/lib/agent-canon/cache/bin" in text
     assert "CARGO_TARGET_DIR=/var/lib/agent-canon/cache/cargo-target" in text
     assert "test -x" not in text
     assert "command -v" not in text
@@ -250,20 +248,6 @@ def test_typed_tool_wrapper_rejects_arbitrary_dispatch() -> None:
     assert "--root /opt/agent-canon/source" in text
     assert "usage: agent-canon tool run" in text
     assert '[[ "${1:-}" != "tool" || "${2:-}" != "run" ]]' in text
-
-
-def test_compile_route_traverses_source_manifests_and_publishes_atomically() -> None:
-    """Rust compilation is source-derived and never names an individual tool."""
-    text = COMPILE_TOOLS.read_text(encoding="utf-8")
-    assert COMPILE_TOOLS.stat().st_mode & stat.S_IXUSR
-    assert "shopt -s globstar nullglob" in text
-    assert 'for manifest in "${manifests[@]}"' in text
-    assert 'manifests=("$source_root"/tools/**/Cargo.toml)' in text
-    assert "cargo metadata" in text
-    assert "cargo build --manifest-path \"$manifest\" --locked --release" in text
-    assert 'mv -f -- "$temporary" "$compiled_bin_dir/$binary"' in text
-    assert "agent-canon-cli" not in text
-    assert "tools/runtime/dispatch/agent-canon" not in text
 
 
 def test_dependency_manifest_is_python_rust_lsp_only() -> None:
