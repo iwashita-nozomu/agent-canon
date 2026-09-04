@@ -1066,6 +1066,36 @@ _agent_canon_apply_volume_export() (
         return 2
       }
       ;;
+    guide)
+      [[ -d "$temporary/agent-improvement-guide" && ! -L "$temporary/agent-improvement-guide" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "improvement guide tree is missing"
+      }
+      [[ -z "$(find "$temporary" -mindepth 1 -maxdepth 1 ! -name agent-improvement-guide -print -quit)" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "improvement guide export contains an unexpected path"
+      }
+      [[ -z "$(find "$temporary/agent-improvement-guide" -type l -print -quit)" ]] || {
+        _agent_canon_json_error volume_export_invalid "improvement guide export contains a symlink"
+        return 2
+      }
+      [[ -z "$(find "$temporary/agent-improvement-guide" ! -type d ! -type f -print -quit)" ]] || {
+        _agent_canon_json_error volume_export_invalid "improvement guide export contains a special file"
+        return 2
+      }
+      source_digest=$(_agent_canon_path_digest "$temporary/agent-improvement-guide") || {
+        _agent_canon_json_error volume_export_invalid "improvement guide digest could not be computed"
+        return 2
+      }
+      begin_directory_transaction "$host_path" || {
+        _agent_canon_json_error volume_export_destination_invalid "improvement guide destination is not a regular directory"
+        return 2
+      }
+      mv -- "$temporary/agent-improvement-guide" "$host_path" || {
+        _agent_canon_json_error volume_export_failed "improvement guide could not be published"
+        return 2
+      }
+      ;;
     private-feedback)
       [[ -z "$(find "$temporary" -type l -print -quit)" ]] || {
         _agent_canon_json_error volume_export_invalid "private feedback contains a symlink"
@@ -1141,7 +1171,8 @@ _agent_canon_volume_copy() {
   fi
   [[ "$kind" == mount-registry || "$kind" == host-mounts ||
      "$kind" == private-log || "$kind" == codex-home || "$kind" == projection ||
-     "$kind" == skill || "$kind" == eval || "$kind" == private-feedback ]] ||
+     "$kind" == skill || "$kind" == eval || "$kind" == guide ||
+     "$kind" == private-feedback ]] ||
     _agent_canon_json_error volume_copy_invalid "volume copy kind is not allowlisted"
   if [[ "$direction" == import ]]; then
     [[ -e "$host_path" || -L "$host_path" ]] ||
@@ -1343,6 +1374,11 @@ else
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 74
       source_digest=$(tree_digest "$source")
       tar -cf - -C "$root/spool" "$relative" ;;
+    guide)
+      source="$root/runtime/reports/agent-improvement-guide"; [ -d "$source" ] && [ ! -L "$source" ] || exit 80
+      [ -z "$(find "$source" -type l -print -quit)" ] || exit 81
+      source_digest=$(tree_digest "$source")
+      tar -cf - -C "$root/runtime/reports" agent-improvement-guide ;;
     private-feedback)
       source="$root/spool/private-feedback"; [ -d "$source" ] && [ ! -L "$source" ] || exit 75
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 76
@@ -4487,6 +4523,27 @@ bootstrap_host_entrypoint() {
         _agent_canon_validate_private_log_mount "$container"
       elif [[ "$operation" == tool || "$operation" == template || "$operation" == eval || "$operation" == exec ]]; then
         _agent_canon_rewrite_target_args "${command_args[@]}"
+      fi
+      if [[ "$operation" == tool && "${command_args[1]:-}" == export ]]; then
+        [[ "${command_args[2]:-}" == guide && ${#command_args[@]} -eq 5 &&
+           "${command_args[3]:-}" == --destination ]] ||
+          _agent_canon_json_error argument_invalid \
+            "tool export accepts only guide --destination <host-dir>"
+        local guide_destination guide_relative
+        guide_destination=$(realpath -m -- "${command_args[4]}" 2>/dev/null) ||
+          _agent_canon_json_error volume_copy_destination_invalid \
+            "improvement guide destination could not be canonicalized"
+        guide_relative=$(realpath -m --relative-to="$AGENT_CANON_CONTROL_ROOT" \
+          "$guide_destination") ||
+          _agent_canon_json_error volume_copy_destination_invalid \
+            "improvement guide destination could not be authorized"
+        [[ "$guide_relative" != . && "$guide_relative" != .. &&
+           "$guide_relative" != ../* ]] ||
+          _agent_canon_json_error volume_copy_destination_invalid \
+            "improvement guide destination must be a strict control-root descendant"
+        _agent_canon_validate_new_path "$guide_destination" "improvement guide destination"
+        _agent_canon_volume_copy export guide "$guide_destination"
+        return $?
       fi
       local output_file error_file rc
       output_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stdout.XXXXXX")

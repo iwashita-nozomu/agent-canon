@@ -39,11 +39,6 @@ jobs:
           fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
           persist-credentials: false
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
       - name: Prepare PR candidate source
         run: |
           set -euo pipefail
@@ -54,8 +49,8 @@ jobs:
           git -C "${GITHUB_WORKSPACE}" push "${candidate_bare}" "HEAD:refs/heads/main"
           git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main
           git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"
+          printf 'AGENT_CANON_CANDIDATE_BARE=%s\n' "${candidate_bare}" >> "${GITHUB_ENV}"
           printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\n' "${candidate_source}" >> "${GITHUB_ENV}"
-          echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=${candidate_source}/.runtime/container-state" >> "${GITHUB_ENV}"
 
       - name: Start shared tool runtime
         run: |
@@ -66,13 +61,15 @@ jobs:
       - name: Generate improvement guide
         id: guide
         run: |
-          report_dir="$(realpath -m "${AGENT_CANON_GUIDE_RUNTIME_ROOT}/reports/agent-improvement-guide")"
-          guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          guide_dir="${RUNNER_TEMP}/agent-improvement-guide"
+          guide_path="${guide_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
             tool run --root "${GITHUB_WORKSPACE}" generate-agent-improvement-guide -- \
             --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}" \
             --output-mode 644
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            tool export guide --destination "${guide_dir}"
           cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"
           echo "guide_path=${guide_path}" >> "$GITHUB_OUTPUT"
 
@@ -89,3 +86,5 @@ jobs:
             "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" stop || true
             "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" uninstall || true
           fi
+          rm -rf -- "${AGENT_CANON_CANDIDATE_BARE:-}" "${AGENT_CANON_CANDIDATE_SOURCE:-}" \
+            "${RUNNER_TEMP}/agent-improvement-guide"

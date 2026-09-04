@@ -790,6 +790,14 @@ def main(argv: list[str]) -> int:
                         return 1
                     emit_tar(source_root.parent, [(source_root, relative)])
                     readback_digest = tree_digest(source_root)
+                elif kind == "guide":
+                    source_root = backing / "runtime" / "reports" / "agent-improvement-guide"
+                    if not source_root.is_dir() or source_root.is_symlink() or any(
+                        path.is_symlink() for path in source_root.rglob("*")
+                    ):
+                        return 1
+                    emit_tar(source_root.parent, [(source_root, source_root.name)])
+                    readback_digest = tree_digest(source_root)
                 elif kind == "private-feedback":
                     source_root = backing / "spool" / "private-feedback"
                     if not source_root.is_dir() or source_root.is_symlink() or any(

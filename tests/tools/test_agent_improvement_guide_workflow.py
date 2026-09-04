@@ -80,15 +80,9 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             '"${candidate_source}" >> "${GITHUB_ENV}"',
             text,
         )
-        self.assertIn(
-            'echo "AGENT_CANON_GUIDE_RUNTIME_ROOT=${candidate_source}/.runtime/container-state"',
-            text,
-        )
+        self.assertIn("printf 'AGENT_CANON_CANDIDATE_BARE=%s", text)
+        self.assertNotIn("AGENT_CANON_GUIDE_RUNTIME_ROOT", text)
         self.assertNotIn("AGENT_CANON_RUNTIME_ROOT", text)
-        self.assertIn(
-            '"${AGENT_CANON_GUIDE_RUNTIME_ROOT}/reports/agent-improvement-guide"',
-            text,
-        )
         bootstrap_lines = [
             line.strip() for line in text.splitlines() if "bootstrap.sh" in line
         ]
@@ -116,6 +110,25 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             "--root . --runtime-root /var/lib/agent-canon/runtime",
             text,
         )
+        self.assertIn(
+            'guide_dir="${RUNNER_TEMP}/agent-improvement-guide"',
+            text,
+        )
+        self.assertIn(
+            'tool export guide --destination "${guide_dir}"',
+            text,
+        )
+        self.assertNotIn("Setup Python", text)
+        self.assertIn(
+            'cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"',
+            text,
+        )
+        self.assertIn(
+            '"${RUNNER_TEMP}/agent-improvement-guide"',
+            text,
+        )
+        self.assertNotIn(".runtime/container-state", text)
+        self.assertNotIn("docker ", text)
 
     def test_main_only_runtime_workflows_keep_install_contract(self) -> None:
         """Main-only runtime workflows retain their strict initial install."""

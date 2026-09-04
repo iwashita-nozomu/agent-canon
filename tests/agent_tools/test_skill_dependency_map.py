@@ -190,7 +190,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             {edge["display_label"] for edge in graph["edges"]},
             {
                 "prerequisite",
-                "successor",
                 "order",
                 "routing",
                 "parallel",
@@ -198,6 +197,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 "tool-resolution",
             },
         )
+        self.assertNotIn("successor", {edge["display_label"] for edge in graph["edges"]})
         self.assertIn(
             "dependency-design", {item["display_label"] for item in graph["skills"]}
         )
