@@ -1905,7 +1905,7 @@ _agent_canon_image_reference() {
     return 0
   fi
   local environment_key key_script
-  key_script="$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/environment_key.sh"
+  key_script="$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/digest.sh"
   if ! environment_key=$(bash "$key_script" "$AGENT_CANON_REPOSITORY_ROOT"); then
     _agent_canon_json_error environment_key_failed "AgentCanon environment key could not be derived"
     return 2
@@ -2559,12 +2559,6 @@ _agent_canon_run_controller() {
   return "$rc"
 }
 
-_agent_canon_compile_tools() {
-  local container=$1
-  _agent_canon_container_exec "$container" \
-    /usr/local/bin/agent-canon-container-entrypoint compile
-}
-
 _agent_canon_restore_candidate_failure() {
   local container=$1 old_image_id=$2 candidate_image_id=$3
   local old_image_ref=${AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF:-$old_image_id}
@@ -2986,7 +2980,8 @@ _agent_canon_replace_resident_locked() {
   fi
   fi
   rc=0
-  if _agent_canon_compile_tools "$candidate"; then
+  if _agent_canon_container_exec "$candidate" \
+    /usr/local/bin/agent-canon-container-entrypoint compile; then
     :
   else
     rc=$?
