@@ -488,7 +488,7 @@ terminal readiness predicate.
 Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/README.md` から current stage と contract に必要な skill を選びます。
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/conventions/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
-repo-changing task では `python3 tools/agent/orchestration/route.py --prompt "<request>" --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は `agents/task_catalog.yaml#workflow_activation_policy` が child handoff を要求する typed route で current stage に入った時点だけ active にします。prompt-only bounded routing では child を要求しません。
+repo-changing task では `python3 tools/agent/orchestration/route.py --prompt "<request>" --mode repo-changing --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は `agents/task_catalog.yaml#workflow_activation_policy` が child handoff を要求する typed route で current stage に入った時点だけ active にします。prompt-only bounded routing では `--mode routing-only` を使い、child を要求しません。
 `bootstrap_agent_run.py` は `--task` 文面から prompt-derived
 skill を追加し、選択済み skill ごとの repo tool route を
 `run.repo_tool_routing_policy` に出します。repo tool route は skill ごとに
