@@ -2,7 +2,7 @@ version = 1
 path_encoding = "nul-delimited"
 selection = "ordered-union"
 deterministic = true
-monotone = true
+monotone_on_valid_inputs = true
 
 [fail_closed]
 reasons = ["empty_input", "invalid_path", "unknown_path", "unreadable_input", "routing_owner_changed"]
