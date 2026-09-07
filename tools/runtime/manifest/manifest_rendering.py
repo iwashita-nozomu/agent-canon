@@ -924,7 +924,7 @@ def suggested_public_skills(
     if task_text.strip():
         decision = decide_skills(
             task_text,
-            "repo-changing",
+            "routing-only",
             load_skill_route_rules(source_root or ROOT),
         )
         selected.extend(f"${skill}" for skill in decision.skills)

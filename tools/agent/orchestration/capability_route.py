@@ -218,7 +218,8 @@ def preflight_capability_argv(argv: Sequence[str]) -> CapabilityPreflight:
     """Validate capability-mode argv before argparse or catalog access."""
     values: list[str] = []
     output_format = "text"
-    mode = "repo-changing"
+    # Capability routing is also caller-owned; omission must stay non-write.
+    mode = "routing-only"
     root: Path | None = None
     format_raw: str | None = None
     mode_raw: str | None = None
@@ -262,7 +263,7 @@ def preflight_capability_argv(argv: Sequence[str]) -> CapabilityPreflight:
                 output_format = value if value in FORMAT_VALUES else "text"
             elif option == "--mode":
                 mode_raw = value
-                mode = value if value in MODE_VALUES else "repo-changing"
+                mode = value if value in MODE_VALUES else "routing-only"
             elif option == "--risk":
                 risk_raw = value
             else:
@@ -303,7 +304,7 @@ def preflight_capability_argv(argv: Sequence[str]) -> CapabilityPreflight:
     if mode_raw is not None and mode_raw not in MODE_VALUES:
         return CapabilityPreflight(
             normalized_ids,
-            "repo-changing",
+            "routing-only",
             output_format,
             f"invalid-capability-mode:{mode_raw}",
             root,
@@ -397,7 +398,7 @@ def capability_failure_decision(
     return CapabilityRouteDecision(
         schema=CAPABILITY_SCHEMA,
         route="capability-selection",
-        mode=mode if mode in MODE_VALUES else "repo-changing",
+        mode=mode if mode in MODE_VALUES else "routing-only",
         status="fail",
         error_code=error_code,
         capability_ids=ids,
