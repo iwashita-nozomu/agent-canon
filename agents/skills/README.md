@@ -144,6 +144,7 @@ in the Codex host runtime.
 - 研究系の task では `research-workflow` を outer loop に使います。
 - tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
 - 実験 topic の review、`run.py` 直実行、GPU/JAX 環境所有、artifact schema、`visualization.py` readiness を確認するときは `experiment-review` を使います。
+- 既存 experiment result の保持・archive・externalization・削除を実行前に計画するときは `retention` を使い、実験実行、artifact identity/checksum、archive serialization は既存 owner に委譲します。
 - semantic delta、obligation、一次検証 owner、hard-edge closure を実装前に割り当てるときは
   `documents/design/semantic-responsibility-contract.md` と
   `templates/documents/semantic-responsibility-contract.template.toml` を正本として使います。
