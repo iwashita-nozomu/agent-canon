@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import subprocess
@@ -21,6 +22,7 @@ import sys
 from collections import defaultdict, deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from glob import has_magic
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -242,19 +244,22 @@ def _read_text(path: Path, relative: str) -> str:
         raise SourceDependencyError(f"source text is unreadable: {relative}: {error}") from error
 
 
-def _normalize_target(
-    root: Path,
-    source: Path,
-    raw_target: str,
-    projections: Sequence[GeneratedProjection] | None = None,
-) -> str:
-    """Resolve one relative dependency target and reject root escape."""
+def _relative_target(root: Path, source: Path, raw_target: str) -> str:
+    """Resolve one relative dependency target to a repository path."""
     if raw_target.startswith("/") or "://" in raw_target:
         raise SourceDependencyError(
             f"dependency path must be repository-relative: {raw_target}"
         )
     target = (source.parent / raw_target).resolve(strict=False)
-    normalized = repo_relative(root, target)
+    return repo_relative(root, target)
+
+
+def _normalize_resolved_target(
+    root: Path,
+    normalized: str,
+    projections: Sequence[GeneratedProjection] | None = None,
+) -> str:
+    """Normalize one repository-relative target and reject stale generated views."""
     generated_target = (
         next(
             (
@@ -280,6 +285,46 @@ def _normalize_target(
     return normalized
 
 
+def _normalize_target(
+    root: Path,
+    source: Path,
+    raw_target: str,
+    projections: Sequence[GeneratedProjection] | None = None,
+) -> str:
+    """Resolve one relative dependency target and reject root escape."""
+    return _normalize_resolved_target(
+        root,
+        _relative_target(root, source, raw_target),
+        projections,
+    )
+
+
+def resolve_dependency_targets(
+    root: Path,
+    source: Path,
+    raw_target: str,
+    projections: Sequence[GeneratedProjection] | None = None,
+) -> tuple[str, ...]:
+    """Resolve one declaration to canonical paths, expanding registry-backed globs."""
+    if projections is None:
+        projections = generated_skill_projections(root)
+    normalized = _relative_target(root, source, raw_target)
+    if has_magic(normalized):
+        matches = tuple(
+            projection
+            for projection in projections
+            if fnmatch.fnmatchcase(projection.path, normalized)
+        )
+        if matches:
+            return tuple(
+                _normalize_resolved_target(root, projection.path, projections)
+                for projection in matches
+            )
+    # Preserve an unmatched pattern as an exact target so stale generated
+    # views remain rejected instead of disappearing from the manifest.
+    return (_normalize_resolved_target(root, normalized, projections),)
+
+
 def parse_manifest_document(
     root: Path,
     relative: str,
@@ -288,6 +333,8 @@ def parse_manifest_document(
     """Parse one canonical source document with the strict dependency DSL."""
     canonical, source = resolve_source_path(root, relative)
     text = _read_text(source, canonical)
+    if projections is None:
+        projections = generated_skill_projections(root)
     in_manifest = False
     saw_start = False
     saw_end = False
@@ -335,16 +382,17 @@ def parse_manifest_document(
             raise SourceDependencyError(
                 f"{canonical}:{line_number}: dependency reason is empty"
             )
-        edges.append(
-            SourceDependencyEdge(
-                source=canonical,
-                direction=direction,
-                kind=kind,
-                target=_normalize_target(root, source, raw_target, projections),
-                reason=reason,
-                line=line_number,
+        for target in resolve_dependency_targets(root, source, raw_target, projections):
+            edges.append(
+                SourceDependencyEdge(
+                    source=canonical,
+                    direction=direction,
+                    kind=kind,
+                    target=target,
+                    reason=reason,
+                    line=line_number,
+                )
             )
-        )
     if saw_start != saw_end:
         raise SourceDependencyError(f"{canonical}: incomplete dependency manifest markers")
     return SourceDependencyDocument(canonical, saw_start and saw_end, tuple(edges))
@@ -353,9 +401,10 @@ def parse_manifest_document(
 def parse_manifest_edges(
     root: Path,
     relative: str,
+    projections: Sequence[GeneratedProjection] | None = None,
 ) -> tuple[SourceDependencyEdge, ...]:
     """Return the normalized dependency edges for one source document."""
-    return parse_manifest_document(root, relative).edges
+    return parse_manifest_document(root, relative, projections).edges
 
 
 def dependency_documents(root: Path) -> tuple[SourceDependencyDocument, ...]:
