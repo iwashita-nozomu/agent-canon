@@ -2505,10 +2505,27 @@ def _gc_fixture(
     """Build a small Docker/runtime fixture for host GC contract tests."""
     control = tmp_path / "control"
     control.mkdir()
-    # Use this Git checkout as a read-only source root; the explicit runtime
-    # remains entirely inside the test-owned control root.
-    repository = ROOT
-    runtime_root = control / "runtime"
+    # Use a test-owned Git checkout so the production default runtime location
+    # remains isolated at <repository>/.runtime.
+    repository = tmp_path / "repository"
+    subprocess.run(["git", "init", "-q", str(repository)], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=AgentCanon Test",
+            "-c",
+            "user.email=agent-canon-test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "fixture",
+        ],
+        check=True,
+    )
+    runtime_root = repository / ".runtime"
     if runtime:
         (runtime_root / "host-state").mkdir(parents=True)
         (runtime_root / "container-state").mkdir()
@@ -2619,6 +2636,7 @@ def _run_gc(
 
 
 def _run_gc_locked(
+    repository: Path,
     control: Path,
     runtime: Path,
     environment: dict[str, str],
@@ -2626,7 +2644,7 @@ def _run_gc_locked(
     """Run the host GC owner with an isolated runtime root."""
     script = f"""
 source {str(ADAPTER)!r}
-AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_CONTROL_ROOT={str(control)!r}
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
 AGENT_CANON_STATE_ROOT={str(runtime / 'container-state')!r}
@@ -2763,7 +2781,7 @@ def test_gc_invokes_container_state_gc_and_combines_receipt(tmp_path: Path) -> N
 
 def test_gc_dry_run_keeps_resident_rollback_preview_read_only(tmp_path: Path) -> None:
     """A resident rollback preview does not copy or clear host mounts."""
-    state, owned, _repository, control, runtime, state_path, name, environment = (
+    state, owned, repository, control, runtime, state_path, name, environment = (
         _gc_fixture(
             tmp_path,
             rollback=("agent-canon-tools:rollback", "sha256:" + "4" * 64),
@@ -2800,7 +2818,7 @@ def test_gc_dry_run_keeps_resident_rollback_preview_read_only(tmp_path: Path) ->
         if path.is_file()
     }
 
-    completed = _run_gc_locked(control, runtime, environment)
+    completed = _run_gc_locked(repository, control, runtime, environment)
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["code"] == "gc_plan"
