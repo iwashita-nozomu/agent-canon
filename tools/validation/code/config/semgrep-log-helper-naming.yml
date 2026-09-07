@@ -1,0 +1,19 @@
+rules:
+  - id: agent-canon.python.log-helper-name
+    languages: [python]
+    severity: ERROR
+    message: Explicit logging helper families must start with _log.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              def $FUNC(...):
+                ...
+          - pattern: |
+              async def $FUNC(...):
+                ...
+      - metavariable-regex:
+          metavariable: $FUNC
+          regex: '^(?:log_|append_log|build_log|collect_log|emit_log|format_log|persist_log|record_log|render_log|save_log|write_log).*$'
+      - metavariable-regex:
+          metavariable: $FUNC
+          regex: '^(?!_log)(?!test_).*$'

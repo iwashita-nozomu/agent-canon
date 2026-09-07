@@ -1,0 +1,10 @@
+# Issue #906: first migration slice for the canonical Ruff docstring route.
+# This overlay is intentionally narrow: it fixes the explicit D213/D212 choice
+# without duplicating path selection, report schemas, or the full Ruff policy.
+
+[lint]
+extend-select = ["D213"]
+extend-ignore = ["D212"]
+
+[lint.pydocstyle]
+convention = "pep257"

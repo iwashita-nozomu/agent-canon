@@ -1,0 +1,16 @@
+version = 1
+owner = "agent-canon-project-validation"
+production_runtime_image_reused_as_test_image = false
+host_source_mount = false
+runtime_package_install = false
+canonical_check_entrypoint = "tools/validation/ci/runners/run_all_checks.sh"
+
+[writable_state]
+allowed = ["control", "runtime", "cache", "eval", "tmp"]
+source_tree_read_only = true
+
+[acceptance]
+require_source_identity = true
+require_image_digest = true
+require_check_status = true
+require_cleanup_absence_readback = true
