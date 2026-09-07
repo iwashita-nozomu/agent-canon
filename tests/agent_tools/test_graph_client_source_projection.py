@@ -254,6 +254,99 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
                     all_nodes=True
                 )
 
+    def test_generated_skill_glob_resolves_all_catalog_owners_without_views(self) -> None:
+        """Registry-backed generated skill globs expand without reading ignored shims."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "agents" / "skills" / "catalog.yaml",
+                """
+                skill_families:
+                  - id: alpha
+                    canonical_doc: agents/skills/alpha.md
+                    shim: .codex/personal/skills/alpha/SKILL.md
+                  - id: beta
+                    canonical_doc: agents/skills/beta.md
+                    shim: .codex/personal/skills/beta/SKILL.md
+                """,
+            )
+            for skill in ("alpha", "beta"):
+                write(
+                    root / "agents" / "skills" / f"{skill}.md",
+                    f"""
+                    # @dependency-start
+                    # contract skill
+                    # responsibility Owns the {skill} skill.
+                    # @dependency-end
+                    """,
+                )
+            write(
+                root / "tools" / "consumer.py",
+                """
+                # @dependency-start
+                # contract tool
+                # responsibility References every generated skill view.
+                # downstream implementation ../.codex/personal/skills/*/SKILL.md generated views
+                # @dependency-end
+                """,
+            )
+
+            projection = GraphClient(
+                root, executable=root / "missing-agent-canon"
+            ).query(all_nodes=True)
+
+            self.assertEqual(
+                {
+                    (fact.source, fact.target)
+                    for fact in projection.dependency_facts
+                },
+                {
+                    ("tools/consumer.py", "agents/skills/alpha.md"),
+                    ("tools/consumer.py", "agents/skills/beta.md"),
+                },
+            )
+            self.assertFalse((root / ".codex").exists())
+
+    def test_unmatched_generated_skill_glob_is_rejected(self) -> None:
+        """An unmatched generated skill glob remains a rejected stale target."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "agents" / "skills" / "catalog.yaml",
+                """
+                skill_families:
+                  - id: example
+                    canonical_doc: agents/skills/example.md
+                    shim: .codex/personal/skills/example/SKILL.md
+                """,
+            )
+            write(
+                root / "agents" / "skills" / "example.md",
+                """
+                # @dependency-start
+                # contract skill
+                # responsibility Owns the example skill.
+                # @dependency-end
+                """,
+            )
+            write(
+                root / "tools" / "consumer.py",
+                """
+                # @dependency-start
+                # contract tool
+                # responsibility References an unmatched generated skill glob.
+                # downstream implementation ../.codex/personal/skills/missing-*/SKILL.md stale view
+                # @dependency-end
+                """,
+            )
+            with self.assertRaisesRegex(
+                GraphClientError,
+                "source dependency projection failed: unknown generated skill view",
+            ):
+                GraphClient(root, executable=root / "missing-agent-canon").query(
+                    all_nodes=True
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

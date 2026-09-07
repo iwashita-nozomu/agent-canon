@@ -1403,7 +1403,7 @@ fi' )
     }
     if ! "${copy_command[@]}" >"$stream_path" 2>"$digest_path"; then
       rm -f -- "$stream_path" "$digest_path"
-      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
+      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind" || return $?
     fi
     copy_readback=$(<"$digest_path")
     [[ "$copy_readback" =~ ^$'volume-copy-digest\t'[0-9a-f]{64}$ ]] || {
@@ -1422,12 +1422,12 @@ fi' )
     rm -f -- "$stream_path" "$digest_path"
   elif [[ "$direction" == clear ]]; then
     if ! "${copy_command[@]}" >/dev/null; then
-      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
+      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind" || return $?
     fi
   else
     local copy_readback
     if ! copy_readback=$("${copy_command[@]}" ); then
-      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
+      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind" || return $?
     fi
     [[ "$copy_readback" =~ ^$'volume-copy-digest\t'[0-9a-f]{64}$ ]] ||
       _agent_canon_json_error volume_copy_readback_failed "volume import digest readback is invalid"
@@ -1806,16 +1806,16 @@ _agent_canon_container_exec() {
   local image_id container_id source_head
   if [[ -n "${AGENT_CANON_ROLLBACK_MOUNTS_FILE:-}" ]]; then
     if [[ -f "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" && ! -L "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" ]]; then
-      _agent_canon_volume_copy import host-mounts "$AGENT_CANON_ROLLBACK_MOUNTS_FILE"
+      _agent_canon_volume_copy import host-mounts "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" || return $?
     else
-      _agent_canon_volume_copy clear host-mounts ""
+      _agent_canon_volume_copy clear host-mounts "" || return $?
     fi
   fi
   if [[ -n "${AGENT_CANON_RESTORE_TARGETS_FILE:-}" ]]; then
     if [[ -f "$AGENT_CANON_RESTORE_TARGETS_FILE" && ! -L "$AGENT_CANON_RESTORE_TARGETS_FILE" ]]; then
-      _agent_canon_volume_copy import host-mounts "$AGENT_CANON_RESTORE_TARGETS_FILE"
+      _agent_canon_volume_copy import host-mounts "$AGENT_CANON_RESTORE_TARGETS_FILE" || return $?
     else
-      _agent_canon_volume_copy clear host-mounts ""
+      _agent_canon_volume_copy clear host-mounts "" || return $?
     fi
   fi
   image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
@@ -3182,6 +3182,10 @@ _agent_canon_gc_locked() {
   control_digest=$(_agent_canon_control_digest)
   live_name=$(_agent_canon_container_name)
   state_volume="agent-canon-runtime-$control_digest"
+  # Dry-run skips host-runtime preparation, but the resident controller still
+  # needs the deterministic named volume for its existing state.
+  AGENT_CANON_STATE_VOLUME_NAME=$state_volume
+  export AGENT_CANON_STATE_VOLUME_NAME
 
   # The existing identity reader is authoritative.  Never use a persisted
   # container ID: the daemon may have recreated the named resident.
@@ -3229,7 +3233,12 @@ _agent_canon_gc_locked() {
     fi
     rollback_ref=$AGENT_CANON_ROLLBACK_IMAGE_REF
     rollback_id=$AGENT_CANON_ROLLBACK_IMAGE_ID
-    [[ -n "$rollback_mounts" ]] && rm -f -- "$rollback_mounts"
+    if [[ -n "$rollback_mounts" ]]; then
+      rm -f -- "$rollback_mounts"
+      # The preview only validates rollback metadata.  Do not let its deleted
+      # temporary projection trigger a host-mount import or clear in exec.
+      unset AGENT_CANON_ROLLBACK_MOUNTS_FILE
+    fi
   fi
 
   for image_id in "$active_id" "$rollback_id"; do
