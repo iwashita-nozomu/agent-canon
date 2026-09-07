@@ -48,7 +48,12 @@ from tools.agent.orchestration.packets import (  # noqa: E402
     resolve_role_document_packet,
     _spec_source_root,
 )
-from tools.agent.orchestration.team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
+from tools.agent.orchestration.team_config import (  # noqa: E402
+    current_stage_skills,
+    load_task_catalog,
+    load_team_config,
+    resolve_role,
+)
 from tools.runtime.authority.task_authority import hash_baseline_bytes  # noqa: E402
 from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary  # noqa: E402
 from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # noqa: E402
@@ -387,6 +392,29 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertLess(
             skills.index("$literature-survey"),
             skills.index("$research-workflow"),
+        )
+
+    def test_skill_text_selection_does_not_infer_repo_changing_mode(self) -> None:
+        """Manifest skill-only selection must not promote prose into write mode."""
+        skills = suggested_public_skills(
+            None,
+            None,
+            "Implement the routing fix and run tests.",
+            source_root=PROJECT_ROOT,
+        )
+
+        self.assertNotIn("$task-routing", skills)
+
+    def test_stage_handoff_mode_comes_from_typed_route_fact(self) -> None:
+        """Only a typed write-capable route enables the bootstrap stage."""
+        selected = ("$agent-orchestration", "$subagent-bootstrap")
+        self.assertNotIn(
+            "$subagent-bootstrap",
+            current_stage_skills(selected, "implement", typed_route_required=False),
+        )
+        self.assertIn(
+            "$subagent-bootstrap",
+            current_stage_skills(selected, "implement", typed_route_required=True),
         )
 
     def test_optional_review_templates_are_materialized_only_when_selected(self) -> None:

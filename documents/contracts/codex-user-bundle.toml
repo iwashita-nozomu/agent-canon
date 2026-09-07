@@ -1,0 +1,18 @@
+version = 1
+components = ["personal-agents", "global-guidance", "hook-plugin"]
+source_checkout_required_at_runtime = false
+user_config_mutation = false
+hook_trust_bypass = false
+automatic_latest_update = false
+
+[identity]
+normalize_path_order = true
+normalize_line_endings = true
+normalize_archive_timestamp = true
+exclude_wall_clock = true
+exclude_host_identity = true
+
+[install]
+reject_unowned_collision = true
+reject_symlink_traversal = true
+remove_modified_owned_files = false
