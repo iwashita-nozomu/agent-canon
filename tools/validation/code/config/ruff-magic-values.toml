@@ -1,0 +1,6 @@
+# Issue #904: Python side of the native magic-number migration.
+# The policy is intentionally narrowed from every numeric literal to the
+# comparison context that Ruff can determine without repository-owned AST logic.
+
+[lint]
+extend-select = ["PLR2004"]
