@@ -366,7 +366,12 @@ def current_stage_skills(
     """Return public skills to declare for the current stage only."""
     active_skills = set(CURRENT_STAGE_SKILLS)
     active_skills.update(catalog_active_stage_skills(source_root))
-    if implementation_handoff_required(task_text, typed_route_required=typed_route_required):
+    mode = "repo-changing" if typed_route_required else "routing-only"
+    if implementation_handoff_required(
+        task_text,
+        mode=mode,
+        typed_route_required=typed_route_required,
+    ):
         active_skills.add("$subagent-bootstrap")
     return tuple(skill for skill in selected_skills if skill in active_skills)
 

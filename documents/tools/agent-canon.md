@@ -39,7 +39,7 @@ tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs fix-math <paths...>
 tools/bin/agent-canon docs fix-mermaid <paths...>
 tools/bin/agent-canon test-design check <test-paths...>
-python3 tools/agent/orchestration/route.py --prompt "<request>" --format json
+python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json
 ```
 
 `check` verifies Markdown lint, heading order, fenced-code language, math
