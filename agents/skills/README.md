@@ -88,7 +88,7 @@ GPU profile の admission semantics は `gpu-execution` に残します。
 
 確認入口:
 - public skill の一覧と shim/doc/config の整合: `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
-- prompt からの skill 選択: `python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json`
+- prompt からの skill 選択: `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json`
 - skill ごとの command packet: `python3 tools/agent/skills/skill_tool_commands.py show --skill <skill> --format text`
 - 依存辞書の静的検査: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
 - 依存辞書の静的検査（source tree を変更しない）: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
@@ -128,7 +128,7 @@ in the Codex host runtime.
   parent- or subtree-owned `.codex/personal/skills/<skill>/SKILL.md` surface.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
-- task ごとの skill 選択は `python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
+- task ごとの skill 選択は `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。編集を明示的に許可する場合だけ `--mode repo-changing` を渡し、prompt 語彙で mode を拡張しません。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - template clone から新 repo を始めるときは `start-repository` を使います。
 - 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。

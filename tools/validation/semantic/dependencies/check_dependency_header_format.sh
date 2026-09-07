@@ -249,12 +249,20 @@ normalize_path() {
   local rel_path="$2"
   local source_dir
   local direct_target
+  local mapped_targets
   local mapped_target
   source_dir="$(dirname "$source_file")"
   direct_target="$(realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path")"
   if [[ "$direct_target" == ".." || "$direct_target" == ../* ]]; then
     return 1
   fi
+  case "$direct_target" in
+    .codex/personal/skills/*/SKILL.md)
+      mapped_targets="$(resolve_generated_skill_targets "$source_file" "$rel_path")" || return 1
+      printf '%s\n' "$mapped_targets"
+      return
+      ;;
+  esac
   if [[ -e "$direct_target" ]]; then
     printf '%s\n' "$direct_target"
     return
@@ -267,6 +275,39 @@ normalize_path() {
   printf '%s\n' "$mapped_target"
 }
 
+resolve_generated_skill_targets() {
+  local source_file="$1"
+  local rel_path="$2"
+  local script_path
+  script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+  python3 - "$script_path" "$ROOT_DIR" "$source_file" "$rel_path" <<'PY'
+from pathlib import Path
+import sys
+
+script_path = Path(sys.argv[1])
+root = Path(sys.argv[2])
+source_file = Path(sys.argv[3])
+raw_target = sys.argv[4]
+sys.path.insert(0, str(script_path.parents[4]))
+from tools.analysis.dependencies.source_dependency_graph import (  # noqa: E402
+    SourceDependencyError,
+    resolve_dependency_targets,
+)
+
+try:
+    source = source_file if source_file.is_absolute() else root / source_file
+    for target in resolve_dependency_targets(root, source, raw_target):
+        print(target)
+except SourceDependencyError as error:
+    # Keep an unmatched generated pattern visible to the shell existence check.
+    if str(error).startswith("unknown generated skill view: "):
+        print(error.args[0].split(": ", 1)[1])
+    else:
+        print(error, file=sys.stderr)
+        raise SystemExit(1)
+PY
+}
+
 source_context_file() {
   local source_file="$1"
   printf '%s\n' "$source_file"
@@ -275,7 +316,7 @@ source_context_file() {
 check_file() {
   local file="$1"
   local start_count end_count start_line end_line line_no line stripped
-  local direction kind rel_path reason target
+  local direction kind rel_path reason target normalized_targets
   local contract_count contract_keyword contract_kind contract_extra
   local coverage_keyword coverage_id coverage_requires coverage_terms
   local responsibility_count responsibility_text
@@ -398,20 +439,23 @@ check_file() {
       echo "$file:$line_no: dependency path must be relative: $rel_path"
       return 1
     fi
-    if ! target="$(normalize_path "$file" "$rel_path")"; then
+    if ! normalized_targets="$(normalize_path "$file" "$rel_path")"; then
       echo "$file:$line_no: dependency target escapes repository root: $rel_path"
       return 1
     fi
-    if [[ ! -e "$target" ]]; then
-      # Issue files are durable mirrors. Their dependency paths describe the
-      # historical repository state and must not be rewritten as part of a
-      # current document relocation.
-      if is_historical_issue_path "$file"; then
-        continue
+    while IFS= read -r target; do
+      [[ -n "$target" ]] || continue
+      if [[ ! -e "$target" ]]; then
+        # Issue files are durable mirrors. Their dependency paths describe the
+        # historical repository state and must not be rewritten as part of a
+        # current document relocation.
+        if is_historical_issue_path "$file"; then
+          continue
+        fi
+        echo "$file:$line_no: dependency target does not exist: $rel_path"
+        return 1
       fi
-      echo "$file:$line_no: dependency target does not exist: $rel_path"
-      return 1
-    fi
+    done <<< "$normalized_targets"
   done < "$file"
 
   if [[ "$responsibility_count" -ne 1 ]]; then
