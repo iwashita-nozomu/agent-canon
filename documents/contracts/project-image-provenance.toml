@@ -1,0 +1,10 @@
+version = 1
+selection_order = ["current-parent-environment-owner", "current-parent-entrypoint", "verified-current-image", "existing-local-tag"]
+past_summary_is_authority = false
+existing_tag_requires_provenance = true
+
+[required_readback]
+fields = ["image_digest", "source_tree_digest", "dockerfile_or_entrypoint_digest", "dependency_identity", "platform"]
+
+[failure]
+stale_or_unbound_tag = "environment_provenance_mismatch"

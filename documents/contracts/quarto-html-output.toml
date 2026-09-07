@@ -1,0 +1,11 @@
+version = 1
+renderer = "quarto"
+format = "html"
+default_execute = false
+default_network = false
+
+[identity]
+fields = ["source_sha256", "config_sha256", "asset_sha256", "quarto_version", "pandoc_version"]
+
+[states]
+values = ["rendered", "missing_asset", "invalid_source", "renderer_unavailable", "render_failed", "validation_failed"]
