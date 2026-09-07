@@ -1,0 +1,16 @@
+version = 1
+build_identity = ["cmake-preset", "explicit-build-dir"]
+compile_database = "compile_commands.json"
+
+[commands]
+configure = "cmake"
+build = "cmake"
+test = "ctest"
+focused_analysis = "clangd"
+multi_file_analysis = "run-clang-tidy"
+format = "clang-format"
+
+[ownership]
+agentcanon_active_compile_db_symlink = false
+project_owns_build_identity = true
+native_reports_are_canonical = true

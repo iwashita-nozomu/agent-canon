@@ -1,0 +1,14 @@
+version = 1
+canonical_spec = "vega-lite-json"
+schema_source = "official-pinned"
+schema_version = "6.4.1"
+schema_url = "https://vega.github.io/schema/vega-lite/v6.4.1.json"
+renderer = "vl-convert"
+content_identity_fields = ["spec_sha256", "data_sha256", "renderer_version"]
+
+[states]
+values = ["rendered", "invalid_spec", "missing_data", "renderer_unavailable", "render_failed"]
+
+[semantics]
+claim_critical_transforms_must_be_materialized = true
+preserve_missing_failed_not_applicable = true

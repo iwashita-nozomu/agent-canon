@@ -1,0 +1,4 @@
+{
+  "typeCheckingMode": "strict",
+  "reportExplicitAny": "error"
+}

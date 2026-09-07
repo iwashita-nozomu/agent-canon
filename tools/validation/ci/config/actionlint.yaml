@@ -1,0 +1,5 @@
+# Issue #910: actionlint owns GitHub Actions language validation.
+# Repository-specific structural policy belongs to Conftest/Rego, not here.
+# ShellCheck is expected to be resolved explicitly by the invoking validation unit.
+self-hosted-runner:
+  labels: []

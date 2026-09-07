@@ -1,0 +1,9 @@
+# Issue #901: native link-check configuration.
+# Supports lychee 0.24.x (verified with the current 0.24.2 release); this
+# release family uses the documented enum for fragment checking.
+# Network is disabled by default for deterministic local validation; callers
+# may opt into the external-link phase explicitly.
+offline = true
+include_fragments = "full"
+require_https = false
+exclude_path = [".git", ".runtime", "reports", "target", "node_modules"]
