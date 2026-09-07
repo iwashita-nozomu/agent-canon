@@ -1,0 +1,12 @@
+version = 1
+operation_values = ["lookup_doi", "search_works", "resolve_candidates"]
+provider_values = ["crossref", "openalex"]
+default_limit = 20
+unbounded_default = false
+canonical_interchange = "csl-json"
+identity_priority = ["doi", "provider-id"]
+
+[provenance]
+retain_raw_response_digest = true
+retain_request_digest = true
+retrieval_time_in_content_identity = false

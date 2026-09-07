@@ -1,0 +1,4 @@
+citeproc: true
+fail-if-warnings: true
+# Bibliography and CSL paths are supplied by the paper build request so this
+# shared defaults file does not create a second paper-specific source of truth.
