@@ -1539,6 +1539,22 @@ skill_families:
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+  - id: retention
+    purpose: Plan retention, archive, externalization, or deletion of existing experiment results without owning execution or serialization.
+    canonical_doc: agents/skills/retention.md
+    shim: .codex/personal/skills/retention/SKILL.md
+    discovery:
+      name: retention
+      description: "Use when planning whether existing experiment results should be retained, archived, externalized, or deleted before mutation."
+    tool_commands:
+      required: []
+      conditional: []
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: explicit retention planning for existing experiment results is in scope
   - id: experiment-lifecycle
     purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
     canonical_doc: agents/skills/experiment-lifecycle.md
