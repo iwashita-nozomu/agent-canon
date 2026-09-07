@@ -1,0 +1,7 @@
+# Issue #901: native link-check configuration.
+# Network is disabled by default for deterministic local validation; callers
+# may opt into the external-link phase explicitly.
+offline = true
+include_fragments = true
+require_https = false
+exclude_path = [".git", ".runtime", "reports", "target", "node_modules"]
