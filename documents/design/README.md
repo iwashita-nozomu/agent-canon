@@ -66,6 +66,8 @@ downstream implementation ../../tools/validation/semantic/documents/check_design
   - tracked source を dependency correctness の正本とし、PR receipt を `source` / `skipped` の二値で writer/parser/consumer 間に渡す境界
 - [dependency-manifest-design.md](dependency-manifest-design.md)
   - manifest DSL、relation semantics、source-derived projection、および明示 graph analysis の reader route
+- [dependency-reference-relation.md](dependency-reference-relation.md)
+  - `reference` relation の repository-contained evidence semantics と、parent / authority 経路からの分離
 - [parent-repository-audit.md](parent-repository-audit.md)
   - AgentCanon を利用する親 repository 全体の責務別 audit unit、legacy checklist 移行、
     finding 修正と close の設計
