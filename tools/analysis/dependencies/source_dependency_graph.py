@@ -285,20 +285,6 @@ def _normalize_resolved_target(
     return normalized
 
 
-def _normalize_target(
-    root: Path,
-    source: Path,
-    raw_target: str,
-    projections: Sequence[GeneratedProjection] | None = None,
-) -> str:
-    """Resolve one relative dependency target and reject root escape."""
-    return _normalize_resolved_target(
-        root,
-        _relative_target(root, source, raw_target),
-        projections,
-    )
-
-
 def resolve_dependency_targets(
     root: Path,
     source: Path,
