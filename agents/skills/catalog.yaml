@@ -1089,19 +1089,9 @@ skill_families:
         - ["spec", "risk"]
         - ["regression", "risk"]
         - ["failure-mode", "risk"]
-        - ["test-design"]
-        - ["test", "design"]
-        - ["テスト", "設計"]
-        - ["numerical", "test"]
-        - ["numeric", "test"]
-        - ["unnecessary", "test"]
-        - ["heavy", "test"]
-        - ["brittle", "test"]
         - ["test oracle"]
         - ["oracle", "mismatch"]
         - ["spec mismatch", "test"]
-        - ["tolerance", "test"]
-        - ["seed", "test"]
   - id: refactor-loop
     purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
     canonical_doc: agents/skills/refactor-loop.md
