@@ -36,7 +36,7 @@ Historical names such as `SKILLS`, `ACTIVE_SKILLS`, `MATCHED_SKILLS`, `RELATED_S
 
 ## Operation
 
-Use `python3 tools/agent/orchestration/route.py --prompt ...` or the canonical changed-path route. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
+Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
 
 ## Boundary
 
