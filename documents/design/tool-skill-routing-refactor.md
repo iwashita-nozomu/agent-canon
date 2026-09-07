@@ -39,7 +39,7 @@ evidence, not an AgentCanon product dependency.
 - Long candidate names are compatibility aliases, not new files.
 - Repeated routing decisions go through `route.py --area <area>`.
 - Prompt-derived public skill selection goes through
-  `python3 tools/agent/orchestration/route.py --prompt <text>` so candidate evidence,
+  `python3 tools/agent/orchestration/route.py --prompt <text> --mode routing-only` so candidate evidence,
   current-wave `ACTIVE_SKILLS`, and later-wave `DEFERRED_SKILLS` are produced
   by the fast deterministic harness. Routing rules and stage policy live in
   `agents/skills/catalog.yaml` under `skill_families[].routing`.
@@ -97,7 +97,7 @@ tokens.
   capability belongs in a probe or route output, and skill routing should name
   only the current task's core AgentCanon functions.
 
-For broad user prompts, `python3 tools/agent/orchestration/route.py --prompt "<request>"`
+For broad user prompts, `python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only`
 prints `ROUTE=skill-selection`, `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
 `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `REASONS`, and `EVIDENCE`. The returned
 `SKILLS` is the full selected set, while `ACTIVE_SKILLS` is the current-stage

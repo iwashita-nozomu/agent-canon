@@ -42,10 +42,6 @@ from tools.agent.orchestration.capability_route import (
     decide_capabilities,
     preflight_capability_argv,
 )
-from tools.agent.skills.skill_lane_detector import (
-    structural_skill_lane_concept_matches,
-    validation_failure_repair_concept_matches,
-)
 from tools.agent.skills.skill_route_catalog import (
     VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
     VISUALIZATION_OWNER_SKILL,
@@ -109,25 +105,6 @@ PRIVATE_ROUTE_STRUCTURAL_FIELDS = (
     "internal_skill_routes",
 )
 
-SUPPLEMENTAL_SKILL_ROUTE_GROUPS: Mapping[str, tuple[tuple[str, ...], ...]] = {}
-BROAD_REFACTOR_ROUTE_GROUPS: tuple[tuple[str, ...], ...] = (
-    ("refactor",),
-    ("リファクタ",),
-)
-USER_GUIDED_DEBUGGING_ROUTE_GROUPS: tuple[tuple[str, ...], ...] = (
-    ("one issue at a time",),
-    ("user-guided debugging",),
-    ("user-guided", "cadence"),
-    ("one concrete issue",),
-    ("1", "issue", "1", "fix"),
-    ("1", "problem", "1", "patch"),
-    ("問題ごと",),
-    ("一件ずつ",),
-    ("一つずつ",),
-    ("1件", "ずつ"),
-    ("ユーザー主導",),
-    ("問題点", "修正"),
-)
 AREA_DATA: tuple[AreaData, ...] = (
     (
         "surface",
@@ -399,22 +376,6 @@ AREA_DATA: tuple[AreaData, ...] = (
     ),
 )
 
-REPO_CHANGING_TERMS = (
-    "修正",
-    "実装",
-    "リファクタ",
-    "移行",
-    "移譲",
-    "変更",
-    "直して",
-    "見直",
-    "fix",
-    "implement",
-    "refactor",
-    "repo-changing",
-)
-
-
 @dataclass(frozen=True)
 class RouteArea:
     """One short routing area."""
@@ -619,7 +580,9 @@ def build_parser(catalog: RouteCatalog) -> argparse.ArgumentParser:
         default=[],
         help="explicit capability id to route",
     )
-    parser.add_argument("--mode", choices=MODE_VALUES, default="repo-changing")
+    # Prompt vocabulary never grants write authority.  Callers must opt into
+    # repo-changing explicitly; an omitted mode stays on the non-write route.
+    parser.add_argument("--mode", choices=MODE_VALUES, default="routing-only")
     parser.add_argument("--list", action="store_true", help="list short routing areas")
     parser.add_argument("--format", choices=FORMAT_VALUES, default="text")
     parser.add_argument("--risk", choices=RISK_VALUES, default="focused")
@@ -665,41 +628,6 @@ def text_matches_term(text: str, term: str) -> bool:
 def text_matches_group(text: str, group: tuple[str, ...]) -> bool:
     """Return whether all group terms appear in text."""
     return all(text_matches_term(text, term) for term in group)
-
-
-def validation_failure_repair_rules(
-    rules_by_skill: Mapping[str, SkillRoutingRule],
-    prompt: str,
-) -> tuple[SkillRoutingRule, ...]:
-    """Return route-owned repair routing for validation-failure prompts."""
-    matches = validation_failure_repair_concept_matches(prompt)
-    if not matches:
-        return ()
-    catalog_rule = rules_by_skill.get("codex-task-workflow")
-    related_skills = ("test-design",)
-    if catalog_rule is not None:
-        related_skills = ordered_unique((*catalog_rule.related_skills, "test-design"))
-    return (
-        SkillRoutingRule(
-            skill="codex-task-workflow",
-            reason=matches[0].reason(),
-            stage_policy="active",
-            triggers=(),
-            capabilities=(),
-            related_skills=related_skills,
-            required_prerequisites=(
-                catalog_rule.required_prerequisites if catalog_rule else ()
-            ),
-            successors=(catalog_rule.successors if catalog_rule else ()),
-            order_constraints=(catalog_rule.order_constraints if catalog_rule else ()),
-            parallel_independent=(
-                catalog_rule.parallel_independent if catalog_rule else ()
-            ),
-            responsibility_group=(
-                catalog_rule.responsibility_group if catalog_rule else "orchestration"
-            ),
-        ),
-    )
 
 
 def read_prompt_file(root: Path, raw_path: str) -> str:
@@ -978,57 +906,6 @@ def matched_skill_routes(
     return tuple(matches)
 
 
-def structural_skill_lane_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
-    """Return skill matches from structural project-owned skill lane evidence."""
-    matches: list[SkillRouteMatch] = []
-    for concept_match in structural_skill_lane_concept_matches(prompt):
-        reason = concept_match.reason()
-        for skill in concept_match.concept.route_skills:
-            matches.append(SkillRouteMatch(skill, reason))
-    return tuple(matches)
-
-
-def validation_failure_repair_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
-    """Return skill matches from same-intent validation repair evidence."""
-    return tuple(
-        SkillRouteMatch(match.concept.owner_skill, match.reason())
-        for match in validation_failure_repair_concept_matches(prompt)
-    )
-
-
-def user_guided_debugging_requested(prompt: str) -> bool:
-    """Return whether the prompt asks for one-issue-at-a-time debugging."""
-    text = prompt.lower()
-    return any(
-        text_matches_group(text, group) for group in USER_GUIDED_DEBUGGING_ROUTE_GROUPS
-    )
-
-
-def broad_refactor_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
-    """Return refactor-loop for broad refactor prompts outside user-guided cadence."""
-    text = prompt.lower()
-    if user_guided_debugging_requested(prompt):
-        return ()
-    if any(text_matches_group(text, group) for group in BROAD_REFACTOR_ROUTE_GROUPS):
-        return (
-            SkillRouteMatch(
-                "refactor-loop",
-                "broad refactor prompt needs behavior-preserving refactor loop",
-            ),
-        )
-    return ()
-
-
-def supplemental_skill_routes(prompt: str) -> tuple[SkillRouteMatch, ...]:
-    """Return route-owned matches that are not yet expressible in catalog data."""
-    text = prompt.lower()
-    return tuple(
-        SkillRouteMatch(skill, "supplemental route-owned prompt trigger")
-        for skill, groups in SUPPLEMENTAL_SKILL_ROUTE_GROUPS.items()
-        if any(text_matches_group(text, group) for group in groups)
-    )
-
-
 def dedupe_skill_route_matches(
     matches: Sequence[SkillRouteMatch],
 ) -> tuple[SkillRouteMatch, ...]:
@@ -1041,16 +918,6 @@ def dedupe_skill_route_matches(
         observed.add(match.skill)
         deduped.append(match)
     return tuple(deduped)
-
-
-def infer_mode(prompt: str, requested_mode: str) -> str:
-    """Return repo-changing mode when the prompt clearly asks for edits."""
-    if requested_mode == "repo-changing":
-        return requested_mode
-    text = prompt.lower()
-    if any(term.lower() in text for term in REPO_CHANGING_TERMS):
-        return "repo-changing"
-    return requested_mode
 
 
 def implementation_handoff_required(
@@ -1081,13 +948,11 @@ def decide_skills(
     prompt: str, mode: str, rules: Sequence[SkillRoutingRule]
 ) -> SkillRouteDecision:
     """Create a prompt-derived public skill route decision."""
+    if mode not in MODE_VALUES:
+        raise ValueError(f"invalid-mode:{mode}")
     public_prompt = strip_private_route_aliases(prompt)
-    active_mode = infer_mode(public_prompt, mode)
-    catalog_rules_by_skill = {rule.skill: rule for rule in rules}
-    effective_rules = (
-        *rules,
-        *validation_failure_repair_rules(catalog_rules_by_skill, public_prompt),
-    )
+    active_mode = mode
+    effective_rules = tuple(rules)
     rules_by_skill = {rule.skill: rule for rule in effective_rules}
     (
         visualization_owner_skill,
@@ -1124,11 +989,7 @@ def decide_skills(
                 if visualization_owner_skill is not None
                 else ()
             ),
-            *broad_refactor_routes(public_prompt),
             *catalog_matches,
-            *structural_skill_lane_routes(public_prompt),
-            *validation_failure_repair_routes(public_prompt),
-            *supplemental_skill_routes(public_prompt),
         )
     )
     matched_skills = tuple(match.skill for match in matches)

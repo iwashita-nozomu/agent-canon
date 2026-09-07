@@ -1,7 +1,7 @@
 version = 1
 mode_source = "caller-typed-input"
 skill_source = "official-or-explicit-selection"
-missing_mode_policy = "fail-closed"
+missing_mode_policy = "routing-only"
 prompt_vocabulary_classifier = false
 cross_clause_trigger_join = false
 

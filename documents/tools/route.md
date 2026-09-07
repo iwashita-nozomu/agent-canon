@@ -22,7 +22,7 @@ small command surface:
 python3 tools/agent/orchestration/route.py --area checks --changed README.md
 python3 tools/agent/orchestration/route.py --name profile_surface_resolver.py
 python3 tools/agent/orchestration/route.py --name repo_refactor_skill.py
-python3 tools/agent/orchestration/route.py --prompt "fix skill routing with multi-agent evidence" --format json
+python3 tools/agent/orchestration/route.py --prompt "fix skill routing with multi-agent evidence" --mode repo-changing --format json
 python3 tools/agent/orchestration/route.py --list --format markdown
 ```
 
@@ -43,6 +43,11 @@ Prompt skill routing is owned by the Python fast path
 triggers. It also returns `RELATED_SKILL_CANDIDATES` and `RELATED_SKILLS` from
 the public skill catalog; use those as next-stage candidates after matching
 evidence appears, not as extra initial reads.
+
+The caller owns the typed mode. Pass `--mode routing-only` for observation or
+skill selection and pass `--mode repo-changing` only when an edit is explicitly
+authorized. If `--mode` is omitted, routing remains in the non-write
+`routing-only` state; prompt vocabulary never widens that authority.
 
 Prompt routing keeps schema `agent_canon.route.skill_route.v1` and adds exactly
 three singular visualization fields:
@@ -91,13 +96,13 @@ Capability mode is the explicit, fail-closed route for a single catalog
 capability. The success command is:
 
 ```bash
-python3 tools/agent/orchestration/route.py --capability oop_type_design --format json
+python3 tools/agent/orchestration/route.py --capability oop_type_design --mode routing-only --format json
 ```
 
 An unknown capability is also explicit and fail-closed:
 
 ```bash
-python3 tools/agent/orchestration/route.py --capability unknown_capability --format json
+python3 tools/agent/orchestration/route.py --capability unknown_capability --mode routing-only --format json
 ```
 
 This command returns exit status 2. Capability mode accepts one exact catalog
@@ -137,10 +142,10 @@ count maps, the deterministic coverage digest, and final-token evidence. If a
 renderer cannot retain complete coverage, return the typed renderer-capacity
 blocker instead of pruning or emitting a partial fallback.
 
-Japanese or English prompts about unnecessary numerical tests, heavy tests,
-test brittleness, tolerance-based tests, or test-design gaps route to
-`$test-design` so the numerical admission gate is applied before workers add
-tests.
+`$test-design` is selected by an explicit skill ID or a bounded prompt clause
+that identifies an unresolved oracle, specification, regression, or
+failure-mode risk after the owning implementation mechanism exists. General
+test vocabulary or unrelated terms do not activate it.
 
 Repository-refactor and structure-review aliases such as
 `repo_refactor_skill.py`, `repo/refactor`, and `structure-review`, plus personal
