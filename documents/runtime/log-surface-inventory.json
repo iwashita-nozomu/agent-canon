@@ -2036,7 +2036,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1213,
+      "line": 1031,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2044,7 +2044,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1236,
+      "line": 1054,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2052,7 +2052,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1257,
+      "line": 1075,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2060,7 +2060,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1346,
+      "line": 1164,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2068,7 +2068,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1347,
+      "line": 1165,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2076,7 +2076,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1350,
+      "line": 1168,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2084,7 +2084,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1369,
+      "line": 1187,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2092,7 +2092,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1417,
+      "line": 1235,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2100,7 +2100,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 1257,
+      "line": 1075,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2108,7 +2108,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "area",
-      "line": 433,
+      "line": 393,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2116,7 +2116,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE",
-      "line": 1612,
+      "line": 1430,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2124,7 +2124,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE_SOURCE_ROOT_FAILURE",
-      "line": 1554,
+      "line": 1372,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2132,7 +2132,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ROUTE_SOURCE_ROOT_FAILURE",
-      "line": 1582,
+      "line": 1400,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2140,7 +2140,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 1579,
+      "line": 1397,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2148,7 +2148,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 1589,
+      "line": 1407,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -2156,7 +2156,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_ROUTER_ERROR",
-      "line": 1601,
+      "line": 1419,
       "path": "tools/agent/orchestration/route.py",
       "surface": "tool"
     },
@@ -4588,7 +4588,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 400,
+      "line": 435,
       "path": "tools/analysis/dependencies/source_dependency_graph.py",
       "surface": "tool"
     },
@@ -4596,7 +4596,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 451,
+      "line": 486,
       "path": "tools/analysis/dependencies/source_dependency_graph.py",
       "surface": "tool"
     },
@@ -4604,7 +4604,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 405,
+      "line": 440,
       "path": "tools/analysis/dependencies/source_dependency_graph.py",
       "surface": "tool"
     },
@@ -4612,7 +4612,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SOURCE_DEPENDENCY_EXPORT",
-      "line": 583,
+      "line": 618,
       "path": "tools/analysis/dependencies/source_dependency_graph.py",
       "surface": "tool"
     },
@@ -4620,7 +4620,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SOURCE_DEPENDENCY_EXPORT",
-      "line": 585,
+      "line": 620,
       "path": "tools/analysis/dependencies/source_dependency_graph.py",
       "surface": "tool"
     },
@@ -17020,7 +17020,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOWS_CHECKED",
-      "line": 827,
+      "line": 841,
       "path": "tools/validation/ci/checks/check_github_workflows.py",
       "surface": "tool"
     },
@@ -17028,7 +17028,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_ERRORS",
-      "line": 828,
+      "line": 842,
       "path": "tools/validation/ci/checks/check_github_workflows.py",
       "surface": "tool"
     },
@@ -17036,7 +17036,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_WARNINGS",
-      "line": 829,
+      "line": 843,
       "path": "tools/validation/ci/checks/check_github_workflows.py",
       "surface": "tool"
     },
@@ -18684,7 +18684,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 299,
+      "line": 340,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18692,7 +18692,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 307,
+      "line": 348,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18700,47 +18700,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 319,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 325,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 329,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 349,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 358,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 362,
+      "line": 360,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18756,23 +18716,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 375,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 379,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 386,
+      "line": 370,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18788,7 +18732,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 394,
+      "line": 399,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18796,7 +18740,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 398,
+      "line": 403,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18804,7 +18748,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 402,
+      "line": 407,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18812,7 +18756,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 412,
+      "line": 416,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18820,7 +18764,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 418,
+      "line": 420,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18828,7 +18772,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 422,
+      "line": 427,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18836,7 +18780,63 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 426,
+      "line": 431,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 435,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 439,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 443,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 455,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 462,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 466,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 470,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18844,7 +18844,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_FORMAT",
-      "line": 433,
+      "line": 477,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18852,7 +18852,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_FORMAT",
-      "line": 452,
+      "line": 496,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18860,7 +18860,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_FORMAT",
-      "line": 456,
+      "line": 500,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },

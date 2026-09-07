@@ -6,9 +6,9 @@ responsibility Owns research-driven change: external evidence, comparison design
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/algorithm-implementation-boundary.md equation-to-code boundary policy
 upstream design ../../documents/experiments/experiment-critical-review.md critical evidence review
-downstream skill literature-survey source search and source packet owner
-downstream skill experiment-lifecycle single-run and rerun owner
-downstream skill adaptive-improvement-loop backlog-driven iteration owner
+downstream design literature-survey.md source search and source packet owner
+downstream design experiment-lifecycle.md single-run and rerun owner
+downstream design adaptive-improvement-loop.md backlog-driven iteration owner
 @dependency-end
 -->
 
