@@ -1,0 +1,12 @@
+version = 1
+mode_source = "caller-typed-input"
+skill_source = "official-or-explicit-selection"
+missing_mode_policy = "fail-closed"
+prompt_vocabulary_classifier = false
+cross_clause_trigger_join = false
+
+[validation]
+validate_skill_ids = true
+validate_dependencies = true
+validate_owner_order = true
+materialize_machine_commands = true
