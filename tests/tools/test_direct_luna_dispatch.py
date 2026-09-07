@@ -201,9 +201,27 @@ def test_current_and_history_scope_requires_each_evidence_dimension_or_omission(
     assert bounded.universe_status == "bounded_omission"
 
 
-def test_new_surface_requires_evidence_backed_rejection_of_every_candidate() -> None:
+def test_current_scope_rejects_history_origin_decisions() -> None:
+    historical = _decision(
+        asset_path="tools/legacy/deleted_helper.py",
+        asset_origin="history",
+        disposition="restore",
+        capability="previously validated helper",
+        reason="history identifies the predecessor for restoration",
+        test_paths=("tests/legacy/test_deleted_helper.py",),
+    )
+    with pytest.raises(ValueError, match="current asset_origin"):
+        _survey(scope="current", decisions=(historical,))
+
+
+def test_new_surface_allows_empty_completed_inventory_and_rejects_actual_candidates() -> None:
+    empty = _survey(surface_admission="new_surface", decisions=())
+    assert empty.decisions == ()
+    packet = _workspace_packet(reuse_survey=empty)
+    assert packet.reuse_survey == empty
+
     with pytest.raises(ValueError, match="every candidate disposition to be reject"):
-        _survey(surface_admission="new_surface")
+        _survey(surface_admission="new_surface", decisions=(_decision(),))
 
     rejected = _decision(
         asset_path="tools/legacy/candidate.py",
@@ -256,6 +274,23 @@ def test_reuse_evidence_must_not_cross_do_not_read() -> None:
     with pytest.raises(ValueError, match="overlaps do_not_read"):
         _workspace_packet(
             reuse_survey=_survey(decisions=(_decision(), forbidden))
+        )
+
+
+@pytest.mark.parametrize(
+    ("allowed_paths", "do_not_read"),
+    (
+        (("tools/agent/orchestration",), ("tools/agent/orchestration/private",)),
+        (("tools/agent/orchestration/private",), ("tools/agent/orchestration",)),
+    ),
+)
+def test_allowed_and_forbidden_ancestor_paths_overlap(
+    allowed_paths, do_not_read
+) -> None:
+    with pytest.raises(ValueError, match="allowed_paths and do_not_read overlap"):
+        _workspace_packet(
+            allowed_paths=allowed_paths,
+            do_not_read=do_not_read,
         )
 
 

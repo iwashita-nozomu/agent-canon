@@ -360,9 +360,11 @@ def build_reuse_survey(
             raise ValueError(
                 "applicable reuse scope requires an applicable status and surface"
             )
-        if not normalized_decisions:
+        if scope == "current" and any(
+            decision.asset_origin != "current" for decision in normalized_decisions
+        ):
             raise ValueError(
-                "applicable reuse_survey decisions must contain at least one candidate"
+                "current reuse scope requires all decisions to have current asset_origin"
             )
         if universe_status == "complete" and normalized_omissions:
             raise ValueError("complete asset universe must not contain bounded omissions")
@@ -478,7 +480,16 @@ def build_direct_luna_packet(
     bounded_do_not_read = _bounded_paths("do_not_read", do_not_read)
     if authority == "workspace-write" and not bounded_allowed_paths:
         raise ValueError("workspace-write authority requires at least one allowed path")
-    overlap = set(bounded_allowed_paths) & set(bounded_do_not_read)
+    overlap = tuple(
+        sorted(
+            {
+                allowed_path
+                for allowed_path in bounded_allowed_paths
+                for forbidden_path in bounded_do_not_read
+                if _paths_overlap(allowed_path, forbidden_path)
+            }
+        )
+    )
     if overlap:
         joined = ", ".join(sorted(overlap))
         raise ValueError(f"allowed_paths and do_not_read overlap: {joined}")

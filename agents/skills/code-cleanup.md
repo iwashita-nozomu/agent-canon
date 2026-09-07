@@ -57,8 +57,10 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    compiler、JIT の変更で吸収しない。
 5. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
    responsibility slices と `allowed_paths` はこの asset universe と disposition から導き、
-   同じ asset に触れる slices を一つへ merge する。新 surface は、調査済みの全 candidate
-   が根拠付き `reject` になっている場合だけ admission する。
+   同じ asset に触れる slices を一つへ merge する。completed universe に candidate が
+   無ければ `decisions` は空のまま新 surface を admission し、synthetic な `reject` は
+   作らない。actual candidate がある場合だけ、全 candidate が根拠付き `reject` である
+   ことを要求する。
 6. approved mechanism を `refactor-loop` へ渡し、同じ serialized `reuse_survey` と
    tests を各 write-capable child と read-only reviewer に伝播して
    behavior-preserving change として実装する。子 prompt 側で disposition を再構築しない。

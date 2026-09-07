@@ -18,6 +18,8 @@ Exchange one bounded, typed packet between the parent and a direct Luna subagent
 
 This Skill owns packet construction, runtime acknowledgement, and handback semantics. It does not choose the logical role, replace specialist Skills, grant authority, or provide a fallback model.
 
+The validator's admission guarantee is limited to packets built through this direct-Luna path. Other canonical runtime flows intentionally keep reuse context optional/advisory; this Skill does not provide runtime-wide admission. Broader runtime admission remains a separate #1033 scope.
+
 ## Inputs
 
 The parent supplies `logical_role_id`, one or more existing `skill_ids`, `reasoning_effort`, `authority`, bounded `allowed_paths` and `do_not_read`, `expected_output`, the parent-owned `validation_route`, bounded `objective` and `context`, and applicable `request_clause_ids`.
@@ -29,7 +31,7 @@ A bounded non-split edit with no reuse choice may use `scope=not_applicable`, bu
 ## Procedure
 
 1. Before any file or worker slice, construct the single current asset universe. For code split/extraction or a missing suspected predecessor, extend that same universe with Git history/deleted paths, prior PR/Issues, predecessor tests, and relevant design documents.
-2. Assign every discovered candidate exactly one supported disposition and bind the reason and test paths. A proposed new surface is admissible only when every candidate in the completed/bounded universe is explicitly `reject` with evidence.
+2. Assign every discovered candidate exactly one supported disposition and bind the reason and test paths. A completed universe with no candidates keeps `decisions` empty; it does not gain a synthetic `reject`. When actual candidates exist, a proposed new surface is admissible only when every candidate in the completed/bounded universe is explicitly `reject` with evidence.
 3. Build `direct_luna_handoff_packet_v1` with `tools/agent/orchestration/direct_luna_dispatch.py`. `workspace-write` fails closed on a missing/incomplete survey, duplicate candidate path, missing evidence dimension, write disposition outside `allowed_paths`, or asset/test path that crosses `do_not_read`.
 4. Spawn direct `gpt-5.6-luna` with `fork_turns="none"` and the serialized packet. The serialized `reuse_survey` is the worker/reviewer prompt evidence; do not restate or independently reconstruct it.
 5. Read back the effective child model and reasoning effort before admitting work.

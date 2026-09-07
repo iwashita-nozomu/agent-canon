@@ -91,5 +91,8 @@ def test_reuse_admission_is_fail_closed_on_the_existing_handoff_path() -> None:
     assert "write handoff へ進めない" in cleanup
     assert "workspace-write` fails closed" in communication
     assert "direct_luna_handoff_packet_v1" in communication
+    assert "packets built through this direct-Luna path" in communication
+    assert "does not provide runtime-wide admission" in communication
+    assert "Broader runtime admission remains a separate #1033 scope" in communication
     assert "new search tool" not in communication
     assert "asset registry" not in communication
