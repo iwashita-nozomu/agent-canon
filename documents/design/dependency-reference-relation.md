@@ -1,5 +1,13 @@
 # Dependency `reference` Relation
 
+<!--
+@dependency-start
+contract design
+responsibility Defines the non-authoritative dependency-manifest `reference` relation semantics.
+upstream design dependency-manifest-design.md dependency manifest DSL and relation semantics
+@dependency-end
+-->
+
 `reference` is a repository-contained evidence edge. It is reachable and must resolve, but it is never an authority or parent edge.
 
 ```text
