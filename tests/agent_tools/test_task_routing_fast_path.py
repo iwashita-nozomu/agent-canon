@@ -153,34 +153,48 @@ class TaskRoutingFastPathTest(unittest.TestCase):
         self.assertEqual(payload["mode"], "repo-changing")
         self.assertIn("codex-task-workflow", payload["skills"])
 
-    def test_explicit_test_design_requires_bounded_risk_or_skill_id(self) -> None:
-        """Test design remains available for explicit IDs and bounded risk evidence."""
-        prompts = (
-            "$test-design after the owning mechanism exists",
-            "The unresolved oracle risk remains after the owning mechanism exists.",
+    def test_explicit_test_design_requires_owner_precondition(self) -> None:
+        """Test design remains available only through explicit selection."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROUTE),
+                "--prompt",
+                "$test-design after the owning mechanism exists",
+                "--mode",
+                "routing-only",
+                "--format",
+                "json",
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
         )
-        for prompt in prompts:
-            with self.subTest(prompt=prompt):
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        str(ROUTE),
-                        "--prompt",
-                        prompt,
-                        "--mode",
-                        "routing-only",
-                        "--format",
-                        "json",
-                    ],
-                    cwd=PROJECT_ROOT,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
 
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                payload = json.loads(result.stdout)
-                self.assertIn("test-design", payload["matched_skills"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("test-design", payload["matched_skills"])
+
+        ordinary = subprocess.run(
+            [
+                sys.executable,
+                str(ROUTE),
+                "--prompt",
+                "The unresolved oracle risk remains after the owning mechanism exists.",
+                "--mode",
+                "routing-only",
+                "--format",
+                "json",
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(ordinary.returncode, 0, ordinary.stdout + ordinary.stderr)
+        ordinary_payload = json.loads(ordinary.stdout)
+        self.assertNotIn("test-design", ordinary_payload["matched_skills"])
 
     def test_catalog_drops_obsolete_broad_test_trigger(self) -> None:
         """The cross-context unnecessary/test trigger is no longer authoritative."""

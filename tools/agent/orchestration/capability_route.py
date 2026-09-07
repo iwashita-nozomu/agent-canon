@@ -263,7 +263,7 @@ def preflight_capability_argv(argv: Sequence[str]) -> CapabilityPreflight:
                 output_format = value if value in FORMAT_VALUES else "text"
             elif option == "--mode":
                 mode_raw = value
-                mode = value if value in MODE_VALUES else "repo-changing"
+                mode = value if value in MODE_VALUES else "routing-only"
             elif option == "--risk":
                 risk_raw = value
             else:

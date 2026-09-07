@@ -142,10 +142,10 @@ count maps, the deterministic coverage digest, and final-token evidence. If a
 renderer cannot retain complete coverage, return the typed renderer-capacity
 blocker instead of pruning or emitting a partial fallback.
 
-`$test-design` is selected by an explicit skill ID or a bounded prompt clause
-that identifies an unresolved oracle, specification, regression, or
-failure-mode risk after the owning implementation mechanism exists. General
-test vocabulary or unrelated terms do not activate it.
+`$test-design` is selected only by an explicit Skill ID or capability route.
+The selected Skill owner evaluates the concrete unresolved oracle,
+specification, regression, or failure-mode risk and confirms that the owning
+implementation mechanism is already known before activation.
 
 Repository-refactor and structure-review aliases such as
 `repo_refactor_skill.py`, `repo/refactor`, and `structure-review`, plus personal
@@ -155,7 +155,7 @@ structure-review skill unless `route.py --name <candidate>` returns
 `STATUS=unknown` after the structure route has been considered.
 
 Routing miss, selection gap, ToolCall, SkillCall, or coverage prompts are
-log-analysis tasks. `route.py --prompt ... --format json` should include
+log-analysis tasks. `route.py --prompt ... --mode routing-only --format json` should include
 `$agent-log-analysis` for those requests so the agent reads compact runtime
 dashboard evidence before editing prompt, hook, skill, or workflow surfaces.
 

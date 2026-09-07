@@ -610,26 +610,6 @@ def decide(area: RouteArea, risk: str, changed_paths: Sequence[str]) -> RouteDec
     )
 
 
-def text_matches_term(text: str, term: str) -> bool:
-    """Return whether one trigger term appears without matching inside words."""
-    normalized = term.lower()
-    if re.fullmatch(r"[a-z0-9]+", normalized):
-        suffix = "s?" if len(normalized) > 2 else ""
-        return (
-            re.search(
-                rf"(?<![A-Za-z0-9]){re.escape(normalized)}{suffix}(?![A-Za-z0-9])",
-                text,
-            )
-            is not None
-        )
-    return normalized in text
-
-
-def text_matches_group(text: str, group: tuple[str, ...]) -> bool:
-    """Return whether all group terms appear in text."""
-    return all(text_matches_term(text, term) for term in group)
-
-
 def read_prompt_file(root: Path, raw_path: str) -> str:
     """Read one prompt file, resolving relative paths from the repository root."""
     path = Path(raw_path)
@@ -780,18 +760,6 @@ def _requested_visualization_adapter(
     return None, None
 
 
-def _catalog_visualization_prose_requested(
-    prompt: str,
-    rules_by_skill: Mapping[str, SkillRoutingRule],
-) -> bool:
-    """Detect visualization prose only through catalog-owned trigger metadata."""
-    return any(
-        rule.skill == VISUALIZATION_OWNER_SKILL
-        and any(text_matches_group(prompt.lower(), group) for group in rule.triggers)
-        for rule in rules_by_skill.values()
-    )
-
-
 def _visualization_prompt_contract(
     prompt: str,
     rules_by_skill: Mapping[str, SkillRoutingRule],
@@ -835,13 +803,6 @@ def _visualization_prompt_contract(
         or explicit_argument_schema
     )
     if not explicitly_routed:
-        if _catalog_visualization_prose_requested(prompt, rules_by_skill):
-            return (
-                None,
-                None,
-                "prose_only",
-                "visualization prose has no explicit owner route",
-            )
         return None, None, None, ""
 
     owner_rule = rules_by_skill.get(VISUALIZATION_OWNER_SKILL)
@@ -889,19 +850,16 @@ def _visualization_prompt_contract(
 def matched_skill_routes(
     prompt: str, rules: Sequence[SkillRoutingRule]
 ) -> tuple[SkillRouteMatch, ...]:
-    """Return public skill matches for one prompt."""
-    text = prompt.lower()
+    """Return only public skills explicitly selected in one prompt."""
+    text = prompt.casefold()
     matches: list[SkillRouteMatch] = []
     observed: set[str] = set()
     for rule in rules:
         if rule.skill in observed:
             continue
         explicit = public_skill_name_mentioned(text, rule.skill)
-        if explicit or any(text_matches_group(text, group) for group in rule.triggers):
-            match_reason = (
-                "prompt explicitly names public skill" if explicit else rule.reason
-            )
-            matches.append(SkillRouteMatch(rule.skill, match_reason))
+        if explicit:
+            matches.append(SkillRouteMatch(rule.skill, "prompt explicitly names public skill"))
             observed.add(rule.skill)
     return tuple(matches)
 
@@ -922,7 +880,7 @@ def dedupe_skill_route_matches(
 
 def implementation_handoff_required(
     prompt: str,
-    mode: str = "repo-changing",
+    mode: str = "routing-only",
     *,
     typed_route_required: bool = False,
 ) -> bool:
@@ -935,7 +893,7 @@ def is_current_stage_skill(
     skill: str,
     rules_by_skill: Mapping[str, SkillRoutingRule],
     prompt: str = "",
-    mode: str = "repo-changing",
+    mode: str = "routing-only",
 ) -> bool:
     """Return whether one matched skill belongs in the initial routing wave."""
     if skill == SUBAGENT_BOOTSTRAP_SKILL:

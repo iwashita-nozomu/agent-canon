@@ -47,9 +47,9 @@ evidence, not an AgentCanon product dependency.
   `$skill-installer`, `$imagegen`, and `$plugin-creator` stay outside the
   AgentCanon public catalog. AgentCanon routes to those names and keeps local
   owner-surface contracts.
-- Japanese or English prompts about unnecessary numerical tests, heavy tests,
-  brittle tests, tolerance-based tests, or test-design gaps route to
-  `$test-design`; they are not handled by ad hoc worker judgment.
+- `$test-design` is selected only by an explicit Skill ID or capability route;
+  its owner then requires the owning implementation mechanism and a concrete
+  unresolved oracle, specification, regression, or failure-mode risk.
 - The public skill for this family is `$task-routing`.
 
 ## Canonical Short Surface
