@@ -1,7 +1,6 @@
 # @dependency-start
 # contract reference
-# responsibility Maps canonical tools to same-named explanatory documents and
-# owns their public/internal/compat/retired/example classification.
+# responsibility Maps canonical tools to same-named explanatory documents and owns their public/internal/compat/retired/example classification.
 # upstream design README.md tool documentation placement policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 # upstream design visualization_contract.md canonical visualization contract/checker documentation
