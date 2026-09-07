@@ -1,0 +1,13 @@
+version = 1
+phases = ["builder-device-entitlement", "cdi-inventory", "run-device-accepted", "device-visible", "driver-library-loadable", "cuda-driver-api-usable", "compile-and-run"]
+runtime_gpu_success_implies_build_gpu_success = false
+nvidia_smi_path_is_sufficient_oracle = false
+
+[failure]
+incomplete_capability = "gpu_build_environment_unavailable"
+
+[handoff]
+project_owns_dockerfile = true
+project_owns_provider_artifact = true
+require_builder_identity = true
+require_detected_compute_capability = true
