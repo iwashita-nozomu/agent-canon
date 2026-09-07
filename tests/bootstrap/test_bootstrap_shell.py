@@ -2505,10 +2505,27 @@ def _gc_fixture(
     """Build a small Docker/runtime fixture for host GC contract tests."""
     control = tmp_path / "control"
     control.mkdir()
-    # Use this Git checkout as a read-only source root; the explicit runtime
-    # remains entirely inside the test-owned control root.
-    repository = ROOT
-    runtime_root = control / "runtime"
+    # Use a test-owned Git checkout so the production default runtime location
+    # remains isolated at <repository>/.runtime.
+    repository = tmp_path / "repository"
+    subprocess.run(["git", "init", "-q", str(repository)], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=AgentCanon Test",
+            "-c",
+            "user.email=agent-canon-test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "fixture",
+        ],
+        check=True,
+    )
+    runtime_root = repository / ".runtime"
     if runtime:
         (runtime_root / "host-state").mkdir(parents=True)
         (runtime_root / "container-state").mkdir()
@@ -2615,6 +2632,36 @@ def _run_gc(
         command.append("--dry-run")
     return subprocess.run(
         command, check=False, capture_output=True, text=True, env=environment
+    )
+
+
+def _run_gc_locked(
+    repository: Path,
+    control: Path,
+    runtime: Path,
+    environment: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    """Run the host GC owner with an isolated runtime root."""
+    script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(runtime / 'container-state')!r}
+AGENT_CANON_PRIVATE_LOG_ROOT={str(control / 'agent-canon-log')!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+AGENT_CANON_IMAGE_REF=agent-canon-tools:live
+export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+export AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT AGENT_CANON_DOCKER_CMD
+export AGENT_CANON_IMAGE_REF
+_agent_canon_gc_locked 1
+"""
+    return subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
     )
 
 
@@ -2730,6 +2777,110 @@ def test_gc_invokes_container_state_gc_and_combines_receipt(tmp_path: Path) -> N
     assert receipt["details"]["state"]["code"] == "state_gc_complete"
     calls = (tmp_path / "docker.calls").read_text(encoding="utf-8")
     assert "exec" in calls and "gc" in calls
+
+
+def test_gc_dry_run_keeps_resident_rollback_preview_read_only(tmp_path: Path) -> None:
+    """A resident rollback preview does not copy or clear host mounts."""
+    state, owned, repository, control, runtime, state_path, name, environment = (
+        _gc_fixture(
+            tmp_path,
+            rollback=("agent-canon-tools:rollback", "sha256:" + "4" * 64),
+        )
+    )
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    volume_root.mkdir()
+    state["volumes"] = {
+        volume_name: {
+            "Name": volume_name,
+            "Labels": owned,
+            "Mountpoint": str(volume_root),
+            "UID": 1000,
+            "GID": 1000,
+            "Mode": "0700",
+        }
+    }
+    state["containers"][name]["Config"]["User"] = "1000:1000"
+    state["containers"][name]["Mounts"] = [
+        {
+            "Type": "volume",
+            "Name": volume_name,
+            "Source": str(volume_root),
+            "Destination": "/var/lib/agent-canon",
+            "RW": True,
+        }
+    ]
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    runtime_before = {
+        path.relative_to(runtime): path.read_bytes()
+        for path in runtime.rglob("*")
+        if path.is_file()
+    }
+
+    completed = _run_gc_locked(repository, control, runtime, environment)
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["code"] == "gc_plan"
+    assert {
+        path.relative_to(runtime): path.read_bytes()
+        for path in runtime.rglob("*")
+        if path.is_file()
+    } == runtime_before
+    assert not any(
+        line.startswith("run ")
+        for line in (tmp_path / "docker.calls").read_text(encoding="utf-8").splitlines()
+    )
+    assert not any(
+        "clear" in line
+        for line in (tmp_path / "docker.calls").read_text(encoding="utf-8").splitlines()
+    )
+    assert not list(volume_root.iterdir())
+
+
+def test_container_exec_does_not_swallow_volume_copy_failure(tmp_path: Path) -> None:
+    """A failed rollback mount copy prevents the later controller exec."""
+    _state, _owned, _repository, control, runtime, _state_path, name, environment = (
+        _gc_fixture(tmp_path)
+    )
+    rollback_mounts = runtime / "container-state" / "rollback-mounts.tsv"
+    rollback_mounts.write_text(
+        "target\tdigest\t/tmp/target\t/targets/digest\tread-only\n",
+        encoding="utf-8",
+    )
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(runtime / 'container-state')!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+AGENT_CANON_IMAGE_REF=agent-canon-tools:live
+AGENT_CANON_STATE_VOLUME_NAME=
+AGENT_CANON_ROLLBACK_MOUNTS_FILE={str(rollback_mounts)!r}
+export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+export AGENT_CANON_STATE_ROOT AGENT_CANON_DOCKER_CMD AGENT_CANON_IMAGE_REF
+export AGENT_CANON_STATE_VOLUME_NAME AGENT_CANON_ROLLBACK_MOUNTS_FILE
+_agent_canon_container_exec {name!r} python3 command
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+"""
+
+    completed = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert completed.returncode == 2
+    assert json.loads(completed.stderr)["code"] == "volume_copy_failed"
+    calls = (tmp_path / "docker.calls").read_text(encoding="utf-8")
+    assert "\nrun\t" in "\n" + calls
+    assert "\nexec\t" not in "\n" + calls
 
 
 def test_resident_replacement_lock_serializes_only_the_replacement(
