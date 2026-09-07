@@ -11,42 +11,27 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timezone
 
 UTC = timezone.utc
 from pathlib import Path
 
-if __package__:
-    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
-else:
-    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-if __package__:
-    from tools.agent.orchestration.team_config import (
-        RunBundleSpec,
-        load_task_catalog,
-        load_team_config,
-        select_roles,
-        specialist_role_ids,
-    )
-else:
-    from tools.agent.orchestration.team_config import (
-        RunBundleSpec,
-        load_task_catalog,
-        load_team_config,
-        select_roles,
-        specialist_role_ids,
-    )
+from tools.agent.orchestration.agent_team import create_run_bundle
+from tools.agent.orchestration.team_config import (
+    RunBundleSpec,
+    load_task_catalog,
+    load_team_config,
+    select_roles,
+    specialist_role_ids,
+)
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
-if __package__:
-    from tools.agent.orchestration.agent_team import create_run_bundle
-else:
-    from tools.agent.orchestration.agent_team import create_run_bundle
-
-if __package__:
-    from tools.repository.workspace.workspace_scope import make_run_id, resolve_repository_roots
-else:
-    from tools.repository.workspace.workspace_scope import make_run_id, resolve_repository_roots
+from tools.repository.workspace.workspace_scope import make_run_id, resolve_repository_roots
+from tools.runtime.lifecycle.bootstrap_agent_run import selected_review_roles
 
 DOC_KIND_MAP = {
     "long-form": {
@@ -193,12 +178,7 @@ def main() -> int:
     )
     created_files = materialization
 
-    review_roles = tuple(
-        role.id
-        for role in roles
-        if role.id.endswith("_reviewer")
-        or role.id in {"reviewer", "verifier", "auditor", "docs_workflow_steward"}
-    )
+    review_roles = selected_review_roles(roles)
     start_declaration = (
         f"workflow={kind_spec['workflow_family']}, "
         f"skills={','.join(kind_spec['skills'])}, "

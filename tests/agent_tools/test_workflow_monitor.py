@@ -41,7 +41,7 @@ def seed_bootstrap_workspace(workspace_root: Path) -> None:
         "agents/model_profiles.toml",
         "agents/canonical/CODEX_WORKFLOW.md",
         "templates/agents/design_brief.md",
-        "agents/workflows/implementation-waterfall-workflow.md",
+        "agents/skills/codex-task-workflow.md",
         "documents/design/dependency-manifest-design.md",
     ):
         destination = workspace_root / relative_path

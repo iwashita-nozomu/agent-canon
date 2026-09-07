@@ -694,7 +694,7 @@ class CheckToolCatalogTest(unittest.TestCase):
             "documents/tools/tool_catalog.md",
             "tools/validation/ci/checks/check_agent_canon_pr.sh",
             "eval/producers/run_accumulated_agent_evals.py",
-            "agents/workflows/agent-canon-pr-workflow.md",
+            "agents/skills/pr-processing.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
         ]:

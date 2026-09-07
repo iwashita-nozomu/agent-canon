@@ -226,22 +226,6 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "ambient 変数や prior segment は authority になりません。\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
-    "agents/workflows/example-workflow.md": (
-        "Before closeout, run "
-        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
-    ),
-    "agents/workflows/long-form-writing-workflow.md": (
-        "$structure-planning $prose-reasoning-graph $md-style-check "
-        "structure_contract=skipped\n"
-        "Before closeout, run "
-        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
-    ),
-    "agents/workflows/pr-queue-cleanup-workflow.md": (
-        "PR Essence problem / user request design intent canonical owner "
-        "behavior or contract delta evidence route\n"
-        "Before closeout, run "
-        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
-    ),
     "agents/skills/agent-orchestration.md": (
         "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
         "literature-survey research-workflow 先に source packet adoption/exclusion "
@@ -363,13 +347,6 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "tools/validation/code/oop/shared/readability_core.py SOLID route owner mechanical projections "
         "readability.py\n"
     ),
-    "agents/workflows/implementation-waterfall-workflow.md": (
-        "Design Integrity Gate owning responsibility model Abstract Design Frame "
-        "replaceable unit mechanism validation route unresolved branch "
-        "design_issue_blocker implementation shortcut\n"
-        "Before closeout, run "
-        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
-    ),
     "agents/skills/formal-proof-workflow.md": (
         "program contract public entrypoint return projection proof obligation "
         "mathematical necessity gate theorem surface\n"
@@ -436,7 +413,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "| skill selection | `agents/skills/catalog.yaml`; "
         "`python3 tools/agent/orchestration/route.py --prompt` |\n"
         "| implementation stage gate | "
-        "`agents/workflows/implementation-waterfall-workflow.md` |\n"
+        "`agents/skills/codex-task-workflow.md` |\n"
         "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
         "`agents/agents_config.json#artifacts.active_design_packet` |\n"
         "| closeout authority | `task_close.py`; `report_artifact_checks.py` |\n\n"
@@ -473,25 +450,17 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "tool_warning_exit_status resolved deferred_with_issue "
         "accepted_with_reason explicit_approval_evidence\n"
     ),
-    "agents/workflows/hypothesis-validation-workflow.md": (
+    "agents/skills/dependency-analysis.md": (
         "scan_code_dependencies.sh\n"
         "Before closeout, run "
         "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
-    "agents/workflows/comprehensive-refactoring-workflow.md": (
-        "readability.py check_convention_compliance.py\n"
-        "compatibility-preservation drift duplicate implementation canonical owner "
-        "Removal and Caller Migration Plan two-stage refactor forced migration "
-        "usage-surface repair return-gate validation\n"
-        "Before closeout, run "
-        "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
-    ),
-    "agents/workflows/adaptive-improvement-workflow.md": (
+    "agents/skills/adaptive-improvement-loop.md": (
         "evaluate_skill_workflow_prompts.py check_convention_compliance.py\n"
         "Before closeout, run "
         "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
-    "agents/workflows/agent-canon-pr-workflow.md": (
+    "agents/skills/agent-canon-update.md": (
         "check_github_workflows.py\n"
         "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
@@ -1221,7 +1190,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             DESIGN_INTEGRITY_GATE_MARKERS,
         )
         self.assertIn(
-            "agents/workflows/implementation-waterfall-workflow.md",
+            "agents/canonical/CODEX_WORKFLOW.md",
             DESIGN_INTEGRITY_GATE_MARKERS,
         )
         self.assertIn(

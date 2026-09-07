@@ -260,7 +260,9 @@ class FakeRunner:
         path_text = str(path)
         if path_text in self.non_executable_paths:
             return False
-        return path_text in self.virtual_executables or path_text.startswith("/usr/bin/")
+        return path_text in self.virtual_executables or path_text.startswith(
+            ("/usr/bin/", "/usr/local/bin/")
+        )
 
     def run(
         self,
@@ -661,14 +663,16 @@ class DependencyModelTests(unittest.TestCase):
                     runner=FakeRunner(),
                 )
             receipts_path.chmod(0o555)
-            with self.assertRaisesRegex(DependencyError, "rebuild-required"):
+            self.assertEqual(
                 image_verify_plan(
                     plan,
                     workspace=root,
                     records=("image-tool",),
                     _test_image_root=image_root,
                     runner=FakeRunner(fail_on="dpkg-query"),
-                )
+                ),
+                ("image-tool",),
+            )
             with self.assertRaisesRegex(DependencyError, "already exists"):
                 image_install_plan(
                     plan,
@@ -868,6 +872,383 @@ class DependencyModelTests(unittest.TestCase):
                     receipts=image_root / "missing-receipts",
                 )
 
+    def test_image_install_is_install_only_and_writes_structural_receipts(self) -> None:
+        """Image install does not invoke package managers or live probes."""
+        apt = parse_record(
+            record(
+                "apt-tool",
+                method="apt-package",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "apt-tool",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        npm = parse_record(
+            record("node-tool", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        pipx = parse_record(
+            record("python-tool", method="pipx"),
+            path=Path("fixture.toml"),
+            index=2,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (apt, npm, pipx)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            init_authentic_git(root)
+            image_root = root / "image-root"
+            runner = FakeRunner()
+            Installer(runner, image_owned=True, image_owned_root=image_root).install(
+                plan,
+                workspace=root,
+                receipts=image_root / "receipts",
+            )
+            for record_id in ("apt-tool", "node-tool", "python-tool"):
+                payload = json.loads(
+                    (image_root / "receipts" / f"{record_id}.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(payload["status"], "installed")
+                self.assertTrue(
+                    Installer._receipt_matches(
+                        image_root / "receipts" / f"{record_id}.json",
+                        plan,
+                        plan.by_id()[record_id],
+                    )
+                )
+            commands = [call[:2] for call in runner.calls]
+            self.assertNotIn(("npm", "ls"), commands)
+            self.assertNotIn(("pipx", "runpip"), commands)
+            self.assertFalse(any(Path(call[0]).name == "dpkg-query" for call in runner.calls))
+            apt_payload = json.loads(
+                (image_root / "receipts" / "apt-tool.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                apt_payload["executable_bindings"]["apt-tool"]["absolute_path"],
+                "/usr/bin/apt-tool",
+            )
+            self.assertEqual(
+                json.loads(
+                    (image_root / "receipts" / "node-tool.json").read_text(
+                        encoding="utf-8"
+                    )
+                )["executable_bindings"]["node-tool"]["absolute_path"],
+                "/usr/local/bin/node-tool",
+            )
+            self.assertEqual(
+                json.loads(
+                    (image_root / "receipts" / "python-tool.json").read_text(
+                        encoding="utf-8"
+                    )
+                )["executable_bindings"]["python-tool"]["absolute_path"],
+                "/usr/local/bin/python-tool",
+            )
+
+    def test_installed_receipt_verification_direct_probes_without_rewriting(self) -> None:
+        """Image verification uses one absolute executable probe and preserves receipts."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = root / "dependencies.toml"
+            write_manifest(manifest, [record("node-tool", method="npm-global")])
+            parsed = parse_record(
+                record("node-tool", method="npm-global"),
+                path=manifest,
+                index=0,
+            )
+            plan = build_plan((loaded_manifest(manifest, (parsed,)),))
+            image_root = root / "image-root"
+            image_root.mkdir()
+            install_runner = FakeRunner()
+            Installer(
+                install_runner, image_owned=True, image_owned_root=root
+            ).install(
+                plan,
+                workspace=root,
+                receipts=image_root / "receipts",
+            )
+            receipt = image_root / "receipts" / "node-tool.json"
+            before = receipt.read_bytes()
+            verify_runner = FakeRunner()
+            installer = Installer(verify_runner)
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            installer._verify_installed_receipt(
+                parsed, payload, workspace=root
+            )
+            self.assertEqual(receipt.read_bytes(), before)
+            self.assertIn(("/usr/local/bin/node-tool", "--version"), verify_runner.calls)
+            self.assertFalse(
+                any(
+                    call[:2] == ("npm", "ls") or call[:2] == ("pipx", "runpip")
+                    for call in verify_runner.calls
+                )
+            )
+            with mock.patch.object(
+                dependency_module,
+                "Installer",
+                lambda: Installer(verify_runner),
+            ):
+                resolved = dependency_module.resolve_verified_executable(
+                    root,
+                    image_root / "receipts",
+                    "node-tool",
+                    "node-tool",
+                    manifest=manifest,
+                )
+            self.assertEqual(resolved.absolute_path, "/usr/local/bin/node-tool")
+            self.assertEqual(receipt.read_bytes(), before)
+
+    def test_image_verify_rejects_pass_receipts(self) -> None:
+        """Image verification accepts only image-owned installed receipts."""
+        parsed = parse_record(
+            record("image-tool", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "24.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-root"
+            image_install_plan(
+                plan,
+                workspace=root,
+                _test_image_root=image_root,
+                runner=FakeRunner(),
+                identity=identity,
+            )
+            receipt = image_root / "receipts" / "image-tool.json"
+            receipt.chmod(0o644)
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["status"] = "pass"
+            receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            receipt.chmod(0o444)
+            with self.assertRaisesRegex(DependencyError, "receipt is not image-installed"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                )
+
+    def test_image_verify_rejects_tampered_installed_binding_path(self) -> None:
+        """Installed receipts cannot redirect image verification to another path."""
+        parsed = parse_record(
+            record(
+                "image-tool",
+                method="apt-package",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "image-tool",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "24.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-root"
+            image_install_plan(
+                plan,
+                workspace=root,
+                _test_image_root=image_root,
+                runner=FakeRunner(),
+                identity=identity,
+            )
+            receipt = image_root / "receipts" / "image-tool.json"
+            receipt.chmod(0o644)
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["executable_bindings"]["image-tool"]["absolute_path"] = (
+                "/tmp/not-image-tool"
+            )
+            receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            receipt.chmod(0o444)
+            with self.assertRaisesRegex(DependencyError, "installed executable binding is stale"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                )
+
+    def test_installed_receipt_rejects_missing_secondary_binding(self) -> None:
+        """A deleted secondary provider cannot satisfy an installed receipt."""
+        parsed = parse_record(
+            record(
+                "pyright-language-server",
+                package="pyright",
+                provides=["pyright", "pyright-langserver"],
+                verification={
+                    "kind": "npm-package",
+                    "executable": "pyright",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer = Installer(FakeRunner(), image_owned=True, image_owned_root=root)
+            payload = {
+                "status": "installed",
+                "executable_bindings": installer._structural_executable_bindings(parsed),
+            }
+            with mock.patch.object(
+                installer,
+                "_path_is_regular_executable",
+                side_effect=lambda path: path.name != "pyright-langserver",
+            ):
+                with self.assertRaisesRegex(
+                    DependencyError,
+                    "installed executable is missing or not executable: pyright-langserver",
+                ):
+                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+
+    def test_installed_receipt_rejects_non_executable_secondary_binding(self) -> None:
+        """A non-executable secondary provider cannot satisfy an installed receipt."""
+        parsed = parse_record(
+            record(
+                "pyright-language-server",
+                package="pyright",
+                provides=["pyright", "pyright-langserver"],
+                verification={
+                    "kind": "npm-package",
+                    "executable": "pyright",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer = Installer(FakeRunner(), image_owned=True, image_owned_root=root)
+            payload = {
+                "status": "installed",
+                "executable_bindings": installer._structural_executable_bindings(parsed),
+            }
+            with mock.patch.object(
+                installer,
+                "_path_is_regular_executable",
+                side_effect=lambda path: path.name != "pyright-langserver",
+            ):
+                with self.assertRaisesRegex(
+                    DependencyError,
+                    "installed executable is missing or not executable: pyright-langserver",
+                ):
+                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+
+    def test_installed_tool_receipts_probe_jq_tree_and_rustc_directly(self) -> None:
+        """Manifest executable fields provide direct image verification for tools."""
+        records = (
+            parse_record(
+                record(
+                    "jq",
+                    method="apt-package",
+                    verification={
+                        "kind": "apt-package",
+                        "executable": "jq",
+                        "args": ["--version"],
+                        "output_contains": "jq-1.7",
+                    },
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            ),
+            parse_record(
+                record(
+                    "tree",
+                    method="apt-package",
+                    verification={
+                        "kind": "apt-package",
+                        "executable": "tree",
+                        "args": ["--version"],
+                        "output_contains": "tree v2.1.1",
+                    },
+                ),
+                path=Path("fixture.toml"),
+                index=1,
+            ),
+            parse_record(
+                record(
+                    "rust-toolchain",
+                    method="rust-toolchain",
+                    components=["rust-src", "rust-analyzer"],
+                    verification={
+                        "kind": "rust-toolchain",
+                        "executable": "rustc",
+                        "args": ["--version"],
+                        "output_contains": "rustc 1.89.0",
+                    },
+                ),
+                path=Path("fixture.toml"),
+                index=2,
+            ),
+        )
+        outputs = {
+            "jq": "jq-1.7\n",
+            "tree": "tree v2.1.1\n",
+            "rustc": "rustc 1.89.0\n",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer = Installer(FakeRunner(), image_owned=True, image_owned_root=root)
+            for item in records:
+                payload = {
+                    "status": "installed",
+                    "executable_bindings": installer._structural_executable_bindings(item),
+                }
+                with mock.patch.object(
+                    installer,
+                    "_capture",
+                    return_value=subprocess.CompletedProcess(
+                        (item.verification.executable or "",),
+                        0,
+                        outputs[item.verification.executable or ""],
+                        "",
+                    ),
+                ) as capture:
+                    with mock.patch.object(
+                        installer, "_path_is_regular_executable", return_value=True
+                    ):
+                        installer._verify_installed_receipt(
+                            item, payload, workspace=root
+                        )
+                self.assertEqual(capture.call_args.args[0][0], payload["executable_bindings"][item.verification.executable]["absolute_path"])
+
+    def test_build_only_pipx_provider_has_no_live_probe(self) -> None:
+        """The purged pipx provider is executable-less by design."""
+        parsed = parse_record(
+            record("pipx", method="apt-package", provides=["pipx"]),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer = Installer(FakeRunner(), image_owned=True, image_owned_root=root)
+            payload = {
+                "status": "installed",
+                "executable_bindings": installer._structural_executable_bindings(parsed),
+            }
+            with mock.patch.object(installer, "_capture") as capture:
+                self.assertIsNone(
+                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+                )
+            capture.assert_not_called()
+
     def test_image_install_failure_does_not_publish_target_and_freezes_tree(self) -> None:
         parsed = parse_record(
             record("image-tool", method="apt-package"),
@@ -1062,8 +1443,7 @@ class DependencyModelTests(unittest.TestCase):
                     ),
                     ("repo",),
                 )
-                verify.assert_called_once()
-                self.assertFalse(verify.call_args.kwargs["allow_network"])
+                verify.assert_not_called()
 
     def test_image_commands_accept_records_without_root_override(self) -> None:
         args = build_parser().parse_args(
@@ -3702,6 +4082,9 @@ class DependencyModelTests(unittest.TestCase):
         dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
         self.assertFalse((ROOT / ".devcontainer").exists())
         self.assertIn("FROM ubuntu:24.04@sha256:", dockerfile)
+        self.assertEqual(dockerfile.count("\nFROM ") + dockerfile.startswith("FROM "), 1)
+        self.assertEqual(dockerfile.count("\nRUN ") + dockerfile.startswith("RUN "), 2)
+        self.assertNotIn("ARG TARGETVARIANT", dockerfile)
         self.assertNotIn("FROM node:", dockerfile)
         self.assertIn("--mount=type=bind,source=tools/runtime/dispatch/agent-canon", dockerfile)
         self.assertIn(
@@ -3723,6 +4106,9 @@ class DependencyModelTests(unittest.TestCase):
         self.assertNotIn("python3-pip", dockerfile)
         self.assertIn("python3-packaging", dockerfile)
         self.assertIn("build-essential", dockerfile)
+        apt_bootstrap = dockerfile.split("apt-get install", 1)[1].split(";", 1)[0]
+        for package in ("pipx", "jq", "tree", "clangd-18"):
+            self.assertNotIn(package, apt_bootstrap)
         self.assertNotIn("ninja-build", dockerfile)
         self.assertNotIn("USER agentcanon", dockerfile)
         self.assertNotIn("AGENT_CANON_RUNTIME_UID", dockerfile)

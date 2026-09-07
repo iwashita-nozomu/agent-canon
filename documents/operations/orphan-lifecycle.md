@@ -5,7 +5,7 @@ contract workflow
 responsibility Defines the canonical semantic orphan inventory, finite classification, and fail-closed cleanup admission contract.
 upstream design ../design/request-intent-and-update-relation.md defines lifecycle flow and existing cleanup-executor delegation.
 upstream design worktree-lifecycle.md defines stale worktree handling and user-owned state protection.
-upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines the existing PR lifecycle and publication owner.
+upstream design ../../agents/skills/agent-canon-update.md defines the existing PR lifecycle and publication owner.
 downstream implementation ../../tools/repository/git/orphan_lifecycle.py produces the canonical read-only inventory and cleanup admission.
 downstream implementation ../../tests/agent_tools/test_orphan_lifecycle.py verifies semantic equivalence and refusal behavior.
 @dependency-end

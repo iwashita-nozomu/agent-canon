@@ -4,7 +4,7 @@
 contract workflow
 responsibility Documents Implementation Waterfall Literature Note for agent workflow canon.
 upstream design ../../agents/workflows/workflow-references.md workflow reference index
-downstream design ../../agents/workflows/implementation-waterfall-workflow.md implemented workflow
+downstream design ../../agents/skills/codex-task-workflow.md task execution owner
 @dependency-end
 -->
 

@@ -4,7 +4,7 @@
 # responsibility Owns the machine-readable AgentCanon update lifecycle schemas, identity guards, receipts, and close token mechanics.
 # upstream design ../../agents/skills/agent-orchestration.md owns Decision Sufficiency meaning and validation.
 # upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the standalone source update transaction.
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns the source PR sequence.
+# upstream design ../../agents/skills/agent-canon-update.md owns the source PR sequence.
 # upstream implementation ./artifact_identity.py provides canonical JSON serialization.
 # upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.py provides the authoritative G2 owner API consumed through SourceProjectionGateOwnerApis.
 # upstream implementation ./github_publish.py provides the authoritative G3 owner API consumed through SourceProjectionGateOwnerApis.
@@ -197,7 +197,7 @@ GATE_CONTRACTS: dict[str, dict[str, object]] = {
         "invariant": "standalone_source_branch_integrity",
         "owners": (
             "tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
-            "agents/workflows/agent-canon-pr-workflow.md",
+            "agents/skills/agent-canon-update.md",
         ),
     },
     "G5": {

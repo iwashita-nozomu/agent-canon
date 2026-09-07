@@ -89,6 +89,6 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 
 ## Boundary
 
-- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の cleanup 診断には `worktree-start` を使います。新規作業の worktree 初期化には使いません。
+- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の cleanup 診断もこの skill の責務です。新規 worktree 初期化や branch 操作は担当しません。
 - branch/worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse safety owner `tools/runtime/authority/hook_safety.py` を正本にします。
 - repo 全体レビューや再編は `comprehensive-development` を使います。

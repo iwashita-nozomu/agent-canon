@@ -7,7 +7,7 @@
 # upstream implementation ../../tools/validation/code/oop/cpp/readability.py C++ analyzer
 # upstream implementation ../../tools/validation/code/oop/shared/readability_core.py shared analyzer report fields
 # upstream design ../../documents/conventions/object-oriented-design.md OOP boundary policy
-# upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md OOP gate
+# upstream design ../../agents/skills/oop-readability-check.md OOP gate
 # @dependency-end
 
 from __future__ import annotations

@@ -109,7 +109,7 @@ AGENT_PROTOCOL_PATHS = frozenset(
         "agents/canonical/CODEX_SUBAGENTS.md",
         "eval/definitions/README.md",
         "templates/agents/workflow_monitoring.md",
-        "agents/workflows/agent-learning-workflow.md",
+        "agents/skills/agent-learning.md",
     }
 )
 TOOL_CATALOG_PATHS = frozenset({"tools/catalog.yaml"})
@@ -117,7 +117,6 @@ EXPERIMENT_EXECUTION_SURFACE_PATHS = frozenset(
     {
         ".codex/personal/skills/experiment-lifecycle/SKILL.md",
         "agents/skills/experiment-lifecycle.md",
-        "agents/workflows/experiment-workflow.md",
         "documents/experiments/experiment-registry.md",
         "documents/design/experiment_runner.md",
         "experiments/registry.toml",

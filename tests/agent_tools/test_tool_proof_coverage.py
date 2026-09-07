@@ -184,7 +184,7 @@ class ToolProofCoverageTest(unittest.TestCase):
             "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
             "tools/validation/ci/checks/check_agent_canon_pr.sh",
-            "agents/workflows/agent-canon-pr-workflow.md",
+            "agents/skills/agent-canon-update.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
         ]:

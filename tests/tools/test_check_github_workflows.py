@@ -36,7 +36,7 @@ def copy_required_surfaces(root: Path) -> None:
         ".github/PULL_REQUEST_TEMPLATE.md",
         ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
         "templates/documents/github/pull-request/agent_canon.md",
-        "agents/workflows/agent-canon-pr-workflow.md",
+        "agents/skills/agent-canon-update.md",
         "README.md",
     ):
         source = ROOT / relative

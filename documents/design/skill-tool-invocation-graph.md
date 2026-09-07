@@ -188,25 +188,29 @@ equality/readback は四段で行う。(1) source→materialized IR は catalog 
 
 | # | catalog skill id | # | catalog skill id | # | catalog skill id |
 | ---: | --- | ---: | --- | ---: | --- |
-| 1 | agent-orchestration | 20 | dependency-module-change | 39 | worktree-health |
-| 2 | repo-onboarding | 21 | pr-processing | 40 | experiment-lifecycle |
-| 3 | task-routing | 22 | agent-update-branch | 41 | experiment-review |
-| 4 | start-repository | 23 | report-writing | 42 | gpu-execution |
-| 5 | codex-task-workflow | 24 | prose-reasoning-graph | 43 | computational-optimization |
-| 6 | agent-orchestration (bounded owner route) | 25 | structure-planning | 44 | adaptive-improvement-loop |
-| 7 | subagent-bootstrap | 26 | code-visualization | 45 | literature-survey |
-| 8 | change-review | 27 | html-output | 46 | formal-proof-workflow |
-| 9 | python-review | 28 | test-design | 47 | lean-algorithm-design |
-| 10 | cpp-review | 29 | refactor-loop | 48 | algorithm-proof-exploration |
-| 11 | oop-readability-check | 30 | structure-refactor | 49 | algorithm-flowchart |
-| 12 | oop-type-design | 31 | user-guided-debugging | 50 | research-workflow |
-| 13 | result-artifact-writeout | 32 | long-form-writing | 51 | comprehensive-development |
-| 14 | result-visualize | 33 | academic-writing | 52 | dependency-design |
-| 15 | tool-finding-report | 34 | paper-writing | 53 | environment-maintenance |
-| 16 | issue-finding-report | 35 | md-style-check | 54 | agent-learning |
-| 17 | agent-log-analysis | 36 | mvp-skeleton |  |  |
-| 18 | runtime-log-repair | 37 | document-canon-cleanup |  |  |
-| 19 | agent-eval-accumulation | 38 | worktree-start |  |  |
+| 1 | agent-orchestration | 24 | pr-processing | 47 | gpu-execution |
+| 2 | repo-onboarding | 25 | agent-update-branch | 48 | computational-optimization |
+| 3 | task-routing | 26 | report-writing | 49 | adaptive-improvement-loop |
+| 4 | start-repository | 27 | prose-reasoning-graph | 50 | literature-survey |
+| 5 | codex-task-workflow | 28 | structure-planning | 51 | formal-proof-workflow |
+| 6 | subagent-bootstrap | 29 | code-visualization | 52 | lean-algorithm-design |
+| 7 | direct-luna-communication | 30 | html-output | 53 | algorithm-proof-exploration |
+| 8 | change-review | 31 | test-design | 54 | algorithm-flowchart |
+| 9 | python-review | 32 | refactor-loop | 55 | research-workflow |
+| 10 | cpp-review | 33 | structure-refactor | 56 | comprehensive-development |
+| 11 | oop-readability-check | 34 | user-guided-debugging | 57 | dependency-design |
+| 12 | oop-type-design | 35 | grilling | 58 | devcontainer-exec |
+| 13 | result-artifact-writeout | 36 | long-form-writing | 59 | environment-maintenance |
+| 14 | result-visualize | 37 | academic-writing | 60 | agent-learning |
+| 15 | tool-finding-report | 38 | paper-writing | 61 | wiki-publication |
+| 16 | issue-finding-report | 39 | md-style-check | 62 | responsibility-cleanup |
+| 17 | agent-log-analysis | 40 | mvp-skeleton | 63 | environment-cleanup |
+| 18 | runtime-log-repair | 41 | document-canon-cleanup | 64 | code-cleanup |
+| 19 | agent-eval-accumulation | 42 | parent-repository-audit | 65 | skill-cleanup |
+| 20 | agent-canon-update | 43 | dependency-analysis | 66 | empirical-prompt-tuning |
+| 21 | agent-canon-bootstrap | 44 | worktree-health | 67 | slides |
+| 22 | repository-topic-clone | 45 | experiment-lifecycle | 68 | tokens |
+| 23 | dependency-module-change | 46 | experiment-review | 69 | integration |
 | source order | catalog が定める skill id の順序（`agents/skills/catalog.yaml`） | readback | `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` が同じ source order を検証 |
 
 ## Complete Mermaid Projection Contract

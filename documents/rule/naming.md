@@ -20,6 +20,11 @@ downstream implementation ../../tools/validation/semantic/logging/check_log_help
 - 近くのファイル名や一時的な作業段階ではなく、概念、責務、入力、変換、出力を根拠にします。
 - 共通規約はこの文書に置き、言語や topic に固有の規約は対応する owner 文書へ置きます。
 
+## 新規責務名の制限
+
+- 新しく提案する file または function の名前に、二つ以上の責務語を結合しません。既存の owner/provider へ委譲するか、実在する未充足の一責務 gap に限り、確立済みの単一責務語を使う新規 surface として定義してから worker handoff を行います。
+- これは新規提案にだけ適用します。既存の file、function、外部固定名は一括 rename せず、互換性が必要な名前も変更しません。命名 checker は追加しません。
+
 ## 文書 filename
 
 - 文書 filename は英語にします。owner 指定のない prose 文書では、英語 lower-kebab-case を既定にします。

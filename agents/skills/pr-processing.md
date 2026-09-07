@@ -6,8 +6,6 @@ responsibility Processes PRs with a single-candidate fast path and dependency-aw
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/responsibility-rationale.md PR queue activation rationale
 upstream design agent-orchestration.md execution-time-aware work-conservation contract
-upstream design ../workflows/pr-queue-cleanup-workflow.md dependency-queue workflow
-upstream design ../workflows/agent-canon-pr-workflow.md AgentCanon source PR workflow
 upstream design ../../documents/agent-canon/agent-canon-update-route.md source PR versus parent pin route
 upstream design ../internal-routines/github-status-lifecycle.md deterministic GitHub Issue status-label reconciliation and evidence contract
 upstream implementation ../../tools/repository/github/github_publish.py publishes PRs and writes summary artifacts
@@ -129,8 +127,9 @@ automatic_merge_ready :=
 
 Stop when any term is unproven. Do not reuse old checks, infer conflict-owner
 intent, ignore branch-owned failure, or merge after head/base movement. The
-AgentCanon source-lane workflow is the concrete regression fixture for this
-ordering; this skill consumes it without duplicating its machine schemas.
+AgentCanon source lane in `$agent-canon-update` is the concrete regression
+fixture for this ordering; this skill consumes that route without duplicating
+its source-update policy or machine schemas.
 
 ## Executor-unavailable validation evidence
 

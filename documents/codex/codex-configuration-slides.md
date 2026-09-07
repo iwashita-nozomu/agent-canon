@@ -9,7 +9,7 @@ upstream implementation ../../.codex/config.toml current shared template Codex c
 
 # Codex Configuration Slides
 
-このスライドは `documents/codex/codex-configuration-reference.md` の要点から作成した Markdown deck です。実際の slide / presentation production は `agents/workflows/slide-production-workflow.md` に従い、固定 template と layout review を優先します。
+このスライドは `documents/codex/codex-configuration-reference.md` の要点から作成した Markdown deck です。実際の slide / presentation production は `agents/skills/slides.md` に従い、固定 template と layout review を優先します。
 
 ## この文書の読み方
 

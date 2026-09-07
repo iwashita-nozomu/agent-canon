@@ -28,9 +28,10 @@ COMMON=(--control-parent-root "$CONTROL")
 "$BOOTSTRAP" "${COMMON[@]}" target add --root "$TARGET" --mode read-only
 ```
 
-The control root is explicit on every call. Unless `--runtime-root` is
-provided, bootstrap stores its reconstructible state in the install root's
-ignored `.runtime/`. A target is not discovered by scanning the parent
+The control root is explicit on every call. Bootstrap stores its
+reconstructible state in the install root's ignored `.runtime/`; the historical
+`--runtime-root` option is accepted only for migration-compatible parsing and
+does not select storage. A target is not discovered by scanning the parent
 workspace.
 
 ## Tool commands
@@ -68,10 +69,11 @@ Task admission and release are explicit:
 "$BOOTSTRAP" "${COMMON[@]}" task release --task-id <task-id> --outcome completed
 ```
 
-`install` and `update` create the explicit control-root split links for skills,
-role files, and the personal `~/.codex/config.toml` source. They preserve
-foreign entries and do not link project hooks or authentication/session/cache
-state. `codex prepare` remains an isolated runtime-local Codex home;
+`install` and `update` create one explicit control-root directory link for
+skills, per-file role links, and the personal `~/.codex/config.toml` source.
+They preserve foreign entries and do not link project hooks or
+authentication/session/cache state. `codex prepare` remains an isolated
+runtime-local Codex home;
 `codex launch` sets `CODEX_HOME` only for the launched child:
 
 ```bash

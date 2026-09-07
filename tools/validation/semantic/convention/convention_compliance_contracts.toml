@@ -31,10 +31,6 @@ markers = ["Design Integrity Gate", "責務 model", "差し替え可能な単位
 path = "agents/canonical/CODEX_WORKFLOW.md"
 markers = ["Design Integrity Gate", "owning responsibility model", "replaceable unit", "mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
 
-[[contracts.surfaces]]
-path = "agents/workflows/implementation-waterfall-workflow.md"
-markers = ["Design Integrity Gate", "owning responsibility model", "replaceable unit", "mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
-
 [[contracts]]
 id = "static_read_validation_policy"
 description = "Validation keeps static/read evidence primary, adds targeted runtime evidence only for changed behavior or integration risk, and records unresolved runtime or static risk before broader execution."

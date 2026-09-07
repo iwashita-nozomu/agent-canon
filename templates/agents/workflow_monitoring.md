@@ -4,7 +4,7 @@
 contract workflow
 responsibility Documents Workflow Monitoring for this repository.
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines staged workflow and closeout gates
-upstream design ../../agents/workflows/agent-learning-workflow.md defines feedback and self-improvement capture
+upstream design ../../agents/skills/agent-learning.md defines feedback and self-improvement capture
 upstream design ../../documents/runtime/task-contract-observation.md defines task contract observation schema and terminal coverage
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py appends canonical monitoring and measurement entries
 downstream implementation ../../tools/runtime/lifecycle/task_contract_observation.py validates and summarizes contract observations

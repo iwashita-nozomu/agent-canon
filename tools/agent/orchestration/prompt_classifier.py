@@ -380,7 +380,7 @@ SKILL_KEYWORDS: dict[str, tuple[tuple[str, ...], ...]] = {
 }
 WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
     "adaptive-improvement-loop": ("next_action", "backlog", "iteration", "改善ループ"),
-    "agent-canon-pr-workflow": (
+    "agent-canon-update": (
         "agent-canon pr",
         "external AgentCanon clone",
         "development clone",

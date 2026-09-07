@@ -21,8 +21,8 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Must Read Before Reviewing
 
-- `agents/workflows/research-workflow.md`
-- `agents/workflows/experiment-workflow.md`
+- `agents/skills/research-workflow.md`
+- `agents/skills/experiment-lifecycle.md`
 - `documents/experiments/experiment-critical-review.md`
 - `documents/conventions/REVIEW_PROCESS.md`
 

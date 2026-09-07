@@ -1089,19 +1089,9 @@ skill_families:
         - ["spec", "risk"]
         - ["regression", "risk"]
         - ["failure-mode", "risk"]
-        - ["test-design"]
-        - ["test", "design"]
-        - ["テスト", "設計"]
-        - ["numerical", "test"]
-        - ["numeric", "test"]
-        - ["unnecessary", "test"]
-        - ["heavy", "test"]
-        - ["brittle", "test"]
         - ["test oracle"]
         - ["oracle", "mismatch"]
         - ["spec mismatch", "test"]
-        - ["tolerance", "test"]
-        - ["seed", "test"]
   - id: refactor-loop
     purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
     canonical_doc: agents/skills/refactor-loop.md
@@ -1277,6 +1267,30 @@ skill_families:
         - ["問題点", "出して", "直"]
         - ["ユーザー主導", "デバッグ"]
         - ["ユーザー主導", "リファクタ"]
+  - id: grilling
+    purpose: Route an explicit, read-only design-tree interview that stress-tests a plan, decision, or idea before implementation.
+    canonical_doc: agents/skills/grilling.md
+    shim: .codex/personal/skills/grilling/SKILL.md
+    discovery:
+      name: grilling
+      description: "Use when the user explicitly asks to grill a plan, decision, or idea; ask the settled prerequisite frontier in rounds with recommendations, inspect facts through the agent, and wait for shared understanding before any action."
+    tool_commands:
+      required: []
+      conditional:
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: user explicitly requests a read-only design-tree grilling interview
+      triggers:
+        - ["grilling"]
+        - ["grill", "me"]
+        - ["grill", "this"]
+        - ["grill", "plan"]
+        - ["grill", "idea"]
+        - ["グリル", "して"]
   - id: long-form-writing
     visualization_owner: code-visualization
     visualization_role: adapter
@@ -1502,31 +1516,6 @@ skill_families:
       - {"tool_id": "scan-dependency-headers", "operation_id": "default"}
       - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--print-edges"]}
       - {"executable": "git", "argv": ["grep"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
-  - id: worktree-start
-    purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
-    canonical_doc: agents/skills/worktree-start.md
-    shim: .codex/personal/skills/worktree-start/SKILL.md
-    discovery:
-      name: worktree-start
-      description: "Legacy cleanup only. Use when inspecting or retiring stale WORKTREE_SCOPE.md/action-log state; do not use to create, recreate, resume, or move work into a git worktree."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "git", "argv": ["worktree"]}
-      - {"tool_id": "worktree-scope-lint", "operation_id": "default", "argv_suffix": ["--current"]}
-      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
-      - {"executable": "git", "argv": ["worktree", "list", "--porcelain"]}
-      - {"executable": "bash", "argv": ["tools/validation/documentation/checks/check_worktree_scopes.sh"]}
-      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "..."]}
-      - {"executable": "bash", "argv": ["tools/repository/worktree/worktree_start.sh", "--current"]}
-      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "<kind>", "--request-clause-id", "R1", "--message", "<what changed>", "--next", "<next>"]}
-      - {"executable": "python3", "argv": ["tools/repository/workspace/worktree_start.py", "--current"]}
-      - {"executable": "python3", "argv": ["tools/experiments/registry/sync_experiment_registry_context.py", "--topic", "<topic>", "--branch", "<branch>"]}
-      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "cleanup", "--message", "<legacy worktree state>", "--next", "<carry-over or remove>"]}
-      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "edit", "--request-clause-id", "R1", "--message", "...", "--next", "..."]}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
@@ -2160,3 +2149,81 @@ skill_families:
         - ["プロンプト", "評価"]
         - ["スキル", "評価"]
         - ["反復", "収束"]
+  - id: slides
+    purpose: Produce presentation decks from a fixed template with readable claims, equations, images, and references.
+    canonical_doc: agents/skills/slides.md
+    shim: .codex/personal/skills/slides/SKILL.md
+    discovery:
+      name: slides
+      description: "Use when authoring or revising a presentation, slide deck, or presentation-oriented Markdown deck."
+    tool_commands:
+      required: []
+      conditional: []
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: an explicitly requested presentation artifact needs a canonical deck owner
+      triggers:
+        - ["slide"]
+        - ["slides"]
+        - ["slide", "deck"]
+        - ["presentation"]
+        - ["presentation", "deck"]
+        - ["PPT"]
+        - ["PPTX"]
+        - ["スライド"]
+        - ["プレゼン"]
+  - id: tokens
+    purpose: Make token budgets, role footprints, and efficiency decisions from equivalent runtime evidence.
+    canonical_doc: agents/skills/tokens.md
+    shim: .codex/personal/skills/tokens/SKILL.md
+    discovery:
+      name: tokens
+      description: "Use when token budget, role footprint, context reuse, or token-efficiency evidence is an explicit decision."
+    tool_commands:
+      required: []
+      conditional:
+      - {"tool_id": "compare-codex-token-footprints", "operation_id": "default"}
+      - {"tool_id": "evaluate-codex-agent-roles", "operation_id": "default"}
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: token budget or efficiency is an explicit runtime decision or evidence-backed claim
+      triggers:
+        - ["token"]
+        - ["tokens"]
+        - ["token", "budget"]
+        - ["token", "efficiency"]
+        - ["context", "reuse", "tokens"]
+        - ["トークン"]
+        - ["トークン", "削減"]
+        - ["トークン", "効率"]
+  - id: integration
+    purpose: Integrate a completed local branch into its base while preserving conflict evidence and branch readback.
+    canonical_doc: agents/skills/integration.md
+    shim: .codex/personal/skills/integration/SKILL.md
+    discovery:
+      name: integration
+      description: "Use when a completed local branch must be integrated into its base or a conflict must be resolved."
+    tool_commands:
+      required: []
+      conditional:
+      - {"tool_id": "conflict-preservation", "operation_id": "default"}
+      maintenance:
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+    routing:
+      stage_policy: active
+      reason: a completed branch integration or conflict-resolution operation is explicitly in scope
+      triggers:
+        - ["branch", "integrate"]
+        - ["branch", "merge"]
+        - ["merge", "conflict"]
+        - ["conflict", "resolve"]
+        - ["integrate", "branch"]
+        - ["ブランチ", "統合"]
+        - ["コンフリクト", "解消"]

@@ -284,7 +284,7 @@ def design_brief_lines(
                 "## Upstream Requirement Packet",
                 (
                     "Read `user_request_contract.md`, `schedule.md`, `intent_brief.md`, "
-                    "and `agents/workflows/implementation-waterfall-workflow.md`."
+                    "and `agents/skills/codex-task-workflow.md`."
                 ),
             ]
         )
@@ -1067,7 +1067,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
             encoding="utf-8"
         )
         workflow_text = (
-            PROJECT_ROOT / "agents" / "workflows" / "implementation-waterfall-workflow.md"
+            PROJECT_ROOT / "agents" / "skills" / "codex-task-workflow.md"
         ).read_text(encoding="utf-8")
 
         for text in (template_text, workflow_text):

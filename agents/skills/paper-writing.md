@@ -39,12 +39,39 @@ section contract と citation/evidence trace を先に固定し、複数 reviewe
 
 ## Core References
 
-- `agents/workflows/paper-writing-workflow.md`
-- `agents/workflows/academic-writing-workflow.md`
-- `agents/workflows/long-form-writing-workflow.md`
+- `agents/skills/academic-writing.md` (shared scholarly prose contract)
+- `agents/skills/long-form-writing.md` (general prose boundary)
 - `documents/conventions/REVIEW_PROCESS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
-- `agents/skills/academic-writing.md`
+
+## Required Artifacts
+
+- `paper intent brief`
+- `claim contract`
+- `section contract`
+- `citation and evidence matrix`
+- `notation ledger`
+- `paragraph claim map`
+- reverse outline
+
+Artifacts may live in a run bundle or a linked note. Keep them readable by the
+reviewers that use them; do not create a second canonical policy document.
+
+## Standard Section Contract
+
+Fix only the sections the paper needs, without merging distinct roles:
+
+- `abstract`: problem, method, main result, and implication
+- `introduction`: gap, contribution, and paper map
+- `related work`: known results and the unresolved position
+- `method`: setting, assumptions, notation, and procedure
+- `results`: observations and measured outcomes
+- `discussion`: interpretation, scope, and limitations
+- `limitations`: material boundaries of the claims
+- `conclusion`: contribution and next step
+
+Each selected section records its purpose, main subclaim, prerequisites,
+supporting citations or artifacts, and the message left to the reader.
 
 ## Mandatory Checklist
 
@@ -100,13 +127,17 @@ python3 tools/analysis/documents/doc_start.py \
 - 文献探索自体が主タスクなら `literature-survey` を先に使います
 - rebuttal や report の evidence traceability を主に見たいなら report review を追加します
 
+## Closeout
+
+Close only after the selected review passes and the changed Markdown has been
+checked with `tools/bin/agent-canon docs check`. Do not require unused optional
+sections or reviewers merely to satisfy a fixed checklist.
+
 ## Runtime Contract Clauses
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
 1. Read `agents/skills/paper-writing.md`.
-1. Read `agents/workflows/paper-writing-workflow.md`.
-1. Read `agents/workflows/academic-writing-workflow.md`.
 1. Select this as the DSL-to-prose projection adapter when file/document responsibility is submission paper, thesis chapter, or paper-style manuscript with paper section contracts and citation/evidence review; do not select it by length.
 1. Use `$structure-planning` before drafting when section order, first figure/table, claim/evidence layout, source-to-structure map, or invalid interpretations are nontrivial.
 1. For paragraph-level claim flow, transition pairs, or logic-gap triage, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument` and treat it as advisory discourse evidence before prose drafting.

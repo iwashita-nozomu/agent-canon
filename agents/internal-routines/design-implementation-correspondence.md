@@ -33,7 +33,7 @@ fingerprint、forward/reverse closure packet は要求しません。
 | --- | --- | --- | --- |
 | 設計の内容 | `documents/design/*.md` | 選択された文書を読む、clause ID と fingerprint を確定する | 設計本文をこの routine に複製しない |
 | capability / skill の順序 | `agents/skills/agent-orchestration.md` と `agents/skills/skill-dependencies.yaml` | owner stage を呼び出す | prompt keyword で capability を決めない |
-| implementation handoff | `agents/COMMUNICATION_PROTOCOL.md`、`agents/workflows/implementation-waterfall-workflow.md` | clause map と digest を handoff に載せる | 実装者の代わりに実装しない |
+| implementation handoff | `agents/COMMUNICATION_PROTOCOL.md`、`agents/skills/codex-task-workflow.md` | clause map と digest を handoff に載せる | 実装者の代わりに実装しない |
 | review | `agents/skills/change-review.md` | forward / reverse coverage と drift を判定対象にする | review policy を再定義しない |
 | evidence / validation | 各 design doc の validation route | clause と evidence の readback を残す | 成功メッセージだけで十分条件にしない |
 | semantic responsibility allocation | `documents/design/semantic-responsibility-contract.md` と run-local instance | delta action、obligation、primary owner、hard-edge closure を対応付ける | class/module/file の構造 mandate や協調指標を導入しない |

@@ -4,7 +4,7 @@
 # responsibility Provides shared OOP boundary observations for language-specific tools.
 # upstream design ../../../../../documents/conventions/object-oriented-design.md OOP boundary policy
 # upstream design ../../../../../documents/conventions/coding-conventions-house-style.md shared readability rules
-# upstream design ../../../../../agents/workflows/comprehensive-refactoring-workflow.md static boundary evidence
+# upstream design ../../../../../agents/skills/oop-readability-check.md static boundary evidence
 # downstream implementation ../python/readability.py Python OOP readability entrypoint
 # downstream implementation ../cpp/readability.py C++ OOP readability entrypoint
 # downstream implementation ../../../../../.codex/agents/oop_readability_reviewer.toml report output

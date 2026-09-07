@@ -24,27 +24,23 @@ GitHub actions, and arbitrary host commands remain owned by the project or
 host workflow. No project-specific AgentCanon image, container, virtualenv,
 Cargo toolchain, volume, or source checkout is created.
 
-The published artifact is one digest-pinned Ubuntu 24.04 output image. Runtime
-and build dependencies are installed in one apt transaction/update, followed by
-dependency and asset/materializer layers. Build-essential, curl, pipx, npm,
-`rustup-init`, Cargo build output, and caches are purged before the image is
-committed; the final runtime retains Node, Python 3.12, jq/tree, clangd, Rust
-runtime components, LSP launchers, and immutable dependency plan/receipts.
-CI owns the runtime smoke: it loads the native image, runs entrypoint health,
-then invokes `/bin/sh` to check versions/imports, both C/C++ LSP resolver paths,
-the plan readback, and absence of build providers. Canonical install/sync/update
-pull `ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` and never fall back
-to a local build; only explicit `update --local-build` enables the development
-build route. Rust source digests are observed in receipts; no manually maintained
-source-tree digest is required in the manifest.
+The published artifact is one digest-pinned Ubuntu 24.04 output image. Its
+stable tag is `ghcr.io/iwashita-nozomu/agent-canon:env-<key>`, where the shared
+shell key owner hashes the Dockerfile and its `source=` bind inputs by
+repository-relative Git tree identity. The key is independent of checkout
+path and source commit ID. CI builds both architectures only when that tag is
+absent; pull requests build for verification without publishing. A source-only
+update reuses the environment image and recompiles only source-mounted Rust
+tools into the writable cache.
 
 ## Host/container activation boundary
 
 `bootstrap.sh` and `bootstrap/host/lifecycle/entrypoint.sh` are executable by a host that
 has Docker and Git but no Python package environment. They never import or
-execute AgentCanon Python directly. Lifecycle and tool operations first build
-or adopt the image, create/start exactly one resident container with
-`--network none`, then invoke the Python controller through `docker exec`.
+execute AgentCanon Python directly. Lifecycle and tool operations first select
+the env-key image, create/start exactly one resident container with
+`--network none`, mount the source checkout read-only at
+`/opt/agent-canon/source`, and invoke source-mounted tools through `docker exec`.
 
 The controller never issues Docker operations. The host shell owns the fixed
 Docker lifecycle transaction and invokes the controller only after the
@@ -53,11 +49,12 @@ resident is healthy. Target sources are exported by the controller as a strict
 Git credentials, or network capability is mounted into the resident. The
 credential-free `container-state` subtree is the only runtime state mount;
 host-only Docker config and archive credentials remain outside it. Systemd
-units and source synchronization remain host shell/Git operations. Sync stages
-a full-history candidate under `.runtime/source-staging/` and replaces the
-resident only after candidate image health; live source fast-forward happens
-afterward and failure restores the old resident. Product
-code verification remains in the project's own Docker test runner.
+units and source synchronization remain host shell/Git operations. Sync fetches
+`origin/main` and force-checks out local `main` at `FETCH_HEAD`, publishes the
+source state, then selects the env-key image and replaces the
+resident only when the environment or required mounts changed. Source advancement is never rolled back when a later image, resident,
+link, or systemd phase fails. Product code verification remains in the
+project's own Docker test runner.
 
 ## One command family
 
@@ -83,7 +80,7 @@ The command family is:
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" update
-"$BOOTSTRAP" "${COMMON[@]}" sync --install-root "$HOME/agent-canon" --remote origin --branch main
+"$BOOTSTRAP" "${COMMON[@]}" sync --install-root "$HOME/agent-canon"
 "$BOOTSTRAP" "${COMMON[@]}" scheduler enable
 "$BOOTSTRAP" "${COMMON[@]}" scheduler status
 "$BOOTSTRAP" "${COMMON[@]}" start
@@ -104,8 +101,9 @@ The invocation cwd is informational only; it is not used to select runtime
 state and no cwd warning is emitted. The flow is `cwd -> bootstrap.sh ->
 install root -> control root -> <install-root>/.runtime/ -> resident
 container`. `install` creates the verified image and resident, `update`
-reconciles the current checkout in that resident, and `status` reads back the
-active image and resident health from `.runtime/`. `gc --dry-run` follows the
+reconciles the current checkout in that resident, and `sync` pulls `origin
+main`, then updates the image and resident. `status` reads back the active
+image and resident health from `.runtime/`. `gc --dry-run` follows the
 same identity and ownership reads without preparing or changing `.runtime/`;
 `gc` performs the exact owned Docker cleanup under the replacement lock and
 includes the resident controller's state/cache/lease GC receipt.
@@ -133,11 +131,11 @@ runtime root; they are operational evidence, not source files. A failed
 operation returns a stable error code and preserves the previous state where
 the operation has a generation or ownership boundary.
 
-The host creates the canonical `.runtime/source-sync.json` record before any
-resident container is created and mounts that file read-only at
-`/var/lib/agent-canon/source-sync.json`. The host shell is the only source-sync
-state writer. Resident status and dashboard readers consume this mounted file;
-`container-state/source-sync.json` is not a state surface.
+The host creates the canonical `.runtime/source-sync/source-sync.json` record
+before any resident container is created and mounts the containing directory
+read-only at `/var/lib/agent-canon/source-sync`. The host shell is the only
+source-sync state writer. Resident status and dashboard readers consume the
+nested mounted file; `container-state/source-sync.json` is not a state surface.
 
 The source-sync record uses schema `agent-canon.source-sync.v1` and contains
 `status`, `code`, `updated_at`, `source_root`, `remote`, `remote_url`, `branch`,
@@ -149,23 +147,17 @@ host sync transition.
 
 ### Install source transition
 
-The public install path has one SourceSync admission transition after argument
-and path parsing but before Docker command discovery, host runtime
-initialization, image build, or resident reconciliation. It fetches
-`refs/heads/main` explicitly into `refs/remotes/origin/main` and admits the
-checkout only when `git rev-parse HEAD` is exactly equal to
-`git rev-parse refs/remotes/origin/main`. Fetch and commit-read failures remain
-typed operational failures. The transition never switches branches, inspects
-working-tree cleanliness, expands shallow history, or reads a source tree for
-admission; tree identity in the host source-sync receipt is telemetry only.
+The public `install` and `sync` paths have one source transition after argument
+parsing and under `replacement.lock`: `git -C <install-root> fetch origin main`
+followed by `git -C <install-root> checkout --force -B main FETCH_HEAD`. Git
+command or network failure is the only source transition failure; the final
+HEAD and tree values in the source-sync receipt are telemetry.
 
-After the commit match, install deletes the exact AgentCanon-owned resident
-and reconstructible runtime projection, then builds and starts the new
-resident. Old `mounts.tsv`, target paths, rollback files, resident layout or
-security configuration, and UID/rootless details are not install inputs.
-Foreign or unlabeled Docker resources remain untouched. A failure in source
-admission, owned-state deletion, build, or start is terminal for that
-invocation; target registration and tool execution remain separate operations.
+After a successful source transition, sync selects the `:env-<key>` image and reuses the
+resident when its environment and source/cache mounts are current. Image
+unavailability is reported before the old resident is stopped; later resident
+failure uses the existing runtime rollback only. Git is never rolled back by
+sync. Foreign or unlabeled Docker resources remain untouched.
 
 ## What is installed and where
 
@@ -186,36 +178,33 @@ image remains outside uninstall.
 After install, update, or rollback readback, `host-state/active-image.tsv`
 atomically records the exact resident `Config.Image` reference and immutable
 image ID. Ordinary `start`, `status`, `target`, `tool`, and Codex routes consume
-that record; they do not recompute a source-derived image tag. Candidate image
+that record; they do not recompute an image tag. Candidate image
 selection is limited to install/update/sync, and rollback may persist the
 immutable ID used to recreate the resident.
 
 `update` reads only the current AgentCanon checkout. It never fetches,
-checks out, merges, rebases, resets, or pulls Git state. It pulls the canonical
-`ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` image and validates its
-OCI revision, native platform, and RepoDigest. Only explicit `update
---local-build` may build locally; pull failure never falls back to a build.
-A handled pull/build or health failure restores the existing v2 generation,
-container, and image.
-`sync` is the one-shot source/update route. It uses `git ls-remote` for
-`origin/main`, treats equal HEAD as a no-op, clones a fresh full-history
-checkout under runtime staging, pulls `:sha-<full-commit>`, verifies the OCI
-revision, RepoDigest, and native platform, then atomically swaps the full
-checkout transactionally while preserving the bootstrap-owned `.runtime/`, then runs
-`update --image-ref`, `start`, and `codex prepare`. A pull,
-health, or candidate bootstrap failure restores the previous checkout and
-runtime; the source checkout's commit history remains available for logs and
-diagnostics.
+checks out, merges, rebases, resets, or pulls Git state. It selects the
+environment key, reuses an exact local `:env-<key>` image when possible, and
+otherwise pulls or builds that environment once. A handled pull/build or
+health failure restores the existing v2 generation, container, and image.
+`sync` is the one-shot source/update route. Under `replacement.lock`, it runs
+`git -C <install-root> fetch origin main` followed by
+`git -C <install-root> checkout --force -B main FETCH_HEAD`, leaving the
+installed checkout on local `main` at the fetched remote revision. It publishes
+the resulting source state, selects `:env-<key>`, and updates the resident only
+when the environment or required mounts changed. Image or resident failure
+never rolls back the source checkout; the previous resident is kept or restored
+according to the existing runtime replacement route.
 `main` and `latest` are discovery labels only and are never runtime identity.
 
-On Linux and WSL with a usable systemd user manager, `install` enables the
+On Linux and WSL with a usable systemd user manager, the host `install` enables the
 one-shot `agent-canon-sync.timer`; its service exits after one sync. The timer
 is owned by `scheduler enable`, `disable`, `status`, and `uninstall`. Hosts
 without systemd user support, macOS, and native Windows remain one-shot-only;
 no daemon, webhook listener, cron route, or `loginctl enable-linger` is added.
-`install` and `update` converge the explicit control-root Codex views into split
-per-entry links. With `$HOME` as control root, these are
-`~/.agents/skills/<skill>` to the ignored source view, `~/.codex/agents/<role>.toml`
+`install` and `update` converge the explicit control-root Codex views. With
+`$HOME` as control root, `~/.agents/skills` is one directory link to the ignored
+source view, while `~/.codex/agents/<role>.toml`
 to the tracked role file, and `~/.codex/config.toml` to the ignored personal
 source under the AgentCanon checkout. An existing regular Codex config is moved
 byte-for-byte (including mode) before linking; update preserves it and uninstall
@@ -223,14 +212,10 @@ restores a regular file. Foreign entries and foreign symlinks are preserved or
 reported as collisions. Project hooks and user authentication, session,
 history, cache, plugins, rules, MCP, and TUI/trust settings are outside this
 projection. `codex prepare` remains the separate runtime-local isolated home
-route. During install/update, the lifecycle also recognizes only the exact
-`~/.codex/skills/empirical-prompt-tuning` directory. It must be non-symlink,
-owned by the current user, contain exactly one regular `SKILL.md`, and match the
-authorized legacy SHA-256. After the canonical generated view and managed
-`~/.agents/skills/empirical-prompt-tuning` link are read back, that exact
-directory is removed. A changed digest, ownership/shape mismatch, symlink, or
-link readback failure is typed and preserves the legacy source. The migration
-never scans or removes `~/.codex/skills/.system` or another user entry.
+route. Legacy per-skill farms are not inspected; install replaces the owned
+`~/.agents/skills` directory as one link, and uninstall removes that link only.
+The migration never scans or removes `~/.codex/skills/.system` or another user
+entry.
 
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,
@@ -242,12 +227,10 @@ lease quotas are checked before garbage collection.
 `codex prepare` creates a manifest-managed, isolated `codex-home/` beneath the
 selected runtime root and `codex launch` sets `CODEX_HOME` only for the launched
 process. Separately, with `$HOME` as explicit control root, install/update own
-split global skill and role links plus the one personal `~/.codex/config.toml`
-link described above. Existing conflicting paths fail closed; only links
-recorded in the strict runtime `global-links.tsv` manifest can be removed by
-`uninstall`, which restores the regular personal config. Foreign links are not
-scanned or removed. Start a new Codex session after an install or update and
-read back both global links and runtime-local targets.
+the complete global skills directory link, role links, and personal config link
+described above. Uninstall removes only the skills directory link and restores
+the regular personal config. Foreign Codex entries are not scanned or removed.
+Start a new Codex session after an install or update.
 
 ## Targets, generations, and failure recovery
 
@@ -281,9 +264,9 @@ container, and managed links after checking that no task is active. It retains
 the external state, owner record, and receipts for absence readback; after that
 readback the installation runtime directory may be removed as the final
 task-owned cleanup. Foreign global Codex entries remain untouched; exact
-AgentCanon-managed links are removed or restored as described above. The
-migrated legacy prompt-skill directory is never restored, and uninstall removes
-only its managed `~/.agents/skills/empirical-prompt-tuning` link.
+AgentCanon-managed links are removed or restored as described above. Legacy
+per-skill farms are not read. Uninstall removes only the AgentCanon-owned
+`~/.agents/skills` directory link.
 
 ## Tool routes and compatibility
 

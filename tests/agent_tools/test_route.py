@@ -40,6 +40,7 @@ from tools.agent.orchestration.team_config import (  # noqa: E402
     load_team_config,
 )
 from tools.agent.orchestration.implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
+from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
 
 
 class RouteToolTest(unittest.TestCase):
@@ -55,6 +56,8 @@ class RouteToolTest(unittest.TestCase):
 
     def run_route(self, *args: str) -> subprocess.CompletedProcess[str]:
         """Run route.py with arguments."""
+        if not any(arg == "--mode" or arg.startswith("--mode=") for arg in args):
+            args = (*args, "--mode", "repo-changing")
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
             cwd=PROJECT_ROOT,
@@ -340,6 +343,7 @@ class RouteToolTest(unittest.TestCase):
         result = self.run_route(
             "--prompt",
             (
+                "$agent-orchestration $task-routing $result-artifact-writeout "
                 "スキル選択ルーティングも含めて修正してください。"
                 "マルチエージェントでログのレポートを残す。"
             ),
@@ -353,11 +357,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(decision["mode"], "repo-changing")
         self.assertEqual(decision["skills"][0], "agent-orchestration")
         self.assertIn("codex-task-workflow", decision["skills"])
-        self.assertIn("subagent-bootstrap", decision["skills"])
         self.assertIn("agent-orchestration", decision["active_skills"])
         self.assertIn("task-routing", decision["active_skills"])
         self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
@@ -365,7 +367,8 @@ class RouteToolTest(unittest.TestCase):
         """A mathematical correction keeps a JIT-looking symptom in the math route."""
         result = self.run_route(
             "--prompt",
-            "修正して。solver の residual が収束しない。更新式と停止条件を確認し、JIT は変更しない。",
+            "$computational-optimization 修正して。solver の residual が収束しない。"
+            "更新式と停止条件を確認し、JIT は変更しない。",
             "--format",
             "json",
         )
@@ -419,7 +422,7 @@ class RouteToolTest(unittest.TestCase):
         """Solver residual plus convergence still selects numerical ownership."""
         result = self.run_route(
             "--prompt",
-            "solver の residual convergence を修正する。",
+            "$computational-optimization solver の residual convergence を修正する。",
             "--format",
             "json",
         )
@@ -543,77 +546,11 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(active.requested_max_threads(), 28)
         self.assertEqual(active.peak_family.direct_frontier_count, 22)
 
-    def test_prompt_routes_subagent_bootstrap_activation_cases(self) -> None:
-        """Activation stays deferred unless the prompt carries a typed handoff signal."""
-        cases = (
-            (
-                "implementation",
-                "Repo-changing implementation patch doc-edit work should be "
-                "subagent-first; parent only orchestrates and integrates.",
-                {"matched_skills": ("subagent-bootstrap",), "deferred_skills": ("subagent-bootstrap",)},
-                {"active_skills": ("subagent-bootstrap",)},
-            ),
-            (
-                "plain-fix",
-                "Fix the failing tests in the repository.",
-                {},
-                {"skills": ("subagent-bootstrap",), "active_skills": ("subagent-bootstrap",)},
-            ),
-            (
-                "plain-refactor",
-                "Refactor the repository routing helpers.",
-                {},
-                {
-                    "skills": ("subagent-bootstrap",),
-                    "active_skills": ("subagent-bootstrap",),
-                    "deferred_skills": ("subagent-bootstrap",),
-                },
-            ),
-            (
-                "review-only",
-                "Use subagents for review only; do not edit files.",
-                {
-                    "matched_skills": ("subagent-bootstrap",),
-                    "skills": ("subagent-bootstrap",),
-                    "deferred_skills": ("subagent-bootstrap",),
-                },
-                {"active_skills": ("subagent-bootstrap",)},
-            ),
-            (
-                "japanese-delegation",
-                "作業はすべてサブエージェントに依頼し，親は監視，エージェント起動，追加指示に徹する",
-                {"matched_skills": ("subagent-bootstrap",), "deferred_skills": ("subagent-bootstrap",)},
-                {"active_skills": ("subagent-bootstrap",)},
-            ),
-            (
-                "review-without-delegation",
-                "レビューを依頼します",
-                {},
-                {
-                    "matched_skills": ("subagent-bootstrap",),
-                    "active_skills": ("subagent-bootstrap",),
-                    "deferred_skills": ("subagent-bootstrap",),
-                },
-            ),
-        )
-        for name, prompt, expected, forbidden in cases:
-            with self.subTest(case=name):
-                result = self.run_route("--prompt", prompt, "--format", "json")
-
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                decision = json.loads(result.stdout)
-                for field, values in expected.items():
-                    for value in values:
-                        self.assertIn(value, decision[field])
-                for field, values in forbidden.items():
-                    for value in values:
-                        self.assertNotIn(value, decision[field])
-
     def test_prompt_routes_direct_review_to_change_review_without_bootstrap(
         self,
     ) -> None:
         """Direct review prompts should activate change-review, not implementation handoff."""
-        for prompt in ("レビューしてください", "変更レビューして"):
+        for prompt in ("$change-review レビューしてください", "$change-review 変更レビューして"):
             with self.subTest(prompt=prompt):
                 result = self.run_route("--prompt", prompt, "--format", "json")
 
@@ -627,7 +564,7 @@ class RouteToolTest(unittest.TestCase):
         """Related skill metadata should guide later waves without expanding active skills."""
         result = self.run_route(
             "--prompt",
-            "スキルが重いので分割し、関連スキルを明示して実行時に適切なスキルを使う",
+            "$task-routing スキルが重いので分割し、関連スキルを明示して実行時に適切なスキルを使う",
             "--format",
             "json",
         )
@@ -646,7 +583,7 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_preserves_test_design_related_skills_for_validation_failure(
         self,
     ) -> None:
-        """Validation-failure routing should keep test-design as secondary."""
+        """Validation prose alone must not select an implementation or test owner."""
         result = self.run_route(
             "--prompt",
             "failed validation; do not delete tests or weaken oracle before repair",
@@ -656,12 +593,8 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("codex-task-workflow", decision["matched_skills"])
-        self.assertIn("codex-task-workflow", decision["active_skills"])
-        self.assertIn("test-design", decision["related_skill_candidates"])
-        self.assertNotIn("test-design", decision["active_skills"])
-        self.assertIn("change-review", decision["related_skill_candidates"])
-        self.assertIn("codex-task-workflow", decision["related_skills"])
+        self.assertNotIn("codex-task-workflow", decision["matched_skills"])
+        self.assertNotIn("test-design", decision["matched_skills"])
 
     def test_prompt_preserves_explicit_test_design_related_skills(self) -> None:
         """Explicit $test-design routing should keep its catalog metadata."""
@@ -681,10 +614,10 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_user_guided_debugging_cadence(self) -> None:
         """PR 359 cadence prompts should select user-guided-debugging."""
         prompts = (
-            "Use user-guided refactor cadence: show one concrete issue, patch only that target, and do not run validation unless I ask.",
-            "Use user-guided debugging: one issue at a time with visible problem statements before each edit.",
-            "ユーザー主導リファクタで、問題点を出してから1件ずつ修正して。",
-            "Debug 1 issue 1 fix; no validation unless asked after the patch.",
+            "$user-guided-debugging Use user-guided refactor cadence: show one concrete issue, patch only that target, and do not run validation unless I ask.",
+            "$user-guided-debugging Use user-guided debugging: one issue at a time with visible problem statements before each edit.",
+            "$user-guided-debugging ユーザー主導リファクタで、問題点を出してから1件ずつ修正して。",
+            "$user-guided-debugging Debug 1 issue 1 fix; no validation unless asked after the patch.",
         )
         for prompt in prompts:
             with self.subTest(prompt=prompt):
@@ -697,23 +630,52 @@ class RouteToolTest(unittest.TestCase):
                 self.assertNotIn("refactor-loop", decision["matched_skills"])
                 self.assertNotIn("refactor-loop", decision["active_skills"])
 
+    def test_prompt_routes_explicit_grilling_interview(self) -> None:
+        """Explicit grilling requests activate the read-only interview skill."""
+        for prompt in (
+            "$grilling grill me on this deployment plan",
+            "$grilling: stress-test this decision before implementation",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("grilling", decision["matched_skills"])
+                self.assertIn("grilling", decision["active_skills"])
+                self.assertIn("agent-orchestration", decision["related_skill_candidates"])
+
+    def test_prompt_does_not_route_grilling_for_ordinary_implementation(self) -> None:
+        """Ordinary implementation language remains outside the grilling route."""
+        result = self.run_route(
+            "--prompt",
+            "Implement the deployment plan and run the focused smoke test.",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("grilling", decision["matched_skills"])
+        self.assertNotIn("grilling", decision["active_skills"])
+
     def test_repository_topic_clone_routes_repository_kind_as_decorator(self) -> None:
         """Parent, dependency, and standalone clones share one generic owner."""
         scenarios = (
             (
-                "Clone a parent repository topic branch into workspace/<topic>/<repo>.",
+                "$repository-topic-clone Clone a parent repository topic branch into workspace/<topic>/<repo>.",
                 False,
             ),
             (
-                "Clone a dependency source topic branch and then update its gitlink.",
+                "$repository-topic-clone $dependency-module-change Clone a dependency source topic branch and then update its gitlink.",
                 True,
             ),
             (
-                "Clone a standalone repository into a workspace topic branch.",
+                "$repository-topic-clone Clone a standalone repository into a workspace topic branch.",
                 False,
             ),
             (
-                "Clone the repository topic, then make a small .gitignore change whose broader owner also requires workflow docs.",
+                "$repository-topic-clone Clone the repository topic, then make a small .gitignore change whose broader owner also requires workflow docs.",
                 False,
             ),
         )
@@ -735,7 +697,7 @@ class RouteToolTest(unittest.TestCase):
         result = self.run_route(
             "--prompt",
             (
-                "Use user-guided refactor cadence: show one concrete issue, "
+                "$user-guided-debugging Use user-guided refactor cadence: show one concrete issue, "
                 "patch only that target, and do not run validation unless I ask."
             ),
             "--format",
@@ -745,15 +707,14 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
         self.assertEqual(decision["mode"], "repo-changing")
-        self.assertIn("subagent-bootstrap", decision["skills"])
         self.assertNotIn("subagent-bootstrap", decision["active_skills"])
-        self.assertIn("subagent-bootstrap", decision["deferred_skills"])
+        self.assertNotIn("subagent-bootstrap", decision["skills"])
 
     def test_prompt_plain_refactor_does_not_route_user_guided_debugging(self) -> None:
         """Ordinary refactor prompts should not select user-guided-debugging."""
         result = self.run_route(
             "--prompt",
-            "Refactor the repository routing helpers.",
+            "$structure-refactor Refactor the repository routing helpers.",
             "--format",
             "json",
         )
@@ -815,7 +776,7 @@ class RouteToolTest(unittest.TestCase):
         result = self.run_route(
             "--prompt",
             (
-                "レポ内の自作ツールへの自動ルーティングが全くされません。"
+                "$task-routing レポ内の自作ツールへの自動ルーティングが全くされません。"
                 "ツールを逐次呼ぶこととスキルの動的ルーティングも直して。"
             ),
             "--format",
@@ -902,13 +863,13 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("code-visualization", decision["active_skills"])
         self.assertIsNone(decision["visualization_owner_skill"])
         self.assertIsNone(decision["visualization_tool_call"])
-        self.assertEqual(decision["visualization_rejection"], "prose_only")
+        self.assertIsNone(decision["visualization_rejection"])
 
     def test_prompt_routes_code_visualization_public_name(self) -> None:
         """Calling the public skill name should select code-visualization."""
         result = self.run_route(
             "--prompt",
-            "Please apply code-visualization to this dependency graph.",
+            "$code-visualization Please apply code-visualization to this dependency graph.",
             "--format",
             "json",
         )
@@ -1276,8 +1237,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(
             packet_payload["discovered_commands"],
             [
-                "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
-                "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+                '["catalog", "render-dependency-manifest-graph", "default"]',
+                '["catalog", "render-dependency-manifest-graph", "default", "python3", "tools/analysis/dependencies/render_dependency_manifest_graph.py", "--root", ".", "--scope", "changed", "--bundle-dir", "reports/dependency-graph", "--format", "json"]',
             ],
         )
         for forbidden in (
@@ -1357,7 +1318,7 @@ class RouteToolTest(unittest.TestCase):
 
     def test_prompt_file_routes_through_python_owner(self) -> None:
         """Prompt files should use the Python routing owner."""
-        prompt = "スキルとツールのルーティングが遅すぎるので改善して"
+        prompt = "$task-routing スキルとツールのルーティングが遅すぎるので改善して"
         with tempfile.TemporaryDirectory() as tmp_dir:
             prompt_path = Path(tmp_dir) / "prompt.txt"
             prompt_path.write_text(prompt, encoding="utf-8")
@@ -1380,7 +1341,7 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_old_tool_document_cleanup(self) -> None:
         """Old tool and document cleanup requests should enter document-canon cleanup."""
         result = self.run_route(
-            "--prompt", "古いツール，文書の掃除を", "--format", "json"
+            "--prompt", "$document-canon-cleanup 古いツール，文書の掃除を", "--format", "json"
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1393,7 +1354,7 @@ class RouteToolTest(unittest.TestCase):
         """GPU execution prompts should activate the managed GPU execution skill."""
         result = self.run_route(
             "--prompt",
-            "Python実行はExperimentRunnerに移譲し，GPU利用では先取無効を追加して実行",
+            "$gpu-execution Python実行はExperimentRunnerに移譲し，GPU利用では先取無効を追加して実行",
             "--format",
             "json",
         )
@@ -1411,6 +1372,7 @@ class RouteToolTest(unittest.TestCase):
         """Codex report and document based repo optimization should not fall through."""
         result = self.run_route(
             "--prompt",
+            "$agent-log-analysis $document-canon-cleanup $structure-refactor "
             "Codexのレポとか文書とか見ながら，ここのレポの最適化を行ってください",
             "--format",
             "json",
@@ -1432,6 +1394,7 @@ class RouteToolTest(unittest.TestCase):
         """Explicit reader-facing report requests should activate report-writing."""
         result = self.run_route(
             "--prompt",
+            "$report-writing $structure-planning $result-artifact-writeout "
             "評価レポートを作り，source packet と limitations を含めて",
             "--format",
             "json",
@@ -1441,11 +1404,7 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("report-writing", decision["matched_skills"])
         self.assertIn("report-writing", decision["active_skills"])
-        self.assertLess(
-            decision["skills"].index("structure-planning"),
-            decision["skills"].index("report-writing"),
-        )
-        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
+        self.assertIn("structure-planning", decision["skills"])
 
     def test_prompt_router_rejects_private_skill_in_public_catalog(self) -> None:
         """Underscore-prefixed skills are private and stay out of public routing."""
@@ -1481,7 +1440,7 @@ class RouteToolTest(unittest.TestCase):
 
     def test_prompt_routes_skill_visibility_naming_to_task_routing(self) -> None:
         """Skill visibility naming requests belong to the routing skill surface."""
-        prompt = "UserFacingなスキルとそうでないものを命名で分ける。private skill は _ 始まりにする"
+        prompt = "$task-routing UserFacingなスキルとそうでないものを命名で分ける。private skill は _ 始まりにする"
         result = self.run_route("--prompt", prompt, "--format", "json")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1536,7 +1495,7 @@ class RouteToolTest(unittest.TestCase):
 
     def test_prompt_routes_official_skill_delegation_to_task_routing(self) -> None:
         """Official skill delegation prompts should enter the deterministic router."""
-        prompt = "公式スキルで賄えるところを移譲して"
+        prompt = "$task-routing 公式スキルで賄えるところを移譲して"
         python_result = self.run_route(
             "--prompt",
             prompt,
@@ -1550,18 +1509,18 @@ class RouteToolTest(unittest.TestCase):
             python_result.returncode, 0, python_result.stdout + python_result.stderr
         )
         python_decision = json.loads(python_result.stdout)
-        self.assertEqual(python_decision["mode"], "repo-changing")
+        self.assertEqual(python_decision["mode"], "routing-only")
         self.assertIn("task-routing", python_decision["matched_skills"])
         self.assertIn("task-routing", python_decision["active_skills"])
         self.assertNotEqual(
-            python_decision["evidence"], "mode=repo-changing;matched=none"
+            python_decision["evidence"], "mode=routing-only;matched=none"
         )
 
     def test_prompt_routes_agent_learning_and_oop_readability(self) -> None:
         """Weak historical skill surfaces should be recommended from contextual prompts."""
         result = self.run_route(
             "--prompt",
-            "こういう止まり方の再発防止と OOP readability check を見直す",
+            "$agent-learning $oop-readability-check こういう止まり方の再発防止と OOP readability check を見直す",
             "--mode",
             "routing-only",
             "--format",
@@ -1570,15 +1529,15 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertEqual(decision["mode"], "repo-changing")
+        self.assertEqual(decision["mode"], "routing-only")
         self.assertIn("agent-learning", decision["skills"])
         self.assertIn("oop-readability-check", decision["skills"])
 
     def test_prompt_routes_skill_tool_call_coverage_to_log_analysis(self) -> None:
         """Toolcall and Skillcall coverage requests should route to runtime log analysis."""
         prompts = (
-            "ToolCall と SkillCall が50%くらいなのでルーティング coverage を調査して実装して",
-            "ログを確認して，スキル修正",
+            "$agent-log-analysis ToolCall と SkillCall が50%くらいなのでルーティング coverage を調査して実装して",
+            "$agent-log-analysis ログを確認して，スキル修正",
         )
 
         for prompt in prompts:
@@ -1595,7 +1554,7 @@ class RouteToolTest(unittest.TestCase):
         """Dashboard-driven skillization should route analysis, routing, and repair follow-up."""
         result = self.run_route(
             "--prompt",
-            "ログをすべて解析して，頻発する作業をスキルにしてルーティングを改善",
+            "$agent-log-analysis $task-routing $runtime-log-repair ログをすべて解析して，頻発する作業をスキルにしてルーティングを改善",
             "--format",
             "json",
         )
@@ -1613,7 +1572,7 @@ class RouteToolTest(unittest.TestCase):
         """Skill-miss cause repair should not leave runtime-log-repair related-only."""
         result = self.run_route(
             "--prompt",
-            "ログをすべて解析して，頻発する作業をスキルにしてルーティングを改善して下さい.スキルミスも原因を特定して修正",
+            "$runtime-log-repair $agent-log-analysis $task-routing ログをすべて解析して，頻発する作業をスキルにしてルーティングを改善して下さい.スキルミスも原因を特定して修正",
             "--format",
             "json",
         )
@@ -1627,7 +1586,7 @@ class RouteToolTest(unittest.TestCase):
         """Codex loading-priority document sweeps should route structure and document canon."""
         result = self.run_route(
             "--prompt",
-            "レポのルールを丁寧に見て，Codexの読み込みプライオリティを考えて上位文書から怪文書に至るまで漏らさず修正",
+            "$structure-refactor $document-canon-cleanup レポのルールを丁寧に見て，Codexの読み込みプライオリティを考えて上位文書から怪文書に至るまで漏らさず修正",
             "--format",
             "json",
         )
@@ -1644,7 +1603,7 @@ class RouteToolTest(unittest.TestCase):
         """Proof-oriented algorithm feedback stays with proof owners, not math inference."""
         result = self.run_route(
             "--prompt",
-            "アルゴリズム修正時にテストから直し始めるのをやめてください",
+            "$algorithm-proof-exploration $agent-learning アルゴリズム修正時にテストから直し始めるのをやめてください",
             "--format",
             "json",
         )
@@ -1660,14 +1619,14 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("computational-optimization", decision["matched_skills"])
         self.assertNotIn("test-design", decision["matched_skills"])
         self.assertNotIn("test-design", decision["active_skills"])
-        self.assertIn("agent-learning", decision["deferred_skills"])
+        self.assertIn("agent-learning", decision["active_skills"])
 
     def test_prompt_routes_runtime_dashboard_repair_to_runtime_log_repair(self) -> None:
         """Runtime dashboard repair prompts should activate runtime-log-repair."""
         result = self.run_route(
             "--prompt",
             (
-                "runtime dashboard next actions: repair failing hook evidence and "
+                "$runtime-log-repair runtime dashboard next actions: repair failing hook evidence and "
                 "AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL"
             ),
             "--format",
@@ -1695,7 +1654,7 @@ class RouteToolTest(unittest.TestCase):
         """Environment maintenance must route through dependency design first."""
         result = self.run_route(
             "--prompt",
-            "environment-maintenance Docker runtime update",
+            "$environment-maintenance environment-maintenance Docker runtime update",
             "--format",
             "json",
         )
@@ -1717,7 +1676,7 @@ class RouteToolTest(unittest.TestCase):
         """Existing-container exec prompts must avoid maintenance routes."""
         result = self.run_route(
             "--prompt",
-            "devcontainer exec --workspace-folder . zsh これで行けるっしょ？",
+            "$devcontainer-exec devcontainer exec --workspace-folder . zsh これで行けるっしょ？",
             "--format",
             "json",
         )
@@ -1735,7 +1694,7 @@ class RouteToolTest(unittest.TestCase):
         """Devcontainer configuration/build prompts retain maintenance routing."""
         result = self.run_route(
             "--prompt",
-            "devcontainer configuration build update",
+            "$environment-maintenance devcontainer configuration build update",
             "--format",
             "json",
         )
@@ -1789,7 +1748,7 @@ class RouteToolTest(unittest.TestCase):
         """PR cleanup prompts should activate pr-processing."""
         result = self.run_route(
             "--prompt",
-            "PRを片付けてください。LocalもMainに追従",
+            "$pr-processing PRを片付けてください。LocalもMainに追従",
             "--format",
             "json",
         )
@@ -1803,7 +1762,7 @@ class RouteToolTest(unittest.TestCase):
         """Docs check failures should activate md-style-check."""
         result = self.run_route(
             "--prompt",
-            "docs check が失敗しているので直して",
+            "$md-style-check docs check が失敗しているので直して",
             "--format",
             "json",
         )
@@ -1817,7 +1776,7 @@ class RouteToolTest(unittest.TestCase):
         """Experiment run/result prompts should activate lifecycle and suggest writeout."""
         result = self.run_route(
             "--prompt",
-            "experiment run artifacts を保存して実験結果をまとめて",
+            "$experiment-lifecycle experiment run artifacts を保存して実験結果をまとめて",
             "--format",
             "json",
         )
@@ -1833,7 +1792,7 @@ class RouteToolTest(unittest.TestCase):
         """Result save/export prompts should activate result-artifact-writeout."""
         result = self.run_route(
             "--prompt",
-            "save result and export result as a durable artifact with raw summary",
+            "$result-artifact-writeout save result and export result as a durable artifact with raw summary",
             "--format",
             "json",
         )
@@ -1847,7 +1806,7 @@ class RouteToolTest(unittest.TestCase):
         """Missed skill feedback should reach routing, log analysis, and learning surfaces."""
         result = self.run_route(
             "--prompt",
-            "適切にスキルが呼ばれないです．関連スキルの記述を絞りすぎ",
+            "$task-routing $agent-log-analysis $agent-learning 適切にスキルが呼ばれないです．関連スキルの記述を絞りすぎ",
             "--format",
             "json",
         )
@@ -1859,16 +1818,15 @@ class RouteToolTest(unittest.TestCase):
             self.assertIn(skill, decision["skills"])
         self.assertIn("task-routing", decision["active_skills"])
         self.assertIn("agent-log-analysis", decision["active_skills"])
-        self.assertIn("agent-learning", decision["deferred_skills"])
+        self.assertIn("agent-learning", decision["active_skills"])
         self.assertIn("issue-finding-report", decision["related_skill_candidates"])
-        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_prompt_routes_source_file_order_feedback(self) -> None:
         """Source file order feedback should reach bounded and Python review routes."""
         result = self.run_route(
             "--prompt",
-            "コードファイル内の順序がわかりにくいです",
+            "$python-review コードファイル内の順序がわかりにくいです",
             "--format",
             "json",
         )
@@ -1878,15 +1836,15 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("bounded-owner-route", decision["matched_skills"])
         self.assertNotIn("bounded-owner-route", decision["active_skills"])
         self.assertIn("python-review", decision["matched_skills"])
-        self.assertIn("python-review", decision["deferred_skills"])
+        self.assertIn("python-review", decision["active_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_prompt_routes_adaptive_improvement_loop_from_iterative_work(self) -> None:
         """Iterative execution and tuning prompts should activate adaptive loop routing."""
         prompts = (
-            "反復実行系のスキルがうまく作動してない。原因を探して",
+            "$adaptive-improvement-loop 反復実行系のスキルがうまく作動してない。原因を探して",
             (
-                "experiments research tuning iterative code improvement "
+                "$adaptive-improvement-loop experiments research tuning iterative code improvement "
                 "managed as one backlog-driven agile outer loop"
             ),
         )
@@ -1916,7 +1874,7 @@ class RouteToolTest(unittest.TestCase):
         """Broad follow-up redesign prompts should not fall through to matched=none."""
         result = self.run_route(
             "--prompt",
-            "根本の設計から見直してください",
+            "$task-routing 根本の設計から見直してください",
             "--format",
             "json",
         )
@@ -1932,6 +1890,7 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_agent_growth_responsibility_migration(self) -> None:
         """Agent-growth responsibility migration should route to repair skills."""
         prompt = (
+            "$task-routing $agent-log-analysis $structure-refactor $comprehensive-development $agent-learning "
             "エージェントの成長のために欠落しているスキル・動線，ツールを探索して実装し，"
             "AGENTS.md と skill の重複を削って skill 側へ責務移行する"
         )
@@ -1953,15 +1912,15 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("task-routing", python_decision["active_skills"])
         self.assertIn("agent-log-analysis", python_decision["active_skills"])
         self.assertIn("structure-refactor", python_decision["active_skills"])
-        self.assertIn("comprehensive-development", python_decision["deferred_skills"])
-        self.assertIn("agent-learning", python_decision["deferred_skills"])
+        self.assertIn("comprehensive-development", python_decision["active_skills"])
+        self.assertIn("agent-learning", python_decision["active_skills"])
         self.assertNotEqual(
             python_decision["evidence"], "mode=repo-changing;matched=none"
         )
 
     def test_prompt_routes_repo_wide_responsibility_deduplication(self) -> None:
         """Repo-wide over-splitting and responsibility overlap should route to structure repair."""
-        prompt = "レポ全体をレビューしながら過剰分割，責務重複を排除してください"
+        prompt = "$structure-refactor $comprehensive-development レポ全体をレビューしながら過剰分割，責務重複を排除してください"
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
         self.assertEqual(
@@ -1971,7 +1930,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("structure-refactor", python_decision["matched_skills"])
         self.assertIn("structure-refactor", python_decision["active_skills"])
         self.assertIn("comprehensive-development", python_decision["matched_skills"])
-        self.assertIn("comprehensive-development", python_decision["deferred_skills"])
+        self.assertIn("comprehensive-development", python_decision["active_skills"])
         self.assertNotEqual(
             python_decision["evidence"], "mode=repo-changing;matched=none"
         )
@@ -1979,8 +1938,8 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_settings_skill_duplicate_management(self) -> None:
         """Settings and skill duplicate-management prompts should not fall through."""
         prompts = (
-            "設定，スキルの二重管理を洗い出して，修正してください",
-            ".codex/.agents と skill catalog の ownership を直して",
+            "$task-routing $structure-refactor 設定，スキルの二重管理を洗い出して，修正してください",
+            "$task-routing $structure-refactor .codex/.agents と skill catalog の ownership を直して",
         )
 
         for prompt in prompts:
@@ -2004,6 +1963,7 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
         """All-skill command packet repair should not fall through."""
         prompt = (
+            "$task-routing $structure-refactor $comprehensive-development $agent-learning "
             "スキル内で明示的にツールの起動コマンドが書いていないから，"
             "ミスることが多発しています．すべてのスキルを修正してください"
         )
@@ -2023,8 +1983,8 @@ class RouteToolTest(unittest.TestCase):
             self.assertIn(skill, python_decision["skills"])
         self.assertIn("task-routing", python_decision["active_skills"])
         self.assertIn("structure-refactor", python_decision["active_skills"])
-        self.assertIn("comprehensive-development", python_decision["deferred_skills"])
-        self.assertIn("agent-learning", python_decision["deferred_skills"])
+        self.assertIn("comprehensive-development", python_decision["active_skills"])
+        self.assertIn("agent-learning", python_decision["active_skills"])
         self.assertNotEqual(
             python_decision["evidence"], "mode=repo-changing;matched=none"
         )
@@ -2035,7 +1995,7 @@ class RouteToolTest(unittest.TestCase):
         """Repo-refactor and ~/.codex boundary prompts should route deterministically."""
         result = self.run_route(
             "--prompt",
-            "レポのリファクタスキルを定義して ~/.codex も見て修正して",
+            "$structure-refactor レポのリファクタスキルを定義して ~/.codex も見て修正して",
             "--format",
             "json",
         )
@@ -2050,7 +2010,7 @@ class RouteToolTest(unittest.TestCase):
         """Parent-repo-specific skill lane design should reach routing and structure."""
         result = self.run_route(
             "--prompt",
-            "親レポに固有スキルを置けるようにする設計修正",
+            "$task-routing $structure-refactor 親レポに固有スキルを置けるようにする設計修正",
             "--format",
             "json",
         )
@@ -2061,20 +2021,6 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("structure-refactor", decision["matched_skills"])
         self.assertNotIn("environment-maintenance", decision["matched_skills"])
         self.assertNotIn("environment-maintenance", decision["active_skills"])
-        self.assertTrue(
-            any(
-                "task-routing:structural_concept=repository_skill_discovery_surface"
-                in reason
-                for reason in decision["reasons"]
-            )
-        )
-        self.assertTrue(
-            any(
-                "structure-refactor:structural_concept=repository_skill_discovery_surface"
-                in reason
-                for reason in decision["reasons"]
-            )
-        )
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
 
     def test_repo_refactor_name_alias_routes_to_structure_area(self) -> None:
@@ -2095,7 +2041,7 @@ class RouteToolTest(unittest.TestCase):
         """Structure review weakness should route to the structure refactor skill."""
         result = self.run_route(
             "--prompt",
-            "構造のレビュースキルが弱いので見直して",
+            "$structure-refactor 構造のレビュースキルが弱いので見直して",
             "--format",
             "json",
         )
@@ -2126,6 +2072,7 @@ class RouteToolTest(unittest.TestCase):
         result = self.run_route(
             "--prompt",
             (
+                "$task-routing $comprehensive-development $structure-planning $change-review "
                 "スキルとツールのルーティングを根本の設計から見直し、"
                 "全体レビューして修正し、構造解析も行う"
             ),
@@ -2173,6 +2120,39 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-learning", decision["skills"])
         self.assertIn("md-style-check", decision["matched_skills"])
         self.assertIn("agent-learning", decision["matched_skills"])
+
+    def test_comprehensive_tasks_project_cross_module_handoff_guidance(self) -> None:
+        """T11/T12 inherit the conditional dependency-resolution prompt."""
+        config = load_team_config()
+        catalog = load_task_catalog(config)
+        family = next(
+            family
+            for family in catalog.workflow_families
+            if family["id"] == "comprehensive_development"
+        )
+        rendered = "\n".join(
+            # The family packet is the existing task-manifest projection for T11/T12.
+            render_subagent_prompt_packet(family, indent="  ")
+        )
+        self.assertIn("involved Git-root/module count", rendered)
+        self.assertIn("dependency-repository consumer", rendered)
+        self.assertIn("dependency DAG", rendered)
+        for marker in (
+            "involved-root identities",
+            "edge kinds",
+            "topological order",
+            "dependency scope / reuse facts",
+            "common validation obligations",
+            "role / module's `allowed_paths`",
+            "`do_not_read`",
+            "write scope",
+            "exact validation commands",
+        ):
+            self.assertIn(marker, rendered)
+        self.assertEqual(
+            [task["family"] for task in catalog.tasks if task["id"] in ("T11", "T12")],
+            ["comprehensive_development", "comprehensive_development"],
+        )
 
     def test_prompt_route_invalid_catalog_fails_structured(self) -> None:
         """Invalid catalog routing should return a structured router error."""
@@ -2294,7 +2274,7 @@ class RouteToolTest(unittest.TestCase):
         """Formatter-adjacent check complaints should route to Markdown style checks."""
         result = self.run_route(
             "--prompt",
-            "フォーマッタ系の周辺チェックを通してすらないことが多い",
+            "$md-style-check フォーマッタ系の周辺チェックを通してすらないことが多い",
             "--format",
             "json",
         )
@@ -2308,7 +2288,7 @@ class RouteToolTest(unittest.TestCase):
         """Prose graph requests should route to the public graph skill."""
         result = self.run_route(
             "--prompt",
-            "既存文章を文章構造グラフにして段落接続と統合 rewrite packet を作りたい",
+            "$prose-reasoning-graph 既存文章を文章構造グラフにして段落接続と統合 rewrite packet を作りたい",
             "--format",
             "json",
         )
@@ -2336,7 +2316,7 @@ class RouteToolTest(unittest.TestCase):
         """PR queue work should route to the public PR processing skill."""
         result = self.run_route(
             "--prompt",
-            "PRの処理をスキル化して、conflict 解消と Issue triage まで扱って",
+            "$pr-processing PRの処理をスキル化して、conflict 解消と Issue triage まで扱って",
             "--format",
             "json",
         )
@@ -2349,7 +2329,7 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_pr_skill_scan_routing_refactor(self) -> None:
         """PR intake followed by skill scan and routing refactor should not fall through."""
         prompt = (
-            "PRをすべて取り込み、その後、Skillを一つずつ走査し"
+            "$pr-processing $task-routing $refactor-loop PRをすべて取り込み、その後、Skillを一つずつ走査し"
             "ルーティングも含めてリファクタリング。実装時の抽象化不足も修正対象。"
         )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
@@ -2369,15 +2349,15 @@ class RouteToolTest(unittest.TestCase):
         self,
     ) -> None:
         """English unneeded numerical-test prompts should route to test design."""
-        prompt = "Stop adding unnecessary numerical tests; use the test-design gate"
+        prompt = "Stop adding unnecessary numerical tests; use the testing gate"
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
         self.assertEqual(
             python_result.returncode, 0, python_result.stdout + python_result.stderr
         )
         python_decision = json.loads(python_result.stdout)
-        self.assertIn("test-design", python_decision["matched_skills"])
-        self.assertIn("test-design", python_decision["active_skills"])
+        self.assertNotIn("test-design", python_decision["matched_skills"])
+        self.assertNotIn("test-design", python_decision["active_skills"])
 
     def test_prompt_routes_failed_validation_to_owning_repair_surface(
         self,
@@ -2393,21 +2373,13 @@ class RouteToolTest(unittest.TestCase):
             python_result.returncode, 0, python_result.stdout + python_result.stderr
         )
         python_decision = json.loads(python_result.stdout)
-        self.assertIn("codex-task-workflow", python_decision["matched_skills"])
-        self.assertIn("codex-task-workflow", python_decision["active_skills"])
-        self.assertIn("test-design", python_decision["related_skill_candidates"])
-        self.assertNotIn("test-design", python_decision["active_skills"])
+        self.assertNotIn("codex-task-workflow", python_decision["matched_skills"])
+        self.assertNotIn("test-design", python_decision["matched_skills"])
         self.assertIn("agent-orchestration", python_decision["active_skills"])
-        self.assertTrue(
-            any(
-                "tests_are=validation_control_surface_not_default_work_owner" in reason
-                for reason in python_decision["reasons"]
-            )
-        )
 
     def test_prompt_routes_oracle_spec_mismatch_to_test_design(self) -> None:
         """Oracle/spec mismatch prompts should still activate test-design."""
-        prompt = "The test oracle has a spec mismatch; update the test design."
+        prompt = "$test-design The test oracle has a spec mismatch; update the test design."
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
         self.assertEqual(
@@ -3020,11 +2992,12 @@ class CapabilityRouteTest(unittest.TestCase):
         )
 
     def test_capability_route_rejects_invalid_mode(self) -> None:
-        """Invalid modes preserve the raw code and use repo-changing output."""
+        """Invalid modes preserve the raw code and use the non-write fallback."""
         result = self.run_route("--capability", "oop_type_design", "--mode", "other")
         self.assert_failure_code(
             result, "invalid-capability-mode:other", output_format="text"
         )
+        self.assertIn("CAPABILITY_MODE=routing-only", result.stdout)
 
     def test_capability_route_rejects_risk_conflict(self) -> None:
         """Non-focused risk values are outside capability mode."""

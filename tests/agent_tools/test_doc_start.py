@@ -164,6 +164,66 @@ class DocStartTest(unittest.TestCase):
                 manifest["run"]["spawn_wave_recommendation"],
             )
 
+    def test_doc_start_explicit_terra_is_review_only(self) -> None:
+        """Explicit Terra selection appears in review output without write authority."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root.mkdir(parents=True, exist_ok=True)
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".codex").mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".codex" / "config.toml").write_bytes(
+                (PROJECT_ROOT / ".codex" / "config.toml").read_bytes()
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(DOC_START_SCRIPT),
+                    "--task",
+                    "adversarial document review",
+                    "--kind",
+                    "long-form",
+                    "--owner",
+                    "codex",
+                    "--enable",
+                    "terra",
+                    "--run-id",
+                    "test-doc-start-terra",
+                    "--report-root",
+                    str(report_root),
+                    "--workspace-root",
+                    str(workspace_root),
+                ],
+                cwd=PROJECT_ROOT,
+                env={
+                    key: value
+                    for key, value in os.environ.items()
+                    if key
+                    not in {
+                        "AGENT_CANON_RUNTIME_ROOT",
+                        "AGENT_CANON_CONTROL_PARENT_ROOT",
+                    }
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            start_declaration = next(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("START_DECLARATION=")
+            )
+            self.assertIn("terra", start_declaration)
+            manifest = yaml.safe_load(
+                (report_root / "test-doc-start-terra" / "team_manifest.yaml").read_text(
+                    encoding="utf-8"
+                )
+            )
+            terra = next(role for role in manifest["roles"] if role["id"] == "terra")
+            self.assertEqual(terra["write_policy"]["mode"], "read_only")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Compares Codex session token footprints and records run-bundle evidence.
 # upstream design ../../templates/agents/workflow_monitoring.md stores run evidence
-# upstream design ../../agents/workflows/token-efficient-codex-workflow.md defines token comparison protocol
+# upstream design ../../agents/skills/tokens.md defines token comparison protocol
 # upstream implementation ./workflow_monitor.py appends monitoring evidence
 # downstream implementation ./generate_agent_runtime_dashboard.py joins canonical token footprints
 # downstream implementation ../../tests/agent_tools/test_compare_codex_token_footprints.py tests it

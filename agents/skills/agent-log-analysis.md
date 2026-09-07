@@ -119,6 +119,9 @@ source checkout is never used as an output directory.
   wave execution reconciliation の観測と解釈を所有します。
 - 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
   skill / role へ渡します。
+- Token budget、baseline、role footprint、efficiency decision の所有は
+  `$tokens` に渡し、この skill は token evidence の観測と route packet
+  作成だけを行います。
 - durable issue 作成は `issue-finding-report` の責務です。この skill は issue
   作成に必要な structured evidence と finding route packet を渡します。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
@@ -186,7 +189,7 @@ closeout_gate=<command or evidence field>
 | `workflow_selection` | `agents/TASK_WORKFLOWS.md` and owning workflow guide | Selection Evidence drilldown row, workflow registry row, owning workflow doc path | workflow selection eval or dashboard miss rate after reset window |
 | `workflow_attribution` | `agent-learning` or hook owner role | Workflow Attribution drilldown, missing event class, hook namespace | dashboard workflow missing count reduced or exemption recorded |
 | `eval_gap` | `agent-eval-accumulation` | eval accumulation structured output, missing / stale / fail families | `eval_accumulation_check.py` pass or issue updated |
-| `token_coverage` | `agent-learning` + runtime logging owner | Token Consumption drilldown and token moving-average status | token comparison / summary evidence present or unsupported claim recorded |
+| `token_coverage` | `tokens` + runtime logging owner | Token Consumption drilldown and token moving-average status | token comparison / summary evidence present or unsupported claim recorded |
 | `archive_hygiene` | `result-artifact-writeout` or log archive owner | `runtime_log_archive_git.py status/check-clean` output | `RUNTIME_LOG_ARCHIVE_CLEAN=yes` |
 | `prompt_or_config_drift` | `prompt_config_reviewer` | affected prompt/config path and structured evidence cell | reviewed patch or routing issue updated |
 | `structure_boundary` | `structure-refactor` | evidence cell plus candidate path / view boundary | structure repair contract or structure issue updated |
@@ -226,8 +229,9 @@ The runtime discovery adapter delegates these required operating clauses to this
    skill selection findings to the affected skill plus `prompt_config_reviewer`;
    tool selection findings to `tools/catalog.yaml` plus the owning tool docs;
    workflow selection findings to `agents/TASK_WORKFLOWS.md` plus the owning
-   workflow guide; workflow attribution or token coverage findings to
-   `$agent-learning` or the logging owner; eval gaps to
+   workflow guide; workflow attribution findings to `$agent-learning` or the
+   logging owner; token coverage findings to `$tokens` and the logging owner;
+   eval gaps to
    `$agent-eval-accumulation`; archive hygiene findings to
    `$result-artifact-writeout` or the log archive owner; prompt/config drift to
    `prompt_config_reviewer`; and structure-boundary findings to

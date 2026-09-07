@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides evaluate agent run agent workflow automation.
-# upstream design ../../agents/workflows/agent-learning-workflow.md behavior feedback
+# upstream design ../../agents/skills/agent-learning.md behavior feedback
 # upstream design ../../templates/agents/agent_evaluation.md defines evaluation artifact shape
 # upstream design ../../templates/agents/workflow_monitoring.md monitoring evidence
 # upstream implementation ./report_artifact_checks.py validates schedule and work log completeness
@@ -1370,8 +1370,8 @@ def render_markdown_title_lines() -> list[str]:
         "",
         "<!--",
         "@dependency-start",
-        "upstream design ../../agents/workflows/"
-        "agent-learning-workflow.md agent feedback workflow",
+        "upstream design ../../agents/skills/"
+        "agent-learning.md agent feedback skill",
         "upstream implementation ../../eval/producers/"
         "evaluate_agent_run.py generates this artifact",
         "@dependency-end",

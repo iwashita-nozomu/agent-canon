@@ -70,13 +70,13 @@ STANDARD_RUN_ARTIFACT_KEYS = (
 ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     "manager": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
-        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
+        "workspace_paths": ["agents/skills/codex-task-workflow.md"],
         "notes": "Requirements and planning start from explicit documented clauses and stage plan.",
     },
     "designer": {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
         "workspace_paths": [
-            "agents/workflows/implementation-waterfall-workflow.md",
+            "agents/skills/codex-task-workflow.md",
             "agents/canonical/CODEX_WORKFLOW.md",
         ],
         "notes": (
@@ -97,7 +97,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "design_review",
             "work_log",
         ],
-        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
+        "workspace_paths": ["agents/skills/codex-task-workflow.md"],
         "notes": (
             "Conditional test design starts from the implemented mechanism, approved design, "
             "and recorded unresolved risk."
@@ -112,7 +112,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "document_flow_review",
         ],
         "workspace_paths": [
-            "agents/workflows/implementation-waterfall-workflow.md",
+            "agents/skills/codex-task-workflow.md",
             "agents/canonical/CODEX_WORKFLOW.md",
         ],
         "must_cite_before_edit": True,
@@ -159,17 +159,16 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     },
     "scheduler": {
         "artifact_keys": ["user_request_contract", "schedule"],
-        "workspace_paths": ["agents/workflows/implementation-waterfall-workflow.md"],
+        "workspace_paths": ["agents/skills/codex-task-workflow.md"],
         "notes": "Scheduling reads explicit requirement and plan surfaces.",
     },
 }
 
 ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
     "designer": {
-        "agents/workflows/implementation-waterfall-workflow.md": (
-            "Gate 5. 詳細設計",
-            "Gate 6. 詳細設計レビュー",
-            "Gate 7. 文書通読レビュー",
+        "agents/skills/codex-task-workflow.md": (
+            "Owner-First Readback",
+            "Stages",
         ),
         "agents/canonical/CODEX_WORKFLOW.md": (
             "4. Run Bootstrap",
@@ -177,13 +176,9 @@ ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
         ),
     },
     "implementer": {
-        "agents/workflows/implementation-waterfall-workflow.md": (
-            "Gate 5. 詳細設計",
-            "Gate 6. 詳細設計レビュー",
-            "Gate 7. 文書通読レビュー",
-            "Gate 8. 実装",
-            "Gate 8.5. 実装後の条件付きテストケース設計",
-            "Gate 9. 条件付き受け入れ review",
+        "agents/skills/codex-task-workflow.md": (
+            "Owner-First Readback",
+            "Stages",
         ),
         "agents/canonical/CODEX_WORKFLOW.md": (
             "4. Run Bootstrap",
@@ -197,7 +192,7 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
     "documents/codex/AGENTS_COORDINATION.md",
     "documents/conventions/coding-conventions-python.md",
     "documents/operations/notes-lifecycle.md",
-    "agents/workflows/agent-learning-workflow.md",
+    "agents/skills/agent-learning.md",
     "documents/agent-canon/agent-canon-update-route.md",
     "documents/notes/guardrails/README.md",
     "documents/notes/guardrails/engineering_avoidances.md",

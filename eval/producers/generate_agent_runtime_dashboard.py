@@ -58,7 +58,7 @@ from tools.repository.github.issue_sync import (  # noqa: E402
 )
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
-SOURCE_SYNC_STATE_PATH = Path("/var/lib/agent-canon/source-sync.json")
+SOURCE_SYNC_STATE_PATH = Path("/var/lib/agent-canon/source-sync/source-sync.json")
 SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
 SOURCE_SYNC_IDENTITY_RE = re.compile(r"^(?:unknown|[0-9a-f]{40})$")
 SOURCE_SYNC_CODE_RE = re.compile(r"^[a-z][a-z0-9_]*$")

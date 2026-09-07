@@ -3,7 +3,7 @@
 contract reference
 responsibility Defines the standalone AgentCanon source update boundary.
 upstream design ../../documents/runtime/bootstrap-runtime.md owns the explicit control/runtime lifecycle.
-upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns source branch and PR publication.
+upstream design ../../agents/skills/agent-canon-update.md owns source branch and PR publication.
 upstream implementation ../../bootstrap.sh owns installation, validation, and cleanup.
 @dependency-end
 -->

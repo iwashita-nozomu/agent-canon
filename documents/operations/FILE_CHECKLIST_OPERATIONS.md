@@ -87,7 +87,7 @@ bash bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install
 確認:
 
 - AgentCanon shared tool image と project-owned Docker/test の責務境界が分離している
-- fixed OS/Python capability、digest-pinned official Node OCI provider image、typed dependency manifest、project extras の owner が混在していない
+- fixed OS/Python capability、Ubuntu 24.04 apt の Node/npm、typed dependency manifest、project extras の owner が混在していない
 - `docker/README.md`、`README.md`、`QUICK_START.md` が更新されている
 - `templates/agents/environment_change_proposal.md` に proposal が残っている
 

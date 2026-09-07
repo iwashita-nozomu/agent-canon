@@ -4,7 +4,6 @@
 @dependency-start
 contract skill
 responsibility Owns AgentCanon agent-side recurrence learning and routes private knowledge or feedback to the external log owner.
-upstream design ../workflows/agent-learning-workflow.md learning workflow and lifecycle
 upstream design ../../documents/runtime/private-feedback-knowledge.md private log command and storage contract
 upstream implementation ../../tools/runtime/archive/private_feedback.py metadata-only private log adapter
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py runtime feedback evidence
@@ -43,7 +42,6 @@ ownerへの記録です。
 
 ## Core References
 
-- `agents/workflows/agent-learning-workflow.md`
 - `documents/runtime/private-feedback-knowledge.md`
 - `tools/runtime/archive/private_feedback.py`
 - `tools/runtime/lifecycle/workflow_monitor.py`
@@ -53,21 +51,22 @@ ownerへの記録です。
 
 - user preferenceとagent-side learningを分け、raw transcriptを貼らず、source、evidence、
   scope、confidenceを持つ短いobservationに圧縮する。
-- `workflow_monitor.py --behavior-event` でskill invocation、subagent routing、tool gate、
-  prompt eval、review feedback、subagent lifecycle、diff-check decisionを記録する。
-- user / reviewer / eval feedbackは `workflow_monitor.py --runtime-feedback` で
-  `source=<user|reviewer|eval> target=<skill-or-workflow-or-eval>
-  action=<prompt_repair|eval_update|knowledge_record|no_op> runtime_feedback=observed`
-  として構造化する。
+- `workflow_monitor.py` が所有する behavior-event の記録を使い、skill invocation、subagent
+  routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check decision
+  を behavior evidence として扱う。この skill は event schema や append 処理を再定義しない。
+- user / reviewer / eval feedback は `workflow_monitor.py` の runtime-feedback route で記録し、
+  source、target、選択した action、観測内容を event owner の schema に従って構造化する。
+  この skill は target と action の判断を行うが、feedback event の field や status vocabulary
+  を再定義しない。
 - feedbackが利用中のskillの弱さ、浅さ、遅さ、routing miss、修正不足を示す場合は、active
-  skill setをfirst repair candidateとしてownerを確認する。単発観測はscoped guidance、
-  example、private knowledgeを優先し、hard ruleは反復観測またはchecker-backed invariant
-  に限る。
-- `skill_improvement_decision=applied` は対象promptまたはeval anchorを変更し、対応validation
-  をrerunした場合だけ記録する。private knowledgeへの記録は
-  `knowledge_learning_decision=recorded` とし、public skillへの自動昇格はしない。
-- behavior evalは `eval/definitions/agent_behavior_eval.toml` を正本とし、feedback action
-  とimprovement decisionを解決して `AGENT_EVALUATION_STATUS=pass` にする。
+  skill setを最初の calibration 候補として owner と原因を確認する。変更する場合は対象、
+  変更内容、validation evidence を記録し、変更しない場合はその判断根拠を記録する。
+  単発観測は scoped guidance、example、private knowledge を優先し、hard rule は反復観測
+  または checker-backed invariant に限る。特定の decision token を必須の完了条件にしない。
+- private knowledgeへ記録した場合はその判断と根拠を残し、public skillへ自動昇格しない。
+  behavior eval は `eval/definitions/agent_behavior_eval.toml` とその
+  owner の評価結果を参照し、feedback action、calibration の判断、変更時の validation
+  evidence が追跡できる状態を保つ。
 
 ## Operating Route
 
@@ -111,5 +110,5 @@ Issue/failure/evidence、またはno-opのいずれかに分類します。単�
    missed skill invocation、recurrence prevention、task retrospectiveのfeedbackでこのskillを選ぶ。
 2. behavior event、runtime feedback、feedback actionの記録先はexternal runtime / private log。
 3. prompt、workflow、eval、private knowledge、Issue、no-opの反映先と根拠を明示する。
-4. closeout前にbehavior manifestを使った `evaluate_agent_run.py --write` を実行し、
-   `AGENT_EVALUATION_STATUS=pass` とfeedback action解決を確認する。
+4. closeout前に behavior-eval owner の評価結果を参照し、feedback action、calibration の
+   判断、変更時の validation evidence が解決または明示的に引き継がれていることを確認する。

@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Saves one experiment raw artifact tree as one deterministic git-annex archive.
 # upstream design ../../documents/experiments/result-log-retention-and-visualization.md defines raw retention and tracked review evidence.
-# upstream design ../../agents/workflows/experiment-workflow.md defines canonical experiment identity paths.
+# upstream design ../../agents/skills/experiment-lifecycle.md defines canonical experiment identity paths.
 # upstream implementation ./experiment_identity.py owns the canonical result/raw path grammar.
 # downstream implementation ../../tests/tools/test_save_experiment_result_annex.py validates archive and annex behavior.
 # @dependency-end

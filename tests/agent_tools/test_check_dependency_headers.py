@@ -60,8 +60,8 @@ VISUALIZATION_QUEUE_PATHS = (
     "tools/runtime/dispatch/agent-canon/src/docs.rs",
     "tools/runtime/dispatch/agent-canon/src/main.rs",
     "tests/tools/test_fix_mermaid.py",
-    "agents/workflows/implementation-waterfall-workflow.md",
-    "agents/workflows/agent-canon-pr-workflow.md",
+    "agents/skills/codex-task-workflow.md",
+    "agents/skills/agent-canon-update.md",
 )
 
 

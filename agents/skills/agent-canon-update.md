@@ -6,7 +6,6 @@ contract workflow
 responsibility Owns editing, publishing, and consuming AgentCanon as a standalone source repository.
 upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream design ../../documents/runtime/bootstrap-runtime.md user lifecycle contract
-upstream design ../workflows/agent-canon-pr-workflow.md standalone source PR route
 upstream implementation ../../bootstrap.sh Host lifecycle entrypoint
 downstream design ../../documents/runtime/runtime-log-archive.md eval archive owner
 @dependency-end
@@ -120,6 +119,18 @@ shared image and at most one resident tool container; task directories and
 exact target mounts provide isolation. Never create a project/task-specific
 AgentCanon image, container, virtualenv, Cargo toolchain, or volume.
 
+`sync` is the automatic-update route. It acquires `replacement.lock` once and
+runs `git -C <install-root> fetch origin main` followed by
+`git -C <install-root> checkout --force -B main FETCH_HEAD`; this leaves the
+installed checkout on local `main` at the fetched remote revision. It then
+writes `.runtime/source-sync/source-sync.json`, selects the shared
+`:env-<key>` image through `digest.sh`, and reuses the resident when
+the environment and source/cache mounts are current. Otherwise it pulls or
+builds the environment once, updates the resident, and refreshes host-owned
+links and the timer. There is no candidate checkout, remote-ref comparison,
+Git rollback, or second source-sync lock. A missing systemd user manager is a
+warning and leaves manual `sync` available.
+
 The container is for AgentCanon Python, Rust, and LSP tools. Project Docker,
 project `test/testrunner.sh`, GPU, Git, GitHub, and Codex host launch remain in
 their owning environment. Rootful/rootless Docker mode is not a branch; the
@@ -136,13 +147,14 @@ Run:
 
 `prepare` writes only manifest-managed links beneath runtime-local isolated
 `codex-home/`; it remains separate from the global link lifecycle. When the
-explicit control root is `$HOME`, install/update also manage per-skill,
-per-agent, and personal `~/.codex/config.toml` links. The regular config is
+explicit control root is `$HOME`, install/update manage one `~/.agents/skills`
+directory link, per-agent, and personal `~/.codex/config.toml` links. The regular config is
 migrated byte-for-byte to the ignored personal source and restored on
 uninstall. Hooks, authentication, sessions, history, cache, plugins, rules,
-MCP, and TUI/trust state remain outside the link set. Collisions fail closed;
-uninstall removes only exact links owned by this installation. After update,
-launch a new session and read back the global links and runtime-local manifest.
+MCP, and TUI/trust state remain outside the link set. The host shell owns
+global link projection; the resident does not enumerate or validate global
+skills. Uninstall removes the AgentCanon-owned skills directory link only.
+After update, launch a new session.
 
 ## Tool and compatibility route
 
@@ -172,6 +184,12 @@ declare target root, allowed paths, purpose, authority, before/after identity,
 and a receipt. Runtime logs, reports, evals, dashboard output, cache, Cargo
 target, SQLite, tmp, and `__pycache__` go to the external runtime root.
 
+Runtime, eval, and archive validation must leave the AgentCanon source status
+and content unchanged. Compare the source before and after validation; any
+source delta is a validation failure. Cleanup removes only transient resources
+owned by the current task; persistent shared runtime and install state may
+remain in place.
+
 Use the existing eval producers and archive owner. `eval collect` writes a
 versioned collection to the runtime spool and records source identity, tool
 digest, family status, metrics, and source unchanged. `eval sync` sends the
@@ -184,32 +202,42 @@ archive state into the AgentCanon source checkout.
 
 ## Change route
 
-1. Resolve the owning Issue and read the current remote/main, open PRs, and
-   relevant runtime documents. Keep #841 and #821 separate.
-2. For a source-free parent migration, freeze the exact management write set
+1. Resolve the owning Issue and read the current remote `main`, open PRs and
+   Issues, and relevant runtime documents. Record repository-qualified branch,
+   HEAD, remote, and dirty-state evidence; keep #841 and #821 separate.
+2. Reuse or create one Issue-qualified topic branch in the qualified
+   standalone source clone. Branch reuse and creation reasons follow
+   `$agent-update-branch`; the parent never becomes the source checkout.
+3. Read the canonical owner, dependency-expanded callers, and selected
+   validation oracle before editing.
+4. For a source-free parent migration, freeze the exact management write set
    and immutable parent surfaces above before inspecting implementation.
-3. Inspect the existing owner and implementation before proposing a change.
+5. Inspect the existing owner and implementation before proposing a change.
    Search beyond the first failing checker and identify source-side effects,
    impossible branches, duplicate gates, and downstream consumers.
-4. Record a contract-complete design: user command family, host/container
+6. Record a contract-complete design: user command family, host/container
    boundary, target mode, state roots, resource cap, failure/rollback, eval
    archive route, cleanup, and validation oracle.
-5. Implement in the owning AgentCanon clone. Keep docs, manifest, code, tests,
-   and dependency headers aligned. Do not modify a parent checkout from this
-   skill.
-6. Run focused tests first. For runtime/container changes, verify exact owned
-   Docker image/container IDs and remove task-created resources at closeout;
-   never run `docker system prune`.
-7. Run the canonical AgentCanon PR checks selected by the changed runtime
-   profile. Confirm source tree unchanged by eval and archive collection, and
-   confirm external artifact paths and archive readback.
-8. Commit with the owning Issue reference, push the topic branch, open/update
-   the AgentCanon PR, and publish a concise evidence comment to the same Issue.
-   The PR body must state what changed, why, scope, validation, and remaining
-   limitation.
-9. After merge, fetch and read back the merge commit on AgentCanon `main`.
-   Only then update a parent revision. A parent must not consume an unmerged
-   branch or restore a vendor/submodule route.
+7. Implement in the owning AgentCanon clone. Keep docs, manifest, code, tests,
+   and dependency headers aligned. Runtime/cache/eval/test artifacts use the
+   explicit external runtime root and never create source-local `.agent-canon`,
+   `target`, `__pycache__`, or generated reports. Do not modify a parent
+   checkout from this skill.
+8. Run focused validation and then the profile selected by the changed owner.
+   Preserve failure evidence by execution plane (AgentCanon tool container,
+   host adapter/archive, or project execution); for runtime/container changes,
+   remove task-created Docker resources at closeout and never run
+   `docker system prune`.
+9. Commit only the Issue-owned write set, push the topic branch, and open or
+   update the AgentCanon PR through `$pr-processing`. Its body states what
+   changed, why, scope, validation, cleanup, and remaining limitations; add a
+   concise evidence comment to the same qualified Issue. `$pr-processing`
+   owns review routing and CI; merge only after the required review and CI are
+   green.
+10. After merge, fetch AgentCanon `main`, verify that the fetched `main`
+   contains the merge commit, and read the merge commit and resulting `main`
+   tree back locally. Only then update a parent revision. A parent must not
+   consume an unmerged branch or restore a vendor/submodule route.
 
 ## Validation and closeout
 
@@ -232,7 +260,9 @@ environment.
 Before closeout, verify:
 
 - source branch is clean except intended commit and its remote is pushed;
-- Issue/PR are qualified as `iwashita-nozomu/agent-canon#...`;
+- repository-qualified Issue identity, source branch, PR, merge commit, and
+  local `main` readback are traceable; no exact phrase or Issue number in the
+  commit message is required;
 - new bootstrap session uses the explicit control/runtime roots;
 - only one owned resident container exists and its limits/readback match;
 - source, parent, foreign global Codex entries, and pre-existing Docker
@@ -247,5 +277,4 @@ Before closeout, verify:
 - [Standalone Bootstrap And Shared Tool Runtime](../../documents/runtime/bootstrap-runtime.md)
 - [Container Operations](../../CONTAINER_OPERATIONS.md)
 - [Runtime Log Archive](../../documents/runtime/runtime-log-archive.md)
-- [AgentCanon PR workflow](../workflows/agent-canon-pr-workflow.md)
 - [Source-free parent bootstrap runbook](../../documents/contracts/derived-repo-bootstrap-runbook.md)

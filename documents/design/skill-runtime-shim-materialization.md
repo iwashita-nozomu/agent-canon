@@ -402,7 +402,7 @@ write set や per-file recovery に含めません。
 ~~~text
 runtime targets:     .codex/personal/skills/<skill_id>/SKILL.md for all catalog ids
 source diff:         agents/skills/catalog.yaml (discovery.name/description only)
-host discovery:      Codex automatic global .agents/skills discovery via managed per-skill links; no config registry
+host discovery:      Codex automatic global .agents/skills discovery via one managed directory link; no config registry
 canonical/deps:      read-only agents/skills/<id>.md and skill-dependencies.yaml
 runtime source:      tools/agent/skills/skill_shim_materializer.py (normal implementation diff)
 command source:      tools/agent/skills/skill_tool_commands.py (normal implementation diff;

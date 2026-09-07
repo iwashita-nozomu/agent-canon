@@ -171,7 +171,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             ".codex/personal/skills/*/SKILL.md",
             "agents/skills/*.md",
             "agents/internal-routines/*.md",
-            "agents/workflows/*.md",
+            "agents/workflows/README.md",
+            "agents/workflows/workflow-references.md",
             "agents/canonical/*.md",
             ".codex/agents/*.toml",
         ):

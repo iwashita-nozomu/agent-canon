@@ -83,6 +83,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
   codex-home/
   tasks/<task-id>/{tmp,locks,reports,logs,receipts}
   container-runtime/  # 01777 exchange only; no control state or credentials
+  source-sync/source-sync.json  # host-written, resident read-only view
   spool/
 
 <install-root>/.runtime/cache/{cargo,pycache,semantic-index,tool-metadata}/
@@ -120,7 +121,13 @@ capability を受けた場合だけ source を変更します。
 経路は `cwd -> bootstrap.sh -> install root -> control root ->
 <install-root>/.runtime/ -> resident container` です。`install` は検証済み image と
 resident を作り、`update` は同じ resident を current checkout へ更新し、`status` は
-`.runtime/` の active image と resident health を読み返します。`gc --dry-run` は
+`.runtime/` の active image と resident health を読み返します。`sync` は
+`replacement.lock` を一度だけ取得し、`git -C <install-root> fetch origin main` に
+続けて `git -C <install-root> checkout --force -B main FETCH_HEAD` を実行します。
+その後 source-sync state と env-key image を選び、必要な場合だけ resident、global
+links、timer を更新します。これにより installed checkout は常に local `main` の
+fetched remote revision に揃います。
+`gc --dry-run` は
 `.runtime/` の準備・作成・chmod をせずに同じ identity/ownership read を行い、`gc` は
 replacement lock の下で stale な owned Docker resource だけを exact ID/reference で
 削除します。resident controller の既存 `runtime.gc/state GC` も継続して呼び出し、host
@@ -182,8 +189,10 @@ stderr を結果に残します。`bootstrap/container/image/Dockerfile` と
 mapping は Host/caller の責務であり、`tests/tools/test_bootstrap_container_contract.py`
 で契約化しています。AgentCanon は user 作成、`--user` 指定、UID/GID readback を行いません。
 container name と label
-は同じ effective UID に対する共有 runtime を1個に制限し、control-root
-digest と manifest digest が一致しない adopt を拒否します。
+は同じ effective UID に対する共有 runtime を1個に制限します。環境 image は
+`ghcr.io/iwashita-nozomu/agent-canon:env-<key>` で選び、key は
+`bootstrap/container/image/digest.sh` が Dockerfile とその
+`source=` bind inputs の Git tree identity から導出します。
 
 `bootstrap/host/manifest.toml` は current、rollback、in-use、pre-existing、gc-eligible を区別します。
 target add/remove が成功すると resident state owner は同じ
@@ -203,9 +212,10 @@ readback します。`docker system prune` は使用せず、manifest-owned exac
 `bootstrap/container/image/Dockerfile` は旧developer-containerの dependency planning / Python / Rust build 部分だけを再利用します。editor、post-create、GPU、
 Compose、workspace lifecycle は移植せず、旧developer-container surfaceは削除します。
 
-Image は digest-pinned Ubuntu 24.04 の一つの output image です。runtime と build
-provider は一つの apt transaction/update で導入し、dependency layer と asset /
-materializer layer に分けます。build-essential、curl、pipx、npm、`rustup-init` と
+Image は digest-pinned Ubuntu 24.04 の一つの output image です。bootstrap package
+transaction は一度だけ apt update を行い、manifest-owned dependency を同じ
+dependency layer へ導入してから asset / materializer layer を作ります。
+build-essential、curl、pipx、npm、`rustup-init` と
 Cargo build の後、npm/pipx/build provider と cache を同じ layer で purge します。
 runtime は Node runtime、Python 3.12、jq/tree、clangd、AgentCanon binary、pipx
 venv launchers、dependency plan/receipts を保持しますが、npm executable や build
@@ -214,10 +224,10 @@ provider は保持しません。Docker cache mount は使用しません。
 dependency plan / receipts は manifest の declared records と観測した Rust source
 digest、exact Cargo.lock digest、binary digest/version を build provenance として
 保存します。Rust source digest は手動の manifest expectation ではありません。
-CI が image を build/load/run し、entrypoint health、実 executable/import、LSP
-resolver、plan と build-provider absence を検証します。canonical install/sync/update
-は `ghcr.io/iwashita-nozomu/agent-canon:sha-<full-commit>` を pull し、明示的な
-`update --local-build` だけが開発用 local build route です。
+CI が image を build/load/run し、entrypoint health を検証します。canonical
+install/sync/update は env key image を再利用し、source-only 更新では
+source-mounted tool compile だけを writable cache に行います。Dockerfile または
+その bind input が変わったときだけ新しい環境 image を作ります。
 
 `bootstrap/container/image/Dockerfile` は次を必須にします。
 
@@ -234,6 +244,12 @@ tmpfs /tmp
 
 Python / Rust dependency は image に一度だけ入れ、project / task ごとの image、
 container、venv、Cargo toolchain、volume を作りません。
+
+Resident は AgentCanon source checkout を `/opt/agent-canon/source` に read-only
+で、runtime state volume の cache を `/var/lib/agent-canon/cache` に writable
+で mount します。source-mounted `tools/**/Cargo.toml` を走査する compile route
+が必要な Rust tool だけを cache/bin に更新し、source-only 更新では environment
+image を再構築しません。
 
 ## Mount Registry And Generation Transaction
 
@@ -388,14 +404,15 @@ manifest-managed link を作ります。resident は image 内の canonical sour
 live AgentCanon checkout の `<install-root>/.codex/...` にします。従って host
 Codex が読む config は `CODEX_HOME/config.toml`、skills/agents はそれぞれの
 runtime-local surface から live checkout を参照します。加えて、control root に `$HOME` を明示した
-install/update は `~/.codex/personal/skills/<skill>`、`~/.codex/agents/<role>.toml`、および
-`~/.codex/config.toml` を個別に管理します。最後のリンク先は AgentCanon checkout
+install/update は `~/.agents/skills` を AgentCanon checkout 内の ignored な
+`~/.codex/personal/skills` へディレクトリ単位でリンクし、`~/.codex/agents/<role>.toml` と
+`~/.codex/config.toml` は個別に管理します。最後のリンク先は AgentCanon checkout
 内の ignored な personal source で、既存の regular config は bytes と mode を保持
 して移行し、uninstall で regular file に戻します。hooks、認証、session、history、
-cache、plugin、rule、MCP、TUI/trust はこの投影に含めません。同名 pre-existing path
-は foreign entry として保持または typed collision にし、uninstall は自分が作った
-exact linkだけを削除します。receipt には surface、source、target、created 状態を
-記録します。
+cache、plugin、rule、MCP、TUI/trust はこの投影に含めません。skills は個別列挙・digest・
+expected-target readback を行わず、旧farmをディレクトリlinkへ置換します。uninstall は
+その AgentCanon-owned directory link だけを削除します。Host shell が global link を
+所有し、resident Python はこの投影を書きません。
 
 `bootstrap.sh ... codex --project-root <path>` は process-local にこの isolated
 `CODEX_HOME` を指定して project root で Codex を起動します。Template に
@@ -426,12 +443,9 @@ source treeを汚しません。non-force push後にremote ref/tree/blob digest�
 finalizeします。`exec` 成功後の private feedback sync も同じく resident は request
 だけを作り、Host shellが credentialed adapterを一度だけ実行します。
 
-`sync` のcandidate checkoutはruntimeのignored `source-staging/`でimage healthを
-確認し、live checkoutをfast-forwardするまでglobal skill/agent/config linkを投影
-しません。live fast-forward後だけlive sourceからリンクを更新し、stagingを削除
-します。rollbackは停止前にcurrent mount manifestを検証し、Hostが旧imageを作成
-した後にresident state ownerが旧target setとgeneration pointerを一つのlocked state
-更新として復元し、Hostが完全なbind mount集合をreadbackします。
+`sync` は候補 checkout、remote-ref照合、local build、source rollback、二つ目のlockを
+持ちません。image取得に失敗した場合は旧residentを停止せず、resident更新に失敗した
+場合もGitは戻しません。rollbackは既存resident state ownerのrollbackだけを対象にします。
 
 local bare remoteを使い、collect -> spool -> clone -> commit -> push -> fetch ->
 ref/tree/blob readback -> duplicate no-op / conflict failureをE2E testします。

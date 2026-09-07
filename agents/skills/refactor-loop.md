@@ -103,10 +103,9 @@ source / pin routing を参照として担当します。
 
 - `documents/conventions/software-engineering-principles.md`
 - `agents/TASK_WORKFLOWS.md`
-- `agents/workflows/implementation-waterfall-workflow.md`
-- `agents/workflows/comprehensive-refactoring-workflow.md`
 - `documents/conventions/REVIEW_PROCESS.md`
-- `agents/workflows/main-integration-workflow.md`
+- `agents/skills/codex-task-workflow.md`
+- `agents/skills/integration.md`
 - `documents/conventions/coding-conventions-cpp.md`
 - `agents/skills/cpp-review.md`
 
@@ -232,6 +231,27 @@ or writing.
    validation と targeted validation で閉じます。
 1. closeout 前に `python3 tools/validation/ci/checks/check_merge_structure.py ...` の要否を確認します。
 
+## Read-only Source Snapshot And OOP Survey
+
+編集可能な working tree がない場合も、refactor の根拠を省略しません。外部
+repository、bare Git repository、または `git archive` の export を調査するときは、
+元の source を変更せず、run-local の読み取り専用 snapshot（archive は展開した
+snapshot）を入力にします。packet / run bundle には次を残します。
+
+- source kind、source locator、commit / object ID または archive digest、snapshot root
+- 実際に解析した `analysis_paths` と、選択した `excluded_paths` および各除外理由
+- raw / summary report の path と、解析結果を渡す reviewer handoff の参照
+
+除外パスや解析パスを特定の repository の慣例から暗黙に決めず、対象と目的に
+応じて選びます。snapshot の source identity が変わったら同じ report として
+扱わず、別の調査結果として記録します。
+
+OOP evidence が必要なときは `$oop-readability-check` に実行を委譲し、snapshot
+root、解析パス、選択した除外、出力形式を明示します。mechanical raw result と
+summary report は保持し、reviewer には report path、scope / exclusions、target
+trace、behavior contract、latest diff を渡します。OOP の数値や finding は
+境界を検討する材料であり、それだけで split / extract や修正を決定しません。
+
 ## Canonicalization-First Refactors
 
 Stopping、logging、runtime tolerance、preconditioner など、複数 algorithm
@@ -280,6 +300,12 @@ validation surface を共有する mechanically safe な target は、同じ bat
    Python structural finding では既定で
    `agent-canon python-structure-hash-scope-plan --input <report.json> --dependency-report-dir <dependency-review-dir> --output <change-impact-packet.json>`
    を使い、親 agent が手作業で block 化しません。
+   finding packet を repair planning に使う場合は、chat 要約ではなく full packet と
+   raw / structured artifact path を planning の入力にします。scope-plan が生成した
+   `impact_blocks`、`scope_candidates`、`selected_scope`、`repair_batches` は
+   refactor plan と handoff に引き継ぎ、親が split / merge するときだけ元の
+   `block_id` と根拠を残します。構造 finding が repair planning を駆動しない場合は、
+   不要な scope-plan や full rescan を追加しません。
 1. `repair_slice.root_finding` は今回の修正 batch の根を示します。実装単位は
    root finding 1 件に固定せず、同じ home/downstream group と dependency wave
    にあり、同じ責務で同時に消せる related finding / target trace を batch に

@@ -8,7 +8,7 @@ of ordinary source-branch publication.
 # contract test
 # responsibility Tests GitHub publish tool command construction and failure boundaries.
 # upstream implementation ../../tools/repository/github/github_publish.py implements gh-backed publish.
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines publish workflow policy.
+# upstream design ../../agents/skills/pr-processing.md defines publish workflow policy.
 # @dependency-end
 
 from __future__ import annotations

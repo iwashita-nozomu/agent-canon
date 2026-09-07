@@ -7,7 +7,7 @@ upstream design ../documents/runtime/runtime-profiles-and-check-matrix.md runtim
 upstream implementation task_catalog.yaml workflow family defaults.
 upstream implementation agents_config.json permanent team and role mapping.
 upstream design canonical/CODEX_SUBAGENTS.md subagent role contract.
-downstream design workflows/implementation-waterfall-workflow.md stage gate implementation flow.
+downstream design skills/codex-task-workflow.md implementation stage and closeout flow.
 downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py emits workflow packets and creates workflow run bundles.
 downstream implementation ../tools/runtime/lifecycle/workflow_monitor.py records dynamic wave events.
 downstream implementation ../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates the canonical packet owner marker.
@@ -36,7 +36,7 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | role behavior, stage conditions, and review separation | `.codex/agents/*.toml` |
 | run bundle, declared workflow / skills / review, and dynamic wave ledger | `bootstrap_agent_run.py`; `workflow_monitor.py` |
 | skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `python3 tools/agent/orchestration/route.py --prompt` |
-| implementation stage gate | `agents/workflows/implementation-waterfall-workflow.md` |
+| implementation stage and closeout | `agents/skills/codex-task-workflow.md`; selected family row in `agents/task_catalog.yaml` |
 | active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; `agents/agents_config.json#artifacts.active_design_packet` |
 | semantic responsibility allocation | `documents/design/semantic-responsibility-contract.md`; run-local instance via active-packet `source_refs` |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |
@@ -102,9 +102,9 @@ repository-wide template or policy.
 
 ## Implementation Flow Graph
 
-The implementation waterfall remains the production stage graph; the active
-packet's typed entries provide its selected graph anchors and materialization
-reader path.
+The selected task family and Skill packets define the production stage graph;
+the active packet's typed entries provide its selected graph anchors and
+materialization reader path.
 
 ## Workflow Family Reader Paths
 

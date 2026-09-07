@@ -4,8 +4,8 @@
 # responsibility Resolves and executes canonical completion-authority publication with expected-old CAS.
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md owns active-W2 publication authority and route state.
 # upstream design ../../documents/operations/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy.
-# upstream design ../../agents/workflows/main-integration-workflow.md owns main integration ordering.
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns AgentCanon PR publication policy.
+# upstream design ../../agents/skills/integration.md owns main integration ordering.
+# upstream design ../../agents/skills/agent-canon-update.md owns AgentCanon PR publication policy.
 # upstream design ../../documents/contracts/ordered_integration_interface.json owns the sole ordered-integration interface path.
 # upstream implementation ./review_dispatch.py resolves current candidate identity only.
 # upstream implementation ./report_artifact_checks.py regenerates materializer-produced validation results.

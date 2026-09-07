@@ -1232,6 +1232,87 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
+    def test_format_expands_generated_skill_glob_without_materialized_views(self) -> None:
+        """Strict format validation checks registry owners instead of ignored shims."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "documents" / "design").mkdir(parents=True)
+            (root / "documents" / "design" / "dependency-contract-kinds.toml").write_text(
+                'allowed_kinds = [\n  "test"\n]\n',
+                encoding="utf-8",
+            )
+            (root / "agents" / "skills").mkdir(parents=True)
+            (root / "agents" / "skills" / "catalog.yaml").write_text(
+                "\n".join(
+                    [
+                        "skill_families:",
+                        "  - id: alpha",
+                        "    canonical_doc: agents/skills/alpha.md",
+                        "    shim: .codex/personal/skills/alpha/SKILL.md",
+                        "  - id: beta",
+                        "    canonical_doc: agents/skills/beta.md",
+                        "    shim: .codex/personal/skills/beta/SKILL.md",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            for skill in ("alpha", "beta"):
+                (root / "agents" / "skills" / f"{skill}.md").write_text(
+                    self.valid_header(f"the {skill} skill"),
+                    encoding="utf-8",
+                )
+            source = root / "consumer.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility References every generated skill view.",
+                        "# downstream implementation .codex/personal/skills/*/SKILL.md generated views",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(source), root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+            self.assertFalse((root / ".codex").exists())
+
+    def test_format_rejects_unmatched_generated_skill_glob(self) -> None:
+        """An unmatched generated skill glob remains a missing dependency target."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "documents" / "design").mkdir(parents=True)
+            (root / "documents" / "design" / "dependency-contract-kinds.toml").write_text(
+                'allowed_kinds = [\n  "test"\n]\n',
+                encoding="utf-8",
+            )
+            source = root / "consumer.py"
+            source.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility References an unmatched generated skill view.",
+                        "# downstream implementation .codex/personal/skills/missing-*/SKILL.md stale view",
+                        "# @dependency-end",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(source), root=root)
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("dependency target does not exist", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
+
     def test_format_preserves_missing_targets_in_issue_mirrors(self) -> None:
         """Durable issue mirrors may retain dependency paths from their recorded state."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -2279,13 +2360,15 @@ class DependencyManifestToolTest(unittest.TestCase):
             "agents/TASK_WORKFLOWS.md",
             "agents/USER_GUIDE_JA.md",
             "agents/skills/catalog.yaml",
-            "agents/skills/worktree-start.md",
+            "agents/skills/worktree-health.md",
             "agents/task_catalog.yaml",
-            "agents/workflows/adaptive-improvement-workflow.md",
-            "agents/workflows/agent-canon-pr-workflow.md",
-            "agents/workflows/agent-learning-workflow.md",
-            "agents/workflows/experiment-workflow.md",
-            "agents/workflows/implementation-waterfall-workflow.md",
+            "agents/workflows/README.md",
+            "agents/workflows/workflow-references.md",
+            "agents/skills/adaptive-improvement-loop.md",
+            "agents/skills/agent-canon-update.md",
+            "agents/skills/agent-learning.md",
+            "agents/skills/experiment-lifecycle.md",
+            "agents/skills/codex-task-workflow.md",
             "documents/operations/BRANCH_SCOPE.md",
             "documents/design/algorithm-implementation-boundary.md",
             "documents/codex/codex-configuration-reference.md",

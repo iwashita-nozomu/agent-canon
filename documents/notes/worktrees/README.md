@@ -9,7 +9,7 @@ upstream design ../README.md notes lifecycle index
 
 
 このディレクトリには、active な worktree の kickoff から closeout までを追う action log と carry-over note を置きます。
-研究・実験改造の全体手順は [agents/workflows/research-workflow.md](../../../agents/workflows/research-workflow.md) を参照してください。
+研究・実験改造の全体手順は [agents/skills/research-workflow.md](../../../agents/skills/research-workflow.md) を参照してください。
 
 ## Purpose
 

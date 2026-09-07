@@ -818,7 +818,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 [
                     "# @dependency-start",
                     "# responsibility Checks AgentCanon PR readiness.",
-                    "# upstream design ../../agents/workflows/agent-canon-pr-workflow.md workflow",
+                    "# upstream design ../../agents/skills/agent-canon-update.md workflow",
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone template",
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template checklist",
                     "# upstream design ../../templates/documents/github/pull-request/agent_canon.md template checklist",
@@ -871,7 +871,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "# @dependency-end\n",
         )
         for relative in [
-            "agents/workflows/agent-canon-pr-workflow.md",
+            "agents/skills/agent-canon-update.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "templates/documents/github/pull-request/agent_canon.md",

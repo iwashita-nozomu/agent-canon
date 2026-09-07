@@ -15,11 +15,11 @@
       "mount-registry"
     ],
     "missing_mounts": [
-      "/var/lib/agent-canon/source-sync.json"
+      "/var/lib/agent-canon/source-sync"
     ]
   },
   "expected": {
-    "source_sync_mount": "/var/lib/agent-canon/source-sync.json",
+    "source_sync_mount": "/var/lib/agent-canon/source-sync",
     "health": "healthy",
     "security": {
       "readonly_rootfs": true,

@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Publishes GitHub branches and pull requests through a gh-verified remote route.
 # upstream design ../../ROOT_AGENTS.md defines PR mutation authority and non-blocking publish policy.
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines the AgentCanon PR workflow.
+# upstream design ../../agents/skills/pr-processing.md defines the GitHub PR workflow.
 # upstream design ../../documents/agent-canon/agent-canon-github-remote.md defines canonical GitHub remote policy.
 # upstream implementation ./update_lifecycle_contract.py owns immutable PR topology and gate identity.
 # downstream design ../../documents/tools/github_publish.md documents the public tool contract.
@@ -1246,7 +1246,7 @@ def build_pull_request_lifecycle(
         "pr_essence": {
             "problem": str(args.user_task),
             "intent": str(getattr(args, "title", "") or args.user_task),
-            "canonical_owner": "agents/workflows/agent-canon-pr-workflow.md",
+            "canonical_owner": "agents/skills/pr-processing.md",
             "contract_delta": str(getattr(args, "title", "") or args.user_task),
             "evidence_refs": [essence_evidence],
         },

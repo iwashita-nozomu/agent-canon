@@ -9,7 +9,7 @@ downstream design skills/agent-orchestration.md routes pre-edit investigation be
 downstream design skills/codex-task-workflow.md consumes pre-edit investigation and context capsules
 downstream design skills/subagent-bootstrap.md consumes fresh subagent context capsules
 downstream design TASK_WORKFLOWS.md routes active design packet ownership
-downstream design workflows/implementation-waterfall-workflow.md consumes the active design packet contract
+downstream design skills/codex-task-workflow.md consumes the active design packet contract
 downstream implementation ../tools/agent/orchestration/agent_team.py normalizes and materializes active design packets
 downstream implementation ../tools/validation/semantic/lifecycle/waterfall_gate_check.py validates persisted active design packets
 downstream implementation ../tools/validation/semantic/tools/tool_rejection_preflight.py predicts edit-time tool rejection gates

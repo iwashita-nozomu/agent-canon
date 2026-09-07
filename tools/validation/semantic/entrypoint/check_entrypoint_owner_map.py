@@ -64,7 +64,7 @@ CONTRACTS = (
             ),
             (
                 "AgentCanon source publication",
-                "agents/workflows/agent-canon-pr-workflow.md",
+                "agents/skills/agent-canon-update.md",
                 "repository-topic-clone and PR checks",
             ),
             (

@@ -4,7 +4,7 @@ contract reference
 responsibility Documents the current GitHub remote boundary for the project template and standalone AgentCanon.
 upstream design ../agent-canon/agent-canon-github-remote.md defines AgentCanon remote policy.
 downstream design ./template-bootstrap.md consumes source-free parent bootstrap policy.
-downstream design ../../agents/workflows/agent-canon-pr-workflow.md consumes AgentCanon source PR evidence.
+downstream design ../../agents/skills/agent-canon-update.md consumes AgentCanon source PR evidence.
 @dependency-end
 -->
 

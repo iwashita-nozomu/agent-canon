@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests test analyze refactor surface behavior.
 # upstream implementation ../../tools/analysis/code/analyze_refactor_surface.py analyzer
-# upstream design ../../agents/workflows/comprehensive-refactoring-workflow.md analyzer gate policy
+# upstream design ../../agents/skills/refactor-loop.md analyzer gate policy
 # @dependency-end
 
 from __future__ import annotations

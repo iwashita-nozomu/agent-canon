@@ -63,6 +63,12 @@ commands remain owned by `task-routing`. This document owns only the execution
 transport, selected stages, and closeout readback; safety and blocker
 prohibitions remain with the canonical workflow/authority owners.
 
+When a completed local branch must return to a selected base, select
+`integration` for the merge, conflict, and changed-tree readback. `worktree-health`
+owns checkout drift and cleanup; `pr-processing` owns GitHub Issue/PR publication
+and remote merge. Do not turn this local integration route into a second
+publication or validation policy.
+
 ## Purpose
 
 Codex が会話コンテキストに依存せず、毎回同じ順序で task を進めるための標準フローです。
@@ -184,7 +190,7 @@ route are ready.
 - repo-changing implementation / patch / doc-edit task では `$agent-orchestration` を先頭に置き、catalog typed route が要求する場合だけ `$subagent-bootstrap` を併用する。bounded request は typed route が child を要求しない限り owner/path/targeted-validation route に留める
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
 - ユーザー向けの作業報告、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書きます。内部の項目名、列挙値、役割名、補助関数風の語は、コマンド、パス、表、正確な根拠の引用に閉じます。専門語が必要な場合は、既存のリポジトリ用語または外部標準の用語を使い、自然文で説明します。
-- AgentCanon update は standalone source または親repoの ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` cloneで行い、`agents/workflows/agent-canon-pr-workflow.md` に従って source branch/PR/main readbackを閉じる。親repoへvendor/submodule/root projectionを作らない
+- AgentCanon update は standalone source または親repoの ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` cloneで行い、`agent-canon-update` の source branch/PR/main readback route に従う。親repoへvendor/submodule/root projectionを作らない
 - AgentCanon bootstrap/runtimeを変更した場合は、明示control/runtime rootでinstall/start/target/status/tool/eval/stop/gc/uninstallを検証し、source不変とexact Docker resource cleanupをcloseout evidenceにする
 - commit / push の前に `documents/operations/BRANCH_SCOPE.md` の commit correctness contract と範囲分割契約を満たす。commit は Git 上の実行単位、PR はレビュー単位として扱い、validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作り、merge 前に別 PR または別 commit へ分ける。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。evidence には branch、commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を残す
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は shell / GitHub checks を走らせず、会話だけで応答します。
@@ -249,7 +255,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 
 1. Read `agents/canonical/CODEX_WORKFLOW.md`.
 1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is selected.
-1. For AgentCanon source/runtime work, use a standalone or qualified ignored source clone and follow `agents/workflows/agent-canon-pr-workflow.md`. The integration executor merges the AgentCanon PR and a publisher/integration child reads back source `main`; do not restore a parent vendor/submodule/root-projection route.
+1. For AgentCanon source/runtime work, use a standalone or qualified ignored source clone and follow `agent-canon-update`. The integration executor merges the AgentCanon PR and a publisher/integration child reads back source `main`; do not restore a parent vendor/submodule/root-projection route.
 1. Ordinary consultation, brainstorming, routing-only advice, and explanation-only turns are conversational turns. For those, keep MCP config inspection, shell commands, and GitHub checks in hold until the user requests state inspection, file edits, validation, PR/issue processing, CI checks, or implementation work, and continue with conversational responses until then.
 1. MCP is a Codex config/runtime surface. Root `mcp/` is a removed legacy path. For repository tasks that change MCP config or MCP-dependent gates, inspect `.codex/config.toml`, the owner docs, and the changed files directly; root `mcp/` remains a removed legacy surface.
 1. Before sweeping `documents/`, `documents/notes/`, `references/`, or local implementation directories, create or cite the `Structure Intake Packet` from `agents/COMMUNICATION_PROTOCOL.md` only when structure ownership, path, root view, responsibility, or stale-surface evidence can change the next decision. Explicit owner/path or canonical README evidence keeps a bounded route on its normal owner/transport path without a Structure Intake packet.

@@ -3,7 +3,7 @@
 @dependency-start
 contract reference
 responsibility Documents GitHub Agent Entry Point for this repository.
-upstream design ../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
+upstream design ../agents/skills/agent-canon-update.md agent-canon PR workflow
 upstream design ../templates/documents/github/README.md canonical GitHub template source and projection map
 @dependency-end
 -->
