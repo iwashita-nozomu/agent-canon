@@ -422,6 +422,302 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
     assert after.allowed_paths == ("src/owned.py",)
 
 
+def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Linked topics share Git objects but keep indexes, markers, and packets separate."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="owner/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+
+    first = rtc.request(
+        remote_url,
+        "repo-linked",
+        workspace,
+        "topic-first",
+        "feature/first",
+        evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    second = rtc.request(
+        remote_url,
+        "repo-linked",
+        workspace,
+        "topic-second",
+        "feature/second",
+        evidence,
+        allowed_paths=("second.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+
+    assert first.clone != second.clone
+    assert run_git(first.clone, "rev-parse", "--git-common-dir") == run_git(
+        second.clone, "rev-parse", "--git-common-dir"
+    )
+    assert run_git(first.clone, "rev-parse", "--git-path", "index") != run_git(
+        second.clone, "rev-parse", "--git-path", "index"
+    )
+    assert run_git(
+        first.clone,
+        "config",
+        "--worktree",
+        "--get",
+        f"{rtc.MARKER_PREFIX}.topic",
+    ) == "topic-first"
+    assert run_git(
+        second.clone,
+        "config",
+        "--worktree",
+        "--get",
+        f"{rtc.MARKER_PREFIX}.topic",
+    ) == "topic-second"
+    with pytest.raises(subprocess.CalledProcessError):
+        run_git(
+            first.clone,
+            "config",
+            "--local",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.topic",
+        )
+    first_packet, _ = read_writer_target_packet(first.clone)
+    second_packet, _ = read_writer_target_packet(second.clone)
+    assert first_packet.allowed_paths == ("first.py",)
+    assert second_packet.allowed_paths == ("second.py",)
+    assert run_git(first.clone, "config", "--get", "extensions.worktreeConfig") == "true"
+    assert run_git(workspace, "status", "--porcelain") == ""
+    assert remote.exists()
+
+
+def test_linked_anchor_resolution_accepts_explicit_linked_workspace_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An explicit linked anchor remains the stable parent for nested topics."""
+    _, remote_url = init_remote(tmp_path)
+    parent = tmp_path / "parent"
+    init_workspace_parent(parent)
+    run_git(parent, "remote", "add", "origin", remote_url)
+    anchor = tmp_path / "anchor"
+    run_git(parent, "worktree", "add", "-b", "anchor", anchor, "main")
+    evidence = anchor / "parent.txt"
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="owner/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+    prepared = rtc.request(
+        remote_url,
+        "repo-linked",
+        anchor,
+        "topic-nested",
+        "feature/nested",
+        evidence,
+        allowed_paths=("nested.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    assert prepared.clone == anchor / "workspace" / "topic-nested" / "repo-linked"
+    assert run_git(prepared.clone, "rev-parse", "--git-common-dir") == run_git(
+        anchor, "rev-parse", "--git-common-dir"
+    )
+    assert run_git(anchor, "status", "--porcelain") == ""
+
+
+def test_linked_reuse_never_switches_and_preserves_branch_in_use_and_dirty_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Linked reuse is read-only with native branch-in-use and dirty failures."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="owner/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+    request = dict(
+        url=remote_url,
+        repository="repo-linked",
+        workspace_root=workspace,
+        topic="topic-first",
+        branch="feature/first",
+        owner_evidence=evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    prepared = rtc.request(**request)
+    reused = rtc.request(**request)
+    assert reused.clone == prepared.clone
+    assert run_git(prepared.clone, "symbolic-ref", "--short", "HEAD") == "feature/first"
+
+    with pytest.raises(rtc.GitCommandError, match="already (checked out|used)"):
+        rtc.request(
+            remote_url,
+            "repo-linked",
+            workspace,
+            "topic-second",
+            "feature/first",
+            evidence,
+            checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+        )
+
+    dirty = prepared.clone / "dirty.txt"
+    dirty.write_text("preserve\n", encoding="utf-8")
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="dirty-worktree"):
+        rtc.request(**request)
+    assert dirty.read_text(encoding="utf-8") == "preserve\n"
+
+
+def test_linked_merge_conflict_uses_worktree_git_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Conflict preservation resolves MERGE_HEAD and info/exclude via Git paths."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="owner/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+    request = rtc.request(
+        remote_url,
+        "repo-linked",
+        workspace,
+        "topic-conflict",
+        "feature/conflict",
+        evidence,
+        allowed_paths=("base.txt",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    clone = request.clone
+    run_git(clone, "config", "user.name", "Test")
+    run_git(clone, "config", "user.email", "test@example.invalid")
+    (clone / "base.txt").write_text("topic\n", encoding="utf-8")
+    run_git(clone, "add", "base.txt")
+    run_git(clone, "commit", "-m", "topic")
+    source = tmp_path / "source"
+    (source / "base.txt").write_text("main\n", encoding="utf-8")
+    run_git(source, "add", "base.txt")
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(source),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "main",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(source, "push", "origin", "main")
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"):
+        rtc.merge_main(request.request)
+    merge_head = Path(run_git(clone, "rev-parse", "--git-path", "MERGE_HEAD"))
+    info_exclude = Path(run_git(clone, "rev-parse", "--git-path", "info/exclude"))
+    assert merge_head.is_file()
+    assert info_exclude.is_file()
+    assert (clone / ".agent-canon" / "conflict-preservation.json").is_file()
+    assert run_git(clone, "status", "--porcelain")
+
+
+def test_linked_cleanup_removes_one_worktree_and_keeps_branch_and_sibling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Native cleanup unregisters one worktree without deleting its branch or sibling."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="owner/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+    first = rtc.request(
+        remote_url,
+        "repo-linked",
+        workspace,
+        "topic-first",
+        "feature/first",
+        evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    second = rtc.request(
+        remote_url,
+        "repo-linked",
+        workspace,
+        "topic-second",
+        "feature/second",
+        evidence,
+        allowed_paths=("second.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    run_git(first.clone, "push", "origin", "feature/first")
+    run_git(second.clone, "push", "origin", "feature/second")
+    proof = rtc.cleanup(first.request, apply=True)
+    assert proof.removed
+    assert not first.clone.exists()
+    assert second.clone.is_dir()
+    assert run_git(workspace, "show-ref", "--verify", "refs/heads/feature/first")
+    assert str(second.clone) in run_git(workspace, "worktree", "list")
+    assert not first.clone.parent.exists()
+
+
 def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
