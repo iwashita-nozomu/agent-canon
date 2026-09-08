@@ -541,6 +541,64 @@ def test_print_only_runner_projects_linked_mount(tmp_path: Path, monkeypatch: py
     assert "/mnt/l/msm_data_root:/mnt/l/msm_data_root" in capsys.readouterr().out
 
 
+def test_pack_runner_resolves_pack_and_build_inputs_from_explicit_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An anchor-invoked pack runner uses the selected checkout for every input."""
+    runner = load_runner_module()
+    repo, pack_path, _ = write_parent_pack(tmp_path, linked=False)
+    (repo / "container").mkdir()
+    (repo / "container" / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+    (repo / "build-context").mkdir()
+    pack_path.write_text(
+        "\n".join(
+            [
+                "[pack]",
+                'name = "selected"',
+                'dockerfile = "container/Dockerfile"',
+                'context = "build-context"',
+                'image_tag = "selected:fixture"',
+                "",
+                "[smoke]",
+                'shell = "/bin/bash"',
+                'commands = ["pwd"]',
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(runtime_module, "write_lifecycle_receipt", lambda *_args: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(RUNNER_SCRIPT),
+            "--pack",
+            "docker/packs/default.toml",
+            "--workspace-root",
+            str(repo),
+            "--builder",
+            "docker",
+            "--skip-run",
+            "--print-only",
+        ],
+    )
+
+    assert runner.main() == 0
+    output = capsys.readouterr().out
+    assert f"-f {repo}/container/Dockerfile" in output
+    assert f"{repo}/build-context" in output
+    assert f"-v {repo}:/workspace" in output
+    assert f"{PROJECT_ROOT}/container/Dockerfile" not in output
+
+
 class FakeLifecycleDaemon:
     """In-memory daemon used to exercise exact-ID lifecycle cleanup."""
 
