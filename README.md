@@ -20,13 +20,13 @@ vendor するものではなく、必要な作業時に明示的な development 
 
 人が読む入口は次の順です。
 
-1. `README.md`
-2. `PHILOSOPHY.md`
-3. `documents/README.md`
-4. `agents/README.md`
-5. `agents/workflows/README.md`
+1. [README.md](README.md)
+2. [PHILOSOPHY.md](PHILOSOPHY.md)
+3. [documents/README.md](documents/README.md)
+4. [agents/README.md](agents/README.md)
+5. [agents/workflows/README.md](agents/workflows/README.md)
 
-Codex の source-tree instruction entrypoint は `AGENTS.md` です。skill、workflow、
+Codex の source-tree instruction entrypoint は [AGENTS.md](AGENTS.md) です。skill、workflow、
 subagent の canonical owner は `agents/`、設計と runtime contract の owner は
 `documents/`、実行可能な tool と checker の owner は `tools/` と
 `tools/runtime/dispatch/agent-canon/` です。

@@ -36,12 +36,12 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | role behavior, stage conditions, and review separation | `.codex/agents/*.toml` |
 | run bundle, declared workflow / skills / review, and dynamic wave ledger | `bootstrap_agent_run.py`; `workflow_monitor.py` |
 | skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `python3 tools/agent/orchestration/route.py --prompt` |
-| implementation stage and closeout | `agents/skills/codex-task-workflow.md`; selected family row in `agents/task_catalog.yaml` |
-| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; `agents/agents_config.json#artifacts.active_design_packet` |
-| semantic responsibility allocation | `documents/design/semantic-responsibility-contract.md`; run-local instance via active-packet `source_refs` |
+| implementation stage and closeout | [agents/skills/codex-task-workflow.md](skills/codex-task-workflow.md); selected family row in `agents/task_catalog.yaml` |
+| active design packet schema | [agents/COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md); `agents/agents_config.json#artifacts.active_design_packet` |
+| semantic responsibility allocation | [documents/design/semantic-responsibility-contract.md](../documents/design/semantic-responsibility-contract.md); run-local instance via active-packet `source_refs` |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |
-| validation failure response taxonomy | `documents/runtime/runtime-profiles-and-check-matrix.json`; generated reader projection: `documents/runtime/runtime-profiles-and-check-matrix.md` |
-| validation failure response workflow projections | `agents/canonical/CODEX_WORKFLOW.md`; `agents/canonical/CODEX_SUBAGENTS.md`; `documents/conventions/REVIEW_PROCESS.md` |
+| validation failure response taxonomy | `documents/runtime/runtime-profiles-and-check-matrix.json`; generated reader projection: [documents/runtime/runtime-profiles-and-check-matrix.md](../documents/runtime/runtime-profiles-and-check-matrix.md) |
+| validation failure response workflow projections | [agents/canonical/CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md); [agents/canonical/CODEX_SUBAGENTS.md](canonical/CODEX_SUBAGENTS.md); [documents/conventions/REVIEW_PROCESS.md](../documents/conventions/REVIEW_PROCESS.md) |
 
 Contract edits start in the owner surface. This reader map changes when the
 reader path changes.
@@ -121,7 +121,7 @@ materialization reader path.
 
 `workflow_activation_policy` selects the positive family/stage/child route. Safety,
 authority, and validation prohibitions stay with their canonical owners;
-`documents/runtime/runtime-profiles-and-check-matrix.md` selects the active
+[documents/runtime/runtime-profiles-and-check-matrix.md](../documents/runtime/runtime-profiles-and-check-matrix.md) selects the active
 validation matrix for the changed path and risk class.
 
 ## Dynamic Wave Evidence

@@ -35,15 +35,15 @@ AgentCanon から将来切り離す場合の集約先である。既存の正本
 ## Evidence And Assumption Ledger
 
 - Evidence sources:
-  `graph-dsl.md`, `database-design.md`, `document-canon-analysis.md`,
-  `../prose-reasoning-graph/dsl-spec.md`,
+  [graph-dsl.md](graph-dsl.md), [database-design.md](database-design.md), [document-canon-analysis.md](document-canon-analysis.md),
+  [../prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md),
   `../dependency-manifest-design.md`, and
   `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - Assumptions:
   `DSL` in this index refers to the Graph DSL Core contract and its adapter
   profiles. Adapter-specific meanings stay in the linked adapter documents.
 - Parent-doc alignment:
-  `../README.md` indexes AgentCanon documents. This README indexes the
+  [../README.md](../README.md) indexes AgentCanon documents. This README indexes the
   structured-analysis contract package.
 
 ## Canon Set
@@ -65,7 +65,7 @@ AgentCanon から将来切り離す場合の集約先である。既存の正本
 - この directory は structured analysis package の候補 root である。
 - 既存文書の正本 path は、明示的な migration まで移動しない。
 - ここに置く新規文書は、独立 tool 化後も残す contract を扱う。
-- 汎用 graph storage の正本は `graph-dsl.md` が持ち、個別 surface の意味論は
+- 汎用 graph storage の正本は [graph-dsl.md](graph-dsl.md) が持ち、個別 surface の意味論は
   adapter 文書が持つ。
 - Run artifact、temporary SQLite DB、generated report はここに置かない。
 - Agent skill の routing や authority boundary は `agents/skills/` 側の責務として残す。
@@ -103,7 +103,7 @@ Structured analysis は次の面を分ける。
 | Document canon graph | Rust structured-analysis inventory | active duplicate heading、runtime mirror、generated report、stale name cleanup findings, plus closed issue historical records. |
 | Report contract graph | report root to sentence trace | claim、evidence、finding、closure event、action。 |
 
-これらの layer は `graph-dsl.md` の `D, N, E, A, P, X, M` object family に
+これらの layer は [graph-dsl.md](graph-dsl.md) の `D, N, E, A, P, X, M` object family に
 materialize される。layer / kind の組が edge と node の意味を所有するため、
 dependency manifest edge、code import、prose support、proof dependency を同じ
 storage table に置いても意味論は混ざらない。

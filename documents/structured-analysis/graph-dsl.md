@@ -23,8 +23,8 @@ dependency-specific, code-specific, report-specific, and proof-specific
 surfaces.
 
 The core boundary is storage, joins, projections, and representation checks.
-Domain tools keep their own semantics and pass/fail authority as documented in `../prose-reasoning-graph/dsl-spec.md`,
-`../design/dependency-manifest-design.md`, and
+Domain tools keep their own semantics and pass/fail authority as documented in [../prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md),
+[../design/dependency-manifest-design.md](../design/dependency-manifest-design.md), and
 `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 
 ## Reader Map
@@ -38,9 +38,9 @@ sections define validation, SQLite materialization, and extension rules.
 ## Evidence And Assumption Ledger
 
 - Evidence paths:
-  `README.md`, `database-design.md`,
-  `../prose-reasoning-graph/dsl-spec.md`,
-  `../design/dependency-manifest-design.md`, and
+  `README.md`, [database-design.md](database-design.md),
+  [../prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md),
+  [../design/dependency-manifest-design.md](../design/dependency-manifest-design.md), and
   `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - DSL term:
   Graph DSL Core means this storage contract plus the
@@ -111,8 +111,8 @@ prose.
 
 The tuple is sufficient for current AgentCanon graph-shaped surfaces with a
 faithful adapter mapping such as the mappings in
-`../prose-reasoning-graph/dsl-spec.md` and
-`../design/dependency-manifest-design.md`:
+[../prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md) and
+[../design/dependency-manifest-design.md](../design/dependency-manifest-design.md):
 
 $$
 \phi_{\mathrm{surface}} : \mathrm{SurfaceObject} \to D + N + E + A + P + X + M
@@ -257,8 +257,8 @@ layer is promoted here.
 
 | Surface | Mapping |
 | --- | --- |
-| Prose Reasoning Graph | Source spans correspond to `source`/`form`; claims, evidence, discourse, presentation features, diagnostics, edit operations, and projections correspond to their matching layers in `../prose-reasoning-graph/dsl-spec.md`. |
-| Dependency manifest graph | Manifest records correspond to `deps` nodes and edges; dependency validation findings correspond to diagnostics/check records in `../design/dependency-manifest-design.md`. |
+| Prose Reasoning Graph | Source spans correspond to `source`/`form`; claims, evidence, discourse, presentation features, diagnostics, edit operations, and projections correspond to their matching layers in [../prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md). |
+| Dependency manifest graph | Manifest records correspond to `deps` nodes and edges; dependency validation findings correspond to diagnostics/check records in [../design/dependency-manifest-design.md](../design/dependency-manifest-design.md). |
 | Canonical repository graph | `graph.rs` maps the parser-owned source snapshot and authoritative producer artifacts into validated nodes, edges, diagnostics, projections, and metadata. `GraphClient` reads command JSON only; no Python transport decoder or alternate SQLite writer exists. |
 | Code dependency graph | Source files and symbols correspond to `code` nodes or payload locators; imports/includes/source references correspond to `code` edges. |
 | Artifact and directory responsibility | Files/directories correspond to `artifact` nodes; containment and responsibility support correspond to `artifact` edges in `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`. |

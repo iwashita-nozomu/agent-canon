@@ -62,9 +62,9 @@ The canonical path-bearing clauses and required obligation sets are:
 
 | canonical clause ID | producer reference in live `text` | required static obligations |
 | --- | --- | --- |
-| `python_solid_boundary` | `agents/skills/python-review.md` and `agents/skills/agent-orchestration.md` | `validation_owner`, `parent_assignment` |
-| `luna_impl` | `agents/skills/agent-orchestration.md` | `validation_owner`, `parent_assignment`, `parent_authority`, `stop_handback` |
-| `spark_impl` | `agents/skills/agent-orchestration.md` | `validation_owner`, `parent_assignment`, `parent_authority`, `stop_handback` |
+| `python_solid_boundary` | [agents/skills/python-review.md](../../agents/skills/python-review.md) and [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md) | `validation_owner`, `parent_assignment` |
+| `luna_impl` | [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md) | `validation_owner`, `parent_assignment`, `parent_authority`, `stop_handback` |
+| `spark_impl` | [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md) | `validation_owner`, `parent_assignment`, `parent_authority`, `stop_handback` |
 
 `consumer_static_text` is mandatory for every clause whose case-normalized live text
 contains any exact forbidden prefix, and for any future clause that names a producer,

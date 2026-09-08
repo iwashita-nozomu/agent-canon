@@ -15,10 +15,10 @@ downstream implementation ../../eval/checkers/eval_accumulation_check.py validat
 This document is procedure-only. It covers one-time or occasional migration of
 old in-tree runtime logs into the external archive. Archive ownership, stable
 branch policy, and steady-state mount rules stay in
-`documents/runtime/runtime-log-archive.md` and the `agent-canon-log` policy
+[documents/runtime/runtime-log-archive.md](runtime-log-archive.md) and the `agent-canon-log` policy
 repository.
 General artifact retention rules stay in
-`documents/experiments/result-log-retention-and-visualization.md`.
+[documents/experiments/result-log-retention-and-visualization.md](../experiments/result-log-retention-and-visualization.md).
 
 This document is the AgentCanon-side boundary for old hook JSONL and accumulated
 eval reports that still exist under `agents/evals/results/`. The policy-owner
@@ -37,7 +37,7 @@ reader-facing documentation, schemas, and tool tests, but no
   Handling.
 - Read this during one-time or occasional archive migration work.
 - Boundary: steady-state archive ownership and retention policy stay in
-  `runtime-log-archive.md` and `result-log-retention-and-visualization.md`.
+  [runtime-log-archive.md](runtime-log-archive.md) and `result-log-retention-and-visualization.md`.
 
 No legacy branch migration, branch deletion, merge, or rewrite is performed by
 the lifecycle redesign. The log repository policy branch contains a

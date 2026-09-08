@@ -38,10 +38,10 @@ evidence に基づいて記録し、plan の completion や run 開始条件に�
 
 ## Core References
 
-- `agents/skills/research-workflow.md`
-- `agents/skills/experiment-lifecycle.md`
-- `agents/skills/comprehensive-development.md`
-- `agents/skills/codex-task-workflow.md`
+- [agents/skills/research-workflow.md](research-workflow.md)
+- [agents/skills/experiment-lifecycle.md](experiment-lifecycle.md)
+- [agents/skills/comprehensive-development.md](comprehensive-development.md)
+- [agents/skills/codex-task-workflow.md](codex-task-workflow.md)
 
 ## Operating Rules
 
@@ -145,9 +145,9 @@ artifact の配置はそれぞれの owner に委譲し、この record には�
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/adaptive-improvement-loop.md`.
-1. Read `agents/skills/research-workflow.md` when external evidence or claim scope is in scope.
-1. Read `agents/skills/experiment-lifecycle.md` for one run or fresh rerun.
+1. Read [agents/skills/adaptive-improvement-loop.md](adaptive-improvement-loop.md).
+1. Read [agents/skills/research-workflow.md](research-workflow.md) when external evidence or claim scope is in scope.
+1. Read [agents/skills/experiment-lifecycle.md](experiment-lifecycle.md) for one run or fresh rerun.
 1. If the user gives goal-driven intent without an exact objective, hand objective clarification and
    execution topology to their canonical owners; do not create role or spawn rules here.
 1. When durable lifecycle evidence is required, record work units, iteration evidence, and next action

@@ -57,16 +57,16 @@ Issue-backed task は、作業が未完了の状態で handoff、停止、別 ta
 1. task に対応する Issue 本文と最新 comment
 1. Issue から辿れる途中作業の current head / state
 1. current main と途中作業との差分
-1. active root `AGENTS.md` の Reader Map row
+1. active root [AGENTS.md](../../AGENTS.md) の Reader Map row
 1. selected canonical Skill の operational section と、同 section が必要時に委譲する owner
 1. `README.md`
 1. `QUICK_START.md`
-1. `documents/README.md`
-1. `agents/workflows/README.md`
+1. [documents/README.md](../../documents/README.md)
+1. [agents/workflows/README.md](../workflows/README.md)
 1. `docker/README.md`
-1. `agents/README.md`
-1. Codex なら `agents/canonical/CODEX_WORKFLOW.md`
-1. `tools/README.md`
+1. [agents/README.md](../README.md)
+1. Codex なら [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md)
+1. [tools/README.md](../../tools/README.md)
 1. `scripts/README.md`
 
 ## Outputs
@@ -76,6 +76,6 @@ Issue-backed task は、作業が未完了の状態で handoff、停止、別 ta
 - repo shape の短い要約
 - 触るべきディレクトリ
 - 追加で読むべき正本
-- `agent-orchestration.md#Owner-First-Read-Trace` の operational-owner readback。未解決なら
+- [agent-orchestration.md#Owner-First-Read-Trace](agent-orchestration.md#owner-first-read-trace) の operational-owner readback。未解決なら
   implementation path を列挙せず `implementation_read=locked` とする
 - 未完了で handoff / stop する場合は Issue progress comment の URL または comment identity

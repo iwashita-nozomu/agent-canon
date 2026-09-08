@@ -32,13 +32,13 @@ research workflow, and adaptive backlog tuning.
 
 ## Core References
 
-- `agents/internal-routines/experiment-workflow.md`
-- `agents/skills/research-workflow.md`
-- `agents/internal-routines/critical-review.md`
-- `agents/internal-routines/report-review.md`
-- `agents/skills/experiment-lifecycle.md`
-- `agents/skills/research-workflow.md`
-- `templates/agents/experiment_change_loop.md`
+- [agents/internal-routines/experiment-workflow.md](experiment-workflow.md)
+- [agents/skills/research-workflow.md](../skills/research-workflow.md)
+- [agents/internal-routines/critical-review.md](critical-review.md)
+- [agents/internal-routines/report-review.md](report-review.md)
+- [agents/skills/experiment-lifecycle.md](../skills/experiment-lifecycle.md)
+- [agents/skills/research-workflow.md](../skills/research-workflow.md)
+- [templates/agents/experiment_change_loop.md](../../templates/agents/experiment_change_loop.md)
 
 ## Inputs
 
@@ -103,9 +103,9 @@ research workflow, and adaptive backlog tuning.
 
 ## Suggested Templates
 
-- `templates/agents/experiment_change_loop.md`
-- `templates/agents/experiment_log.md`
-- `templates/agents/decision_log.md`
+- [templates/agents/experiment_change_loop.md](../../templates/agents/experiment_change_loop.md)
+- [templates/agents/experiment_log.md](../../templates/agents/experiment_log.md)
+- [templates/agents/decision_log.md](../../templates/agents/decision_log.md)
 
 ## Boundary
 

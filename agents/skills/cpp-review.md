@@ -50,10 +50,10 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 
 ## Core References
 
-- `documents/conventions/coding-conventions-cpp.md`
-- `documents/conventions/DOCSTRING_GUIDE.md`
-- `documents/conventions/coding-conventions-testing.md`
-- `documents/conventions/REVIEW_PROCESS.md`
+- [documents/conventions/coding-conventions-cpp.md](../../documents/conventions/coding-conventions-cpp.md)
+- [documents/conventions/DOCSTRING_GUIDE.md](../../documents/conventions/DOCSTRING_GUIDE.md)
+- [documents/conventions/coding-conventions-testing.md](../../documents/conventions/coding-conventions-testing.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
 
 性能レビューの工学的参考資料として次の一次資料を使えます。これらは AgentCanon の第二
 policy owner ではなく、この Skill の evidence contract を解釈するための reference です。
@@ -83,7 +83,7 @@ policy owner ではなく、この Skill の evidence contract を解釈する�
 changed surface に `cpp_reviewer` を候補として返した場合に、reviewer を起動します。
 convention/template documentation は同じ
 path inventory から `docs_workflow_steward` が担当し、catalog capability は OOP/type design
-owner の選択に限ります。semantic clause の owner は `documents/conventions/DOCSTRING_GUIDE.md`
+owner の選択に限ります。semantic clause の owner は [documents/conventions/DOCSTRING_GUIDE.md](../../documents/conventions/DOCSTRING_GUIDE.md)
 へ戻します。レビューは Doxygen syntax / format、header/source anchor、native ownership
 evidence と、target responsibility region に選択した semantic delta が対応するかを確認
 します。signature、namespace、field、型事実を comment に複製せず、`@param`、`@return`、

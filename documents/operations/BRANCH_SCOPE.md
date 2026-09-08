@@ -25,7 +25,7 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - 主な順路は、基本方針、branch 名、Scope の固定、コミット・プッシュ、
   Conflict 解決と merge / rebase、削除前チェックです。
 - branch や PR の責務を固定する前、または merge 判断時に読みます。
-- 境界: worktree 作成と carry-over の詳細は `worktree-lifecycle.md` が扱います。
+- 境界: worktree 作成と carry-over の詳細は [worktree-lifecycle.md](worktree-lifecycle.md) が扱います。
 
 ## 1. 基本方針
 
@@ -97,7 +97,7 @@ validation route を同じ entrypoint で再実行できることを指します
 - 履歴を読みやすく保つため、ローカル整理には `rebase` を使って構いません。
 - 統合時の安全性と文脈保持を優先する場合は `merge` を選びます。
 - 別 branch と同じファイルを触っている場合は、先に `documents/notes/branches/` と `documents/notes/worktrees/` で衝突リスクを明示します。
-- file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、`agents/skills/integration.md` の手順で統合します。
+- file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、[agents/skills/integration.md](../../agents/skills/integration.md) の手順で統合します。
 - 構成変更がある branch は、`main` 側で file 単位に拾い直して close してはいけません。
 - 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`python3 tools/validation/ci/checks/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - integration branch が妥当なら、`main` へは `git merge --ff-only integrate/<topic>-YYYYMMDD` で持ち帰ります。

@@ -21,9 +21,9 @@ upstream design ../skills/prose-reasoning-graph.md prose graph logic diagnostic 
 
 ## Core References
 
-- `agents/skills/academic-writing.md`
-- `agents/internal-routines/critical-review.md`
-- `documents/conventions/REVIEW_PROCESS.md`
+- [agents/skills/academic-writing.md](../skills/academic-writing.md)
+- [agents/internal-routines/critical-review.md](critical-review.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
 
 ## Mandatory Checklist
 

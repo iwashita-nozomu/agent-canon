@@ -16,7 +16,7 @@ downstream implementation ../../.codex/personal/skills/parent-repository-audit/S
 ## Reader Map
 
 - 目的: AgentCanon を利用する親 repository を semantic audit unit ごとに読み、finding を owner repair、対象 readback、closure まで進める。
-- 入口: `documents/parent-repository-audit/README.md`、catalog capability、dependency map、resolver が解決した tool command の順に読む。
+- 入口: [documents/parent-repository-audit/README.md](../../documents/parent-repository-audit/README.md)、catalog capability、dependency map、resolver が解決した tool command の順に読む。
 - 順序: `parent_repository_audit.py list` が返す unit を path 昇順で一つずつ処理し、unit receipt を残してから次へ進む。
 - 境界: path owner/class は親の `responsibility-scope.toml`、path existence/kind は structure contract、AgentCanon runtime lifecycle は standalone `bootstrap.sh` と明示 runtime root が所有する。
 - 出力: selected surface/unit、tracked evidence count、unit ごとの `pass|closed|failed|deferred|blocked`、repair/readback evidence、全体 status。
@@ -42,7 +42,7 @@ owner skill/worker へ routing し、新しい path registry、checker、runtime
 
 ## Source And Evidence Boundary
 
-正本は `documents/parent-repository-audit/README.md` と `audit-unit/*.md` です。各 unit は
+正本は [documents/parent-repository-audit/README.md](../../documents/parent-repository-audit/README.md) と `audit-unit/*.md` です。各 unit は
 `Owner Responsibility`、`Invariant`、`Evidence Sources`、`Repair Route`、`Validation`、
 `Close Condition`、`Related Change Surfaces`、`Legacy Migration IDs` を持ちます。
 

@@ -20,8 +20,8 @@ question、protocol、run、report を分けて実験を扱います。
 
 ## Core References
 
-- `agents/skills/experiment-lifecycle.md`
-- `agents/skills/research-workflow.md`
+- [agents/skills/experiment-lifecycle.md](../skills/experiment-lifecycle.md)
+- [agents/skills/research-workflow.md](../skills/research-workflow.md)
 
 ## Boundary
 

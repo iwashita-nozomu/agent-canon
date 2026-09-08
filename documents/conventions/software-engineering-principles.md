@@ -45,9 +45,9 @@ review finding、validation route に接続します。選ばれなかった原�
 
 | Surface | Owns | Does not own |
 | --- | --- | --- |
-| `PHILOSOPHY.md` | AgentCanon 全体の top-level philosophy と最初の reader route | 個別原則の詳細、task-specific target state |
+| [PHILOSOPHY.md](../../PHILOSOPHY.md) | AgentCanon 全体の top-level philosophy と最初の reader route | 個別原則の詳細、task-specific target state |
 | この文書 | 一般原則、競合時の優先順位、誤用防止、evidence model | 特定 module の設計、言語 syntax、OOP 固有の形 |
-| `object-oriented-design.md` | class、state、inheritance、composition、`Protocol`、SOLID の専門判断 | 全変更への一律 OOP activation |
+| [object-oriented-design.md](object-oriented-design.md) | class、state、inheritance、composition、`Protocol`、SOLID の専門判断 | 全変更への一律 OOP activation |
 | language convention | syntax、layout、language/toolchain 固有の境界 | repository-wide の意味上の owner |
 | task-specific design | target state、tradeoff、assumption、implementation trace | 一般原則の第二正本 |
 | Issue / PR | current snapshot 固有の要求、削減理由、実装・検証 evidence | 長期 policy の唯一の根拠 |
@@ -172,7 +172,7 @@ write、external service、process、filesystem、network、shared mutable state
 cleanup / rollback を責任範囲に含めます。
 
 inheritance、substitutability、interface segregation、DI container、public object model の判断は、
-実際に object contract が変わる場合だけ `object-oriented-design.md` へ委譲します。
+実際に object contract が変わる場合だけ [object-oriented-design.md](object-oriented-design.md) へ委譲します。
 
 ## 3. 単純さと抽象化の admission
 
@@ -399,7 +399,7 @@ root mechanism、consumer migration、cleanup を未完にしたりしません�
 
 review finding は、具体的な contract / invariant / owner / dependency / failure risk と、関係する clause を結びます。全 PR に
 原則 checklist、SOLID report、negative receipt を要求しません。OOP-sensitive change の専門判断は
-`object-oriented-design.md` と canonical OOP reviewer に委譲します。
+[object-oriented-design.md](object-oriented-design.md) と canonical OOP reviewer に委譲します。
 
 ## Conflict examples
 

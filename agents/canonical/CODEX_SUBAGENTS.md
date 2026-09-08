@@ -17,7 +17,7 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 # Codex Subagents
 
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。
-shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
+shared workflow は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
 role profile/instruction authority は `agents/model_profiles.toml` と
 `tools/agent/orchestration/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
@@ -28,13 +28,13 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 
 ## Compact request/update projection
 
-`../../documents/design/request-intent-and-update-relation.md` の handoff flow は既存
+[../../documents/design/request-intent-and-update-relation.md](../../documents/design/request-intent-and-update-relation.md) の handoff flow は既存
 agent context の再利用を優先し、owner/write-scope/DAG evidence が disjoint な場合だけ
 必要な並列 handoff を作ります。descendant close、reservation release、terminal handback
 はこの owner の既存 lifecycle evidence と `close_agent` receipt を使います。
 
 Runtime collaboration capability and coordination receipts are owned by
-`agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake`.
+[agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake](../COMMUNICATION_PROTOCOL.md#runtime-collaboration-capability-handshake).
 This document only projects the route: read capability from the direct runtime
 collaboration namespace, use `direct_peer` only after an `available` readback,
 and use an honest `parent_relay` or `durable_artifact` path for
@@ -100,10 +100,10 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
 - 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
-- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
+- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
 - subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
-- fresh subagent は必要な launch ごとに `agents/COMMUNICATION_PROTOCOL.md`
+- fresh subagent は必要な launch ごとに [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
   の `Fresh Subagent Context Capsule` を受け取ります。active agent を再利用
   できる場合は、同じ protocol-owned context を compatible な revised scope
   として更新します。`context_artifacts`、`allowed_paths`、`do_not_read`、
@@ -133,7 +133,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   design、path、failure semantics が固定された handoff は selected owner gate
   へ直接 route できます。追加の読み取り、packet、review、wave は次の決定を
   変える場合だけ追加します。DSV policy の意味論は
-  `agents/skills/agent-orchestration.md#Decision Sufficiency Packet` だけが所有します。
+  [agents/skills/agent-orchestration.md#Decision Sufficiency Packet](../skills/agent-orchestration.md#decision-sufficiency-packet) だけが所有します。
 - `.codex/config.toml` の `max_threads` は capacity topology の生成値を
   loader/readback した configured value です。現在は direct frontier `21` と
   nested reservation `6` から生成された `27` で、universal hard ceiling では
@@ -275,7 +275,7 @@ implementation intent changes.
 
 The canonical token-safe `cause_classification` and `intent_preservation` slug
 lists are owned by `documents/runtime/runtime-profiles-and-check-matrix.json` and
-projected into `documents/runtime/runtime-profiles-and-check-matrix.md`. This section is
+projected into [documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md). This section is
 only the subagent handoff projection: handoffs must carry those five fields and
 must cite the runtime profile taxonomy rather than defining a separate slug
 list. Implementation bugs, test-oracle/spec mismatches, fixture or environment
@@ -719,7 +719,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - `reviewer`
   - 読み取り専用で diff と risk を findings-led で洗う
 - `python_reviewer`
-  - Python diff の型、API境界、親 packet が選択した validation evidence を review する。validation scope は `../skills/python-review.md#Validation route` と `../skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照し、reviewer が追加の full suite を選択しない
+  - Python diff の型、API境界、親 packet が選択した validation evidence を review する。validation scope は [python-review.md#Validation selection](../skills/python-review.md#validation-selection) と [agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary](../skills/agent-orchestration.md#write-capable-handoff-validation-trust-boundary) を参照し、reviewer が追加の full suite を選択しない
 - `cpp_reviewer`
   - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `oop_readability_reviewer`
@@ -790,7 +790,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
 - この文書では route と inventory だけを決め、各 role の詳細条件は `.codex/agents/*.toml` に集約します
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
-- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは `agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
+- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
 - context が増えたら capsule artifact を更新して再配送します
 - math-intent route の write-capable handoff には、protocol の Target Binding Packet に加えて
   `mathematical_intent_packet` を必ず添えます。packet は `math_object` / `problem`, `variables` /

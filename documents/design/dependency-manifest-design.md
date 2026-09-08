@@ -226,7 +226,7 @@ responsibility <role statement...>
 
 ただし、manifest block 全体が空の file は graph 上の孤立 node になりやすいため、default graph gate では fail とします。
 少なくとも、編集前に読むべき nearest canonical context を `upstream` に置くか、変更後に確認すべき consumer / index / generated mirror を `downstream` に置きます。
-shared canon の file は、実依存がない場合でも `AGENTS.md`、`README.md`、directory-level README、canonical workflow doc、tool index、skill implementation guide のような canon 内 anchor に接続します。
+shared canon の file は、実依存がない場合でも [AGENTS.md](../../AGENTS.md)、`README.md`、directory-level README、canonical workflow doc、tool index、skill implementation guide のような canon 内 anchor に接続します。
 Dockerfile や repo-local environment file は universal anchor にしません。
 shared canon は派生 repo に配布されるため、environment edge はその file が本当に Docker / CI / requirements / runtime assumption に依存する場合だけ使います。
 
@@ -386,7 +386,7 @@ target が `foo` の symlink (`120000`) は異なる fingerprint になる。
 各経路が symlink / regular file / missing の読み方を二重実装しない。
 
 The canonical machine interface is the four JSON graph operations documented
-in `agents/canonical/CLI_ENTRYPOINTS.md`. A dependency query uses
+in [agents/canonical/CLI_ENTRYPOINTS.md](../../agents/canonical/CLI_ENTRYPOINTS.md). A dependency query uses
 `--all --relation dependency --direction both --depth 0` and preserves stable
 fact IDs, source spans, producer, evidence reference, authority, and the
 dependency detail. Python consumers use `GraphClient` and
@@ -586,7 +586,7 @@ Valid ways to avoid isolation:
 - add an `environment` edge only when the file truly depends on Docker, CI, requirements, or runtime configuration
 
 Do not add synthetic Dockerfile dependencies just to make a node non-isolated.
-For `agent-canon`, generic files should connect to canon-owned anchors such as `AGENTS.md`, `README.md`, `agents/canonical/*.md`, `documents/*.md`, or `tools/README.md`.
+For `agent-canon`, generic files should connect to canon-owned anchors such as [AGENTS.md](../../AGENTS.md), `README.md`, `agents/canonical/*.md`, `documents/*.md`, or [tools/README.md](../../tools/README.md).
 
 ## Self Reference And Cycles
 
@@ -624,7 +624,7 @@ Responsibilities:
 - delegate the normal scan to the canonical LSP `scan-legacy` report
 - keep output independent from manifest upstream/downstream edges
 - support explicit path lists and `--changed`
-- provide pre-edit evidence for `agents/skills/dependency-analysis.md`
+- provide pre-edit evidence for [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md)
 - require `--lexical-only` for the compatibility extractor and fail closed when
   the canonical LSP server is unavailable
 

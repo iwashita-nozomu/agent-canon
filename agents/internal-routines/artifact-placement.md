@@ -20,7 +20,7 @@ task 中に増える文書や出力を、run-local artifact、repo-wide 正本�
 
 ## Core Reference
 
-- `agents/canonical/ARTIFACT_PLACEMENT.md`
+- [agents/canonical/ARTIFACT_PLACEMENT.md](../canonical/ARTIFACT_PLACEMENT.md)
 
 ## Outputs
 

@@ -10,7 +10,7 @@ upstream design ../documents/design/responsibility-rationale.md canonical curren
 
 ## Status
 
-`gpt-5.6-benchmark-report-ja.md` is retained as dated benchmark/evidence synthesis. It is **not** the canonical owner of current AgentCanon execution topology, agent count, or write protocol. Current policy is owned by `documents/design/responsibility-rationale.md`; a later benchmark may update evidence without silently changing that policy.
+[gpt-5.6-benchmark-report-ja.md](gpt-5.6-benchmark-report-ja.md) is retained as dated benchmark/evidence synthesis. It is **not** the canonical owner of current AgentCanon execution topology, agent count, or write protocol. Current policy is owned by [documents/design/responsibility-rationale.md](../documents/design/responsibility-rationale.md); a later benchmark may update evidence without silently changing that policy.
 
 This separation resolves two places where the historical report over-generalized benchmark observations into defaults that the same report did not experimentally establish at task/system level.
 

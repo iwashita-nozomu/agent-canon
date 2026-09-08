@@ -34,7 +34,7 @@ generation boundaries so search output is not mistaken for edit authority.
 
 ## Evidence And Assumption Ledger
 
-- Evidence sources: `search-coordination.md`,
+- Evidence sources: [search-coordination.md](search-coordination.md),
   `../../tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs`, and
   `../../tools/catalog.yaml`.
 - Assumption:

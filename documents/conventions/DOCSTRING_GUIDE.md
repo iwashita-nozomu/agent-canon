@@ -33,7 +33,7 @@ downstream design ../../agents/skills/oop-type-design.md selects language-neutra
 - **reviewer / maintainer**: `Forward / Reverse Trace` を閉じ、コード・設計・Docstring の
   不整合を判定します。
 
-`documents/conventions/DOCSTRING_GUIDE.md` は semantic contract と template skeleton の
+[documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) は semantic contract と template skeleton の
 唯一の owner です。language convention は syntax / format projection、template は
 projection consumer であり、同じ契約を再定義しません。
 
@@ -41,14 +41,14 @@ projection consumer であり、同じ契約を再定義しません。
 
 | responsibility | canonical owner or projection path | role |
 | --- | --- | --- |
-| semantic contract | `documents/conventions/DOCSTRING_GUIDE.md` | 唯一の正本 |
-| canonical template skeleton | `documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton` | 言語非依存の clause source |
-| reusable document-template projection | `templates/documents/design-document.template.md` | skeleton を参照する既存 template |
-| Python adapter projection | `documents/conventions/coding-conventions-python.md` | Python docstring syntax / format |
-| C++ adapter projection | `documents/conventions/coding-conventions-cpp.md` | C++ documentation syntax / native format |
+| semantic contract | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | 唯一の正本 |
+| canonical template skeleton | [documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton](DOCSTRING_GUIDE.md#canonical-template-skeleton) | 言語非依存の clause source |
+| reusable document-template projection | [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md) | skeleton を参照する既存 template |
+| Python adapter projection | [documents/conventions/coding-conventions-python.md](coding-conventions-python.md) | Python docstring syntax / format |
+| C++ adapter projection | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) | C++ documentation syntax / native format |
 | Python code-template projection | `templates/experiments/_template/run.py` | runtime code への current projection |
 | Python module-template projection | `templates/experiments/_template/cases.py` | module responsibility の current projection |
-| Python public surface | `documents/conventions/coding-conventions-python.md` | `__all__` と公開 export の owner |
+| Python public surface | [documents/conventions/coding-conventions-python.md](coding-conventions-python.md) | `__all__` と公開 export の owner |
 
 `__all__` は Docstring contract の一部ではありません。Python public surface owner へ
 分離し、Docstring 側では公開名、namespace、field、annotation を再掲しません。
@@ -174,7 +174,7 @@ Snippet は matrix の意味関係から選択し、同じ関係に対応する�
 path / clause / evidence trace に束縛してから language adapter の syntax へ投影します。
 
 この skeleton の reusable document-template projection target は
-`templates/documents/design-document.template.md` です。そこへ semantic clause をコピー
+[templates/documents/design-document.template.md](../../templates/documents/design-document.template.md) です。そこへ semantic clause をコピー
 して第二正本を作らず、contract owner への参照と projection/trace 欄を追加します。
 
 ## Projection consumers and acceptance trace
@@ -185,7 +185,7 @@ acceptance trace だけを持ちます。
 
 ### Document-template projection
 
-- consumer: `templates/documents/design-document.template.md`
+- consumer: [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md)
 - responsibility region: authority / decision status、target state、OOP/type boundary、
   dependency/effect、adversarial review、reconstruction、acceptance、evidence ledger
 - acceptance trace: template section anchor と design clause の source anchor を既存 DIC
@@ -195,7 +195,7 @@ acceptance trace だけを持ちます。
 
 ### Python projection
 
-- adapter owner: `documents/conventions/coding-conventions-python.md`
+- adapter owner: [documents/conventions/coding-conventions-python.md](coding-conventions-python.md)
 - consumer: `templates/experiments/_template/run.py`、
   `templates/experiments/_template/cases.py`
 - responsibility regions: `run.py` の `compact_timestamp` / `resolve_run_dir`（結果と
@@ -211,8 +211,8 @@ acceptance trace だけを持ちます。
 
 ### C++ projection
 
-- adapter owner: `documents/conventions/coding-conventions-cpp.md`
-- native-consumer join: `documents/design/cpp-build-layout.md` が派生 repo の C++ target
+- adapter owner: [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md)
+- native-consumer join: [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) が派生 repo の C++ target
   identity を選び、`cpp/include/<project>/...` または `cpp/src/...` の native source/header
   surface とこの adapter projection を結びます。
 - responsibility regions: public header の declaration / ownership boundary と、source
@@ -230,10 +230,10 @@ normalization の意味、owner、evidence、validation を、次の短い struc
 
 | id | normalization meaning | owner | evidence | validation |
 | --- | --- | --- | --- | --- |
-| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | `documents/design/cpp-build-layout.md` | canonical dependency readback と design document source anchor | canonical CI/readback、`check_design_doc_claims.py`、native-path candidate |
-| DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | `documents/conventions/coding-conventions-cpp.md` + `documents/design/cpp-build-layout.md` | C++ projection record の adapter owner、target identity、header/source anchor | design claim checker と C++ adapter readback |
+| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | canonical dependency readback と design document source anchor | canonical CI/readback、`check_design_doc_claims.py`、native-path candidate |
+| DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | C++ projection record の adapter owner、target identity、header/source anchor | design claim checker と C++ adapter readback |
 | DAL-03 | reviewer 選択は changed-surface evidence を existing language/docs candidates へ正規化し、OOP ownerだけを capability projection へ渡す | `tools/agent/orchestration/agent_team.py` + `agents/skills/catalog.yaml` | candidate list、OOP route packet、dependency order | `language_review_candidates`、`route.py`、orchestration check |
-| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | `documents/conventions/DOCSTRING_GUIDE.md` | DIC path / section / clause / evidence trace | docs check、prose readback、design claim checker |
+| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | DIC path / section / clause / evidence trace | docs check、prose readback、design claim checker |
 
 ## Language projection boundary
 
@@ -244,8 +244,8 @@ comment、declaration/header placement、exception/error wording を選びます
 独自に変更しません。
 
 Python adapter の `__all__`、public export、package surface は
-`documents/conventions/coding-conventions-python.md` が所有します。C++ adapter の
-ABI/header/native ownership の詳細は `documents/conventions/coding-conventions-cpp.md`
+[documents/conventions/coding-conventions-python.md](coding-conventions-python.md) が所有します。C++ adapter の
+ABI/header/native ownership の詳細は [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md)
 が所有します。
 
 ## Skill routing boundary
@@ -343,11 +343,11 @@ Completion は欄の充足率ではなく、次の forward/reverse correspondenc
 
 | trace id | source / design clause | current canonical path | current projection consumer | acceptance evidence |
 | --- | --- | --- | --- | --- |
-| DSC-01 | semantic contract, matrix, DIC path / clause / evidence trace | `documents/conventions/DOCSTRING_GUIDE.md` | same section remains the source | DIC path, clause, and evidence readback |
-| DSC-02 | canonical skeleton | `documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton` | `templates/documents/design-document.template.md` | document-template record with section anchor |
-| DSC-03 | document-template responsibility region | this section | `templates/documents/design-document.template.md` | authority/target/acceptance section trace |
-| DSC-04 | Python syntax/public surface | `documents/conventions/coding-conventions-python.md` | `templates/experiments/_template/run.py`, `cases.py` | DIC path/section/clause/evidence readback for Python regions |
-| DSC-05 | C++ syntax/native boundary and build-design join | `documents/conventions/coding-conventions-cpp.md` + `documents/design/cpp-build-layout.md` | derived-repo `cpp/include/<project>/...` / `cpp/src/...` target identity | DIC path/section/clause/evidence readback with build-design anchor |
+| DSC-01 | semantic contract, matrix, DIC path / clause / evidence trace | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | same section remains the source | DIC path, clause, and evidence readback |
+| DSC-02 | canonical skeleton | [documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton](DOCSTRING_GUIDE.md#canonical-template-skeleton) | [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md) | document-template record with section anchor |
+| DSC-03 | document-template responsibility region | this section | [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md) | authority/target/acceptance section trace |
+| DSC-04 | Python syntax/public surface | [documents/conventions/coding-conventions-python.md](coding-conventions-python.md) | `templates/experiments/_template/run.py`, `cases.py` | DIC path/section/clause/evidence readback for Python regions |
+| DSC-05 | C++ syntax/native boundary and build-design join | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | derived-repo `cpp/include/<project>/...` / `cpp/src/...` target identity | DIC path/section/clause/evidence readback with build-design anchor |
 | DSC-06 | existing prose migration | this guide plus language convention owners | existing Python/C++ prose converted into projection consumers | duplicate semantic owner removed and DIC trace retained |
 | DSC-07 | reviewer routing | `agent_team.language_review_candidates` plus OOP capability owner | existing changed-path candidates and OOP route packet | language implementation/docs candidates; no keyword/new branch |
 | DSC-08 | positive completion | this section | implementation Docstring and review artifact | each current path has forward/reverse DIC trace; no per-function record |
@@ -361,17 +361,17 @@ record. The existing DIC path / clause / evidence trace owns semantic completene
 
 | current path | forward projection section / region | clause trace | reverse evidence trace |
 | --- | --- | --- | --- |
-| `documents/conventions/DOCSTRING_GUIDE.md` | `Semantic contract`, `Canonical template skeleton`, `Positive completion and design trace` | DSC-01, DSC-08; DIC-004..006 | guide matrix, skeleton, and DIC readback |
-| `documents/conventions/README.md` | conventions index / Docstring owner reference | DSC-01 | owner link and docs check |
-| `documents/conventions/coding-conventions-python.md` | Python Docstring syntax / public-surface projection | DSC-04, DSC-06 | syntax/format section and Python adapter readback |
-| `documents/conventions/coding-conventions-cpp.md` | C++ documentation syntax / native-boundary projection | DSC-05, DSC-06 | Doxygen/native anchor and cpp-build-layout reference |
-| `templates/README.md` | template Docstring projection index | DSC-02, DSC-03 | guide reference and docs check |
-| `templates/documents/design-document.template.md` | design-template Docstring projection | DSC-02, DSC-03 | owner reference and projection fields |
+| [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | `Semantic contract`, `Canonical template skeleton`, `Positive completion and design trace` | DSC-01, DSC-08; DIC-004..006 | guide matrix, skeleton, and DIC readback |
+| [documents/conventions/README.md](README.md) | conventions index / Docstring owner reference | DSC-01 | owner link and docs check |
+| [documents/conventions/coding-conventions-python.md](coding-conventions-python.md) | Python Docstring syntax / public-surface projection | DSC-04, DSC-06 | syntax/format section and Python adapter readback |
+| [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) | C++ documentation syntax / native-boundary projection | DSC-05, DSC-06 | Doxygen/native anchor and cpp-build-layout reference |
+| [templates/README.md](../../templates/README.md) | template Docstring projection index | DSC-02, DSC-03 | guide reference and docs check |
+| [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md) | design-template Docstring projection | DSC-02, DSC-03 | owner reference and projection fields |
 | `templates/experiments/_template/run.py` | module, result, worker, artifact, subprocess, failure, and orchestration regions | DSC-04, DSC-08 | Python syntax/static check and DIC reverse readback |
 | `templates/experiments/_template/cases.py` | module-level case-definition region | DSC-04, DSC-08 | Python syntax/static check and DIC reverse readback |
-| `agents/skills/oop-type-design.md` | OOP/type boundary and Docstring projection route | DSC-07, DIC-007 | OOP capability route and skill docs readback |
-| `agents/skills/python-review.md` | Python implementation-path reviewer route | DSC-04, DSC-07 | `agent_team.language_review_candidates` and Python review readback |
-| `agents/skills/cpp-review.md` | native implementation-path reviewer route | DSC-05, DSC-07 | `agent_team.language_review_candidates` and C++ review readback |
+| [agents/skills/oop-type-design.md](../../agents/skills/oop-type-design.md) | OOP/type boundary and Docstring projection route | DSC-07, DIC-007 | OOP capability route and skill docs readback |
+| [agents/skills/python-review.md](../../agents/skills/python-review.md) | Python implementation-path reviewer route | DSC-04, DSC-07 | `agent_team.language_review_candidates` and Python review readback |
+| [agents/skills/cpp-review.md](../../agents/skills/cpp-review.md) | native implementation-path reviewer route | DSC-05, DSC-07 | `agent_team.language_review_candidates` and C++ review readback |
 
 Convention and template documentation paths are current consumers owned by
 `docs_workflow_steward`; Python/C++ reviewers are candidates when the changed surface also

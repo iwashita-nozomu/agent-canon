@@ -28,7 +28,7 @@ downstream implementation ../../tools/validation/semantic/logging/check_log_help
 ## 文書 filename
 
 - 文書 filename は英語にします。owner 指定のない prose 文書では、英語 lower-kebab-case を既定にします。
-- `README.md`、`AGENTS.md`、external schema、tool、manifest など owner が固定する名前は例外です。
+- `README.md`、[AGENTS.md](../../AGENTS.md)、external schema、tool、manifest など owner が固定する名前は例外です。
 - 命名の可読性を、過度な語彙リストや path の列挙で代替しません。既存の naming family、owner の用語、読者が行う検索を根拠にします。
 - 本文は日本語にします。ただし path、identifier、ToolCall、external fixed name は原表記を保ちます。
 - 互換 alias や一時的な suffix を追加して不確かな名前を温存せず、既存 family と一緒に rename する必要がある場合は design で境界を固定します。
@@ -38,7 +38,7 @@ downstream implementation ../../tools/validation/semantic/logging/check_log_help
 - 関数、tool、theorem、artifact、branch、run、report の名前は、対象概念と責務が検索できる粒度にします。
 - proof や generated artifact は探索手順ではなく、対象 theorem profile、public root、projection などの安定した対象を表します。
 - Python helper / local function は、`helper_function_inventory.py` が推定する role と整合する action token を含めます。
-- Python のログ用 helper 関数は `documents/conventions/coding-conventions-logging.md` に従い、`_log` から始めます。
+- Python のログ用 helper 関数は [documents/conventions/coding-conventions-logging.md](../conventions/coding-conventions-logging.md) に従い、`_log` から始めます。
 
 ## 命名計画
 

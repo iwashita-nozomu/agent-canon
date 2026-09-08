@@ -110,7 +110,7 @@ composite 自体を変更しません。
 provider-independent direct command は同じ NVIDIA evidence、BUSY/UNKNOWN/FREE
 分類、full UUID lock、lock-held fresh readback、plan freeze を再利用しますが、
 外部 provider protocol と completion coverage を要求しません。direct route の
-正本は `documents/experiments/gpu-direct-command.md` です。
+正本は [documents/experiments/gpu-direct-command.md](gpu-direct-command.md) です。
 
 managed experiment の実行順序は次の固定 sequence です。
 

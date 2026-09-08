@@ -38,7 +38,7 @@ This file records the shared Graph DSL Core storage created and validated by
 ## Evidence And Assumption Ledger
 
 - Evidence sources:
-  `graph-dsl.md`, `../prose-reasoning-graph/dsl-spec.md`,
+  [graph-dsl.md](graph-dsl.md), [../prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md),
   `../dependency-manifest-design.md`, and
   `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - Assumption:
@@ -46,7 +46,7 @@ This file records the shared Graph DSL Core storage created and validated by
   the structured-analysis cache. `--out-dir` names a durable report export
   directory for JSON/Markdown evidence and summary files.
 - Parent-doc alignment:
-  `graph-dsl.md` owns the necessary/sufficient graph object family contract.
+  [graph-dsl.md](graph-dsl.md) owns the necessary/sufficient graph object family contract.
   This document maps that core through `initialize_graph_schema` to `metadata`,
   `documents`, `nodes`, `edges`, and `diagnostics`.
 - Profile coverage boundary:
@@ -99,7 +99,7 @@ The implemented `prose_graph.sqlite` schema has five required tables:
 | `edges` | `id`, `layer`, `kind`, `from_node_id`, `to_node_id`, `order_kind`, `confidence`, `evidence_node_id`, `payload_json` | `E` typed directed edge records in the edges table. |
 | `diagnostics` | `id`, `layer`, `target_node_id`, `target_edge_id`, `severity`, `rule`, `message`, `suggested_action_json` | `A` diagnostics. |
 
-Projection and operation families from `graph-dsl.md` use `nodes` or `edges`
+Projection and operation families from [graph-dsl.md](graph-dsl.md) use `nodes` or `edges`
 rows when an adapter emits them through `payload_json`. Empty projection or
 operation row sets conform to the core storage contract.
 

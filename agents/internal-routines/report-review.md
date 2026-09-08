@@ -22,9 +22,9 @@ manifest metadataで確認します。別 variant の同名 run や旧 topic-onl
 
 ## Core References
 
-- `documents/experiments/experiment-report-style.md`
-- `documents/experiments/experiment-critical-review.md`
-- `templates/agents/experiment_report.md`
+- [documents/experiments/experiment-report-style.md](../../documents/experiments/experiment-report-style.md)
+- [documents/experiments/experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md)
+- [templates/agents/experiment_report.md](../../templates/agents/experiment_report.md)
 
 ## Expected Outcome
 

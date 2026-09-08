@@ -240,7 +240,7 @@ solution proposal. Otherwise return to cause/scope analysis with
 - `run_repo_dependency_review.sh --report-dir` は dependency header 由来の `dependency_graph.tsv` を生成します。
 - search result を編集対象に変換するときは、responsibility-based context、bounded `git grep` hit、`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を issue / PR evidence に残します。raw text-search hit だけで編集対象を決めません。
 - design document を修正または作成するときは、major claim の code / path token、初出 DSL / standard-form terms、parent-doc alignment を `Evidence And Assumption Ledger` に接続し、`check_design_doc_claims.py` の finding を design evidence gap として扱います。
-- Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は `AGENTS.md`、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
+- Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は [AGENTS.md](../../AGENTS.md)、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
 - `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
 - baseline 扱いにする場合も、今回差分で old-format header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。
 
@@ -354,16 +354,16 @@ agent-canon python-structure-hash-scope-plan \
 
 ## Core References
 
-- `documents/design/dependency-manifest-design.md`
-- `agents/skills/change-review.md`
-- `agents/canonical/CODEX_WORKFLOW.md`
-- `templates/agents/closeout_gate.md`
+- [documents/design/dependency-manifest-design.md](../../documents/design/dependency-manifest-design.md)
+- [agents/skills/change-review.md](change-review.md)
+- [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md)
+- [templates/agents/closeout_gate.md](../../templates/agents/closeout_gate.md)
 
 ## Runtime Contract Clauses
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `documents/design/dependency-manifest-design.md`.
+1. Read [documents/design/dependency-manifest-design.md](../../documents/design/dependency-manifest-design.md).
 1. If the task selects or justifies a fix surface, read this skill's `Cause Investigation Surface` and `Root-Cause Repair Scope`; use `change-review` for the findings-first review after the owner is selected.
 1. For code-improvement work, do not implement until the artifact records `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `fix_surface_validated=yes`.
 1. Before `required_action` or a solution proposal, activate cause investigation only when causal ambiguity remains unresolved or an alternative could change owner/fix/validation. For an activated packet, record a compact cause-evidence note covering the applicable incoming callers/entrypoints, owning mechanism/state/guards, downstream consumers/side effects/cleanup, sibling implementations/tests/docs/config, conditional temporal evidence, reachability/overcheck analysis, alternative disposition, selected cause, expected mechanism, and action derivation. For a straightforward packet, record direct cause proof instead; rejected/duplicate/already-covered/unreachable findings need only their reason and evidence. Do not require an arbitrary full-repository scan or fixed candidate count; stop when owner/fix/validation-changing alternatives are disconfirmed or bounded, or record the invariant that proves a narrower scope sufficient.

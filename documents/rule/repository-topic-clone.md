@@ -133,9 +133,9 @@ repository-topic clone は依存モジュールの branch 特化パスを使わ�
 
 ## 関連正本
 
-- `documents/rule/dependency-module-changes.md`: gitlink/pin/projection の所有責務
-- `agents/skills/repository-topic-clone.md`: 実行ルート
-- `documents/tools/repository_topic_clone.md`: CLI 参照
+- [documents/rule/dependency-module-changes.md](dependency-module-changes.md): gitlink/pin/projection の所有責務
+- [agents/skills/repository-topic-clone.md](../../agents/skills/repository-topic-clone.md): 実行ルート
+- [documents/tools/repository_topic_clone.md](../tools/repository_topic_clone.md): CLI 参照
 
 ## Evidence And Assumption Ledger
 

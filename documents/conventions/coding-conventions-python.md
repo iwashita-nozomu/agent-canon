@@ -12,7 +12,7 @@ downstream design ./object-oriented-design.md general OOP policy for Python clas
 
 この文書は、`python/` と `tests/` を前提にした Python 実装向け規約の入口です。
 特定 package 名や過去 project の前提は持ち込まず、template で再利用できる共通部分だけを残します。
-厳格な実装と文書の書きぶりは `documents/conventions/coding-conventions-house-style.md` を併読してください。
+厳格な実装と文書の書きぶりは [documents/conventions/coding-conventions-house-style.md](coding-conventions-house-style.md) を併読してください。
 
 ## この文書の読み方
 

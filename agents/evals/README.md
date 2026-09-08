@@ -24,4 +24,4 @@ resolve them to `eval/definitions/*.toml`.
 
 Legacy `agents/evals/results/` paths remain migration inputs for old accumulated
 run artifacts. New accumulated run output belongs in the mounted runtime log
-archive documented by `documents/runtime/runtime-log-archive.md`.
+archive documented by [documents/runtime/runtime-log-archive.md](../../documents/runtime/runtime-log-archive.md).

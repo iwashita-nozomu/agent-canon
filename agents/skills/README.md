@@ -43,7 +43,7 @@ or copy the universal omission/granularity policy into adapter entries.
 ## Rules
 
 - skill の目的、使う場面、関連正本は `agents/skills/` に書きます。
-- `AGENTS.md` には長い skill 説明を複製しません。
+- [AGENTS.md](../../AGENTS.md) には長い skill 説明を複製しません。
 - `.codex/personal/skills/` は ignored な生成 view です。Codex の global
   auto-discovery path は `~/.agents/skills/` です。
 - 人間が skill を明示する場合は plain text ではなく `$skill-name` を使います。
@@ -98,7 +98,7 @@ GPU profile の admission semantics は `gpu-execution` に残します。
 ## Internal Review And Runtime Routines
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
-- artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、`documents/conventions/REVIEW_PROCESS.md` の責務に寄せます。
+- artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、[documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md) の責務に寄せます。
 - `.codex/personal/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim を同じ変更で追加します。bootstrap が `~/.agents/skills/<skill>` をこの view にリンクするため、列挙 config は追加しません。
 - agent orchestration は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
 - subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。
@@ -127,12 +127,12 @@ in the Codex host runtime.
 - Parent repositories add repo-specific skills only through an official
   parent- or subtree-owned `.codex/personal/skills/<skill>/SKILL.md` surface.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
-- Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
+- Codex では [AGENTS.md](../../AGENTS.md) と [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
 - task ごとの skill 選択は `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。編集を明示的に許可する場合だけ `--mode repo-changing` を渡し、prompt 語彙で mode を拡張しません。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - template clone から新 repo を始めるときは `start-repository` を使います。
 - 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。
-- specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
+- specialist を使う場合の Codex-specific routing は [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) を見ます。
 - repo-changing task では `$agent-orchestration` から始めます。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正は通常の owner route で進め、execution stage で `$codex-task-workflow`、handoff / wave が ready になった stage で `$subagent-bootstrap` を追加します。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 自然言語の数学的 claim を形式証明へ落とすときは `formal-proof-workflow` を使い、既存 proof / 文献探索は `literature-survey` へ接続します。
@@ -146,7 +146,7 @@ in the Codex host runtime.
 - 実験 topic の review、`run.py` 直実行、GPU/JAX 環境所有、artifact schema、`visualization.py` readiness を確認するときは `experiment-review` を使います。
 - 既存 experiment result の保持・archive・externalization・削除を実行前に計画するときは `retention` を使い、実験実行、artifact identity/checksum、archive serialization は既存 owner に委譲します。
 - semantic delta、obligation、一次検証 owner、hard-edge closure を実装前に割り当てるときは
-  `documents/design/semantic-responsibility-contract.md` と
+  [documents/design/semantic-responsibility-contract.md](../../documents/design/semantic-responsibility-contract.md) と
   `templates/documents/semantic-responsibility-contract.template.toml` を正本として使います。
 - `test-design` は owning mechanism の確立または修復後に、既存 owner と targeted validation
   では閉じない test-owned runtime risk がある場合だけ起動します。contract-only wrapper は
@@ -179,9 +179,9 @@ in the Codex host runtime.
 - GPU / CUDA / JAX / XLA / IREE backend 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、JAX preallocation 無効化、GPU validation blocker を扱うときは `gpu-execution` を使い、Python 実行は ExperimentRunner に委譲します。
 - JIT-canonical IR、生成済み Lean 実装定義、theorem graph overlay から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。
 - repo-wide な実装・文書・tooling・runtime の統合変更では、上の `comprehensive-development` route を使います。
-- repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `templates/agents/environment_change_proposal.md` を使います。
+- repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と [templates/agents/environment_change_proposal.md](../../templates/agents/environment_change_proposal.md) を使います。
 - private knowledge / feedback の検索・記録は既存の `agent-learning` owner と Rust
-  `agent-canon k/f` route を使います。stable preference は対象の `AGENTS.md` へ明示変更として
+  `agent-canon k/f` route を使います。stable preference は対象の [AGENTS.md](../../AGENTS.md) へ明示変更として
   直接昇格し、private logやsource treeを第二の正本にしません。
 
 ## Updating Skills
@@ -189,4 +189,4 @@ in the Codex host runtime.
 1. `agents/skills/<family>.md` を更新する
 1. `agents/skills/catalog.yaml` を更新する
 1. `.codex/personal/skills/<family>/SKILL.md` を更新する
-1. 必要なら `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md` の routing を更新する
+1. 必要なら [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) と [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) の routing を更新する

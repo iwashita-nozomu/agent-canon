@@ -20,10 +20,10 @@ Codex の入口、読順、skill path、subagent path を固定します。
 
 ## Read Order
 
-1. `AGENTS.md`
-1. `agents/README.md`
-1. `agents/canonical/CODEX_WORKFLOW.md`
-1. 必要なら `agents/canonical/CODEX_SUBAGENTS.md`
+1. [AGENTS.md](../../AGENTS.md)
+1. [agents/README.md](../README.md)
+1. [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md)
+1. 必要なら [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md)
 
 ## First Update
 
