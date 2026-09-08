@@ -1459,21 +1459,24 @@ def cleanup(
             )
 
     if publication_readback is None:
-        try:
-            _run_git(clone, ["fetch", "origin", request_state.branch])
-            remote_head = _run_git(
-                clone, ["rev-parse", f"refs/remotes/origin/{request_state.branch}"]
-            ).strip()
-            remote_tree = _run_git(
-                clone, ["rev-parse", f"{remote_head}^{{tree}}"]
-            ).strip()
-        except GitCommandError as exc:
-            raise RepositoryTopicCloneError(
-                f"cleanup hold: remote branch unavailable ({request_state.branch})"
-            ) from exc
-        if remote_head != candidate_sha or remote_tree != candidate_tree:
-            raise RepositoryTopicCloneError("cleanup hold: remote branch head mismatch")
-        evidence_kind = "publication-head" if has_lifecycle_evidence else "remote-head"
+        if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
+            evidence_kind = "linked-local-head"
+        else:
+            try:
+                _run_git(clone, ["fetch", "origin", request_state.branch])
+                remote_head = _run_git(
+                    clone, ["rev-parse", f"refs/remotes/origin/{request_state.branch}"]
+                ).strip()
+                remote_tree = _run_git(
+                    clone, ["rev-parse", f"{remote_head}^{{tree}}"]
+                ).strip()
+            except GitCommandError as exc:
+                raise RepositoryTopicCloneError(
+                    f"cleanup hold: remote branch unavailable ({request_state.branch})"
+                ) from exc
+            if remote_head != candidate_sha or remote_tree != candidate_tree:
+                raise RepositoryTopicCloneError("cleanup hold: remote branch head mismatch")
+            evidence_kind = "publication-head" if has_lifecycle_evidence else "remote-head"
     else:
         _run_git(clone, ["fetch", "origin", "main"])
         origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()

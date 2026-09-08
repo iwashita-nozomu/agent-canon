@@ -841,11 +841,14 @@ def test_linked_cleanup_removes_one_worktree_and_keeps_branch_and_sibling(
     )
     run_git(first.clone, "push", "origin", "feature/first")
     run_git(second.clone, "push", "origin", "feature/second")
+    run_git(tmp_path / "source", "push", "origin", "--delete", "feature/first")
     proof = rtc.cleanup(first.request, apply=True)
     assert proof.removed
+    assert proof.evidence == "linked-local-head"
     assert not first.clone.exists()
     assert second.clone.is_dir()
     assert run_git(workspace, "show-ref", "--verify", "refs/heads/feature/first")
+    assert run_git(workspace, "cat-file", "-e", f"{first.candidate_sha}^{{commit}}") == ""
     assert str(second.clone) in run_git(workspace, "worktree", "list")
     assert not first.clone.parent.exists()
 
