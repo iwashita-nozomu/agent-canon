@@ -48,6 +48,16 @@ not re-own task procedures, command recipes, role lifecycles, implementation
 policy, validation schemas, or AgentCanon source-editing policy. Those details
 belong to the consumer-specific section or the consumer's own canonical owner.
 
+Before selecting or editing a consumer surface, establish the actual working
+directory and Git root, branch, and `HEAD`, then trace the selected owner's
+dependency and consumer edges. Inspect the actual `HEAD` of every in-scope
+dependency checkout and its pin when present; a named path is only a candidate
+until that trace confirms the responsible replaceable unit. Record no dependency
+only after the trace shows that no edge applies, never from an unperformed
+inspection. Re-read this identity and dependency state after a directory,
+branch, dependency checkout, or pin change; unchanged ordinary commands do not
+require duplicate readback.
+
 ## Runtime Owner Map
 
 | Responsibility | Consumer canonical owner | Validation / reader route |
@@ -65,6 +75,18 @@ Resolve the task owner and the consumer validation oracle from those surfaces.
 When the task changes AgentCanon itself, move to a qualified AgentCanon
 development checkout and keep the consumer tree unchanged unless the consumer
 task explicitly owns the resulting generated file.
+
+A progress update is not a final report. Keep the request active while required
+implementation, validation, integration, publication, cleanup, or its result
+remains unresolved. An acknowledgement, apology, promise, child claim/handoff,
+post-hoc healthy status, or incomplete result is not the requested operation or
+its success. Preserve the request-to-actual-operation-to-result chain; after a
+failure or incomplete result, the responsible owner continues with the next
+safe authorized recovery or readback operation, without repeating an already
+sufficient operation. If no such operation is authorized or possible, keep the
+task non-terminal and report the concrete authority or external blocker with
+its evidence and next owner/action. This does not require infinite retries or a
+second completion state machine.
 
 ## Validation Routing
 

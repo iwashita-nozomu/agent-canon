@@ -37,7 +37,7 @@ downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces c
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の structured output を取る
-1. read-only worktree check で、必要なら AgentCanon source の repository-topic checkout を使うかを分類する。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` とし、どちらも `<anchor>/workspace/<topic>/<repo>` に置く。更新が必要なら current checkout を保持し、standalone topic branch / PR workflow に入る。source branch の dirty / unpushed / divergent state は evidence として保持し、detached state は source owner identity repair へ route する
+1. read-only worktree check で、必要なら AgentCanon source の repository-topic checkout を使うかを分類する。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` とし、どちらも `<anchor>/workspace/<topic>/<repo>` に置く。更新が必要なら current checkout を保持し、standalone topic branch / PR workflow に入る。source branch の dirty / unpushed / divergent state は evidence として保持し、detached state は source owner identity repair へ route する。編集候補を選ぶ前に [`Checkout Identity Readback`](../COMMUNICATION_PROTOCOL.md#checkout-identity-readback) を一度取得し、owner/path/validation に関係する依存 edge ごとに実依存 checkout の HEAD と参照 pin（存在する場合）を確認します。依存なしは未調査の既定値にせず、依存/consumer trace で edge が無い根拠を確認して記録します。cwd、branch、または依存 checkout/pin が変わった場合だけ identity と依存 HEAD を再読し、状態が変わらない通常 command では繰り返しません
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
 1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
 1. 実装を伴う task では `$codex-task-workflow` と、選択された task-family Skill を読む
@@ -157,7 +157,7 @@ decision が選択された後、必要な topic だけを `agent-canon k search
 logへ on-demand に検索します。stable preference は対象 owner への明示変更として扱います。
 
 raw text search の hit だけで編集対象を決めません。
-検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を作ります。write-capable child handoff は `agents/task_catalog.yaml#workflow_activation_policy` が要求する typed route だけで materialize します。空の unresolved-decision set は即時に選択 route へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request も同じ typed route で扱います。
+user、parent、handoff、router が示した path は候補として保存し、候補の確定と edit owner の確定を同一視しません。編集に入る前に既存の [`Owner-First Read Trace`](../skills/agent-orchestration.md#owner-first-read-trace) で selected Skill と operational owner を解決し、必要な dependency/downstream edge を入口、呼び元、実装、consumer、既存 test のうち判断を変える面へ bounded にたどって、候補が本当にその owner の差し替え可能な単位かを確認します。判断を変えない面は既存の `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` に理由付きで分類し、候補が支持されない場合は route を更新してから編集します。検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を作ります。write-capable child handoff は `agents/task_catalog.yaml#workflow_activation_policy` が要求する typed route だけで materialize します。空の unresolved-decision set は即時に選択 route へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request も同じ typed route で扱います。
 asset reuse investigation は decomposition / prototyping より前に行います。
 split / extraction または suspected predecessor の現行欠落では splitter が
 current module/helper/type/test/docs と `git log`、`-S`、deleted paths、prior PR /
@@ -866,7 +866,17 @@ environment, produce resources, or duplicate tests/gates.
 
 `task_close.py` is the sole terminal readiness predicate. This workflow records
 stage-specific evidence and sends it to that owner; it does not define a second
-closeout checklist or readiness state.
+closeout checklist or readiness state. 作業 update は progress readback であり、final
+report ではありません。required operation、validation、integration、publication、または
+cleanup が残る間は request を active のまま保ち、既存の dependency order に従う次の
+具体的な操作へ進みます。受領・謝罪・約束、child の claim/handoff、事後的な healthy
+status、または incomplete result は、actual operation や success の証拠になりません。
+各 clause は request → actual operation → result の対応を保ち、失敗・未完了の result は
+既存の `failure_response` / `repair_pending` または owning stage に戻して、権限を持つ
+owner が利用可能な次の安全な recovery/readback を実行します。十分な operation を
+繰り返しません。権限または外部状態のために次の安全な操作を実行できない場合だけ、
+closeout を non-terminal のまま、genuine blocker の根拠と次の owner/action を報告します。
+これは無限 retry や新しい readiness predicate を要求する規則ではありません。
 
 - repo に残す差分がある task では、validation 後に commit を作る
 - commit は `documents/operations/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、source checkout SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
