@@ -173,7 +173,7 @@ classification = "public"
 tool = "tools/repository/workspace/repository_topic_clone.py"
 doc = "documents/tools/repository_topic_clone.md"
 language = "python"
-summary = "Generic repository topic clone lifecycle and reconstructibility cleanup documentation."
+summary = "Generic repository topic checkout lifecycle and reconstructibility cleanup documentation."
 
 [[tool]]
 id = "conflict-preservation"

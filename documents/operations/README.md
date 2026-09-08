@@ -17,7 +17,7 @@ upstream design ../README.md documents 索引と正本境界。
 - `orphan-lifecycle.md`: branch・PR・worktree の意味差分 inventory、有限分類、cleanup admission の正本。
 - `FILE_CHECKLIST_OPERATIONS.md`: 作業別 checklist。
 - `TROUBLESHOOTING.md`: 障害対応の入口。
-- `WORKTREE_SCOPE_TEMPLATE.md`、`worktree-lifecycle.md`: worktree の記録とcleanup。
+- `WORKTREE_SCOPE_TEMPLATE.md`、`worktree-lifecycle.md`: lifecycle が準備した worktree の記録とcleanup。
 - `notes-lifecycle.md`: notes の lifecycle。
 - `issue-label-taxonomy.md`: Issue の分類。
 

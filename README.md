@@ -174,8 +174,9 @@ ignored directory below the install checkout:
 ```
 
 For an AgentCanon edit from Template or another parent repository, use that
-parent's ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon`
-clone. Do not add a submodule, vendor checkout, source symlink, or `notes/` /
+parent's ignored repository-topic checkout at
+`<anchor>/workspace/<topic>/agent-canon`, selecting the lifecycle mode from the
+repository relationship. Do not add a submodule, vendor checkout, source symlink, or `notes/` /
 `tests/` projection to the parent. The parent owns project tests and the user
 workflow; AgentCanon owns only the shared runtime source.
 

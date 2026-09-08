@@ -41,8 +41,8 @@ unchanged and returns to the user.
   conflict preservation, and integrated-head readback belong to `$integration`.
 
 The parent repository never becomes an AgentCanon update hub and no source pin
-or projection is maintained. `repository-topic-clone` owns the qualified clone
-path and cleanup; this skill owns lane selection only.
+or projection is maintained. `repository-topic-clone` owns the qualified
+checkout path, selected mode, and cleanup; this skill owns lane selection only.
 
 ## Knowledge-Eval Lane
 
@@ -62,7 +62,8 @@ bash tools/repository/git/agent_update_branch.sh push knowledge-eval <branch>
 
 ## Canon-Source Lane
 
-Use the qualified standalone AgentCanon development clone and keep the parent
+Use the qualified standalone AgentCanon development checkout prepared by
+`repository-topic-clone` and keep the parent
 tracked tree unchanged. `$agent-canon-update` owns the source Issue, source
 PR, runtime validation, and `main` readback; do not duplicate that route here.
 

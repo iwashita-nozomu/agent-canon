@@ -149,8 +149,9 @@ uninstall 前に `eval sync`、
 
 ## AgentCanon を編集する場合
 
-Template や派生 repo の編集は、親レポが指定する ignored clone
-`workspace/agent-canondevelop/<qualified-task>/agent-canon` で行います。親レポに
+Template や派生 repo の編集は、親レポが指定する repository-topic lifecycle の ignored
+checkout `<anchor>/workspace/<topic>/agent-canon` で行います。parent/same-repository
+branch は `linked-worktree`、dependency repository は `independent-clone` を選びます。親レポに
 submodule、vendor checkout、source symlink、AgentCanon の tests や eval 名を追加しません。
 AgentCanon を変更したら AgentCanon 側の branch/PR/main readback を完了し、親レポ側は
 その後に必要な source revision だけを更新します。

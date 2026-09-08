@@ -22,9 +22,10 @@ downstream design ../../agents/skills/agent-canon-update.md consumes AgentCanon 
 Use `origin` for the repository being edited and qualify every Issue/PR with
 its repository name. A parent clone does not initialize AgentCanon as a
 submodule or vendor path. When source changes are needed, clone AgentCanon into
-the parent's ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon`
-directory, publish its source PR, and read back merged `main` before closing
-the parent task.
+the parent's ignored `<anchor>/workspace/<topic>/agent-canon` path through
+`repository-topic-clone`, selecting the mode from the repository relationship,
+publish its source PR, and read back merged `main` before closing the parent
+task.
 
 ## Authentication and CI
 

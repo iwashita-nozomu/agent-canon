@@ -60,7 +60,7 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 - `python3 tools/repository/workspace/worktree_scope_lint.py --current` が placeholder や stale kickoff field を出していない
 - `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` の relevant item が未対応のまま残っていない
 - `git worktree list --porcelain` で duplicate / stale worktree が無いか確認している
-- branch / worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と `tools/runtime/authority/hook_safety.py` に委譲し、この skill は診断 command と `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>` の存在だけを確認している
+- branch / worktree 作成 route は `repository-topic-clone` の checkout-mode と、`agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default、`tools/runtime/authority/hook_safety.py` に委譲し、この skill は診断 command と `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>` の存在だけを確認している
 - carry-over すべき note、report、result の置き場が消える前提になっていない
 - dependency clone cleanup では、exact computed path、clean / untracked-zero
   state、remote integrated tree readback を health evidence として確認する。
@@ -73,7 +73,7 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 1. `reports/agents/.active_run`、run-local `work_log.md`、必要なら branch summary を読み、authority と carry-over 先を確認します。
 1. legacy cleanup が scope に入る場合だけ `python3 tools/repository/workspace/worktree_scope_lint.py --current` を流し、古い scope 文書の placeholder と stale field を拾います。
 1. `git status --short --branch`、`git diff --name-only`、`git worktree list --porcelain` を見て drift を洗います。
-1. branch / worktree 作成が必要に見える場合は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default を参照し、この skill では `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と対応箇所の有無だけを確認します。
+1. branch / worktree 作成が必要に見える場合は `repository-topic-clone` の選択済み checkout-mode と `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default を参照し、この skill では `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と対応箇所の有無だけを確認します。手動作成は行いません。
 1. `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を見直し、今回の drift や cleanup risk と関連する既知項目がないか確認します。
 1. legacy cleanup が scope に入る場合だけ `bash tools/validation/documentation/checks/check_worktree_scopes.sh` で repo 内の worktree scope 配置を確認します。
 1. specialist run bundle を伴う場合は、必要に応じて `validate_role_write_scope.py` で write policy 逸脱を見ます。
@@ -89,6 +89,6 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 
 ## Boundary
 
-- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の cleanup 診断もこの skill の責務です。新規 worktree 初期化や branch 操作は担当しません。
-- branch/worktree 作成 route は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse safety owner `tools/runtime/authority/hook_safety.py` を正本にします。
+- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の cleanup 診断もこの skill の責務です。新規 checkout の初期化や branch 操作は担当せず、必要な作成・再利用は `repository-topic-clone` の lifecycle owner に戻します。
+- branch/worktree 作成 route は `repository-topic-clone` の checkout-mode、`agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default、PreToolUse safety owner `tools/runtime/authority/hook_safety.py` を正本にします。
 - repo 全体レビューや再編は `comprehensive-development` を使います。

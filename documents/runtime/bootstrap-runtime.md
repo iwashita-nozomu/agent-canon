@@ -18,11 +18,13 @@ which adopts one shared, bounded tool container from the published
 multi-architecture GHCR image and then
 launches tools against explicitly registered targets.
 
-The bootstrap owns only shell/Docker/Git adapters. The container owns Python,
-Rust, and language-server tools. Project builds, product tests, GPU access,
+The bootstrap owns only shell/Docker/Git adapters. The shared toolresident owns
+Python, Rust, and language-server tools and is distinct from every project
+product/test/development container. Project builds, product tests, GPU access,
 GitHub actions, and arbitrary host commands remain owned by the project or
 host workflow. No project-specific AgentCanon image, container, virtualenv,
-Cargo toolchain, volume, or source checkout is created.
+Cargo toolchain, volume, or source checkout is created; project image/layer
+reuse remains a project-owned decision.
 
 The published artifact is one digest-pinned Ubuntu 24.04 output image. Its
 stable tag is `ghcr.io/iwashita-nozomu/agent-canon:env-<key>`, where the shared
@@ -45,8 +47,10 @@ the env-key image, create/start exactly one resident container with
 The controller never issues Docker operations. The host shell owns the fixed
 Docker lifecycle transaction and invokes the controller only after the
 resident is healthy. Target sources are exported by the controller as a strict
-`mounts.tsv` manifest and are validated by the shell before each create. No Docker socket, host `$HOME`,
-Git credentials, or network capability is mounted into the resident. The
+`mounts.tsv` manifest and are validated by the shell before each create. Each
+target row names the exact selected checkout/worktree root, with Git metadata
+read-only. No Docker socket, host `$HOME`, Git credentials, or network
+capability is mounted into the resident. The
 credential-free `container-state` subtree is the only runtime state mount;
 host-only Docker config and archive credentials remain outside it. Systemd
 units and source synchronization remain host shell/Git operations. Sync fetches
@@ -111,7 +115,13 @@ includes the resident controller's state/cache/lease GC receipt.
 `target add` is explicit because the shared runtime never scans a workspace
 or mounts a whole home directory. `read-only` is the default and is required
 for analysis. `explicit-target-write` is available only for an operation whose
-documented mutation capability names its target and allowed paths.
+documented mutation capability names its target and allowed paths. Outputs and
+build directories remain checkout-local or use an explicitly named run-specific
+external mount. Shared data/cache writes require parent-owned scope and
+concurrency coordination; product resource limits are not inferred from this
+toolresident contract. Container target selection is automatic and has no
+separate checkout-mode flag. An existing project `--skip-build` request remains
+an explicit build-reuse choice.
 
 `install` is a clean reconstruction transition. After SourceSync has selected
 the current source generation, it resets the reconstructible lifecycle state

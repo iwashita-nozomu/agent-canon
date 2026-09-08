@@ -41,9 +41,10 @@ under the external runtime root.
 
 ## Source and project boundaries
 
-AgentCanon source changes are made in an ignored qualified clone under
-`workspace/agent-canondevelop/<qualified-task>/agent-canon`, published through
-an Issue-qualified AgentCanon PR, and read back from merged `main`. Parent
+AgentCanon source changes are made in an ignored repository-topic checkout under
+`<anchor>/workspace/<topic>/agent-canon`, using the mode selected by
+`repository-topic-clone` for the repository relationship, published through an
+Issue-qualified AgentCanon PR, and read back from merged `main`. Parent
 project implementation and tests are run through the parent-owned Docker/test
 entrypoint. No parent command may restore a vendor checkout or submodule as a
 fallback.
