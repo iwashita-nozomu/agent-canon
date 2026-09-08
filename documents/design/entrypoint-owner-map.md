@@ -4,7 +4,7 @@ contract design
 responsibility Defines the structural grammar and ownership invariant for root agent instruction entrypoints.
 upstream design ../conventions/software-engineering-principles.md single-owner, information-hiding, and contract-complete change policy
 downstream design ../../AGENTS.md standalone source-tree entrypoint
-downstream design ../../ROOT_AGENTS.md common consumer root base
+downstream design ../../ROOT_AGENTS.md common root base read by consumer and source-specific AGENTS
 downstream implementation ../../tools/agent/templates/entrypoint_composer.py consumer root composer
 downstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py structural verifier
 downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml canonical marker ownership projection
@@ -54,7 +54,7 @@ Standalone `AGENTS.md`:
 - `Task Entry`
 - `Validation Routing`
 
-Consumer common `ROOT_AGENTS.md`:
+Common `ROOT_AGENTS.md` (shared entry base for consumer and source-specific roots):
 
 - `Repository Role`
 - `Reader Map`
@@ -66,7 +66,12 @@ Consumer common `ROOT_AGENTS.md`:
 Consumer root `AGENTS.md` は、この `ROOT_AGENTS.md` の bytes を先頭の論理内容として
 保持し、consumer-owned specific section を明示的に合成した regular tracked file です。
 合成元の source commit と exact input-byte digest は deterministic comment marker にのみ
-記録します。これらの節は identity、owner edge、activation boundary の要約だけを持ちます。
+記録します。Source-specific AgentCanon `AGENTS.md` は先頭の literal `@ROOT_AGENTS.md`
+でこの共通 base を明示参照し、その後に source-specific Reader Map を保持します。
+これは consumer composition とは別の explicit read であり、自動展開、runtime import、
+wrapper、source copy を意味しません。ROOT の consumer map / owner route は consumer root
+にだけ適用し、source-specific AGENTS が source owner と validation route を保持します。
+これらの節は identity、owner edge、activation boundary の要約だけを持ちます。
 subagent sequence、Git environment variables、update command、design receipt、experiment setting、
 validation menu、closeout token は、それぞれの owner surface に置きます。
 

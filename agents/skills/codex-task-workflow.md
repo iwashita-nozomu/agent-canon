@@ -102,7 +102,16 @@ EOF conditions hold. If the trace is unresolved, implementation remains locked
 and the existing coordinated-search route owns the bounded lookup. A
 partial response, known path, or whole-file canonical read is not a substitute;
 do not create a per-read receipt, identifier, approval gate, or duplicate Skill
-body.
+body. A path named by a user, parent, handoff, or router is likewise only a
+candidate until the owner-first trace and the decision-relevant bounded
+dependency/downstream check select the replaceable unit. Merely naming a
+delegated path does not unlock implementation or establish completion.
+Before selecting that unit, carry one existing `Checkout Identity Readback` and
+inspect the actual HEAD of each in-scope dependency checkout plus its pin when
+present. Record `no dependency` only after the dependency/consumer trace shows
+that no edge applies; an unperformed inspection is not that result. Re-read
+identity and dependency HEAD only after cwd, branch, dependency checkout, or pin
+changes; ordinary commands do not require a duplicate readback.
 Do not replace this readback with an implementation-path list, a repository
 sweep, or a new durable packet.
 
@@ -146,7 +155,10 @@ Task-catalog roles, default review packs, and related skills are candidates;
 they become work only when an owner-critical operation, unresolved branch, or
 selected validation route activates them. A wave is launchable only when its
 owner, replaceable responsibility, context, write authority, and validation
-route are ready.
+route are ready. A stage update is progress readback, not a final report: while
+required work or its result remains unresolved, keep the request active and
+continue through the existing `../canonical/CODEX_WORKFLOW.md#completion-readiness`
+route.
 
 ## Required Output
 
