@@ -1204,7 +1204,6 @@ def finalize_merge_main(
             raise RepositoryTopicCloneError(
                 "merge-finalize hold: checkout mode mismatch"
             )
-        _ensure_worktree_config(clone)
     elif _is_linked_worktree(clone):
         raise RepositoryTopicCloneError("merge-finalize hold: checkout mode mismatch")
     try:

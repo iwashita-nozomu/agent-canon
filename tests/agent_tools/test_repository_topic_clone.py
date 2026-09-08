@@ -656,6 +656,18 @@ def test_linked_foreign_occupant_does_not_mutate_common_git_state(
             checkout_mode=rtc.CHECKOUT_MODE_LINKED,
         )
 
+    foreign_request = rtc.RepositoryTopicCloneRequest(
+        url=remote_url,
+        repository="repo-foreign",
+        workspace_root=workspace,
+        topic="foreign-topic",
+        branch="feature/request",
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="branch mismatch"):
+        rtc.finalize_merge_main(foreign_request)
+
     assert common_config.read_bytes() == before_config
     assert run_git(workspace, "worktree", "list", "--porcelain") == before_worktrees
     assert run_git(workspace, "show-ref") == before_refs
