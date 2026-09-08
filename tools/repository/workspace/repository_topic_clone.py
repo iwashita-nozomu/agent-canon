@@ -566,7 +566,7 @@ def _marker(
     field: str,
     *,
     prefix: str = MARKER_PREFIX,
-    checkout_mode: str = CHECKOUT_MODE_INDEPENDENT,
+    checkout_mode: str,
 ) -> str:
     try:
         return _run_git(
