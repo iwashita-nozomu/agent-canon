@@ -70,11 +70,13 @@ checkout/topic directory の作成前に検証します。検証を通った req
 exact local/remote branch は同じ prepare で再利用し、不一致は
 state-preserving typed collision とします。作業完了時はこの skill が computed checkout path を
 canonical tool に渡し、selected Git toplevel、owner evidence/marker、URL、branch、clean
-non-detached state、および fetch した `origin/<branch>` の commit/tree と local head/tree の
-一致を preflight します。通常の closeout は workspace packet artifact を作らず、preflight が
-成功した場合だけ `CleanupProof` / cleanup receipt を受け取ります。失敗時は checkout と topic
-root を保持した typed hold にします。specialized adapter が適用外でもこの generic operation
-は継続します。
+non-detached state を preflight します。linked-worktree は保持された local branch と共有 Git
+common objects の readback で復元可能性を確認し、remote branch を要求しません。独立
+`independent-clone` は fetch した `origin/<branch>` の commit/tree と local head/tree が一致する
+external recoverability proof を要求します。通常の closeout は workspace packet artifact を作らず、
+preflight が成功した場合だけ `CleanupProof` / cleanup receipt を受け取ります。失敗時は checkout
+と topic root を保持した typed hold にします。specialized adapter が適用外でもこの generic
+operation は継続します。
 
 marker は canonical `repository-topic-clone.*` namespace を優先します。canonical marker が
 完全に欠ける既存 dependency checkout だけは、legacy `agent-canon.topic.*` の topic、
@@ -84,8 +86,9 @@ partial/mismatch/unknown role・placement は typed hold で、cleanup dry-run �
 を書き換えません。
 
 candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを
-渡す場合だけ candidate CAS と PR lifecycle の coherent set を検証し、merged state では
-strict publication readback、merge tree、`origin/main` containment を追加確認します。
+渡す場合だけ candidate CAS と PR lifecycle の coherent set を検証し、publication readback を
+渡した merged state では strict publication readback、merge tree、`origin/main` containment を
+追加確認します。
 publication evidence は proof を enrich しますが、通常の cleanup のために materialize しません。
 cleanup の exact-root gate は維持しつつ、既存 checkout の proof-gated removal は root ignore の
 後続 driftだけで止めません。`dependency_module_change.py status` と `projected_clone_path`

@@ -98,13 +98,15 @@ python3 tools/repository/workspace/repository_topic_clone.py merge-main \
   hold とし、dry-run は Git config marker を書き換えません。
 - cleanup は closeout の明示 dispatch として canonical tool を呼び、request から計算した
   exact clone path、owner evidence/marker、URL、branch、clean non-detached state を検証します。
-  通常の cleanup は publication packet を作らず、fetch した `origin/<branch>` の commit/tree と
-  local `HEAD` の commit/tree が一致する reconstructibility proof だけで dry-run/apply できます。
-  proof が一致しないものは削除しません。
+  linked-worktree は保持された local branch と共有 Git common objects の readback で復元可能性を
+  確認し、remote branch を要求しません。`independent-clone` は fetch した `origin/<branch>` の
+  commit/tree と local `HEAD` の commit/tree が一致する external recoverability proof を要求します。
+  通常の cleanup は publication packet を作らず、proof が一致しないものは削除しません。
 - candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを
-  渡す場合は candidate CAS と PR lifecycle を一組で渡し、merged state の publication readback
-  を含む coherent transition を検証します。integration 後は canonical publication readback
-  transition、merge commit/tree、`origin/main` containment を追加検証します。
+  渡す場合は candidate CAS と PR lifecycle を一組で渡し、publication readback を渡した merged
+  state では strict publication readback、merge tree、`origin/main` containment を含む coherent
+  transition を検証します。integration 後は canonical publication readback transition、merge
+  commit/tree、`origin/main` containment を追加検証します。
 - clone と topic root は同一 receipt で扱う。管理外 path へ退避しない。
 - preflight が通った `--apply` だけが `CleanupProof` / cleanup receipt を返して computed
   clone と空の topic root を削除します。proof 不足、衝突、unknown dirty/staged/untracked

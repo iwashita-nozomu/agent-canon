@@ -50,10 +50,13 @@ workspace/topic directory の作成前に symlink component、toplevel、tracked
 `prepare` は既存 checkout を marker/evidence/branch/url/upstream で検証し、exact branch を
 再利用します。不一致は state-preserving typed collision です。`merge-main` は
 `origin/main` を通常 merge し、ancestor proof を返します。`cleanup` は computed checkout の
-identity、owner evidence、clean branch、fetch した `origin/<branch>` の commit/tree と local
-head/tree の一致を検証します。candidate CAS、PR lifecycle、publication transition は任意の
-追加 evidence であり、merged state の場合だけ strict publication readback を要求します。
-pass 時だけ `CleanupProof` を返し、unknown sibling や dirty collision は保持します。
+identity、owner evidence、clean branch を検証します。linked-worktree は保持された local branch
+と共有 Git common objects の readback で復元可能性を確認し、remote branch を要求しません。
+`independent-clone` は fetch した `origin/<branch>` の commit/tree と local head/tree の一致を
+検証する external recoverability proof を要求します。candidate CAS、PR lifecycle、publication
+transition は任意の追加 evidence であり、publication readback を渡した merged state では
+strict publication readback、merge tree、`origin/main` containment を追加確認します。pass 時だけ
+`CleanupProof` を返し、unknown sibling や dirty collision は保持します。
 `cleanup` は exact Git toplevel を検証してから proof preflight を実行し、root ignore の
 後続 driftだけでは既存 checkout の proof-gated removalを停止しません。adapter の `status`
 と `projected_clone_path` は directory を作らない read-only projection です。
