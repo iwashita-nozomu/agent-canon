@@ -969,6 +969,13 @@ def request(
         )
     except Exception as exc:
         raise RepositoryTopicCloneError(_parent_error(exc)) from exc
+    if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
+        anchor_url = _normalise_url(_remote_url(repository_root))
+        request_url = _normalise_url(request_state.url)
+        if anchor_url != request_url:
+            raise RepositoryTopicCloneError(
+                "prepare collision: anchor-origin-mismatch"
+            )
     owner_sha = _evidence_sha256(request_state.owner_evidence)
     clone = computed_clone_path(request_state, create_topic=True)
     if request_state.parent_attestation is None:

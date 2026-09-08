@@ -543,6 +543,38 @@ def test_linked_anchor_resolution_accepts_explicit_linked_workspace_root(
     assert run_git(anchor, "status", "--porcelain") == ""
 
 
+def test_linked_url_mismatch_is_rejected_before_worktree_mutation(
+    tmp_path: Path,
+) -> None:
+    """A dependency URL mismatch cannot create a topic directory or branch."""
+    _, remote_url = init_remote(tmp_path)
+    wrong_remote = tmp_path / "wrong.git"
+    subprocess.run(["git", "init", "--bare", str(wrong_remote)], check=True)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    target = workspace / "workspace" / "topic-mismatch" / "repo-linked"
+    before_worktrees = run_git(workspace, "worktree", "list", "--porcelain")
+    before_refs = run_git(workspace, "show-ref")
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="anchor-origin-mismatch"):
+        rtc.request(
+            str(wrong_remote),
+            "repo-linked",
+            workspace,
+            "topic-mismatch",
+            "feature/mismatch",
+            evidence,
+            checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+        )
+
+    assert not target.exists()
+    assert not (workspace / "workspace").exists()
+    assert run_git(workspace, "worktree", "list", "--porcelain") == before_worktrees
+    assert run_git(workspace, "show-ref") == before_refs
+
+
 def test_linked_reuse_never_switches_and_preserves_branch_in_use_and_dirty_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
