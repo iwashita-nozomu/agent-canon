@@ -44,6 +44,9 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 ## 3. Scope の固定
 
 - branch を切ったら、必要に応じて対応する worktree root に `WORKTREE_SCOPE.md` を置きます。
+  parent/same-repository branch の分離は `repository-topic-clone` の `linked-worktree`、
+  dependency repository は `independent-clone` を使い、配置は常に
+  `<anchor>/workspace/<topic>/<repo>` とします。
 - `WORKTREE_SCOPE.md` には editable directories、carry-over target、action log を明記します。
 - branch で experiment topic を継続的に触る場合は、`experiments/registry.toml` の `active_branch` と必要なら `scope_file` を更新します。
 - branch の入口が必要な場合は `documents/notes/branches/<branch_topic>.md` に置き、scope と関連 note をそこから辿れるようにします。
@@ -78,7 +81,7 @@ validation route を同じ entrypoint で再実行できることを指します
 - commit は Git 上の runnable unit です。`git checkout <commit>` で得られる tracked tree と、明示された external runtime/source clone だけで、選択した validation route が再実行できる状態にします。
 - validation が読んだ source、config、schema、fixture、文書、tool entrypoint は、その commit の tracked tree に含めます。ignored / generated runtime output は artifact、cache、log、result のどれかに分類して evidence に残します。
 - code 変更では、file-level の code dependency scan と、言語 tool が対応する関数 / public entrypoint 単位の call-site evidence を commit evidence に含めます。Python では `python3 tools/analysis/code/helper_function_inventory.py --changed --all-functions --format json` を関数単位 evidence に使います。
-- commit evidence には branch、commit SHA、source clone SHA/PR readback（該当時）、validation command、validation 対象 path、残った dirty / untracked path の分類を含めます。
+- commit evidence には branch、commit SHA、source checkout SHA/PR readback（該当時）、validation command、validation 対象 path、残った dirty / untracked path の分類を含めます。
 - `WORKTREE_SCOPE.md` を更新した場合は、早い段階で commit します。
 - push 前に、その branch で必須の test / lint / document check を実行します。
 - 初回 push と PR 作成は `python3 tools/repository/github/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。

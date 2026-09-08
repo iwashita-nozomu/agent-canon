@@ -683,7 +683,8 @@ def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> No
             "python3 tools/repository/workspace/repository_topic_clone.py merge-main "
             "--url git@github.com:iwashita-nozomu/agent-canon.git "
             "--repo-name agent-canon --workspace-root /tmp --topic issue-942 "
-            "--branch fix/942 --owner-evidence evidence.txt"
+            "--branch fix/942 --checkout-mode independent-clone "
+            "--owner-evidence evidence.txt"
         )
         allowed = evaluate_mutation_authority(
             {"tool_name": "Bash", "tool_input": {"command": command}},

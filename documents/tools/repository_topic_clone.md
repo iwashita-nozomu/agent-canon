@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py
 
 # repository_topic_clone.py
 
-`tools/repository/workspace/repository_topic_clone.py` は、`repository-topic` clone の
+`tools/repository/workspace/repository_topic_clone.py` は、`repository-topic` checkout の
 `workspace/<topic>/<repo>` 形 lifecycle を管理する tool です。詳細責務と
 clause は
 [`documents/rule/repository-topic-clone.md`](../rule/repository-topic-clone.md)
@@ -20,20 +20,25 @@ clause は
 ```bash
 python3 tools/repository/workspace/repository_topic_clone.py prepare \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file>
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
+  --owner-evidence <evidence-file>
 
 python3 tools/repository/workspace/repository_topic_clone.py merge-main \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file>
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
+  --owner-evidence <evidence-file>
 
 python3 tools/repository/workspace/repository_topic_clone.py cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
+  --owner-evidence <evidence-file> \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
 
-host は `<parent-root>/workspace/<topic>/<repo>` を想定し、path alias は持ちません。
+host は `<parent-root>/workspace/<topic>/<repo>` を想定し、path alias は持ちません。parent または
+同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` を
+選びます。container 側に checkout-mode の別 flag はなく、exact target metadata から自動判定します。
 owner evidence と computed identity が一致する canonical `prepare` / `merge-main` は
 operation-level の追加承認なしで repo-local workspace を管理します。reuse は `prepare`
 に含まれます。
@@ -42,18 +47,21 @@ operation-level の追加承認なしで repo-local workspace を管理します
 workspace/topic directory の作成前に symlink component、toplevel、tracked ignore、
 `workspace/.agent-canon-workspace-probe` の ignore source を検証し、global/info exclude
 だけで成立する root や nested/non-repository root を typed error として保持します。
-`prepare` は既存 clone を marker/evidence/branch/url/upstream で検証し、exact branch を
+`prepare` は既存 checkout を marker/evidence/branch/url/upstream で検証し、exact branch を
 再利用します。不一致は state-preserving typed collision です。`merge-main` は
-`origin/main` を通常 merge し、ancestor proof を返します。`cleanup` は computed clone の
-identity、owner evidence、clean branch、fetch した `origin/<branch>` の commit/tree と local
-head/tree の一致を検証します。candidate CAS、PR lifecycle、publication transition は任意の
-追加 evidence であり、merged state の場合だけ strict publication readback を要求します。
-pass 時だけ `CleanupProof` を返し、unknown sibling や dirty collision は保持します。
+`origin/main` を通常 merge し、ancestor proof を返します。`cleanup` は computed checkout の
+identity、owner evidence、clean branch を検証します。linked-worktree は保持された local branch
+と共有 Git common objects の readback で復元可能性を確認し、remote branch を要求しません。
+`independent-clone` は fetch した `origin/<branch>` の commit/tree と local head/tree の一致を
+検証する external recoverability proof を要求します。candidate CAS、PR lifecycle、publication
+transition は任意の追加 evidence であり、publication readback を渡した merged state では
+strict publication readback、merge tree、`origin/main` containment を追加確認します。pass 時だけ
+`CleanupProof` を返し、unknown sibling や dirty collision は保持します。
 `cleanup` は exact Git toplevel を検証してから proof preflight を実行し、root ignore の
-後続 driftだけでは既存 clone の proof-gated removalを停止しません。adapter の `status`
+後続 driftだけでは既存 checkout の proof-gated removalを停止しません。adapter の `status`
 と `projected_clone_path` は directory を作らない read-only projection です。
 
-`merge-main` が競合した場合は、解消や片側 checkout を実行せず、clone 内の
+`merge-main` が競合した場合は、解消や片側 checkout を実行せず、prepared checkout 内の
 `.agent-canon/conflict-preservation.json` に base/ours/theirs の immutable blob
 reference、staged/unmerged state、各 hunk、unaffected user/unknown content を保存して
 停止します。integration executor は disposition、owner、cause、expected mechanism、exact

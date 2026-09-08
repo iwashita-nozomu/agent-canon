@@ -8,7 +8,8 @@ upstream design worktree-lifecycle.md worktree lifecycle policy
 -->
 
 
-このファイルは、他環境へ渡す worktree や、変更範囲を限定して使う worktree のためのテンプレートです。
+このファイルは、`repository-topic-clone` が準備した linked worktree または independent clone
+など、他環境へ渡す checkout や変更範囲を限定して使う worktree のためのテンプレートです。
 実際に使うときは、このファイルを worktree root に `WORKTREE_SCOPE.md` として置きます。
 
 ## この文書の読み方

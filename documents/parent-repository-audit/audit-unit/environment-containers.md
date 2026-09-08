@@ -39,11 +39,14 @@ setup、親固有 setup の owner split を監査します。
    `.zshrc`/zshrc が存在しなくても cold image が成立する。
 7. 必須 runtime environment は Docker `ENV`、devcontainer `containerEnv`、または owner が
    明示した bootstrap のいずれかで宣言し、interactive shell startup に隠さない。
-8. host file mount inventory を一件ずつ確認し、default の required mount は workspace
-   source と GPU runtime passthrough だけに限定する。read-only `.zshrc` は optional かつ
+8. host file mount inventory を一件ずつ確認し、default の required mount は exact selected
+   checkout/worktree source と GPU runtime passthrough だけに限定する。Git metadata は
+   read-only とし、outputs/builddirs は checkout-local か明示した run-specific external mount
+   に置く。read-only `.zshrc` は optional かつ
    absence-safe とし、host `~/.codex`、parent environment/config/previous state、Docker
    socket を default successful create や tool availability の必須条件にしない。Docker
-   socket は optional profile としてだけ許可する。
+   socket は optional profile としてだけ許可する。shared data/cache write は parent-owned
+   scope と concurrency を明示し、product の memcap/countlimit を自動付与しない。
 
 ## Evidence Sources
 

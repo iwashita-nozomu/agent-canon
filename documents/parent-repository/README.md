@@ -19,7 +19,7 @@ For current parent usage, read:
 - [Standalone Bootstrap And Shared Tool Runtime](../runtime/bootstrap-runtime.md)
   for the shared Python/Rust/LSP runtime.
 - [AgentCanon Update](../../agents/skills/agent-canon-update.md) for a qualified
-  ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` source clone.
+  ignored repository-topic checkout at `<anchor>/workspace/<topic>/agent-canon`.
 
 Parent product code, Docker, tests, CI, and GPU execution remain parent-owned.
 The parent does not initialize or mount AgentCanon source, tests, or eval

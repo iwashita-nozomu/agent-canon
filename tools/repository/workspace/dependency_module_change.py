@@ -27,6 +27,7 @@ except ImportError:  # direct CLI execution
     import tools.repository.workspace.parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
 
 from tools.repository.workspace.repository_topic_clone import (
+    CHECKOUT_MODE_INDEPENDENT,
     RepositoryTopicCloneError,
     RepositoryTopicCloneRequest,
     projected_clone_path,
@@ -217,6 +218,7 @@ def _topic_request_from_args(
         branch=branch,
         owner_evidence=owner_evidence,
         allowed_paths=tuple(allowed_paths),
+        checkout_mode=CHECKOUT_MODE_INDEPENDENT,
     )
 
 
@@ -242,6 +244,7 @@ def _prepare(args: argparse.Namespace, *, command: str) -> int:
             request.branch,
             request.owner_evidence,
             allowed_paths=request.allowed_paths,
+            checkout_mode=CHECKOUT_MODE_INDEPENDENT,
         )
         topic_root = receipt.clone.parent
         print(f"TOPIC_ROOT={topic_root}")

@@ -19,6 +19,15 @@ class PromptClassifierTest(unittest.TestCase):
         signals = prompt_intake_signals(PromptClassifierInputs("use $task-routing", Path("."), {}, {}))
         self.assertEqual(signals.skills, ("task-routing",))
 
+    def test_repository_topic_checkout_modes_keep_agentcanon_route_metadata(self) -> None:
+        for prompt in (
+            "Use the parent/same-repository branch with linked-worktree for the AgentCanon update.",
+            "Use the dependency repository's independent-clone for the AgentCanon update.",
+        ):
+            signals = prompt_intake_signals(PromptClassifierInputs(prompt, Path("."), {}, {}))
+            self.assertIn("agent-canon-update", signals.candidate_workflows)
+            self.assertIn("agent-canon-update-route", signals.candidate_workflows)
+
 
 if __name__ == "__main__":
     unittest.main()

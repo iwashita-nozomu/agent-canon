@@ -37,7 +37,7 @@ downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces c
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の structured output を取る
-1. read-only worktree check で、必要なら別の AgentCanon source clone を使うかを分類する。AgentCanon source はこの repository か、親の `workspace/agent-canondevelop/<qualified-task>/agent-canon` にある独立 clone だけを扱う。更新が必要なら current checkout を保持し、standalone topic branch / PR workflow に入る。source branch の dirty / unpushed / divergent state は evidence として保持し、detached state は source owner identity repair へ route する
+1. read-only worktree check で、必要なら AgentCanon source の repository-topic checkout を使うかを分類する。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` とし、どちらも `<anchor>/workspace/<topic>/<repo>` に置く。更新が必要なら current checkout を保持し、standalone topic branch / PR workflow に入る。source branch の dirty / unpushed / divergent state は evidence として保持し、detached state は source owner identity repair へ route する
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
 1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
 1. 実装を伴う task では `$codex-task-workflow` と、選択された task-family Skill を読む
@@ -70,12 +70,12 @@ Cross-Cutting Packet:
 
 ### Agent Canon Freshness
 
-task 開始時は read-only worktree check で、現在の AgentCanon source clone と親の作業領域を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合は standalone topic branch / PR route に入ります。
+task 開始時は read-only worktree check で、現在の AgentCanon source checkout と親の作業領域を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合は repository-topic lifecycle の選択済み checkout-mode で standalone topic branch / PR route に入ります。
 
-- AgentCanon source/runtime変更は standalone cloneから `$agent-canon-update` と `$pr-processing` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへlive root view、vendor、submodule pinを同期しません。consumer root `AGENTS.md` は、親が明示 composer で common `ROOT_AGENTS.md` と consumer-specific text を合成して通常 file として管理します。
-- 親で source の変更が必要な場合は、親の ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` に clone し、完了時に exact clone path を削除します。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
+- AgentCanon source/runtime変更は standalone source checkout から `$agent-canon-update` と `$pr-processing` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへlive root view、vendor、submodule pinを同期しません。consumer root `AGENTS.md` は、親が明示 composer で common `ROOT_AGENTS.md` と consumer-specific text を合成して通常 file として管理します。
+- 親で source の変更が必要な場合は、repository-topic lifecycle が親の `<anchor>/workspace/<topic>/agent-canon` に選択済み mode の checkout を用意し、完了時に exact path の cleanup proof を取ります。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
 - standalone AgentCanon source branch が remote main と divergeしている場合はfail-closedとし、source branchのrebase/merge判断、AgentCanon PR、merge後main readbackを完了してから実装へ戻ります。
-- `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。親から起動したときは AgentCanon source clone の存在、runtime root の containment、source-unchanged readbackを確認します。`skipped_source_canon` は AgentCanon source checkout がこの task の owner でない場合だけ妥当です。
+- `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。親から起動したときは AgentCanon source checkout の存在、runtime root の containment、source-unchanged readbackを確認します。`skipped_source_canon` は AgentCanon source checkout がこの task の owner でない場合だけ妥当です。
 
 ### Branch Reuse Default
 
@@ -100,14 +100,14 @@ task 開始時は read-only worktree check で、現在の AgentCanon source clo
   clean state、remote head/tree readback を渡し、ordinary `CleanupProof` / receipt が
   返った場合だけ `--apply` を受理します。publication artifacts は存在する場合だけ
   coherent enrichment として保持します。proof 不足、collision、unknown dirty state は
-  clone/topic root を保持して typed hold として記録します。
+  checkout/topic root を保持して typed hold として記録します。
 
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に、通常作成なら creation authority/reason、force-create/ref overwrite なら creation と destructive の両 authority pair を置いた場合だけ実行できます。
-- AgentCanon source 変更は standalone source clone を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。親で作業する場合は ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` clone を再利用します。親の pin や root projection は作成しません。
+- AgentCanon source 変更は standalone source checkout を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。親で作業する場合は repository-topic lifecycle の `<anchor>/workspace/<topic>/agent-canon` checkout を再利用します。親の pin や root projection は作成しません。
 - standalone source の変更は非並列 single-stream の既定です。write-capable handoff を並列化する場合は、各 handoff に repository-topic-clone で準備済みの `writer_target`（絶対 checkout_root、固定 branch、正規化済み remote、allowed_paths）を付け、同じ checkout_root は spawn 前に拒否します。独立 stream の workspace placement は、replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定して選択します。parent は ready な全 stream を launch し、全 descendant を monitor し、同一責任・同一 worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
-- repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 clone と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent、dependency、standalone の区別は prepare 後の policy decorator です。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が状態を保持して意図的に解消します。競合を検出したら `conflict_preservation.py` で merge-base、base/ours/theirs の stage/blob、hunk、unaffected user/unknown content、disposition、原因、期待機構、正確な edit delta を記録し、解消後の保存 readback を通します。whole-file checkout/reset/reclone/overwrite/regeneration は reconstruction map なしでは不許可です。`origin/main` の read/CAS だけでは merge 済みの代替になりません。writer target は短命な handoff 値であり、claim、PID、expiry、daemon、writer registry は作成しません。
+- repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 checkout と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` を選び、どちらも同じ `<anchor>/workspace/<topic>/<repo>` placement にします。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が状態を保持して意図的に解消します。競合を検出したら `conflict_preservation.py` で merge-base、base/ours/theirs の stage/blob、hunk、unaffected user/unknown content、disposition、原因、期待機構、正確な edit delta を記録し、解消後の保存 readback を通します。whole-file checkout/reset/reclone/overwrite/regeneration は reconstruction map なしでは不許可です。`origin/main` の read/CAS だけでは merge 済みの代替になりません。writer target は短命な handoff 値であり、claim、PID、expiry、daemon、writer registry は作成しません。
 
 ### Runtime Profile And Risk Selection
 
@@ -209,7 +209,7 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 
 1. current repo で、欠落している path が root symlink view、synced root copy、shared workflow / skill / tool / memory surface、または template 由来の scaffold かを確認する
 1. template root または登録された template remote / current template main で同じ path の有無と現在の正本形を確認する
-1. standalone AgentCanon source clone と親の development clone で同じ path の有無、rename、移動、外部 runtime への移行理由を確認する
+1. standalone AgentCanon source checkout と親の development checkout で同じ path の有無、rename、移動、外部 runtime への移行理由を確認する
 1. AgentCanon-owned surface なら `documents/runtime/bootstrap-runtime.md`、`documents/runtime/runtime-log-archive.md`、および選択した owner Skill に従い、standalone source update、shared runtime update、または意図的削除のどれかに分類する
 1. template と canon のどちらにも無く、task 固有に必要な file だけを新規作成候補にし、既存実装・文書で足りない理由を run bundle に残す
 
@@ -869,7 +869,7 @@ stage-specific evidence and sends it to that owner; it does not define a second
 closeout checklist or readiness state.
 
 - repo に残す差分がある task では、validation 後に commit を作る
-- commit は `documents/operations/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、source clone SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
+- commit は `documents/operations/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、source checkout SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
 - commit / PR の切り方は `documents/operations/BRANCH_SCOPE.md` の範囲分割契約に従う。commit は実行単位、PR はレビュー単位として扱い、複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作ってから merge 前に別 PR または別 commit へ分ける
 - final report の前に branch push を行い、user が明示的に停止を指定した場合は停止理由を final report に残す
 - `task_close.py` に渡す stage-specific evidence として、verification、request

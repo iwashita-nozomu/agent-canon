@@ -1,4 +1,16 @@
 # Experiment Result Retention Planning
+<!--
+@dependency-start
+contract skill
+responsibility Owns read-only retention planning for existing experiment results and delegates run state, artifact identity, and archive serialization.
+upstream design ../canonical/skills.md public skill registry and visibility contract
+upstream design ../../documents/experiments/result-log-retention-and-visualization.md shared result retention policy
+upstream implementation ./catalog.yaml public skill identity and routing metadata
+downstream design ./experiment-lifecycle.md experiment run-state and publication owner
+downstream design ./result-artifact-writeout.md concrete artifact identity and checksum owner
+downstream implementation ../../tools/experiments/artifacts/save_experiment_result_annex.py deterministic archive serialization owner
+@dependency-end
+-->
 
 Use this Skill before mutating or archiving an existing collection of experiment results.
 It plans retention; it does not own experiment execution, artifact writing, archive serialization, publication, or report generation.
