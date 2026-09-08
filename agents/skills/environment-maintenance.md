@@ -113,6 +113,16 @@ CIで同じimageとtest commandを再利用できる状態にします。
   `--gpus all`を内部選択し、full UUID visibilityと6個のexact environment値を同じrun argvへ
   渡します。
 - Dockerfile、Dev Container、Compose、CI、READMEの project image target と command を同じ変更でそろえます。
+- Project runners reuse the image tag selected by the current environment owner and
+  runtime pack across checkouts. They perform one native local-tag presence lookup;
+  a missing tag is built with the builder's normal cache, while an explicit
+  build/update request uses that same cache unless the caller selected `--no-cache`.
+  Ordinary runs do not create task-specific image tags, attach task lifecycle
+  labels to shared images, or remove/retag the selected image. The run container
+  is disposable (`docker run --rm` / equivalent); the selected image remains.
+- Image selection is caller-owned. Same Dockerfile text, source-tree hashes,
+  registry provenance, and daemon preflight/snapshot comparisons are not
+  substitutes for the configured runtime-pack image tag.
 - 既存のrunning Dev Container内でcommandが通ることをenvironment acceptanceにしません。
   previous mutable stateを排除したimage build/runがacceptance ownerです。
 - validation failureを解消するためにtest範囲やoracleを弱めません。imageに不足するcapabilityを

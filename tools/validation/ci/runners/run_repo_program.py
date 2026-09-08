@@ -23,16 +23,12 @@ from tools.validation.ci.runners.container_runtime import (
     build_build_command,
     build_run_command,
     build_shell_invocation,
-    emit_not_created_lifecycle_receipt,
     join_shell_lines,
-    lifecycle_context,
     load_or_default_pack,
     print_label_and_command,
     resolve_builder,
-    scope_pack_image_tag,
-    start_container_lifecycle,
+    should_build_image,
     workspace_path,
-    write_lifecycle_receipt,
 )
 from tools.validation.ci.runners.run_python_in_dockerfile import PythonExecutionRule, load_rules, resolve_rule
 
@@ -248,15 +244,17 @@ def main() -> int:
             dockerfile=args.dockerfile,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
-        lifecycle = lifecycle_context(workspace_root, builder, "repo-program")
-        if not args.skip_build:
-            pack = scope_pack_image_tag(pack, lifecycle)
-        lifecycle = lifecycle.bind_image_tag(pack.image_tag)
+        build_requested = should_build_image(
+            builder,
+            pack.image_tag,
+            workspace_root=workspace_root,
+            skip_build=args.skip_build,
+            print_only=args.print_only,
+        )
         build_command = build_build_command(
             builder,
             pack,
             workspace_root=workspace_root,
-            labels=lifecycle.labels(),
         )
         print_label_and_command("build", build_command)
 
@@ -269,7 +267,6 @@ def main() -> int:
                 command=build_env_check_command(),
                 env=tuple(args.env),
                 mounts=tuple(args.mount),
-                labels=lifecycle.labels(),
             )
             print_label_and_command("env-check", env_check_command)
 
@@ -281,42 +278,19 @@ def main() -> int:
             env=tuple(args.env),
             mounts=tuple(args.mount),
             workdir=resolution.workdir,
-            labels=lifecycle.labels(),
         )
         print_label_and_command("run", run_command)
 
         if args.print_only:
-            emit_not_created_lifecycle_receipt(workspace_root, lifecycle)
             return 0
 
-        lifecycle_run = start_container_lifecycle(
-            workspace_root, builder, "repo-program", context=lifecycle
-        )
-        if lifecycle_run.receipt.state != "snapshot":
-            write_lifecycle_receipt(workspace_root, lifecycle_run.receipt)
-            print(
-                f"container lifecycle unavailable: {lifecycle_run.receipt.failure or lifecycle_run.receipt.before.query_status}",
-                file=sys.stderr,
-            )
-            return 2
-
         command_exit = 0
-        try:
-            if not args.skip_build:
-                command_exit = subprocess.run(build_command, check=False).returncode
-            if command_exit == 0 and env_check_command is not None:
-                command_exit = subprocess.run(env_check_command, check=False).returncode
-            if command_exit == 0:
-                command_exit = subprocess.run(run_command, check=False).returncode
-        finally:
-            cleanup_result = lifecycle_run.finish(cleanup=True)
-        if cleanup_result.state not in {"cleaned", "not-created"}:
-            print(
-                f"container lifecycle cleanup state={cleanup_result.state}: {cleanup_result.failure}",
-                file=sys.stderr,
-            )
-            if command_exit == 0:
-                command_exit = 2
+        if build_requested:
+            command_exit = subprocess.run(build_command, check=False).returncode
+        if command_exit == 0 and env_check_command is not None:
+            command_exit = subprocess.run(env_check_command, check=False).returncode
+        if command_exit == 0:
+            command_exit = subprocess.run(run_command, check=False).returncode
         return command_exit
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)

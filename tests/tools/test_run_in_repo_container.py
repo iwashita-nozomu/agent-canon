@@ -2,10 +2,10 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies repository-container parsing preserves parent workspace ownership and rejects retained task images.
+# responsibility Verifies repository-container parsing preserves parent workspace ownership and disposable-run semantics.
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent-owned container lifecycle boundary
 # upstream implementation ../../tools/validation/ci/runners/run_in_repo_container.py owns repository-container orchestration
-# upstream implementation ../../tools/validation/ci/runners/container_runtime.py owns lifecycle receipts, scoped images, and cleanup
+# upstream implementation ../../tools/validation/ci/runners/container_runtime.py owns stable image selection and disposable runs
 # @dependency-end
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def load_runner() -> Any:
 
 
 def test_parser_exposes_parent_workspace_and_rejects_keep_image() -> None:
-    """Repository execution always cleans task-created images."""
+    """Repository execution exposes no retained-image option."""
     runner = load_runner()
     args = runner.build_parser().parse_args(["--workspace-root", "/workspace/parent", "--", "true"])
 
