@@ -646,7 +646,7 @@ _agent_canon_codex_digest() {
 
 _agent_canon_init_state_volume() {
   local volume="$AGENT_CANON_STATE_VOLUME_NAME"
-  local label_runtime label_control label_state volume_id caller_uid caller_gid init_name init_readback
+  local label_runtime label_control label_state volume_id caller_uid caller_gid init_name init_readback init_rc=0
   label_runtime=$("$AGENT_CANON_DOCKER_CMD" volume inspect \
     --format '{{index .Labels "io.agent-canon.runtime"}}' "$volume" 2>/dev/null || true)
   if [[ -z "$label_runtime" ]]; then
@@ -684,7 +684,7 @@ _agent_canon_init_state_volume() {
   caller_uid=$(id -u)
   caller_gid=$(id -g)
   init_name="agent-canon-volume-init-$(_agent_canon_control_digest | cut -c1-16)-$$"
-  if ! init_readback=$("$AGENT_CANON_DOCKER_CMD" run --rm \
+  init_readback=$("$AGENT_CANON_DOCKER_CMD" run --rm \
     --name "$init_name" \
     --user 0:0 \
     --read-only \
@@ -812,9 +812,10 @@ write_probe="$root/.agent-canon-volume-write.$$"
 printf "write\n" > "$write_probe"
 [ "$(cat "$write_probe")" = "write" ] || exit 62
 rm -f "$write_probe"
-printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ); then
+printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ) || init_rc=$?
+  if ((init_rc != 0)); then
     _agent_canon_json_error state_volume_init_failed \
-      "controller state volume could not be initialized"
+      "controller state volume could not be initialized (Docker exit $init_rc)"
     return 2
   fi
   if [[ "$init_readback" != $'marker\t'"$(_agent_canon_control_digest)"$'\ncontent\tok' ]]; then
