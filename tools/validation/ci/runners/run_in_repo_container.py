@@ -136,15 +136,15 @@ def main() -> int:
     """Run the CLI."""
     try:
         args = build_parser().parse_args()
+        workspace_root = workspace_path(args.workspace_root)
         pack = apply_pack_overrides(
-            load_or_default_pack(args.pack),
+            load_or_default_pack(args.pack, workspace_root=workspace_root),
             dockerfile=args.dockerfile,
             context=args.context,
             target=args.target,
             tag=args.tag,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
-        workspace_root = workspace_path(args.workspace_root)
         lifecycle = lifecycle_context(workspace_root, builder, "repo-container")
         if not args.skip_build:
             pack = scope_pack_image_tag(pack, lifecycle)
@@ -156,6 +156,7 @@ def main() -> int:
         build_command = build_build_command(
             builder,
             pack,
+            workspace_root=workspace_root,
             pull=args.pull,
             no_cache=args.no_cache,
             labels=lifecycle.labels(),

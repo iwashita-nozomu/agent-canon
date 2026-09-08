@@ -172,6 +172,91 @@ def test_workspace_discovery_uses_repo_markers_without_runtime_pack(
     assert runtime_module.detect_workspace_root() == repo
 
 
+def test_linked_worktree_mounts_only_readonly_common_git_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A linked checkout gets its common Git metadata, never a sibling source tree."""
+    parent = tmp_path / "parent"
+    init_authentic_git(parent)
+    worktree = tmp_path / "worktree"
+    subprocess.run(
+        ["git", "-C", str(parent), "worktree", "add", "--quiet", "-b", "fixture-wt", str(worktree)],
+        check=True,
+    )
+    monkeypatch.chdir(worktree)
+
+    assert runtime_module.detect_workspace_root() == worktree
+    metadata_mounts = runtime_module.git_mounts(worktree)
+    common_dir = Path(
+        subprocess.run(
+            ["git", "-C", str(worktree), "rev-parse", "--git-common-dir"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
+    if not common_dir.is_absolute():
+        common_dir = (worktree / common_dir).resolve()
+    assert metadata_mounts == (f"{common_dir}:{common_dir}:ro",)
+
+    pack = runtime_module.default_container_pack(workspace_root=worktree)
+    command = runtime_module.build_run_command(
+        "docker", pack, workspace_root=worktree, command=["git", "describe"]
+    )
+    assert f"{worktree}:/workspace" in command
+    assert metadata_mounts[0] in command
+    assert f"{parent}:/workspace" not in command
+
+
+def test_build_command_uses_explicit_checkout_for_context_and_dockerfile(
+    tmp_path: Path,
+) -> None:
+    """Build inputs are resolved against the selected checkout, not the runner repo."""
+    checkout = tmp_path / "checkout"
+    (checkout / "docker").mkdir(parents=True)
+    (checkout / "docker" / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+    pack = runtime_module.ContainerPack(
+        name="fixture",
+        dockerfile="docker/Dockerfile",
+        context=".",
+        target=None,
+        image_tag="fixture:latest",
+        platform=None,
+        smoke=runtime_module.SmokeSpec(),
+        runtime=runtime_module.RuntimeSpec(),
+    )
+
+    command = runtime_module.build_build_command(
+        "docker", pack, workspace_root=checkout
+    )
+
+    assert command[command.index("-f") + 1] == str(checkout / "docker" / "Dockerfile")
+    assert command[-1] == str(checkout)
+
+
+def test_linked_worktree_metadata_mount_is_absent_for_clone_and_non_git(
+    tmp_path: Path,
+) -> None:
+    """Regular clones and non-Git workspace roots retain their previous mount set."""
+    clone = tmp_path / "clone"
+    init_authentic_git(clone)
+    non_git = tmp_path / "non-git"
+    non_git.mkdir()
+
+    assert runtime_module.git_mounts(clone) == ()
+    assert runtime_module.git_mounts(non_git) == ()
+
+
+def test_broken_git_file_does_not_silently_skip_metadata_mount(tmp_path: Path) -> None:
+    """A Git-link file with unusable metadata is a typed runtime failure."""
+    checkout = tmp_path / "broken-worktree"
+    checkout.mkdir()
+    (checkout / ".git").write_text("gitdir: /missing/worktree\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Git metadata cannot be resolved"):
+        runtime_module.git_mounts(checkout)
+
+
 def test_repo_program_defaults_without_pack_or_python_rules(tmp_path: Path) -> None:
     """Direct execution uses Dockerfile defaults when optional TOML is absent."""
     repo = tmp_path / "parent"

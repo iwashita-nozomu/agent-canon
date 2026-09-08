@@ -90,9 +90,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def load_rules(path_like: str) -> tuple[str, list[PythonExecutionRule]]:
+def load_rules(
+    path_like: str, *, workspace_root: Path | None = None
+) -> tuple[str, list[PythonExecutionRule]]:
     """Load rule definitions."""
-    data = load_toml(path_like)
+    data = load_toml(path_like, workspace_root=workspace_root)
     defaults = data.get("defaults", {})
     if not isinstance(defaults, dict):
         raise ValueError(
@@ -146,13 +148,21 @@ def resolve_rule(
     dockerfile: str,
     python_file: Path,
     rules: list[PythonExecutionRule],
+    workspace_root: Path | None = None,
 ) -> PythonExecutionRule | None:
     """Return the first matching rule for a Python file."""
-    normalized_dockerfile = workspace_path(dockerfile).resolve()
-    relative_file = python_file.relative_to(workspace_path("."))
+    normalized_dockerfile = workspace_path(
+        dockerfile, workspace_root=workspace_root
+    ).resolve()
+    relative_file = python_file.relative_to(
+        workspace_path(".", workspace_root=workspace_root)
+    )
     normalized_relative = relative_file.as_posix()
     for rule in rules:
-        if workspace_path(rule.dockerfile).resolve() != normalized_dockerfile:
+        if (
+            workspace_path(rule.dockerfile, workspace_root=workspace_root).resolve()
+            != normalized_dockerfile
+        ):
             continue
         if any(normalized_relative.startswith(prefix) for prefix in rule.match_roots):
             return rule
@@ -163,13 +173,21 @@ def main() -> int:
     """Run the CLI."""
     try:
         args = build_parser().parse_args()
-        python_file = workspace_path(args.python_file)
+        workspace_root = workspace_path(".")
+        python_file = workspace_path(args.python_file, workspace_root=workspace_root)
         if not python_file.is_file():
             raise SystemExit(f"Python file not found: {python_file}")
 
-        rules = load_rules(args.rules)[1] if args.rules is not None else []
+        rules = (
+            load_rules(args.rules, workspace_root=workspace_root)[1]
+            if args.rules is not None
+            else []
+        )
         resolved_rule = resolve_rule(
-            dockerfile=args.dockerfile, python_file=python_file, rules=rules
+            dockerfile=args.dockerfile,
+            python_file=python_file,
+            rules=rules,
+            workspace_root=workspace_root,
         )
         pack_path = args.pack or (
             resolved_rule.pack
@@ -182,15 +200,15 @@ def main() -> int:
         workdir = resolved_rule.workdir if resolved_rule is not None else None
 
         pack = apply_pack_overrides(
-            load_or_default_pack(pack_path), dockerfile=args.dockerfile
+            load_or_default_pack(pack_path, workspace_root=workspace_root),
+            dockerfile=args.dockerfile,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
-        workspace_root = workspace_path(".")
         lifecycle = lifecycle_context(workspace_root, builder, "python")
         if not args.skip_build:
             pack = scope_pack_image_tag(pack, lifecycle)
         lifecycle = lifecycle.bind_image_tag(pack.image_tag)
-        relative_python = python_file.relative_to(workspace_path(".")).as_posix()
+        relative_python = python_file.relative_to(workspace_root).as_posix()
         container_python = (
             f"{pack.runtime.workspace_mount.rstrip('/')}/{relative_python}"
         )
@@ -199,7 +217,12 @@ def main() -> int:
         if python_args and python_args[0] == "--":
             python_args = python_args[1:]
 
-        build_command = build_build_command(builder, pack, labels=lifecycle.labels())
+        build_command = build_build_command(
+            builder,
+            pack,
+            workspace_root=workspace_root,
+            labels=lifecycle.labels(),
+        )
         run_command = build_run_command(
             builder,
             pack,
