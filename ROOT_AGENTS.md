@@ -11,11 +11,13 @@ downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_
 @dependency-end
 -->
 
-This is the common base for a consumer repository's root `AGENTS.md`. The
-consumer keeps that generated file as a regular tracked file by composing this
-base with its own specific instructions. The composition is an explicit
-consumer maintenance operation; it is not a live AgentCanon projection,
-runtime import, updater, vendor checkout, submodule, or symlink.
+This is the common base for a repository root `AGENTS.md`, including a consumer
+root and a source-specific AgentCanon root. A consumer keeps its generated file
+as a regular tracked file by composing this base with its own specific
+instructions. A source-specific AgentCanon `AGENTS.md` may reference this base
+explicitly and retain its own reader map. These are explicit reads/composition,
+not a live projection, runtime import, updater, vendor checkout, submodule, or
+symlink.
 
 ## Repository Role
 
@@ -75,6 +77,11 @@ Resolve the task owner and the consumer validation oracle from those surfaces.
 When the task changes AgentCanon itself, move to a qualified AgentCanon
 development checkout and keep the consumer tree unchanged unless the consumer
 task explicitly owns the resulting generated file.
+
+When a root `AGENTS.md` begins with the literal `@ROOT_AGENTS.md`, read this
+common base first and then continue into that file's source- or consumer-specific
+Reader Map. The marker is a reference for the reader, not a claim of automatic
+expansion or runtime import.
 
 A progress update is not a final report. Keep the request active while required
 implementation, validation, integration, publication, cleanup, or its result
