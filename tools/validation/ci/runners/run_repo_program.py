@@ -118,9 +118,11 @@ def normalize_program_args(program_args: list[str]) -> list[str]:
     return normalized
 
 
-def workspace_relative(program_path: Path) -> str:
+def workspace_relative(program_path: Path, *, workspace_root: Path | None = None) -> str:
     """Return a workspace-relative path in POSIX form."""
-    return program_path.relative_to(workspace_path(".")).as_posix()
+    return program_path.relative_to(
+        workspace_path(".", workspace_root=workspace_root)
+    ).as_posix()
 
 
 def workspace_container_path(workspace_mount: str, relative_program: str) -> str:
@@ -140,20 +142,22 @@ def resolve_program(
     program_args: list[str],
     shell: str | None,
     workdir_override: str | None,
+    workspace_root: Path | None = None,
 ) -> ProgramResolution:
     """Resolve how one program should run."""
-    workspace_root = workspace_path(".")
-    program_candidate = workspace_root / program
+    selected_root = workspace_root or workspace_path(".")
+    program_candidate = selected_root / program
     normalized_args = normalize_program_args(program_args)
     resolved_rule: PythonExecutionRule | None = None
 
     if program_candidate.exists() and program_candidate.is_file():
         if program_candidate.suffix == ".py" and rules_path is not None:
-            _, rules = load_rules(rules_path)
+            _, rules = load_rules(rules_path, workspace_root=selected_root)
             resolved_rule = resolve_rule(
                 dockerfile=dockerfile,
                 python_file=program_candidate,
                 rules=rules,
+                workspace_root=selected_root,
             )
         pack_path = pack_override or (
             resolved_rule.pack
@@ -163,7 +167,7 @@ def resolve_program(
     else:
         pack_path = pack_override
 
-    pack = load_or_default_pack(pack_path)
+    pack = load_or_default_pack(pack_path, workspace_root=selected_root)
     workspace_mount = pack.runtime.workspace_mount
     default_workdir = workspace_mount.rstrip("/") or "/"
     workdir = workdir_override or (
@@ -171,7 +175,9 @@ def resolve_program(
     )
 
     if program_candidate.exists() and program_candidate.is_file():
-        relative_program = workspace_relative(program_candidate)
+        relative_program = workspace_relative(
+            program_candidate, workspace_root=selected_root
+        )
         container_program = workspace_container_path(workspace_mount, relative_program)
 
         if program_candidate.suffix == ".py":
@@ -224,6 +230,7 @@ def main() -> int:
     """Run the CLI."""
     try:
         args = build_parser().parse_args()
+        workspace_root = workspace_path(".")
         resolution = resolve_program(
             dockerfile=args.dockerfile,
             rules_path=args.rules,
@@ -232,18 +239,25 @@ def main() -> int:
             program_args=list(args.program_args),
             shell=args.shell,
             workdir_override=args.workdir,
+            workspace_root=workspace_root,
         )
         pack = apply_pack_overrides(
-            load_or_default_pack(resolution.pack_path),
+            load_or_default_pack(
+                resolution.pack_path, workspace_root=workspace_root
+            ),
             dockerfile=args.dockerfile,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
-        workspace_root = workspace_path(".")
         lifecycle = lifecycle_context(workspace_root, builder, "repo-program")
         if not args.skip_build:
             pack = scope_pack_image_tag(pack, lifecycle)
         lifecycle = lifecycle.bind_image_tag(pack.image_tag)
-        build_command = build_build_command(builder, pack, labels=lifecycle.labels())
+        build_command = build_build_command(
+            builder,
+            pack,
+            workspace_root=workspace_root,
+            labels=lifecycle.labels(),
+        )
         print_label_and_command("build", build_command)
 
         env_check_command: list[str] | None = None
