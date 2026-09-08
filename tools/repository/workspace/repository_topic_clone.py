@@ -210,9 +210,9 @@ class RepositoryTopicCloneRequest:
     topic: str
     branch: str
     owner_evidence: Path
+    checkout_mode: str
     allowed_paths: tuple[str, ...] = ()
     parent_attestation: _parent_boundary.ParentRootAttestationReceipt | None = None
-    checkout_mode: str = CHECKOUT_MODE_INDEPENDENT
 
     def __post_init__(self) -> None:
         """Reject an ambiguous lifecycle implementation at the API boundary."""
@@ -939,7 +939,7 @@ def request(
     *,
     allowed_paths: Sequence[str] | None = None,
     policy: RepositoryPolicyCallback | None = None,
-    checkout_mode: str = CHECKOUT_MODE_INDEPENDENT,
+    checkout_mode: str,
 ) -> PrepareReceipt:
     """Prepare a topic clone and return a typed receipt."""
     repository_root = _repository_workspace_root(workspace_root, require_ignore=True)
@@ -981,15 +981,6 @@ def request(
     if request_state.parent_attestation is None:
         raise RepositoryTopicCloneError("parent-root-attestation:boundary:attestation missing")
     state = _inspect(clone, request_state, owner_sha=owner_sha)
-    if (
-        request_state.checkout_mode == CHECKOUT_MODE_LINKED
-        and clone.exists()
-        and _is_linked_worktree(clone)
-        and state.state
-        not in {"dirty-worktree-index-or-untracked", "merge-conflict-preserve", "detached"}
-    ):
-        _ensure_worktree_config(clone)
-        state = _inspect(clone, request_state, owner_sha=owner_sha)
     if state.state == "absent":
         if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
             branch_source = _prepare_linked_worktree(request_state, clone)
@@ -1213,7 +1204,6 @@ def finalize_merge_main(
             raise RepositoryTopicCloneError(
                 "merge-finalize hold: checkout mode mismatch"
             )
-        _ensure_worktree_config(clone)
     elif _is_linked_worktree(clone):
         raise RepositoryTopicCloneError("merge-finalize hold: checkout mode mismatch")
     try:
@@ -1469,21 +1459,24 @@ def cleanup(
             )
 
     if publication_readback is None:
-        try:
-            _run_git(clone, ["fetch", "origin", request_state.branch])
-            remote_head = _run_git(
-                clone, ["rev-parse", f"refs/remotes/origin/{request_state.branch}"]
-            ).strip()
-            remote_tree = _run_git(
-                clone, ["rev-parse", f"{remote_head}^{{tree}}"]
-            ).strip()
-        except GitCommandError as exc:
-            raise RepositoryTopicCloneError(
-                f"cleanup hold: remote branch unavailable ({request_state.branch})"
-            ) from exc
-        if remote_head != candidate_sha or remote_tree != candidate_tree:
-            raise RepositoryTopicCloneError("cleanup hold: remote branch head mismatch")
-        evidence_kind = "publication-head" if has_lifecycle_evidence else "remote-head"
+        if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
+            evidence_kind = "linked-local-head"
+        else:
+            try:
+                _run_git(clone, ["fetch", "origin", request_state.branch])
+                remote_head = _run_git(
+                    clone, ["rev-parse", f"refs/remotes/origin/{request_state.branch}"]
+                ).strip()
+                remote_tree = _run_git(
+                    clone, ["rev-parse", f"{remote_head}^{{tree}}"]
+                ).strip()
+            except GitCommandError as exc:
+                raise RepositoryTopicCloneError(
+                    f"cleanup hold: remote branch unavailable ({request_state.branch})"
+                ) from exc
+            if remote_head != candidate_sha or remote_tree != candidate_tree:
+                raise RepositoryTopicCloneError("cleanup hold: remote branch head mismatch")
+            evidence_kind = "publication-head" if has_lifecycle_evidence else "remote-head"
     else:
         _run_git(clone, ["fetch", "origin", "main"])
         origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
@@ -1563,7 +1556,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
-        default=CHECKOUT_MODE_INDEPENDENT,
+        required=True,
         help="Checkout implementation (linked-worktree or independent-clone).",
     )
     prepare.add_argument(
@@ -1583,7 +1576,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     merge.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
-        default=CHECKOUT_MODE_INDEPENDENT,
+        required=True,
     )
 
     finalize = commands.add_parser(
@@ -1599,7 +1592,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     finalize.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
-        default=CHECKOUT_MODE_INDEPENDENT,
+        required=True,
     )
     finalize.add_argument("--inventory")
     finalize.add_argument("--plan")
@@ -1617,7 +1610,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     resume.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
-        default=CHECKOUT_MODE_INDEPENDENT,
+        required=True,
     )
     resume.add_argument("--inventory")
     resume.add_argument("--plan")
@@ -1632,7 +1625,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     clean.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
-        default=CHECKOUT_MODE_INDEPENDENT,
+        required=True,
     )
     clean.add_argument("--candidate-cas")
     clean.add_argument("--pr-lifecycle")
