@@ -6,6 +6,7 @@ responsibility Designs runtime regression tests only for unresolved test-owned b
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic obligation and verification-owner contract
 upstream design ../../documents/design/responsibility-rationale.md regression-test admission rationale
+upstream design ../../documents/conventions/coding-conventions-testing.md reproduction evidence placement and lifecycle
 @dependency-end
 -->
 
@@ -35,6 +36,12 @@ Each proposed regression case needs only:
 A five-stage `Design Clause -> Mechanism -> Breaking Input -> Observable -> Oracle` packet is optional evidence for complex or ambiguous algorithms/state machines, not a universal requirement.
 
 Existing reproduced failures, public failing inputs, issue reproductions, and deterministic integration failures are themselves reachability evidence. Do not require an additional null-hypothesis document for them. Use an explicit reachability witness only when the candidate may be unreachable from supported public behavior.
+
+For reproduction placement, Issue permalinks, before/after evidence, and
+post-fix consolidation, consume
+[Bug reproduction evidence](../../documents/conventions/coding-conventions-testing.md#22-bug-reproduction-evidence).
+Preserving a reproduction does not activate this skill or require an additional
+per-Issue test when the existing validation owners already close the risk.
 
 ## Validation failure response
 
