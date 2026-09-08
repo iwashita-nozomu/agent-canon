@@ -45,9 +45,11 @@ Dockerfile -> canonical image -> docker run <canonical-full-test-command> -> pas
 - buildしたimageは、Feature、initialize、post-create、post-attach、host interpreter、
   mounted installer、workspace venv、previous container stateに依存せず、
   `docker run`からrepositoryの標準テスト一式を完了します。
-- Dev Container、Compose、runtime pack、GitHub Actionsは同じimageを選択・build・runし、
-  source/data mount、UID/GID、GPU/device、port、credential、secret、environment variable
-  の配線だけを担当します。
+- Dev Container、Compose、runtime pack、GitHub Actionsは project-owned image/layer を
+  選択・build・runし、source/data mount、UID/GID、GPU/device、port、credential、secret、
+  environment variable の配線だけを担当します。これは AgentCanon の shared toolresident
+  とは別の execution plane です。project 側で image/layer を再利用しても container は
+  product と toolresident を兼用しません。
 - optional workflow capabilityが追加imageを必要とする場合も、そのworkflowが選ぶ
   Dockerfile/OCI image targetとして完成させます。container起動後のinstallへ逃がしません。
 
@@ -110,7 +112,7 @@ CIで同じimageとtest commandを再利用できる状態にします。
   選ばず、同skillのwrapperがDocker daemonのexact CDI inventoryから個別CDIまたは
   `--gpus all`を内部選択し、full UUID visibilityと6個のexact environment値を同じrun argvへ
   渡します。
-- Dockerfile、Dev Container、Compose、CI、READMEのimage targetとcommandを同じ変更でそろえます。
+- Dockerfile、Dev Container、Compose、CI、READMEの project image target と command を同じ変更でそろえます。
 - 既存のrunning Dev Container内でcommandが通ることをenvironment acceptanceにしません。
   previous mutable stateを排除したimage build/runがacceptance ownerです。
 - validation failureを解消するためにtest範囲やoracleを弱めません。imageに不足するcapabilityを

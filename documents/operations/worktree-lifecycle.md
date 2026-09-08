@@ -9,8 +9,11 @@ upstream design orphan-lifecycle.md defines semantic orphan classification and f
 -->
 
 
-この文書は、既存の stale worktree、古い `WORKTREE_SCOPE.md`、または過去の branch/action log を片付ける場合だけ参照します。
-新規 repo-changing task では追加の `git worktree`、separate worktree、integration worktree を作成・使用しません。既定運用は current checkout 上の branch / wave です。
+この文書は、既存の stale worktree、古い `WORKTREE_SCOPE.md`、または過去の branch/action log を片付ける場合に参照します。
+repo-changing task が分離 checkout を必要とする場合は、`repository-topic-clone` が
+`<anchor>/workspace/<topic>/<repo>` に `linked-worktree` または `independent-clone` を
+準備します。手動の `git worktree` や別 path は作成せず、分離不要な作業は current checkout
+上の branch / wave で続けます。
 
 branch または worktree の削除可否は、先に [orphan-lifecycle.md](orphan-lifecycle.md) の canonical
 read-only inventory で分類します。経過日数、最終更新日時、stale という呼称だけでは cleanup を認可しません。
@@ -28,7 +31,8 @@ read-only inventory で分類します。経過日数、最終更新日時、sta
 - `git fetch --prune origin main` 後の exact `refs/remotes/origin/main` を固定し、
   `python3 tools/repository/git/orphan_lifecycle.py inventory ...` の digest と candidate identity を残します。
 - `orphan_safe_to_remove` 以外、または cleanup blocker が一つでもある candidate は削除しません。
-- 新しい worktree は切りません。
+- 新しい worktree が必要な場合は、親が選択した `repository-topic-clone` の
+  `linked-worktree` mode で準備し、手動では切りません。
 - current checkout で続けられる作業は current checkout の後続 wave に直列化します。
 - carry-over 先、runtime output directory、削除または保持する legacy note を先に決めます。
 
@@ -45,7 +49,9 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 - `python3 tools/repository/workspace/worktree_scope_lint.py --current` で stale scope の placeholder と kickoff 欄を確認します。`bash tools/repository/worktree/worktree_start.sh --current` は cleanup diagnostic 以外では使いません。
 - `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash tools/validation/documentation/checks/check_worktree_scopes.sh` を実行します。
 - dirty state、conflict risk、scope drift の兆候があれば、編集前に action log に残します。
-- `main` へ戻す場合も integration worktree は切らず、`agents/skills/integration.md` の current-checkout branch 手順を使います。
+- `main` へ戻す場合は、integration owner が準備済み checkout 上で統合します。integration
+  用 checkout が必要なら `repository-topic-clone` の selected mode を使い、手動の integration
+  worktree は切りません。
 
 ## ルール
 

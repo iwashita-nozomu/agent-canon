@@ -11,14 +11,14 @@ downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py
 
 # repository-topic clone ルール
 
-この規約は、`<topic>` と `<repo>` で識別される generic repository-topic clone に対する
-一貫した規約です。対象は `workspace/<topic-slug>/<repo-name>` の単一 clone と
+この規約は、`<topic>` と `<repo>` で識別される generic repository-topic checkout に対する
+一貫した規約です。対象は `workspace/<topic-slug>/<repo-name>` の単一 checkout と
 その merge/readback cleanup です。`.gitmodules` 配下以外の依存変更や `.gitignore`、
 差分サイズ判定を scope として使いません。スコープは構造、依存、差し替え可能単位で決めます。
 
 ## 適用範囲
 
-`tools/repository/workspace/repository_topic_clone.py` が扱う repository clone の
+`tools/repository/workspace/repository_topic_clone.py` が扱う repository checkout の
 一意復元と cleanup はこの規約の対象です。`dependency-module-change` 系統は
 gitlink/pin/projection の共有責務を担い、この文書の clone 実装責務を重複して
 所有しません。
@@ -39,10 +39,22 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
   別 special route で拒否せず、generic operation に戻して再評価する。
 - `main`/`origin/main` の branch は source owner にはせず、branch 起点・merge ベースとしてのみ扱う。
 
+### Checkout mode
+
+`prepare` は `--checkout-mode linked-worktree|independent-clone` を必須の選択値として
+受け取ります。parent または同一 repository の branch は `linked-worktree`、dependency
+repository の変更は `independent-clone` を使います。どちらも同じ
+`<anchor>/workspace/<topic>/<repo>` に配置し、branch ごとに topic 名を分けます。branch
+hash や group 階層を path に追加しません。
+
+linked worktree は native Git の shared refs/config と per-worktree index を使います。
+writer packet と task marker は各 worktree に属し、別 worktree の状態を共有・上書きしません。
+independent clone も同じ path、marker、writer packet、branch identity の検証を通ります。
+
 ## clone ライフサイクル
 
 - `prepare` は必ず `workspace/<topic-slug>/<repo-name>` の computed path を返す。
-- 既存 clean clone が exact identity と一致すれば local/remote named branch を再利用する。
+- 既存 clean checkout が exact identity と一致すれば local/remote named branch を再利用する。
   computed path の occupant、URL、owner evidence、branch upstream が不一致なら typed
   collision として状態を保持する。
 - requested branch が local/remote のどちらにも無い場合だけ、最新 `origin/main` から作る。
@@ -63,12 +75,14 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
 ```bash
 python3 tools/repository/workspace/repository_topic_clone.py prepare \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
+  --owner-evidence <evidence-file> \
   --allowed-path <relative-path>
 
 python3 tools/repository/workspace/repository_topic_clone.py merge-main \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file>
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
+  --owner-evidence <evidence-file>
 ```
 
 ## クリーンアップ
@@ -99,7 +113,8 @@ python3 tools/repository/workspace/repository_topic_clone.py merge-main \
 ```bash
 python3 tools/repository/workspace/repository_topic_clone.py cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
+  --owner-evidence <evidence-file> \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```

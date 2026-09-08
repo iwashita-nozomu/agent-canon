@@ -211,6 +211,9 @@ claims が同じ owner、responsibility、context、write authority、validation
 共有する場合は active instance を再利用し、独立 review や distinct unresolved
 claim/risk のために分ける場合だけ fresh instance を使います。
 包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。write-capable handoff には `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必ず付け、branch は handoff 前に `repository-topic-clone.prepare` で用意し、dedicated clone の ignored `.agent-canon/writer-target.json` に検証済み identity とともに保存します。同じ `checkout_root` を持つ writer handoff は agent team の materializer が spawn 前に拒否し、packet がない shared checkout も workspace write を拒否し、reader は target なしで共有できます。
+Prepared target は repository-topic lifecycle が選択した `linked-worktree` または
+`independent-clone` の checkout に保存します。「dedicated clone」はこの prepared
+checkout を指し、手動 clone/worktree 作成を意味しません。
 各 user input は `same_active_task_delta`、`scope_or_contract_change`、または
 `new_task` として分類しますが、新しい turn や名前を変えた packet だけでは
 fresh agent の理由になりません。owner、responsibility、context、write authority、
@@ -220,6 +223,8 @@ failed context integrity の場合だけ fresh agent / wave を起こします�
 resumption が必要な場合は checkpoint と updated packet path を durable に残し、それ以外
 は structured handoff message/tool result を使います。
 workspace を変更する writer の生成 prompt は target の `cwd` / `git_root` / `branch` / `remote` と一致する状態から開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しません。外部 GitHub publication 専用の publisher は target を持ちません。target は handoff の値としてのみ扱い、claim、PID、expiry、daemon、writer registry は作成しません。
+この worker 制約は、lifecycle owner が handoff 前に行う mode 選択・checkout 作成・再利用を
+妨げません。integration_executor は準備済み target 上で統合だけを行います。
 subagent handoff prompt には lifecycle decision と fresh-agent 条件を含めますが、
 `fresh_subagents_required: true` や `reuse_for_new_task: forbidden` を一律の機械契約には
 しません。
@@ -352,7 +357,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    changed-path evidence, parent packet evidence, or explicit review-pack
    activation.
 1. If a write-capable coding / docs-edit subagent cannot be launched because authorization or tool gates are missing, record `WRITE_SUBAGENT_AUTHORIZATION=required` or the gate-specific blocker in the run bundle and stop expanding read-only analysis for that slice. Return a typed blocked/retry/user-report packet; no parent write route exists.
-1. Default to one writer in the current checkout. If multiple writers are necessary, use them only when `team_manifest.yaml` fixes dependency order, wave plan, disjoint write scope, integration order, and review gate; colliding writers are serialized into later waves in the current checkout instead of split into separate worktrees.
+1. Default to one writer in the current checkout. If multiple writers are necessary, use them only when `team_manifest.yaml` fixes dependency order, wave plan, disjoint write scope, integration order, and review gate. Colliding writers are serialized into later waves; independent streams use the repository-topic lifecycle's prepared `linked-worktree` or `independent-clone` under the same workspace/topic/repo placement rather than manual worktree setup.
 1. For multiple independent workstreams, schedule a stage owner per workstream and let that owner create a vertical dynamic wave under `run.delegated_spawn_policy` instead of flattening every role into one parent wave. Only sibling waves with disjoint input packets, write scopes, validation routes, and review gates may run together.
 1. For log-analysis-driven launches, require the `Finding Route Packet` from `agents/skills/agent-log-analysis.md`. Use `finding_class` to choose the destination owner and `instance_partition` to shard same-role instances by `repo_key`, `hook_family`, `skill_name`, `workflow_name`, `issue_id`, or path scope.
 1. For same-role log-analysis instances, use an id shaped like `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` and give each instance its own structured evidence cell, allowed paths, expected output, validation route, and review gate.

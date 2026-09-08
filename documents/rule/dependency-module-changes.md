@@ -15,23 +15,24 @@ downstream design ../../agents/skills/dependency-module-change.md exposes the sh
 ## Reader Map
 
 この規約は `.gitmodules` identity、gitlink、pin、projection の判断を所有します。
-clone path、branch reuse、`origin/main` merge、publication evidence、cleanup は
+checkout path、branch reuse、`origin/main` merge、publication evidence、cleanup は
 [`repository-topic-clone.md`](repository-topic-clone.md) が所有します。AgentCanon update
-はこの組合せを使う一例であり、別の clone 手順を持ちません。
+はこの組合せを使う一例であり、別の checkout 手順を持ちません。
 
 ## 責務境界
 
 - 親 repository の `.gitmodules` が module path、URL、任意 branch を所有する。
 - `dependency_module_change.py` は構造化 manifest から URL と repository name を解決し、
   generic `RepositoryTopicCloneRequest` を構成する。
-- `repository_topic_clone.py` が唯一の `workspace/<topic-slug>/<repo-name>` path、branch、
+- `repository_topic_clone.py` が唯一の `workspace/<topic-slug>/<repo-name>` path、checkout mode、branch、
   merge、publication readback、cleanup authority を決定する。
 - dependency decorator は prepare/merge 後に gitlink、pin、projection、親側 validation を
   接続し、generic lifecycle の path/base/branch/merge/cleanup を変更しない。
 
-repository kind は clone 後の policy decorator です。dependency skill の前提が成立しない
-場合は decorator だけを外し、要求された clone/edit/update operation を generic owner へ
-戻します。manual clone、別 workspace topology、operation refusal は代替 routeではありません。
+repository kind は checkout 後の policy decorator です。dependency skill の前提が成立しない
+場合は decorator だけを外し、要求された checkout/edit/update operation を generic owner へ
+戻します。dependency repository は `independent-clone` mode を使い、manual clone、別
+workspace topology、operation refusal は代替 routeではありません。
 
 ## AgentCanon parent state decision table
 
@@ -86,9 +87,9 @@ python3 tools/repository/workspace/dependency_module_change.py --root <parent-ro
   --owner-evidence <file> [--allowed-path <relative-path> ...]
 ```
 
-manifest identity を generic request へ写像し、exact clone/branch を再利用するか、不在
-branch を最新 `origin/main` から作成します。`PrepareReceipt`、module path/URL readback、
-computed clone path の一致が完了証拠です。
+manifest identity を generic request へ写像し、exact independent checkout/branch を再利用するか、
+不在 branch を最新 `origin/main` から作成します。`PrepareReceipt`、module path/URL readback、
+computed checkout path の一致が完了証拠です。
 owner evidence、manifest identity、computed path が一致する canonical prepare は
 operation-level の追加承認なしで実行できます。この扱いは repo-local topic workspace
 の lifecycle command にだけ適用し、共有 checkout の protected raw Git route には継承
@@ -116,7 +117,7 @@ python3 tools/repository/workspace/dependency_module_change.py --root <parent-ro
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
 
-通常の cleanup は manifest から解決した computed clone を再計算し、selected Git toplevel、
+通常の cleanup は manifest から解決した computed checkout を再計算し、selected Git toplevel、
 owner evidence/marker、URL、branch、clean non-detached state、および fetch した
 `origin/<branch>` の commit/tree と local `HEAD` の commit/tree の一致だけを検証します。
 publication packet を作らなくても dry-run/apply でき、unknown sibling は保持し、topic directory

@@ -12,10 +12,12 @@ downstream implementation tests/bootstrap/test_bootstrap_runtime.py lifecycle va
 @dependency-end
 -->
 
-This rulebook applies to the standalone AgentCanon tool runtime. It does not
-define a project's product image, test image, GPU policy, or development
-environment. Project repositories own those surfaces and run their tests with
-their own Docker/test runner.
+This rulebook applies to the standalone AgentCanon tool runtime. The shared
+toolresident is distinct from every project product, test, or development
+container. It does not define a project's product image, test image, GPU
+policy, or development environment. Project repositories own those surfaces
+and run their tests with their own Docker/test runner; they may reuse product
+images or layers when that is their own explicit policy.
 
 ## Operating boundary
 
@@ -41,7 +43,12 @@ The host owns Docker, Git, GitHub, Codex launch, credentials, project builds,
 and project tests. The resident container owns only AgentCanon Python, Rust,
 and language-server tools. It receives exact allowlisted target mounts and a
 task-scoped exchange directory; it does not receive a Docker socket, SSH agent,
-GitHub token, host home, arbitrary Git state, or a general network.
+GitHub token, host home, arbitrary Git state, or a general network. A target
+mount is the exact selected checkout/worktree root; Git metadata is read-only.
+Outputs and build directories stay checkout-local or use an explicitly named
+run-specific external mount. Shared data/cache writes require parent-owned
+scope and concurrency coordination; the AgentCanon resident does not infer or
+apply a product memcap/countlimit policy.
 
 `bootstrap.sh` is usable on a host with Docker and Git but without AgentCanon's
 Python dependencies. Its shell adapter uses only fixed bootstrap constants in
@@ -87,8 +94,10 @@ reference and immutable ID are stored in
 `<runtime-root>/host-state/active-image.tsv`. Start, status,
 target, tool, and Codex routes consume that state; only install/update/sync
 select a new candidate image reference.
-The runtime uses one image/container across registered projects; task
-separation is provided by exact target mounts and runtime-root task directories.
+The runtime uses one shared AgentCanon tool image/resident across registered
+projects; task separation is provided by exact target mounts and runtime-root
+task directories. This resident is not a project product container, even when
+a project reuses an image or layer in its own execution plane.
 The source checkout is mounted read-only at `/opt/agent-canon/source`; the
 runtime state volume provides the writable `/var/lib/agent-canon/cache`. After
 the resident is available, source-mounted Rust tools are compiled by the
@@ -143,11 +152,17 @@ Register each exact project root before execution:
   target add --root <project-root> --mode read-only
 ```
 
-`read-only` is the default and the required mode for analysis. A named
+`read-only` is the default and the required mode for analysis. The target is
+the exact selected checkout/worktree, including read-only Git metadata. A named
 `explicit-target-write` operation must provide a target capability, purpose,
 allowed paths, before/after identity, and receipt. Registering an entire home,
 workspace, or unresolved symlink is rejected. A project test directory is not
 an AgentCanon mount requirement.
+
+Container target selection is automatic from the registered target metadata;
+the container route has no separate checkout-mode flag. Existing project
+runner `--skip-build` options remain explicit requests to reuse an existing
+build and do not select another checkout or create another container.
 
 Target updates run under `lifecycle.lock`:
 

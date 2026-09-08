@@ -501,10 +501,12 @@ second call order or related-skill list.
 ### Repository Topic Clone Workstreams
 
 親、依存、standalone の source workstream はすべて
-`repository-topic-clone` の単一 lifecycle を使います。要求された clone/edit/update
+`repository-topic-clone` の単一 lifecycle を使います。要求された checkout/edit/update
 operation を先に保ち、`workspace/<topic-slug>/<repo-name>` の exact identity が既存
-clone と一致すれば named branch を再利用し、branch が無ければ最新
-`origin/main` から作成します。repository kind は prepare 後の policy decorator
+checkout と一致すれば named branch を再利用し、branch が無ければ最新
+`origin/main` から作成します。parent または同一 repository の branch は
+`linked-worktree`、dependency repository は `independent-clone` を選び、両方とも同じ
+workspace/topic/repo placement を使います。repository kind は prepare 後の policy decorator
 であり、specialized skill の前提が合わない場合はその decorator だけを外して generic
 operation を続けます。
 
@@ -516,7 +518,8 @@ remote、branch、module identity が一致する repo-local workspace に対し
 mutation（checkout/switch、branch/worktree、reset/restore/clean/stash、protected update
 wrapper）は同じ command でも既存の明示 authority gate を通します。canonical tool の
 内部で必要な Git 操作を理由に、caller が raw Git authority を付けたり、manual clone、
-別 path、`rm -rf` を選んだりしてはいけません。
+  別 path、`rm -rf` を選んだりしてはいけません。container 側に checkout-mode の
+  別 flag はなく、登録された exact target の metadata から自動判定します。
 
 `dependency_module_change.py status` は adapter-only の read command です。generic
 lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
@@ -528,7 +531,7 @@ task closeout では `repository-topic-clone` または `dependency-module-chang
 PR lifecycle、publication readback は任意の追加 evidence であり、指定時だけ coherent set と
 merged publication readback を検証します。preflight が成功して `CleanupProof` / cleanup
 receipt を返したときだけ `--apply` の削除を受理し、未達・衝突・unknown dirty state・proof
-mismatch は clone/topic root を保持した typed hold として closeout packet に記録します。
+mismatch は checkout/topic root を保持した typed hold として closeout packet に記録します。
 通常 cleanup に workspace packet artifact は不要で、proof-free deletion は完了状態になりません。
 
 workstream の scope は repository 構造、依存 edge、差し替え可能な責務単位、validation
