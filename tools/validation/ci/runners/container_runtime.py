@@ -1749,6 +1749,44 @@ class CommandDaemonClient:
         raise RuntimeError(command_error_detail(result.stdout, result.stderr))
 
 
+def image_exists(
+    builder: str, image_tag: str, *, workspace_root: Path | None = None
+) -> bool:
+    """Return whether the caller-selected image tag is present locally.
+
+    This is deliberately a single native image lookup.  Ordinary project
+    runners do not snapshot or clean the daemon: the configured image tag is
+    shared across checkouts and only the disposable run container is theirs.
+    """
+    return (
+        CommandDaemonClient(builder, cwd=workspace_root).inspect_image_tag(image_tag)
+        is not None
+    )
+
+
+def should_build_image(
+    builder: str,
+    image_tag: str,
+    *,
+    workspace_root: Path,
+    skip_build: bool = False,
+    force_build: bool = False,
+    print_only: bool = False,
+) -> bool:
+    """Decide whether an ordinary runner should execute its build command.
+
+    ``--skip-build`` always wins.  Explicit update/build requests force the
+    normal builder cache path; otherwise a build is needed only when the
+    configured local tag is absent.  Print-only previews never contact the
+    daemon.
+    """
+    if skip_build or print_only:
+        return False
+    if force_build:
+        return True
+    return not image_exists(builder, image_tag, workspace_root=workspace_root)
+
+
 def detect_host_runtime_features() -> HostRuntimeFeatures:
     """Detect host-dependent runtime features once."""
     has_gpu = Path("/dev/nvidiactl").exists() or shutil.which("nvidia-smi") is not None

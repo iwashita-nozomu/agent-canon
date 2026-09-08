@@ -234,6 +234,56 @@ def test_build_command_uses_explicit_checkout_for_context_and_dockerfile(
     assert command[-1] == str(checkout)
 
 
+def test_image_exists_uses_the_selected_tag_lookup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Missing-image admission uses one native tag lookup, not a daemon snapshot."""
+    runtime = load_runtime_module()
+    calls: list[tuple[str, str, Path | None]] = []
+
+    def inspect(self: Any, tag: str) -> str | None:
+        calls.append((self.builder, tag, self.cwd))
+        return "sha256:image"
+
+    monkeypatch.setattr(runtime.CommandDaemonClient, "inspect_image_tag", inspect)
+
+    assert runtime.image_exists("docker", "fixture:stable", workspace_root=tmp_path)
+    assert calls == [("docker", "fixture:stable", tmp_path)]
+
+
+@pytest.mark.parametrize(
+    ("skip_build", "force_build", "print_only", "present", "expected"),
+    (
+        (True, False, False, False, False),
+        (False, True, False, True, True),
+        (False, False, True, False, False),
+        (False, False, False, False, True),
+        (False, False, False, True, False),
+    ),
+)
+def test_should_build_image_preserves_explicit_build_controls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    skip_build: bool,
+    force_build: bool,
+    print_only: bool,
+    present: bool,
+    expected: bool,
+) -> None:
+    """Skip/force controls and absent-tag selection have explicit semantics."""
+    runtime = load_runtime_module()
+    monkeypatch.setattr(runtime, "image_exists", lambda *_args, **_kwargs: present)
+
+    assert runtime.should_build_image(
+        "docker",
+        "fixture:stable",
+        workspace_root=tmp_path,
+        skip_build=skip_build,
+        force_build=force_build,
+        print_only=print_only,
+    ) is expected
+
+
 def test_linked_worktree_metadata_mount_is_absent_for_clone_and_non_git(
     tmp_path: Path,
 ) -> None:
