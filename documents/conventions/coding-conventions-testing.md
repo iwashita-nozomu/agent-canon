@@ -195,7 +195,7 @@ Validation test/check が失敗した場合は、通すために intended behavi
 `intent_preservation`、`evidence` を記録します。`cause_classification` と
 `intent_preservation` の slug set と route semantics は
 `documents/runtime/runtime-profiles-and-check-matrix.json` が所有します。
-`documents/runtime/runtime-profiles-and-check-matrix.md` は生成済み reader projection として
+[documents/runtime/runtime-profiles-and-check-matrix.md](../runtime/runtime-profiles-and-check-matrix.md) は生成済み reader projection として
 参照します。
 `cause_classification=implementation_bug` で contract と oracle が安定している場合は、
 追加 test planning で止めず owning code / config / docs / workflow repair へ進みます。

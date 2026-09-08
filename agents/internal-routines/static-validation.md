@@ -19,7 +19,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Activation
 
-`documents/runtime/runtime-profiles-and-check-matrix.md` owns profile activation and
+[documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md) owns profile activation and
 the check matrix. Select a profile from the changed responsibility and risk; this
 entrypoint does not define a standard command set or a universal closeout gate.
 

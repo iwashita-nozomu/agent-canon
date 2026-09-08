@@ -10,8 +10,8 @@ downstream design ../../ROOT_AGENTS.md common consumer base
 
 # Consumer root instruction composer
 
-`entrypoint_composer.py` creates a consumer-owned regular `AGENTS.md` from
-three explicit inputs: AgentCanon `ROOT_AGENTS.md`, consumer-specific text,
+`entrypoint_composer.py` creates a consumer-owned regular [AGENTS.md](../../AGENTS.md) from
+three explicit inputs: AgentCanon [ROOT_AGENTS.md](../../ROOT_AGENTS.md), consumer-specific text,
 and the output path. The source checkout is used only to record its current
 commit in the managed comment marker. The output contains the exact input
 bytes, fixed separators, and their SHA-256 digests, so a consumer can read it
@@ -19,7 +19,7 @@ without an AgentCanon checkout or runtime.
 
 An absent output is created atomically. An existing unmarked file, symlink,
 directory, or partial managed file fails without changing it. A valid managed
-file may be refreshed from the current exact inputs. Nested `AGENTS.md` files
+file may be refreshed from the current exact inputs. Nested [AGENTS.md](../../AGENTS.md) files
 are outside this operation, and `AGENT.md` is not a supported alias.
 
 The tool is a maintainer workflow helper. Invoke it through the existing

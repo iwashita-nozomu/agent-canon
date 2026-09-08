@@ -155,7 +155,7 @@ result_overwrite_policy=<append-only|unique-file|regenerate-from-source>
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/result-artifact-writeout.md`.
+1. Read [agents/skills/result-artifact-writeout.md](result-artifact-writeout.md).
 1. Classify the destination before writing: `run-local`, `accumulated-eval`, `hook-result`, `experiment-result`, `reader-report`, or `generated-triage`.
 1. When raw output is selected, preserve the machine-readable source result first, then derive the Markdown/table summary from that same result. Raw, summary, manifest, report, and archive outputs are otherwise optional and unselected outputs remain absent.
 1. For prose graph outputs, treat the SQLite DB as the source result and keep projection, diagnostics, explanation, integration plan, handoff, and rewrite packets tied to that DB path.

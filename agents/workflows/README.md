@@ -11,7 +11,7 @@ downstream design workflow-references.md bibliography index
 -->
 
 `agents/workflows/` contains this index and the bibliography at
-`workflow-references.md`. Executable task procedures live in the public Skills;
+[workflow-references.md](workflow-references.md). Executable task procedures live in the public Skills;
 task-family activation and stage topology live in `agents/task_catalog.yaml`.
 The index is a reader aid, not another procedure or policy source.
 

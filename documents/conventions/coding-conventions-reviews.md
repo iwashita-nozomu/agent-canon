@@ -119,8 +119,8 @@ responsibility Documents レビュー文書の運用規約 for this repository.
 ## 9. 関連文書
 
 - 実験結果のような生成物は `./reviews/` ではなく `experiments/.../results/` で管理します。
-- 実験環境の運用ルールは `coding-conventions-experiments.md` に書きます。
-- プロジェクト全体の branch / worktree 運用は `coding-conventions-project.md` に書きます。
+- 実験環境の運用ルールは [coding-conventions-experiments.md](coding-conventions-experiments.md) に書きます。
+- プロジェクト全体の branch / worktree 運用は [coding-conventions-project.md](coding-conventions-project.md) に書きます。
 
 ## 10. 禁止事項
 

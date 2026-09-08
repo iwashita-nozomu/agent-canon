@@ -21,7 +21,7 @@ upstream design ../contracts/github-first-module-and-devcontainer-policy.md envi
   `cause_classification`、`intent_preservation`、`evidence` を記録します。
 - `cause_classification` と `intent_preservation` の slug set は
   `documents/runtime/runtime-profiles-and-check-matrix.json` が所有します。
-  `documents/runtime/runtime-profiles-and-check-matrix.md` は生成済み reader projection として
+  [documents/runtime/runtime-profiles-and-check-matrix.md](../runtime/runtime-profiles-and-check-matrix.md) は生成済み reader projection として
   参照します。
   approved intent を保って修正するか、intent 変更前に escalation します。
 
@@ -30,13 +30,13 @@ upstream design ../contracts/github-first-module-and-devcontainer-policy.md envi
 - `make docker-build-check` を実行して、build と container 起動のどちらで落ちるかを切り分けます。
 - `docker` / `podman` がない環境では、GitHub Actions の `Docker Build` workflow を使います。
 - repo-local `docker/Dockerfile`、`pyproject.toml`、AgentCanon shared image の責務境界に更新漏れがないか確認します。固定 OS/Python capability と Ubuntu 24.04 の Node/npm は一つの image に入り、追加ツールは typed manifest の owner です。
-- Linux / WSL host の前提が怪しい場合は `documents/contracts/linux-wsl-host-requirements.md` を見ます。
+- Linux / WSL host の前提が怪しい場合は [documents/contracts/linux-wsl-host-requirements.md](../contracts/linux-wsl-host-requirements.md) を見ます。
 
 ## WSL / host 前提が怪しい
 
 - repo が Linux filesystem 側にあるか確認します。
 - `docker version` と `id` を見て、今の shell から daemon に到達できるか確認します。
-- VS Code dev container が不安定なら `.devcontainer/` と `documents/contracts/linux-wsl-host-requirements.md` を見直します。
+- VS Code dev container が不安定なら `.devcontainer/` と [documents/contracts/linux-wsl-host-requirements.md](../contracts/linux-wsl-host-requirements.md) を見直します。
 
 ## import や依存が壊れる
 
@@ -48,10 +48,10 @@ upstream design ../contracts/github-first-module-and-devcontainer-policy.md envi
 
 - partial run を正式結果として扱わないことを確認します。
 - run 条件、出力先、比較条件を先に固定します。
-- `agents/skills/experiment-lifecycle.md` と `agents/skills/research-workflow.md` を見直します。
+- [agents/skills/experiment-lifecycle.md](../../agents/skills/experiment-lifecycle.md) と [agents/skills/research-workflow.md](../../agents/skills/research-workflow.md) を見直します。
 
 ## agent 運用が分からない
 
-- `agents/README.md`
-- `documents/codex/AGENTS_COORDINATION.md`
-- `agents/TASK_WORKFLOWS.md`
+- [agents/README.md](../../agents/README.md)
+- [documents/codex/AGENTS_COORDINATION.md](../codex/AGENTS_COORDINATION.md)
+- [agents/TASK_WORKFLOWS.md](../../agents/TASK_WORKFLOWS.md)

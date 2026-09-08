@@ -16,35 +16,35 @@ upstream design ../../AGENTS.md standalone AgentCanon Codex runtime instruction 
 
 - この文書は、repo 運用から現在の agent 正本 surface へ誘導する入口です。
 - 主な順路は、正本、Runtime Entry Points、Skills、実行入口、repo 側の運用ルールです。
-- 古い `documents/codex/AGENTS_COORDINATION.md` 参照を見つけたときや、
+- 古い [documents/codex/AGENTS_COORDINATION.md](AGENTS_COORDINATION.md) 参照を見つけたときや、
   runtime entrypoint の正本を確認するときに読みます。
 - 境界: 新しい stage rule や skill policy はここではなく、リンク先の
   runtime instruction surface、`agents/`、skill owner surface が所有します。
 
 ## Codex Loading Priority
 
-Codex loading-priority policy is owned by `ROOT_AGENTS.md` and `AGENTS.md`;
+Codex loading-priority policy is owned by [ROOT_AGENTS.md](../../ROOT_AGENTS.md) and [AGENTS.md](../../AGENTS.md);
 this file only maps legacy references to the current owner surfaces. Codex の
 自動 instruction 読み込みは Codex home の global guidance から始まり、その後
 project root から current working directory へ進む runtime chain で決まります。
-各 directory では `AGENTS.override.md`、`AGENTS.md`、
+各 directory では `AGENTS.override.md`、[AGENTS.md](../../AGENTS.md)、
 `project_doc_fallback_filenames` の順に最大 1 file だけが入ります。current working
 directory に近い file ほど後に結合され、広い guidance を局所的に上書きします。
 この文書は legacy adapter であり、Codex が常に自動で読む runtime instruction
 surface ではありません。
 
 Parent root から Codex を開始した場合、parent の self-contained
-`AGENTS.md` が instruction entrypoint です。AgentCanon source checkout 内を
-current working directory として開始した場合、この tree の `AGENTS.md` が
+[AGENTS.md](../../AGENTS.md) が instruction entrypoint です。AgentCanon source checkout 内を
+current working directory として開始した場合、この tree の [AGENTS.md](../../AGENTS.md) が
 standalone source-tree entrypoint になります。必要な AgentCanon tool runtime は
 qualified source clone の `bootstrap.sh` と明示 runtime root から起動し、親へ
-instruction view を投影しません。`.github/AGENTS.md` は `.github/` subtree に
+instruction view を投影しません。[.github/AGENTS.md](../../.github/AGENTS.md) は `.github/` subtree に
 入ったときの parent overlay です。
 
-Consumer root の `AGENTS.md` は、AgentCanon の `ROOT_AGENTS.md` common base と
+Consumer root の [AGENTS.md](../../AGENTS.md) は、AgentCanon の [ROOT_AGENTS.md](../../ROOT_AGENTS.md) common base と
 consumer-owned specific text を明示的に合成した通常の tracked file です。base の
 source checkout、runtime、symlink、vendor、submodule は consumer の instruction
-chain に必要ありません。AgentCanon source の `AGENTS.md` は standalone source-tree
+chain に必要ありません。AgentCanon source の [AGENTS.md](../../AGENTS.md) は standalone source-tree
 編集用であり、consumer root へ直接コピーしたり、`AGENT.md` という singular alias
 を追加したりしません。
 
@@ -155,7 +155,7 @@ artifact-only role や review role の write scope を確認するときは、`v
 ## repo 側の運用ルール
 
 - role 定義と write policy は `agents/agents_config.json` を正本にします。
-- handoff、review、response、escalation の書式は `agents/COMMUNICATION_PROTOCOL.md` を正本にします。
+- handoff、review、response、escalation の書式は [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) を正本にします。
 - 共通 workflow と skill routing は `agents/` 側で保守し、runtime entrypoint へ role 一覧を重複記載しません。
 - 会話だけを根拠に実装へ進めず、`documents/`、`documents/notes/`、`references/` と local library の sweep を先に行います。
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します。

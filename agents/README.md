@@ -18,8 +18,8 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 
 - この文書は、AgentCanon の人間向け agent hub として workflow、skill、subagent、runtime entrypoint への入口を所有します。
 - `## Hub Routes` は目的別入口、`## Runtime Entry Points` と `## Skills And Subagents` は runtime surface、`## Team Shape` 以降は role と startup / command contract を扱います。
-- 全体の読み順は root `README.md` の目的別ルートが正本です。この hub は、agent runtime、workflow、skill、subagent のどこを開くかだけを決めます。
-- chunked reading では、まず `## Hub Routes` で入口を選び、`agents/canonical/README.md` は layout appendix として必要時だけ参照します。
+- 全体の読み順は root [README.md](../README.md) の目的別ルートが正本です。この hub は、agent runtime、workflow、skill、subagent のどこを開くかだけを決めます。
+- chunked reading では、まず `## Hub Routes` で入口を選び、[agents/canonical/README.md](canonical/README.md) は layout appendix として必要時だけ参照します。
 
 ## Hub Routes
 
@@ -35,7 +35,7 @@ skill を user-facing に明示するときは `$skill-name` を使います。
 | skill を選ぶ | [skills/README.md](skills/README.md), [skills/catalog.yaml](skills/catalog.yaml) | 個別 skill 文書へ進む前に family と trigger を決める |
 | internal routine を確認する | [internal-routines/README.md](internal-routines/README.md) | workflow が呼ぶ review / validation / compatibility routine を見る |
 
-個別 skill のリンク一覧は `skills/README.md` と `skills/catalog.yaml` に集約します。
+個別 skill のリンク一覧は [skills/README.md](skills/README.md) と `skills/catalog.yaml` に集約します。
 この hub には常用 skill の抜粋を増やしません。
 
 Target-State-First と Decision Sufficiency は
@@ -162,7 +162,7 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 - 共通方針は `agents/` 配下に集約し、entrypoint へ重複記述しません。
 - workflow family 選択は [task_catalog.yaml](task_catalog.yaml) の typed route を正本にし、この hub は reader entrypoint だけを示します。
 - 新しい workflow や skill を追加するときは、まず `agents/canonical/` の文書を更新します。
-- 実行環境固有の都合がある場合だけ、`AGENTS.md` にその環境で必要な差分を持たせます。
+- 実行環境固有の都合がある場合だけ、[AGENTS.md](../AGENTS.md) にその環境で必要な差分を持たせます。
 - 会話だけを根拠に実装へ進めず、`documents/`、`documents/notes/`、`references/`、dependency surface、local implementation を先に探索します。
 - reuse sweep をせずに新しい file や module を増やしません。
 - 既存実装を使えるか、導入済みライブラリを拡張できるか、既存では足りない理由が何かを artifact に残さずに新規実装へ進めません。

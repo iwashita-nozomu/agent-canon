@@ -37,7 +37,7 @@ template fixture と task fixture を同時に確認する場合は `--template`
 
 ## Evidence boundary
 
-- `documents/design/semantic-responsibility-contract.md` が policy の正本です。
+- [documents/design/semantic-responsibility-contract.md](../design/semantic-responsibility-contract.md) が policy の正本です。
 - `templates/documents/semantic-responsibility-contract.template.toml` は空の再利用可能な
   instance shape です。
 - populated instance は current run bundle にだけ置き、active design packet の

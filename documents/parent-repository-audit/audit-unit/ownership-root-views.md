@@ -34,7 +34,7 @@ readback を監査します。
 - qualified source clone の Git status、branch、remote/main、PR merge readback
 - `bootstrap.sh status` と runtime-root ownership/readback
 - source-unchanged and exact cleanup evidence
-- parent `AGENTS.md` と source clone `AGENTS.md`
+- parent [AGENTS.md](../../../AGENTS.md) と source clone [AGENTS.md](../../../AGENTS.md)
 
 ## Repair Route
 

@@ -20,9 +20,9 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `agents/skills/academic-writing.md`
-- `agents/skills/long-form-writing.md`
-- `documents/conventions/REVIEW_PROCESS.md`
+- [agents/skills/academic-writing.md](../skills/academic-writing.md)
+- [agents/skills/long-form-writing.md](../skills/long-form-writing.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
 
 ## Mandatory Checklist
 

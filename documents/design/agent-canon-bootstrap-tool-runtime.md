@@ -25,7 +25,7 @@ downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootst
 
 ## Reader Map
 
-- Host は Skill、`AGENTS.md`、workflow shell、Git、GitHub、Docker、Codex 起動を所有する。
+- Host は Skill、[AGENTS.md](../../AGENTS.md)、workflow shell、Git、GitHub、Docker、Codex 起動を所有する。
 - 共有 tool container は AgentCanon の Python / Rust / LSP tool だけを実行する。
 - project build / test / experiment / GPU は project-owned execution environment が所有する。
 - runtime lifecycle state は bootstrap-owned で ignored な `<install-root>/.runtime/` に置く。
@@ -422,7 +422,7 @@ Codex を起動することも要求しません。install/update 後は現在 s
 inventory と link target を readback します。
 
 `tools/runtime/container/bootstrap_runtime.py` は isolated Codex homeのskill/agent surfaceを cross-repository
-discovery entry とし、project-local `AGENTS.md` は親 repository の責務のままと
+discovery entry とし、project-local [AGENTS.md](../../AGENTS.md) は親 repository の責務のままと
 する Codex discovery model を前提にします。
 
 ## Eval Collection And agent-canon-log

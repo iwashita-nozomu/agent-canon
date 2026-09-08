@@ -36,7 +36,7 @@ upstream design ../README.md document index and notes placement boundary
 - [`failures/`](./failures/README.md)
   - 再発させたくない failure の短い記録
 
-`branches/` と `worktrees/` は常用カテゴリではありません。`documents/operations/worktree-lifecycle.md` に従って branch / worktree を例外運用した場合だけ使います。
+`branches/` と `worktrees/` は常用カテゴリではありません。[documents/operations/worktree-lifecycle.md](../operations/worktree-lifecycle.md) に従って branch / worktree を例外運用した場合だけ使います。
 
 ## 置くもの
 
@@ -66,9 +66,9 @@ upstream design ../README.md document index and notes placement boundary
 
 - 実行中の局所ログは `documents/notes/worktrees/` に残します。
 - closeout 時に、再利用知識は `documents/notes/knowledge/`、topic synthesis は `documents/notes/themes/`、再発防止は `documents/notes/failures/` へ昇格させます。
-- どこへ昇格させるか迷うときは `documents/operations/notes-lifecycle.md` を見ます。
+- どこへ昇格させるか迷うときは [documents/operations/notes-lifecycle.md](../operations/notes-lifecycle.md) を見ます。
 - `documents/notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
-- stable preference は対象の `AGENTS.md` または canonical owner へ直接昇格します。
+- stable preference は対象の [AGENTS.md](../../AGENTS.md) または canonical owner へ直接昇格します。
 - 同じ問題に再遭遇したときに使う独立した知識や修正 feedback は private `agent-canon-log` に残します。
   raw chat と時系列観測は runtime logs/evidence/Issue/failures の owner に置きます。
 
@@ -87,5 +87,5 @@ upstream design ../README.md document index and notes placement boundary
 - 自分の仮説や解釈は `Idea:`、`Interpretation:`、`Consideration:` で分けます。
 - 重要情報をリンク先に逃がしすぎません。
 - 一度 `main` に置いた過去の note 本文はむやみに書き換えません。補足が必要なら追記で対応します。
-- host 固有の Git mirror や bare repo hook は `documents/notes/github-mirror-procedure.md` に残します。
+- host 固有の Git mirror や bare repo hook は [documents/notes/github-mirror-procedure.md](github-mirror-procedure.md) に残します。
 - 新しい note は category ごとの template から始めて構いません。

@@ -41,8 +41,8 @@ projection rules, validation rules, and extension contract live here.
   graph.
 - Corpus hints may be inferred from source text and user prompt, then exported
   as projection metadata for retrieval and evaluation calibration.
-- `documents/tools/prose_reasoning_graph.md` owns CLI usage and operator flow.
-- `agents/skills/prose-reasoning-graph.md` owns skill selection, handoff, and
+- [documents/tools/prose_reasoning_graph.md](../tools/prose_reasoning_graph.md) owns CLI usage and operator flow.
+- [agents/skills/prose-reasoning-graph.md](../../agents/skills/prose-reasoning-graph.md) owns skill selection, handoff, and
   authority boundaries.
 - `tools/analysis/documents/prose_reasoning_graph.py` owns the current MVP
   implementation and must be kept in sync with the DSL spec.

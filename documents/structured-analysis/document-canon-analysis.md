@@ -29,7 +29,7 @@ stale name、duplicate heading を structured analysis に取り込む adapter c
 ## Evidence And Assumption Ledger
 
 - Evidence sources:
-  `database-design.md`, `README.md`, and
+  [database-design.md](database-design.md), `README.md`, and
   `../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs`.
 - Assumptions:
   Document canon inventory JSON uses the implemented keys `documents`,
@@ -38,7 +38,7 @@ stale name、duplicate heading を structured analysis に取り込む adapter c
   `historical_record`, edge kinds `targets_document` and
   `references_canonical`, and metadata key `document_canon_inventory`.
 - Parent-doc alignment:
-  `database-design.md` owns the shared table contract. This adapter owns the
+  [database-design.md](database-design.md) owns the shared table contract. This adapter owns the
   document-inventory classification and import mapping.
 
 ## Rust CLI

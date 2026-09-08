@@ -20,10 +20,10 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `documents/notes/themes/from_another_agent.md`
-- `AGENTS.md`
-- `agents/COMMUNICATION_PROTOCOL.md`
-- `agents/canonical/ARTIFACT_PLACEMENT.md`
+- [documents/notes/themes/from_another_agent.md](../../documents/notes/themes/from_another_agent.md)
+- [AGENTS.md](../../AGENTS.md)
+- [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
+- [agents/canonical/ARTIFACT_PLACEMENT.md](../canonical/ARTIFACT_PLACEMENT.md)
 
 ## Expected Outcome
 
@@ -33,7 +33,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Default Sequence
 
-1. `documents/notes/themes/from_another_agent.md` を最初に読みます。
+1. [documents/notes/themes/from_another_agent.md](../../documents/notes/themes/from_another_agent.md) を最初に読みます。
 1. `## やるべきこと` から、今回の task に直接効く項目だけを抜き出します。
 1. `## お勧め機能` は scope を広げすぎない範囲でだけ採用します。
 1. 正式ルールに昇格した内容は `agents/` か `documents/` へ移し、この note には carry-over だけを残します。

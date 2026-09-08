@@ -16,7 +16,7 @@ downstream design documents/runtime/private-feedback-knowledge.md private knowle
 この文書は、AgentCanon の top-level philosophy です。
 ユーザー、repo owner、maintainer、agent が同じ設計思想を共有するために置きます。
 設計・実装・refactor・review で原則が競合する場合の詳細な判断順序は
-`documents/conventions/software-engineering-principles.md` が所有し、この文書では複製しません。
+[documents/conventions/software-engineering-principles.md](documents/conventions/software-engineering-principles.md) が所有し、この文書では複製しません。
 
 ## 原則
 
@@ -46,8 +46,8 @@ downstream design documents/runtime/private-feedback-knowledge.md private knowle
 
 ## 境界
 
-- 一般的なソフトウェア工学原則と競合時の優先順位は `documents/conventions/software-engineering-principles.md` に置く。
-- OOP、class、state、inheritance、`Protocol`、SOLID の専門判断は `documents/conventions/object-oriented-design.md` に置く。
+- 一般的なソフトウェア工学原則と競合時の優先順位は [documents/conventions/software-engineering-principles.md](documents/conventions/software-engineering-principles.md) に置く。
+- OOP、class、state、inheritance、`Protocol`、SOLID の専門判断は [documents/conventions/object-oriented-design.md](documents/conventions/object-oriented-design.md) に置く。
 - 個別 tool の使い方は `tools/` と tool document に置く。
 - skill の実行契約は `agents/skills/` と `.codex/personal/skills/` に置く。
 - task の手順は `agents/skills/` に置き、`agents/workflows/` には reader index と bibliography だけを置く。

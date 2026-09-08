@@ -16,13 +16,13 @@ downstream design ./codex-configuration-slides.md slide deck derived from this r
 / `codex review --help` / `codex mcp --help` / `codex features list`、
 およびこの template の `.codex/config.toml` から整理したものです。
 
-目的は、agent-canon / template で Codex 設定を変更するときに、設定キー、CLI override、subagent、MCP、hooks、skills、AGENTS.md の責務境界を一か所で確認できるようにすることです。
+目的は、agent-canon / template で Codex 設定を変更するときに、設定キー、CLI override、subagent、MCP、hooks、skills、[AGENTS.md](../../AGENTS.md) の責務境界を一か所で確認できるようにすることです。
 
 ## Reader Map
 
 Use this reference to answer where Codex configuration lives, which source owns
 each setting, and how repo-scoped `.codex/config.toml` relates to CLI overrides,
-subagents, MCP servers, hooks, skills, AGENTS.md, profiles, and local state.
+subagents, MCP servers, hooks, skills, [AGENTS.md](../../AGENTS.md), profiles, and local state.
 Read Primary Sources and Configuration Surfaces first, then use the coverage
 matrix and per-key inventory for edits. The later sections group settings by
 runtime surface and end with the practical change checklist and stability notes.
@@ -50,7 +50,7 @@ runtime surface and end with the practical change checklist and stability notes.
 | CLI direct flags | single invocation | Common overrides for model, profile, sandbox, approval policy, cwd, images, web search, and output mode. |
 | `.codex/agents/*.toml` / `~/.codex/agents/*.toml` | project / user | Custom subagent roles with model, sandbox, MCP, skills, and instructions overrides. |
 | `.codex/personal/skills/**/SKILL.md` and other skill roots | directory / repo / user / system | Reusable task instructions and optional scripts/resources read after skill selection. |
-| `AGENTS.md` and fallback project docs | repo tree | Runtime instructions discovered from project root to current working directory. |
+| [AGENTS.md](../../AGENTS.md) and fallback project docs | repo tree | Runtime instructions discovered from project root to current working directory. |
 | `hooks.json` or `[hooks]` | repo / user | Lifecycle automation around session start, prompt submit, tool use, stop, and permission events. |
 
 ## Load and Override Model
@@ -58,7 +58,7 @@ runtime surface and end with the practical change checklist and stability notes.
 Codex combines settings from persistent config, project config, profiles, custom agent config, and CLI flags. For day-to-day operations:
 
 - Put durable repo policy in `.codex/config.toml`.
-- Put human-readable task and coding rules in `AGENTS.md`, not in model/provider settings.
+- Put human-readable task and coding rules in [AGENTS.md](../../AGENTS.md), not in model/provider settings.
 - Use user-level `profiles` for reusable modes such as safe review, full-access container runs, or other machine-specific defaults.
 - Use CLI `-c` for temporary one-off changes; do not commit temporary operator overrides.
 - Treat `experimental_*` and realtime websocket overrides as unstable unless a task explicitly targets those features.
@@ -183,10 +183,10 @@ runtime/config/routing surface として経路化しません。`codex-cli-guide
   [`codex-rs/exec/src/lib.rs`](https://github.com/openai/codex/blob/main/codex-rs/exec/src/lib.rs)
   にある OSS provider resolution と、公式 CLI reference の
   `--local-provider` / `--oss` の定義。既存 guide の
-  `codex-cli-guide/source/codex_cli_guide_config_deepdive.full.md` も、
+  [codex-cli-guide/source/codex_cli_guide_config_deepdive.full.md](../../codex-cli-guide/source/codex_cli_guide_config_deepdive.full.md) も、
   `--oss`（source line 459）と `oss_provider`（source line 626）を記録する
   upstream-only reference です。
-- Reviewed version evidence: `codex-cli-guide/README.md` の Runtime
+- Reviewed version evidence: [codex-cli-guide/README.md](../../codex-cli-guide/README.md) の Runtime
   compatibility note が記録する `codex-cli 0.130.0` と、上記 version/help
   route の組合せ。この version evidence は AgentCanon の runtime version
   pin や local-provider support claim ではありません。
@@ -330,7 +330,7 @@ and are not AgentCanon configuration surfaces.
 | `plugins` | object | Plugin enablement by plugin name. |
 | `profile` | string | Selected named profile. |
 | `profiles` | object | Named reusable config overlays. |
-| `project_doc_fallback_filenames` | array | Fallback filenames checked after `AGENTS.override.md` and `AGENTS.md`. |
+| `project_doc_fallback_filenames` | array | Fallback filenames checked after `AGENTS.override.md` and [AGENTS.md](../../AGENTS.md). |
 | `project_doc_max_bytes` | integer | Maximum bytes read from project doc files. |
 | `project_root_markers` | array | Markers for detecting repo root when scanning `.codex`. |
 | `projects` | object | Per-project trust settings. |
@@ -438,7 +438,7 @@ Network permission config supports:
 Custom agents live in `~/.codex/agents/` or `.codex/agents/` as standalone TOML. They can override many normal config keys, including model, reasoning, sandbox, MCP servers, skills, and instructions. The important policy boundary is:
 
 - Use `agents/model_profiles.toml` as profile authority and regenerate `.codex/agents/*.toml` role views.
-- Use `AGENTS.md` and workflow docs to define when roles may be used.
+- Use [AGENTS.md](../../AGENTS.md) and workflow docs to define when roles may be used.
 - Do not rely on high `max_threads` alone to improve work quality; fan-out still needs owner, input packet, write scope, and review gate.
 
 ## MCP Servers
@@ -592,19 +592,19 @@ Skills are loaded from multiple roots. Official docs describe repository, user, 
 Operational guidance:
 
 - Keep reusable workflow logic in skills when it must be invoked repeatedly.
-- Keep current project policy in `AGENTS.md` and workflow docs.
+- Keep current project policy in [AGENTS.md](../../AGENTS.md) and workflow docs.
 - Put repository skills in `.codex/personal/skills/<skill>/SKILL.md`; rely on automatic
   discovery instead of enumerating enabled entries in project config.
 - If many skills exist, descriptions compete for initial prompt budget; names and descriptions must be concise and distinctive.
 
-## AGENTS.md and Project Docs
+## [AGENTS.md](../../AGENTS.md) and Project Docs
 
-Codex uses `AGENTS.md` as project instructions. Config keys affecting discovery are:
+Codex uses [AGENTS.md](../../AGENTS.md) as project instructions. Config keys affecting discovery are:
 
 | Key | Purpose |
 | --- | ------- |
 | `project_doc_max_bytes` | Maximum bytes included from project doc files. |
-| `project_doc_fallback_filenames` | Fallback filenames checked after `AGENTS.override.md` and `AGENTS.md`. |
+| `project_doc_fallback_filenames` | Fallback filenames checked after `AGENTS.override.md` and [AGENTS.md](../../AGENTS.md). |
 | `project_root_markers` | Root-detection markers used while searching for `.codex` folders. |
 | `include_environment_context` | Whether environment context block is injected. |
 | `include_permissions_instructions` | Whether permissions instruction block is injected. |
@@ -612,7 +612,7 @@ Codex uses `AGENTS.md` as project instructions. Config keys affecting discovery 
 
 Policy boundary:
 
-- `AGENTS.md` should say what must happen.
+- [AGENTS.md](../../AGENTS.md) should say what must happen.
 - `config.toml` should say how the runtime is configured.
 - hooks should enforce deterministic startup/tool behavior.
 - run bundles should preserve task-specific evidence.
@@ -722,10 +722,10 @@ If prompts or repo data are sensitive, keep `log_user_prompt=false` unless the e
 
 Before changing Codex config in this repo:
 
-1. Identify the target surface: user config, repo config, custom agent, hook, skill, MCP, or AGENTS.md.
+1. Identify the target surface: user config, repo config, custom agent, hook, skill, MCP, or [AGENTS.md](../../AGENTS.md).
 2. Check this reference and the official schema for the exact key name.
-3. Prefer repo policy in `AGENTS.md` and runtime mechanics in `.codex/config.toml`.
-4. If changing shared canon, read `documents/rule/dependency-module-changes.md`,
+3. Prefer repo policy in [AGENTS.md](../../AGENTS.md) and runtime mechanics in `.codex/config.toml`.
+4. If changing shared canon, read [documents/rule/dependency-module-changes.md](../rule/dependency-module-changes.md),
    edit the managed topic-workspace source clone, and use the request-evidence-authorized
    `bash bootstrap.sh` の standalone source/runtime route. Parent repository へ
    pin や root projection を戻す操作は行わない。

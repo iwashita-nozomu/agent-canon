@@ -11,10 +11,10 @@ downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_
 @dependency-end
 -->
 
-This is the common base for a repository root `AGENTS.md`, including a consumer
+This is the common base for a repository root [AGENTS.md](AGENTS.md), including a consumer
 root and a source-specific AgentCanon root. A consumer keeps its generated file
 as a regular tracked file by composing this base with its own specific
-instructions. A source-specific AgentCanon `AGENTS.md` reads the shared entry
+instructions. A source-specific AgentCanon [AGENTS.md](AGENTS.md) reads the shared entry
 behavior explicitly and retains its own reader map; the consumer-only maps and
 routes below do not apply to that source root. These are explicit
 reads/composition, not a live projection, runtime import, updater, vendor
@@ -28,7 +28,7 @@ AgentCanon does not become a second source of truth for those surfaces. The
 generated root file is self-contained after it is committed and remains usable
 when the AgentCanon source checkout and runtime are unavailable. For a
 source-specific AgentCanon root, the source checkout owns AgentCanon's source
-and canonical owner map; its source-specific `AGENTS.md` takes precedence for
+and canonical owner map; its source-specific [AGENTS.md](AGENTS.md) takes precedence for
 those responsibilities, while consumer-only guidance below does not redirect
 source work.
 
@@ -44,7 +44,7 @@ For a consumer root, use only the following consumer-owned map:
 | consumer-specific agent instructions | the appended consumer-owned section of this file |
 | AgentCanon maintenance (consumer roots) | a separately selected AgentCanon development checkout |
 
-For a source-specific AgentCanon root, the source checkout's `AGENTS.md` Reader
+For a source-specific AgentCanon root, the source checkout's [AGENTS.md](AGENTS.md) Reader
 Map and canonical owners are the local authority. The common base supplies
 shared entry behavior without reassigning source responsibilities.
 
@@ -62,7 +62,7 @@ This common base establishes the shared root instruction boundary. It does not
 re-own task procedures, command recipes, role lifecycles, implementation policy,
 validation schemas, or AgentCanon source-editing policy. Consumer details belong
 to the consumer-specific section or the consumer's own canonical owner; source
-details belong to the source-specific `AGENTS.md` and its canonical owners.
+details belong to the source-specific [AGENTS.md](AGENTS.md) and its canonical owners.
 
 Before selecting or editing a repository surface, inspect its actual location,
 canonical owner, callers, and consumers. Establish the actual working
@@ -87,7 +87,7 @@ For a consumer root, use only the following consumer-owned map:
 | root instruction extension | consumer-specific section in this file | consumer instruction route |
 | AgentCanon source maintenance (consumer roots) | selected AgentCanon development checkout | AgentCanon maintenance route |
 
-For a source-specific AgentCanon root, the source checkout's `AGENTS.md` and
+For a source-specific AgentCanon root, the source checkout's [AGENTS.md](AGENTS.md) and
 its canonical owners supply the owner and validation route.
 
 ## Task Entry
@@ -97,11 +97,11 @@ instructions. Resolve the task owner and repository-specific validation oracle
 from those surfaces. For a consumer root, use its appended consumer-specific
 instructions and select a separate qualified AgentCanon development checkout
 when the task changes AgentCanon itself. For a source-specific AgentCanon root,
-continue with that checkout's `AGENTS.md` Reader Map and canonical owner; keep
+continue with that checkout's [AGENTS.md](AGENTS.md) Reader Map and canonical owner; keep
 consumer trees unchanged unless the consumer task explicitly owns the resulting
 generated file.
 
-When a root `AGENTS.md` begins with the literal `@ROOT_AGENTS.md`, read this
+When a root [AGENTS.md](AGENTS.md) begins with the literal `@ROOT_AGENTS.md`, read this
 common base first and then continue into that file's source- or consumer-specific
 Reader Map. The marker is a reference for the reader, not a claim of automatic
 expansion or runtime import.

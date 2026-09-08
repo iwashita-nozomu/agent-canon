@@ -50,12 +50,12 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 
 ## Core References
 
-- `agents/skills/academic-writing.md` (scholarly prose boundary)
-- `agents/skills/paper-writing.md` (paper-specific overlay)
-- `agents/skills/structure-planning.md` (structural decision owner)
-- `agents/skills/prose-reasoning-graph.md` (optional graph diagnostics)
-- `documents/conventions/REVIEW_PROCESS.md`
-- `agents/canonical/CODEX_SUBAGENTS.md`
+- [agents/skills/academic-writing.md](academic-writing.md) (scholarly prose boundary)
+- [agents/skills/paper-writing.md](paper-writing.md) (paper-specific overlay)
+- [agents/skills/structure-planning.md](structure-planning.md) (structural decision owner)
+- [agents/skills/prose-reasoning-graph.md](prose-reasoning-graph.md) (optional graph diagnostics)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md)
 
 ## Mandatory Checklist
 
@@ -132,7 +132,7 @@ skill 名は互換のため `long-form-writing` のままですが、選択基�
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/long-form-writing.md`.
+1. Read [agents/skills/long-form-writing.md](long-form-writing.md).
 1. Treat the skill name as compatibility wording. Select this skill by file/document responsibility, not by word count: it is the prose projection adapter for general explanatory repository documents such as README, workflow, guide, migration, and specification docs.
 1. If the document is a paper, thesis chapter, scholarly note, or symbol-dense academic manuscript, switch to `academic-writing` instead.
 1. Before substantive document additions or revisions, classify whether section order, responsibility, claim/support, reader path, source map, or canonical route changes. If yes, run the structure-analysis gate before adding prose; if the edit is typo/link/format-only, record that reason and use `$md-style-check` instead.

@@ -78,7 +78,7 @@ immutable record per approved unit. The public actions are
 `predecessor-integration`, `verify-predecessor-integration`, and
 `verify-predecessor-integration-set`; `--root` appears at most once before the
 action. The complete grammar and two-unit command sequence are fixed in
-`agents/canonical/CLI_ENTRYPOINTS.md`.
+[agents/canonical/CLI_ENTRYPOINTS.md](../../agents/canonical/CLI_ENTRYPOINTS.md).
 
 The producer derives exactly
 `<report-dir>/predecessor_integration.<unit_id>.json`, where `unit_id` matches

@@ -119,7 +119,7 @@ python3 eval/checkers/eval_accumulation_check.py \
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/agent-eval-accumulation.md`.
+1. Read [agents/skills/agent-eval-accumulation.md](agent-eval-accumulation.md).
 1. Start with `python3 eval/checkers/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; use the compact JSON and stdout counters as the first evidence.
 1. If the checker reports missing eval family reports or stale accumulation gaps, run `python3 eval/producers/run_accumulated_agent_evals.py --root . --run-id <run-id> --report-dir reports/agents/<run-id>` and pass every used skill with repeated `--skill-used <skill>`.
 1. Do not hand-generate eval reports under `.agent-canon/log-archive/**` or `agents/evals/results/**`; registered producers own accumulated reports.

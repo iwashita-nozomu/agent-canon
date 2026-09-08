@@ -63,5 +63,5 @@ git push --mirror <mirror-remote>
 
 ## Related
 
-- `documents/notes/knowledge/git_mirroring.md`
+- [documents/notes/knowledge/git_mirroring.md](knowledge/git_mirroring.md)
 - `tools/repository/publish/push_origin.sh`

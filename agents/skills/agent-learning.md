@@ -37,12 +37,12 @@ AGENTS、またはcanonical documentへ直接反映します。
 - 既存ownerに昇格済みでない、独立したprivate knowledgeまたはfeedbackがある。
 
 Stable user preferenceはこのskillの第二正本にしません。安定したpreferenceは対象の
-`AGENTS.md`またはcanonical ownerへの明示変更、単発の観測はruntime log/evidence/Issue
+[AGENTS.md](../../AGENTS.md)またはcanonical ownerへの明示変更、単発の観測はruntime log/evidence/Issue
 ownerへの記録です。
 
 ## Core References
 
-- `documents/runtime/private-feedback-knowledge.md`
+- [documents/runtime/private-feedback-knowledge.md](../../documents/runtime/private-feedback-knowledge.md)
 - `tools/runtime/archive/private_feedback.py`
 - `tools/runtime/lifecycle/workflow_monitor.py`
 - `eval/definitions/agent_behavior_eval.toml`
@@ -94,7 +94,7 @@ agent-canon f status
 - actionable workflow defect: repository-qualified GitHub Issue
 - failure analysis: `documents/notes/failures/`
 - reusable private knowledge / feedback: private `agent-canon-log`
-- repo-wide permanent rule: canonical documents / `AGENTS.md`
+- repo-wide permanent rule: canonical documents / [AGENTS.md](../../AGENTS.md)
 - `documents/notes/knowledge/`: human-readable documentation only。private logの代替ではない。
 
 ## Closeout Decision

@@ -13,7 +13,7 @@ upstream design ../../conventions/software-engineering-principles.md canonical A
 - This note owns reusable external methods and source-informed heuristics for implementation,
   planning, review follow-up, and closeout judgment.
 - AgentCanon の安定した原則、競合時の優先順位、誤用防止は
-  `documents/conventions/software-engineering-principles.md` が正本です。
+  [documents/conventions/software-engineering-principles.md](../../conventions/software-engineering-principles.md) が正本です。
 - Read the canonical policy first when deciding a repository change; use this note when
   SWEBOK、ATAM、ADR、Google Engineering Practices などの method/source context が必要です。
 - This note is durable reference guidance, not a substitute for task-specific
@@ -107,7 +107,7 @@ receipt、workflow をこの note から直接追加しません。current requi
 
 - `python3 tools/runtime/lifecycle/bootstrap_agent_run.py --task "<task>" --task-id T1 --owner codex --workspace-root "$PWD"`
 - `python3 tools/runtime/lifecycle/task_close.py --report-dir <reports/agents/run-id>`
-- `documents/conventions/software-engineering-principles.md`
+- [documents/conventions/software-engineering-principles.md](../../conventions/software-engineering-principles.md)
 - `documents/notes/knowledge/`
 - `reports/agents/<run-id>/user_request_contract.md`
 - `reports/agents/<run-id>/closeout_gate.md`

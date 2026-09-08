@@ -313,7 +313,7 @@ semantics を変えて速度差を作らないでください。
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/computational-optimization.md`.
+1. Read [agents/skills/computational-optimization.md](computational-optimization.md).
 1. Use this skill for optimizer, solver, preconditioner, residual, KKT, convergence, derivative, tolerance, or numerical benchmark work.
 1. Before implementation or experiment runs, fix an optimization contract: objective or residual, variables, constraints, derivatives, algorithm state, stopping policy, numerical invariants, and failure semantics.
 1. Route mathematical runtime checks, diagnostic gates, stopping checks, test
@@ -350,7 +350,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    the implementation: do not feed residual / convergence / breakdown status
    produced inside `lax.while_loop` back into the next `cond`, and normalize
    Python scalar settings to dtype-specific JAX arrays at the JIT boundary. Use
-   `documents/conventions/python/15_jax_rules.md` as the detailed code-writing
+   [documents/conventions/python/15_jax_rules.md](../../documents/conventions/python/15_jax_rules.md) as the detailed code-writing
    rule.
 1. If the task includes external method comparison or claims, also use `$research-workflow`; if it includes a concrete run protocol or rerun decision, also use `$experiment-lifecycle`.
 1. If the owning mechanism is established or repaired and a concrete

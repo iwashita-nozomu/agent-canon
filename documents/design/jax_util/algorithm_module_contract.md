@@ -26,7 +26,7 @@ public surface、callable `Algorithm`、nested ownership、`Info` の concrete s
 - first_artifact: parity matrix。
 - first_artifact_question: 現行二つの Python route と Rust route のどの観測可能な差を、単一 Rust route が吸収する必要があるか。
 - visual_plan: table。各 checker の finding、status、diagnostic、syntax behavior の対応を一つの行で比較でき、別の flowchart は情報を重複させる。
-- document_unit: owner は本ファイル、reader は上記の実装者と route owner、source map は parity matrix の各行から指定 path へ張る、validation は Rust tests・fixture readback・docs check、update cadence は algorithm contract または checker surface の変更時、canonical parent は `documents/design/README.md`、downstream consumers は Rust owner・catalog・CI・tool docs。
+- document_unit: owner は本ファイル、reader は上記の実装者と route owner、source map は parity matrix の各行から指定 path へ張る、validation は Rust tests・fixture readback・docs check、update cadence は algorithm contract または checker surface の変更時、canonical parent は [documents/design/README.md](../README.md)、downstream consumers は Rust owner・catalog・CI・tool docs。
 - document_split_decision: keep。同じ owner、reader、validation route、source map、update cadence を共有し、別の責務単位を新設しない。
 - ordered_structure: target decision → parity matrix → canonical output contract → Rust gaps → retired surfaces → migration order → readback and acceptance.
 - invalid_interpretations: Python wrapper を残す二重 route、旧 CLI の alias、finding prefix の二重出力、`Info` の run-log summary だけを child ownership の代替とみなすこと。
@@ -51,7 +51,7 @@ algorithm を包む場合は、child の ownership を親の contract field と�
   JSON を一度抽出し、standard surface、callable `Algorithm`、nested `Info` を含む
   contract、legacy stopping policy の finding を一つの report にまとめる。退役した
   Python checker は互換 wrapper や別 route として残さない。
-- `tools/catalog.yaml`、`documents/tools/README.md`、`tools/validation/ci/runners/run_all_checks.sh`
+- `tools/catalog.yaml`、[documents/tools/README.md](../../tools/README.md)、`tools/validation/ci/runners/run_all_checks.sh`
   は `python-algorithm-contract-check` の単一 capability、CLI、CI wiring を final
   tree の source として参照する。旧 Python implementation/test path は retire set
   と parity matrix の履歴 evidence にだけ残り、active route の根拠にはしない。
@@ -394,9 +394,9 @@ artifact は空 arrays を含み、下流が text の exit status だけに依�
 | catalog | `check-algorithm-module-public-surface` entry | 削除。Rust entry に capability を統合 |
 | catalog | `check-algorithm-module-nested-contract` entry | 削除。Rust entry の `default_wiring.ci` を `true` に変更 |
 | runtime inventory | `documents/runtime/log-surface-inventory.json` | Rust owner fix 後に canonical inventory tool で再生成し、stale-path diff を閉じる。logs/log archive は保持 |
-| tool docs | `documents/tools/README.md` の二つの Python bullet | canonical Rust bullet 一つへ統合 |
-| tool docs | `tools/README.md` の nested checker bullet | 削除し Rust CLI entry を唯一の案内にする |
-| provenance | `documents/tools/repo-local-tool-imports.md` の nested checker rows | 現行 capability から削除または retired record に明示更新 |
+| tool docs | [documents/tools/README.md](../../tools/README.md) の二つの Python bullet | canonical Rust bullet 一つへ統合 |
+| tool docs | [tools/README.md](../../../tools/README.md) の nested checker bullet | 削除し Rust CLI entry を唯一の案内にする |
+| provenance | [documents/tools/repo-local-tool-imports.md](../../tools/repo-local-tool-imports.md) の nested checker rows | 現行 capability から削除または retired record に明示更新 |
 
 `tools/validation/semantic/algorithm/check_algorithm_config_partition.py` と
 `tests/agent_tools/test_check_algorithm_config_partition.py` は retire set に含めない。

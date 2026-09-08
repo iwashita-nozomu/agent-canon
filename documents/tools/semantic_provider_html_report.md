@@ -20,7 +20,7 @@ visualization contract. `agent-canon semantic-index compare-providers` owns
 provider comparison data and candidate authority boundaries. The HTML report is
 a projection artifact over provider nodes, candidate-delta edges, overlap
 metrics, and source locators that can be mapped into the DSL object model in
-`documents/prose-reasoning-graph/dsl-spec.md`.
+[documents/prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md).
 
 Adapter mapping uses each provider result, candidate document, and shared or
 divergent match as a source-truth anchor with source span metadata where the

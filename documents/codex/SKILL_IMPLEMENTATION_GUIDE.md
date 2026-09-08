@@ -13,14 +13,14 @@ upstream design README.md durable document index
 
 ## 正本
 
-- 人間向けハブ: `agents/README.md`
-- canonical layout: `agents/canonical/README.md`
-- skill registry: `agents/canonical/skills.md`
-- human skill canon: `agents/skills/README.md`
+- 人間向けハブ: [agents/README.md](../../agents/README.md)
+- canonical layout: [agents/canonical/README.md](../../agents/canonical/README.md)
+- skill registry: [agents/canonical/skills.md](../../agents/canonical/skills.md)
+- human skill canon: [agents/skills/README.md](../../agents/skills/README.md)
 - machine-readable skill catalog: `agents/skills/catalog.yaml`
-- artifact placement canon: `agents/canonical/ARTIFACT_PLACEMENT.md`
-- CLI entrypoint canon: `agents/canonical/CLI_ENTRYPOINTS.md`
-- Codex workflow canon: `agents/canonical/CODEX_WORKFLOW.md`
+- artifact placement canon: [agents/canonical/ARTIFACT_PLACEMENT.md](../../agents/canonical/ARTIFACT_PLACEMENT.md)
+- CLI entrypoint canon: [agents/canonical/CLI_ENTRYPOINTS.md](../../agents/canonical/CLI_ENTRYPOINTS.md)
+- Codex workflow canon: [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md)
 - Codex discovery path: `.codex/personal/skills/`
 
 ## 方針
@@ -57,6 +57,6 @@ upstream design README.md durable document index
 
 ## 整理ルール
 
-- 新しい skill を追加するときは `agents/canonical/skills.md` を更新します。
+- 新しい skill を追加するときは [agents/canonical/skills.md](../../agents/canonical/skills.md) を更新します。
 - Skill の `SKILL.md` や `agents/skills/*.md` を編集する前に `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を実行し、`log_surface_inventory_guard` が予測された場合は log-surface baseline check を同じ変更内で通します。
 - Skill 内の code fence に `KEY=value` 形式の機械出力例を追加・削除した場合は `python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json` を通し、意図した field change なら `documents/runtime/log-surface-inventory.json` を再生成します。

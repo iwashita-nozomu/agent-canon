@@ -20,7 +20,7 @@ upstream design ../common/03_comments.md common decision-comment policy
 
 ## 規約
 
-- コメントの必須条件、保存する情報、配置、禁止事項、lifecycle は `documents/conventions/common/03_comments.md` を正本とします。
+- コメントの必須条件、保存する情報、配置、禁止事項、lifecycle は [documents/conventions/common/03_comments.md](../common/03_comments.md) を正本とします。
 - 名前、型、配置から責務を安全に復元できない関数、メソッド、内部補助関数の直前には、`# 責務:` で担当する判断、変換、状態遷移、境界を 1 行程度で示すことを必須にします。
 - 関数内部で共通規約の `needs_local_comment` を満たす判断は、その式、分岐、loop、resource operation の直前へ短い理由コメントを置くことを必須にします。
 - `jax.lax.scan`、`while_loop`、`cond` のように trace 系の制御フローが見えにくくなる箇所では、loop state、停止条件、分岐の意味のうちコードから復元できないものを先にコメントで示します。

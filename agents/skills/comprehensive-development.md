@@ -19,7 +19,7 @@ upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint r
 
 複数 surface を束ねるときは、各 bounded slice の design locator、clause
 fingerprint、implementation target、review evidence を
-`../internal-routines/design-implementation-correspondence.md` に接続します。
+[../internal-routines/design-implementation-correspondence.md](../internal-routines/design-implementation-correspondence.md) に接続します。
 この skill は umbrella integration stage の owner であり、共通 policy の別実装
 を作りません。
 
@@ -126,12 +126,12 @@ verified completion に昇格させず remaining verification として残しま
 
 - `agents/task_catalog.yaml` (`workflow_families[].id: comprehensive_development`)
 - `agents/agents_config.json`
-- `agents/TASK_WORKFLOWS.md`
-- `agents/canonical/CODEX_SUBAGENTS.md`
-- `agents/COMMUNICATION_PROTOCOL.md`
-- `documents/conventions/software-engineering-principles.md`
-- `documents/conventions/common/03_comments.md`
-- `documents/design/semantic-responsibility-contract.md`
+- [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md)
+- [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
+- [documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md)
+- [documents/conventions/common/03_comments.md](../../documents/conventions/common/03_comments.md)
+- [documents/design/semantic-responsibility-contract.md](../../documents/design/semantic-responsibility-contract.md)
 
 ## Standard Bundle
 
@@ -152,9 +152,9 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 1. regression / fixture / mock を追加する場合は、canonical invariant、minimal counterexample、existing oracle への統合可能性、representation independence、duplicate truth、旧 regression の consolidation、completion oracle を先に確認します。
 1. `agents/task_catalog.yaml` の `comprehensive_development` family から `spawn_budget`、`role_topology`、`roles`、`subagent_prompt` を読みます。
 1. `agents/agents_config.json` で permanent team role ownership、required output、write policy を確認します。
-1. `agents/canonical/CODEX_SUBAGENTS.md` で Codex inventory、activation、runtime surface を確認します。
+1. [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) で Codex inventory、activation、runtime surface を確認します。
 1. run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` と catalog / config 由来の route を宣言します。
-1. `agents/COMMUNICATION_PROTOCOL.md` の fresh context capsule と bounded source packet を使って、stage ごとに subagent handoff を作ります。
+1. [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) の fresh context capsule と bounded source packet を使って、stage ごとに subagent handoff を作ります。
 1. write-capable work は approved design trace から導いた bounded slice に限定し、親が integration order と validation rerun を管理します。
 1. closeout では `project_reviewer` を integration gate として使い、canonical contract、selected principle clause、implementation basis、コメントの同期、catalog / config / inventory と実 diff の整合を確認します。
 
@@ -171,4 +171,4 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 - Docker / CI が中心なら `Platform And Environment` を使います。
 - 外部調査と experiment が主役なら `Research-Driven Change` を使います。
 - 一般原則の意味、優先順位、誤用防止はこの skill に複製せず、canonical policy を参照します。
-- root `AGENTS.md` / `ROOT_AGENTS.md` は owner route だけを持ち、本節の basis contract を複製しません。
+- root [AGENTS.md](../../AGENTS.md) / [ROOT_AGENTS.md](../../ROOT_AGENTS.md) は owner route だけを持ち、本節の basis contract を複製しません。

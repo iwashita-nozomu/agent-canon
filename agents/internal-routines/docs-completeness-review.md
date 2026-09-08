@@ -20,10 +20,10 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `documents/conventions/coding-conventions-project.md`
-- `documents/README.md`
-- `agents/internal-routines/docs-consistency-review.md`
-- `agents/skills/md-style-check.md`
+- [documents/conventions/coding-conventions-project.md](../../documents/conventions/coding-conventions-project.md)
+- [documents/README.md](../../documents/README.md)
+- [agents/internal-routines/docs-consistency-review.md](docs-consistency-review.md)
+- [agents/skills/md-style-check.md](../skills/md-style-check.md)
 
 ## Expected Outcome
 

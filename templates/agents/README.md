@@ -43,8 +43,8 @@ partial を展開します。展開時に partial の dependency manifest block 
 partial は findings table や decision 節など、artifact 間で生成上の意味を同じに保つ反復構造に
 限って使います。role 固有の review focus、必要証跡、承認基準を partial に隠しません。
 
-共通 partial `reader_map.md` は読者経路・内容・owner・validation・cleanup の欄を提供し、
-`review_contract.md` は review の design trace、dependency/effect、oracle、failure cause、
+共通 partial [reader_map.md](_partials/reader_map.md) は読者経路・内容・owner・validation・cleanup の欄を提供し、
+[review_contract.md](_partials/review_contract.md) は review の design trace、dependency/effect、oracle、failure cause、
 conflict intent を提供します。role 固有の判断は各 top-level template に残します。
 
 ## Active Design Packet の射影
@@ -54,10 +54,10 @@ conflict intent を提供します。role 固有の判断は各 top-level templa
 document-flow review の経路、clause registry、4 つの typed entry は 1 つの run bundle に
 射影され、`team_manifest.yaml#run.active_design_packet` に保存されます。付属する
 `active_design_packet_reference_projection` は packet SHA、source-byte identity、dependency
-endpoint、選択 output、reviewer artifact identity を記録します。4 entry は `design_brief.md`
-の対応節へ射影し、`design_review.md` は artifact identity と entry を、
-`document_flow_review.md` は source packet と読者可視の副作用を、`change_review.md` と
-`final_review.md` は統合 trace を検証します。
+endpoint、選択 output、reviewer artifact identity を記録します。4 entry は [design_brief.md](design_brief.md)
+の対応節へ射影し、[design_review.md](design_review.md) は artifact identity と entry を、
+[document_flow_review.md](document_flow_review.md) は source packet と読者可視の副作用を、[change_review.md](change_review.md) と
+[final_review.md](final_review.md) は統合 trace を検証します。
 
 template は packet authority を parse や推論で作りません。`create_run_bundle` が packet を解決し、
 closed field set、relative artifact path、typed graph reference、materialized source/dependency

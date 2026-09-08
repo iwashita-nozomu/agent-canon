@@ -17,7 +17,7 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 
 Use `structure-planning` only when the task contains a real structural decision: a responsibility owner, canonical source, reader entry, document split/merge, section topology, presentation/storyboard topology, or validation route has more than one plausible target. A bounded claim, wording, link, paragraph, or already-owned section edit does not activate this skill merely because it is substantive.
 
-The long-lived reason and activation boundary are owned by `documents/design/responsibility-rationale.md`. This skill owns the selected structural decision; it does not create evidence that an unselected responsibility was skipped.
+The long-lived reason and activation boundary are owned by [documents/design/responsibility-rationale.md](../../documents/design/responsibility-rationale.md). This skill owns the selected structural decision; it does not create evidence that an unselected responsibility was skipped.
 
 ## Activation
 

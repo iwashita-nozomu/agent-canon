@@ -21,9 +21,9 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `documents/runtime/runtime-profiles-and-check-matrix.md`
-- `documents/conventions/REVIEW_PROCESS.md`
-- `agents/internal-routines/project-review.md`
+- [documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
+- [agents/internal-routines/project-review.md](project-review.md)
 
 ## Expected Outcome
 
@@ -41,7 +41,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Selection
 
-変更や観測した drift の責務を `documents/runtime/runtime-profiles-and-check-matrix.md`
+変更や観測した drift の責務を [documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md)
 で分類し、該当 profile の route だけを選びます。直近の変更がないという
 理由で基礎 command を一律に実行しません。repo-wide な兆候がある場合だけ
 `project-review` に調査を委譲し、findings を `fix now`、`follow-up`、`watch`

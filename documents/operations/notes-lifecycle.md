@@ -92,9 +92,9 @@ closeout ごとに最低限次を確認します。
 
 ## Templates
 
-- `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- `documents/notes/branches/BRANCH_NOTE_TEMPLATE.md`
-- `documents/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
-- `documents/notes/themes/THEME_NOTE_TEMPLATE.md`
+- [documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md](../notes/worktrees/WORKTREE_LOG_TEMPLATE.md)
+- [documents/notes/branches/BRANCH_NOTE_TEMPLATE.md](../notes/branches/BRANCH_NOTE_TEMPLATE.md)
+- [documents/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md](../notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md)
+- [documents/notes/themes/THEME_NOTE_TEMPLATE.md](../notes/themes/THEME_NOTE_TEMPLATE.md)
 - private `agent-canon-log/knowledge/topics/<topic>/candidate.md`
-- `documents/notes/failures/FAILURE_NOTE_TEMPLATE.md`
+- [documents/notes/failures/FAILURE_NOTE_TEMPLATE.md](../notes/failures/FAILURE_NOTE_TEMPLATE.md)

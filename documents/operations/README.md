@@ -13,12 +13,12 @@ upstream design ../README.md documents 索引と正本境界。
 
 ## 構成
 
-- `BRANCH_SCOPE.md`: branch と Git の作業境界。
-- `orphan-lifecycle.md`: branch・PR・worktree の意味差分 inventory、有限分類、cleanup admission の正本。
-- `FILE_CHECKLIST_OPERATIONS.md`: 作業別 checklist。
-- `TROUBLESHOOTING.md`: 障害対応の入口。
-- `WORKTREE_SCOPE_TEMPLATE.md`、`worktree-lifecycle.md`: lifecycle が準備した worktree の記録とcleanup。
-- `notes-lifecycle.md`: notes の lifecycle。
-- `issue-label-taxonomy.md`: Issue の分類。
+- [BRANCH_SCOPE.md](BRANCH_SCOPE.md): branch と Git の作業境界。
+- [orphan-lifecycle.md](orphan-lifecycle.md): branch・PR・worktree の意味差分 inventory、有限分類、cleanup admission の正本。
+- [FILE_CHECKLIST_OPERATIONS.md](FILE_CHECKLIST_OPERATIONS.md): 作業別 checklist。
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md): 障害対応の入口。
+- [WORKTREE_SCOPE_TEMPLATE.md](WORKTREE_SCOPE_TEMPLATE.md)、[worktree-lifecycle.md](worktree-lifecycle.md): lifecycle が準備した worktree の記録とcleanup。
+- [notes-lifecycle.md](notes-lifecycle.md): notes の lifecycle。
+- [issue-label-taxonomy.md](issue-label-taxonomy.md): Issue の分類。
 
 運用文書は、実装・設計の正本を複製せず、参照先と完了条件を示します。
