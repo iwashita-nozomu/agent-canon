@@ -1,3 +1,4 @@
+@ROOT_AGENTS.md
 # AgentCanon Repository Instructions
 <!--
 @dependency-start
@@ -9,24 +10,31 @@ upstream design agents/internal-routines/chatgpt-codex-routing.md request modali
 upstream design agents/skills/comprehensive-development.md cross-surface implementation-basis consumer
 upstream design agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
 upstream design agents/canonical/CODEX_SUBAGENTS.md subagent lifecycle owner
-downstream design ROOT_AGENTS.md explicit live-integration root entrypoint
+downstream design ROOT_AGENTS.md common root base read before source-specific map
 downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py validates thin entrypoint structure
 downstream implementation tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates runtime owner-map alignment
 @dependency-end
 -->
 
 This tree is the standalone AgentCanon source of truth. This file is a reader
-and owner map only. Task procedures, command recipes, role lifecycles,
-implementation policy, and closeout schemas remain in the canonical surfaces
-named below.
+and owner map only, using the shared entry behavior in `ROOT_AGENTS.md` and
+adding the source-specific AgentCanon map below.
+The leading `@ROOT_AGENTS.md` is an explicit read reference: callers must read
+that file first and then this source-specific Reader Map; this marker is not an
+assertion that any runtime automatically expands or imports the file. Task
+procedures, command recipes, role lifecycles, implementation policy, and
+closeout schemas remain in the canonical surfaces named below.
 
 ## Repository Role
 
 Use this entrypoint when the detected repository root is the AgentCanon source
 checkout. A default `project_template` or derived repository owns its tracked
 instructions directly and does not acquire live AgentCanon runtime behavior by
-mentioning this repository. `ROOT_AGENTS.md` applies only to an explicitly
-selected `live-agent-canon` integration.
+mentioning this repository. `ROOT_AGENTS.md` supplies common root instructions;
+the consumer-only maps and routes in that base do not redirect this source
+checkout. This file retains the source-specific AgentCanon reader map. A
+consumer's generated root file remains governed by its explicit composition
+and its own specific instructions.
 
 Directory-local `AGENTS.md` files may narrow behavior for their subtree. They
 must add only the responsibility owned by that subtree and must not copy a
