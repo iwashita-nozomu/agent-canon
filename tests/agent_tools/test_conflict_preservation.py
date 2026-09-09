@@ -109,6 +109,65 @@ def gitlink_conflicted_repo(tmp_path: Path) -> tuple[Path, str, str, str, str]:
     return repo, base, ours, theirs, ours_gitlink
 
 
+def gitlink_merge_conflicted_repo(
+    tmp_path: Path,
+) -> tuple[Path, str, str, str, str, str]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-b", "main")
+    (repo / "file.txt").write_text("base\nuser-old\n", encoding="utf-8")
+    base_gitlink = "a" * 40
+    git(repo, "add", "file.txt")
+    git(repo, "update-index", "--add", "--cacheinfo", f"160000,{base_gitlink},module")
+    commit(repo, "base")
+    base = git(repo, "rev-parse", "HEAD")
+
+    ours_gitlink = base_gitlink
+    theirs_gitlink = "2" * 40
+    git(repo, "switch", "-c", "feature")
+    (repo / "file.txt").write_text("feature\nuser-change\n", encoding="utf-8")
+    git(repo, "add", "file.txt")
+    git(
+        repo,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-m",
+        "feature",
+    )
+    ours = git(repo, "rev-parse", "HEAD")
+
+    git(repo, "switch", "main")
+    (repo / "file.txt").write_text("main\nuser-old\n", encoding="utf-8")
+    git(repo, "add", "file.txt")
+    git(
+        repo,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-m",
+        "main",
+    )
+    theirs = git(repo, "rev-parse", "HEAD")
+
+    git(repo, "switch", "feature")
+    git(repo, "merge", "--no-edit", "main", check=False)
+    set_index_entries(
+        repo,
+        [
+            f"160000 {base_gitlink} 1\tmodule\n",
+            f"160000 {ours_gitlink} 2\tmodule\n",
+            f"160000 {theirs_gitlink} 3\tmodule\n",
+        ],
+    )
+    assert git(repo, "status", "--porcelain")
+    return repo, base, ours, theirs, ours_gitlink, theirs_gitlink
+
+
 def plan_for(inventory: dict[str, object], *, operation: str = "manual") -> dict[str, object]:
     entry = next(item for item in inventory["paths"] if item["path"] == "file.txt")
     source_hunk = next(
@@ -140,7 +199,6 @@ def plan_for(inventory: dict[str, object], *, operation: str = "manual") -> dict
                             "source_sha256": source_hunk["sha256"],
                             "source_header": source_hunk["header"],
                             "resolved_header": source_hunk["header"],
-                            "required_lines": ["+user-change\n"],
                         },
                     }
                 ],
@@ -227,6 +285,47 @@ def test_gitlink_tree_capture_and_readback_preserve_foreign_oid(tmp_path: Path) 
         }
     )
     validate_plan(inventory, plan, repo=repo)
+
+
+def test_gitlink_conflict_requires_expected_mode_and_oid_readback(tmp_path: Path) -> None:
+    repo, base, ours, theirs, ours_gitlink, _theirs_gitlink = gitlink_merge_conflicted_repo(
+        tmp_path
+    )
+    inventory = capture_inventory(
+        repo, base=base, ours=ours, theirs=theirs, user_paths=["module"]
+    )
+    module = next(entry for entry in inventory["paths"] if entry["path"] == "module")
+    assert module["unaffected_content"] == []
+
+    (repo / "file.txt").write_text("feature\nuser-change\n", encoding="utf-8")
+    git(repo, "add", "file.txt")
+    wrong_gitlink = "9" * 40
+    git(repo, "update-index", "--force-remove", "--", "module")
+    git(repo, "update-index", "--add", "--cacheinfo", f"160000,{wrong_gitlink},module")
+    plan = plan_for(inventory)
+    plan["paths"].append(
+        {
+            "path": "module",
+            "owner": "integration_executor",
+            "disposition": "manual",
+            "operation": "manual",
+            "rationale": "manual resolution records the selected gitlink identity",
+            "expected_edit_delta": "retain the selected mode and OID",
+            "unaffected_content": [],
+        }
+    )
+    with pytest.raises(ConflictPreservationError, match="expected_gitlink preservation"):
+        validate_plan(inventory, plan, repo=repo)
+
+    plan["paths"][-1]["unaffected_content"] = [
+        {
+            "path": "module",
+            "owner": "integration_executor",
+            "expected_gitlink": {"mode": "160000", "oid": ours_gitlink},
+        }
+    ]
+    with pytest.raises(ConflictPreservationError, match="preserved gitlink"):
+        validate_plan(inventory, plan, repo=repo)
 
 
 def test_whole_file_discard_requires_reconstruction_mapping(tmp_path: Path) -> None:

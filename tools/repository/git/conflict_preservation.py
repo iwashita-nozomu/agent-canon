@@ -496,6 +496,16 @@ def _non_empty(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _has_gitlink_stage(entry: object) -> bool:
+    if not isinstance(entry, Mapping):
+        return False
+    stages = entry.get("stages")
+    return isinstance(stages, Mapping) and any(
+        isinstance(stage, Mapping) and stage.get("mode") == "160000"
+        for stage in stages.values()
+    )
+
+
 def _require_fields(packet: Mapping[str, object], fields: Sequence[str], label: str) -> None:
     missing = [field for field in fields if not _non_empty(packet.get(field))]
     if missing:
@@ -611,6 +621,11 @@ def validate_plan(
     if not isinstance(planned, list):
         raise ConflictPreservationError("conflict plan requires paths list")
     expected_paths = {str(item.get("path")) for item in entries if isinstance(item, Mapping)}
+    inventory_by_path = {
+        str(entry.get("path")): entry
+        for entry in entries
+        if isinstance(entry, Mapping) and isinstance(entry.get("path"), str)
+    }
     seen: set[str] = set()
     for item in planned:
         if not isinstance(item, Mapping):
@@ -626,6 +641,8 @@ def validate_plan(
         unaffected = item.get("unaffected_content")
         if not isinstance(unaffected, list):
             raise ConflictPreservationError(f"{path_text}: unaffected_content is required")
+        requires_gitlink = _has_gitlink_stage(inventory_by_path.get(path_text))
+        has_expected_gitlink = False
         for preserved in unaffected:
             if not isinstance(preserved, Mapping):
                 raise ConflictPreservationError(f"{path_text}: malformed unaffected content")
@@ -651,7 +668,12 @@ def validate_plan(
                     f"{path_text}: anywhere-text preservation is not accepted; use hunk_identity"
                 )
             if "expected_gitlink" in preserved:
+                has_expected_gitlink = True
                 _validate_expected_gitlink(path_text, preserved["expected_gitlink"])
+        if requires_gitlink and not has_expected_gitlink:
+            raise ConflictPreservationError(
+                f"{path_text}: mode 160000 requires expected_gitlink preservation"
+            )
         operation = item.get("operation")
         if operation in WHOLE_FILE_OPERATIONS:
             mapping = item.get("reconstruction_map")
@@ -731,6 +753,16 @@ def validate_readback(repo: Path, inventory: Mapping[str, object], plan: Mapping
     planned = plan.get("paths")
     if not isinstance(planned, list):
         raise ConflictPreservationError("readback requires planned paths")
+    entries = inventory.get("paths")
+    inventory_by_path = (
+        {
+            str(entry.get("path")): entry
+            for entry in entries
+            if isinstance(entry, Mapping) and isinstance(entry.get("path"), str)
+        }
+        if isinstance(entries, list)
+        else {}
+    )
     for item in planned:
         if not isinstance(item, Mapping):
             continue
@@ -739,6 +771,13 @@ def validate_readback(repo: Path, inventory: Mapping[str, object], plan: Mapping
             continue
         content = item.get("unaffected_content")
         assert isinstance(content, list)
+        if _has_gitlink_stage(inventory_by_path.get(path)) and not any(
+            isinstance(preserved, Mapping) and "expected_gitlink" in preserved
+            for preserved in content
+        ):
+            raise ConflictPreservationError(
+                f"{path}: mode 160000 requires expected_gitlink preservation"
+            )
         gitlink_content = [
             preserved
             for preserved in content
