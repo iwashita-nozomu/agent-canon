@@ -8,6 +8,7 @@ upstream design ../../documents/design/responsibility-rationale.md PR queue acti
 upstream design agent-orchestration.md execution-time-aware work-conservation contract
 upstream design ../../documents/agent-canon/agent-canon-update-route.md source PR versus parent pin route
 upstream design ../internal-routines/github-status-lifecycle.md deterministic GitHub Issue status-label reconciliation and evidence contract
+upstream design ../../documents/conventions/coding-conventions-testing.md Issue-linked bug reproduction evidence owner
 upstream implementation ../../tools/repository/github/github_publish.py publishes PRs and writes summary artifacts
 downstream implementation ../../.codex/personal/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
@@ -197,6 +198,12 @@ post_merge_base_head=<sha or none>
 ## Publication boundary
 
 Before merge/ready/close/update, read fresh remote state and confirm authority. After the write, read back the PR/issue state. These write controls apply in both single and queue modes.
+
+For bug work, including handoff before a PR is complete, consume
+[Bug reproduction evidence](../../documents/conventions/coding-conventions-testing.md#22-bug-reproduction-evidence)
+for the Issue-linked source, execution result, and post-fix disposition. This
+applies even when no new test is admitted; it does not add a test requirement
+or change the status lifecycle delegated below.
 
 ## Repository-qualified Issue identity
 
