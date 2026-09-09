@@ -68,7 +68,7 @@ upstream design README.md notes lifecycle index
 ## References
 
 この template の `references/` には、上の例で使う PDF 本体は同梱していません。
-外部文献を追加する場合は、`references/README.md` の方針に従って source、取得日、
+外部文献を追加する場合は、[references/README.md](../../../references/README.md) の方針に従って source、取得日、
 利用範囲を記録します。
 
 - Markus Holtz, Sparse Grid Quadrature in High Dimensions with Applications in Finance and Insurance, 2010

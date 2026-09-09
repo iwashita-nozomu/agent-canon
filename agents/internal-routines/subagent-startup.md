@@ -49,7 +49,7 @@ or public prompt-routing skill lists.
 ## Handoff Use
 
 `$subagent-bootstrap` cites this routine when preparing startup handoffs. The
-schema for the handoff stays in `agents/COMMUNICATION_PROTOCOL.md`; this
+schema for the handoff stays in [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md); this
 routine only names the internal startup route owner.
 
 Generated run artifacts carry the route structurally under:

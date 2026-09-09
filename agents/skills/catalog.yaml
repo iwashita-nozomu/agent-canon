@@ -764,18 +764,18 @@ skill_families:
         - ["AgentCanon", "ツール", "コンテナ"]
         - ["AgentCanon", "評価", "収集"]
   - id: repository-topic-clone
-    purpose: Prepare, reuse, merge, publish-readback, and reconstructibly clean one generic repository topic clone before repository-kind policy decoration.
+    purpose: Prepare, reuse, merge, publish-readback, and reconstructibly clean one generic repository topic checkout before repository-kind policy decoration.
     canonical_doc: agents/skills/repository-topic-clone.md
     shim: .codex/personal/skills/repository-topic-clone/SKILL.md
     discovery:
       name: repository-topic-clone
-      description: "Use for any parent, dependency, or standalone repository topic clone lifecycle under workspace/<topic>/<repo>; repository kind is a post-clone policy decorator."
+      description: "Use for any parent, dependency, or standalone repository topic checkout under workspace/<topic>/<repo>; linked-worktree or independent-clone mode is selected by repository relationship, and repository kind is a post-checkout policy decorator."
     tool_commands:
       required: []
       conditional:
-      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["prepare", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--owner-evidence", "<path>"]}
-      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["merge-main", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--owner-evidence", "<path>"]}
-      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["cleanup", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--owner-evidence", "<path>", "[--candidate-cas", "<path>", "--pr-lifecycle", "<path>", "[--publication-readback", "<path>]]", "[--apply]"]}
+      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["prepare", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--checkout-mode", "<linked-worktree|independent-clone>", "--owner-evidence", "<path>"]}
+      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["merge-main", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--checkout-mode", "<linked-worktree|independent-clone>", "--owner-evidence", "<path>"]}
+      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["cleanup", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--checkout-mode", "<linked-worktree|independent-clone>", "--owner-evidence", "<path>", "[--candidate-cas", "<path>", "--pr-lifecycle", "<path>", "[--publication-readback", "<path>]]", "[--apply]"]}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
@@ -794,12 +794,12 @@ skill_families:
         - ["repository", "クローン"]
         - ["topic", "clone"]
   - id: dependency-module-change
-    purpose: Decorate the generic repository topic clone lifecycle with .gitmodules, gitlink, pin, and projection policy.
+    purpose: Decorate the generic repository topic checkout lifecycle with .gitmodules, gitlink, pin, and projection policy.
     canonical_doc: agents/skills/dependency-module-change.md
     shim: .codex/personal/skills/dependency-module-change/SKILL.md
     discovery:
       name: dependency-module-change
-      description: "Use when a dependency source change, topic branch clone, or reconstructibility-based clone cleanup is required."
+      description: "Use when a dependency source change, independent topic checkout, or reconstructibility-based checkout cleanup is required."
     tool_commands:
       required: []
       conditional:

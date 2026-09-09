@@ -56,7 +56,7 @@ or deletion authority over another repository's `rust/` directory.
 
 ## Validation
 
-Use the bootstrap lifecycle described in `bootstrap-runtime.md`, then run the
+Use the bootstrap lifecycle described in [bootstrap-runtime.md](bootstrap-runtime.md), then run the
 standalone source checks for the changed tool or runtime surface. Check the
 inventory with:
 

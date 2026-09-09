@@ -41,8 +41,8 @@ allowlist は現在、次の consumer-owned regular file だけを含みます�
 - `.codex/config.toml`
 - `.codex/agents/<role>.toml`
 
-consumer root instruction は、共通の `ROOT_AGENTS.md` base と consumer-owned specific text を
-明示合成した project-owned `AGENTS.md` です。生成された root file は static-seed allowlist に
+consumer root instruction は、共通の [ROOT_AGENTS.md](../../ROOT_AGENTS.md) base と consumer-owned specific text を
+明示合成した project-owned [AGENTS.md](../../AGENTS.md) です。生成された root file は static-seed allowlist に
 混ぜず、consumer tree で通常の tracked file として管理します。現行 live runtime を参照する source
 instruction file、AgentCanon checkout、source symlink は seed に混ぜません。
 

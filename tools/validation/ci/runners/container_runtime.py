@@ -46,11 +46,34 @@ except ImportError:  # pragma: no cover - direct script loading.
     )
 
 
+def _git(start: Path, argument: str) -> str | None:
+    """Return one ``git rev-parse`` value, or ``None`` outside a Git checkout."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(start), "rev-parse", argument],
+            cwd=start,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    return value or None
+
+
 def detect_workspace_root() -> Path:
-    """Return the repo root even when reached through a symlink view."""
+    """Return the selected checkout root using native Git discovery first."""
     markers = (".git", "README.md")
     search_roots = [Path.cwd().resolve(), Path(__file__).absolute().parent]
     for search_root in search_roots:
+        native_root = _git(search_root, "--show-toplevel")
+        if native_root is not None:
+            candidate = Path(native_root).resolve()
+            if candidate.is_dir():
+                return candidate
         for candidate in (search_root, *search_root.parents):
             if all((candidate / marker).exists() for marker in markers):
                 return candidate
@@ -1726,6 +1749,44 @@ class CommandDaemonClient:
         raise RuntimeError(command_error_detail(result.stdout, result.stderr))
 
 
+def image_exists(
+    builder: str, image_tag: str, *, workspace_root: Path | None = None
+) -> bool:
+    """Return whether the caller-selected image tag is present locally.
+
+    This is deliberately a single native image lookup.  Ordinary project
+    runners do not snapshot or clean the daemon: the configured image tag is
+    shared across checkouts and only the disposable run container is theirs.
+    """
+    return (
+        CommandDaemonClient(builder, cwd=workspace_root).inspect_image_tag(image_tag)
+        is not None
+    )
+
+
+def should_build_image(
+    builder: str,
+    image_tag: str,
+    *,
+    workspace_root: Path,
+    skip_build: bool = False,
+    force_build: bool = False,
+    print_only: bool = False,
+) -> bool:
+    """Decide whether an ordinary runner should execute its build command.
+
+    ``--skip-build`` always wins.  Explicit update/build requests force the
+    normal builder cache path; otherwise a build is needed only when the
+    configured local tag is absent.  Print-only previews never contact the
+    daemon.
+    """
+    if skip_build or print_only:
+        return False
+    if force_build:
+        return True
+    return not image_exists(builder, image_tag, workspace_root=workspace_root)
+
+
 def detect_host_runtime_features() -> HostRuntimeFeatures:
     """Detect host-dependent runtime features once."""
     has_gpu = Path("/dev/nvidiactl").exists() or shutil.which("nvidia-smi") is not None
@@ -1760,17 +1821,61 @@ def default_host_mounts(
     return tuple(mounts)
 
 
-def workspace_path(path_like: str | Path) -> Path:
-    """Resolve a workspace-relative path."""
+def workspace_path(
+    path_like: str | Path, *, workspace_root: Path | None = None
+) -> Path:
+    """Resolve a path relative to the selected checkout root."""
     candidate = Path(path_like)
     if candidate.is_absolute():
-        return candidate
-    return (WORKSPACE_ROOT / candidate).resolve()
+        return candidate.resolve()
+    root = (
+        workspace_root.resolve()
+        if workspace_root is not None
+        else detect_workspace_root()
+    )
+    return (root / candidate).resolve()
 
 
-def default_container_pack() -> ContainerPack:
+def git_mounts(workspace_root: Path) -> tuple[str, ...]:
+    """Return a read-only bind for a linked worktree's common Git metadata."""
+    root = workspace_root.resolve(strict=True)
+    git_file = root / ".git"
+    if not git_file.is_file():
+        return ()
+
+    git_dir_value = _git(root, "--git-dir")
+    common_dir_value = _git(root, "--git-common-dir")
+    if git_dir_value is None or common_dir_value is None:
+        raise ValueError(
+            f"linked worktree Git metadata cannot be resolved: {root / '.git'}"
+        )
+
+    def normalize_git_path(value: str) -> Path:
+        path = Path(value)
+        return (path if path.is_absolute() else root / path).resolve(strict=False)
+
+    git_dir = normalize_git_path(git_dir_value)
+    common_dir = normalize_git_path(common_dir_value)
+    if git_dir == common_dir:
+        return ()
+    if not common_dir.is_dir():
+        raise ValueError(
+            f"linked worktree Git common directory does not exist: {common_dir}"
+        )
+    # The source checkout's .git file contains an absolute gitdir path. Mount
+    # only the common metadata directory at that exact host path; never mount
+    # the linked worktree's sibling source checkout.
+    return (f"{common_dir}:{common_dir}:ro",)
+
+
+def default_container_pack(*, workspace_root: Path | None = None) -> ContainerPack:
     """Return direct Dockerfile defaults when no project pack is selected."""
-    repository_name = re.sub(r"[^a-z0-9._-]+", "-", WORKSPACE_ROOT.name.lower())
+    root = (
+        workspace_root.resolve()
+        if workspace_root is not None
+        else detect_workspace_root()
+    )
+    repository_name = re.sub(r"[^a-z0-9._-]+", "-", root.name.lower())
     repository_name = repository_name.strip("-.") or "repository"
     return ContainerPack(
         name="default",
@@ -2112,9 +2217,11 @@ def _normalized_mount_destination(mount: str) -> Path | None:
     return path.resolve(strict=False)
 
 
-def load_pack(path_like: str | Path) -> ContainerPack:
+def load_pack(
+    path_like: str | Path, *, workspace_root: Path | None = None
+) -> ContainerPack:
     """Load a runtime pack from TOML."""
-    path = workspace_path(path_like)
+    path = workspace_path(path_like, workspace_root=workspace_root)
     with path.open("rb") as handle:
         data = cast("dict[str, object]", tomllib.load(handle))
 
@@ -2196,11 +2303,13 @@ def load_pack(path_like: str | Path) -> ContainerPack:
     )
 
 
-def load_or_default_pack(path_like: str | None) -> ContainerPack:
+def load_or_default_pack(
+    path_like: str | None, *, workspace_root: Path | None = None
+) -> ContainerPack:
     """Load an explicit project pack or use direct Dockerfile defaults."""
     if path_like is None:
-        return default_container_pack()
-    return load_pack(path_like)
+        return default_container_pack(workspace_root=workspace_root)
+    return load_pack(path_like, workspace_root=workspace_root)
 
 
 def apply_pack_overrides(
@@ -2225,16 +2334,22 @@ def build_build_command(
     builder: str,
     pack: ContainerPack,
     *,
+    workspace_root: Path | None = None,
     pull: bool = False,
     no_cache: bool = False,
     labels: Mapping[str, str] | None = None,
 ) -> list[str]:
     """Build the container build command for one pack."""
+    root = (
+        workspace_root.resolve()
+        if workspace_root is not None
+        else detect_workspace_root()
+    )
     command = [
         builder,
         "build",
         "-f",
-        str(workspace_path(pack.dockerfile)),
+        str(workspace_path(pack.dockerfile, workspace_root=root)),
         "-t",
         pack.image_tag,
     ]
@@ -2248,7 +2363,7 @@ def build_build_command(
         command.extend(["--target", pack.target])
     if pack.platform:
         command.extend(["--platform", pack.platform])
-    command.append(str(workspace_path(pack.context)))
+    command.append(str(workspace_path(pack.context, workspace_root=root)))
     return command
 
 
@@ -2286,6 +2401,7 @@ def build_run_command(
     )
     combined_env = tuple(f"{name}={value}" for name, value in combined.items())
     optional_profiles = _canonical_optional_mount_profiles(pack)
+    linked_worktree_mounts = git_mounts(resolved_workspace)
     linked_data_mounts = resolve_linked_data_mounts(pack, resolved_workspace)
     profile_mounts = (
         resolve_docker_host_mounts()
@@ -2295,6 +2411,10 @@ def build_run_command(
     linked_targets = tuple(
         Path(linked_root.target).resolve(strict=False)
         for linked_root in pack.runtime.linked_data_roots
+    )
+    linked_worktree_targets = tuple(
+        Path(mount.split(":", 2)[1]).resolve(strict=False)
+        for mount in linked_worktree_mounts
     )
     for mount in mounts:
         destination = _normalized_mount_destination(mount)
@@ -2307,12 +2427,23 @@ def build_run_command(
             raise ValueError(
                 "CLI mount destination collides with a linked-data-roots target"
             )
+        if destination is not None and any(
+            destination == metadata_target
+            or destination.is_relative_to(metadata_target)
+            or metadata_target.is_relative_to(destination)
+            for metadata_target in linked_worktree_targets
+        ):
+            raise ValueError(
+                "CLI mount destination collides with linked worktree Git metadata target"
+            )
         if (
             "docker-host" in optional_profiles
             and destination == Path("/var/run/docker.sock").resolve(strict=False)
         ):
             raise ValueError("CLI mount destination collides with docker-host socket target")
-    combined_mounts = linked_data_mounts + profile_mounts + mounts
+    combined_mounts = (
+        linked_worktree_mounts + linked_data_mounts + profile_mounts + mounts
+    )
 
     run_command = [builder, "run", "--rm"]
     if tty:
@@ -2355,8 +2486,10 @@ def print_label_and_command(label: str, command: list[str]) -> None:
     print(shlex.join(command))
 
 
-def load_toml(path_like: str | Path) -> dict[str, object]:
+def load_toml(
+    path_like: str | Path, *, workspace_root: Path | None = None
+) -> dict[str, object]:
     """Load one generic TOML file."""
-    path = workspace_path(path_like)
+    path = workspace_path(path_like, workspace_root=workspace_root)
     with path.open("rb") as handle:
         return tomllib.load(handle)

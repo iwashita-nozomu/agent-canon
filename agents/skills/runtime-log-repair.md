@@ -114,7 +114,7 @@ evidence and does not duplicate those policy definitions.
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/runtime-log-repair.md`.
+1. Read [agents/skills/runtime-log-repair.md](runtime-log-repair.md).
 1. Start from `$agent-log-analysis` dashboard artifacts:
    `reports/agent-runtime-dashboard/agent-log-analysis-api.json` and
    `reports/agent-runtime-dashboard/agent-log-analysis-compact.md`. If they are

@@ -21,8 +21,8 @@ repo 全体を横断して、文書、skill、ツール、統合設定の破綻�
 
 ## Core References
 
-- `documents/runtime/runtime-profiles-and-check-matrix.md`
-- `agents/internal-routines/project-review.md`
+- [documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md)
+- [agents/internal-routines/project-review.md](project-review.md)
 
 ## Expected Outcome
 
@@ -42,4 +42,4 @@ command set を所有せず、profile 外の validator を追加しません。
 - 局所 diff のレビューだけなら `code-review` を使います。
 - repo-wide review の最上位入口としては `project-review` を使います。
 - 研究系の独立視点 review は `research-perspective-review` を使います。
-- profile activation と check の対応は `documents/runtime/runtime-profiles-and-check-matrix.md` が所有します。
+- profile activation と check の対応は [documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md) が所有します。

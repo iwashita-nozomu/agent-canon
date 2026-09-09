@@ -23,7 +23,7 @@ branch registry、cleanup database、Issue state machine を作りません。
 どちらも ref、PR、worktree、ファイルを削除しません。
 
 - PR の publication と GitHub mutation は `tools/repository/github/github_publish.py` および
-  `agents/skills/pr-processing.md` に残ります。
+  [agents/skills/pr-processing.md](../../agents/skills/pr-processing.md) に残ります。
 - worktree の停止・除去・prune は runtime provisioning owner または user owner に残ります。
 - local/remote branch の削除は、現在その resource を所有する既存 cleanup route に残ります。
 - `project_template` は本判定器を複製しません。template 固有の stale artifact が観測された場合だけ

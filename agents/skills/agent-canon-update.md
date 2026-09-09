@@ -27,13 +27,14 @@ prebuilt artifact build/distribution. Do not place local lifecycle work under
 
 ## Source checkout and workspace
 
-Edit the AgentCanon repository itself or a qualified development clone. For a
-Template or derived parent, the clone belongs under the parent's ignored
-`workspace/agent-canondevelop/<qualified-task>/agent-canon`. Do not restore a
-submodule, vendor checkout, root projection, source symlink, `notes/`, or
-AgentCanon test/eval directory in the parent. The clone is disposable and is
-removed only after branch, PR, main readback, and archive/evidence obligations
-are complete.
+Edit the AgentCanon repository itself or a repository-topic checkout prepared by
+the canonical lifecycle. For a Template or derived parent, use
+`<anchor>/workspace/<topic>/agent-canon`; select `linked-worktree` for a
+parent/same-repository branch and `independent-clone` for a dependency
+repository. Do not restore a submodule, vendor checkout, root projection,
+source symlink, `notes/`, or AgentCanon test/eval directory in the parent. The
+prepared checkout is disposable and is removed only after branch, PR, main
+readback, and archive/evidence obligations are complete.
 
 Keep the source checkout clean at the start. Preserve unrelated dirty state;
 do not reset, clean, or delete an unknown path. Record the source remote,
@@ -205,8 +206,9 @@ archive state into the AgentCanon source checkout.
 1. Resolve the owning Issue and read the current remote `main`, open PRs and
    Issues, and relevant runtime documents. Record repository-qualified branch,
    HEAD, remote, and dirty-state evidence; keep #841 and #821 separate.
-2. Reuse or create one Issue-qualified topic branch in the qualified
-   standalone source clone. Branch reuse and creation reasons follow
+2. Reuse or create one Issue-qualified topic branch through
+   `repository-topic-clone` in the qualified standalone source checkout.
+   Select the lifecycle checkout-mode from the repository relationship. Branch reuse and creation reasons follow
    `$agent-update-branch`; the parent never becomes the source checkout.
 3. Read the canonical owner, dependency-expanded callers, and selected
    validation oracle before editing.

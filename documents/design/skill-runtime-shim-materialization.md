@@ -34,7 +34,7 @@ agents/skills/<skill>.md が所有し、この文書は本文の複製ではあ�
 
 現在の public skill identity は agents/skills/catalog.yaml の全 `skill_families` 行、依存関係は
 agents/skills/skill-dependencies.yaml、読者向け索引は
-agents/canonical/skills.md、host discovery は bootstrap が
+[agents/canonical/skills.md](../../agents/canonical/skills.md)、host discovery は bootstrap が
 `~/.agents/skills/<skill>` から個別リンクする `.codex/personal/skills/<skill>/SKILL.md`
 が所有します。
 
@@ -105,8 +105,8 @@ materializer はその target だけを生成し、`.codex/config.toml` に skil
 | ToolID / ToolCall / argument schema | `agent_team.materialize_skill_tool_call_token(skill, phase=...)` | skill/phase 固有 ToolCall/argument-schema identity の locator と digest だけ | ToolCall payload、argument schema、ToolID の再定義 |
 | graph identity / edge | skill_dependency_map.py の source universe | 参照用 graph locator | graph edge の再 materialize |
 
-agents/canonical/skills.md は index/read parity の projection であり（正本: `agents/skills/catalog.yaml`）、catalog-derived な
-identity source ではありません。documents/design/skill-tool-invocation-graph.md
+[agents/canonical/skills.md](../../agents/canonical/skills.md) は index/read parity の projection であり（正本: `agents/skills/catalog.yaml`）、catalog-derived な
+identity source ではありません。[documents/design/skill-tool-invocation-graph.md](skill-tool-invocation-graph.md)
 の graph owner はこの設計の owner/identity locator を参照できますが、shim の
 Markdown template は所有しません。
 
@@ -926,7 +926,7 @@ python3 eval/producers/skill_shim_evaluation.py tokens \
 | SHIM-003 canonical prose stays out of runtime adapter | human skill canon | agents/skills/<skill>.md and generated template | adapter contains link/digest only; duplicate-policy scan=0 |
 | SHIM-004 owner/dependency/route identity | route/dependency readers | `agents/skills/catalog.yaml`、`tools/agent/skills/skill_route_catalog.py`、`tools/agent/orchestration/route.py`、`documents/runtime/skill-dependency-graph.json`、`tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` | catalog-derived route/dependency digests and semantic edge golden |
 | SHIM-005 command packet preservation | command packet owner | `agents/skills/catalog.yaml`、`tools/agent/skills/skill_tool_commands.py` / SkillCommandPacket (read-only) | complete packet JSON/digest, all phases/resolved fields, catalog-derived command count equals `documents/runtime/skill-dependency-graph.json` readback |
-| SHIM-005b typed ToolID/ToolCall preservation | graph/tool-packet owner | agent_team.py, skill-tool-invocation-graph.md | ToolID/ToolCall/argument-schema Ref and digest equal; no payload in shim |
+| SHIM-005b typed ToolID/ToolCall preservation | graph/tool-packet owner | agent_team.py, [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md) | ToolID/ToolCall/argument-schema Ref and digest equal; no payload in shim |
 | SHIM-006 host discovery preservation | runtime alignment | `.codex/personal/skills/*/SKILL.md`, check_agent_runtime_alignment.py | catalog-sized shim paths、frontmatter pass、project config skill registry absent |
 | SHIM-007 single writer | shim materializer | skill_shim_materializer.py; skill_tool_commands.py has no sync/write surface | writer inventory identifies exactly one SKILL.md writer; sync symbol absent |
 | SHIM-008 all-catalog migration/readback | migration route | `tools/agent/skills/skill_shim_materializer.py` migrate/readback and tests | catalog-sized row receipt, unresolved=0 |
@@ -953,6 +953,6 @@ reopens this design before implementation.
 - first_artifact: exact generated shim schema/table
 - first_artifact_question: host discovery に必要な最小入力と canonical prose の owner は何か
 - visual_plan: text-only; schema table、state table、trace table、既存 generated graph を使うため新規 Mermaid は追加しない
-- document_unit: owner=documents/design/skill-runtime-shim-materialization.md; reader=implementation and validation owners; source map=catalog/dependencies/canonical docs/graph/checklist; validation=design claims, headers, alignment, graph readback; cadence=Wave 4 implementation and future shim template changes; canonical parent=documents/design/README.md; consumers=materializer, checkers, route, evaluator
+- document_unit: owner=[documents/design/skill-runtime-shim-materialization.md](skill-runtime-shim-materialization.md); reader=implementation and validation owners; source map=catalog/dependencies/canonical docs/graph/checklist; validation=design claims, headers, alignment, graph readback; cadence=Wave 4 implementation and future shim template changes; canonical parent=[documents/design/README.md](README.md); consumers=materializer, checkers, route, evaluator
 - document_split_decision: split because this is a new owner, schema, materializer, migration route, and validation surface
 - invalid_interpretations: this document is not a route keyword dictionary, not a generated graph, not permission to implement/commit, and not evidence that the planned materializer already exists

@@ -31,7 +31,7 @@ This design specializes the dependency-manifest design for authority and runtime
 ownership in `tools/analysis/dependencies/source_dependency_graph.py`. It replaces the
 former assumption that dependency correctness must be read from a persisted graph in `tools/analysis/dependencies/graph_client.py`. The manifest DSL, relation meanings,
 bidirectional review, cycle review, and changed-path selection remain owned by
-`dependency-manifest-design.md`.
+[dependency-manifest-design.md](dependency-manifest-design.md).
 
 ## Problem
 
@@ -197,7 +197,7 @@ combined with the authority correction.
 ## Evidence And Assumption Ledger
 
 - `DSL` assumption: relation syntax and registered kinds are owned by
-  `documents/design/dependency-manifest-design.md` and parsed by
+  [documents/design/dependency-manifest-design.md](dependency-manifest-design.md) and parsed by
   `tools/analysis/dependencies/source_dependency_graph.py`.
 - `normalization` assumption: canonical path and surface binding normalization
   is owned by `tools/analysis/dependencies/source_dependency_graph.py` and
@@ -206,7 +206,7 @@ combined with the authority correction.
   `tools/validation/ci/receipts/pr_gate_receipt.py`, and
   `tests/tools/test_pr_gate_receipt_round_trip.py`.
 - Parent-doc alignment: relation and runtime authority remain governed by
-  `documents/design/dependency-manifest-design.md`.
+  [documents/design/dependency-manifest-design.md](dependency-manifest-design.md).
 
 ## Validation
 

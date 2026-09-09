@@ -12,8 +12,8 @@ upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed G
 
 この文書は、parent `experiments/` の managed run と、`cpp/experiments/` の native
 C++ experiment target を、build、run、result、report の責務に分けて扱います。
-研究の問い、数式、比較対象、逐次改造の記録方法は `agents/skills/research-workflow.md` を正本とします。
-準備、実装、静的チェック、実行、結果レポートの標準手順は `agents/skills/experiment-lifecycle.md` を参照してください。
+研究の問い、数式、比較対象、逐次改造の記録方法は [agents/skills/research-workflow.md](../../agents/skills/research-workflow.md) を正本とします。
+準備、実装、静的チェック、実行、結果レポートの標準手順は [agents/skills/experiment-lifecycle.md](../../agents/skills/experiment-lifecycle.md) を参照してください。
 
 ## この文書の読み方
 

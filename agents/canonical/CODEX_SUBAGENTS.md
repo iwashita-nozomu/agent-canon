@@ -17,7 +17,7 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 # Codex Subagents
 
 この文書は、Codex を primary runtime とする場合の subagent routing と inventory の正本です。
-shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
+shared workflow は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
 role profile/instruction authority は `agents/model_profiles.toml` と
 `tools/agent/orchestration/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
@@ -28,13 +28,13 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 
 ## Compact request/update projection
 
-`../../documents/design/request-intent-and-update-relation.md` の handoff flow は既存
+[../../documents/design/request-intent-and-update-relation.md](../../documents/design/request-intent-and-update-relation.md) の handoff flow は既存
 agent context の再利用を優先し、owner/write-scope/DAG evidence が disjoint な場合だけ
 必要な並列 handoff を作ります。descendant close、reservation release、terminal handback
 はこの owner の既存 lifecycle evidence と `close_agent` receipt を使います。
 
 Runtime collaboration capability and coordination receipts are owned by
-`agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake`.
+[agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake](../COMMUNICATION_PROTOCOL.md#runtime-collaboration-capability-handshake).
 This document only projects the route: read capability from the direct runtime
 collaboration namespace, use `direct_peer` only after an `available` readback,
 and use an honest `parent_relay` or `durable_artifact` path for
@@ -100,10 +100,10 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
 - 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
-- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
+- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
 - subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
-- fresh subagent は必要な launch ごとに `agents/COMMUNICATION_PROTOCOL.md`
+- fresh subagent は必要な launch ごとに [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
   の `Fresh Subagent Context Capsule` を受け取ります。active agent を再利用
   できる場合は、同じ protocol-owned context を compatible な revised scope
   として更新します。`context_artifacts`、`allowed_paths`、`do_not_read`、
@@ -133,7 +133,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   design、path、failure semantics が固定された handoff は selected owner gate
   へ直接 route できます。追加の読み取り、packet、review、wave は次の決定を
   変える場合だけ追加します。DSV policy の意味論は
-  `agents/skills/agent-orchestration.md#Decision Sufficiency Packet` だけが所有します。
+  [agents/skills/agent-orchestration.md#Decision Sufficiency Packet](../skills/agent-orchestration.md#decision-sufficiency-packet) だけが所有します。
 - `.codex/config.toml` の `max_threads` は capacity topology の生成値を
   loader/readback した configured value です。現在は direct frontier `21` と
   nested reservation `6` から生成された `27` で、universal hard ceiling では
@@ -275,7 +275,7 @@ implementation intent changes.
 
 The canonical token-safe `cause_classification` and `intent_preservation` slug
 lists are owned by `documents/runtime/runtime-profiles-and-check-matrix.json` and
-projected into `documents/runtime/runtime-profiles-and-check-matrix.md`. This section is
+projected into [documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md). This section is
 only the subagent handoff projection: handoffs must carry those five fields and
 must cite the runtime profile taxonomy rather than defining a separate slug
 list. Implementation bugs, test-oracle/spec mismatches, fixture or environment
@@ -719,7 +719,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - `reviewer`
   - 読み取り専用で diff と risk を findings-led で洗う
 - `python_reviewer`
-  - Python diff の型、API境界、親 packet が選択した validation evidence を review する。validation scope は `../skills/python-review.md#Validation route` と `../skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照し、reviewer が追加の full suite を選択しない
+  - Python diff の型、API境界、親 packet が選択した validation evidence を review する。validation scope は [python-review.md#Validation selection](../skills/python-review.md#validation-selection) と [agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary](../skills/agent-orchestration.md#write-capable-handoff-validation-trust-boundary) を参照し、reviewer が追加の full suite を選択しない
 - `cpp_reviewer`
   - C / C++ diff を build、header、ownership、native test 前提で洗う
 - `oop_readability_reviewer`
@@ -790,7 +790,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
 - この文書では route と inventory だけを決め、各 role の詳細条件は `.codex/agents/*.toml` に集約します
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
-- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは `agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
+- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
 - context が増えたら capsule artifact を更新して再配送します
 - math-intent route の write-capable handoff には、protocol の Target Binding Packet に加えて
   `mathematical_intent_packet` を必ず添えます。packet は `math_object` / `problem`, `variables` /
@@ -834,14 +834,14 @@ remote を解決できない場合は `unknown` をそのまま伝え、対象�
 - parent が `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を管理します
 - write-capable handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必須とし、branch は handoff 前に `repository-topic-clone.prepare` で用意します
 - 同一 wave の writer target が同じ `checkout_root` を持つ場合、agent team は spawn callback 前に typed collision として拒否します。reader は `writer_target` を持たず同じ checkout を共有できます
-- `repository-topic-clone.prepare` は dedicated clone の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。PreToolUse はこの packet を正本として読み、環境変数は readback 一致確認に限って使い、modified path が `allowed_paths` の外なら拒否します。packet が無い checkout や packet 自身の変更は拒否し、read-only command はこの writer path gate の対象外です
+- `repository-topic-clone.prepare` は選択済み mode の prepared checkout の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。PreToolUse はこの packet を正本として読み、環境変数は readback 一致確認に限って使い、modified path が `allowed_paths` の外なら拒否します。packet が無い checkout や packet 自身の変更は拒否し、read-only command はこの writer path gate の対象外です
 - repository write は `worker`、`spark_worker`、`integration_executor` の各 write-capable route に限定します。IssueWorker の `publisher` は外部 GitHub publication 専用で target を持たず、reviewer と artifact-only role は read-only とします
 - 同一 path、同一 directory ownership、同一 public API surface、shared Git index/HEAD、generated output、formatter output は順序制約つきの writer に割り当てます
 - 同一 worktree の write-capable subagent instance は、writer target が distinct である場合だけ同じ role type を含む複数 writer instance を同一 wave で使えます
 - same directory / same file / same canonical surface を同時に触る writer は先行 / 後続 wave に分けます
 - 衝突する target は順序制約として扱い、先行 wave の validation と tool rerun 後に後続 wave で統合します
 - writer は current checkout 内の wave plan で分離し、追加判断が要る writer は後続 wave へ直列化します
-- isolated worktree は通常の衝突回避には使わず、明示 workflow が要求する genuinely independent alternative implementation experiment に限定します
+- checkout の分離は通常の衝突回避を手動で行うためではなく、repository-topic lifecycle が親/同一 repository の `linked-worktree` または dependency repository の `independent-clone` として選択した独立 workstream に限ります
 - review role は常に read-only とし、parent-managed write-scope discipline と writer-instance separation の確認は `plan_reviewer` と `project_reviewer` の固定責務です
 
 writer target は短命な handoff 値であり、claim file、PID、expiry、daemon、または別の writer registry を作りません。worker と integration_executor の生成 prompt は target の checkout で開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しないことを明示します。外部 GitHub publication 専用の publisher は target 不要です。

@@ -56,7 +56,7 @@ GPU/JAX 環境の所有境界、artifact / visualization.py renderer / README �
   を主張していない
 
 正式な report をレビューする場合は、`report-writing` が選んだ本文構成と
-`documents/experiments/experiment-report-style.md` を参照します。ここでは reader-facing
+[documents/experiments/experiment-report-style.md](../../documents/experiments/experiment-report-style.md) を参照します。ここでは reader-facing
 文章を再作成せず、結果と claim の対応だけを判定します。
 
 ## Suggested Static Search

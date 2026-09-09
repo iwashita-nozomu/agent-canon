@@ -33,14 +33,14 @@ worktree を作った直後は、最低限次を残します。
 
 - branch 名、worktree path、purpose
 - `WORKTREE_SCOPE.md` の所在と main carry-over target
-- `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を見たか、その中で今回 relevant な項目
+- [documents/notes/guardrails/README.md](../guardrails/README.md) と [documents/notes/failures/README.md](../failures/README.md) を見たか、その中で今回 relevant な項目
 - `git status --short --branch` と `git worktree list --porcelain` の確認結果
 - 今から最初にやる 1 手
 
 ## Template
 
 - kickoff と継続記録には [WORKTREE_LOG_TEMPLATE.md](WORKTREE_LOG_TEMPLATE.md) を使います。
-- closeout で再利用知識へ昇格させるときは `documents/operations/notes-lifecycle.md` を見ます。
+- closeout で再利用知識へ昇格させるときは [documents/operations/notes-lifecycle.md](../../operations/notes-lifecycle.md) を見ます。
 
 ## What To Extract
 

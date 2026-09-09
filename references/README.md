@@ -16,7 +16,7 @@ workflow, review, and research guidance. If an agent consults an external PDF
 or HTML source, the source URL must be registered here as a Markdown reference
 file before the work is closed.
 
-Use `agents/workflows/workflow-references.md` for workflow-level bibliography
+Use [agents/workflows/workflow-references.md](../agents/workflows/workflow-references.md) for workflow-level bibliography
 and source notes. Put large external artifacts outside the tracked tree unless a
 task explicitly requires a small, redistributable reference file.
 

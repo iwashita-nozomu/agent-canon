@@ -18,7 +18,7 @@ runs, and analysis tools.
 
 This file owns storage classes and retention decisions. External runtime hook
 JSONL and accumulated eval archive branch policy belong to
-`documents/runtime/runtime-log-archive.md`.
+[documents/runtime/runtime-log-archive.md](../runtime/runtime-log-archive.md).
 
 ## Reader Map
 
@@ -29,7 +29,7 @@ JSONL and accumulated eval archive branch policy belong to
 - Read this before deciding where run artifacts, summaries, and images,
   or report evidence should live.
 - Boundary: external runtime hook JSONL and accumulated eval archive branch
-  policy are owned by `documents/runtime/runtime-log-archive.md`.
+  policy are owned by [documents/runtime/runtime-log-archive.md](../runtime/runtime-log-archive.md).
 
 ## Storage Classes
 
@@ -42,7 +42,7 @@ JSONL and accumulated eval archive branch policy belong to
 - external runtime hook JSONL, accumulated eval reports, Codex runtime summaries,
   and archived agent run reports live under
   `.agent-canon/log-archive/...` as defined by
-  `documents/runtime/runtime-log-archive.md`.
+  [documents/runtime/runtime-log-archive.md](../runtime/runtime-log-archive.md).
 - `experiments/<topic>/result/<run-id>/raw/` stores raw experiment outputs, JSONL,
   HLO dumps, and other producer-owned evidence.
 - `experiments/<topic>/result/<run-id>/summary/` stores compact summaries,

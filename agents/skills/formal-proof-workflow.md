@@ -121,17 +121,17 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
 
 ## Core References
 
-- `agents/skills/literature-survey.md`
-- `agents/skills/academic-writing.md`
-- `agents/skills/long-form-writing.md`
-- `agents/skills/report-writing.md`
-- `agents/skills/research-workflow.md`
-- `agents/skills/paper-writing.md`
-- `agents/skills/lean-algorithm-design.md`
-- `agents/skills/algorithm-proof-exploration.md`
-- `documents/tools/formal_proof.md`
-- `documents/tools/lean_capability_matrix.md`
-- `references/agent-canon-technology-bibliography.md`
+- [agents/skills/literature-survey.md](literature-survey.md)
+- [agents/skills/academic-writing.md](academic-writing.md)
+- [agents/skills/long-form-writing.md](long-form-writing.md)
+- [agents/skills/report-writing.md](report-writing.md)
+- [agents/skills/research-workflow.md](research-workflow.md)
+- [agents/skills/paper-writing.md](paper-writing.md)
+- [agents/skills/lean-algorithm-design.md](lean-algorithm-design.md)
+- [agents/skills/algorithm-proof-exploration.md](algorithm-proof-exploration.md)
+- [documents/tools/formal_proof.md](../../documents/tools/formal_proof.md)
+- [documents/tools/lean_capability_matrix.md](../../documents/tools/lean_capability_matrix.md)
+- [references/agent-canon-technology-bibliography.md](../../references/agent-canon-technology-bibliography.md)
 
 ## Mandatory Checklist
 
@@ -176,7 +176,7 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   theorem を通してはいけません。証明に必要な可観測値は `Answer` / `State` /
   `Info` の静的 field、または theorem graph が実装 path から再構成する値として
   扱います。
-- formal proof work を subagent に渡す場合は、`agents/COMMUNICATION_PROTOCOL.md`
+- formal proof work を subagent に渡す場合は、[agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
   が所有する `Target Binding Packet` を handoff に含めます。file list
   だけで「証明を見て」「blocker を探して」と渡してはいけません。unchecked theorem
   sketch、型が合っていない statement、public root への到達が示されていない local
@@ -660,7 +660,7 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
 - JIT-canonical evidence、theorem graph slice、proof search query packet を作ります。
 - 既存 proof search を先に行い、検索 query、採用候補、除外理由を残します。
 - web search は `$literature-survey` の source policy に従い、primary source、公式 docs、formal library docs、peer-reviewed paper、preprint、blog を区別します。
-- Lean では、`documents/tools/lean_capability_matrix.md` を読み、frontier shape に応じて
+- Lean では、[documents/tools/lean_capability_matrix.md](../../documents/tools/lean_capability_matrix.md) を読み、frontier shape に応じて
   Lean core、Mathlib、Aesop、Plausible、LeanSearchClient、`grind`、theorem search を選びます。proof theme が明示的に
   core-only を要求しない限り Mathlib-backed route を標準とし、routine な
   propositional / constructor / relation-composition / library-lemma search obligation では
@@ -1301,8 +1301,8 @@ Everything else is planning, search evidence, or an unverified proof sketch.
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/formal-proof-workflow.md`.
-1. Read `agents/skills/literature-survey.md` before web or paper search.
+1. Read [agents/skills/formal-proof-workflow.md](formal-proof-workflow.md).
+1. Read [agents/skills/literature-survey.md](literature-survey.md) before web or paper search.
 1. For pre-implementation algorithm design claims, use
    `$lean-algorithm-design` first. Adopt its checked Lean design definitions and
    theorem targets before connecting the design to production code.
@@ -1345,7 +1345,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    state/config. If a theorem needs a value, expose it through the public return
    schema or reconstruct it in the theorem graph from the implementation path.
 1. When handing proof work to a subagent, include the protocol-owned
-   `Target Binding Packet` from `agents/COMMUNICATION_PROTOCOL.md`. Do not ask a
+   `Target Binding Packet` from [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md). Do not ask a
    subagent to "look at the proof" or "find blockers" from a file list alone.
    Do not adopt an unchecked theorem sketch, type-incompatible statement, local
    counterexample, or algorithm suggestion unless it is checked against the same
@@ -2015,7 +2015,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    `main`, the algorithm, or the JIT boundary.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `documents/notes/`, and `documents/` before external web search.
-1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/analysis/proof/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
+1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read [documents/tools/lean_capability_matrix.md](../../documents/tools/lean_capability_matrix.md) and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/analysis/proof/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
 1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or scope-limiting evidence.
 1. Do not mark a claim verified unless the target proof assistant or solver checks the exact artifact without placeholders, `sorry`, `Admitted`, unchecked axioms, or equivalent proof escape hatches.
 1. Do not mark a claim impossible merely because attempts failed. Use

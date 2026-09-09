@@ -1951,8 +1951,8 @@ required_regex = ["bootstrap\\.sh", "--control-parent-root", "<install-root>/.ru
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-2"
 critical = true
-description = "Keeps AgentCanon standalone and uses a qualified disposable development clone without restoring vendor state."
-required_regex = ["workspace/agent-canondevelop/<qualified-task>/agent-canon", "Do not restore a", "submodule", "source branch", "AgentCanon PR", "iwashita-nozomu/agent-canon#"]
+description = "Keeps AgentCanon standalone and uses a qualified disposable repository-topic checkout, selecting linked-worktree for parent/same-repository branches and independent-clone for dependency repositories without restoring vendor state."
+required_regex = ["<anchor>/workspace/<topic>/agent-canon", "linked-worktree", "parent/same-repository", "independent-clone", "dependency\\s+repository", "Do not restore a", "submodule", "source branch", "AgentCanon PR", "iwashita-nozomu/agent-canon#"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-3"

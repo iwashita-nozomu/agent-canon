@@ -24,9 +24,9 @@ static seed を通常 file として所有し、AgentCanon source や runtime li
 
 ## Core References
 
-- `documents/contracts/template-bootstrap.md`
-- `documents/contracts/template-github-remote.md`
-- `documents/contracts/static-seed-export.md`
+- [documents/contracts/template-bootstrap.md](../../documents/contracts/template-bootstrap.md)
+- [documents/contracts/template-github-remote.md](../../documents/contracts/template-github-remote.md)
+- [documents/contracts/static-seed-export.md](../../documents/contracts/static-seed-export.md)
 - `scripts/README.md`
 - `scripts/start_repository.sh`
 - `scripts/init_from_template.sh`

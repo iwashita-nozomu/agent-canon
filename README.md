@@ -20,13 +20,13 @@ vendor するものではなく、必要な作業時に明示的な development 
 
 人が読む入口は次の順です。
 
-1. `README.md`
-2. `PHILOSOPHY.md`
-3. `documents/README.md`
-4. `agents/README.md`
-5. `agents/workflows/README.md`
+1. [README.md](README.md)
+2. [PHILOSOPHY.md](PHILOSOPHY.md)
+3. [documents/README.md](documents/README.md)
+4. [agents/README.md](agents/README.md)
+5. [agents/workflows/README.md](agents/workflows/README.md)
 
-Codex の source-tree instruction entrypoint は `AGENTS.md` です。skill、workflow、
+Codex の source-tree instruction entrypoint は [AGENTS.md](AGENTS.md) です。skill、workflow、
 subagent の canonical owner は `agents/`、設計と runtime contract の owner は
 `documents/`、実行可能な tool と checker の owner は `tools/` と
 `tools/runtime/dispatch/agent-canon/` です。
@@ -174,8 +174,9 @@ ignored directory below the install checkout:
 ```
 
 For an AgentCanon edit from Template or another parent repository, use that
-parent's ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon`
-clone. Do not add a submodule, vendor checkout, source symlink, or `notes/` /
+parent's ignored repository-topic checkout at
+`<anchor>/workspace/<topic>/agent-canon`, selecting the lifecycle mode from the
+repository relationship. Do not add a submodule, vendor checkout, source symlink, or `notes/` /
 `tests/` projection to the parent. The parent owns project tests and the user
 workflow; AgentCanon owns only the shared runtime source.
 

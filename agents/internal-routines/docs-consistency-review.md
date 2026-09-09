@@ -20,9 +20,9 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `documents/README.md`
-- `documents/codex/AGENTS_COORDINATION.md`
-- `agents/README.md`
+- [documents/README.md](../../documents/README.md)
+- [documents/codex/AGENTS_COORDINATION.md](../../documents/codex/AGENTS_COORDINATION.md)
+- [agents/README.md](../README.md)
 
 ## Expected Outcome
 
@@ -32,7 +32,7 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Comparison Surface
 
-- `AGENTS.md`、`README.md`、`QUICK_START.md` の入口文書
+- [AGENTS.md](../../AGENTS.md)、`README.md`、`QUICK_START.md` の入口文書
 - `agents/` と `documents/` の正本
 - `.codex/personal/skills/` の runtime shim
 - script usage と文書中の command 例

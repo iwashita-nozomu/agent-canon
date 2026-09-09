@@ -3004,6 +3004,12 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("SETUP_WORKTREE_FORWARDER=deprecated", result.stderr)
             self.assertIn("CALLER_CHAIN=", result.stderr)
+            self.assertIn(
+                "tools/repository/workspace/repository_topic_clone.py prepare",
+                result.stderr,
+            )
+            self.assertIn("--checkout-mode linked-worktree", result.stderr)
+            self.assertIn("--checkout-mode independent-clone", result.stderr)
             self.assertFalse((workspace_root / ".worktrees").exists())
 
     def test_task_close_rejects_locked_bundle(self) -> None:

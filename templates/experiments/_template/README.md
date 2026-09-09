@@ -108,5 +108,5 @@ HTML または画像を `summary/` など契約された出力先へ書きます
 実行 command、branch、commit、config、environment、seed、resource allocation、result identity、
 cleanup policy は `provenance.toml` と summary snapshot の両方で読み戻せるようにします。raw は
 要約から再計算できるよう保持し、summary は比較・レビューに必要な最小証跡として保持します。
-保持期間と annex 移送は `documents/experiments/result-log-retention-and-visualization.md` の
+保持期間と annex 移送は [documents/experiments/result-log-retention-and-visualization.md](../../documents/experiments/result-log-retention-and-visualization.md) の
 契約に従います。

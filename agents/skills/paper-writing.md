@@ -39,10 +39,10 @@ section contract と citation/evidence trace を先に固定し、複数 reviewe
 
 ## Core References
 
-- `agents/skills/academic-writing.md` (shared scholarly prose contract)
-- `agents/skills/long-form-writing.md` (general prose boundary)
-- `documents/conventions/REVIEW_PROCESS.md`
-- `agents/canonical/CODEX_SUBAGENTS.md`
+- [agents/skills/academic-writing.md](academic-writing.md) (shared scholarly prose contract)
+- [agents/skills/long-form-writing.md](long-form-writing.md) (general prose boundary)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md)
 
 ## Required Artifacts
 
@@ -137,7 +137,7 @@ sections or reviewers merely to satisfy a fixed checklist.
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/paper-writing.md`.
+1. Read [agents/skills/paper-writing.md](paper-writing.md).
 1. Select this as the DSL-to-prose projection adapter when file/document responsibility is submission paper, thesis chapter, or paper-style manuscript with paper section contracts and citation/evidence review; do not select it by length.
 1. Use `$structure-planning` before drafting when section order, first figure/table, claim/evidence layout, source-to-structure map, or invalid interpretations are nontrivial.
 1. For paragraph-level claim flow, transition pairs, or logic-gap triage, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument` and treat it as advisory discourse evidence before prose drafting.

@@ -21,7 +21,7 @@ downstream implementation ../../eval/definitions/skill_workflow_prompt_eval.toml
 ## Reader path and boundary
 
 この stage は owning design の read、clause ID/fingerprint、responsibility map
-を `../internal-routines/design-implementation-correspondence.md` の record に
+を [../internal-routines/design-implementation-correspondence.md](../internal-routines/design-implementation-correspondence.md) の record に
 接続します。universal invariant と failure semantics は routine 側にあり、
 ここでは OOP/type contract owner の設計 packet だけを定義します。
 
@@ -41,7 +41,7 @@ diff exists. They do not select this design owner, and this skill does not
 duplicate their checks or evidence.
 
 When the changed surface includes a Docstring or template projection, read
-`documents/conventions/DOCSTRING_GUIDE.md` as the semantic owner. The packet
+[documents/conventions/DOCSTRING_GUIDE.md](../../documents/conventions/DOCSTRING_GUIDE.md) as the semantic owner. The packet
 records the responsibility region, selected semantic relation, and projection
 anchor; it does not copy the guide’s clause text or force `Args`, `Returns`,
 `Raises`, or other fixed sections. The catalog capability `oop_type_design` selects this
@@ -167,7 +167,7 @@ owners:
 - C/C++ build, headers, and ownership: `$cpp-review` and its project-native checks.
 - C++ target responsibility: `cpp-core` is the provider; individual test and experiment
   targets are consumers; root-anchored build/install paths and lifecycle-owned result paths
-  are read back from `documents/design/cpp-build-layout.md`.
+  are read back from [documents/design/cpp-build-layout.md](../../documents/design/cpp-build-layout.md).
 - Explicit `Any`: `python3 tools/validation/semantic/code/check_static_any.py --submodule-aware`.
 - OOP/SOLID signals: `$oop-readability-check`; keep its evidence with the owning review.
 - Dependency headers/graph: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.

@@ -12,7 +12,7 @@ downstream implementation ../tools/runtime/dispatch/agent-canon/src/structured_a
 
 # documents/
 
-`documents/README.md` は、この directory の唯一の直下ファイルであり、文書の入口です。
+[documents/README.md](README.md) は、この directory の唯一の直下ファイルであり、文書の入口です。
 個別文書は責務 directory に置き、直下へ戻しません。各 directory の README が、その
 配下の役割、構造、読者入口を所有します。
 

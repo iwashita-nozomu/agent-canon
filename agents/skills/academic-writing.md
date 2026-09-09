@@ -41,12 +41,12 @@ method note、symbol-dense claim-heavy explanation の文書を、共通 graph/D
 
 ## Core References
 
-- `agents/skills/paper-writing.md` (paper-specific overlay)
-- `agents/skills/long-form-writing.md` (general prose boundary)
-- `documents/conventions/REVIEW_PROCESS.md`
-- `agents/canonical/CODEX_SUBAGENTS.md`
-- `agents/skills/literature-survey.md`
-- `CONTAINER_OPERATIONS.md`
+- [agents/skills/paper-writing.md](paper-writing.md) (paper-specific overlay)
+- [agents/skills/long-form-writing.md](long-form-writing.md) (general prose boundary)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md)
+- [agents/skills/literature-survey.md](literature-survey.md)
+- [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md)
 
 ## Mandatory Checklist
 
@@ -140,7 +140,7 @@ python3 tools/analysis/documents/doc_start.py \
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/academic-writing.md`.
+1. Read [agents/skills/academic-writing.md](academic-writing.md).
 1. Select this as the DSL-to-prose projection adapter when file/document responsibility is academic prose, scholarly note, thesis chapter, method note, or symbol-dense claim-heavy explanation; do not select it by length.
 1. Use `$structure-planning` before drafting when section order, figure/table placement, claim/evidence layout, first section, or invalid interpretations are nontrivial.
 1. When claim flow or discourse connectives matter, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument`; keep TeX routing separate from discourse evidence.

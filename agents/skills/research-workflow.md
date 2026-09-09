@@ -135,7 +135,7 @@ artifact の role・checksum・readback、reader-facing report の構成は、�
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/research-workflow.md`.
+1. Read [agents/skills/research-workflow.md](research-workflow.md).
 1. Fix the question, scope, comparison target, evidence targets, protocol, and operational stop condition before implementation or formal execution.
 1. Do not use research acceptance states as plan-time run or completion gates; record them only after evidence exists.
 1. Invoke `$literature-survey` before external search when a source-backed claim, method comparison, or benchmark premise is in scope.

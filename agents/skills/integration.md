@@ -43,10 +43,12 @@ manual recreation of deleted content. Keep the source tree shape, including
 renames, deletions, file types, and links, unless a conflict decision is backed
 by the owning contract.
 
-Run the merge in the current authorized integration checkout. This skill does
-not create a new `git worktree`. `--no-ff` is not a default acceptance rule:
-use it only when the selected branch/commit contract requires a merge commit;
-otherwise the repository's normal fast-forward or merge route is sufficient.
+Run the merge in the current authorized integration checkout. If the selected
+repository-topic lifecycle prepared a `linked-worktree` or `independent-clone`,
+reuse that checkout; this skill does not manually create, move, or remove a
+worktree. `--no-ff` is not a default acceptance rule: use it only when the
+selected branch/commit contract requires a merge commit; otherwise the
+repository's normal fast-forward or merge route is sufficient.
 
 For a structural source diff, the changed-scope tree comparison is the
 semantic readback: compare every source-side path involved in an add, delete,

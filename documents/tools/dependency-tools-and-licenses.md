@@ -21,7 +21,7 @@ tool を人間向けにまとめます。機械可読の正本は次のままで
 
 - AgentCanon 内部 tool の正本: `tools/catalog.yaml`
 - 外部 toolchain / compiled tool の正本: `agent-canon-environment.toml`
-- Docker / devcontainer への配置責務: `CONTAINER_OPERATIONS.md`
+- Docker / devcontainer への配置責務: [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md)
 
 この文書は license advice ではありません。配布、再配布、商用利用、
 container image 公開、model weight 共有を行う前に、該当 version の

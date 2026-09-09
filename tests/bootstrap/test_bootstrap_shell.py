@@ -1149,6 +1149,57 @@ def test_fake_marked_volume_rejects_invalid_marker(tmp_path: Path) -> None:
     assert not (volume_root / "private-log").exists()
 
 
+def test_state_volume_init_reports_native_docker_exit(tmp_path: Path) -> None:
+    """Initializer failures retain the Docker stderr and native exit code."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    control.mkdir()
+    runtime.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps({"images": {}, "containers": {}, "volumes": {}, "next": 1}),
+        encoding="utf-8",
+    )
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"$1\" == run ]]; then\n"
+        "  printf 'native state-volume failure\\n' >&2\n"
+        "  exit 17\n"
+        "fi\n"
+        f"exec {str(ROOT / 'tests/bootstrap/fake_docker.py')!r} \"$@\"\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_DOCKER_CMD={str(docker)!r}; "
+                f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 2
+    assert "native state-volume failure" in result.stderr
+    receipt = json.loads(result.stderr.splitlines()[-1])
+    assert receipt["code"] == "state_volume_init_failed"
+    assert "Docker exit 17" in receipt["detail"]
+
+
 def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path) -> None:
     """Initializer failure aborts target replacement and restores the prior resident."""
     home = tmp_path / "home"

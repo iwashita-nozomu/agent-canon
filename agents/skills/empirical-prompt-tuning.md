@@ -13,7 +13,7 @@ downstream implementation ../../tools/validation/semantic/runtime/check_agent_ru
 
 ## Purpose
 
-Improve a reusable skill, slash command, task prompt, `AGENTS.md` section, or
+Improve a reusable skill, slash command, task prompt, [AGENTS.md](../../AGENTS.md) section, or
 code-generation prompt by having an independent evaluator execute the
 instruction surface and report both observable behavior and its own reading
 experience. Stop only when the frozen scenarios have converged.

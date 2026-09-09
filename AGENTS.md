@@ -1,3 +1,4 @@
+@ROOT_AGENTS.md
 # AgentCanon Repository Instructions
 <!--
 @dependency-start
@@ -9,26 +10,33 @@ upstream design agents/internal-routines/chatgpt-codex-routing.md request modali
 upstream design agents/skills/comprehensive-development.md cross-surface implementation-basis consumer
 upstream design agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
 upstream design agents/canonical/CODEX_SUBAGENTS.md subagent lifecycle owner
-downstream design ROOT_AGENTS.md explicit live-integration root entrypoint
+downstream design ROOT_AGENTS.md common root base read before source-specific map
 downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py validates thin entrypoint structure
 downstream implementation tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates runtime owner-map alignment
 @dependency-end
 -->
 
 This tree is the standalone AgentCanon source of truth. This file is a reader
-and owner map only. Task procedures, command recipes, role lifecycles,
-implementation policy, and closeout schemas remain in the canonical surfaces
-named below.
+and owner map only, using the shared entry behavior in [ROOT_AGENTS.md](ROOT_AGENTS.md) and
+adding the source-specific AgentCanon map below.
+The leading `@ROOT_AGENTS.md` is an explicit read reference: callers must read
+that file first and then this source-specific Reader Map; this marker is not an
+assertion that any runtime automatically expands or imports the file. Task
+procedures, command recipes, role lifecycles, implementation policy, and
+closeout schemas remain in the canonical surfaces named below.
 
 ## Repository Role
 
 Use this entrypoint when the detected repository root is the AgentCanon source
 checkout. A default `project_template` or derived repository owns its tracked
 instructions directly and does not acquire live AgentCanon runtime behavior by
-mentioning this repository. `ROOT_AGENTS.md` applies only to an explicitly
-selected `live-agent-canon` integration.
+mentioning this repository. [ROOT_AGENTS.md](ROOT_AGENTS.md) supplies common root instructions;
+the consumer-only maps and routes in that base do not redirect this source
+checkout. This file retains the source-specific AgentCanon reader map. A
+consumer's generated root file remains governed by its explicit composition
+and its own specific instructions.
 
-Directory-local `AGENTS.md` files may narrow behavior for their subtree. They
+Directory-local [AGENTS.md](AGENTS.md) files may narrow behavior for their subtree. They
 must add only the responsibility owned by that subtree and must not copy a
 root, workflow, or Skill policy for visibility.
 
@@ -36,17 +44,17 @@ root, workflow, or Skill policy for visibility.
 
 | Task intent | Canonical owner |
 | --- | --- |
-| ChatGPT conversation closure vs Codex workspace execution | `agents/internal-routines/chatgpt-codex-routing.md` |
-| request interpretation and task transport after Codex admission | `agents/skills/agent-orchestration.md`, `agents/skills/codex-task-workflow.md`, `agents/canonical/CODEX_WORKFLOW.md` |
-| contract-complete implementation and engineering basis | `documents/conventions/software-engineering-principles.md`, `agents/skills/comprehensive-development.md`, task-specific implementation Skills |
-| mathematical, algorithmic, and numerical obligation ownership | `documents/design/semantic-responsibility-contract.md`, `documents/design/algorithm-implementation-boundary.md`, selected proof / optimization Skill |
-| design-to-implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md` |
-| repository structure and responsibility boundaries | `agents/skills/structure-refactor.md`, `documents/structure/repo-structure-contract.toml` |
-| branch, worktree, and destructive Git safety | `agents/skills/worktree-health.md`, `agents/canonical/CODEX_WORKFLOW.md`, `.codex/hooks/` |
-| AgentCanon source update and publication | `agents/skills/agent-canon-update.md`, `agents/skills/pr-processing.md` |
-| subagent activation and handoff | `agents/skills/agent-orchestration.md`, `agents/skills/subagent-bootstrap.md`, `agents/canonical/CODEX_SUBAGENTS.md` |
-| validation profile and closeout | `documents/runtime/runtime-profiles-and-check-matrix.md`, `agents/canonical/CODEX_WORKFLOW.md`, `tools/runtime/lifecycle/task_close.py` |
-| GitHub Issue / PR publication and status | `agents/skills/pr-processing.md`, `agents/internal-routines/github-status-lifecycle.md` |
+| ChatGPT conversation closure vs Codex workspace execution | [agents/internal-routines/chatgpt-codex-routing.md](agents/internal-routines/chatgpt-codex-routing.md) |
+| request interpretation and task transport after Codex admission | [agents/skills/agent-orchestration.md](agents/skills/agent-orchestration.md), [agents/skills/codex-task-workflow.md](agents/skills/codex-task-workflow.md), [agents/canonical/CODEX_WORKFLOW.md](agents/canonical/CODEX_WORKFLOW.md) |
+| contract-complete implementation and engineering basis | [documents/conventions/software-engineering-principles.md](documents/conventions/software-engineering-principles.md), [agents/skills/comprehensive-development.md](agents/skills/comprehensive-development.md), task-specific implementation Skills |
+| mathematical, algorithmic, and numerical obligation ownership | [documents/design/semantic-responsibility-contract.md](documents/design/semantic-responsibility-contract.md), [documents/design/algorithm-implementation-boundary.md](documents/design/algorithm-implementation-boundary.md), selected proof / optimization Skill |
+| design-to-implementation correspondence | [agents/internal-routines/design-implementation-correspondence.md](agents/internal-routines/design-implementation-correspondence.md) |
+| repository structure and responsibility boundaries | [agents/skills/structure-refactor.md](agents/skills/structure-refactor.md), `documents/structure/repo-structure-contract.toml` |
+| branch, worktree, and destructive Git safety | [agents/skills/worktree-health.md](agents/skills/worktree-health.md), [agents/canonical/CODEX_WORKFLOW.md](agents/canonical/CODEX_WORKFLOW.md), `.codex/hooks/` |
+| AgentCanon source update and publication | [agents/skills/agent-canon-update.md](agents/skills/agent-canon-update.md), [agents/skills/pr-processing.md](agents/skills/pr-processing.md) |
+| subagent activation and handoff | [agents/skills/agent-orchestration.md](agents/skills/agent-orchestration.md), [agents/skills/subagent-bootstrap.md](agents/skills/subagent-bootstrap.md), [agents/canonical/CODEX_SUBAGENTS.md](agents/canonical/CODEX_SUBAGENTS.md) |
+| validation profile and closeout | [documents/runtime/runtime-profiles-and-check-matrix.md](documents/runtime/runtime-profiles-and-check-matrix.md), [agents/canonical/CODEX_WORKFLOW.md](agents/canonical/CODEX_WORKFLOW.md), `tools/runtime/lifecycle/task_close.py` |
+| GitHub Issue / PR publication and status | [agents/skills/pr-processing.md](agents/skills/pr-processing.md), [agents/internal-routines/github-status-lifecycle.md](agents/internal-routines/github-status-lifecycle.md) |
 
 ## Always-On Boundary
 
@@ -69,14 +77,14 @@ here.
 | root runtime entrypoint | `bootstrap.sh` | `bash bootstrap.sh --help` |
 | workflow family, spawn budget, role topology | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
 | public skill registry | `agents/skills/catalog.yaml` | `check_agent_runtime_alignment.py` |
-| AgentCanon source publication | `agents/skills/agent-canon-update.md`, `agents/skills/pr-processing.md` | repository-topic-clone and PR checks |
-| entrypoint responsibility grammar | `documents/design/entrypoint-owner-map.md` | `check_entrypoint_owner_map.py` |
-| implementation decision precedence | `documents/conventions/software-engineering-principles.md` | task-specific Skill and review evidence |
+| AgentCanon source publication | [agents/skills/agent-canon-update.md](agents/skills/agent-canon-update.md), [agents/skills/pr-processing.md](agents/skills/pr-processing.md) | repository-topic-clone and PR checks |
+| entrypoint responsibility grammar | [documents/design/entrypoint-owner-map.md](documents/design/entrypoint-owner-map.md) | `check_entrypoint_owner_map.py` |
+| implementation decision precedence | [documents/conventions/software-engineering-principles.md](documents/conventions/software-engineering-principles.md) | task-specific Skill and review evidence |
 
 ## Task Entry
 
 Resolve request modality through
-`agents/internal-routines/chatgpt-codex-routing.md` before repository
+[agents/internal-routines/chatgpt-codex-routing.md](agents/internal-routines/chatgpt-codex-routing.md) before repository
 orchestration. A `chatgpt` route closes in conversation without workspace
 execution. A `codex` route hands its typed scope and validation oracle to
 `agent-orchestration` before task-shape skill selection.

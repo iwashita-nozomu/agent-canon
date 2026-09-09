@@ -21,13 +21,13 @@ downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md expo
 ## Reader Map
 
 implementation stage に入る前に、
-`../internal-routines/design-implementation-correspondence.md` の design read と
+[../internal-routines/design-implementation-correspondence.md](../internal-routines/design-implementation-correspondence.md) の design read と
 clause fingerprint route を task packet に接続します。この skill は task
 stage の transport owner であり、対応 policy を複製しません。
 
 ### Compact request/update projection
 
-`documents/design/request-intent-and-update-relation.md` の flow を task packet の既存
+[documents/design/request-intent-and-update-relation.md](../../documents/design/request-intent-and-update-relation.md) の flow を task packet の既存
 request clauses、active state、validation route へ投影します。質問は evidence-read と
 answer completion で閉じ、explicit write clause は owner handoff に進み、追加入力は
 既存 packet の sparse delta として read-back します。
@@ -72,9 +72,9 @@ publication or validation policy.
 ## Purpose
 
 Codex が会話コンテキストに依存せず、毎回同じ順序で task を進めるための標準フローです。
-`repository-topic` 専用 clone が含まれる場合は、`documents/rule/repository-topic-clone.md`
+`repository-topic` 専用 clone が含まれる場合は、[documents/rule/repository-topic-clone.md](../../documents/rule/repository-topic-clone.md)
 を先に読み、clone 形状は同ファイルで固定し、共有責務の gitlink/pin/projection は
-`documents/rule/dependency-module-changes.md` に戻します。
+[documents/rule/dependency-module-changes.md](../../documents/rule/dependency-module-changes.md) に戻します。
 
 ## Use When
 
@@ -84,12 +84,12 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 
 ## Core Reference
 
-- `agents/canonical/CODEX_WORKFLOW.md`
+- [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md)
 
 ## Owner-First Readback
 
 Before the implementation stage, consume
-`agents/skills/agent-orchestration.md#Owner-First-Read-Trace`. Read the
+[agents/skills/agent-orchestration.md#Owner-First-Read-Trace](agent-orchestration.md#owner-first-read-trace). Read the
 generated discovered `SKILL.md` in bounded chunks with
 `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`
 until `file_eof=true`; it is the
@@ -102,7 +102,16 @@ EOF conditions hold. If the trace is unresolved, implementation remains locked
 and the existing coordinated-search route owns the bounded lookup. A
 partial response, known path, or whole-file canonical read is not a substitute;
 do not create a per-read receipt, identifier, approval gate, or duplicate Skill
-body.
+body. A path named by a user, parent, handoff, or router is likewise only a
+candidate until the owner-first trace and the decision-relevant bounded
+dependency/downstream check select the replaceable unit. Merely naming a
+delegated path does not unlock implementation or establish completion.
+Before selecting that unit, carry one existing `Checkout Identity Readback` and
+inspect the actual HEAD of each in-scope dependency checkout plus its pin when
+present. Record `no dependency` only after the dependency/consumer trace shows
+that no edge applies; an unperformed inspection is not that result. Re-read
+identity and dependency HEAD only after cwd, branch, dependency checkout, or pin
+changes; ordinary commands do not require a duplicate readback.
 Do not replace this readback with an implementation-path list, a repository
 sweep, or a new durable packet.
 
@@ -146,7 +155,10 @@ Task-catalog roles, default review packs, and related skills are candidates;
 they become work only when an owner-critical operation, unresolved branch, or
 selected validation route activates them. A wave is launchable only when its
 owner, replaceable responsibility, context, write authority, and validation
-route are ready.
+route are ready. A stage update is progress readback, not a final report: while
+required work or its result remains unresolved, keep the request active and
+continue through the existing [../canonical/CODEX_WORKFLOW.md#completion-readiness](../canonical/CODEX_WORKFLOW.md#completion-readiness)
+route.
 
 ## Required Output
 
@@ -190,13 +202,13 @@ route are ready.
 - repo-changing implementation / patch / doc-edit task では `$agent-orchestration` を先頭に置き、catalog typed route が要求する場合だけ `$subagent-bootstrap` を併用する。bounded request は typed route が child を要求しない限り owner/path/targeted-validation route に留める
 - workflow family、public skill set、review stack は `agent-orchestration` の出力を入力として受け取り、この skill で routing matrix を重複定義しない
 - ユーザー向けの作業報告、最終報告、レビュー要約、handoff guidance、reader-facing docs は日本語で書きます。内部の項目名、列挙値、役割名、補助関数風の語は、コマンド、パス、表、正確な根拠の引用に閉じます。専門語が必要な場合は、既存のリポジトリ用語または外部標準の用語を使い、自然文で説明します。
-- AgentCanon update は standalone source または親repoの ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` cloneで行い、`agent-canon-update` の source branch/PR/main readback route に従う。親repoへvendor/submodule/root projectionを作らない
+- AgentCanon update は standalone source または repository-topic lifecycle が用意した親repoの `<anchor>/workspace/<topic>/agent-canon` checkout で行い、parent/same-repository branch は `linked-worktree`、dependency repository は `independent-clone` を選びます。`agent-canon-update` の source branch/PR/main readback route に従い、親repoへvendor/submodule/root projectionを作らない
 - AgentCanon bootstrap/runtimeを変更した場合は、明示control/runtime rootでinstall/start/target/status/tool/eval/stop/gc/uninstallを検証し、source不変とexact Docker resource cleanupをcloseout evidenceにする
-- commit / push の前に `documents/operations/BRANCH_SCOPE.md` の commit correctness contract と範囲分割契約を満たす。commit は Git 上の実行単位、PR はレビュー単位として扱い、validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作り、merge 前に別 PR または別 commit へ分ける。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。evidence には branch、commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を残す
+- commit / push の前に [documents/operations/BRANCH_SCOPE.md](../../documents/operations/BRANCH_SCOPE.md) の commit correctness contract と範囲分割契約を満たす。commit は Git 上の実行単位、PR はレビュー単位として扱い、validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作り、merge 前に別 PR または別 commit へ分ける。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。evidence には branch、commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を残す
 - 普通の相談、壁打ち、routing-only advice、説明だけの turn はこの skill の実行対象ではありません。その場合は shell / GitHub checks を走らせず、会話だけで応答します。
 - GitHub Actions run、PR check、GitHub Issue を読むだけの GitHub-only read inspection は repository task に昇格させない
 - request clauses から `requested_scope` を先に固定し、その後に owner boundary、dependency evidence、validation route から `work_scope` を導く。限定された `work_scope` は実装段階の packet としてだけ使えます。broader request を閉じるには `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` を明示し、要求された surface を勝手に外していないことを示します。
-- `documents/`、`documents/notes/`、`references/`、local implementation directories を広く読む前に、構造が owner、path、root view、責務境界、または stale surface の判断を変える場合だけ `agents/COMMUNICATION_PROTOCOL.md` の `Structure Intake Packet` を作るか引用します。明示された owner/path または canonical README が edit surface を固定している bounded route は Structure Intake を追加せず、選択済み owner と targeted validation を使います。
+- `documents/`、`documents/notes/`、`references/`、local implementation directories を広く読む前に、構造が owner、path、root view、責務境界、または stale surface の判断を変える場合だけ [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) の `Structure Intake Packet` を作るか引用します。明示された owner/path または canonical README が edit surface を固定している bounded route は Structure Intake を追加せず、選択済み owner と targeted validation を使います。
 - 編集手段は、手編集で責務を追える差分では patch-based edit、機械生成・一括変換では repo script / formatter の順に選ぶ
 - sweep と原因調査は、次の具体的な作業に結び付けます。各結果は、実装経路、再利用判断、古い面の修復、依存範囲、検証経路、Issue、または担当者付きの保留のどれかを更新します。更新先が同じ根拠は記録内の短い引用に圧縮し、現在の作業へ戻ります。
 - 検証は静的解析・読み取り evidence を主証跡にします。静的解析、依存確認、
@@ -210,7 +222,7 @@ route are ready.
 - 詳細設計が編集対象 path に絞る前に、責務 model、概念 graph または layer model、非対象、将来拡張 layer、評価軸、canonical surface 関係を含む `Abstract Design Frame` を書くか引用する。実装 scope、file list、validation は nearest editable path や current finding ではなく、この frame から導く
 - semantic responsibility contract の run-local instance を active design packet から参照し、実装前に obligation と一次検証 owner を割り当てる。各 delta は `reuse|extend|replace|introduce` のいずれか一つの action を持ち、hard-edge closure は semantic grouping だけを決める。
 - 実装 path を選ぶ前に、owner、replaceable unit、implementation mechanism、validation route のいずれかが未確定な場合だけ、`python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` を走らせるか引用する。明示された owner/path、canonical README、または approved design packet が edit surface を固定している bounded route は provider sweep を追加しない。deterministic search が失敗した場合は diagnostic evidence を残し、owner/path ambiguity が残るときだけ `router_unavailable_blocker` とする。
-- 編集前の repo 調査は `agents/COMMUNICATION_PROTOCOL.md` が所有する `Pre-Edit Repository Investigation Packet` として固定する。既存 repo 調査が甘いまま実装へ進んだ場合は、差分を広げる前にこの packet を作り直す
+- 編集前の repo 調査は [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) が所有する `Pre-Edit Repository Investigation Packet` として固定する。既存 repo 調査が甘いまま実装へ進んだ場合は、差分を広げる前にこの packet を作り直す
 - `Pre-Edit Repository Investigation Packet` は、次に進む具体的な作業と担当者を 1 つ書いて閉じます。別の探索へ広げる前に、その作業を実装、検証、Issue 処理のいずれかへ進めます。
 - 検証経路は、primary validation evidence として使った静的解析・読み取り、
   広い実行が supplemental かつ承認済みか、担当者の 3 点を書いて閉じます。
@@ -237,7 +249,7 @@ route are ready.
 - 変更対象の `Dependency Manifest Plan` を設計で固定し、編集前に upstream、編集後に downstream を読む
 - write-capable child route では、実装前に cause investigation child が artifact を固定し、`Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を残してから code edit に入る
 - parent 直編集でも write-capable subagent でも、実装前に `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、予測された cause investigation / OOP / helper / dependency / responsibility_scope / hook runtime / skill mirror / tool catalog / protocol / log-surface gate と repair plan を handoff または work log に残す。実装ディレクトリを選ぶ前に owner scope と protecting tools を記録する
-- fresh subagent に渡す prompt は chat history 依存にしない。`agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、full transcript、raw logs、full dashboard、repo root 全体を context として渡さない
+- fresh subagent に渡す prompt は chat history 依存にしない。[agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) が定義する `Fresh Subagent Context Capsule` を渡し、full transcript、raw logs、full dashboard、repo root 全体を context として渡さない
 - runtime/tool gate が write-capable spawn を阻害する場合は `WRITE_SUBAGENT_AUTHORIZATION=required` または該当 gate blocker を local/tool evidence として記録し、`selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を明示する。継続する際は `canonical_rerun_pass`、`durable_blocker_or_issue`、`router_unavailable_blocker`、`explicit revised route` 付きの approved route に限定する。The parent does not write as a recovery path.
 - 既存的な `status=blocked` の timeout 回復では、同一内容での再待機は行わず、`new state evidence` または `revised parent packet` がある場合のみ再 wait/再評価し、ユーザー向けの fallback message は出さない
 - tool / checker / hook / reviewer / subagent feedback から実装へ入る場合は `tool-finding-report` で finding packet を作り、write-capable subagent handoff に artifact path、structured findings、prompt feedback decision を渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` が出た場合は、次の write-capable subagent を起動する前に handoff prompt、skill、workflow、または task catalog prompt を修正する
@@ -253,12 +265,12 @@ route are ready.
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/canonical/CODEX_WORKFLOW.md`.
+1. Read [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md).
 1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is selected.
-1. For AgentCanon source/runtime work, use a standalone or qualified ignored source clone and follow `agent-canon-update`. The integration executor merges the AgentCanon PR and a publisher/integration child reads back source `main`; do not restore a parent vendor/submodule/root-projection route.
+1. For AgentCanon source/runtime work, use a standalone or qualified ignored source checkout prepared by `repository-topic-clone` and follow `agent-canon-update`. The integration executor merges the AgentCanon PR and a publisher/integration child reads back source `main`; do not restore a parent vendor/submodule/root-projection route.
 1. Ordinary consultation, brainstorming, routing-only advice, and explanation-only turns are conversational turns. For those, keep MCP config inspection, shell commands, and GitHub checks in hold until the user requests state inspection, file edits, validation, PR/issue processing, CI checks, or implementation work, and continue with conversational responses until then.
 1. MCP is a Codex config/runtime surface. Root `mcp/` is a removed legacy path. For repository tasks that change MCP config or MCP-dependent gates, inspect `.codex/config.toml`, the owner docs, and the changed files directly; root `mcp/` remains a removed legacy surface.
-1. Before sweeping `documents/`, `documents/notes/`, `references/`, or local implementation directories, create or cite the `Structure Intake Packet` from `agents/COMMUNICATION_PROTOCOL.md` only when structure ownership, path, root view, responsibility, or stale-surface evidence can change the next decision. Explicit owner/path or canonical README evidence keeps a bounded route on its normal owner/transport path without a Structure Intake packet.
+1. Before sweeping `documents/`, `documents/notes/`, `references/`, or local implementation directories, create or cite the `Structure Intake Packet` from [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) only when structure ownership, path, root view, responsibility, or stale-surface evidence can change the next decision. Explicit owner/path or canonical README evidence keeps a bounded route on its normal owner/transport path without a Structure Intake packet.
 1. Preserve the user's requested scope before deriving work packets. Record `requested_scope` from the request clauses, then derive `work_scope` from owner boundaries, dependency evidence, and validation route. A bounded `work_scope` is allowed only as an implementation phase with explicit `covered_surfaces`, `deferred_surfaces`, and `omitted_surfaces` evidence; it is not completion evidence for a broader request.
 1. Keep sweeps and cause investigations tied to the next concrete work. Each result updates one of: implementation route, reuse decision, stale-surface repair, dependency scope, validation route, durable issue, or explicit deferred owner. Evidence that leaves those fields unchanged stays as a short citation in the packet, then control returns to the current step.
 1. Keep validation centered on static/read evidence. Use static analysis,
@@ -270,7 +282,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    integration risk, or unresolved static findings require them. Record what
    the static/read evidence left unresolved before scheduling broader
    execution.
-1. Before touching files, record a provisional workflow route from `agents/TASK_WORKFLOWS.md` and keep it revisable until owner boundary, replaceable unit, validation route, and public behavior / schema impact are evidenced.
+1. Before touching files, record a provisional workflow route from [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) and keep it revisable until owner boundary, replaceable unit, validation route, and public behavior / schema impact are evidenced.
 1. In the first work update, declare `workflow=<provisional-or-final-family>`, `skills=<...>`, `review=<...>` with `$agent-orchestration` first in the skill list, and present apparent breadth only as provisional routing context.
 1. When skills are explicitly named in the task or handoff, use `$skill-name` notation and preserve it in `skills=<...>`.
 1. Treat `run.repo_tool_routing_policy` from `bootstrap_agent_run.py` as the selected repo-owned tool route. Carry `tool_route`, `tool_commands`, and `tool_evidence` into subagent handoff packets, and run each selected skill packet in the manifest order before replacing it with prose review.
@@ -297,11 +309,11 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Keep `unknown_or_open_question` out of active must-do, must-not-do, and completion-evidence clauses; move remaining unknowns to deferred or escalation entries after the sweep.
 1. For repo-changing implementation / patch / doc-edit work, bootstrap or schedule a selected write-capable implementer only when the catalog typed route requires a child, including when a bounded route explicitly selects that child. Reuse the same active agent for revised scope; independent review, disjoint write authority, differing owner/context, or failed context integrity require a fresh agent. Plan, detailed-design, and document-flow reviewers are selected only when an owner-critical validation or unresolved branch activates them. Routes without child activation remain on their owner/path/targeted-validation route.
 1. If the user explicitly asks for subagent coding/implementation/patch/editing, preserve that request as route evidence, but route completion through the selected write-capable implementer only when the catalog typed route requires a child. The pre-handoff investigation packet still derives dependency-expanded handoff scope, validation route, and `tool_rejection_preflight` evidence from route seed, responsibility search, reuse survey, and stale-surface scan.
-1. Use `agents/canonical/ARTIFACT_PLACEMENT.md` before creating task-facing documents.
+1. Use [agents/canonical/ARTIFACT_PLACEMENT.md](../canonical/ARTIFACT_PLACEMENT.md) before creating task-facing documents.
 1. Before detailed design selects implementation paths, write or cite an abstract design frame: responsibility model, concept graph or layer model, non-goals, future extension layers, evaluation axes, and canonical-surface relationships. Implementation scope, file list, and validation must be derived from that frame rather than from the nearest editable path or current finding alone.
 1. Before implementation path selection, run or cite the deterministic provider search only when owner, replaceable unit, implementation mechanism, or validation route remains unknown. Explicit owner/path or approved design evidence skips the provider sweep. A failed search is diagnostic; it becomes `router_unavailable_blocker` only when owner/path ambiguity remains. Any continuation records the local/tool blocker evidence required by the selected handoff route.
 1. After timeout, record the current status and return control. A later wait starts only with new state evidence or an explicit revised parent packet.
-1. Before edits, create or cite the protocol-owned `Pre-Edit Repository Investigation Packet` from `agents/COMMUNICATION_PROTOCOL.md`. If this packet is missing or shallow, return to investigation before patching.
+1. Before edits, create or cite the protocol-owned `Pre-Edit Repository Investigation Packet` from [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md). If this packet is missing or shallow, return to investigation before patching.
 1. Close the `Pre-Edit Repository Investigation Packet` by naming the next concrete step and one owner. Continue with that step before opening another line of exploration.
 1. Close the validation route by stating the static/read evidence used as the
    primary confirmation, whether broader execution is supplemental and
@@ -317,7 +329,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    generated artifact failures to their owner; record unrelated failures as
    residual; escalate approved-design/user-request conflicts before changing
    intent.
-1. Before commit or push, satisfy the `documents/operations/BRANCH_SCOPE.md` commit correctness contract and scope-split contract: treat the commit as the runnable Git unit and the PR as the review unit; include every validation-read source/config/schema/fixture/doc/tool entrypoint in the tracked tree; when a diff spans multiple problems, canonical owners, behavior or contract deltas, or validation routes, write a scope table and split independently landable slices into separate PRs or commits before merge; for code changes record file-level code dependency plus function/public-entrypoint call-site evidence when language tools support it; and record branch, commit SHA, submodule SHA, validation commands, validation paths, and any remaining dirty or untracked path classification.
+1. Before commit or push, satisfy the [documents/operations/BRANCH_SCOPE.md](../../documents/operations/BRANCH_SCOPE.md) commit correctness contract and scope-split contract: treat the commit as the runnable Git unit and the PR as the review unit; include every validation-read source/config/schema/fixture/doc/tool entrypoint in the tracked tree; when a diff spans multiple problems, canonical owners, behavior or contract deltas, or validation routes, write a scope table and split independently landable slices into separate PRs or commits before merge; for code changes record file-level code dependency plus function/public-entrypoint call-site evidence when language tools support it; and record branch, commit SHA, submodule SHA, validation commands, validation paths, and any remaining dirty or untracked path classification.
 1. Load the extra skills required by the current stage and contract; carry unrelated skills as deferred route signals. Nontrivial document creation or revision adds `prose-reasoning-graph` as the common graph/DSL gate and `$structure-planning` as the structure contract gate, then file/document responsibility selects the DSL-to-prose adapter: general explanatory README/workflow/guide/migration/spec docs add `long-form-writing`, submission papers or thesis-chapter drafts add `paper-writing`, broader academic or scholarly-note writing adds `academic-writing`, and the required notation/logic/citation reviewers follow that adapter choice. For typo/link/format-only edits, pair `$md-style-check` with `structure_contract=skipped` and the reason.
 1. When the evidence shows a bounded owner, replaceable unit, targeted validation route, and `external public API/behavior/schema unchanged`, use the normal owner route before patching and keep targeted validation as the closeout route. Routine docs, Focused code, and typo/link/format-only labels use the same route. Any public-surface addition, contraction, removal, rename, restriction, deprecation, or semantic change selects `scoped_change` or a broader route and forms `dependency/consumer/migration/docs closure`. File count and nearby ownership are only auxiliary context and cannot narrow that closure.
 1. If coordination, resumption, or selected specialist roles need durable
@@ -335,7 +347,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. For new or edited human-authored text files, use the current `@dependency-start` / `@dependency-end` manifest format.
 1. If the design trace is missing or conflicts with repo docs or code, return to detailed design review instead of editing from chat context.
 1. Before any write-capable subagent edit, run or cite `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and put predicted OOP, helper, dependency, responsibility_scope, hook runtime, skill mirror, tool catalog, protocol, and log-surface gates plus repair commands into the work log or handoff. Record the owner scope and protecting tools before selecting the implementation directory.
-1. For fresh subagent launches, include the protocol-owned `Fresh Subagent Context Capsule` from `agents/COMMUNICATION_PROTOCOL.md` instead of chat history, full transcripts, raw logs, full dashboards, or repo-root scope.
+1. For fresh subagent launches, include the protocol-owned `Fresh Subagent Context Capsule` from [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) instead of chat history, full transcripts, raw logs, full dashboards, or repo-root scope.
 1. If runtime/tool gates block write-capable spawn, record local/tool evidence with `WRITE_SUBAGENT_AUTHORIZATION=required` or the specific gate blocker, `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; a different implementation route requires an explicit revised parent packet.
 1. When implementation is driven by tool/checker/hook/reviewer/subagent findings, use `$tool-finding-report` first and pass the finding packet path, structured findings, impact, and prompt feedback decision into the parent or write-capable subagent handoff.
 1. If `$tool-finding-report` classifies feedback as `handoff_prompt_gap` or `shared_skill_or_workflow_gap`, repair the handoff prompt, skill, workflow, or task catalog prompt before launching the next write-capable subagent.

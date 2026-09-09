@@ -36,7 +36,7 @@ field が揃うまで作成しません。
 
 - stale `WORKTREE_SCOPE.md` を current task の scope authority として扱っていない
 - action log path が concrete になっている
-- `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を見ている
+- [documents/notes/guardrails/README.md](../notes/guardrails/README.md) と [documents/notes/failures/README.md](../notes/failures/README.md) を見ている
 - kickoff 後の次の 1 手が action log に残っている
 
 ## 2. Python 実装変更
@@ -89,7 +89,7 @@ bash bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install
 - AgentCanon shared tool image と project-owned Docker/test の責務境界が分離している
 - fixed OS/Python capability、Ubuntu 24.04 apt の Node/npm、typed dependency manifest、project extras の owner が混在していない
 - `docker/README.md`、`README.md`、`QUICK_START.md` が更新されている
-- `templates/agents/environment_change_proposal.md` に proposal が残っている
+- [templates/agents/environment_change_proposal.md](../../templates/agents/environment_change_proposal.md) に proposal が残っている
 
 ## 5. closeout
 

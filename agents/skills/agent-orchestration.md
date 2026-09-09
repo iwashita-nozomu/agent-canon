@@ -23,7 +23,7 @@ downstream design ./direct-luna-communication.md owns bounded direct-Luna packet
 ## Reader Map
 
 設計を伴う repository-changing route では、owner selection の後に
-`../internal-routines/design-implementation-correspondence.md` を stage route
+[../internal-routines/design-implementation-correspondence.md](../internal-routines/design-implementation-correspondence.md) を stage route
 として参照します。universal policy は同 routine にあり、この skill は route
 selection の owner だけを持ちます。
 
@@ -44,7 +44,7 @@ selection の owner だけを持ちます。
 
 ### Compact request/update projection
 
-`documents/design/request-intent-and-update-relation.md` is the compact design note for
+[documents/design/request-intent-and-update-relation.md](../../documents/design/request-intent-and-update-relation.md) is the compact design note for
 this owner: read evidence closes advisory questions with an answer, explicit write clauses
 enter the selected owner route, and in-progress input updates the existing packet with only
 changed goal/artifact/order/handoff deltas. This skill owns the semantic decision; the note
@@ -87,14 +87,14 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 
 ## Core References
 
-- `agents/TASK_WORKFLOWS.md`
-- `documents/runtime/runtime-profiles-and-check-matrix.md`
-- `agents/COMMUNICATION_PROTOCOL.md`
-- `agents/canonical/ARTIFACT_PLACEMENT.md`
-- `agents/canonical/CLI_ENTRYPOINTS.md`
-- `agents/canonical/CODEX_SUBAGENTS.md`
+- [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md)
+- [documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md)
+- [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
+- [agents/canonical/ARTIFACT_PLACEMENT.md](../canonical/ARTIFACT_PLACEMENT.md)
+- [agents/canonical/CLI_ENTRYPOINTS.md](../canonical/CLI_ENTRYPOINTS.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md)
 - `agents/skills/skill-dependencies.yaml`
-- `agents/skills/direct-luna-communication.md`
+- [agents/skills/direct-luna-communication.md](direct-luna-communication.md)
 
 ## Owner-First Read Trace
 
@@ -102,7 +102,7 @@ Repository source is not the first discovery surface. Before opening an
 implementation file, test, hook, checker, or generated artifact, use this
 fixed route:
 
-1. Start at the active root `AGENTS.md` Reader Map and select the task Skill.
+1. Start at the active root [AGENTS.md](../../AGENTS.md) Reader Map and select the task Skill.
    Resolve its canonical path from `agents/skills/catalog.yaml`; do not guess
    from a nearby filename or a text-search hit.
    The root row only needs to identify the routing owner; it does not need one
@@ -153,7 +153,7 @@ fixed route:
    that tool's result.
 5. If the Skill body and its task-relevant delegated edge do not resolve one
    operational owner, report the unresolved item and use the bounded purpose search in
-   `documents/tools/search-coordination.md`. Search results nominate an owner;
+   [documents/tools/search-coordination.md](../../documents/tools/search-coordination.md). Search results nominate an owner;
    they do not unlock implementation until the selected Skill/upstream-owner
    trace is resolved.
 
@@ -202,7 +202,7 @@ that decision.
 1. subagent scheduling は `CODEX_SUBAGENTS.md` が所有する typed capacity handshake と lifecycle ledger を消費し、ready dependency-DAG frontier の stage owner ごとに `vertical dynamic wave` を組みます。requested / configured / platform-effective / workflow-demand / write-cap / nested-reserved / available を分離し、既知制約の最小値を startup で read back してから reservation 成功時だけ spawn します。capacity が足りない ready work は失敗させず queue し、durable handback、全 descendant close readback、reservation release を終えた slot から再開します。固定 active/write 数、disposable capacity probe、または generated role view は scheduling authority になりません
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
 1. prompt-derived skill routing が必要なら `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。編集を許可する場合だけ caller が `--mode repo-changing` を明示します。`bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
-1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。依存 source clone / module lifecycle が scope の場合は `$dependency-module-change` を一般 route として先に選び、AgentCanon update はその具体例として後続に置く。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
+1. [agents/skills/README.md](README.md) から current stage に必要な public skill だけを足す。依存 source clone / module lifecycle が scope の場合は `$dependency-module-change` を一般 route として先に選び、AgentCanon update はその具体例として後続に置く。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
 1. repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。
 1. owner boundary、差し替え可能な単位、validation route が閉じた bounded edit は、catalog の typed route が child handoff を要求する場合だけその route で実行する。parent は既存 tool と targeted validation を選択された child packet に指定するだけで、実行結果を自ら解釈しない。public API/behavior/schema の追加、縮小、削除、rename、restriction、deprecation、意味変更だけは `scoped_change` または broader route に進め、必要な dependency/consumer/migration/docs closure を形成する
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
@@ -214,8 +214,7 @@ that decision.
 ### Local Capability Priority
 
 Subagent communication capability and coordination receipts follow the sole
-contract in `agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability
-Handshake`; this route does not duplicate that schema. Read the direct runtime
+contract in [agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake](../COMMUNICATION_PROTOCOL.md#runtime-collaboration-capability-handshake); this route does not duplicate that schema. Read the direct runtime
 collaboration namespace before selecting `direct_peer`. Matcher/tool inventory
 names are not capability evidence, so `unavailable`/`unverified` routes remain
 `parent_relay` or `durable_artifact`.
@@ -501,10 +500,12 @@ second call order or related-skill list.
 ### Repository Topic Clone Workstreams
 
 親、依存、standalone の source workstream はすべて
-`repository-topic-clone` の単一 lifecycle を使います。要求された clone/edit/update
+`repository-topic-clone` の単一 lifecycle を使います。要求された checkout/edit/update
 operation を先に保ち、`workspace/<topic-slug>/<repo-name>` の exact identity が既存
-clone と一致すれば named branch を再利用し、branch が無ければ最新
-`origin/main` から作成します。repository kind は prepare 後の policy decorator
+checkout と一致すれば named branch を再利用し、branch が無ければ最新
+`origin/main` から作成します。parent または同一 repository の branch は
+`linked-worktree`、dependency repository は `independent-clone` を選び、両方とも同じ
+workspace/topic/repo placement を使います。repository kind は prepare 後の policy decorator
 であり、specialized skill の前提が合わない場合はその decorator だけを外して generic
 operation を続けます。
 
@@ -516,7 +517,8 @@ remote、branch、module identity が一致する repo-local workspace に対し
 mutation（checkout/switch、branch/worktree、reset/restore/clean/stash、protected update
 wrapper）は同じ command でも既存の明示 authority gate を通します。canonical tool の
 内部で必要な Git 操作を理由に、caller が raw Git authority を付けたり、manual clone、
-別 path、`rm -rf` を選んだりしてはいけません。
+  別 path、`rm -rf` を選んだりしてはいけません。container 側に checkout-mode の
+  別 flag はなく、登録された exact target の metadata から自動判定します。
 
 `dependency_module_change.py status` は adapter-only の read command です。generic
 lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
@@ -528,7 +530,7 @@ task closeout では `repository-topic-clone` または `dependency-module-chang
 PR lifecycle、publication readback は任意の追加 evidence であり、指定時だけ coherent set と
 merged publication readback を検証します。preflight が成功して `CleanupProof` / cleanup
 receipt を返したときだけ `--apply` の削除を受理し、未達・衝突・unknown dirty state・proof
-mismatch は clone/topic root を保持した typed hold として closeout packet に記録します。
+mismatch は checkout/topic root を保持した typed hold として closeout packet に記録します。
 通常 cleanup に workspace packet artifact は不要で、proof-free deletion は完了状態になりません。
 
 workstream の scope は repository 構造、依存 edge、差し替え可能な責務単位、validation
@@ -694,7 +696,7 @@ Task-to-family mapping, activation mode, stage selection, and required roles are
 owned by `agents/task_catalog.yaml` (`tasks[].family`,
 `workflow_activation_policy`, `workflow_families[].roles`, and
 `role_topology_defaults.stage_waves`). This skill resolves that typed record and
-does not maintain a parallel task-shape table. `agents/TASK_WORKFLOWS.md` is the
+does not maintain a parallel task-shape table. [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) is the
 reader map for the same owner.
 
 ### Mathematical intent route
@@ -823,9 +825,9 @@ route を止める根拠に非数理エラーだけを使いません。
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/agent-orchestration.md` as the sole policy owner.
+1. Read [agents/skills/agent-orchestration.md](agent-orchestration.md) as the sole policy owner.
 1. When the selected execution profile is Luna, read
-   `agents/skills/direct-luna-communication.md` and use its bounded packet,
+   [agents/skills/direct-luna-communication.md](direct-luna-communication.md) and use its bounded packet,
    effective-runtime readback, and typed blocker contract.
 1. Consume the owner-produced semantic decision-sufficiency record referenced by
    the active route packet. A structured handoff or tool result is sufficient;

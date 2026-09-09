@@ -64,7 +64,7 @@ readback before `task_close.py` can report a terminal result.
 
 After any validation test/check failure, do not simplify, revert, delete intended behavior/tests, weaken the oracle, or downscope required validation just to pass.
 First record the five machine fields: `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`.
-This runtime-profile inventory JSON is the canonical validation-failure-response taxonomy owner. `documents/runtime/runtime-profiles-and-check-matrix.md` is the generated reader projection, while `agents/canonical/CODEX_WORKFLOW.md`, `agents/canonical/CODEX_SUBAGENTS.md`, `agents/TASK_WORKFLOWS.md`, and `documents/conventions/REVIEW_PROCESS.md` are workflow, handoff, reader-map, or checklist projections that must cite this inventory instead of defining separate slug lists.
+This runtime-profile inventory JSON is the canonical validation-failure-response taxonomy owner. [documents/runtime/runtime-profiles-and-check-matrix.md](runtime-profiles-and-check-matrix.md) is the generated reader projection, while [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md), [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md), [agents/TASK_WORKFLOWS.md](../../agents/TASK_WORKFLOWS.md), and [documents/conventions/REVIEW_PROCESS.md](../conventions/REVIEW_PROCESS.md) are workflow, handoff, reader-map, or checklist projections that must cite this inventory instead of defining separate slug lists.
 Repair with approved intent preserved or escalate before intent change.
 
 Required machine fields:

@@ -22,7 +22,7 @@ refactor target trace を固定する前に、owning design を read し、routi
 clause fingerprint と implementation trace を参照します。refactor の change
 mapping と review はこの skill の owner ですが、design drift invariant は
 routine に委譲します。一般原則の意味、競合時の優先順位、KISS / YAGNI / DRY、
-abstraction admission は `documents/conventions/software-engineering-principles.md`
+abstraction admission は [documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md)
 が所有し、この skill では refactor 固有の実行 contract だけを追加します。
 
 - Purpose: manage large refactors as behavior-preserving reorganizations with
@@ -66,7 +66,7 @@ refactor 固有の実行契約は、挙動保存を次の順で閉じます。
 ## Validation route
 
 validation command の正本は
-`agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` です。
+[agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary) です。
 refactor-loop は親 packet または変更後 responsibility graph が明示した exact command
 だけを消費します。global/full rescan が未指定なら実行せず、`unexpected-action` または
 `unresolved-risk` として親へ返します。
@@ -101,13 +101,13 @@ source / pin routing を参照として担当します。
 
 ## Core References
 
-- `documents/conventions/software-engineering-principles.md`
-- `agents/TASK_WORKFLOWS.md`
-- `documents/conventions/REVIEW_PROCESS.md`
-- `agents/skills/codex-task-workflow.md`
-- `agents/skills/integration.md`
-- `documents/conventions/coding-conventions-cpp.md`
-- `agents/skills/cpp-review.md`
+- [documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md)
+- [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
+- [agents/skills/codex-task-workflow.md](codex-task-workflow.md)
+- [agents/skills/integration.md](integration.md)
+- [documents/conventions/coding-conventions-cpp.md](../../documents/conventions/coding-conventions-cpp.md)
+- [agents/skills/cpp-review.md](cpp-review.md)
 
 ## C++ project migration projection
 
@@ -372,7 +372,7 @@ validation を使います。
    target traces、allowed files、target-by-target repair intent、
    forbidden semantic delta、親が選択した exact validation commands、final response
    format を指定します。validation commands は
-   `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` の閉じた
+   [agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary) の閉じた
    trust boundary であり、full suite / full scan は owner packet または変更後の
    responsibility graph が選んだ exact command の場合だけ含めます。
    repair intent では、各 target trace ごとに current problem、intended
@@ -585,8 +585,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    reason as root/shared contract risk, risky semantic change, or no batchable
    target. Record `review_required` / `deferred` only as that evidence-backed
    blocker.
-1. Read `agents/skills/refactor-loop.md` and the material clauses in
-   `documents/conventions/software-engineering-principles.md`.
+1. Read [agents/skills/refactor-loop.md](refactor-loop.md) and the material clauses in
+   [documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md).
 1. Use `$structure-planning` before editing when file moves, module boundaries, repair slices, path mapping, responsibility maps, allowed structural delta, or forbidden semantic delta are nontrivial.
 1. Fix `Behavior Contract`, `Allowed Structural Delta`, and `Forbidden Semantic Delta` before editing.
 1. For API-shaping refactors, fix `Expected API` before editing and pass that

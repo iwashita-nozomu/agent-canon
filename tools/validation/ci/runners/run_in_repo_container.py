@@ -17,15 +17,11 @@ from tools.validation.ci.runners.container_runtime import (
     apply_pack_overrides,
     build_build_command,
     build_run_command,
-    emit_not_created_lifecycle_receipt,
-    lifecycle_context,
     load_or_default_pack,
     print_label_and_command,
     resolve_builder,
-    scope_pack_image_tag,
-    start_container_lifecycle,
+    should_build_image,
     workspace_path,
-    write_lifecycle_receipt,
 )
 
 
@@ -47,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dockerfile", help="Dockerfile path override.")
     parser.add_argument("--context", help="Build context override.")
     parser.add_argument("--target", help="Build target override.")
-    parser.add_argument("--tag", help="Temporary image tag override.")
+    parser.add_argument("--tag", help="Image tag override for the selected runtime pack.")
     parser.add_argument(
         "--pull", action="store_true", help="Pull the latest base image."
     )
@@ -136,29 +132,34 @@ def main() -> int:
     """Run the CLI."""
     try:
         args = build_parser().parse_args()
+        workspace_root = workspace_path(args.workspace_root)
         pack = apply_pack_overrides(
-            load_or_default_pack(args.pack),
+            load_or_default_pack(args.pack, workspace_root=workspace_root),
             dockerfile=args.dockerfile,
             context=args.context,
             target=args.target,
             tag=args.tag,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
-        workspace_root = workspace_path(args.workspace_root)
-        lifecycle = lifecycle_context(workspace_root, builder, "repo-container")
-        if not args.skip_build:
-            pack = scope_pack_image_tag(pack, lifecycle)
-        lifecycle = lifecycle.bind_image_tag(pack.image_tag)
         command = normalize_command(args.command, shell_session=args.shell_session)
         shell = args.shell or pack.runtime.shell
         run_payload = command if command else [shell]
 
+        build_requested = should_build_image(
+            builder,
+            pack.image_tag,
+            workspace_root=workspace_root,
+            skip_build=args.skip_build,
+            force_build=args.build_only or args.pull or args.no_cache,
+            print_only=args.print_only,
+        )
+
         build_command = build_build_command(
             builder,
             pack,
+            workspace_root=workspace_root,
             pull=args.pull,
             no_cache=args.no_cache,
-            labels=lifecycle.labels(),
         )
         run_command = build_run_command(
             builder,
@@ -174,7 +175,6 @@ def main() -> int:
             gpus=args.gpus,
             user=args.user,
             tty=args.tty,
-            labels=lifecycle.labels(),
         )
 
         print_label_and_command("build", build_command)
@@ -182,36 +182,13 @@ def main() -> int:
             print_label_and_command("run", run_command)
 
         if args.print_only:
-            emit_not_created_lifecycle_receipt(workspace_root, lifecycle)
             return 0
 
-        lifecycle_run = start_container_lifecycle(
-            workspace_root, builder, "repo-container", context=lifecycle
-        )
-        if lifecycle_run.receipt.state != "snapshot":
-            write_lifecycle_receipt(workspace_root, lifecycle_run.receipt)
-            print(
-                f"container lifecycle unavailable: {lifecycle_run.receipt.failure or lifecycle_run.receipt.before.query_status}",
-                file=sys.stderr,
-            )
-            return 2
-
         command_exit = 0
-        try:
-            if not args.skip_build:
-                command_exit = subprocess.run(build_command, check=False).returncode
-            if command_exit == 0 and not args.build_only:
-                command_exit = subprocess.run(run_command, check=False).returncode
-        finally:
-            cleanup_result = lifecycle_run.finish(cleanup=True)
-
-        if cleanup_result.state not in {"cleaned", "not-created"}:
-            print(
-                f"container lifecycle cleanup state={cleanup_result.state}: {cleanup_result.failure}",
-                file=sys.stderr,
-            )
-            if command_exit == 0:
-                command_exit = 2
+        if build_requested:
+            command_exit = subprocess.run(build_command, check=False).returncode
+        if command_exit == 0 and not args.build_only:
+            command_exit = subprocess.run(run_command, check=False).returncode
         return command_exit
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)

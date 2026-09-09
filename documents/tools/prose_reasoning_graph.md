@@ -22,7 +22,7 @@ command surface、result surface、verification route、skill handoff を説明�
 
 ## この文書の読み方
 
-この tool reference は、Prose Reasoning Graph の根拠 surface、読者と責務境界、graph visualization owner、graph contract、runtime flow、command surface、result surface、document responsibility check、profiles、verification route、skill handoff、writing loop を順に説明します。実行入口を探すときは Command Surface へ進み、出力や責務境界を確認するときは Graph Contract と Result Surface を先に読みます。DSL の正本は `documents/prose-reasoning-graph/dsl-spec.md` です。
+この tool reference は、Prose Reasoning Graph の根拠 surface、読者と責務境界、graph visualization owner、graph contract、runtime flow、command surface、result surface、document responsibility check、profiles、verification route、skill handoff、writing loop を順に説明します。実行入口を探すときは Command Surface へ進み、出力や責務境界を確認するときは Graph Contract と Result Surface を先に読みます。DSL の正本は [documents/prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md) です。
 
 ## 根拠 Surface
 
