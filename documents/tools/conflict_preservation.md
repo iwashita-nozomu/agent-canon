@@ -13,8 +13,10 @@ downstream implementation ../../tests/agent_tools/test_conflict_preservation.py 
 `conflict_preservation.py` is the small content-level companion to the
 existing `repository_topic_clone.py` lifecycle. It records the merge base,
 base/ours/theirs index stages, hunk evidence, staged state, and unaffected
-content before a conflict is resolved. It does not select a side or resolve
-the conflict.
+content before a conflict is resolved. Regular-file stages include blob
+metadata; mode `160000` gitlink stages preserve their mode and OID without
+requiring the foreign submodule commit to exist in the superproject object
+database. It does not select a side or resolve the conflict.
 
 `capture` is invoked automatically when `merge-main` stops on a conflict.
 `validate` and `validate-rework` report packet validity; they do not complete a
@@ -48,6 +50,8 @@ not prove preservation.
 The hook accepts a destructive command only when every normalized mutation
 target is covered by the inventory/plan, the packet files exist below the
 active clone's `.agent-canon/` evidence scope, and `HEAD`, `MERGE_HEAD`, and
-the target stage blob references still equal the captured snapshot. Broad
+the target stage entries still equal the captured snapshot. Regular target
+stages are checked through their blob references; gitlinks are checked through
+their mode/OID identity. Broad
 reset, clean, reclone, multi-source replacement, and unbounded pathspecs are
 held for explicit finalization.
