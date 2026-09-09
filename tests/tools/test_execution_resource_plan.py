@@ -765,6 +765,31 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
         finally:
             os.close(evidence.fd)
 
+    def test_nvidia_fixture_xml_ignores_historical_accounting_processes(self) -> None:
+        list_evidence, _ = self._fixture_evidence("list.valid.physical_mig")
+        xml_evidence, expected = self._fixture_evidence(
+            "xml.valid.accounted_processes"
+        )
+        try:
+            parsed = parse_nvidia_smi_xml(xml_evidence)
+            self.assertEqual(parsed.process_inventory_disposition, expected["disposition"])
+            observation = NvidiaInventoryProbe(
+                list_evidence=list_evidence,
+                xml_evidence=xml_evidence,
+            ).observe_structured(
+                frozenset({"GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+            )
+            self.assertEqual(observation.processes, ())
+            self.assertEqual(
+                observation.process_inventory_visibility["units"][
+                    "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                ]["process_count"],
+                0,
+            )
+        finally:
+            os.close(list_evidence.fd)
+            os.close(xml_evidence.fd)
+
     def test_r5_ambiguous_xml_gpu_join_fails_closed(self) -> None:
         """An ambiguous topology join cannot become a usable GPU unit."""
         inventory, disposition, descriptors = self._fixture_nvidia_inventory()
