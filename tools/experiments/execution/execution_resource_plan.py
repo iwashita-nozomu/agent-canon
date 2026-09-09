@@ -2592,7 +2592,12 @@ def _parse_structured_gpu_processes(
     unknown_gpu_ids: set[str] = set()
     xml_binding_unknown = False
     ancestry_probe = ProcAncestryProbe()
-    for process_info in root.findall(".//process_info"):
+    for process_info in (
+        candidate
+        for container in _process_inventory_containers(root)
+        for candidate in container.iter()
+        if _xml_local_name(candidate) == "process_info"
+    ):
         pid_text = _xml_text(process_info.find("pid"), "process_info.pid")
         try:
             pid = int(pid_text)
@@ -3000,6 +3005,7 @@ _NVIDIA_UNSAFE_XML_RE = re.compile(r"<!\s*ENTITY\b", re.IGNORECASE)
 _NVIDIA_PROCESS_CONTAINER_TAGS = frozenset(
     {"processes", "compute_processes", "graphics_processes"}
 )
+_NVIDIA_ACCOUNTING_CONTAINER_TAGS = frozenset({"accounted_processes"})
 _NVIDIA_PROCESS_RECORD_TAGS = frozenset(
     {"process_info", "pid", "process_name", "used_memory", "type"}
 )
@@ -3453,7 +3459,11 @@ def _parse_nvidia_smi_xml_document(evidence: EvidenceFd) -> _ParsedNvidiaXmlDocu
     )
     for element in root.iter():
         tag = _xml_local_name_strict(element)
-        if "process" in tag and tag not in _NVIDIA_PROCESS_CONTAINER_TAGS | _NVIDIA_PROCESS_RECORD_TAGS:
+        if "process" in tag and tag not in (
+            _NVIDIA_PROCESS_CONTAINER_TAGS
+            | _NVIDIA_ACCOUNTING_CONTAINER_TAGS
+            | _NVIDIA_PROCESS_RECORD_TAGS
+        ):
             raise _nvidia_parser_failure(
                 "gpu_process_scope_unproven",
                 "NVIDIA XML contains an unsupported process scope",
