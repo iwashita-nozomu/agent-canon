@@ -43,6 +43,7 @@ For a consumer root, use only the following consumer-owned map:
 | repository structure and file responsibility | the consumer's structure documentation |
 | consumer-specific agent instructions | the appended consumer-owned section of this file |
 | AgentCanon maintenance (consumer roots) | a separately selected AgentCanon development checkout |
+| observed AgentCanon runtime defect | the applicable repository-specific Issue owner | immediate Issue record or qualified no-mutation handoff |
 
 For a source-specific AgentCanon root, the source checkout's [AGENTS.md](AGENTS.md) Reader
 Map and canonical owners are the local authority. The common base supplies
@@ -57,6 +58,16 @@ consumer root, keep consumer product behavior, environment policy, tests, CI,
 credentials, and runtime semantics with consumer owners. For a
 source-specific AgentCanon root, keep those source responsibilities with the
 source checkout's owners.
+
+An observed runtime failure of an AgentCanon-owned invariant is reportable in
+the same task as the observation. The first record does not wait for a repeated
+occurrence, dashboard evidence, repair completion, or confirmed cause; preserve
+the error, command or action, snapshot, expected behavior, actual behavior, and
+any unresolved hypotheses through the applicable Issue owner. Generic host,
+dotfile, credential, consumer, or ownership-unknown failures stay with their
+applicable owner or qualified handoff and are not attributed to AgentCanon by
+proximity. This common base exposes that reporting scope without selecting an
+external checkout, credential, or publication implementation.
 
 This common base establishes the shared root instruction boundary. It does not
 re-own task procedures, command recipes, role lifecycles, implementation policy,
@@ -86,6 +97,7 @@ For a consumer root, use only the following consumer-owned map:
 | repository structure and file placement | consumer structure owner | consumer structure route |
 | root instruction extension | consumer-specific section in this file | consumer instruction route |
 | AgentCanon source maintenance (consumer roots) | selected AgentCanon development checkout | AgentCanon maintenance route |
+| observed AgentCanon runtime defect | applicable repository-specific Issue owner | immediate Issue record or qualified handoff |
 
 For a source-specific AgentCanon root, the source checkout's [AGENTS.md](AGENTS.md) and
 its canonical owners supply the owner and validation route.
