@@ -9,11 +9,11 @@ upstream implementation ../../.codex/config.toml current shared template Codex c
 
 # Codex Configuration Slides
 
-このスライドは `documents/codex/codex-configuration-reference.md` の要点から作成した Markdown deck です。実際の slide / presentation production は `agents/skills/slides.md` に従い、固定 template と layout review を優先します。
+このスライドは [documents/codex/codex-configuration-reference.md](codex-configuration-reference.md) の要点から作成した Markdown deck です。実際の slide / presentation production は [agents/skills/slides.md](../../agents/skills/slides.md) に従い、固定 template と layout review を優先します。
 
 ## この文書の読み方
 
-この deck は、Codex 設定の全体像、根拠、設定 surface、template の現在値、未設定項目、CLI override、主要 key、subagents、MCP、hooks、skills、AGENTS.md discovery を順に説明します。発表や説明資料を作るときは前半の全体像から読み、設定変更の根拠確認には詳細 reference である `codex-configuration-reference.md` に戻ります。この文書自体は slide 派生物であり、設定正本ではありません。
+この deck は、Codex 設定の全体像、根拠、設定 surface、template の現在値、未設定項目、CLI override、主要 key、subagents、MCP、hooks、skills、[AGENTS.md](../../AGENTS.md) discovery を順に説明します。発表や説明資料を作るときは前半の全体像から読み、設定変更の根拠確認には詳細 reference である [codex-configuration-reference.md](codex-configuration-reference.md) に戻ります。この文書自体は slide 派生物であり、設定正本ではありません。
 
 ---
 
@@ -22,7 +22,7 @@ upstream implementation ../../.codex/config.toml current shared template Codex c
 Codex の設定は 1 ファイルではなく、複数の runtime surface で構成されます。
 
 - `config.toml`: runtime の機械的設定
-- `AGENTS.md`: repo 内の作業規律
+- [AGENTS.md](../../AGENTS.md): repo 内の作業規律
 - hooks: セッションと tool 実行の決定的処理
 - MCP: 外部 tool / repo tool 接続
 - skills: 再利用可能な workflow
@@ -52,14 +52,14 @@ Codex の設定は 1 ファイルではなく、複数の runtime surface で構
 | `-c key=value` | run | 一時 override |
 | `.codex/agents/*.toml` | repo/user | custom subagent |
 | `.codex/personal/skills` | dir/repo/user | workflow package |
-| `AGENTS.md` | repo tree | 作業規律 |
+| [AGENTS.md](../../AGENTS.md) | repo tree | 作業規律 |
 | hooks | repo/user | 起動・tool 実行時の強制処理 |
 
 ---
 
 # 覚えるべき分担
 
-- `AGENTS.md`: 何を必ず守るか
+- [AGENTS.md](../../AGENTS.md): 何を必ず守るか
 - `.codex/config.toml`: runtime をどう動かすか
 - `.codex/agents/*.toml`: role ごとの model / sandbox / MCP / skills
 - `hooks.json`: deterministic startup と tool gate
@@ -378,7 +378,7 @@ Codex は skill metadata で候補を選び、選択後に該当 `SKILL.md` を�
 
 - description は短く明確にする
 - frontmatter を壊すと skill が load されない
-- workflow は skill、repo policy は `AGENTS.md`
+- workflow は skill、repo policy は [AGENTS.md](../../AGENTS.md)
 - plugin は配布単位、skill は実行単位
 
 ---
@@ -396,7 +396,7 @@ Codex は repository の `.codex/personal/skills/` を自動探索します。pr
 
 ---
 
-# AGENTS.md discovery
+# [AGENTS.md](../../AGENTS.md) discovery
 
 関連 key:
 
@@ -407,7 +407,7 @@ Codex は repository の `.codex/personal/skills/` を自動探索します。pr
 - `include_permissions_instructions`
 - `include_apps_instructions`
 
-`AGENTS.md` は agent が読む作業規律の正本です。設定値の一覧表を置く場所ではありません。
+[AGENTS.md](../../AGENTS.md) は agent が読む作業規律の正本です。設定値の一覧表を置く場所ではありません。
 
 ---
 
@@ -512,7 +512,7 @@ credential は committed config に直書きしません。
 # Agent-canon での推奨設計
 
 - `.codex/config.toml`: 責務を追える形に保つ
-- `AGENTS.md`: workflow gate と closeout policy
+- [AGENTS.md](../../AGENTS.md): workflow gate と closeout policy
 - `.codex/agents/*.toml`: role behavior
 - `.codex/personal/skills`: reusable workflow
 - hooks: deterministic startup
@@ -530,5 +530,5 @@ Codex 設定は「便利な knobs の集合」ではなく、agent が確実に�
 - durable policy は repo に残す
 - temporary override は CLI / profile
 - tool startup は hooks / MCP
-- workflow は skills / AGENTS.md
+- workflow は skills / [AGENTS.md](../../AGENTS.md)
 - evidence は run bundle

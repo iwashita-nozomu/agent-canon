@@ -38,7 +38,7 @@ downstream implementation ../../tools/validation/semantic/convention/convention_
   `tests/cpp/` が所有し、root CMake から out-of-tree に接続します。
 - `python/` は Python implementation の正本です。parent root は language-neutral な
   command/document entry として保ちます。
-- C++ を使う場合の build layout は `documents/design/cpp-build-layout.md` を正本にします。
+- C++ を使う場合の build layout は [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) を正本にします。
 - Bash 実装は用途で置き場所を固定します。shared automation の Bash は `tools/`、repo-local bootstrap の Bash は `scripts/` に置きます。
 
 ## 3. 文書運用
@@ -53,28 +53,28 @@ downstream implementation ../../tools/validation/semantic/convention/convention_
   validation command を示します。
 - 長めの reader-facing Markdown は、先頭付近に文書内容、主な章のまとまり、
   読むべき場面、誤用を避ける境界を示す reader map を置きます。詳細は
-  `documents/conventions/common/05_docs.md` を正本にします。
+  [documents/conventions/common/05_docs.md](common/05_docs.md) を正本にします。
 - Markdown を編集したら、対象の `.md` に formatter を適用し、その後で `tools/bin/agent-canon docs check` を通します。
 - 上の Markdown 運用は `documents/`、`tools/`、`scripts/`、`.github/`、root `README.md`、`QUICK_START.md` を含む正本文書に適用します。
 - 日付付きの途中報告、個別メモ、比較の試行錯誤は `documents/notes/` に置きます。
-- agent team の要約は `agents/README.md` に集約します。
+- agent team の要約は [agents/README.md](../../agents/README.md) に集約します。
 
 ## 4. 開発環境
 
-- 共通実行環境が必要な場合は、AgentCanon の `documents/runtime/bootstrap-runtime.md` と `bootstrap.sh`、親の `docker/` / test entrypoint の責務を分けます。
+- 共通実行環境が必要な場合は、AgentCanon の [documents/runtime/bootstrap-runtime.md](../runtime/bootstrap-runtime.md) と `bootstrap.sh`、親の `docker/` / test entrypoint の責務を分けます。
 - Python 依存を追加する場合は、親 `pyproject.toml` の optional extras と親 image build の image-owned dependency lifecycle / readback を契約の基準にします。Agent/Codex tools は AgentCanon の `bootstrap/` manifest から shared image build 時に導入します。post-create や source checkout は dependency installer ではありません。
 - `docker/Dockerfile`、`pyproject.toml`、`bootstrap/`、または親 `.devcontainer/` を更新した変更では、対応する container contract checker と対象 image/runtime validation を実行します。
 - 開発環境の更新では、必要な README と運用文書も同じ変更で更新します。
 - Python を使う場合でも、repo 全体の入口は language-neutral に保ちます。
 - canonical container の safe-directory は shared post-create が mounted workspace の実体を検証して管理します。image build や host runtime で repository-specific な登録スクリプトを呼び出しません。
-- Template / AgentCanon 固有の machine-local remote path は `documents/contracts/template-github-remote.md` と `documents/agent-canon/agent-canon-github-remote.md` を正本にします。
+- Template / AgentCanon 固有の machine-local remote path は [documents/contracts/template-github-remote.md](../contracts/template-github-remote.md) と [documents/agent-canon/agent-canon-github-remote.md](../agent-canon/agent-canon-github-remote.md) を正本にします。
 - Docker container 内から Docker を使う手順を正本にする場合は、明示した `docker-host` optional profile の socket bind または別 daemon の要件を文書へ明記します。default lifecycle は host Docker CLI/socket に依存しません。
-- Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針の具体的な境界、例外、validation は `CONTAINER_OPERATIONS.md` を正本にします。
+- Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針の具体的な境界、例外、validation は [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md) を正本にします。
 
 ## 4.5 環境依存ツール導入提案のルール
 
-- repo-wide に使う環境依存ツールの導入提案では、`templates/agents/environment_change_proposal.md` を使って理由、影響範囲、validation、rollback を記録します。
-- host-global install 由来の要件は、必要時に `CONTAINER_OPERATIONS.md` または `docker/` の運用境界へ反映します。
+- repo-wide に使う環境依存ツールの導入提案では、[templates/agents/environment_change_proposal.md](../../templates/agents/environment_change_proposal.md) を使って理由、影響範囲、validation、rollback を記録します。
+- host-global install 由来の要件は、必要時に [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md) または `docker/` の運用境界へ反映します。
 - repo-wide に必要な Python tool は、`pyproject.toml` の selected extras と、親が必要とする場合は image build の project-dependency lifecycle / readback contract に反映します。Agent/Codex tools は AgentCanon `bootstrap/` manifest が所有し、shared image build で fixed OS/Python/native capability を準備します。post-create から editable install、pip setup、package mutation を呼び出しません。
 - CI でも使う tool は手元だけの補助 install に留めず、共有運用手順へ反映してから利用します。
 - 1 回限りの調査や個人補助にとどまる tool は、repo 正本へ追加する前に container 実行、checked-in script、既存依存での代替可否を確認します。
@@ -89,10 +89,10 @@ downstream implementation ../../tools/validation/semantic/convention/convention_
 
 - `docker/Dockerfile` を更新する変更では、依存追加の有無にかかわらず `README.md`、`QUICK_START.md`、関連する `documents/` の command や説明も同じ変更で見直します。
 - Docker 変更で新しい tool を同梱する場合は、その tool の用途、呼び出し入口、不要になったときの削除方針を文書へ残します。
-- Docker 変更で AgentCanon tool が必要になった場合は、`documents/runtime/bootstrap-runtime.md` に従って AgentCanon の `bootstrap/` image manifest と shared runtime を更新します。親 `.devcontainer/` は image-verify/readback 以外の AgentCanon installer になりません。
-- Docker runtime の project 正本は `docker/Dockerfile` とし、`docker/packs/*.toml` と Python execution rules は存在するときだけ project-owned override として使います。nested-Codex の profile 選択は `documents/runtime/runtime-profiles-and-check-matrix.md` を参照します。
+- Docker 変更で AgentCanon tool が必要になった場合は、[documents/runtime/bootstrap-runtime.md](../runtime/bootstrap-runtime.md) に従って AgentCanon の `bootstrap/` image manifest と shared runtime を更新します。親 `.devcontainer/` は image-verify/readback 以外の AgentCanon installer になりません。
+- Docker runtime の project 正本は `docker/Dockerfile` とし、`docker/packs/*.toml` と Python execution rules は存在するときだけ project-owned override として使います。nested-Codex の profile 選択は [documents/runtime/runtime-profiles-and-check-matrix.md](../runtime/runtime-profiles-and-check-matrix.md) を参照します。
 - Docker runtime、optional runtime pack、または親 devcontainer 導線を変えた場合は対応 checker を通し、存在する project surface と AgentCanon shared runtime の所有境界を確認します。
-- main server host の path、mount、builder 前提は `documents/contracts/server-host-contract.md` と `templates/documents/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
+- main server host の path、mount、builder 前提は [documents/contracts/server-host-contract.md](../contracts/server-host-contract.md) と `templates/documents/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
 - C++ の canonical project entrypoint は `cpp/CMakeLists.txt` です。parent root は
   language-neutral に保ち、C++ は explicit な `cpp` source directory から configure します。
 - template 既定では C++ 実装を持ちません。C++ を追加する project では `cpp/include/`
@@ -123,9 +123,9 @@ cmake --install "$ROOT/build/cpp/<profile>"
 
 ## 運用境界
 
-- repo 固有の Template / AgentCanon mirror path は `documents/contracts/template-github-remote.md` / `documents/agent-canon/agent-canon-github-remote.md` へ集約します。
-- Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針は `CONTAINER_OPERATIONS.md` の手順で扱います。
-- host-global install 由来の要件は `CONTAINER_OPERATIONS.md` / `docker/` の更新対象として収束させます。
+- repo 固有の Template / AgentCanon mirror path は [documents/contracts/template-github-remote.md](../contracts/template-github-remote.md) / [documents/agent-canon/agent-canon-github-remote.md](../agent-canon/agent-canon-github-remote.md) へ集約します。
+- Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針は [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md) の手順で扱います。
+- host-global install 由来の要件は [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md) / `docker/` の更新対象として収束させます。
 - CI でも使う tool は、共有運用ルートへ反映して運用します。
 - `cpp/` の下に nested manifest を追加する場合は `cpp/CMakeLists.txt` の同一 configure
   graph に接続し、nested manifest は project identity を持たず target ownership を

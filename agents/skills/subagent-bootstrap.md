@@ -52,15 +52,15 @@ config policy の第二の正本にはしません。
 
 ## Core References
 
-- `agents/TASK_WORKFLOWS.md`
-- `agents/COMMUNICATION_PROTOCOL.md`
-- `agents/canonical/CODEX_SUBAGENTS.md`
-- `agents/skills/direct-luna-communication.md`
-- `agents/internal-routines/subagent-startup.md`
+- [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md)
+- [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
+- [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md)
+- [agents/skills/direct-luna-communication.md](direct-luna-communication.md)
+- [agents/internal-routines/subagent-startup.md](../internal-routines/subagent-startup.md)
 - `tools/runtime/lifecycle/bootstrap_agent_run.py`
 
 Runtime collaboration capability and coordination receipts are defined only by
-`agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake`.
+[agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake](../COMMUNICATION_PROTOCOL.md#runtime-collaboration-capability-handshake).
 This skill projects the launch route: capability must be read from the direct
 runtime collaboration namespace before `direct_peer` communication is chosen.
 When the status is `unavailable` or `unverified`, record `parent_relay` or
@@ -127,12 +127,12 @@ repo-changing task では、`--task-id` から catalog の typed family、stage�
 role、child/bundle activation を解決します。specialist と review pack は
 owner-critical decision、artifact operation、または selected review gate が必要な
 場合だけ有効化します。
-handoff / capsule fields の正本は `agents/COMMUNICATION_PROTOCOL.md` です。この skill は launch timing、role selection、wave ledger、authorization、closeout mechanics を所有し、capsule field list を第二の正本にしません。
+handoff / capsule fields の正本は [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) です。この skill は launch timing、role selection、wave ledger、authorization、closeout mechanics を所有し、capsule field list を第二の正本にしません。
 Git 状態に関係する handoff は `python3 tools/runtime/authority/checkout_identity.py --format lines` の
 `checkout_identity` block（絶対 cwd、Git root、branch または detached、HEAD、normalized
 remote owner/repository）を開始、checkout 遷移、Git mutation 境界、handoff、final handback
 で一度だけ渡します。通常の各コマンドで繰り返さず、これは authority や承認を追加しません。
-subagent-only startup / internal skill routes are owned by `agents/internal-routines/subagent-startup.md`. Bootstrap cites that routine and carries `run.subagent_prompt_packet.subagent_startup_route` into handoff routing when present; it does not add `_...` labels to public skill routing or duplicate the capsule schema.
+subagent-only startup / internal skill routes are owned by [agents/internal-routines/subagent-startup.md](../internal-routines/subagent-startup.md). Bootstrap cites that routine and carries `run.subagent_prompt_packet.subagent_startup_route` into handoff routing when present; it does not add `_...` labels to public skill routing or duplicate the capsule schema.
 prompt / routing / subagent-config drift を直す task では、shared policy prose を
 直接広く書き換える前に `prompt_config_reviewer` を prompt/config audit wave として起動し、
 対象 surface は route seed として扱い、責務検索、再利用確認、stale surface scan、dependency expansion を通して handoff scope へ落とします。
@@ -150,7 +150,7 @@ read-only exploration に切る前に、その質問を所有する checker、ro
 repo inventory、tool drift survey、機械 report 要約、experiment/log execution は、implementation の critical path を塞がない独立検証または実験実行として Luna/high の通常 role に切ります。mini/medium は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。static validation triage、diff-local Python / C++ review、bounded review、report traceability、checklist-style review gate は、該当 decision があるときに一つの accountable `gpt-5.6-luna/high` review role へ切ります。writer と owner gate/review は、semantic decision と selected validation route が要求する場合だけ分けます。write-capable child は catalog の typed route が要求するときだけ起動します。
 - fixed packet の worker substitution、smaller slice、speculative test、repeated preflight、rollback checkpoint、compatibility fallback は禁止します。compile/static failure は `ImplementationFeedback`、exact target contradiction は一度の `StructuralDesignGap` と同じ Spark の resume です。
 選択済み candidate が起動できない場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録します。candidate を変える場合は explicit revised parent packet と wave を必須にします。`skill_evaluator`、実験実行 role、または review role の起動失敗は、同じ role packet と該当 `.codex/agents/*.toml` の `model` / `model_reasoning_effort` で原因を切り分けます。
-command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt は `agents/COMMUNICATION_PROTOCOL.md` の `Context Visibility Contract` と `Fresh Subagent Context Capsule` を満たすように、`team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` から selected fields だけを入れます。full packet、raw stdout、raw logs、broad chat summary は prompt に貼りません。
+command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt は [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) の `Context Visibility Contract` と `Fresh Subagent Context Capsule` を満たすように、`team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` から selected fields だけを入れます。full packet、raw stdout、raw logs、broad chat summary は prompt に貼りません。
 固定の `STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only` を completion 条件にしません。
 各 wave は owner-critical な plan、review、edit のうち実際に必要な stage だけを
 記録し、未選択 stage の artifact を作りません。
@@ -158,7 +158,7 @@ command output の `DEFAULT_QUALITY_CHECKS=candidate_only`、
 candidate role / agent-type lines を確認し、
 review と edit の handoff では `team_manifest.yaml` の
 `run.default_quality_check_policy` を含めます。
-handoff prompt には repo root や `/workspace` 全体ではなく、dependency-expanded `allowed_paths`、該当 canon 節、`do_not_read` surface、expected output schema を含め、context artifact は `agents/COMMUNICATION_PROTOCOL.md` が定義する capsule で参照します。implementation handoff では implementation-surface router の `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にし、router が unavailable なら deterministic router recovery output を local provisional source-packet evidence として保持するか `router_unavailable_blocker` を記録します。この evidence は新しい candidate や public route を自動選択せず、responsibility search と dependency scope で handoff path を確定するための local/tool context に限定します。`allowed_paths` は手書き対象だけで閉じず、編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。full tree search、raw accumulated logs、unrelated module scan が必要になった場合は、parent へ escalation して input packet を拡張してから進めます。
+handoff prompt には repo root や `/workspace` 全体ではなく、dependency-expanded `allowed_paths`、該当 canon 節、`do_not_read` surface、expected output schema を含め、context artifact は [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) が定義する capsule で参照します。implementation handoff では implementation-surface router の `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にし、router が unavailable なら deterministic router recovery output を local provisional source-packet evidence として保持するか `router_unavailable_blocker` を記録します。この evidence は新しい candidate や public route を自動選択せず、responsibility search と dependency scope で handoff path を確定するための local/tool context に限定します。`allowed_paths` は手書き対象だけで閉じず、編集候補、検索 hit、checker finding、changed path を seed に dependency header graph で再帰展開した `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。full tree search、raw accumulated logs、unrelated module scan が必要になった場合は、parent へ escalation して input packet を拡張してから進めます。
 theorem-driven、algorithm、implementation handoff では、protocol-owned `Target Binding Packet` を Fresh Subagent Context Capsule に必ず入れます。packet が不完全な場合は subagent を起動せず、packet owner が capsule または source packet を補完します。subagent から返った unchecked theorem sketch、型が合っていない式、public root への到達が示されていない local counterexample、または code suggestion は、verifier または owning reviewer が同じ public root に対する checker / validation route を通すまで採用しません。
 write-capable subagent へ渡す前に `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせるか明示引用し、`TOOL_REJECTION_PREDICTED_GATE`、`rejection_preflight_command`、gate-specific repair plan を handoff に含めます。Hook / Tool / SKILL / workflow / protocol surface では、予測 gate が `agentcanon_new_tool_source_route`、`codex_hook_runtime_alignment`、`tool_catalog`、`agent_protocol_convention`、`log_surface_inventory_guard` を出す場合があるため、対応 command を実装前の必須 evidence として渡します。既存 AgentCanon tool source はこの新規 source route gate では止めません。
 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む implementation は `worker` に戻します。
@@ -280,16 +280,16 @@ Evidence に `runtime_no_close_operation:terminal_status_observed` を記録し�
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/subagent-bootstrap.md`.
-1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
-1. Read `agents/skills/direct-luna-communication.md` when the selected execution
+1. Read [agents/skills/subagent-bootstrap.md](subagent-bootstrap.md).
+1. Read [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md).
+1. Read [agents/skills/direct-luna-communication.md](direct-luna-communication.md) when the selected execution
    profile is Luna, and require its effective model / effort readback before
    admitting work.
-1. Read `agents/internal-routines/subagent-startup.md` before preparing
+1. Read [agents/internal-routines/subagent-startup.md](../internal-routines/subagent-startup.md) before preparing
    subagent-only startup or internal skill route handoffs. The canonical private
-   startup route is `agents/internal-routines/subagent-startup.md`; historical
+   startup route is [agents/internal-routines/subagent-startup.md](../internal-routines/subagent-startup.md); historical
    startup labels are not public skills or accepted route aliases.
-1. Treat `agents/COMMUNICATION_PROTOCOL.md` as the single owner of handoff and
+1. Treat [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) as the single owner of handoff and
    capsule fields. This skill owns launch timing, role selection, wave ledger,
    authorization, and closeout mechanics; it does not create a second capsule
    schema.
@@ -328,7 +328,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Treat a bounded implementation slice as `spark_worker` eligible only when it is derived from the Abstract Design Frame and is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable. Eligibility does not replace the explicit typed parent-packet selection.
 1. Keep every handoff packet owned after discovery: include dependency-expanded `allowed_paths`, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema, with context artifacts referenced through the protocol-owned capsule. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, retain deterministic router recovery output only as local provisional source-packet evidence or record `router_unavailable_blocker` before handoff. This evidence does not select a new candidate or public route; confirm the handoff paths through responsibility search and dependency scope.
 1. For a fresh launch, build the `Fresh Subagent Context Capsule` through
-   `agents/COMMUNICATION_PROTOCOL.md` and its `Context Visibility Contract`.
+   [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) and its `Context Visibility Contract`.
    Reuse an active agent when owner, responsibility, context, write authority,
    and validation route remain compatible, including revised scope. New turns or
    renamed packets alone do not require fresh launch. Keep full packets, raw
@@ -359,7 +359,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. If a write-capable coding / docs-edit subagent cannot be launched because authorization or tool gates are missing, record `WRITE_SUBAGENT_AUTHORIZATION=required` or the gate-specific blocker in the run bundle and stop expanding read-only analysis for that slice. Return a typed blocked/retry/user-report packet; no parent write route exists.
 1. Default to one writer in the current checkout. If multiple writers are necessary, use them only when `team_manifest.yaml` fixes dependency order, wave plan, disjoint write scope, integration order, and review gate. Colliding writers are serialized into later waves; independent streams use the repository-topic lifecycle's prepared `linked-worktree` or `independent-clone` under the same workspace/topic/repo placement rather than manual worktree setup.
 1. For multiple independent workstreams, schedule a stage owner per workstream and let that owner create a vertical dynamic wave under `run.delegated_spawn_policy` instead of flattening every role into one parent wave. Only sibling waves with disjoint input packets, write scopes, validation routes, and review gates may run together.
-1. For log-analysis-driven launches, require the `Finding Route Packet` from `agents/skills/agent-log-analysis.md`. Use `finding_class` to choose the destination owner and `instance_partition` to shard same-role instances by `repo_key`, `hook_family`, `skill_name`, `workflow_name`, `issue_id`, or path scope.
+1. For log-analysis-driven launches, require the `Finding Route Packet` from [agents/skills/agent-log-analysis.md](agent-log-analysis.md). Use `finding_class` to choose the destination owner and `instance_partition` to shard same-role instances by `repo_key`, `hook_family`, `skill_name`, `workflow_name`, `issue_id`, or path scope.
 1. For same-role log-analysis instances, use an id shaped like `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` and give each instance its own structured evidence cell, allowed paths, expected output, validation route, and review gate.
 1. After the parent or delegated stage owner actually spawns, skips, or replaces a wave, record it with `python3 tools/runtime/lifecycle/workflow_monitor.py --subagent-wave ...`; delegated child waves must include `remaining_spawn_budget`.
 1. Treat a wave as an adaptive loop, not a fixed one-shot fan-out. The owning reviewer, verifier, or integration executor processes each wave result and turns remaining frontier rows into the next bounded handoff queue; parent only relays packets and manages dependency order/status. Do not return `unverified_with_next_witness`, `connection_unconnected`, or bridge gaps as user-facing stopping points while the next frontier can still be worked.
@@ -391,6 +391,6 @@ The runtime discovery adapter delegates these required operating clauses to this
   update, or write-capable implementation routing. Compatible active agents may
   be reused for revised scope.
 - Tool Commands: run this skill's command packet, then read the canonical
-  `agents/skills/subagent-bootstrap.md` route before spawning or recording waves.
+  [agents/skills/subagent-bootstrap.md](subagent-bootstrap.md) route before spawning or recording waves.
 - Boundary: do not spawn or reuse agents without bounded scope, validation
   route, review gate, and lifecycle evidence.

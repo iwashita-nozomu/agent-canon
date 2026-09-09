@@ -89,8 +89,8 @@ migration packet に記録します。
 - consumer-owned project config、実 topic、product tests、Docker/CI surface を保持する。
 - source checkout を不可視化した fixture で bootstrap と canonical project checks を実行する。
 - static seed の再生成を consumer setup、CI、runtime へ追加しない。
-- `ROOT_AGENTS.md` を共通 base、`documents/agent-canon/consumer-root-instructions.md` を
-  consumer-specific source とし、consumer root `AGENTS.md` は明示 composer の regular output とする。
+- [ROOT_AGENTS.md](../ROOT_AGENTS.md) を共通 base、`documents/agent-canon/consumer-root-instructions.md` を
+  consumer-specific source とし、consumer root [AGENTS.md](../AGENTS.md) は明示 composer の regular output とする。
 - composition output に source checkout、symlink、vendor、submodule、singular `AGENT.md` を追加しない。
 
 Migration order は AgentCanon static consumer contract、consumer tree ownership、canonical command、

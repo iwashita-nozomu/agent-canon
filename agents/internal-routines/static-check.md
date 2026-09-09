@@ -23,8 +23,8 @@ upstream implementation ../../tools/validation/ci/runners/run_standalone_static_
 
 ## Core References
 
-- `agents/internal-routines/static-validation.md`
-- `documents/tools/README.md`
+- [agents/internal-routines/static-validation.md](static-validation.md)
+- [documents/tools/README.md](../../documents/tools/README.md)
 - `tools/validation/ci/runners/run_standalone_static_gate_unit.sh`
 - `tools/validation/ci/runners/run_all_checks.sh`
 - `tools/bin/agent-canon docs check`
@@ -39,7 +39,7 @@ upstream implementation ../../tools/validation/ci/runners/run_standalone_static_
 
 ## Selection
 
-`documents/runtime/runtime-profiles-and-check-matrix.md` を読み、変更した
+[documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md) を読み、変更した
 責務に対応する profile と、その profile が要求する route だけを選びます。
 この入口は command list や default sequence を再定義しません。選択した
 route の結果（pass / fail / 未実行）と追加調査の要否だけを記録します。

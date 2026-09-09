@@ -17,7 +17,7 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 
 `report-writing` turns existing evidence into reader-facing status, audit, evaluation, experiment, review, decision, recommendation, or presentation prose. Correctness is semantic: material claims map to evidence, observations are separated from inference, material limitations are visible, and the reader can determine the next action.
 
-The canonical rationale is `documents/design/responsibility-rationale.md`. Raw artifacts remain owned by `result-artifact-writeout`. A structure plan is optional and activates only when `structure-planning` identifies a genuine structural decision.
+The canonical rationale is [documents/design/responsibility-rationale.md](../../documents/design/responsibility-rationale.md). Raw artifacts remain owned by `result-artifact-writeout`. A structure plan is optional and activates only when `structure-planning` identifies a genuine structural decision.
 
 ## Source packet
 

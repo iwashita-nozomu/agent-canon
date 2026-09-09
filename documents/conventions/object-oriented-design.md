@@ -82,7 +82,7 @@ class、module、file、directory の形を機械的に要求しません。OOP 
 
 SOLID は、この文書の責務、状態、契約、公開面の規約をレビュー時に並べ替える見出しとして扱います。
 一般原則の優先順位、KISS / YAGNI / DRY、abstraction admission は
-`software-engineering-principles.md` が所有します。この section は object model が material に
+[software-engineering-principles.md](software-engineering-principles.md) が所有します。この section は object model が material に
 変わる場合の specialization であり、全 change へ一律適用しません。
 機械 checker は finding kind を SOLID principle signal へ投影し、Markdown / JSON report に集計を出します。
 投影の正本は `tools/validation/code/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
@@ -245,7 +245,7 @@ Markdown / JSON report は、上記 finding を SOLID principle signal として
 C++ checker は schema / DTO / config / metrics などの named aggregate value
 object、annotated primitive ABI / `__nad_` exported ABI function、式 DSL の
 terminal identity morphism、compact numeric scalar wrapper を意図的な境界として扱います。
-これらの許容は `documents/tools/oop/cpp/readability.md` に固定し、behavior を持つ
+これらの許容は [documents/tools/oop/cpp/readability.md](../tools/oop/cpp/readability.md) に固定し、behavior を持つ
 public state owner や domain contract のない wrapper の finding とは区別します。
 
 `OOP_READABILITY` は error / gate / review の signal class で決めます。

@@ -186,7 +186,7 @@ closeout_gate=<command or evidence field>
 | `wave_execution` | `subagent-bootstrap` + `prompt_config_reviewer` when role config is implicated | compact Wave And Subagent Execution drilldown, planned-vs-actual wave ids, and the overplanning/logging-gap classification | logging-gap rows reconciled or the unresolved owner finding is recorded |
 | `skill_selection` | affected skill + `prompt_config_reviewer` | Selection Evidence drilldown row, skill source path, reset basis | skill prompt eval or dashboard miss rate after reset window |
 | `tool_selection` | `tools/catalog.yaml`, owning tool docs, and invocation guidance | Selection Evidence drilldown row, tool catalog entry, owning tool doc path | tool catalog validation and dashboard miss rate after reset window |
-| `workflow_selection` | `agents/TASK_WORKFLOWS.md` and owning workflow guide | Selection Evidence drilldown row, workflow registry row, owning workflow doc path | workflow selection eval or dashboard miss rate after reset window |
+| `workflow_selection` | [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) and owning workflow guide | Selection Evidence drilldown row, workflow registry row, owning workflow doc path | workflow selection eval or dashboard miss rate after reset window |
 | `workflow_attribution` | `agent-learning` or hook owner role | Workflow Attribution drilldown, missing event class, hook namespace | dashboard workflow missing count reduced or exemption recorded |
 | `eval_gap` | `agent-eval-accumulation` | eval accumulation structured output, missing / stale / fail families | `eval_accumulation_check.py` pass or issue updated |
 | `token_coverage` | `tokens` + runtime logging owner | Token Consumption drilldown and token moving-average status | token comparison / summary evidence present or unsupported claim recorded |
@@ -223,12 +223,12 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When the user asks to turn structured evidence into durable skill issues, hand
    the structured API output, structured Markdown summary, and Finding Route Packet to
    `$issue-finding-report`.
-1. If the analysis drives a prompt, skill, workflow, or tool change, write the `Finding Route Packet` from `agents/skills/agent-log-analysis.md` before editing or spawning the repair wave. A structured handoff message or tool result satisfies it; use a durable file only for coordination or resumption. The packet must include `finding_class`, `evidence_cells`, `route_target`, `instance_partition`, `required_packet`, and `closeout_gate`.
+1. If the analysis drives a prompt, skill, workflow, or tool change, write the `Finding Route Packet` from [agents/skills/agent-log-analysis.md](agent-log-analysis.md) before editing or spawning the repair wave. A structured handoff message or tool result satisfies it; use a durable file only for coordination or resumption. The packet must include `finding_class`, `evidence_cells`, `route_target`, `instance_partition`, `required_packet`, and `closeout_gate`.
 1. Route by finding class:
    wave execution findings to `$subagent-bootstrap`;
    skill selection findings to the affected skill plus `prompt_config_reviewer`;
    tool selection findings to `tools/catalog.yaml` plus the owning tool docs;
-   workflow selection findings to `agents/TASK_WORKFLOWS.md` plus the owning
+   workflow selection findings to [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) plus the owning
    workflow guide; workflow attribution findings to `$agent-learning` or the
    logging owner; token coverage findings to `$tokens` and the logging owner;
    eval gaps to

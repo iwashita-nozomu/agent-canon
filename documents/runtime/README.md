@@ -15,9 +15,9 @@ runtime surface ではありません。hooks、tools の実装は各 source dir
 
 ## 構成
 
-- `bootstrap-runtime.md`: shared tool runtime の人間向け規約。
+- [bootstrap-runtime.md](bootstrap-runtime.md): shared tool runtime の人間向け規約。
 - `runtime-profiles-and-check-matrix.json`、`.md`: profile と validation route。
-- `runtime-log-archive.md`、`runtime-log-archive-migration.md`: log archive の契約。
+- [runtime-log-archive.md](runtime-log-archive.md)、[runtime-log-archive-migration.md](runtime-log-archive-migration.md): log archive の契約。
 - `log-surface-inventory.json`: runtime surface inventory。
 
 機械可読ファイルを編集した場合は、対応する runtime checker の所有範囲を確認します。

@@ -19,7 +19,7 @@ downstream implementation ../../tests/agent_tools/test_log_repository_lifecycle.
 
 ## Reader Map
 
-この文書は、AgentCanon runtime log の source identity、source root、stable branch、snapshot、concurrency、legacy import、retention、外部 preflight、内部 sync transaction、remote readback を一つの lifecycle contract として定義する設計正本です。先に owner boundary と state model を読み、次に preflight と内部 transaction の分離、identity override、snapshot/concurrency、legacy/retention の順に確認します。#4 の policy と #461 の consumer adapter の所有分割は外部固定証跡として参照し、`tools/runtime/archive/runtime_log_archive_git.py` と `documents/runtime/runtime-log-archive.md` の exact link と clause trace で検証します。
+この文書は、AgentCanon runtime log の source identity、source root、stable branch、snapshot、concurrency、legacy import、retention、外部 preflight、内部 sync transaction、remote readback を一つの lifecycle contract として定義する設計正本です。先に owner boundary と state model を読み、次に preflight と内部 transaction の分離、identity override、snapshot/concurrency、legacy/retention の順に確認します。#4 の policy と #461 の consumer adapter の所有分割は外部固定証跡として参照し、`tools/runtime/archive/runtime_log_archive_git.py` と [documents/runtime/runtime-log-archive.md](../runtime/runtime-log-archive.md) の exact link と clause trace で検証します。
 
 ## Responsibility / Owner Boundaries
 
@@ -31,7 +31,7 @@ downstream implementation ../../tests/agent_tools/test_log_repository_lifecycle.
 | operator preflight | `runtime_log_archive_git.py` の `ensure`, `status`, `check-clean` | archive clone、fetch、branch、dirty state を準備・観測する。publication transaction は開始しない | CLI parser と `archive_status_summary` |
 | internal sync transaction | `runtime_log_archive_git.py` | stage→snapshot→commit→compare/rebase/push→readback の順序を実行する | `prepare_archive_transaction`, `stage_archive_paths`, `publish_prepared_archive`, `_compare_and_push`, `_verify_remote_archive_readback` |
 | legacy import / source deletion boundary | import command owner + external policy authority | `--delete-source` は legacy import-only。通常 sync/archive/push/ensure/status では authority がない | `LegacyImportPlan`, `_legacy_import_plan`, `_finalize_legacy_import` |
-| design/implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md` | clause fingerprint、target/validation digest、forward/reverse review を要求する | DIC routine |
+| design/implementation correspondence | [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) | clause fingerprint、target/validation digest、forward/reverse review を要求する | DIC routine |
 
 ## Exact Data / State Model
 
@@ -119,7 +119,7 @@ snapshot は source bytes を size/hash 付きで一度読み、同一 source �
 | `main_legacy_import.count` | `26` | main 側 `hook-runs/legacy-import` の保存観測。42 branch count と混同しない |
 | `mode` / blockers | `read_only` / 3 blockers | delete、merge、rewrite、migration は inventory の副作用ではない |
 
-従って現行 contract は「42 branch の preservation/inventory/mapping evidence を残す」までで、42 branch を自動 merge/delete しない。`tools/validation/semantic/archive/check_agent_canon_log_policy.py` は network retrieval と deterministic byte validation を分離し、merge `9f101301` の blob digest、42 rows、42 mappings、read-only blockers、main observation を機械的に readback する。migration は dry-run manifest、explicit authority、exact remote readback の三条件を満たす `documents/runtime/runtime-log-archive-migration.md` の legacy-import route でのみ進む。retention/deletion の一般 policy は #4 owner であり、AgentCanon #461 は retention authority を発明しない。
+従って現行 contract は「42 branch の preservation/inventory/mapping evidence を残す」までで、42 branch を自動 merge/delete しない。`tools/validation/semantic/archive/check_agent_canon_log_policy.py` は network retrieval と deterministic byte validation を分離し、merge `9f101301` の blob digest、42 rows、42 mappings、read-only blockers、main observation を機械的に readback する。migration は dry-run manifest、explicit authority、exact remote readback の三条件を満たす [documents/runtime/runtime-log-archive-migration.md](../runtime/runtime-log-archive-migration.md) の legacy-import route でのみ進む。retention/deletion の一般 policy は #4 owner であり、AgentCanon #461 は retention authority を発明しない。
 
 `--delete-source` は明示的な authority boundary である。現行 CLI でこの flag を持つのは `import-legacy`（hook JSONL）と `import-eval-results`（eval Markdown）の二つだけで、`ensure`、`status`、`check-clean`、`archive-agent-report(s)`、`sync`、`push` の parser/API にこの authority を追加しない。許可された legacy import は `LegacyImportPlan` と append-only `legacy-import/import-index.jsonl` を作り、`_finalize_legacy_import` が source/destination mapping、immutable copy、digest/readback、inventory、archive commit/tree/index、remote push/ref/blob readback の全てを確認した後に、mapped source files だけを削除する。いずれかが失敗した場合は source を保持する。flag の存在だけで deletion を正当化せず、operator の explicit authority と #4 policy evidence が必要である。
 
@@ -157,7 +157,7 @@ preflight の clone/fetch/branch selection は `tools/runtime/archive/runtime_lo
 | commit/tree/index/cursor/projection/remote readback mismatch (`tools/runtime/archive/runtime_log_archive_git.py`) | `retained` | receipt と source を保持し、exact identity を再検証 |
 | legacy branch not inventoried/mapped or external authority missing | `blocked` | #4 inventory/policy を参照し、migration/deletion を実行しない |
 | `--delete-source` outside legacy import or before readback | `blocked` | authority boundary violation。source は保持 |
-| implementation target/validation route packet digest drift (`agents/internal-routines/design-implementation-correspondence.md`) | `blocked` | design routine で packet を再生成・再レビュー |
+| implementation target/validation route packet digest drift ([agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md)) | `blocked` | design routine で packet を再生成・再レビュー |
 
 ## Validation / Readback
 
@@ -197,7 +197,7 @@ python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain
 
 ## Exact #4 / #461 Owner Split
 
-AgentCanon-log PR #4 (merge `9f101301`) owns archive policy, stable branch policy, merge attributes, the exact 42-branch legacy inventory/mapping, and retention/deletion authority. AgentCanon #461 owns the consumer adapter: it resolves source identity/root, validates the optional id/remote override relationship, chooses the policy branch, maintains ignored local archive state, captures immutable snapshots, performs bounded optimistic publication, and fails closed on branch/dirty/readback errors. `documents/runtime/runtime-log-archive.md` remains the reader-facing consumer contract. This design links the external policy artifact instead of copying its schema or retention prose.
+AgentCanon-log PR #4 (merge `9f101301`) owns archive policy, stable branch policy, merge attributes, the exact 42-branch legacy inventory/mapping, and retention/deletion authority. AgentCanon #461 owns the consumer adapter: it resolves source identity/root, validates the optional id/remote override relationship, chooses the policy branch, maintains ignored local archive state, captures immutable snapshots, performs bounded optimistic publication, and fails closed on branch/dirty/readback errors. [documents/runtime/runtime-log-archive.md](../runtime/runtime-log-archive.md) remains the reader-facing consumer contract. This design links the external policy artifact instead of copying its schema or retention prose.
 
 ## Design-To-Implementation Trace
 
@@ -208,10 +208,10 @@ AgentCanon-log PR #4 (merge `9f101301`) owns archive policy, stable branch polic
 | `RL-004` | current preflight and transaction owner | `runtime_log_archive_git.py` CLI `ensure/status/check-clean`, `prepare_archive_transaction`, `stage_archive_paths`, `publish_prepared_archive`, `_verify_remote_archive_readback` | any preflight/transaction state or order change must preserve the split and exact sequence |
 | `RL-005..RL-006` | current snapshot/archive owner | `runtime_log_archive_git.py:report_snapshot_digest`, `:snapshot_hook_spool_events`, `:_archive_agent_report_prepared` | bytes, digest, idempotence, collision, or retention-on-failure changes cite clauses |
 | `RL-007..RL-008` | current concurrency/publication/readback owner | `runtime_log_archive_git.py:acquire_publication_attempt_lock`, `:_compare_and_push`, `:_verify_remote_archive_readback`, `:finalize_hook_spool_readback` | lock/retry/force/readback changes require lifecycle evidence |
-| `RL-009..RL-012` | external policy + current legacy command owner | #4 `docs/migration/legacy-inventory.json`; local `check_agent_canon_log_policy.py:validate_inventory_bytes`; `runtime_log_archive_git.py:LegacyImportPlan`, `:_legacy_import_plan`, `:_finalize_legacy_import`; `documents/runtime/runtime-log-archive-migration.md` | branch preservation, mapping, deletion, or retention changes require external authority, exact inventory evidence, and post-push readback |
-| `RL-013` | current command/readback owner | `runtime_log_archive_git.py:command_sync`, `:command_push`, `:command_check_clean`; `documents/runtime/runtime-log-archive.md` | public command/order/remote-readback changes are design drift until reviewed |
-| `RL-014` | universal correspondence routine | `agents/internal-routines/design-implementation-correspondence.md` | every implementation target and validation route packet carries ordered list plus digest; observed drift blocks |
-| `RL-015` | current identity/legacy owners and design review owner | `tools/runtime/archive/log_repository_identity.py:source_repository_id_for_write`, `runtime_log_archive_git.py:command_import_legacy`, `:command_import_eval_results`, `:_finalize_legacy_import`, `agents/internal-routines/design-implementation-correspondence.md` | implementation mismatch cannot weaken override validation, explicit authority, copy/readback/inventory/commit-before-delete order |
+| `RL-009..RL-012` | external policy + current legacy command owner | #4 `docs/migration/legacy-inventory.json`; local `check_agent_canon_log_policy.py:validate_inventory_bytes`; `runtime_log_archive_git.py:LegacyImportPlan`, `:_legacy_import_plan`, `:_finalize_legacy_import`; [documents/runtime/runtime-log-archive-migration.md](../runtime/runtime-log-archive-migration.md) | branch preservation, mapping, deletion, or retention changes require external authority, exact inventory evidence, and post-push readback |
+| `RL-013` | current command/readback owner | `runtime_log_archive_git.py:command_sync`, `:command_push`, `:command_check_clean`; [documents/runtime/runtime-log-archive.md](../runtime/runtime-log-archive.md) | public command/order/remote-readback changes are design drift until reviewed |
+| `RL-014` | universal correspondence routine | [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) | every implementation target and validation route packet carries ordered list plus digest; observed drift blocks |
+| `RL-015` | current identity/legacy owners and design review owner | `tools/runtime/archive/log_repository_identity.py:source_repository_id_for_write`, `runtime_log_archive_git.py:command_import_legacy`, `:command_import_eval_results`, `:_finalize_legacy_import`, [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) | implementation mismatch cannot weaken override validation, explicit authority, copy/readback/inventory/commit-before-delete order |
 
 Reverse mapping rule: every changed implementation path, public command, identity field, remote relationship, archive state, branch/ref operation, snapshot field, lock/retry behavior, legacy disposition, retention reference, deletion boundary, or readback field must cite one or more `RL-*` clauses. A current implementation link without clause evidence is incomplete; a planned link is not a claim that production code or tests changed.
 
@@ -222,7 +222,7 @@ Reverse mapping rule: every changed implementation path, public command, identit
 | request contract | #4/#461 owner split、stable identity/root/branch/snapshot/concurrency/legacy/retention、preflight/transaction split、42 evidence、delete boundary | user request; `RL-001..RL-015` | fixed |
 | external fixed evidence | merge `9f101301` inventory has exact 42 remote legacy refs, 42 mapping rows, main import observation, read-only blockers | [policy artifact](https://github.com/iwashita-nozomu/agent-canon-log/blob/9f10130184539beaebe8991bbcfb5665d476fbe5/docs/migration/legacy-inventory.json), `docs/migration/legacy-inventory.json` | checked |
 | current state | AgentCanon #461 consumer adapter exists for identity, root, paths, snapshots, locks, bounded push, legacy import parser, and readback | exact implementation links above; lifecycle tests | checked |
-| target state | external policy owns retention/deletion while AgentCanon owns consumer lifecycle and exact readback | `documents/runtime/runtime-log-archive.md`, PR #4 | fixed |
+| target state | external policy owns retention/deletion while AgentCanon owns consumer lifecycle and exact readback | [documents/runtime/runtime-log-archive.md](../runtime/runtime-log-archive.md), PR #4 | fixed |
 | packet contract | implementation targets and validation route are ordered logical lists with independent canonical digests | `agents/internal-routines/design-implementation-correspondence.md:Record` | fixed |
 | scope | this workstream implements the post-merge identity, legacy-finalize, policy-verifier, regression, and trace obligations without changing external policy ownership | git diff scope; implementation correspondence readback | explicit |
 | assumption | `normalization` means the validated `normalize_remote` procedure and stable id digest in `tools/runtime/archive/log_repository_identity.py` | `RL-001`, `log_repository_identity.py` | explicit |

@@ -32,11 +32,11 @@ fingerprint、forward/reverse closure packet は要求しません。
 | 責務 | 正本 owner | このルートが行うこと | 行わないこと |
 | --- | --- | --- | --- |
 | 設計の内容 | `documents/design/*.md` | 選択された文書を読む、clause ID と fingerprint を確定する | 設計本文をこの routine に複製しない |
-| capability / skill の順序 | `agents/skills/agent-orchestration.md` と `agents/skills/skill-dependencies.yaml` | owner stage を呼び出す | prompt keyword で capability を決めない |
-| implementation handoff | `agents/COMMUNICATION_PROTOCOL.md`、`agents/skills/codex-task-workflow.md` | clause map と digest を handoff に載せる | 実装者の代わりに実装しない |
-| review | `agents/skills/change-review.md` | forward / reverse coverage と drift を判定対象にする | review policy を再定義しない |
+| capability / skill の順序 | [agents/skills/agent-orchestration.md](../skills/agent-orchestration.md) と `agents/skills/skill-dependencies.yaml` | owner stage を呼び出す | prompt keyword で capability を決めない |
+| implementation handoff | [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)、[agents/skills/codex-task-workflow.md](../skills/codex-task-workflow.md) | clause map と digest を handoff に載せる | 実装者の代わりに実装しない |
+| review | [agents/skills/change-review.md](../skills/change-review.md) | forward / reverse coverage と drift を判定対象にする | review policy を再定義しない |
 | evidence / validation | 各 design doc の validation route | clause と evidence の readback を残す | 成功メッセージだけで十分条件にしない |
-| semantic responsibility allocation | `documents/design/semantic-responsibility-contract.md` と run-local instance | delta action、obligation、primary owner、hard-edge closure を対応付ける | class/module/file の構造 mandate や協調指標を導入しない |
+| semantic responsibility allocation | [documents/design/semantic-responsibility-contract.md](../../documents/design/semantic-responsibility-contract.md) と run-local instance | delta action、obligation、primary owner、hard-edge closure を対応付ける | class/module/file の構造 mandate や協調指標を導入しない |
 
 ## Related Document Closure
 
@@ -174,9 +174,9 @@ tools/bin/agent-canon docs check
 
 | clause | current/planned implementation owner | file / symbol | evidence / reverse rule |
 | --- | --- | --- | --- |
-| `DIC-001..DIC-009` | current workflow and review owners | `agents/skills/agent-orchestration.md`, `agents/skills/oop-type-design.md`, `agents/skills/change-review.md`, this routine | active DIC route の changed path は DIC clause を cite し、missing design readback は block |
-| `DIC-003..DIC-004` | planned transport owner | `tools/runtime/lifecycle/bootstrap_agent_run.py`, `agents/COMMUNICATION_PROTOCOL.md` | handoff identity、`implementation_targets`、`validation_route` は各 digest で参照し、実行 readback は両 digest を再計算する |
-| `DIC-005..DIC-006` | current/planned review owner | `agents/skills/change-review.md`, `tools/validation/semantic/documents/check_design_doc_claims.py` | every accepted finding has forward and reverse evidence; drift is a blocker |
+| `DIC-001..DIC-009` | current workflow and review owners | [agents/skills/agent-orchestration.md](../skills/agent-orchestration.md), [agents/skills/oop-type-design.md](../skills/oop-type-design.md), [agents/skills/change-review.md](../skills/change-review.md), this routine | active DIC route の changed path は DIC clause を cite し、missing design readback は block |
+| `DIC-003..DIC-004` | planned transport owner | `tools/runtime/lifecycle/bootstrap_agent_run.py`, [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) | handoff identity、`implementation_targets`、`validation_route` は各 digest で参照し、実行 readback は両 digest を再計算する |
+| `DIC-005..DIC-006` | current/planned review owner | [agents/skills/change-review.md](../skills/change-review.md), `tools/validation/semantic/documents/check_design_doc_claims.py` | every accepted finding has forward and reverse evidence; drift is a blocker |
 | `DIC-007..DIC-008` | current routing/path owners | `tools/agent/orchestration/route.py`, `tools/runtime/source/agent_canon_source_root.py` | capability and locator changes map back to the clause that authorized them |
 | `DIC-009` | current canonical-document owners | `agents/internal-routines/`, `agents/skills/`, `documents/design/` | a new policy copy or loophole maps to a rejected design change |
 | `DIC-010` | current DIC routine | this routine only; owner surfaces consume `DIC-010` path/section/clause/ref receipts | dependency headers, README map, target headers, validation/runtime docs, and root projections close the forward/reverse source packet |

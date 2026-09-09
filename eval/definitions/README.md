@@ -136,7 +136,7 @@ The file name convention is:
 
 Behavior evals inspect `workflow_monitoring.md`, `agent_evaluation.md`, review artifacts,
 closeout evidence, and validation logs. `agent_behavior_eval.toml` and
-`templates/agents/workflow_monitoring.md` are the source packet for the
+[templates/agents/workflow_monitoring.md](../../templates/agents/workflow_monitoring.md) are the source packet for the
 required behavior-event fields.
 
 | Behavior event family | Required evidence |
@@ -164,7 +164,7 @@ they are not promoted to canonical evidence.
 | Archive identity | unique `hook_run_id` values under the external `agent-canon-log` archive's `hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`. |
 | Legacy source-tree result path | `agents/evals/results/` is not a normal read or write location; old results must be imported into the external archive and deleted from source. |
 
-The archive boundary is documented in `documents/runtime/runtime-log-archive.md`.
+The archive boundary is documented in [documents/runtime/runtime-log-archive.md](../../documents/runtime/runtime-log-archive.md).
 Run the bootstrap collection and archive sync before using accumulated evidence
 in a PR or guide:
 

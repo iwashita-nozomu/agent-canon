@@ -59,17 +59,17 @@ best-effort edge を report trace と impact packet に渡す。
 
 ## Evidence And Assumption Ledger
 
-- Evidence sources: `documents/structured-analysis/code-analysis.md` owns this scope.
+- Evidence sources: [documents/structured-analysis/code-analysis.md](code-analysis.md) owns this scope.
 - Evidence sources: `tools/analysis/code/lsp_code_analysis.py` owns the LSP adapter and report.
-- Evidence sources: `.devcontainer/dependencies.toml` and `documents/design/dependency-manifest-design.md` provide manifest, receipt, and live-verification evidence.
+- Evidence sources: `.devcontainer/dependencies.toml` and [documents/design/dependency-manifest-design.md](../design/dependency-manifest-design.md) provide manifest, receipt, and live-verification evidence.
 - Evidence sources: `tests/agent_tools/test_lsp_code_analysis.py`, `tests/agent_tools/test_dependency_manifest_tools.py`, `tests/agent_tools/test_search.py`, and `tests/agent_tools/test_git_dependency_diff_summary.py` cover protocol, scanner, consumer, and summary behavior.
 - Assumptions: the manifest receipt/live verifier is the authority for executable selection.
 - Assumptions: LSP 3.17 server responses are runtime evidence.
 - Assumptions: lexical candidates are compatibility and impact evidence, not compiler completeness.
 - Assumptions: explicit `--lexical-only` does not trigger automatic downgrade.
-- Parent-doc alignment: `documents/design/dependency-manifest-design.md` owns manifest/dependency evidence.
-- Parent-doc alignment: `documents/tools/lsp_code_analysis.md` owns the tool and report contract.
-- Parent-doc alignment: `documents/tools/search-coordination.md` owns the in-memory `code-deps` consumer boundary.
+- Parent-doc alignment: [documents/design/dependency-manifest-design.md](../design/dependency-manifest-design.md) owns manifest/dependency evidence.
+- Parent-doc alignment: [documents/tools/lsp_code_analysis.md](../tools/lsp_code_analysis.md) owns the tool and report contract.
+- Parent-doc alignment: [documents/tools/search-coordination.md](../tools/search-coordination.md) owns the in-memory `code-deps` consumer boundary.
 
 ## Boundary
 

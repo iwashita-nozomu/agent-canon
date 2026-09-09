@@ -113,7 +113,7 @@ make docker-build-check-host-docker
 
 ## Related
 
-- `documents/contracts/linux-wsl-host-requirements.md`
-- `documents/contracts/remote-execution-repo-contract.md`
+- [documents/contracts/linux-wsl-host-requirements.md](linux-wsl-host-requirements.md)
+- [documents/contracts/remote-execution-repo-contract.md](remote-execution-repo-contract.md)
 - `vendor/agent-canon/templates/documents/server_host_inventory.template.md`
 - `vendor/agent-canon/templates/documents/server_runtime_layout.template.toml`

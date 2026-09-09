@@ -128,5 +128,5 @@ adapter を同じ package に入れてよい。ただし package 内でも次の
 
 - Manifest DSL は `dependency-manifest-design.md` の文法を正とする。
 - Prose DSL は Prose Reasoning Graph DSL を正とする。
-- DB schema は `database-design.md` を正とする。
+- DB schema は [database-design.md](database-design.md) を正とする。
 - AgentCanon skill、PR workflow、submodule update policy は package core に入れない。

@@ -33,7 +33,7 @@ self-reference、cycle、孤立 manifest、古い header 形式がない。depen
 - `tools/validation/semantic/dependencies/check_dependency_headers.py`
 - `tools/analysis/dependencies/check_dependency_graph.sh`
 - `tools/analysis/dependencies/run_repo_dependency_review.sh`
-- `documents/design/parent-repository-audit.md` の dependency edge
+- [documents/design/parent-repository-audit.md](../../design/parent-repository-audit.md) の dependency edge
 
 ## Repair Route
 

@@ -21,11 +21,11 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 
 ## Core References
 
-- `agents/internal-routines/comprehensive-review.md`
-- `agents/internal-routines/project-health.md`
-- `documents/conventions/REVIEW_PROCESS.md`
-- `documents/codex/AGENTS_COORDINATION.md`
-- `documents/conventions/coding-conventions-project.md`
+- [agents/internal-routines/comprehensive-review.md](comprehensive-review.md)
+- [agents/internal-routines/project-health.md](project-health.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
+- [documents/codex/AGENTS_COORDINATION.md](../../documents/codex/AGENTS_COORDINATION.md)
+- [documents/conventions/coding-conventions-project.md](../../documents/conventions/coding-conventions-project.md)
 
 ## Expected Outcome
 
@@ -40,7 +40,7 @@ repo 全体を横断して、構成、文書、skills、ツール、静的健全
 1. `Static Health`
    - `make agent-checks` と `make ci-quick` を変更リスクに応じて選びます。必要な個別 validator は catalog のコマンドから実行します。
 1. `Workflow Health`
-   - `AGENTS.md`、`agents/`、`documents/` の導線が一致しているかを見ます。
+   - [AGENTS.md](../../AGENTS.md)、`agents/`、`documents/` の導線が一致しているかを見ます。
 1. `Tooling Health`
    - Docker、CI、dependency、補助 script の stale 化を見ます。
 1. `Worktree Health`

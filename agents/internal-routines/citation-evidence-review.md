@@ -22,10 +22,10 @@ upstream design ../skills/prose-reasoning-graph.md prose graph citation/evidence
 
 ## Core References
 
-- `agents/skills/paper-writing.md`
-- `agents/skills/academic-writing.md`
-- `documents/conventions/REVIEW_PROCESS.md`
-- `templates/agents/citation_evidence_review.md`
+- [agents/skills/paper-writing.md](../skills/paper-writing.md)
+- [agents/skills/academic-writing.md](../skills/academic-writing.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
+- [templates/agents/citation_evidence_review.md](../../templates/agents/citation_evidence_review.md)
 
 ## Checklist
 

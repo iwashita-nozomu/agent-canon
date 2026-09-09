@@ -45,8 +45,8 @@ COPILOT_BLOCKER=<none|short blocker>
 AgentCanon currently treats these as the canonical checked-in surfaces for
 Copilot / PR automation policy:
 
-- `ROOT_AGENTS.md`: repository-wide PR mutation authority rules.
-- `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template / derived repo
+- [ROOT_AGENTS.md](../../ROOT_AGENTS.md): repository-wide PR mutation authority rules.
+- [.github/PULL_REQUEST_TEMPLATE/agent_canon.md](../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md): template / derived repo
   AgentCanon-pin PR checklist and evidence fields.
 - `tools/validation/ci/checks/check_github_workflows.py`: GitHub workflow and PR-template
   convention checker.

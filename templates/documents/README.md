@@ -49,12 +49,12 @@ reader path の要約を置き、読者が本文を逆戻りせずに owner と�
 
 | surface | canonical path | natural format | role |
 | --- | --- | --- | --- |
-| design document | `design-document.template.md` | Markdown | authority、責務、型境界、依存、effects、options、review、reconstruction、acceptance |
+| design document | [design-document.template.md](design-document.template.md) | Markdown | authority、責務、型境界、依存、effects、options、review、reconstruction、acceptance |
 | semantic responsibility contract | `semantic-responsibility-contract.template.toml` | TOML | run-local semantic delta、obligation、一次検証 owner、hard-edge closure |
-| README | `README.template.md` | Markdown | purpose、structure、owner、entrypoint、reproduce、canonical/non-canonical boundary |
+| README | [README.template.md](README.template.md) | Markdown | purpose、structure、owner、entrypoint、reproduce、canonical/non-canonical boundary |
 | experiment topic scaffold | `../experiments/_template/` | directory + Python/Markdown/TOML | plan、resource/GPU、run/result provenance、accepted failure、reproducibility |
 | GitHub Issue | `github/issue/*.yml` | GitHub Issue Form YAML | observed facts、reproduction、owner、impact、options、acceptance、non-goal |
-| GitHub PR | `github/pull-request/agent_canon.md` | GitHub Markdown template | essence、dependency closure、head/review/validation/artifact/cleanup evidence |
+| GitHub PR | [github/pull-request/agent_canon.md](github/pull-request/agent_canon.md) | GitHub Markdown template | essence、dependency closure、head/review/validation/artifact/cleanup evidence |
 
 GitHub template の canonical source は `github/` 配下です。GitHub が実際に認識する
 standalone AgentCanon の `.github/ISSUE_TEMPLATE/` と `.github/PULL_REQUEST_TEMPLATE/`
@@ -72,7 +72,7 @@ Template / derived parent の `.github` target は parent-owned regular content 
 
 ## Server Host
 
-- `server_host_inventory.template.md`
+- [server_host_inventory.template.md](server_host_inventory.template.md)
   - main server host の inventory と readiness gap を記録する template
 - `server_runtime_layout.template.toml`
   - main server host の path、mount、builder 前提を記録する template

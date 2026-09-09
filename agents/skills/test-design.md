@@ -61,7 +61,7 @@ the repair.
 For numerical, randomized, tolerance, solver, convergence, residual, benchmark,
 or experiment-style tests, apply the conditional Numerical Test Admission Gate
 only when `activation=required`: consult
-`documents/conventions/coding-conventions-testing.md`, record the `数値 trigger`,
+[documents/conventions/coding-conventions-testing.md](../../documents/conventions/coding-conventions-testing.md), record the `数値 trigger`,
 numerical trigger,
 non-numerical alternative, oracle, GPU target, and budget, and omit the numerical
 test with an omission reason when the target behavior is not numerical. Do not

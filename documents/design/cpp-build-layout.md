@@ -43,7 +43,7 @@ audience=親 repository の C++ 実装者、build/CI 保守者、reviewer
 decision_context=C++ source、tests、experiments の project 境界と移行順を確定する
 first_artifact=table:target-state-path-command-owner-records
 visual_plan=table:ownership、command、migration、trace を同じ識別子で照合する
-document_unit=owner:AgentCanon design; reader:C++/project/container maintainers; validation:docs+dependency+profile checks; cadence:build-layout change; canonical_parent:documents/design/README.md; downstream_consumers:parent README, QUICK_START, cmake, docker, Makefile, CI
+document_unit=owner:AgentCanon design; reader:C++/project/container maintainers; validation:docs+dependency+profile checks; cadence:build-layout change; canonical_parent:[documents/design/README.md](README.md); downstream_consumers:parent README, QUICK_START, cmake, docker, Makefile, CI
 document_split_decision=keep:同じ C++ build owner、reader、validation route、更新 cadence を共有する; evidence=`structure_contract`
 metric_or_delta_contract=allowed structural delta:root CMake entrypoint から cpp project への移動と target graph の導入; forbidden semantic delta:この設計 phase で runtime behavior、experiment protocol、dependency version を変更しない
 ordered_structure=target state → source ownership → target graph/commands → generated paths → dependency/symlink boundaries → parent migration → forward/reverse trace → validation
@@ -154,9 +154,9 @@ ROOT=/workspace/project_template
 AGENT_CANON_SOURCE_ROOT="$ROOT/workspace/cpp-cmake-build-layout-design-20260730/agent-canon"
 PARENT_ROOT="$ROOT"
 for logical_path in \
-  documents/conventions/coding-conventions-cpp.md \
-  documents/runtime/runtime-profiles-and-check-matrix.md \
-  agents/skills/cpp-review.md; do
+  [documents/conventions/coding-conventions-cpp.md](../conventions/coding-conventions-cpp.md) \
+  [documents/runtime/runtime-profiles-and-check-matrix.md](../runtime/runtime-profiles-and-check-matrix.md) \
+  [agents/skills/cpp-review.md](../../agents/skills/cpp-review.md); do
   test -f "$AGENT_CANON_SOURCE_ROOT/$logical_path"
   printf "logical:%s=present\n" "$logical_path"
 done
@@ -172,9 +172,9 @@ done
 Expected readback:
 
 ```text
-logical:documents/conventions/coding-conventions-cpp.md=present
-logical:documents/runtime/runtime-profiles-and-check-matrix.md=present
-logical:agents/skills/cpp-review.md=present
+logical:[documents/conventions/coding-conventions-cpp.md](../conventions/coding-conventions-cpp.md)=present
+logical:[documents/runtime/runtime-profiles-and-check-matrix.md](../runtime/runtime-profiles-and-check-matrix.md)=present
+logical:[agents/skills/cpp-review.md](../../agents/skills/cpp-review.md)=present
 parent:vendor/agent-canon/documents/conventions/coding-conventions-cpp.md=present
 parent:vendor/agent-canon/agents/skills/cpp-review.md=present
 parent:README.md=present

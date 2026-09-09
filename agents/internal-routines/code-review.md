@@ -21,10 +21,10 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Core References
 
-- `agents/skills/change-review.md`
-- `agents/skills/python-review.md`
-- `agents/skills/cpp-review.md`
-- `documents/conventions/REVIEW_PROCESS.md`
+- [agents/skills/change-review.md](../skills/change-review.md)
+- [agents/skills/python-review.md](../skills/python-review.md)
+- [agents/skills/cpp-review.md](../skills/cpp-review.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
 
 ## Expected Outcome
 

@@ -71,16 +71,16 @@ CIで同じimageとtest commandを再利用できる状態にします。
 
 ## Core References
 
-- `CONTAINER_OPERATIONS.md`
-- `documents/contracts/github-first-module-and-devcontainer-policy.md`
-- `documents/conventions/coding-conventions-project.md`
+- [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md)
+- [documents/contracts/github-first-module-and-devcontainer-policy.md](../../documents/contracts/github-first-module-and-devcontainer-policy.md)
+- [documents/conventions/coding-conventions-project.md](../../documents/conventions/coding-conventions-project.md)
 - project-owned `Dockerfile` / `docker/`
 - `bootstrap.sh` / `bootstrap/`
 - project-owned `.devcontainer/` when the parent explicitly provides one
 - `.github/workflows/`
 - `README.md`
-- `agents/skills/dependency-design.md`
-- `agents/skills/gpu-execution.md`
+- [agents/skills/dependency-design.md](dependency-design.md)
+- [agents/skills/gpu-execution.md](gpu-execution.md)
 
 ## Required Change Fields
 

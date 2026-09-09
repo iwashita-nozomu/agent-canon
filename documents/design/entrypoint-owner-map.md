@@ -17,7 +17,7 @@ downstream design ../../agents/skills/comprehensive-development.md implementatio
 
 ## Purpose
 
-`AGENTS.md` と `ROOT_AGENTS.md` は常時ロードされ得るため、task-specific policy の
+[AGENTS.md](../../AGENTS.md) と [ROOT_AGENTS.md](../../ROOT_AGENTS.md) は常時ロードされ得るため、task-specific policy の
 保存場所ではなく、repository identity と canonical owner を解決する入口に限定します。
 詳細手順を Skill から入口へ複製すると、activation boundary、instruction budget、変更理由、
 validation owner が混線します。本設計は「薄い」という形容を、見出し名や byte 数ではなく
@@ -45,7 +45,7 @@ byte 数や行数は、この不変条件の代理にしません。短い文書
 
 ## Allowed information architecture
 
-Standalone `AGENTS.md`:
+Standalone [AGENTS.md](../../AGENTS.md):
 
 - `Repository Role`
 - `Reader Map`
@@ -54,7 +54,7 @@ Standalone `AGENTS.md`:
 - `Task Entry`
 - `Validation Routing`
 
-Common `ROOT_AGENTS.md` (shared entry base for consumer and source-specific roots):
+Common [ROOT_AGENTS.md](../../ROOT_AGENTS.md) (shared entry base for consumer and source-specific roots):
 
 - `Repository Role`
 - `Reader Map`
@@ -63,10 +63,10 @@ Common `ROOT_AGENTS.md` (shared entry base for consumer and source-specific root
 - `Task Entry`
 - `Validation Routing`
 
-Consumer root `AGENTS.md` は、この `ROOT_AGENTS.md` の bytes を先頭の論理内容として
+Consumer root [AGENTS.md](../../AGENTS.md) は、この [ROOT_AGENTS.md](../../ROOT_AGENTS.md) の bytes を先頭の論理内容として
 保持し、consumer-owned specific section を明示的に合成した regular tracked file です。
 合成元の source commit と exact input-byte digest は deterministic comment marker にのみ
-記録します。Source-specific AgentCanon `AGENTS.md` は先頭の literal `@ROOT_AGENTS.md`
+記録します。Source-specific AgentCanon [AGENTS.md](../../AGENTS.md) は先頭の literal `@ROOT_AGENTS.md`
 でこの共通 base を明示参照し、その後に source-specific Reader Map を保持します。
 これは consumer composition とは別の explicit read であり、自動展開、runtime import、
 wrapper、source copy を意味しません。ROOT の consumer map / owner route は consumer root
@@ -79,12 +79,12 @@ validation menu、closeout token は、それぞれの owner surface に置き�
 
 | Detailed responsibility | Canonical owner after migration |
 | --- | --- |
-| implementation completeness and evidence-backed mechanism selection | `documents/conventions/software-engineering-principles.md` and selected implementation / review Skill |
-| cross-surface implementation-basis packet | `agents/skills/comprehensive-development.md` |
-| design correspondence | `agents/internal-routines/design-implementation-correspondence.md` |
-| structure intake | `agents/skills/structure-refactor.md` and structure contract |
-| Git mutation safety | `agents/skills/worktree-health.md`, canonical workflow, hooks |
-| AgentCanon update | `agents/skills/agent-canon-update.md` and update route |
+| implementation completeness and evidence-backed mechanism selection | [documents/conventions/software-engineering-principles.md](../conventions/software-engineering-principles.md) and selected implementation / review Skill |
+| cross-surface implementation-basis packet | [agents/skills/comprehensive-development.md](../../agents/skills/comprehensive-development.md) |
+| design correspondence | [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) |
+| structure intake | [agents/skills/structure-refactor.md](../../agents/skills/structure-refactor.md) and structure contract |
+| Git mutation safety | [agents/skills/worktree-health.md](../../agents/skills/worktree-health.md), canonical workflow, hooks |
+| AgentCanon update | [agents/skills/agent-canon-update.md](../../agents/skills/agent-canon-update.md) and update route |
 | orchestration / subagent lifecycle | orchestration and subagent canonical owners |
 | validation / closeout | runtime profile, canonical workflow, closeout tools |
 
@@ -100,7 +100,7 @@ validation menu、closeout token は、それぞれの owner surface に置き�
 - fenced block と番号付き procedure がないこと
 - bullet / direct command recipe がないこと
 - required owner-map row が同一 row 内に存在すること
-- convention marker manifest が source `AGENTS.md` / `ROOT_AGENTS.md` を operational surface として
+- convention marker manifest が source [AGENTS.md](../../AGENTS.md) / [ROOT_AGENTS.md](../../ROOT_AGENTS.md) を operational surface として
   再登録していないこと
 
 checker は prose の意味を推測しません。意味上の重複は review owner が判断し、構造的に再流入可能な
@@ -117,14 +117,14 @@ byte count と SHA-256、固定 separator、二つの exact source byte 列が�
 typed failure になります。valid な managed output だけが current exact sources で更新されます。
 
 この composition は consumer の bootstrap/maintenance 操作です。AgentCanon runtime update、
-source symlink、vendor/submodule projection、nested directory `AGENTS.md` の更新を行いません。
+source symlink、vendor/submodule projection、nested directory [AGENTS.md](../../AGENTS.md) の更新を行いません。
 生成後の consumer は output だけで instruction を読め、AgentCanon checkout や runtime の存在を
 前提にしません。`AGENT.md` という singular alias はこの contract に存在しません。
 
 ## Template boundary
 
-`project_template` の tracked `AGENTS.md` は self-contained static consumer の project-owned file です。
+`project_template` の tracked [AGENTS.md](../../AGENTS.md) は self-contained static consumer の project-owned file です。
 本設計はそれを source resolver、updater、vendor、submodule、symlink projection へ戻しません。
 consumer の具体的な追加文は consumer 側の `documents/agent-canon/consumer-root-instructions.md`
-が所有し、AgentCanon の `ROOT_AGENTS.md` はその共通 base だけを所有します。static-seed allowlist は
-role/config のままとし、生成された root `AGENTS.md` は consumer の tracked output として扱います。
+が所有し、AgentCanon の [ROOT_AGENTS.md](../../ROOT_AGENTS.md) はその共通 base だけを所有します。static-seed allowlist は
+role/config のままとし、生成された root [AGENTS.md](../../AGENTS.md) は consumer の tracked output として扱います。

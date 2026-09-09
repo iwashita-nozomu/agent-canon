@@ -63,9 +63,9 @@ risk/follow-up の順で記録します。Alternatives / independent review は�
 | `issue/config.yml` | `.github/ISSUE_TEMPLATE/config.yml` | GitHub Issue configuration YAML |
 | `issue/agentcanon-maintenance.yml` | `.github/ISSUE_TEMPLATE/agentcanon-maintenance.yml` | GitHub Issue Form YAML |
 | `issue/eval-capture.yml` | `.github/ISSUE_TEMPLATE/eval-capture.yml` | GitHub Issue Form YAML |
-| `pull-request/agent_canon.md` | `.github/PULL_REQUEST_TEMPLATE/agent_canon.md` | GitHub Markdown template |
+| [pull-request/agent_canon.md](pull-request/agent_canon.md) | [.github/PULL_REQUEST_TEMPLATE/agent_canon.md](../../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md) | GitHub Markdown template |
 
-`.github/PULL_REQUEST_TEMPLATE.md` は standalone AgentCanon のPR checklistであり、
+[.github/PULL_REQUEST_TEMPLATE.md](../../../.github/PULL_REQUEST_TEMPLATE.md) は standalone AgentCanon のPR checklistであり、
 AgentCanon内だけに残します。これは
 template/derived repo向け `agent_canon.md` の第二正本ではなく、異なる読者・責務の
 standalone routeです。親rootへは投影しません。

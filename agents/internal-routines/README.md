@@ -34,13 +34,13 @@ skill, entrypoint, or routine that calls it.
 
 | Group | Files | Public Route |
 | ----- | ----- | ------------ |
-| Request modality routing | `chatgpt-codex-routing.md` | root entrypoints before `$agent-orchestration` |
-| Review routines | `code-review.md`, `critical-review.md`, `project-review.md`, `report-review.md`, `comprehensive-review.md` | `$change-review`, `$research-workflow`, `$comprehensive-development`, `$report-writing` |
-| Academic review routines | `citation-evidence-review.md`, `logic-gap-review.md`, `notation-definition-review.md` | `$academic-writing`, `$paper-writing`, `$prose-reasoning-graph` |
-| Docs review routines | `docs-completeness-review.md`, `docs-consistency-review.md` | `$document-canon-cleanup`, `$md-style-check` |
-| Research routines | `experiment-change-loop.md`, `experiment-workflow.md`, `research-perspective-review.md` | `$experiment-lifecycle`, `$adaptive-improvement-loop`, `$research-workflow` |
-| Runtime and validation adapters | `artifact-placement.md`, `codex-cli.md`, `static-check.md`, `static-validation.md`, `project-health.md`, `from_another_agent.md` | workflow stages, tool checks, and project review |
-| Subagent startup routines | `subagent-startup.md` | `$subagent-bootstrap`, `route.py --area agents` |
+| Request modality routing | [chatgpt-codex-routing.md](chatgpt-codex-routing.md) | root entrypoints before `$agent-orchestration` |
+| Review routines | [code-review.md](code-review.md), [critical-review.md](critical-review.md), [project-review.md](project-review.md), [report-review.md](report-review.md), [comprehensive-review.md](comprehensive-review.md) | `$change-review`, `$research-workflow`, `$comprehensive-development`, `$report-writing` |
+| Academic review routines | [citation-evidence-review.md](citation-evidence-review.md), [logic-gap-review.md](logic-gap-review.md), [notation-definition-review.md](notation-definition-review.md) | `$academic-writing`, `$paper-writing`, `$prose-reasoning-graph` |
+| Docs review routines | [docs-completeness-review.md](docs-completeness-review.md), [docs-consistency-review.md](docs-consistency-review.md) | `$document-canon-cleanup`, `$md-style-check` |
+| Research routines | [experiment-change-loop.md](experiment-change-loop.md), [experiment-workflow.md](experiment-workflow.md), [research-perspective-review.md](research-perspective-review.md) | `$experiment-lifecycle`, `$adaptive-improvement-loop`, `$research-workflow` |
+| Runtime and validation adapters | [artifact-placement.md](artifact-placement.md), [codex-cli.md](codex-cli.md), [static-check.md](static-check.md), [static-validation.md](static-validation.md), [project-health.md](project-health.md), [from_another_agent.md](from_another_agent.md) | workflow stages, tool checks, and project review |
+| Subagent startup routines | [subagent-startup.md](subagent-startup.md) | `$subagent-bootstrap`, `route.py --area agents` |
 
 ## Contract
 

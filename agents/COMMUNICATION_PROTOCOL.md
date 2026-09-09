@@ -29,7 +29,7 @@ downstream implementation ../tools/validation/semantic/tools/tool_rejection_pref
 
 ### Compact request/update projection
 
-`../documents/design/request-intent-and-update-relation.md` is the compact flow connected to
+[../documents/design/request-intent-and-update-relation.md](../documents/design/request-intent-and-update-relation.md) is the compact flow connected to
 this protocol's active context, write-scope, and handoff. Deltas attach to existing
 capsules/packets, compatible context is reused, and only disjoint scope receives a separate
 handoff. Transport schema and context ownership remain here.
@@ -73,12 +73,12 @@ cleanup executors retain their existing owners and receipt formats.
 
 ### Consumer root instruction composition
 
-Consumer root の `AGENTS.md` は communication packet や agent 発言から生成しません。
-AgentCanon の `ROOT_AGENTS.md` common base と、consumer が所有する
+Consumer root の [AGENTS.md](../AGENTS.md) は communication packet や agent 発言から生成しません。
+AgentCanon の [ROOT_AGENTS.md](../ROOT_AGENTS.md) common base と、consumer が所有する
 `documents/agent-canon/consumer-root-instructions.md` を、明示された composer の
 入力として一度の deterministic composition に渡します。生成された通常 file は
 consumer が commit して読みます。source checkout、runtime projection、symlink、vendor、
-submodule、singular `AGENT.md` を通信経路に追加せず、nested directory の `AGENTS.md` は
+submodule、singular `AGENT.md` を通信経路に追加せず、nested directory の [AGENTS.md](../AGENTS.md) は
 この root composition の対象外です。
 
 ## Runtime Collaboration Capability Handshake
@@ -563,7 +563,7 @@ contract.
 
 ## CompletionCoverage v1 Schema Contract
 
-`COMMUNICATION_PROTOCOL.md` owns the human-readable schema and evidence
+[COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md) owns the human-readable schema and evidence
 semantics for the deterministic completion read model. The canonical chain is
 the existing append-only logical run ledger, the generated
 `agent-canon.completion-coverage.v1` artifact, and its deterministic reader.

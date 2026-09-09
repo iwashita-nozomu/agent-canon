@@ -55,17 +55,17 @@ the implementation authority.
   `2d04030ea757d275936a6c1f441a05a67190402d`; current configuration and owner
   paths `.codex/config.toml`
   (`42143eef0837dde325d52296c3c3b1fe74d5d48476c832ff97af46e377c3e49f`),
-  `.codex/README.md`
+  [.codex/README.md](../../.codex/README.md)
   (`07783939c5bfd9f2be7f948ab3491244720d25d8d7027abb356db39bf22989b4`),
   `agents/task_catalog.yaml`
   (`63214bd1fd2c43ae6dff0af392e535f45a250c33474e8331aa454067fadc7fff`),
   `agents/agents_config.json`
   (`1e4ad31a154d6bf85c989ac441d9a54f26d937de5d23e27684c369b8f42440a5`),
-  `agents/canonical/CODEX_SUBAGENTS.md`
+  [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md)
   (`2a0965c7ae6583ea6d2597d7941e04eac1f1730d1154f729b521fc71137b1169`),
-  `agents/canonical/CODEX_WORKFLOW.md`
+  [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md)
   (`cf6b4940fdaebb0e5019b6451e91fe420a8710b1258c8950fb4f824cbb3e426a`),
-  and `agents/COMMUNICATION_PROTOCOL.md`
+  and [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md)
   (`9213c4ff92a814298da78b8db34425765e256908de4f5178cf9ceeb95272cff6`).
 - Evidence sources: current executable views `.codex/agents/worker.toml`
   (`571d8df93d186a45025968af806ab60a1539fc107c9de25bd47dd9cecd1d7913`)
@@ -74,7 +74,7 @@ the implementation authority.
   establish the eight executable TOML fields and current
   Luna/Spark model tuples; all 34 view paths are inventoried in section 2.3.
 - Evidence sources: the landed explicit-skill/OOP predecessor identities are
-  `agents/skills/oop-type-design.md`
+  [agents/skills/oop-type-design.md](../../agents/skills/oop-type-design.md)
   (`147906d68db1c24eed3c12a53f07c914130d9fe99c53977af94a0613c424e1c6`),
   `tools/agent/skills/skill_route_catalog.py`
   (`c09ef7d29a378aa31000157847e7d742cea77e734c4cc2c155d712c582161e28`),
@@ -644,9 +644,9 @@ test_paths:
 ```
 
 The exact replacement set is: numeric budget/hard-cap statements in
-`agents/task_catalog.yaml`, `agents/canonical/CODEX_SUBAGENTS.md`,
-`agents/canonical/CODEX_WORKFLOW.md`, `agents/skills/subagent-bootstrap.md`,
-and `.codex/README.md`; duplicated model/prompt fields in the 34 generated
+`agents/task_catalog.yaml`, [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md),
+[agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md), [agents/skills/subagent-bootstrap.md](../../agents/skills/subagent-bootstrap.md),
+and [.codex/README.md](../../.codex/README.md); duplicated model/prompt fields in the 34 generated
 role views above; generic prompt construction branches in
 `tools/agent/orchestration/agent_team.py`; and duplicate lifecycle/queue arithmetic
 outside `tools/agent/orchestration/capacity_handshake.py` and
@@ -999,16 +999,16 @@ only where the new canonical owner is explicit:
 | `agents/agents_config.json` | Permanent role ownership, artifacts, allowed candidate agent types | Permanent role ownership plus `profile_id` references; no duplicated model/prompt prose |
 | The 34 exact `.codex/agents/*.toml` paths listed in section 2.3 | Executable role model/reasoning and role instructions | Generated executable role views from the typed registry; no hand-edited profile/prompt truth |
 | `.codex/config.toml` | Parent/runtime registry and configured runtime settings | Runtime registration plus `configured_max_threads`; no duplicated workflow budget or capsule prose |
-| `agents/canonical/CODEX_SUBAGENTS.md` | Inventory, activation, handoff, and model mapping | Human-facing projection of the typed registry, capacity contract, and lifecycle ledger |
-| `agents/COMMUNICATION_PROTOCOL.md` | Capsule fields and lineage contract | Adds `TargetStateContract`, profile-specific projection, and capacity lineage fields |
+| [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) | Inventory, activation, handoff, and model mapping | Human-facing projection of the typed registry, capacity contract, and lifecycle ledger |
+| [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) | Capsule fields and lineage contract | Adds `TargetStateContract`, profile-specific projection, and capacity lineage fields |
 | `tools/agent/orchestration/agent_team.py` | Packet projection and manifest generation | Consumes materializer/handshake, queues, reserves, reclaims, and records readback |
 | `tools/agent/orchestration/route.py` | Public catalog-backed skill/area/prompt router | Preserve current task-routing ownership; it must not import or expose implementation capability/model selection |
 | `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` | Runtime alignment checker | Validates registry, generated views, capacity references, and role/profile constraints |
 | `eval/producers/evaluate_codex_agent_roles.py` | Static role/model evaluation | Adds target-state, profile, Spark-gate, saturation, and attribution checks |
 | `eval/producers/evaluate_skill_workflow_prompts.py` | Frozen prompt checklist evaluator | Checks generated profile/capsule prompt surfaces without becoming the registry owner |
-| `documents/design/dependency-manifest-design.md` | Dependency-header and manifest contract | Adds exact new-owner/header edges and rejects undocumented registry/handshake/ledger imports |
-| `documents/runtime/SHARED_RUNTIME_SURFACES.md` | Shared source/view policy | Records AgentCanon source, generated role-view, and template-root projection ownership |
-| `AGENTS.md`, `ROOT_AGENTS.md`, `documents/codex/AGENTS_COORDINATION.md` | Root/handoff guidance | Projects Target-State-First, queue/reclaim, and closeout lifecycle requirements without independent model/capacity prose |
+| [documents/design/dependency-manifest-design.md](dependency-manifest-design.md) | Dependency-header and manifest contract | Adds exact new-owner/header edges and rejects undocumented registry/handshake/ledger imports |
+| [documents/runtime/SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md) | Shared source/view policy | Records AgentCanon source, generated role-view, and template-root projection ownership |
+| [AGENTS.md](../../AGENTS.md), [ROOT_AGENTS.md](../../ROOT_AGENTS.md), [documents/codex/AGENTS_COORDINATION.md](../codex/AGENTS_COORDINATION.md) | Root/handoff guidance | Projects Target-State-First, queue/reclaim, and closeout lifecycle requirements without independent model/capacity prose |
 
 ### 2.9 Typed trust boundary and evidence handoff
 
@@ -1474,15 +1474,15 @@ The clause inventory is also total. The quoted cells below are the exact
 
 | Clause ID | Exact intent text | Typed failure semantics | Explicit reuse sources / golden semantic IDs |
 | --- | --- | --- | --- |
-| `identity_trust_v1` | Verify this capsule and its input identities, then consume producer-owned evidence identities without rechecking their owned invariants. | `stale_input_identity`, `missing_upstream_evidence`, `trust_boundary_violation` | `agents/COMMUNICATION_PROTOCOL.md` context/evidence boundary; `input_identity_verified`, `no_duplicate_upstream_check` |
-| `target_state_first_v1` | For repository changes, require an implementation-executable target that fixes every owner, public shape, path, dependency, transition, deletion/replacement mapping, and validation boundary; when its unresolved-design list is empty, immediately materialize the complete responsibility unit once and run its owning gate after completion. | `target_state_missing`, `target_state_stale`, `target_state_not_executable`, `unresolved_design_decision`, `unlisted_final_path` | `AGENTS.md` Design Integrity Gate, `.codex/agents/worker.toml`; `approved_design_required`, `implementation_executable_target`, `complete_responsibility_unit`, `immediate_direct_materialization` |
-| `decision_sufficiency_v1` | When every evidence-consistent state has the same owner, edit mechanism, and validation action, start that action and do not add a read, search, check, or review. | `action_divergence`, `unauthorized_evidence_request` | `agents/canonical/CODEX_WORKFLOW.md` evidence routing; `named_decision_and_branches`, `identical_action_executes` |
+| `identity_trust_v1` | Verify this capsule and its input identities, then consume producer-owned evidence identities without rechecking their owned invariants. | `stale_input_identity`, `missing_upstream_evidence`, `trust_boundary_violation` | [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) context/evidence boundary; `input_identity_verified`, `no_duplicate_upstream_check` |
+| `target_state_first_v1` | For repository changes, require an implementation-executable target that fixes every owner, public shape, path, dependency, transition, deletion/replacement mapping, and validation boundary; when its unresolved-design list is empty, immediately materialize the complete responsibility unit once and run its owning gate after completion. | `target_state_missing`, `target_state_stale`, `target_state_not_executable`, `unresolved_design_decision`, `unlisted_final_path` | [AGENTS.md](../../AGENTS.md) Design Integrity Gate, `.codex/agents/worker.toml`; `approved_design_required`, `implementation_executable_target`, `complete_responsibility_unit`, `immediate_direct_materialization` |
+| `decision_sufficiency_v1` | When every evidence-consistent state has the same owner, edit mechanism, and validation action, start that action and do not add a read, search, check, or review. | `action_divergence`, `unauthorized_evidence_request` | [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) evidence routing; `named_decision_and_branches`, `identical_action_executes` |
 | `owner_write_scope_v1` | Write only the packet's exact allowed set, preserve forbidden and unlisted paths, and return any owner-boundary conflict. | `write_scope_violation`, `owner_boundary_conflict`, `scope_broadening` | `.codex/agents/worker.toml`, `.codex/agents/spark_worker.toml`; `allowed_paths_only`, `no_silent_scope_expansion` |
 | `validation_failure_v1` | Run the named deterministic validations after materialization; compile, static, and deterministic acceptance failures remain implementation feedback in the same pass unless evidence contradicts the fixed target structure, and neither intent nor oracle may be weakened. | `validation_failed`, `implementation_feedback_misclassified`, `oracle_change_forbidden`, `intent_change_forbidden` | `.codex/agents/worker.toml`, `.codex/agents/reviewer.toml`; `canonical_failure_taxonomy_ref`, `intent_preserved`, `implementation_feedback_not_design_reopen` |
-| `tool_tokens_v1` | Use only materialized ToolCall tokens; natural language carries intent and typed failure semantics and never restates a command or argument schema. | `missing_tool_token`, `invalid_tool_token`, `tool_pseudocommand_forbidden` | `agents/skills/subagent-bootstrap.md`, `agents/COMMUNICATION_PROTOCOL.md`; `canonical_tool_id`, `closed_argument_schema` |
-| `lineage_closeout_v1` | Record parent lineage and shared-ledger transitions; after durable handback, verify descendant closure, close terminal agents, and release reservations only after close readback. | `missing_handback`, `unknown_descendant`, `terminal_agent_open`, `reservation_leak` | `agents/canonical/CODEX_SUBAGENTS.md`, `agents/skills/subagent-bootstrap.md`; `full_descendant_topology`, `close_before_release` |
-| `sol_orchestration_v1` | Own route selection, packet materialization, capacity readback, continuation choice, integration, promotion, and closeout; after the executable-target guard passes, dispatch implementation immediately and do not interleave precautionary slices, tests, preflight, rollback checkpoints, or reviews. | `parent_role_broadening`, `implementation_transition_delayed`, `missing_owner_gate`, `review_override_forbidden` | `agents/canonical/CODEX_SUBAGENTS.md`; `parent_integrates`, `immediate_implementation_transition`, `review_decision_blocks` |
-| `sol_capacity_queue_v1` | Reserve from current readback, queue unchanged ready work when unavailable, and never infer configured, thread, or model capacity from another capacity identity. | `capacity_identity_conflation`, `failed_spawn_task_loss`, `model_fallback_forbidden` | `.codex/README.md`, `agents/canonical/CODEX_SUBAGENTS.md`; `queue_preserves_packet`, `capacity_inputs_distinct` |
+| `tool_tokens_v1` | Use only materialized ToolCall tokens; natural language carries intent and typed failure semantics and never restates a command or argument schema. | `missing_tool_token`, `invalid_tool_token`, `tool_pseudocommand_forbidden` | [agents/skills/subagent-bootstrap.md](../../agents/skills/subagent-bootstrap.md), [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md); `canonical_tool_id`, `closed_argument_schema` |
+| `lineage_closeout_v1` | Record parent lineage and shared-ledger transitions; after durable handback, verify descendant closure, close terminal agents, and release reservations only after close readback. | `missing_handback`, `unknown_descendant`, `terminal_agent_open`, `reservation_leak` | [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md), [agents/skills/subagent-bootstrap.md](../../agents/skills/subagent-bootstrap.md); `full_descendant_topology`, `close_before_release` |
+| `sol_orchestration_v1` | Own route selection, packet materialization, capacity readback, continuation choice, integration, promotion, and closeout; after the executable-target guard passes, dispatch implementation immediately and do not interleave precautionary slices, tests, preflight, rollback checkpoints, or reviews. | `parent_role_broadening`, `implementation_transition_delayed`, `missing_owner_gate`, `review_override_forbidden` | [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md); `parent_integrates`, `immediate_implementation_transition`, `review_decision_blocks` |
+| `sol_capacity_queue_v1` | Reserve from current readback, queue unchanged ready work when unavailable, and never infer configured, thread, or model capacity from another capacity identity. | `capacity_identity_conflation`, `failed_spawn_task_loss`, `model_fallback_forbidden` | [.codex/README.md](../../.codex/README.md), [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md); `queue_preserves_packet`, `capacity_inputs_distinct` |
 | `luna_owned_judgment_v1` | Resolve only the assigned ambiguous design, causal repair, cross-owner integration, authoring, investigation, execution, or review contract and return its role-specific schema. | `unowned_judgment`, `silent_target_revision`, `ambiguous_return_schema` | current Luna role TOMLs plus `agents/agents_config.json`; `logical_role_projection`, `role_specific_return` |
 | `luna_independent_review_v1` | Review the exact completed artifact or candidate at its owning gate, return findings first with approve, revise, or escalate, and never edit or interleave the materialization pass. | `review_write_forbidden`, `review_before_completed_structure`, `missing_exact_identity`, `noncanonical_verdict` | `.codex/agents/reviewer.toml`, `.codex/agents/ship_reviewer.toml`; `findings_first`, `post_completion_exact_candidate_review` |
 | `luna_implementation_v1` | Implement the approved cross-owner or causal-repair responsibility unit once against its final dependency order, then return every changed file, validation result, blocker, remaining final-DAG unit, and next gate; do not use micro-slices or compatibility staging. | `cross_owner_order_violation`, `design_issue_blocker`, `micro_slice_forbidden`, `incomplete_return` | `.codex/agents/worker.toml`; `design_trace_required`, `direct_complete_unit_materialization`, `remaining_work_reported` |
@@ -3945,14 +3945,14 @@ this design document; all rows below are planned changes after approval.
 | --- | --- | --- |
 | `agents/agents_config.json` | Permanent team owner | Add `profile_id`, `capsule_schema_id`, and capability references to role records; remove model/prompt duplicates if present; retain ownership and artifact policy. |
 | `agents/task_catalog.yaml` | Workflow activation and declared topology owner | Retain role families/stage classes; declare producer nested-owner eligibility and reviewer/final frontier membership; remove every numeric `spawn_budget` field including `skill_evaluation`; add `capacity_policy_ref`, capability packet requirements, and target-state gate references without prose duplication. Its generated maximum is the research-driven 20-reviewer frontier plus six nested producer reservations. |
-| `agents/canonical/CODEX_SUBAGENTS.md` | Subagent inventory owner | Replace manual model/prompt/budget claims with generated-registry and capacity-policy projections; state Luna/Spark boundaries, implementation-executable target guard, immediate one-pass handoff, same-Spark structural-gap resume, post-completion owner gate, queue semantics, view ownership, and the mandatory nested lifecycle transition. Remove higher-reasoning substitution or slice/test escalation for a Spark design gap. |
-| `agents/canonical/CODEX_WORKFLOW.md` | Executable workflow procedure owner | Make Target-State-First and Decision Sufficiency universal before edits/handoffs; require the complete executable structure and empty unresolved-design set; then transition immediately to one direct complete-unit materialization and only afterward to the owning gate. Replace minimal/conservative/provisional, task-size/count-budget, precautionary micro-slice, speculative-test, repeated-preflight, rollback-checkpoint, and interleaved-review defaults. Compile/static errors remain implementation feedback; only an actual target-structure contradiction returns to design, repairs once, and resumes the same Spark. |
-| `agents/COMMUNICATION_PROTOCOL.md` | Capsule/lineage owner | Add `TargetStateContract`, `ImplementationExecutionContract`, `ImplementationFeedback`, `StructuralDesignGap`, `DecisionSufficiencyRecord`, typed evidence requests, profile-specific capsule projection references, same-worker continuation, trust boundary, loader/capacity readback, thread/model events, shared ledger, queue, reservation, closeout packet, and nested observability fields. Preserve the rebound deterministic `search.py` route. |
-| `agents/skills/agent-orchestration.md` | Routing skill owner | Require an implementation-executable TargetStateContract and Decision Sufficiency before implementation route; reject unvalued reads/searches/checks/reviews; project the machine-readable decision/branch map; delegate fixed-packet model decision to `implementation_route.py`; dispatch exactly one Spark immediately for a fixed unit, resume that same Spark after one structural-gap repair, and invoke one owner gate only after completion; preserve landed explicit-skill owners and the rebound deterministic `search.py` route; update capacity/queue semantics and require the shared lifecycle ledger at every parent transition. |
-| `agents/skills/subagent-bootstrap.md` | Handoff/lifecycle owner | Require implementation-executable target, immutable packet digest, direct complete-unit materialization, profile materializer output, continuity decision, same-worker structural-gap resume, capacity reservation, shared-ledger transitions, automatic close, and closeout-packet generation. Remove minimal/provisional, candidate-substitution, micro-slice, speculative-test, repeated-preflight, rollback-checkpoint, and interleaved-review defaults. |
-| `agents/skills/task-routing.md` | Public route owner | Preserve landed name/area/prompt and explicit-skill capability routes; point fixed implementation packets to their separate owner; forbid implementation-model/profile/capacity selection imports. |
-| `agents/canonical/README.md` and `agents/README.md` | Reader map owners | Add canonical registry/capacity owner links and remove stale numeric/model sources. |
-| `documents/design/README.md` | Design index owner | Add this design as the canonical entry and link the future model-profile/capacity owner documents only when created. |
+| [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) | Subagent inventory owner | Replace manual model/prompt/budget claims with generated-registry and capacity-policy projections; state Luna/Spark boundaries, implementation-executable target guard, immediate one-pass handoff, same-Spark structural-gap resume, post-completion owner gate, queue semantics, view ownership, and the mandatory nested lifecycle transition. Remove higher-reasoning substitution or slice/test escalation for a Spark design gap. |
+| [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) | Executable workflow procedure owner | Make Target-State-First and Decision Sufficiency universal before edits/handoffs; require the complete executable structure and empty unresolved-design set; then transition immediately to one direct complete-unit materialization and only afterward to the owning gate. Replace minimal/conservative/provisional, task-size/count-budget, precautionary micro-slice, speculative-test, repeated-preflight, rollback-checkpoint, and interleaved-review defaults. Compile/static errors remain implementation feedback; only an actual target-structure contradiction returns to design, repairs once, and resumes the same Spark. |
+| [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) | Capsule/lineage owner | Add `TargetStateContract`, `ImplementationExecutionContract`, `ImplementationFeedback`, `StructuralDesignGap`, `DecisionSufficiencyRecord`, typed evidence requests, profile-specific capsule projection references, same-worker continuation, trust boundary, loader/capacity readback, thread/model events, shared ledger, queue, reservation, closeout packet, and nested observability fields. Preserve the rebound deterministic `search.py` route. |
+| [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md) | Routing skill owner | Require an implementation-executable TargetStateContract and Decision Sufficiency before implementation route; reject unvalued reads/searches/checks/reviews; project the machine-readable decision/branch map; delegate fixed-packet model decision to `implementation_route.py`; dispatch exactly one Spark immediately for a fixed unit, resume that same Spark after one structural-gap repair, and invoke one owner gate only after completion; preserve landed explicit-skill owners and the rebound deterministic `search.py` route; update capacity/queue semantics and require the shared lifecycle ledger at every parent transition. |
+| [agents/skills/subagent-bootstrap.md](../../agents/skills/subagent-bootstrap.md) | Handoff/lifecycle owner | Require implementation-executable target, immutable packet digest, direct complete-unit materialization, profile materializer output, continuity decision, same-worker structural-gap resume, capacity reservation, shared-ledger transitions, automatic close, and closeout-packet generation. Remove minimal/provisional, candidate-substitution, micro-slice, speculative-test, repeated-preflight, rollback-checkpoint, and interleaved-review defaults. |
+| [agents/skills/task-routing.md](../../agents/skills/task-routing.md) | Public route owner | Preserve landed name/area/prompt and explicit-skill capability routes; point fixed implementation packets to their separate owner; forbid implementation-model/profile/capacity selection imports. |
+| [agents/canonical/README.md](../../agents/canonical/README.md) and [agents/README.md](../../agents/README.md) | Reader map owners | Add canonical registry/capacity owner links and remove stale numeric/model sources. |
+| [documents/design/README.md](README.md) | Design index owner | Add this design as the canonical entry and link the future model-profile/capacity owner documents only when created. |
 
 ### 5.3 Runtime and generated-view changes
 
@@ -3964,7 +3964,7 @@ this design document; all rows below are planned changes after approval.
 | `tools/runtime/lifecycle/bootstrap_agent_run.py` | Task/run packet generator | Load the declared-team witness value 26 into `run.capacity_request.requested_total_capacity`, derive actual DAG demand/write frontiers separately, emit `RequestedCapacityLoaderEvidence` plus policy/topology digests in `team_manifest.yaml`, and remove family numeric defaults. Preserve the rebound deterministic `search.py` route in bootstrap output. |
 | `tools/agent/orchestration/route.py` | Checked unchanged public composition/renderer | Preserve landed name/area/prompt and `capability_route.py` composition. Add no `implementation_route`, model-profile, capacity, or Decision Sufficiency imports; alignment tests enforce those negative edges. |
 | `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` | Runtime checker | Validate canonical registry, generated role views, profile-role exclusivity, implementation-executable TargetStateContract requirements, immediate one-pass transition, implementation-feedback/design-gap separation, same-Spark resume identity, capacity-policy references, close-agent ToolCall binding, shared-ledger fields, Decision Sufficiency decision/branch declarations, invariant-action one-Spark/one-post-completion-gate topology with no extra agent, and absence of duplicate numeric or conservative procedure claims. |
-| `.codex/README.md` | Runtime reader view | Replace “hard ceiling 24” wording with the capacity-input model and handshake/readback link. |
+| [.codex/README.md](../../.codex/README.md) | Runtime reader view | Replace “hard ceiling 24” wording with the capacity-input model and handshake/readback link. |
 | `tools/runtime/lifecycle/task_close.py` | Closeout checker | Read the complete parent/nested ledger and fail on any lifecycle state before `reservation released`, completed-but-open agent, unknown descendant, missing automatic close evidence, or leaked reservation. |
 
 The landed OOP owners in section 9 remain read-only predecessor evidence. The
@@ -3982,7 +3982,7 @@ review. The implementation worker may not invent an alternate path.
 | `eval/producers/evaluate_skill_workflow_prompts.py` | Add frozen checklist targets for every generated capsule schema, implementation-executable Target-State-First wording, immediate direct materialization, post-completion owner gate, implementation-feedback/design-gap separation, same-Spark resume, typed ToolCall tokens, machine-readable evidence-request declarations, invariant-action direct execution, and divergence-only reopen comprehension; preserve evaluator-only semantics. |
 | `eval/definitions/agent_behavior_eval.toml` | Add role-attributed scenarios for fixed executable Spark tasks with immediate one-pass implementation, exactly one worker/one post-completion owner gate/no extra agent, same-Spark structural-gap repair/resume, compile/static implementation feedback, prohibited compensation controls, graph-owned Luna unresolved/cross-owner controls, identical/divergent action tuples, rejection of undeclared evidence requests, divergence-only design reopen, thread and model-capacity queueing as distinct events, continuation reuse, and completed/errored nested lineage cleanup. |
 | `eval/definitions/skill_workflow_prompt_eval.toml` | Add prompt/capsule comprehensibility checklist targets with critical ordered fields, implementation-executable target and immediate-transition semantics, implementation-feedback/design-gap distinction, same-Spark resume, ToolCall schema identity, allowed/excluded context, and Decision Sufficiency failure semantics while preserving the rebound deterministic search fixture. |
-| `documents/codex/prompt-skill-evaluation-checklist.md` | Add checklist guidance for target-state packet sufficiency, profile-specific fields, ToolCall token completeness, unauthorized extra-reference detection, and no hidden history. |
+| [documents/codex/prompt-skill-evaluation-checklist.md](../codex/prompt-skill-evaluation-checklist.md) | Add checklist guidance for target-state packet sufficiency, profile-specific fields, ToolCall token completeness, unauthorized extra-reference detection, and no hidden history. |
 | `tests/agent_tools/test_check_agent_runtime_alignment.py` | Add generated-view parity, profile exclusivity, numeric-source uniqueness, executable-target status, immediate one-pass transition, implementation-feedback/design-gap distinction, same-Spark resume, capacity-policy reference, no task-size/count authority, evidence-request declaration, invariant-action one-Spark/one-post-completion-gate/no-extra-agent, no compensation fallback, distinct capacity-event, and forbidden-import tests. |
 | `tests/agent_tools/test_implementation_route.py` | Add identical-action immediate direct-Spark/one-post-completion-owner-gate/no-extra-agent, same-Spark structural-gap repair/resume, compile/static same-pass feedback, prohibited compensation controls, graph-owned divergent-action Luna, divergence-only design reopen, suitable-context continuation, typed queue, stale evidence, forbidden or undeclared evidence request, and no compatibility-fallback tests. |
 | `tests/agent_tools/test_evaluate_codex_agent_roles.py` | Add role/profile and capability attribution tests, identical-packet incumbent/candidate pairing, missing/malformed runtime-metric rejection, static/external hypothesis-only behavior, and approved assignment-gate identity; retain gpt-5.4-mini only for T14. |
@@ -4045,8 +4045,8 @@ Each decision is tied to the downstream surface that must change with it.
 | Session reload | config/profile/capacity readback | runtime | prompt-config | generation mismatch test | RC-13 | `.codex/config.toml` runtime registration |
 | Shared lifecycle ledger | parent, nested child, team manifest, closeout | orchestration -> team -> closeout | detailed design + prompt-config | full transition and leak-failure fixtures | RC-20/21 | existing lifecycle evidence and workflow monitor |
 | `close_agent` ToolCall token | registry, route packet, closeout packet | model-profile -> handoff/closeout | prompt-config + document flow | token/schema parity and missing-token failure | RC-18/21 | canonical tool identity and typed argument schemas |
-| Dependency/import manifest | `documents/design/dependency-manifest-design.md`, headers on every new source/test path | design -> implementation | detailed design | manifest/header checker and import graph | RC-08/17/21 | existing `@dependency-start` contracts |
-| Shared/root views | `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `AGENTS.md`, `ROOT_AGENTS.md`, `documents/codex/AGENTS_COORDINATION.md` | source -> generated/root view | document flow + structure | root/view parity and stale-surface sweep | RC-09/11/21 | shared runtime surface policy |
+| Dependency/import manifest | [documents/design/dependency-manifest-design.md](dependency-manifest-design.md), headers on every new source/test path | design -> implementation | detailed design | manifest/header checker and import graph | RC-08/17/21 | existing `@dependency-start` contracts |
+| Shared/root views | [documents/runtime/SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md), [AGENTS.md](../../AGENTS.md), [ROOT_AGENTS.md](../../ROOT_AGENTS.md), [documents/codex/AGENTS_COORDINATION.md](../codex/AGENTS_COORDINATION.md) | source -> generated/root view | document flow + structure | root/view parity and stale-surface sweep | RC-09/11/21 | shared runtime surface policy |
 | Evaluation provenance | `eval/definitions/agent_behavior_eval.toml`, `eval/definitions/skill_workflow_prompt_eval.toml`, role/prompt evaluators | implementation -> evaluation | prompt-config + detailed design | `PerformanceEvidenceRecord` plus machine-enforced `AssignmentEvidenceGate` | RC-15/18/19 | existing role and skill eval tools |
 | Claim evidence classification | design ledger, claim checker, final readback | design -> implementation -> closeout | detailed design + document flow | current/request/target/assumption fixtures and target verification transition | RC-09/10/11/17 | existing implementation-backed claim checker |
 
@@ -4072,20 +4072,20 @@ Each decision is tied to the downstream surface that must change with it.
 | new registry/implementation-route/capacity tests | 5.4 | RC-10/13/14/18/22/23/25/26 | existing agent tool tests | pytest with deterministic executable-target/direct-pass/feedback/gap fixtures |
 | `agents/agents_config.json` | 4.1/5.2 | RC-07/21 | permanent role/artifact ownership | role-source parity and lifecycle field checks |
 | `agents/task_catalog.yaml` | 5.2/10 | RC-12/14 | workflow activation/topology | no embedded fixed budget; capacity-policy reference |
-| `agents/canonical/CODEX_SUBAGENTS.md` | 5.2/8 | RC-03/06/11/13/21 | subagent inventory and wave ledger | docs check and lifecycle transition checker |
-| `agents/canonical/CODEX_WORKFLOW.md` | 5.2/8 | RC-09/11/13/21/22/23/25/26 | executable workflow gates | executable-target immediate direct pass, post-completion gate, implementation-feedback/structural-gap split, same-Spark resume, Decision Sufficiency, one-Spark/no-extra-agent, capacity, and closeout checks |
-| `agents/COMMUNICATION_PROTOCOL.md` | 5.2/2.3/2.3.1/2.9/2.10 | RC-04/06/17/21/22/23/25/26 | capsule/lineage contract | execution-contract/schema/order, feedback/gap fields, same-worker continuation, evidence-request decision/branch map, capacity-event, and parent-child ledger tests |
-| `agents/skills/agent-orchestration.md` | 5.2/9 | RC-02/08/17/21/22/23/25/26 | routing skill owner | decision/import, trust-boundary, immediate invariant-action execution, same-Spark resume, post-completion gate, and queue checks |
-| `agents/skills/subagent-bootstrap.md` | 5.2/2.10 | RC-11/18/21/26 | handoff/lifecycle owner | complete-unit one-pass, same-worker gap resume, no-compensation, closeout token, and transition tests |
-| `agents/skills/task-routing.md` | 5.2/9 | RC-02/08 | public catalog-backed router | no capability-policy ownership checker |
-| `AGENTS.md` | 5.2/8 | RC-09/11/21 | root runtime guidance | root/view parity and contradiction sweep |
-| `ROOT_AGENTS.md` | 5.2/8 | RC-09/11/21 | AgentCanon root guidance | source/view alignment |
-| `documents/codex/AGENTS_COORDINATION.md` | 5.2/2.10 | RC-06/21 | coordination guidance | docs check and lifecycle term order |
-| `documents/runtime/SHARED_RUNTIME_SURFACES.md` | 2.8/5.2 | RC-07/08/21 | shared source/view policy | structure and generated-view ownership checks |
-| `documents/design/dependency-manifest-design.md` | 5.2/2.2 | RC-08/17/21 | dependency header contract | header and import graph checks |
-| `documents/codex/prompt-skill-evaluation-checklist.md` | 4.4/11 | RC-04/15/18 | skill prompt checklist | tool-token/schema comprehensibility eval |
+| [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) | 5.2/8 | RC-03/06/11/13/21 | subagent inventory and wave ledger | docs check and lifecycle transition checker |
+| [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) | 5.2/8 | RC-09/11/13/21/22/23/25/26 | executable workflow gates | executable-target immediate direct pass, post-completion gate, implementation-feedback/structural-gap split, same-Spark resume, Decision Sufficiency, one-Spark/no-extra-agent, capacity, and closeout checks |
+| [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) | 5.2/2.3/2.3.1/2.9/2.10 | RC-04/06/17/21/22/23/25/26 | capsule/lineage contract | execution-contract/schema/order, feedback/gap fields, same-worker continuation, evidence-request decision/branch map, capacity-event, and parent-child ledger tests |
+| [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md) | 5.2/9 | RC-02/08/17/21/22/23/25/26 | routing skill owner | decision/import, trust-boundary, immediate invariant-action execution, same-Spark resume, post-completion gate, and queue checks |
+| [agents/skills/subagent-bootstrap.md](../../agents/skills/subagent-bootstrap.md) | 5.2/2.10 | RC-11/18/21/26 | handoff/lifecycle owner | complete-unit one-pass, same-worker gap resume, no-compensation, closeout token, and transition tests |
+| [agents/skills/task-routing.md](../../agents/skills/task-routing.md) | 5.2/9 | RC-02/08 | public catalog-backed router | no capability-policy ownership checker |
+| [AGENTS.md](../../AGENTS.md) | 5.2/8 | RC-09/11/21 | root runtime guidance | root/view parity and contradiction sweep |
+| [ROOT_AGENTS.md](../../ROOT_AGENTS.md) | 5.2/8 | RC-09/11/21 | AgentCanon root guidance | source/view alignment |
+| [documents/codex/AGENTS_COORDINATION.md](../codex/AGENTS_COORDINATION.md) | 5.2/2.10 | RC-06/21 | coordination guidance | docs check and lifecycle term order |
+| [documents/runtime/SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md) | 2.8/5.2 | RC-07/08/21 | shared source/view policy | structure and generated-view ownership checks |
+| [documents/design/dependency-manifest-design.md](dependency-manifest-design.md) | 5.2/2.2 | RC-08/17/21 | dependency header contract | header and import graph checks |
+| [documents/codex/prompt-skill-evaluation-checklist.md](../codex/prompt-skill-evaluation-checklist.md) | 4.4/11 | RC-04/15/18 | skill prompt checklist | tool-token/schema comprehensibility eval |
 | `.codex/config.toml` | 4.3/5.3 | RC-12/13/19 | runtime registration | generation/restart readback fixture |
-| `.codex/README.md` | 5.2/8 | RC-12/14/19 | runtime reader view | no hard-ceiling/fixed-budget claim |
+| [.codex/README.md](../../.codex/README.md) | 5.2/8 | RC-12/14/19 | runtime reader view | no hard-ceiling/fixed-budget claim |
 | each exact generated view in section 2.3 | 4.1/4.4/5.3 | RC-04/07 | existing executable TOML view | generated digest parity |
 | `eval/definitions/agent_behavior_eval.toml` | 11 | RC-15/19/20/25/26 | role evaluation manifest | attributed performance, executable-target direct pass, feedback/gap split, same-Spark resume, no-compensation/no-extra-agent, divergence-only reopen, and lifecycle leak fixtures |
 | `eval/definitions/skill_workflow_prompt_eval.toml` | 11 | RC-15/18/25/26 | skill evaluation manifest | capsule/tool-token/Decision-Sufficiency/executable-target/direct-pass comprehension |
@@ -4106,19 +4106,19 @@ the implementation pass, with no second rule layered beside them:
 
 | Current surface | Current contradiction | Replacement |
 | --- | --- | --- |
-| `agents/canonical/CODEX_WORKFLOW.md` | “minimal write-capable handoff” | “target-state-complete responsibility unit handoff” |
-| `agents/canonical/CODEX_WORKFLOW.md` | repo-changing families are fixed at active four/write two | topology-derived ready frontier and pairwise-disjoint write frontier; no numeric family default |
-| `agents/canonical/CODEX_WORKFLOW.md` | conservative Objective draft | target-state-complete Objective; provisional intake cannot authorize edits |
-| `agents/canonical/CODEX_WORKFLOW.md` | precautionary micro-slices, speculative tests, repeated preflight, rollback checkpoints, or interleaved review after design completion | implementation-executable target plus empty unresolved-decision guard transitions immediately to one direct complete-unit materialization; compile/static feedback stays in implementation and the owning gate follows completion |
-| `agents/canonical/CODEX_SUBAGENTS.md` | conservative Objective and incremental/prototype defaults | completed target-state contract before writer handoff; prototype is a task capability, not a partial-state default |
-| `agents/canonical/CODEX_SUBAGENTS.md` | a Spark design gap can be answered by a higher-reasoning coder, smaller slice, or more tests | return one typed structural gap, repair that exact target field once, and resume the same Spark instance |
-| `agents/skills/subagent-bootstrap.md` | provisional packet or candidate-replacement language that can look handoff-ready | provisional artifacts are read-only discovery only; writer packet requires an implementation-executable TargetStateContract, direct complete-unit pass, and same-worker gap continuation |
-| `agents/skills/agent-orchestration.md` | provisional route can drift into selection, repeated investigation, preflight, or review interleaving | target state and Decision Sufficiency gate selection; `implementation_route.py` owns immediate fixed-packet dispatch and same-Spark gap resume; owner review follows completed materialization |
-| `agents/COMMUNICATION_PROTOCOL.md` | packet can omit final target layout/deletion set or distinguish neither implementation feedback nor a structural gap | add mandatory typed TargetStateContract/ImplementationExecutionContract fields, ImplementationFeedback, StructuralDesignGap, same-worker continuation, and revision/re-review rule |
+| [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) | “minimal write-capable handoff” | “target-state-complete responsibility unit handoff” |
+| [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) | repo-changing families are fixed at active four/write two | topology-derived ready frontier and pairwise-disjoint write frontier; no numeric family default |
+| [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) | conservative Objective draft | target-state-complete Objective; provisional intake cannot authorize edits |
+| [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) | precautionary micro-slices, speculative tests, repeated preflight, rollback checkpoints, or interleaved review after design completion | implementation-executable target plus empty unresolved-decision guard transitions immediately to one direct complete-unit materialization; compile/static feedback stays in implementation and the owning gate follows completion |
+| [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) | conservative Objective and incremental/prototype defaults | completed target-state contract before writer handoff; prototype is a task capability, not a partial-state default |
+| [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) | a Spark design gap can be answered by a higher-reasoning coder, smaller slice, or more tests | return one typed structural gap, repair that exact target field once, and resume the same Spark instance |
+| [agents/skills/subagent-bootstrap.md](../../agents/skills/subagent-bootstrap.md) | provisional packet or candidate-replacement language that can look handoff-ready | provisional artifacts are read-only discovery only; writer packet requires an implementation-executable TargetStateContract, direct complete-unit pass, and same-worker gap continuation |
+| [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md) | provisional route can drift into selection, repeated investigation, preflight, or review interleaving | target state and Decision Sufficiency gate selection; `implementation_route.py` owns immediate fixed-packet dispatch and same-Spark gap resume; owner review follows completed materialization |
+| [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) | packet can omit final target layout/deletion set or distinguish neither implementation feedback nor a structural gap | add mandatory typed TargetStateContract/ImplementationExecutionContract fields, ImplementationFeedback, StructuralDesignGap, same-worker continuation, and revision/re-review rule |
 | `.codex/agents/worker.toml` and `spark_worker.toml` | bounded slice language without universal target-state completion or with blocking micro-checkpoints | bounded means complete final responsibility unit in one direct pass; checkpoints are nonblocking observations; no conservative patch, worker substitution, smaller slice, speculative test, or compatibility layer |
 | `.codex/agents/scientific_computing_reviewer.toml` and role ownership | “incremental change” as default | target-state-complete change, testing, automation, and prototype discipline |
 | `.codex/config.toml` | hand-authored `max_threads = 24` | generated `max_threads = 26` from the closed 20-direct-plus-6-nested topology witness, followed by loader/restart readback |
-| `.codex/README.md`, `CODEX_SUBAGENTS.md`, workflow docs | duplicated numeric “hard ceiling” or static active four | link to capacity handshake; distinguish requested/configured/platform/currently-available/effective/reserved/available values, queue, and reservation |
+| [.codex/README.md](../../.codex/README.md), `CODEX_SUBAGENTS.md`, workflow docs | duplicated numeric “hard ceiling” or static active four | link to capacity handshake; distinguish requested/configured/platform/currently-available/effective/reserved/available values, queue, and reservation |
 
 The implementation packet must include a `contradiction_sweep` artifact that
 records every occurrence in the named owner surfaces, whether it is retained
@@ -4134,7 +4134,7 @@ owner identities:
 
 | Path | SHA-256 | Fixed responsibility |
 | --- | --- | --- |
-| `agents/skills/oop-type-design.md` | `147906d68db1c24eed3c12a53f07c914130d9fe99c53977af94a0613c424e1c6` | OOP/type packet and explicit capability owner contract |
+| [agents/skills/oop-type-design.md](../../agents/skills/oop-type-design.md) | `147906d68db1c24eed3c12a53f07c914130d9fe99c53977af94a0613c424e1c6` | OOP/type packet and explicit capability owner contract |
 | `tools/agent/skills/skill_route_catalog.py` | `c09ef7d29a378aa31000157847e7d742cea77e734c4cc2c155d712c582161e28` | explicit skill capability catalog/index |
 | `tools/agent/orchestration/capability_route.py` | `f9bdc819cae5f66c7f3450f2948fde7d89668a9248e57e80b153b5de90534482` | raw-argv preflight and immutable explicit-skill decision |
 | `tools/agent/orchestration/route.py` | `544ce80bfba6be4817f28e4c16801483f9e929e5502a6e7698d7f328f50e4ee7` | public explicit-skill route composition/rendering; preserves the rebound deterministic `search.py` invocation |
@@ -4146,10 +4146,10 @@ and required preservation are:
 
 | Path | Old SHA-256 | Rebound SHA-256 | Preservation invariant |
 | --- | --- | --- | --- |
-| `ROOT_AGENTS.md` | `3496f3125dab824bb96b9eeee55c10eb6d2f9e2d247b6db4840a4d681bc7788b` | `4aa15ed0f8573f1a6d5b8928a60a10d5b8a51a6f0f7ba14bc528e9cac312688f` | Keep the canonical deterministic `tools/analysis/search/search.py` route while projecting RC-26. |
-| `agents/COMMUNICATION_PROTOCOL.md` | `00c3eaa15e81fd19b6a9496c59586aa5d0f5503d3fa9519ee95e17329db3090b` | `9213c4ff92a814298da78b8db34425765e256908de4f5178cf9ceeb95272cff6` | Keep the deterministic search packet/command contract while adding execution-contract and same-worker fields. |
-| `agents/skills/agent-orchestration.md` | `a46020bc9ad549eefd38626898d89d425315bdd1d5a48e5bc1379532202231a0` | `dffcd5ac2fb921f7702636448c3a81948aa02feff9a9f9cc79cb1c2095ff3eb0` | Keep the deterministic search route; RC-26 replaces only conflicting procedure defaults. |
-| `documents/runtime/SHARED_RUNTIME_SURFACES.md` | `1a988cebdfd25fe2a14fd13ce00fd2aa9d92669c8ca40f787df59a6a0401ddb6` | `39d61a341ca9d0ed72b731c362aa72e0102598e7a1300a20f33d5b75cd8985a3` | Keep the rebound GPU-admission R5 identity paragraph and dependency edge. |
+| [ROOT_AGENTS.md](../../ROOT_AGENTS.md) | `3496f3125dab824bb96b9eeee55c10eb6d2f9e2d247b6db4840a4d681bc7788b` | `4aa15ed0f8573f1a6d5b8928a60a10d5b8a51a6f0f7ba14bc528e9cac312688f` | Keep the canonical deterministic `tools/analysis/search/search.py` route while projecting RC-26. |
+| [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) | `00c3eaa15e81fd19b6a9496c59586aa5d0f5503d3fa9519ee95e17329db3090b` | `9213c4ff92a814298da78b8db34425765e256908de4f5178cf9ceeb95272cff6` | Keep the deterministic search packet/command contract while adding execution-contract and same-worker fields. |
+| [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md) | `a46020bc9ad549eefd38626898d89d425315bdd1d5a48e5bc1379532202231a0` | `dffcd5ac2fb921f7702636448c3a81948aa02feff9a9f9cc79cb1c2095ff3eb0` | Keep the deterministic search route; RC-26 replaces only conflicting procedure defaults. |
+| [documents/runtime/SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md) | `1a988cebdfd25fe2a14fd13ce00fd2aa9d92669c8ca40f787df59a6a0401ddb6` | `39d61a341ca9d0ed72b731c362aa72e0102598e7a1300a20f33d5b75cd8985a3` | Keep the rebound GPU-admission R5 identity paragraph and dependency edge. |
 | `eval/definitions/skill_workflow_prompt_eval.toml` | `cf1d2968cbd12ff4b3698cb55a27e42520a804428c932f5fb9d9d370fa3c10db` | `1e2522f9f8e5717e85a2da978119799df7c40dbb6290e6503aab9926b43a5153` | Keep the deterministic-search fixture and add RC-26 comprehension assertions in the same eval owner. |
 | `tools/agent/orchestration/agent_team.py` | `2165ae6541f002a2db3c970ec291665687535d89bea838d6134921231822374b` | `bfa29be9588641ac76833cfde989b45871a01f7bfe684691e87a6fdb4875d3c4` | Keep deterministic-search packet generation while adding model/capacity/lifecycle materialization. |
 | `tools/runtime/lifecycle/bootstrap_agent_run.py` | `0e83c874dc2d954f2c44b5befdd699460b943db41e65ae70d8f2eb2feddc934d` | `54f5a976da85648f45cccbc5b761b28dca8dc4293b24496a6b94ca23c8caf05f` | Keep deterministic-search bootstrap output while adding target/capacity/lifecycle fields. |
@@ -4516,7 +4516,7 @@ its acceptance input and produces those outputs during validation.
 
 ### Upstream evidence envelope (parent/materializer only)
 
-- Approved design artifact: `documents/design/codex-spark-implementation-routing.md`, exact approved SHA.
+- Approved design artifact: [documents/design/codex-spark-implementation-routing.md](codex-spark-implementation-routing.md), exact approved SHA.
 - `TargetStateContract`: approved embedded contract or run-bundle projection,
   including responsibility graph, final paths, owner/invariant boundaries,
   public shapes, deletion/replacement set, dependency direction, migration
@@ -4527,7 +4527,7 @@ its acceptance input and produces those outputs during validation.
   detailed-design, and document-flow evidence remains in the review ledger but
   is not a launch prerequisite.
 - OOP predecessor main `404678e1e9c242737e2f610e98743328931edd8f` and the
-  recorded SHA-256 identities for `agents/skills/oop-type-design.md`,
+  recorded SHA-256 identities for [agents/skills/oop-type-design.md](../../agents/skills/oop-type-design.md),
   `tools/agent/skills/skill_route_catalog.py`,
   `tools/agent/orchestration/capability_route.py`, and `tools/agent/orchestration/route.py`;
   these owners are immutable packet evidence, not worker choices.
@@ -4556,15 +4556,15 @@ its acceptance input and produces those outputs during validation.
   implementation, design, review, and skill evaluation.
 - `agents/agents_config.json` implementer, designer,
   reviewers, artifacts, and profile references.
-- `agents/canonical/CODEX_SUBAGENTS.md` Wave Plan, Handoff
+- [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) Wave Plan, Handoff
   Context, mapping, Spark eligibility, capacity, and observability sections.
-- `agents/COMMUNICATION_PROTOCOL.md` capsule, TargetState,
+- [agents/COMMUNICATION_PROTOCOL.md](../../agents/COMMUNICATION_PROTOCOL.md) capsule, TargetState,
   write-scope, lineage, review, and lifecycle sections.
-- `agents/canonical/CODEX_WORKFLOW.md` target-state,
+- [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) target-state,
   design-integrity, implementation, capacity, and closeout gates.
-- `agents/skills/agent-orchestration.md`,
+- [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md),
   `subagent-bootstrap.md`, and `task-routing.md` owner sections.
-- `.codex/config.toml`, `.codex/README.md`, and the generated role views for
+- `.codex/config.toml`, [.codex/README.md](../../.codex/README.md), and the generated role views for
   the selected profile only.
 - `tools/agent/orchestration/model_profile_registry.py`,
   `capacity_handshake.py`, `implementation_route.py`, `agent_team.py`, and
@@ -4796,9 +4796,9 @@ the exact repair; any other missing field queues unchanged ready work.
 
 ## 16. Terra 横断 role 追加契約
 
-この節は、`documents/design/codex-spark-implementation-routing.md` の既存の
+この節は、[documents/design/codex-spark-implementation-routing.md](codex-spark-implementation-routing.md) の既存の
 Spark 実装 routing 契約に対するユーザー明示の後続契約であり、
-`agents/canonical/CODEX_SUBAGENTS.md` の既存の Sol・Luna・Spark の責務を
+[agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) の既存の Sol・Luna・Spark の責務を
 再割当てしない。
 
 | ID | 契約 | owner / evidence |
@@ -4806,7 +4806,7 @@ Spark 実装 routing 契約に対するユーザー明示の後続契約であ�
 | TERRA-01 | Sol parent は routing、packet relay、status、external readback を保持し、integration_executor と ship_reviewer が integration/final authority を持つ。 | Sol/integration_executor/ship_reviewer; `agents/agents_config.json` |
 | TERRA-02 | Terra は canonical 登録された conditional read-only cross-cutting specialist candidate とし、always-on、coordinator、general worker にはしない。task-id のない fallback でも activation evidence なしには選択しない。 | Terra; `agents/agents_config.json` |
 | TERRA-03 | Terra の capability は `cross_owner_integration`、`context_reconstruction`、`adversarial_contradiction_validation` の三つに限定する。ユーザー提示済み、または既存 finding 内の alternative architecture は adversarial comparison 入力として許可し、Terra 自身による未要求の新規案生成、採用、final decision は許可しない。 | Terra profile; `agents/model_profiles.toml` |
-| TERRA-04 | Luna は design、review、ordinary ambiguous implementation を保持し、Spark は fixed mechanical leaf を保持する。 | Luna / Spark; `agents/canonical/CODEX_SUBAGENTS.md` |
+| TERRA-04 | Luna は design、review、ordinary ambiguous implementation を保持し、Spark は fixed mechanical leaf を保持する。 | Luna / Spark; [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) |
 | TERRA-05 | Terra の activation evidence は multi-owner dependency closure、compaction・long-run・incomplete handoff による context reconstruction、または複数案・finding の contradiction validation のいずれかである。 | task topology; `agents/task_catalog.yaml` |
 | TERRA-06 | Terra は owner closure、context capsule、accepted・rejected・escalated の handback を返して終了し、unresolved は Sol に返す。descendant と reservation の cleanup は既存 lifecycle 契約で閉じる。 | Terra / Sol; `agents/agents_config.json` |
 | TERRA-07 | `team_manifest.yaml` は run 生成 artifact であり、Terra の恒久正本にはしない。role/profile は canonical source と materializer から生成する。 | runtime owners; `tools/agent/orchestration/model_profile_registry.py` |

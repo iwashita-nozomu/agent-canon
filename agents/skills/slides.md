@@ -45,9 +45,9 @@ has a genuine unresolved choice.
 
 Before drafting, read the source that applies:
 
-- `documents/codex/codex-configuration-slides.md`
-- `documents/contracts/template-bootstrap.md`
-- `documents/experiments/experiment-report-style.md` when the deck presents
+- [documents/codex/codex-configuration-slides.md](../../documents/codex/codex-configuration-slides.md)
+- [documents/contracts/template-bootstrap.md](../../documents/contracts/template-bootstrap.md)
+- [documents/experiments/experiment-report-style.md](../../documents/experiments/experiment-report-style.md) when the deck presents
   evidence or comparative results
 
 Record the selected template path and any active source artifact paths in the
@@ -116,7 +116,7 @@ layout, and do not create placeholder evidence for unused operations.
 The runtime discovery adapter delegates these required operating clauses to
 this canonical owner.
 
-1. Read `agents/skills/slides.md`.
+1. Read [agents/skills/slides.md](slides.md).
 1. Select this skill only for an explicitly requested presentation artifact;
    reports, HTML, experiments, and visualization rendering keep their owning
    skill unless deck production is also requested.

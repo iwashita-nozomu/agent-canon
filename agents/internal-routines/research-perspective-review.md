@@ -21,10 +21,10 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Must Read Before Reviewing
 
-- `agents/skills/research-workflow.md`
-- `agents/skills/experiment-lifecycle.md`
-- `documents/experiments/experiment-critical-review.md`
-- `documents/conventions/REVIEW_PROCESS.md`
+- [agents/skills/research-workflow.md](../skills/research-workflow.md)
+- [agents/skills/experiment-lifecycle.md](../skills/experiment-lifecycle.md)
+- [documents/experiments/experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md)
+- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
 
 ## Default Perspective Pack
 

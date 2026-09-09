@@ -121,7 +121,7 @@ change. A no-change or unselected route records its rationale as evidence.
 1. plan review で execution order、担当 subagent、rollback point を確認し、normalized decision が承認でなければ planner に戻します。
 1. detailed design review で reuse plan、existing-style adherence、design doc completeness を確認し、normalized decision が承認でなければ designer に戻します。
 1. detailed design review で、`Installed Libraries And Existing Implementation Survey` が dependency surface、導入済みライブラリ候補、既存実装候補、reuse / extend / replace / add-new の判断、既存では足りない理由を列挙していることを確認します。
-1. detailed design review で、新規または rename する identifier、path、CLI flag、config key、public API が design または local precedent で固定され、worker が reusable / user-facing な名前を発明しなくてよいことを確認します。naming plan は対象概念、責務語彙、既存 naming family、採用名、禁止名を含み、`documents/rule/naming.md` と言語別規約に合っている必要があります。
+1. detailed design review で、新規または rename する identifier、path、CLI flag、config key、public API が design または local precedent で固定され、worker が reusable / user-facing な名前を発明しなくてよいことを確認します。naming plan は対象概念、責務語彙、既存 naming family、採用名、禁止名を含み、[documents/rule/naming.md](../rule/naming.md) と言語別規約に合っている必要があります。
 1. detailed design review で、tree 上の親文書だけを読んで sibling / cross-cutting 文書を見落としていないか、`Cross-Doc Coverage Review` を確認します。
 1. detailed design review で、`Design Side-Effect Map` が主要設計判断ごとに影響する implementation、document、workflow、prompt/config、validation、dependency manifest、user-facing surface を列挙し、各 item を `Abstract Design Frame`、request clause ID、reuse precedent、owner stage、review gate、validation / test-plan item に接続していることを確認します。
 1. 数式、擬似コード、仕様記述、method contract を伴う task では detailed design review か checkpoint review で、[algorithm-implementation-boundary.md](../design/algorithm-implementation-boundary.md) の Boundary Map を artifact に固定し、implementation がどの式・仕様項目・state boundary に対応するか、runtime success だけを acceptance 根拠にしないことを確認します。
@@ -173,7 +173,7 @@ change. A no-change or unselected route records its rationale as evidence.
    `cause_classification`、`intent_preservation`、`evidence` を記録します。
    `cause_classification` と `intent_preservation` の token-safe slug list は
    `documents/runtime/runtime-profiles-and-check-matrix.json` が正本で、
-   `documents/runtime/runtime-profiles-and-check-matrix.md` が生成済み reader projection
+   [documents/runtime/runtime-profiles-and-check-matrix.md](../runtime/runtime-profiles-and-check-matrix.md) が生成済み reader projection
    です。この review checklist は slug list を独自定義せず、runtime profile
    taxonomy の owner route に従って approved intent を保った修正または intent
    変更前の escalation を確認します。

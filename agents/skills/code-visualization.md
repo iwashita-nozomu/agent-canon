@@ -250,7 +250,7 @@ path is not a ToolID.
 
 Read the detailed renderer contract in:
 
-`documents/tools/render_dependency_manifest_graph.md`
+[documents/tools/render_dependency_manifest_graph.md](../../documents/tools/render_dependency_manifest_graph.md)
 
 For non-code-space visualization, delegate source ownership through the
 related skill that owns the facts: `$dependency-analysis` for dependency and
@@ -348,7 +348,7 @@ Closeout cites:
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/code-visualization.md`.
+1. Read [agents/skills/code-visualization.md](code-visualization.md).
    Complete its canonical typed gate before renderer selection.
 1. Record a context-derived `Visualization Selection` before rendering:
    - `context_question`

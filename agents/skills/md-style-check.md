@@ -63,10 +63,20 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 
 ## Core References
 
-- `documents/conventions/coding-conventions-project.md`
-- `documents/conventions/common/05_docs.md`
+- [`coding-conventions-project.md`](../../documents/conventions/coding-conventions-project.md)
+- [`05_docs.md`](../../documents/conventions/common/05_docs.md)
 - `.markdownlint.json`
 - `tools/runtime/dispatch/agent-canon/src/docs.rs`
+
+## Link Convention
+
+文書または skill の reader-facing な参照は、[`05_docs.md`](../../documents/conventions/common/05_docs.md)
+の標準相対 Markdown リンク規約に従います。この skill はそのリンクの存在と相対 path の
+整合を確認します。command、glob、placeholder、machine-readable header / directive、literal
+output、および `$skill-name` の invocation syntax は code のままにします。reader-facing な
+skill owner は canonical doc（例えば [`md-style-check`](md-style-check.md)）へリンクし、公開
+skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-readable な正本として
+扱います。
 
 ## Expected Outcome
 
@@ -123,8 +133,9 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 ## Final Guard
 
 - formatter と checker が pass しても、最後に変更箇所の table、文中数式、
-  inline code を確認します。文中数式は `$...$`、code/path/literal は backtick
-  で分けます。table cell の中に raw `|` を含む数式や code を置くと
+  inline code を確認します。文中数式は `$...$`、literal な code/path/value は backtick
+  で分け、reader-facing な文書・skill 参照は [`05_docs.md`](../../documents/conventions/common/05_docs.md) の標準相対 Markdown link
+  にします。table cell の中に raw `|` を含む数式や code を置くと
   Markdown の列として解釈されるため、式を display math へ出す、短い名前へ置換する、
   または table 外の本文へ移してから、`tools/bin/agent-canon docs check <paths...>` を再実行します。
 - format-only として閉じる場合は、`structure_contract=skipped` と理由が
@@ -140,12 +151,12 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/md-style-check.md`.
-1. Check `documents/conventions/coding-conventions-project.md` and
-   `documents/conventions/common/05_docs.md`.
+1. Read the canonical [`md-style-check`](md-style-check.md) document.
+1. Check [`coding-conventions-project.md`](../../documents/conventions/coding-conventions-project.md) and
+   [`05_docs.md`](../../documents/conventions/common/05_docs.md).
 1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
 1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, or `agent-canon docs` failures.
-1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Use it with the normal owner route when the whole task is a bounded repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add `$prose-reasoning-graph` and `$structure-planning` before prose edits; for the format-only route, record `structure_contract=skipped` with the reason.
+1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Use it with the normal owner route when the whole task is a bounded repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add the canonical [`prose-reasoning-graph`](prose-reasoning-graph.md) and [`structure-planning`](structure-planning.md) skills before prose edits; retain `$prose-reasoning-graph` and `$structure-planning` as invocation syntax when dispatching them. For the format-only route, record `structure_contract=skipped` with the reason.
 1. For typo/link/format-only edits, do not require runtime `SKILL.md` reading
    before running the docs tool or patching. Keep owner, existing-tool route,
    and targeted-validation evidence.

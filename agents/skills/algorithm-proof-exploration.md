@@ -148,7 +148,7 @@ recurrence/convergence oracle.
 Lean 定義と設計定理を checked にしてから、この skill で production entrypoint への
 refinement / realization を扱います。
 この skill から formal-proof subagent へ渡す `formal_proof_handoff` は、
-`agents/COMMUNICATION_PROTOCOL.md` が所有する `Target Binding Packet` を必ず含めます。
+[agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) が所有する `Target Binding Packet` を必ず含めます。
 packet を埋められない場合は、曖昧な blocker summary を渡さず、IR、theorem graph、または
 source packet を先に再生成・修復します。
 

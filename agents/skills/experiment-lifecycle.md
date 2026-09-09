@@ -46,10 +46,10 @@ python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 
 ## Core References
 
-- `documents/experiments/experiment-registry.md`
+- [documents/experiments/experiment-registry.md](../../documents/experiments/experiment-registry.md)
 - `tools/experiments/lifecycle/create_experiment_topic.py`
-- `agents/skills/research-workflow.md`
-- `agents/skills/adaptive-improvement-loop.md`
+- [agents/skills/research-workflow.md](research-workflow.md)
+- [agents/skills/adaptive-improvement-loop.md](adaptive-improvement-loop.md)
 
 ## Role In Research-Driven Change
 
@@ -108,9 +108,9 @@ artifact reader / renderer であり、formal run launcher、test surface、conf
 ## Boundary
 
 - この skill が repo 横断の実験 lifecycle 正本です。topic 固有の詳細は各 topic README と
-  `documents/experiments/experiment-registry.md` が所有します。
+  [documents/experiments/experiment-registry.md](../../documents/experiments/experiment-registry.md) が所有します。
 - 実験結果を見ながら code change、調査、チューニングまで含めた loop を回す場合は `adaptive-improvement-loop` を追加します。
-- topic の entrypoint と formal command は project-root `experiments/registry.toml` を project-owned 正本にします。AgentCanon source は registry 契約を `documents/experiments/experiment-registry.md` で定義します。parent root からは qualified ignored source clone または task が選択した published source revision として読みます。
+- topic の entrypoint と formal command は project-root `experiments/registry.toml` を project-owned 正本にします。AgentCanon source は registry 契約を [documents/experiments/experiment-registry.md](../../documents/experiments/experiment-registry.md) で定義します。parent root からは qualified ignored source clone または task が選択した published source revision として読みます。
 - 新規 topic は Topic Preparation の creator route を実行します。create tool が内部の runnable scaffold owner を解決し、project-root `experiments/<topic>/`、canonical な topic `README.md` / `provenance.toml`、および project registry の topic entry を配置します。
 - topic 作成後は `run.py` の `main::main`、`cases.py`、`config.yaml`、`visualization.py`、`README.md` の順で編集します。
 - project registry がある場合は、実行前に `python3 -m tools.validation.ci.checks.check_experiment_registry` で registry schema と registered command placeholder を確認します。
@@ -128,7 +128,7 @@ artifact reader / renderer であり、formal run launcher、test surface、conf
 - experiment execution surface を変更する task は、patch 前に
   `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>`
   を実行し、`experiment_execution_surface_guard` の handoff を解決します。
-  対象 surface は `tools/validation/ci/checks/check_experiment_registry.py`、`documents/experiments/experiment-registry.md`、
+  対象 surface は `tools/validation/ci/checks/check_experiment_registry.py`、[documents/experiments/experiment-registry.md](../../documents/experiments/experiment-registry.md)、
   `experiments/registry.toml`、topic `run.py` entrypoint です。
   この場合は `test-design` を併用します。project `experiments/registry.toml`
   がある checkout では `python3 -m tools.validation.ci.checks.check_experiment_registry` を実行します。
@@ -149,12 +149,12 @@ artifact reader / renderer であり、formal run launcher、test surface、conf
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read `agents/skills/experiment-lifecycle.md`.
+1. Read [agents/skills/experiment-lifecycle.md](experiment-lifecycle.md).
 1. Keep execution steps, result paths, and report locations consistent with this skill and the topic README.
 1. Select only the preparation, implementation, static-check, execution, or report phase required by the topic protocol; do not turn optional phases into universal gates.
 1. Classify a run as `debug`/`smoke`, `verified`, or `formal`. Do not promote spot, subset, or partial runs to formal comparison evidence; stopped runs require `Stop Reason:` and `Restart Decision:` plus a fresh run identity when rerun.
 1. For a new experiment topic, fix the topic name first and run `python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>`; the tool owns scaffold placement and registry registration. Then edit `run.py` `main::main`, `cases.py`, `config.yaml`, `visualization.py`, and `README.md` in that order. Do not copy `templates/experiments/_template/` directly.
-1. Treat project-root `experiments/registry.toml` as the project-owned topic registry for entrypoints and registered smoke/formal commands. AgentCanon source owns the registry contract in `documents/experiments/experiment-registry.md`; from a parent root, read it from the qualified ignored source clone or published source revision selected by the task.
+1. Treat project-root `experiments/registry.toml` as the project-owned topic registry for entrypoints and registered smoke/formal commands. AgentCanon source owns the registry contract in [documents/experiments/experiment-registry.md](../../documents/experiments/experiment-registry.md); from a parent root, read it from the qualified ignored source clone or published source revision selected by the task.
 1. When a project registry exists, validate registry schema and registered command placeholders with `python3 -m tools.validation.ci.checks.check_experiment_registry` before execution.
 1. Treat `python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py` as the user-facing run route. The topic `run.py` is an inner entrypoint called by the managed runner and owns `result/<run-id>/raw/`, `result/<run-id>/summary/`, config snapshotting, and atomic artifact writing.
 1. Keep topic code limited to experiment orchestration, case logic, context construction, and declared resource estimates; delegate process lifecycle, timeout, child cleanup, completion, slot allocation, and caller environment propagation to the managed runner.
@@ -172,7 +172,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When reviewing an experiment topic, add `$experiment-review` and check the managed runner route, GPU/JAX environment ownership, artifact schema, and visualization.py renderer readiness.
 1. Ensure every topic run has `result/<run-id>/raw/` and `result/<run-id>/summary/`; compact outputs use `summary/summary.json` and `summary/cases.jsonl`, with no root-level fallback.
 1. Require only producer-declared artifacts. Record references to files that actually exist through `$result-artifact-writeout`; do not impose a universal summary/case/visualization.py renderer/log inventory or create synthetic missing-artifact limitations for outputs the producer did not select.
-1. For planned edits to experiment execution surfaces, run `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and resolve the `experiment_execution_surface_guard` handoff before patching. This surface includes `tools/validation/ci/checks/check_experiment_registry.py`, `documents/experiments/experiment-registry.md`, `experiments/registry.toml`, and topic `run.py` entrypoints. Pair this skill with `$test-design`; run `python3 -m tools.validation.ci.checks.check_experiment_registry` when project `experiments/registry.toml` exists, use `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` for runner or registry checker behavior changes, and reserve long experiment runs for an explicit run plan.
+1. For planned edits to experiment execution surfaces, run `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and resolve the `experiment_execution_surface_guard` handoff before patching. This surface includes `tools/validation/ci/checks/check_experiment_registry.py`, [documents/experiments/experiment-registry.md](../../documents/experiments/experiment-registry.md), `experiments/registry.toml`, and topic `run.py` entrypoints. Pair this skill with `$test-design`; run `python3 -m tools.validation.ci.checks.check_experiment_registry` when project `experiments/registry.toml` exists, use `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` for runner or registry checker behavior changes, and reserve long experiment runs for an explicit run plan.
 1. Use `$structure-planning` before experiment planning, rerun planning, result report generation, or HTML view generation when the structure is nontrivial; fix first artifact, source-to-structure map, OOP structure contract, metric contract, invalid interpretations, and validation gate before running or writing.
 1. For experiment plans and reports, require the OOP structure contract to list reused modules/classes/functions/protocols, objects created/mutated/passed/written by each step, the factory/function boundary where variants differ, and dependency direction across orchestration, domain logic, metrics, visualization, and artifact I/O before section order is drafted.
 1. For experiment plans or reports with nontrivial paragraph order or causal/evidence transitions, ask `$structure-planning` to use `agent-canon semantic-index discourse-relations --profile experiment-report` or `--profile methods-protocol` as advisory edge evidence.

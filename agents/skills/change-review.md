@@ -274,7 +274,7 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
    だけで閉じます。必要な場合だけ latest remote/Issue/branch history を確認します。
 1. 選択した contract surface と material engineering-principle clause に対して docs と tests が追随しているか確認します。regression を追加した場合は、canonical invariant/owner と completion oracle への従属、第二 truth の不在、consolidation の有無も確認します。
 1. 継承/substitutability、ownership/lifecycle、dependency inversion/DI、public object model、または typed boundary が material に変わる場合だけ `python-review` を追加し、`$oop-readability-check` と `check_solid_evidence.py` の evidence を review input にします。class、dataclass、`Protocol`、annotation、parser model、public type の存在だけでは OOP/SOLID を起動しません。
-1. 数値・solver・tolerance・convergence・residual・benchmark の test 変更では、必要な場合だけ `test-design` の Numerical Test Admission Gate と `documents/conventions/coding-conventions-testing.md` を参照し、trigger、non-numerical alternative、oracle、budget を確認します。非数値の変更にはこの gate を追加しません。
+1. 数値・solver・tolerance・convergence・residual・benchmark の test 変更では、必要な場合だけ `test-design` の Numerical Test Admission Gate と [documents/conventions/coding-conventions-testing.md](../../documents/conventions/coding-conventions-testing.md) を参照し、trigger、non-numerical alternative、oracle、budget を確認します。非数値の変更にはこの gate を追加しません。
 1. まず static checks と targeted validation を実行し、full repository
    dependency review、full suite、remote CI は最終候補の契約が選択した場合だけ一度実行します。
 1. findings を hypothesis として priority 順に並べ、current snapshot、reachable

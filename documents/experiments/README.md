@@ -15,11 +15,11 @@ ExperimentRunner lifecycle、結果と可視化の保持を扱います。実験
 
 ## 構成
 
-- `experiment-registry.md`: 実験登録の契約。
-- `../design/experiment-topic-template.md`: topic scaffold、module owner、raw/summary result layout の設計正本。
-- `experiment-runner-ff97-lifecycle.md`、`../design/experiment_runner.md`:
+- [experiment-registry.md](experiment-registry.md): 実験登録の契約。
+- [../design/experiment-topic-template.md](../design/experiment-topic-template.md): topic scaffold、module owner、raw/summary result layout の設計正本。
+- [experiment-runner-ff97-lifecycle.md](experiment-runner-ff97-lifecycle.md)、[../design/experiment_runner.md](../design/experiment_runner.md):
   ExperimentRunner の lifecycle と設計。
-- `experiment-critical-review.md`、`experiment-report-style.md`: 実験レビューと報告。
+- [experiment-critical-review.md](experiment-critical-review.md)、[experiment-report-style.md](experiment-report-style.md): 実験レビューと報告。
 - `gpu-admission-r5-*.md`、`gpu-admission-r5-ordered-integration-interface.json`:
   GPU admission の source packet と機械可読境界。
-- `result-log-retention-and-visualization.md`: 結果・ログ・可視化の保持規約。
+- [result-log-retention-and-visualization.md](result-log-retention-and-visualization.md): 結果・ログ・可視化の保持規約。

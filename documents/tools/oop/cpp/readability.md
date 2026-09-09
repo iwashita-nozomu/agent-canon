@@ -11,7 +11,7 @@ downstream design ../../tool-docs.toml one-to-one tool/document manifest
 -->
 
 この文書は `tools/validation/code/oop/cpp/readability.py` と一対一で対応します。
-同名の `readability.py` が tool、同名の `readability.md` が説明文書です。
+同名の `readability.py` が tool、同名の [readability.md](readability.md) が説明文書です。
 
 ## 何をチェックするか
 

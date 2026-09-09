@@ -64,7 +64,7 @@ maintainer が明示的に行う **one-way export** であり、clone、bootstra
 から自動実行しません。
 
 project 固有の instruction、script、workflow、Docker/Dev Container、editor config は project が
-通常 file として所有します。共通の `ROOT_AGENTS.md` と
+通常 file として所有します。共通の [ROOT_AGENTS.md](../../ROOT_AGENTS.md) と
 `documents/agent-canon/consumer-root-instructions.md` を明示 composer で合成し、その output だけを
 tracked file とします。static seed を上流 source への link、runtime import、代替 package、
 別 checkout に置き換えません。
@@ -86,7 +86,7 @@ bash scripts/start_repository.sh --validate-only
 
 ## 5. 開発環境
 
-- host 前提: `documents/contracts/linux-wsl-host-requirements.md`
+- host 前提: [documents/contracts/linux-wsl-host-requirements.md](linux-wsl-host-requirements.md)
 - container: `docker/README.md`
 - VS Code Dev Container: `.devcontainer/`
 - workspace defaults: `.vscode/`
