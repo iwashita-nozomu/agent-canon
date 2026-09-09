@@ -74,6 +74,13 @@ def _blob(repo: Path, oid: str | None) -> dict[str, object] | None:
     return {"oid": oid, "type": kind, "size": size}
 
 
+def _stage_entry(repo: Path, mode: str, oid: str) -> dict[str, object]:
+    """Record a staged entry without treating a gitlink as a superproject blob."""
+    if mode == "160000":
+        return {"mode": mode, "oid": oid}
+    return {"mode": mode, **(_blob(repo, oid) or {})}
+
+
 def _blob_bytes(repo: Path, oid: str) -> bytes:
     result = subprocess.run(
         ["git", "-C", str(repo), "cat-file", "blob", oid],
@@ -92,16 +99,28 @@ def _safe_relative_path(path: str) -> Path:
     return candidate
 
 
-def _tree_blob(repo: Path, revision: str, path: str) -> dict[str, object] | None:
+def _tree_entry(repo: Path, revision: str, path: str) -> dict[str, object] | None:
+    """Read a tree entry while preserving gitlink mode and object identity."""
     result = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", f"{revision}:{path}"],
+        ["git", "-C", str(repo), "ls-tree", "-z", revision, "--", path],
         check=False,
         capture_output=True,
-        text=True,
     )
-    if result.returncode != 0:
+    if result.returncode != 0 or not result.stdout:
         return None
-    return _blob(repo, result.stdout.strip())
+    record = result.stdout.split(b"\0", 1)[0]
+    header, separator, encoded_path = record.partition(b"\t")
+    if not separator:
+        raise ConflictPreservationError("malformed tree entry")
+    fields = header.decode("ascii").split()
+    if len(fields) != 3:
+        raise ConflictPreservationError("malformed tree entry")
+    mode, _kind, oid = fields
+    if encoded_path != path.encode("utf-8", errors="surrogateescape"):
+        raise ConflictPreservationError(f"tree entry path does not match requested path: {path}")
+    if mode == "160000":
+        return {"mode": mode, "oid": oid}
+    return {"mode": mode, **(_blob(repo, oid) or {})}
 
 
 def _parse_unmerged(repo: Path) -> dict[str, dict[str, object]]:
@@ -126,8 +145,7 @@ def _parse_unmerged(repo: Path) -> dict[str, dict[str, object]]:
         stages = entry["stages"]
         assert isinstance(stages, dict)
         stages[{"1": "base", "2": "ours", "3": "theirs"}.get(stage, stage)] = {
-            "mode": mode,
-            **(_blob(repo, oid) or {}),
+            **_stage_entry(repo, mode, oid),
         }
     return records
 
@@ -402,6 +420,32 @@ def capture_inventory(
                 for hunk in ours_hunks
             ]
         else:
+            tree_entries = {
+                side: _tree_entry(root, revision, path)
+                for side, revision in (
+                    ("base", base),
+                    ("ours", ours),
+                    ("theirs", theirs),
+                )
+            }
+            ours_entry = tree_entries["ours"]
+            if isinstance(ours_entry, Mapping) and ours_entry.get("mode") == "160000":
+                unaffected = {
+                    "path": path,
+                    "owner": "user" if path in user_path_set else "unknown",
+                    "status": "unaffected",
+                    "expected_gitlink": {
+                        "mode": ours_entry["mode"],
+                        "oid": ours_entry["oid"],
+                    },
+                }
+            else:
+                unaffected = {
+                    "path": path,
+                    "owner": "user" if path in user_path_set else "unknown",
+                    "status": "unaffected",
+                    "expected_blob": ours_entry,
+                }
             entry = {
                 "path": path,
                 "state": (
@@ -411,24 +455,13 @@ def capture_inventory(
                     if path in changed_ours & changed_theirs
                     else "unaffected"
                 ),
-                "stages": {
-                    "base": _tree_blob(root, base, path),
-                    "ours": _tree_blob(root, ours, path),
-                    "theirs": _tree_blob(root, theirs, path),
-                },
+                "stages": tree_entries,
                 "hunks": {
                     "base_to_ours": _hunks(root, base, ours, path, context=0),
                     "base_to_theirs": _hunks(root, base, theirs, path, context=0),
                 },
                 "unaffected_content": (
-                    [
-                        {
-                            "path": path,
-                            "owner": "user" if path in user_path_set else "unknown",
-                            "status": "unaffected",
-                            "expected_blob": _tree_blob(root, ours, path),
-                        }
-                    ]
+                    [unaffected]
                     if path not in changed_ours & changed_theirs
                     else [
                         {
@@ -617,6 +650,8 @@ def validate_plan(
                 raise ConflictPreservationError(
                     f"{path_text}: anywhere-text preservation is not accepted; use hunk_identity"
                 )
+            if "expected_gitlink" in preserved:
+                _validate_expected_gitlink(path_text, preserved["expected_gitlink"])
         operation = item.get("operation")
         if operation in WHOLE_FILE_OPERATIONS:
             mapping = item.get("reconstruction_map")
@@ -655,8 +690,39 @@ def _read_path(repo: Path, path: str) -> bytes:
         raise ConflictPreservationError(f"preserved path is unavailable: {path}") from exc
 
 
+def _index_entry(repo: Path, path: str) -> dict[str, str]:
+    """Read one resolved index entry, including its mode and object identity."""
+    result = subprocess.run(
+        ["git", "-C", str(repo), "ls-files", "--stage", "-z", "--", path],
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0 or not result.stdout:
+        raise ConflictPreservationError(f"resolved index entry is missing: {path}")
+    records = [record for record in result.stdout.split(b"\0") if record]
+    if len(records) != 1:
+        raise ConflictPreservationError(f"resolved index entry is not unique: {path}")
+    header, separator, encoded_path = records[0].partition(b"\t")
+    if not separator or encoded_path != path.encode("utf-8", errors="surrogateescape"):
+        raise ConflictPreservationError(f"resolved index path does not match: {path}")
+    fields = header.decode("ascii").split()
+    if len(fields) != 3 or fields[2] != "0":
+        raise ConflictPreservationError(f"resolved index entry is still unmerged: {path}")
+    return {"mode": fields[0], "oid": fields[1]}
+
+
+def _validate_expected_gitlink(path: str, value: object) -> Mapping[str, str]:
+    if not isinstance(value, Mapping):
+        raise ConflictPreservationError(f"{path}: expected_gitlink must be an object")
+    mode = value.get("mode")
+    oid = value.get("oid")
+    if mode != "160000" or not isinstance(oid, str) or not oid:
+        raise ConflictPreservationError(f"{path}: expected_gitlink requires mode 160000 and an OID")
+    return {"mode": mode, "oid": oid}
+
+
 def validate_readback(repo: Path, inventory: Mapping[str, object], plan: Mapping[str, object]) -> None:
-    """Prove that planned unaffected text/blob content remains after resolution."""
+    """Prove that planned unaffected text/blob/gitlink content remains after resolution."""
     unmerged = _parse_unmerged(repo)
     if unmerged:
         raise ConflictPreservationError(
@@ -671,9 +737,17 @@ def validate_readback(repo: Path, inventory: Mapping[str, object], plan: Mapping
         path = item.get("path")
         if not isinstance(path, str):
             continue
-        current = _read_path(repo, path)
         content = item.get("unaffected_content")
         assert isinstance(content, list)
+        gitlink_content = [
+            preserved
+            for preserved in content
+            if isinstance(preserved, Mapping)
+            and "expected_gitlink" in preserved
+            and "expected_blob" not in preserved
+            and "hunk_identity" not in preserved
+        ]
+        current = _read_path(repo, path) if not content or len(gitlink_content) != len(content) else None
         for preserved in content:
             if not isinstance(preserved, Mapping):
                 raise ConflictPreservationError(f"{path}: malformed unaffected content")
@@ -693,10 +767,19 @@ def validate_readback(repo: Path, inventory: Mapping[str, object], plan: Mapping
                 )
             expected_blob = preserved.get("expected_blob")
             if isinstance(expected_blob, Mapping):
+                assert current is not None
                 oid = expected_blob.get("oid")
                 if isinstance(oid, str) and _sha256(current) != _sha256(_blob_bytes(repo, oid)):
                     raise ConflictPreservationError(
                         f"{path}: preserved whole-file content does not match expected blob"
+                    )
+            expected_gitlink = preserved.get("expected_gitlink")
+            if expected_gitlink is not None:
+                expected = _validate_expected_gitlink(path, expected_gitlink)
+                observed = _index_entry(repo, path)
+                if observed != expected:
+                    raise ConflictPreservationError(
+                        f"{path}: preserved gitlink does not match expected mode/OID"
                     )
 
 
