@@ -36,6 +36,12 @@ MIG unit の unknown は MIG と physical parent、physical unit の unknown は
 UNKNOWN に閉じます。compute-only の process list、短い UUID、integer GPU index は
 absence の証明になりません。
 
+`accounted_processes` は NVIDIA の accounting mode が保持する終了済みを含む履歴であり、
+現在の GPU 占有を表す process inventory ではありません。したがって parser はこの要素を
+未知の process scope として拒否せず、`processes`、`compute_processes`、
+`graphics_processes` の active container だけを current holder として数えます。active
+container が欠落する場合や permission/unknown marker がある場合の fail-closed は維持します。
+
 ## process identity
 
 各 holder は full opaque UUID、PID、starttime、namespace、cgroup と結び付きます。
