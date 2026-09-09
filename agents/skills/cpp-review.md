@@ -8,6 +8,7 @@ upstream design ./catalog.yaml public skill and capability projection
 upstream design ./skill-dependencies.yaml prerequisite and reviewer order
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json C++ validation profile owner
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse C++ projection
+upstream design ../../documents/experiments/host-build-admission.md native compiler/linker host admission and no-rerun boundary
 @dependency-end
 -->
 
@@ -32,6 +33,13 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 
 ## Required Checks
 
+native build は GPU admission の有無にかかわらず、
+[host compiler/linker admission](../../documents/experiments/host-build-admission.md)
+を通して実行します。host RAM 予算、明示的な並列度、選択済み環境の実効 cgroup、
+独立 timeout、host 永続ログが成立しない場合は開始しません。環境起動失敗を別 daemon、
+cgroup 無効化、無制限 host 実行で迂回しません。現在の利用者指示が再実行を禁止している
+場合は縮小 workload も起動せず、静的調査・fixture と実環境の未検証事項を分離します。
+
 - project-native configure / build / test evidence
 - When native static analysis is relevant and a CMake-generated database exists, use:
   `python3 tools/validation/code/static/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
@@ -41,7 +49,7 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
   compiler flags, or provider-specific diagnostics.
 - `ctest` があるならその結果
 - CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
-  `cmake --build "$ROOT/build/cpp/<profile>" --parallel`、
+  host admission を通した `cmake --build "$ROOT/build/cpp/<profile>"`（並列度は admission owner が付与）、
   `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure` の結果
 - install contract がある場合は `cmake --install "$ROOT/build/cpp/<profile>"` の結果
 - 性能変更が activation 条件を満たす場合は、repository-owned benchmark / profiler / workload
