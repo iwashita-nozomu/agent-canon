@@ -130,6 +130,21 @@ task non-terminal and report the concrete authority or external blocker with
 its evidence and next owner/action. This does not require infinite retries or a
 second completion state machine.
 
+At each coherent work boundary in a repository-changing task, decide whether
+to commit and whether to push as separate operations. Commit a coherent,
+reviewed unit after the selected validation when the request and ownership
+support it; if the work is incomplete or mixes user-owned changes,
+preserve it and state the concrete reason and next condition in the existing
+work log or final status. Decide push independently from its sharing,
+handoff, remote-backup, or PR purpose, the existing authority, and the
+designated destination. Read-only, local-only, no-push, no-change, and genuine
+external-failure cases remain valid. Do not force-push, mutate `main`, overwrite
+unknown user files, create a new remote, or merge across scope. A committed but
+unpushed child result is an intermediate handoff, not final publication; the
+next authorized owner must launch the selected push operation when its purpose
+and conditions are met. This is decision guidance, not an unconditional
+commit/push gate or a new receipt requirement.
+
 ## Validation Routing
 
 Use the validation route owned by the changed repository-specific responsibility.

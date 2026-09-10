@@ -445,7 +445,7 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 - SEP-09 の complete target state は実装開始前に固定され、implementation sequencing / waves はその work の順序だけを担っている。未完了の target を段階実装として completion に昇格しない
 - LCPが選択された場合は、[`agent-orchestration.md#Local Capability Priority`](../skills/agent-orchestration.md#local-capability-priority) の既存canonical record locatorを完了証拠として引用する
 - validation は `necessary_presence`、`forbidden_presence`、`sufficient_behavior` を区別する。必要なpath・linkの存在や禁止された旧経路の不在をbehavior成立の十分条件へ昇格させず、behaviorの十分条件が要求されない作業に実行テスト・完全一致比較・網羅レビューを追加しない
-- schedule、review、validation、commit / push、shared canon sync、follow-up 判断を含む今回 scope の task が 1 つも未完了で残っていない
+- schedule、review、validation、shared canon sync、follow-up 判断、および今回の scope で選択された commit / push operation の判断・結果を含む task が 1 つも未完了で残っていない
 - task が数式、擬似コード、仕様、method contract を持つ場合、runtime success ではなく
   静的解析・読み取りによる implementation alignment evidence が review artifact に
   主証跡として残っている
@@ -465,7 +465,7 @@ terminal readiness predicate.
 
 実装後から user-facing completion までの間は、parent の自己判断だけで閉じず、次の機械的 loop を `closeout_gate.md` に evidence として残します。
 
-1. `user_request_contract.md` の active clause、`schedule.md` の planned work unit、直近 review findings、validation blockers、commit / push、shared canon sync、follow-up 判断を一覧化します。
+1. `user_request_contract.md` の active clause、`schedule.md` の planned work unit、直近 review findings、validation blockers、commit / push の判断・結果、shared canon sync、follow-up 判断を一覧化します。
 1. 最新 diff と tracked / untracked state を確認し、変更対象 file の dependency manifest、downstream edge、旧参照、copy / snapshot / backup path を見ます。
 1. 静的解析、読み取り確認、docs / targeted tests / agent checks を先に実行します。
    repo-wide dependency review や broad execution は、最終候補の touched contract
@@ -701,7 +701,7 @@ handoff には `allowed_paths`、`do_not_read`、context artifact path、expecte
       --workspace-root "$PWD"
 
 Adaptive Improvement Loop では、outer run の `experiment_change_loop.md` に `Extension Backlog` を持ち、各 extension で別の waterfall run-id を作ります。
-次の extension へ進む前に、直前 extension で選択された `waterfall-gate-check`、review、`task-close`、commit / push を完了させます。未選択の review artifact や full rerun は作りません。
+次の extension へ進む前に、直前 extension で選択された `waterfall-gate-check`、review、`task-close`、および commit / push の判断・結果を完了させます。未選択の review artifact や full rerun は作りません。
 
 `--task-id` を指定しても、`agents/task_catalog.yaml` の task-default specialist と `default_for_tasks` review pack は候補です。owner-critical decision または distinct unresolved claim/risk が有効化したものだけ materialize し、空の reviewer/template artifact は生成しません。
 language-specific reviewer は `bootstrap_agent_run.py` が `--changed-path` か workspace の `git status --short` から自動で足します。
@@ -878,13 +878,13 @@ owner が利用可能な次の安全な recovery/readback を実行します。�
 closeout を non-terminal のまま、genuine blocker の根拠と次の owner/action を報告します。
 これは無限 retry や新しい readiness predicate を要求する規則ではありません。
 
-- repo に残す差分がある task では、validation 後に commit を作る
+- repo に残す差分がある task では、validation 後の作業単位が coherent でレビュー済みか、未完了・混在変更として保持すべきかを判断し、commit の実行または保留理由と次条件を既存の work log / final status に反映する
 - commit は [documents/operations/BRANCH_SCOPE.md](../../documents/operations/BRANCH_SCOPE.md) の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、source checkout SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
 - commit / PR の切り方は [documents/operations/BRANCH_SCOPE.md](../../documents/operations/BRANCH_SCOPE.md) の範囲分割契約に従う。commit は実行単位、PR はレビュー単位として扱い、複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作ってから merge 前に別 PR または別 commit へ分ける
-- final report の前に branch push を行い、user が明示的に停止を指定した場合は停止理由を final report に残す
+- commit とは独立に、sharing、handoff、remote backup、PR などの目的、既存権限、指定宛先から branch push の要否を判断する。push を選択した場合だけ実行し、user が明示的に停止した場合や外部 blocker の場合は既存の final status に理由を残す
 - `task_close.py` に渡す stage-specific evidence として、verification、request
   contract、completion coverage、selected validation/static/dependency results、
-  review disposition、commit / push、shared canon sync、follow-up 判断を記録する
+  review disposition、commit / push の判断・結果、shared canon sync、follow-up 判断を記録する
 - creator-owned temporary files, directories, and containers must have a cleanup
   receipt naming the exact created paths or resource IDs and an absence readback
   before `task_close.py`; missing creator-owned cleanup evidence keeps closeout
@@ -912,9 +912,9 @@ closeout を non-terminal のまま、genuine blocker の根拠と次の owner/a
 - trainer replacement、scalability、superiority、広い theorem は baseline comparison と scope-limited evidence で主張する
 - failure-onset dimension を記録し、implementation bug と frontier limit を分けて扱う
 - 実験・性能改善では、correctness evidence と performance evidence を別項目で示す
-- final report には branch、commit、push の成否を短く残す
-- push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
-- push が自然な完了条件に含まれる場合は、push の許可を取りに戻らず実行する
+- final report には branch と、判断した commit / push の結果を短く残す
+- push を選択して失敗した場合は commit を保持し、安全な in-scope recovery または具体的 blocker とその理由を final status に明記する。push を選択しなかった場合も、既存の作業記録に判断理由を残す
+- push の目的・権限・宛先から実行が適切と判断できる場合は、追加の許可取りに戻らず実行する。これは push を常に要求する規則ではない
 - closeout 前に今回の観測を既存 record の update、独立 record の create、canonical owner への
   明示変更、issue/failure/evidence のいずれかに分類する。memory は `agent-learning` owner
   から on-demand に検索し、stable preference は対象 [AGENTS.md](../../AGENTS.md) へ直接変更する。
@@ -938,15 +938,15 @@ closeout を non-terminal のまま、genuine blocker の根拠と次の owner/a
 - selected owner/design review gate が resolved または not-needed になってから `worker`
   相当の実装を始める
 - tracked repo change がある task では、selected review gate (when activated)、validation、
-  commit、`origin` への push を完了条件にする
-- standalone local source-branch push は reversible branch transport として、
+  および既存の commit / push 判断を完了させ、その結果を closeout evidence にする。commit と push を無条件の完了条件にはしない
+- standalone local source-branch push を選択した場合は reversible branch transport として、
   verified remote identity/permission、named branch、commit/tree、SHA ref
   push、remote `ls-remote` readback、push 前後の local identity 不変を
   completion evidence にする。G1/G2/G3/PR lifecycle は生成・主張しない。
   packet-bound push と PR mutation は既存 sealed 要件を使い、CI fresh-clone
   fixture は通常 publication の証拠に数えない
-- tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行する。user が明示的に停止を指定した場合や external block がある場合は、理由を evidence に残す
-- planned work、review finding、validation、commit / push、shared canon sync、follow-up 判断の completion evidence を揃えて user-facing completion を返す
+- tracked repo change で sharing、handoff、remote backup、PR などの目的、権限、宛先から push が自然な完了条件と判断できる場合は、push の許可を取りに戻らず実行する。user が明示的に停止した場合や external block がある場合は、理由を evidence に残す
+- planned work、review finding、validation、commit / push の判断・結果、shared canon sync、follow-up 判断の completion evidence を揃えて user-facing completion を返す
 - `verification.txt`、`closeout_gate.md`、`user_request_contract.md` の close 条件を満たして user-facing completion を返す
 - Codex 専用事情でも、再利用可能なルールは `agents/` に昇格する
 - 会話文脈由来の運用は repo 正本へ昇格してから使う
