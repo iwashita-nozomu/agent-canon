@@ -17,10 +17,10 @@ downstream implementation ../../.codex/personal/skills/agent-eval-accumulation/S
 
 - Purpose: accumulates AgentCanon eval evidence through registered producers
   and log-archive storage instead of hand-written summaries.
-- Use When: eval evidence is missing, stale, failing, or needs family-level
-  accumulation before claims are accepted.
+- Use When: eval collection or repair is selected to establish required evidence,
+  not merely because read-only analysis observes missing, stale, or failing data.
 - Section path: Purpose and Use When define scope; Required Flow is the
-  mandatory checklist; Boundaries limits what this skill may generate or claim.
+  checklist for selected collection/repair; Boundaries limits what this skill may generate or claim.
 - Boundary: do not hand-write eval reports when a registered producer and
   archive path own the evidence.
 
@@ -38,15 +38,21 @@ checker output と archive 側 accumulated report に残します。
 
 ## Use When
 
-- `eval_accumulation_check.py` が `no-*-eval-reports`、duplicate run id、
-  missing run id、legacy source-tree result などを返した
-- `$agent-log-analysis` が structured dashboard / API の後に eval family gap を見つけた
+- `eval_accumulation_check.py` が返した `no-*-eval-reports`、duplicate run id、
+  missing run id、legacy source-tree result などの修理が依頼範囲として選択された
+- `$agent-log-analysis` の eval family gap について、観測・Issue 記録とは別に
+  eval collection / repair を選択した
 - skill、workflow、subagent role、router、report-writing、deterministic search routing を直した後、
-  accumulated eval evidence を PR / closeout gate に戻す必要がある
-- 過去 run の反復課題を skill / workflow / role prompt に還元する前に、どの eval
-  family が evidence を持っているか確認したい
+  selected validation が accumulated eval evidence を PR / closeout gate に必要とする
+
+過去 report の欠落・鮮度・失敗を読むだけの調査は `$agent-log-analysis` に留めます。
+既存の checker output だけで報告できる場合は再実行しません。必要な検査を一度
+選んでも、その fail だけで producer 再実行や履歴移行まで依頼範囲を広げません。
 
 ## Required Flow
+
+以下は選択済みの eval collection / repair の手順です。読取分析や Issue 記録の
+前提条件ではありません。修理が未選択なら、この loop は起動しません。
 
 1. Run-local evidence directory を先に決めます。通常は
    `reports/agents/<run-id>/` を使い、producer の transient stdout / stderr は
@@ -108,7 +114,7 @@ python3 eval/checkers/eval_accumulation_check.py \
 ## Boundaries
 
 - Log aggregation と raw JSONL 回避は `$agent-log-analysis` の責務です。この skill は
-  eval producer / checker の repair loop だけを担当します。
+  選択済みの eval producer / checker の repair loop だけを担当します。
 - Raw / summary artifact placement は `$result-artifact-writeout` の責務です。再生成可能な
   producer stdout / stderr は durable artifact ではありません。
 - Reader-facing な改善報告は `$report-writing` の責務です。
@@ -120,6 +126,9 @@ python3 eval/checkers/eval_accumulation_check.py \
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
 1. Read [agents/skills/agent-eval-accumulation.md](agent-eval-accumulation.md).
+   Apply the following loop only to selected eval collection/repair. A gap found
+   during read-only analysis or a selected checker invocation is not by itself
+   authority to run producers, migrate historical logs, or block Issue recording.
 1. Start with `python3 eval/checkers/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; use the compact JSON and stdout counters as the first evidence.
 1. If the checker reports missing eval family reports or stale accumulation gaps, run `python3 eval/producers/run_accumulated_agent_evals.py --root . --run-id <run-id> --report-dir reports/agents/<run-id>` and pass every used skill with repeated `--skill-used <skill>`.
 1. Do not hand-generate eval reports under `.agent-canon/log-archive/**` or `agents/evals/results/**`; registered producers own accumulated reports.
