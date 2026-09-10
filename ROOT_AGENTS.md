@@ -86,6 +86,14 @@ inspection. Re-read this identity and dependency state after a directory,
 branch, dependency checkout, or pin change; unchanged ordinary commands do not
 require duplicate readback.
 
+Before forming, changing, or delegating a team, read the applicable repository
+team owner and the selected orchestration skill, then follow the selected typed
+route's definitions for logical role, model/profile, skills, authority, and
+handoff. Candidate role lists are not activation instructions, and logical-role
+coverage is not a physical-instance count. Keep consumer-owned team guidance
+self-contained; a source-specific checkout may name its canonical AgentCanon
+team owners, but a consumer root must not import or copy those source paths.
+
 ## Runtime Owner Map
 
 For a consumer root, use only the following consumer-owned map:
@@ -129,6 +137,21 @@ sufficient operation. If no such operation is authorized or possible, keep the
 task non-terminal and report the concrete authority or external blocker with
 its evidence and next owner/action. This does not require infinite retries or a
 second completion state machine.
+
+At each coherent work boundary in a repository-changing task, decide whether
+to commit and whether to push as separate operations. Commit a coherent,
+reviewed unit after the selected validation when the request and ownership
+support it; if the work is incomplete or mixes user-owned changes,
+preserve it and state the concrete reason and next condition in the existing
+work log or final status. Decide push independently from its sharing,
+handoff, remote-backup, or PR purpose, the existing authority, and the
+designated destination. Read-only, local-only, no-push, no-change, and genuine
+external-failure cases remain valid. Do not force-push, mutate `main`, overwrite
+unknown user files, create a new remote, or merge across scope. A committed but
+unpushed child result is an intermediate handoff, not final publication; the
+next authorized owner must launch the selected push operation when its purpose
+and conditions are met. This is decision guidance, not an unconditional
+commit/push gate or a new receipt requirement.
 
 ## Validation Routing
 
