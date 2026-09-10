@@ -3,12 +3,14 @@
 contract policy
 responsibility Documents テスト規約（共通） for this repository.
 upstream design ../design/semantic-responsibility-contract.md semantic responsibility allocation and verification ownership
+downstream design ../../agents/skills/test-design.md consumes reproduction evidence without widening test admission
+downstream design ../../agents/skills/pr-processing.md consumes Issue-linked reproduction evidence at publication
 @dependency-end
 -->
 
 # テスト規約（共通）
 
-この文書は、`tests/` 配下のテストを対象にします。
+この文書は、`tests/` 配下のテストと、バグ再現証拠の保存・参照・整理を対象にします。
 
 ## この文書の読み方
 
@@ -88,6 +90,65 @@ upstream design ../design/semantic-responsibility-contract.md semantic responsib
 cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests
 ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure
 ```
+
+### 2.2 Bug reproduction evidence
+
+再現証拠を保存することと、新しい恒久回帰 test を採用することは別の判断です。
+Issue を判断・経緯の入口、Git を必要な再現ソースの保存先にします。まず既存 test、
+static checker、integration evidence の組み合わせが対象 failure を識別し、契約を
+保証できるか確認します。十分なら新しい Issue 専用 test は要求せず、その根拠と
+既存 validation の参照を Issue に残します。新規 test の admission は既存 owner に
+従い、再現コードの有無や Issue 番号だけでは activation しません。
+
+#### 保存先の選択
+
+| 再現の形 | 保存・参照先 |
+| --- | --- |
+| 既存 test 基盤で再現・判定できる | 必要な case を既存の責務別 test に統合し、その case 自体を再現コードとする。既存 case で十分なら参照だけにする。 |
+| 特殊な環境や操作が必要で通常 test に載せにくい | 所有 repository の既存 test root を使い、必要時だけ `tests/repro/issue-123/` 等に最小ソースと実行説明を置く。 |
+| 既存コマンドだけで再現できる | 新しいソースや wrapper を作らず、Issue に対象 SHA、条件、コマンド、結果を残す。 |
+
+`tests/repro/issue-123/` は必要時の配置例であり、既存 directory という主張や
+一律の作成義務ではありません。consumer が `test/` または別の canonical 配置を
+持つ場合はそれに従い、改名や第二の test root を要求しません。standalone repro は
+通常 test discovery へ意図せず載せず、必要な環境と明示的な実行コマンドを README
+等の一箇所に記録します。専用 runner、framework、registry は追加しません。
+
+#### 再現・判定と Issue evidence
+
+再現コードは問題の製品実装をコピーせず、実際の公開 API、CLI、build/compiler
+entrypoint 等を呼びます。可能な限り同じ入力・同じ oracle を修正前後へ適用し、
+期待する契約と対象 failure を区別します。単なる non-zero exit は再現成功では
+ありません。依存取得失敗、環境不足、別の compile error、未実行は対象バグの再現や
+修正確認と分け、確認できた範囲だけを報告します。
+
+既存の Issue 本文または evidence comment に、次を一続きで残します。新しい
+packet、台帳、固定 schema を作る必要はありません。
+
+- repository-qualified Issue、対象製品コードの commit SHA、再現ソースの commit
+  SHA とファイル固定リンクを区別する。既存 test が再現なら、その case を指す。
+- 再現に影響する環境・依存 version、入力または取得手順、cwd と実行コマンド、
+  期待結果と実結果を残す。別 SHA の再現ソースを使う場合は適用方法も明示する。
+- 修正後に検証した exact SHA と同じ oracle の結果、継続的に保証する既存 test /
+  checker / integration evidence、未検証範囲と理由を残す。
+
+ファイルリンクは浮動する `main` / branch ではなく commit SHA 固定にします。
+PR 未完成でも、再現ソースが得られた時点で Issue 番号入りの作業 branch に commit・
+push し、完了報告や引継ぎの前に Issue から辿れるようにします。既存ソースや
+コマンドだけで十分な場合は、このためだけの commit は作りません。
+秘密情報・個人情報・大型実データ・生成ログを再現ソースとして commit せず、
+最小の安全な入力、生成方法、または既存のアクセス制御された保存先を参照します。
+
+#### 修正後の整理
+
+恒久 test は Issue 番号ではなく保証する機能・性質の owner に配置します。
+統合後に standalone repro を重複維持せず、Issue に元の固定リンクと統合先を残して
+不要なコピーを削除します。特殊環境の再調査など独立した用途がある場合だけ、
+保持理由と実行条件を残して維持します。未 merge の branch を唯一の保存先とする
+場合は、branch を処分する前に必要なソースと参照を維持対象の履歴へ引き継ぎます。
+履歴保存のために既知 failure を通常 CI へ恒久登録したり、skip / xfail を理由なく
+残したりしません。検証不能時の status と publication は既存の GitHub lifecycle
+owner に従い、証拠を保存しただけで修正検証済みとは扱いません。
 
 ## 2.5 Semantic responsibility test ownership
 

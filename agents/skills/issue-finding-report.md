@@ -63,6 +63,80 @@ It also owns direct upstream escalation when a current repository task supports
 that the failing invariant belongs to AgentCanon rather than the consumer
 repository. This direct route does not require repeated evidence or a dashboard.
 
+## Immediate Runtime Defect Recording
+
+When a runtime reporter observes a failure of an invariant owned by AgentCanon,
+record an Issue candidate during the same task. The initial record is an
+evidence receipt, not a confirmed root cause or a completion declaration. Do not
+delay it for a second occurrence, dashboard accumulation, repair completion,
+or root-cause proof. The only pre-record gate is the minimum ownership check:
+distinguish an AgentCanon invariant failure from a generic host, dotfile,
+credential, consumer, or ownership-unknown failure. The latter stays with its
+applicable owner or qualified no-mutation handoff.
+
+The initial `iwashita-nozomu/agent-canon` Issue body, or the private body
+referenced by a pending packet, must preserve, at minimum:
+
+- the observed error and the command or action that produced it;
+- the immutable runtime or checkout snapshot (including `HEAD` when available);
+- the expected behavior and actual behavior; and
+- cause hypotheses as explicitly unknown, inconclusive, or tentative when they
+  have not been demonstrated.
+
+Add occurrence locations when available, but missing optional location detail
+does not block the first record. Enrichment, related-Issue intake, and bounded
+reorganization follow the initial record. A cohesive same-responsibility Issue
+receives the new observation as an evidence append/update; a mixed Issue set is
+reorganized with transfer receipts while preserving unique clauses. Do not
+silently discard a first observation as a title/key duplicate. `noop` is valid
+only after fresh readback shows that the current observation, evidence, and
+responsibility clauses are already present.
+
+## Runtime Issue Write Route
+
+The write path for a direct runtime candidate is:
+
+`reporter -> canonical AgentTeam IssueWorker dispatch/ToolCall -> host publisher -> gh Issue lookup -> IssueWorker.plan_publication() -> gh Issue create/comment/edit/reopen -> fresh URL/number/title/body/state readback`
+
+The reporter supplies a typed candidate and the checkout identity; the
+dashboard, resident runtime, and parent-side qualification remain read-only.
+The host `publisher` owns the credentialed GitHub adapter. It normalizes and
+filters the candidate to `iwashita-nozomu/agent-canon`, reads the related open
+and closed set with `gh issue list`/`gh issue view`, and applies the selected
+`create`, `update`, `reopen`, or `reorganize` operation through the existing
+adapter. For an initial record or evidence append, the host uses
+`gh issue create` or `gh issue comment` with `--repo iwashita-nozomu/agent-canon`
+and the prepared Markdown `--body-file`; controlled `gh issue edit` is used for
+responsibility reorganization. Concretely, an initial runtime defect uses
+`gh issue create --repo iwashita-nozomu/agent-canon --title <title> --label bug --label workflow --label agent-canon --label 'need verification' --body-file -`,
+where the candidate body is supplied on standard input. An evidence append uses
+`gh issue comment <number> --repo iwashita-nozomu/agent-canon --body-file <evidence-file>`.
+The host then runs
+`gh issue view <number> --repo iwashita-nozomu/agent-canon --json number,title,body,state,url`.
+A successful
+publication is claimed only after that fresh readback returns the URL, number,
+title, body, and state.
+
+The initial host `gh` write does not execute the resident runtime. After that
+GitHub readback, the publisher invokes the existing resident
+`issue_sync.py --stage-publication-receipt` route through the canonical
+`bootstrap.sh ... tool run/exec issue-sync -- ...` ToolCall and reads back the
+body-free private receipt. This is post-publication, metadata-only bookkeeping;
+it does not replace the GitHub Issue authority or become a new gate on the
+initial host record. The reporter does not execute a broken AgentCanon
+resident to report its own failure, install host Python, pass GitHub tokens
+into the resident, or grant a container Docker socket.
+
+If GitHub/authentication or the receipt/spool route is unavailable, preserve the
+candidate through the existing
+`agent-canon-log/feedback/issue-packets/pending/` metadata-only packet route.
+Mark it `unpublished`/`pending`, retain the private body locator and digest,
+and retry through the same host IssueWorker route when the external route is
+available. Do not claim `Issue created`, fabricate a URL, or remove the pending
+packet until GitHub and receipt readbacks both succeed. A foreign repository or
+an ownership-unknown finding is a qualified no-mutation handoff, not an
+AgentCanon Issue publication.
+
 ## Use When
 
 - User asks to turn logs, prompt history, run bundles, or agent reports into
@@ -192,6 +266,14 @@ owner, required fix, validation route, or responsibility relation, consume a
 bounded Cause Investigation Receipt from `dependency-analysis` or produce the
 same fields directly for a mechanically straightforward case.
 
+For a direct runtime defect, this contract governs enrichment and the
+owner-scoped repair Issue after the initial evidence record. It does not delay
+that first record: the minimum ownership check and the required error,
+command/action, snapshot, expected/actual, and explicitly unresolved-hypothesis
+fields from [Immediate Runtime Defect Recording](#immediate-runtime-defect-recording)
+are sufficient to publish an investigative candidate. Do not turn an unproven
+cause into a required-fix claim while the receipt is incomplete.
+
 ```text
 observed_facts: <snapshot-bound facts without causal wording>
 cause_hypotheses:
@@ -259,8 +341,14 @@ same finding, path, PR, or conversation.
 
 ## Related Issue Set Intake
 
-Before creating or modifying an Issue, collect the repository-qualified set of
-related open and closed Issues plus linked PRs/commits. For each Issue record:
+For a direct runtime defect, record the initial evidence candidate after the
+minimum ownership check and then perform this intake before enrichment,
+reorganization, or lifecycle mutation. For all other Issue writes, complete
+this intake before creating or modifying an Issue.
+
+Except for the direct initial runtime record, before creating or modifying an
+Issue, collect the repository-qualified set of related open and closed Issues
+plus linked PRs/commits. For each Issue record:
 
 ```text
 issue: <owner/repository#number>
@@ -363,6 +451,12 @@ close the source Issue in those states.
 Build a mutation plan before writes and route GitHub publication through
 `pr-processing`:
 
+The direct runtime first-record exception starts with the evidence-only
+`create` or same-responsibility `comment` route after the minimum ownership
+check. The remaining mutation order below governs subsequent enrichment,
+relation transfers, reorganization, and lifecycle changes; none may erase or
+postpone the initial observation.
+
 1. Add `in progress` to the active implementation Issue when code or canonical
    policy changes begin.
 1. Update canonical destinations with transferred clauses and source backlinks.
@@ -455,9 +549,12 @@ must not be reported as successful publication; non-qualified and foreign
 handoffs do not create receipts. The publisher ToolCall invokes the resident
 AgentCanon `issue_sync.py --stage-publication-receipt` subcommand through the
 canonical `bootstrap.sh ... tool run/exec issue-sync -- ...` route after a
-receipt-route preflight, and the host shell archive sync owns the subsequent
-Git commit/push; the dashboard only reads the published namespace. If the
-external runtime/spool route is unavailable, defer before invoking GitHub.
+receipt-route preflight for the ordinary publication lifecycle, and the host
+shell archive sync owns the subsequent Git commit/push; the dashboard only
+reads the published namespace. The direct runtime first-record route is the
+exception described above: its host `gh` write is independent of resident
+execution, and an unavailable external runtime/spool is retained as an
+unpublished/pending outcome rather than a fabricated success.
 
 The publisher filters every related Issue against both the candidate repository
 and the current checkout identity before editing. Foreign Issues are retained
@@ -547,7 +644,13 @@ Apply these rules:
 
 ## Issue Candidate Contract
 
-Before writing a new Issue:
+The following prepublication search and cause-investigation sequence applies to
+enrichment, repair candidates, and non-runtime Issue writes. A direct runtime
+candidate has already recorded its minimum evidence through [Immediate Runtime
+Defect Recording](#immediate-runtime-defect-recording); continue this sequence
+after that first record and preserve its evidence when updating or reorganizing.
+
+Before writing an enrichment, repair, or non-runtime Issue:
 
 1. Search existing durable and GitHub surfaces, including open and closed
    Issues, repository-qualified cross-repository links, and linked PRs/commits.
