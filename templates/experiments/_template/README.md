@@ -23,6 +23,7 @@ topic record に整理します。評価指標、比較方法、研究上の成�
 実験開始前に question → hypothesis → cases/observables → resource/env → managed run → result/failure
 の順で確認します。実験毎の計画と machine-readable な値は `provenance.toml` に記録します。
 
+- `.gitignore`: topic-local raw input、raw output、中間物を通常 Git blob から除外する境界。
 - `README.md`: 人間向けの計画、判断、再現手順。
 - `provenance.toml`: 実験計画・resource・run・result の機械可読な provenance。
 - `run.py`: managed runner の入口、case 集約、schema、atomic publication、manifest readback。
@@ -36,6 +37,7 @@ topic record に整理します。評価指標、比較方法、研究上の成�
 
 ```text
 experiments/<topic>/
+├── .gitignore
 ├── README.md
 ├── provenance.toml
 ├── run.py
@@ -58,8 +60,8 @@ topic は `tools/experiments/execution/run_managed_experiment.py` から呼び�
 
 ```text
 result/<run-id>/
-├── raw/                         # case worker が生成する生結果
-└── summary/                     # runner が atomic に公開する要約・証跡
+├── raw/                         # case worker が生成する生結果; 通常 Git では ignore
+└── summary/                     # runner が atomic に公開する compact 要約・証跡
     ├── summary.json
     ├── cases.jsonl
     ├── artifact-manifest.json
@@ -108,5 +110,19 @@ HTML または画像を `summary/` など契約された出力先へ書きます
 実行 command、branch、commit、config、environment、seed、resource allocation、result identity、
 cleanup policy は `provenance.toml` と summary snapshot の両方で読み戻せるようにします。raw は
 要約から再計算できるよう保持し、summary は比較・レビューに必要な最小証跡として保持します。
+
+`.gitignore` は未追跡 payload にだけ効きます。既に通常 Git で追跡された payload は、まず既存の
+`save_experiment_result_annex.py` owner で圧縮 archive を作り、manifest の source digest、annex key、
+archive digest を読み戻し、設定済み remote がある場合は `git annex copy --to <remote>` と取得側の
+`git annex get` を含む readback で content availability を確認してから `git rm --cached` で index
+だけから外します。作業 tree の入力やログを先に移動・削除してはいけません。remote が無い場合は
+local-only retention と明記し、remote durability を主張しません。payload の分類は拡張子ではなく
+`data/`、canonical `result/<run-id>/raw/` と compact summary/source/config/report の役割で行います。
+
+稼働中 run は archive 対象の完成結果ではありません。process が利用している入力、ignored raw、log、
+dirty working tree を保全し、terminal state と compact evidence が確定した後だけ retention 判断を
+行います。topic branch には当該 topic の source と compact evidence だけを載せ、無関係な実験 payload
+は集積せず、共通依存は registry / dependency reference で参照します。
+
 保持期間と annex 移送は [documents/experiments/result-log-retention-and-visualization.md](../../documents/experiments/result-log-retention-and-visualization.md) の
 契約に従います。
