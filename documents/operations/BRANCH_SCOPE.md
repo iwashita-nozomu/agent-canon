@@ -160,11 +160,11 @@ selected_validation(T_i, E_i) = pass
 - `WORKTREE_SCOPE.md` を更新した場合は、早い段階で commit します。
 - push 前に、その branch で必須の test / lint / document check を実行します。
 - 初回 push と PR 作成は `python3 tools/repository/github/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。
-- user-facing の完了報告は、原則として commit と push を終えてから行います。
+- user-facing の完了報告は、今回の scope で選択した commit / push の判断と結果を既存の closeout evidence に反映してから行います。選択しなかった操作を無条件に作成・実行する完了条件にはしません。
 - さらに `verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved`、`review_convergence_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで完了報告を出しません。
-- push を行わない task が許されるのは、review-only、no-change、または user が明示的に commit / push を止めた場合です。
-- push が自然な完了条件に含まれる task では、agent は push の許可を取りに戻りません。required review と validation が揃い、repo policy 的に自然ならそのまま push します。
-- push に失敗した場合は、完了扱いにせず、branch、commit、`github_publish.py` の `NEXT_ACTION` と失敗理由を明記して報告します。literal URL push や remote 推測の alternate route は使いません。
+- commit / push を選択しない task は、review-only、read-only、no-change、local-only / no-push、または user が明示的に停止した場合として、既存の closeout status を `not_applicable` にし、既存の work log / final status に判断理由を残します。選択した操作の status は `yes` になるまで完了扱いにしません。
+- commit / push が sharing、handoff、remote backup、PR などの目的と既存権限・指定宛先から適切と判断できる task では、agent は追加の許可取りに戻らず実行します。
+- 選択した push に失敗した場合は、完了扱いにせず、commit を保持したまま branch、commit、`github_publish.py` の `NEXT_ACTION` と失敗理由を明記して報告します。literal URL push や remote 推測の alternate route は使いません。
 
 ## 5. Conflict 解決と merge / rebase
 

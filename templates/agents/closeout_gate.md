@@ -59,8 +59,8 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - canonical_tree_head_complete: no
 - agent_evaluation_complete: no
 - runtime_log_archive_synced: no
-- commit_created: no
-- push_completed: no
+- commit_created: no / not_applicable
+- push_completed: no / not_applicable
 - user_completion_report: locked
 - algorithm_contract_before_tests: pending
 - necessary_sufficient_oracle_boundary: pending
@@ -101,8 +101,8 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
 - runtime_log_archive_synced: yes
-- commit_created: yes
-- push_completed: yes
+- commit_created: yes / not_applicable
+- push_completed: yes / not_applicable
 - algorithm_contract_before_tests: pass / not_applicable_with_reason
 - necessary_sufficient_oracle_boundary: pass / not_applicable_with_reason
 - failure_cause_classification_complete: yes
