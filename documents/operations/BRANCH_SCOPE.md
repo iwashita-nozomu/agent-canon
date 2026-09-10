@@ -9,6 +9,7 @@ downstream design ../../agents/skills/codex-task-workflow.md exposes commit corr
 downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes commit correctness runtime guidance
 downstream design ../../agents/skills/pr-processing.md exposes PR merge scope review
 downstream design ../../.codex/personal/skills/pr-processing/SKILL.md exposes PR merge scope review
+downstream design ../rule/dependency-module-changes.md consumes workspace dependency checkout readback
 @dependency-end
 -->
 
@@ -50,6 +51,49 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - `WORKTREE_SCOPE.md` には editable directories、carry-over target、action log を明記します。
 - branch で experiment topic を継続的に触る場合は、`experiments/registry.toml` の `active_branch` と必要なら `scope_file` を更新します。
 - branch の入口が必要な場合は `documents/notes/branches/<branch_topic>.md` に置き、scope と関連 note をそこから辿れるようにします。
+
+### Workspace と依存 checkout の確認
+
+作業開始・再開、checkout の変更、integration、実行・検証、publication / handoff の
+既存の branch 確認境界では、対象 repository だけでなく、作業 workspace 内の
+依存クローンも確認します。確認対象の発見は `workspace/<...>` の実在内容から
+行い、既存の `workspace/<repo>` や canonical な `workspace/<topic>/<repo>` を
+親の `.gitignore` や親だけの `git status` を理由に除外しません。これは既存
+checkout の観測であり、新規作成時の canonical 配置を変更する規定ではありません。
+
+依存宣言と実際の build / import / 実行時の解決先を辿り、対象となる Git root を
+確定します。`.git` directory だけでなく `.git` file を持つ worktree / submodule、
+local path override、workspace 外に解決される使用中の clone も取り落としません。
+同じ repository の複数 clone は path ごとに区別します。無関係と確認できた
+workspace の repository は更新対象にせず、全 toolchain の無制限走査も要求しません。
+
+対象ごとに次の観測を既存の Issue / PR / 作業記録へ残します。新しい台帳や
+`checkout_identity` schema は作らず、既存の checkout 観測を再利用します。
+
+| 観測 | 確認内容 |
+| --- | --- |
+| clone identity | resolved path、Git root、remote の owner/repository、branch または detached、actual `HEAD` の full SHA |
+| local state | staged / unstaged / untracked の有無と、今回の入力に関係する差分。親 repository の状態で代用しない |
+| 宣言した依存 | 選択した consumer tree / index の gitlink、manifest / lock 等の pin、その所有 path、対応する依存 PR と採用 SHA（変更時） |
+| 実際の入力 | build / import / 実行設定が読む checkout path と SHA、local override の有無。cache / install / 生成物を読む場合は採用 pin 由来であること |
+
+依存の source 開発 clone と、consumer が読む pin checkout は別々に扱います。
+開発 clone の新しい HEAD だけを見て consumer の更新済みとは判断せず、consumer が
+読む入力を宣言 pin と照合します。pin 用の clean detached checkout は正常であり、
+branch attach や全依存の最新 main 化を要求しません。依存側の修正に着手する場合は、
+その repository の最新 main 起点、または関連 Issue の active branch を使い、
+branch 名には対応する Issue 番号を含めます。未知の dirty state は保持します。
+
+依存変更を要する実行は
+[依存モジュール変更規約](../rule/dependency-module-changes.md) の PR → exact pin →
+consumer 実行の順序に従います。pin と実際の入力が不一致、dirty な依存入力、
+または由来を確認できない場合は、その入力を使う実行・検証を止め、具体的な
+path / SHA / 未確認事項を残します。黙って branch を切り替えたり、reset / clean /
+stash、別 clone や cache で不一致を隠したりしません。依存しない作業まで止めません。
+
+directory、branch、HEAD、依存 PR の revision、pin、local override / mount 等の
+入力解決先が変わったら、影響する対象を次の操作前に再確認します。同じ境界の
+観測を共有でき、状態が変わっていない通常 command ごとの重複確認は不要です。
 
 ## 4. コミット・プッシュ
 

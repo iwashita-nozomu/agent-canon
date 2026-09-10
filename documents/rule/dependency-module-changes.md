@@ -4,6 +4,7 @@ contract policy
 responsibility Defines dependency-module identity, pin, and projection policy over the generic repository topic clone lifecycle.
 upstream design ./repository-topic-clone.md generic repository topic clone lifecycle
 upstream design ../design/dependency-manifest-design.md dependency ownership and header graph model
+upstream design ../operations/BRANCH_SCOPE.md workspace dependency checkout and actual input readback
 downstream implementation ../../tools/repository/workspace/dependency_module_change.py applies the dependency policy decorator
 downstream design ../agent-canon/agent-canon-update-route.md routes standalone AgentCanon source updates
 downstream design ../../agents/skills/dependency-module-change.md exposes the short skill route
@@ -33,6 +34,45 @@ repository kind は checkout 後の policy decorator です。dependency skill �
 場合は decorator だけを外し、要求された checkout/edit/update operation を generic owner へ
 戻します。dependency repository は `independent-clone` mode を使い、manual clone、別
 workspace topology、operation refusal は代替 routeではありません。
+
+## 依存 PR → exact pin → consumer 実行
+
+branch 確認の対象・観測項目・再確認境界は
+[Branch Scope と Git ワークフロー](../operations/BRANCH_SCOPE.md) に従います。
+`workspace/<...>` にある依存の source 開発 clone と、consumer が実際に読む
+checkout の branch / HEAD は両方確認し、manifest の pin だけで確認済みにしません。
+この順序は gitlink だけでなく、consumer owner が manifest / lock 等で管理する
+Git source の pin にも適用します。依存 adapter に別の pin 管理機構は追加しません。
+
+依存の変更が consumer の実行に必要な場合は、次の順序を守ります。
+
+1. 依存 repository の Issue と編集 scope を確定し、generic lifecycle が選ぶ
+   最新 main 起点または関連 Issue の active branch で修正します。branch 名に
+   対応 Issue 番号を含め、依存側の focused validation を行います。この段階の
+   依存単体の開発検証は許されますが、consumer の pinned validation ではありません。
+2. 依存側を commit / push して PR を公開し、PR の repository、番号、remote の
+   exact head SHA と取得可能性を読み戻します。ローカル commit だけ、将来作る PR、
+   PR 番号だけ、branch 名や可変 ref だけでは consumer 実行の前提を満たしません。
+3. consumer owner の既存 gitlink / manifest / lock に採用する full commit SHA を
+   固定し、実際に解決される checkout / build input がその pin であることを確認して
+   から consumer を実行・検証します。consumer の Issue / PR に依存 PR、採用 SHA、
+   pin の所有 path、実使用 path / SHA、検証結果を残します。未 commit の依存変更や
+   workspace clone の偶然の HEAD を、local override / install / cache 経由で読ませません。
+4. 依存 PR の head が更新されたら、現在の pin を保持するか新 SHA を採用するかを
+   明示します。pin を可変 head に自動追従させません。新しい入力を採用した場合は
+   その pin と使用先を再照合し、影響する consumer 検証をやり直します。merge 後に
+   merge / squash commit へ pin を変更する場合も同じ扱いです。
+
+未 merge の PR head を使うことと、merge 済み依存を使うことは区別して記録します。
+merge 必須かは consumer の既存受入契約に従い、この規約だけで全 PR の merge 待ちを
+追加しません。変更不要の既存 pin には新しい依存 PR を要求しません。依存同士に
+変更の前提関係がある場合は、既存の dependency-analysis が定める順序で同じ手順を
+適用し、他 module の未公開変更を前提にした成功を報告しません。
+
+source-free な AgentCanon consumer には、この規約を理由に `vendor/agent-canon`、
+submodule pin、root view、runtime import を新設しません。AgentCanon の source 更新・
+配布は既存 owner の source / publication / runtime identity readback に従います。
+以下の parent state table は、実際に対応する submodule を持つ親だけに適用します。
 
 ## AgentCanon parent state decision table
 
@@ -145,5 +185,5 @@ python3 -m pytest tests/agent_tools/test_repository_topic_clone.py -q
 python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 ```
 
-dependency source publication 後は親 repository で exact gitlink pin と必要 projection を更新し、
-親 owner の targeted check を実行します。
+pin / projection を持つ依存では、source PR publication 後に親 repository の exact pin と
+必要 projection を更新・照合してから、親 owner の targeted check を実行します。
