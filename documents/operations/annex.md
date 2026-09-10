@@ -51,9 +51,10 @@ annex object store に保持します。pointer が存在しても、この chec
 - pointer と object の対応、symlink、`.git/annex/objects/` の内容を手で編集しません。
   状態が不明・payload が見つからない場合は、推測で修復せず owner に返します。
 
-git-annex の内部 metadata を持つ `git-annex` branch は通常の topic branch ではありません。
-内部 tracking 用の ref として git-annex が管理するため、topic branch の cleanup や手作業の
-ref 削除の対象にしません。
+git-annex の内部 metadata を持つ `git-annex` branch は、通常の作業 branch、`main`、
+`source`、`results`、`archive` の merge 対象にしません。git-annex が管理する内部 tracking
+ref なので、ref 更新や metadata 操作は native git-annex に委ねます。これは通常の Git 保守や
+checkout 全般を禁止する規則ではありません。
 
 ## native operation の選び方
 
@@ -64,7 +65,8 @@ ref 削除の対象にしません。
 | --- | --- | --- |
 | path を annex 管理に入れる | `git annex add <path>` | pointer と annex metadata を作る。remote への転送ではない。 |
 | この checkout に実体を得る | `git annex get <path>` | owner が許可した remote/config と exact path が必要。 |
-| 明示した remote と実体を転送する | `git annex copy <path> --to/--from <remote>` | payload transfer と Git metadata の commit/push を別々に readback する。 |
+| local から明示した remote へ実体を転送する | `git annex copy <path> --to=<remote>` | payload transfer と Git metadata の commit/push を別々に readback する。 |
+| 明示した remote から local に実体を得る | `git annex copy <path> --from=<remote>` | payload transfer と Git metadata の commit/push を別々に readback する。 |
 | 編集可能な表現にする | `git annex unlock <path>` | 表現変更を commit する書き込みで、copy による容量増加があり得る。 |
 | commit、pull、push、内容同期をまとめて行う | `git annex sync` | read-only ではない。既定で local change を commit し、pull/push する。内容転送は設定・option に依存する。 |
 | local payload を解放する | `git annex drop <path>` | native の安全な copy 検証に失敗したら保持する。`--force` で確認を迂回しない。 |
@@ -91,6 +93,7 @@ directory、retention decision、checksum/readback をその route の owner に
 ## 参照
 
 - [git-annex](https://git-annex.branchable.com/)
+- [git-annex copy](https://git-annex.branchable.com/git-annex-copy/)
 - [git-annex sync](https://git-annex.branchable.com/git-annex-sync/)
 - [git-annex unlock](https://git-annex.branchable.com/git-annex-unlock/)
 - [git-annex drop](https://git-annex.branchable.com/git-annex-drop/)
