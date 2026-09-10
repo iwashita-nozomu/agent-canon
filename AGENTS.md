@@ -53,6 +53,7 @@ root, workflow, or Skill policy for visibility.
 | branch, worktree, and destructive Git safety | [agents/skills/worktree-health.md](agents/skills/worktree-health.md), [agents/canonical/CODEX_WORKFLOW.md](agents/canonical/CODEX_WORKFLOW.md), `.codex/hooks/` |
 | AgentCanon source update and publication | [agents/skills/agent-canon-update.md](agents/skills/agent-canon-update.md), [agents/skills/pr-processing.md](agents/skills/pr-processing.md) |
 | subagent activation and handoff | [agents/skills/agent-orchestration.md](agents/skills/agent-orchestration.md), [agents/skills/subagent-bootstrap.md](agents/skills/subagent-bootstrap.md), [agents/canonical/CODEX_SUBAGENTS.md](agents/canonical/CODEX_SUBAGENTS.md) |
+| team composition, role/model/skills/authority/handoff selection | [agents/task_catalog.yaml](agents/task_catalog.yaml), [agents/skills/agent-orchestration.md](agents/skills/agent-orchestration.md), [agents/skills/subagent-bootstrap.md](agents/skills/subagent-bootstrap.md), [agents/canonical/CODEX_SUBAGENTS.md](agents/canonical/CODEX_SUBAGENTS.md) |
 | validation profile and closeout | [documents/runtime/runtime-profiles-and-check-matrix.md](documents/runtime/runtime-profiles-and-check-matrix.md), [agents/canonical/CODEX_WORKFLOW.md](agents/canonical/CODEX_WORKFLOW.md), `tools/runtime/lifecycle/task_close.py` |
 | GitHub Issue / PR publication and status | [agents/skills/pr-processing.md](agents/skills/pr-processing.md), [agents/internal-routines/github-status-lifecycle.md](agents/internal-routines/github-status-lifecycle.md) |
 
@@ -94,6 +95,12 @@ registry only after Codex admission. Read the selected owner surface before
 editing. A bounded request with an identified owner, path, and targeted
 validation stays bounded; broader design, orchestration, research, or subagent
 machinery activates only when its owner-defined condition is present.
+
+Before forming, changing, or delegating a team, follow the team-composition
+Reader Map row above. Read the selected typed route and its role/model/skills/
+authority/handoff sources; do not infer activation from a candidate role list,
+replace a selected model, or omit a selected role without an evidence-backed
+handoff update to the responsible owner.
 
 Read-only web, connector, and supplied-material analysis remain ChatGPT work
 unless the requested result depends on repository-local state, command

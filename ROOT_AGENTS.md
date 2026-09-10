@@ -86,6 +86,14 @@ inspection. Re-read this identity and dependency state after a directory,
 branch, dependency checkout, or pin change; unchanged ordinary commands do not
 require duplicate readback.
 
+Before forming, changing, or delegating a team, read the applicable repository
+team owner and the selected orchestration skill, then follow the selected typed
+route's definitions for logical role, model/profile, skills, authority, and
+handoff. Candidate role lists are not activation instructions, and logical-role
+coverage is not a physical-instance count. Keep consumer-owned team guidance
+self-contained; a source-specific checkout may name its canonical AgentCanon
+team owners, but a consumer root must not import or copy those source paths.
+
 ## Runtime Owner Map
 
 For a consumer root, use only the following consumer-owned map:
