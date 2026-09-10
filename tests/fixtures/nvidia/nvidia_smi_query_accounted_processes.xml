@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nvidia_smi_log>
+  <gpu>
+    <uuid>GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</uuid>
+    <fb_memory_usage>
+      <total>40960 MiB</total>
+      <used>0 MiB</used>
+      <free>40960 MiB</free>
+    </fb_memory_usage>
+    <mig_devices>
+      <mig_device>
+        <device_ordinal>0</device_ordinal>
+        <uuid>MIG-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</uuid>
+        <parent_uuid>GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</parent_uuid>
+        <fb_memory_usage>
+          <total>8192 MiB</total>
+          <used>0 MiB</used>
+          <free>8192 MiB</free>
+        </fb_memory_usage>
+      </mig_device>
+    </mig_devices>
+    <processes />
+    <compute_processes />
+    <graphics_processes />
+    <accounted_processes>
+      <process_info>
+        <pid>456</pid>
+        <process_name>historical</process_name>
+        <used_memory>2 MiB</used_memory>
+        <type>C</type>
+      </process_info>
+    </accounted_processes>
+  </gpu>
+</nvidia_smi_log>
