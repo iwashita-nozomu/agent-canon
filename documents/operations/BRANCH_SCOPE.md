@@ -41,6 +41,12 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - 結果保存 branch は `results/<topic>` を使います。
 - branch 名は目的が読める英語句で付けます。
 
+Git branch の metadata と大容量 payload を annex で扱う場合は、操作前に repository 固有の
+branch/storage owner と対象 path・remote を固定します。pointer/metadata の commit・push は
+payload の転送証明ではありません。locked/unlocked、payload の有無、内容の transfer/drop は
+別の状態として readback し、共通の操作境界は [annex.md](annex.md) に従います。実験結果や
+private feedback の archive は、それぞれの owner 文書に従い、branch workflow と混ぜません。
+
 ## 3. Scope の固定
 
 - branch を切ったら、必要に応じて対応する worktree root に `WORKTREE_SCOPE.md` を置きます。
