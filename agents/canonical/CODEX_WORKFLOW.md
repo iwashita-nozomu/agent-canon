@@ -885,6 +885,7 @@ closeout を non-terminal のまま、genuine blocker の根拠と次の owner/a
 - `task_close.py` に渡す stage-specific evidence として、verification、request
   contract、completion coverage、selected validation/static/dependency results、
   review disposition、commit / push の判断・結果、shared canon sync、follow-up 判断を記録する
+- 既存 closeout status の `commit_created` と `push_completed` は、選択した operation では `yes`、選択しなかった operation では `not_applicable` とする。`no` または欠落は未完了として扱い、選択理由は既存の work log / final status に残す
 - creator-owned temporary files, directories, and containers must have a cleanup
   receipt naming the exact created paths or resource IDs and an absence readback
   before `task_close.py`; missing creator-owned cleanup evidence keeps closeout

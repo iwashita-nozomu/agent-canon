@@ -940,7 +940,12 @@ def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
 
 
 def write_ready_closeout_bundle(
-    report_dir: Path, run_id: str, workspace: Path = PROJECT_ROOT
+    report_dir: Path,
+    run_id: str,
+    workspace: Path = PROJECT_ROOT,
+    *,
+    commit_created: str = "yes",
+    push_completed: str = "yes",
 ) -> None:
     """Write ready closeout artifacts except the diff-check artifact."""
     active_run_path = report_dir.parent / ".active_run"
@@ -1054,8 +1059,8 @@ def write_ready_closeout_bundle(
                 "- canonical_tree_head_complete: yes",
                 "- agent_evaluation_complete: yes",
                 "- runtime_log_archive_synced: yes",
-                "- commit_created: yes",
-                "- push_completed: yes",
+                f"- commit_created: {commit_created}",
+                f"- push_completed: {push_completed}",
                 "- user_completion_report: unlocked",
                 "- mapping_error_sets_empty: yes",
                 "- typed_owner_boundary_status: pass",
@@ -3829,7 +3834,13 @@ class BootstrapAndCloseTest(unittest.TestCase):
             initialize_clean_workspace(workspace_root)
             report_dir = root / "reports" / "test-task-close-no-change"
             report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, "test-task-close-no-change", workspace_root)
+            write_ready_closeout_bundle(
+                report_dir,
+                "test-task-close-no-change",
+                workspace_root,
+                commit_created="not_applicable",
+                push_completed="not_applicable",
+            )
             mark_diff_check_not_applicable(report_dir)
 
             result = subprocess.run(
@@ -3853,6 +3864,44 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
             self.assertIn("DIFF_CHECK_AGENT_COMPLETE=not_applicable", result.stdout)
+
+    def test_task_close_rejects_uncompleted_selected_push(self) -> None:
+        """A selected push that remains incomplete keeps closeout blocked."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            root = Path(tmp_dir)
+            workspace_root = root / "workspace"
+            initialize_clean_workspace(workspace_root)
+            report_dir = root / "reports" / "test-task-close-push-pending"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(
+                report_dir,
+                "test-task-close-push-pending",
+                workspace_root,
+                push_completed="no",
+            )
+            mark_diff_check_not_applicable(report_dir)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=workspace_root,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_PARENT_ROOT": str(workspace_root),
+                    "AGENT_CANON_RUNTIME_ROOT": str(TEST_TEMP_ROOT),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", result.stdout)
+            self.assertIn("push_completed", result.stdout)
 
     def test_task_close_rejects_unselected_diff_check_on_dirty_workspace(self) -> None:
         """A dirty checkout cannot use an unselected diff-check closeout."""
