@@ -17,7 +17,9 @@ import pytest
 from tools.repository.git.conflict_preservation import (
     ConflictPreservationError,
     capture_inventory,
+    main as preservation_main,
     validate_plan,
+    validate_readback,
     validate_rework_packet,
     validate_snapshot,
 )
@@ -287,7 +289,7 @@ def test_gitlink_tree_capture_and_readback_preserve_foreign_oid(tmp_path: Path) 
     validate_plan(inventory, plan, repo=repo)
 
 
-def test_gitlink_conflict_requires_expected_mode_and_oid_readback(tmp_path: Path) -> None:
+def test_gitlink_readback_validates_only_explicit_preservation(tmp_path: Path) -> None:
     repo, base, ours, theirs, ours_gitlink, _theirs_gitlink = gitlink_merge_conflicted_repo(
         tmp_path
     )
@@ -314,8 +316,7 @@ def test_gitlink_conflict_requires_expected_mode_and_oid_readback(tmp_path: Path
             "unaffected_content": [],
         }
     )
-    with pytest.raises(ConflictPreservationError, match="expected_gitlink preservation"):
-        validate_plan(inventory, plan, repo=repo)
+    validate_plan(inventory, plan, repo=repo)
 
     plan["paths"][-1]["unaffected_content"] = [
         {
@@ -325,6 +326,152 @@ def test_gitlink_conflict_requires_expected_mode_and_oid_readback(tmp_path: Path
         }
     ]
     with pytest.raises(ConflictPreservationError, match="preserved gitlink"):
+        validate_plan(inventory, plan, repo=repo)
+
+    git(repo, "update-index", "--cacheinfo", f"160000,{ours_gitlink},module")
+    validate_plan(inventory, plan, repo=repo)
+    git(repo, "update-index", "--force-remove", "--", "module")
+    with pytest.raises(ConflictPreservationError, match="resolved index entry is missing"):
+        validate_plan(inventory, plan, repo=repo)
+
+
+def test_empty_preservation_allows_regular_file_deletion(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo, base, ours, theirs = conflicted_repo(tmp_path)
+    inventory = capture_inventory(repo, base=base, ours=ours, theirs=theirs)
+    plan = plan_for(inventory)
+    plan["paths"][0].update(
+        disposition="manual",
+        rationale="the user approved removal of this obsolete file",
+        expected_edit_delta="remove file.txt from the resolved tree",
+        unaffected_content=[],
+    )
+    validate_plan(inventory, plan, repo=repo, readback=False)
+    git(repo, "rm", "-f", "--", "file.txt")
+    validate_plan(inventory, plan, repo=repo)
+    validate_readback(repo, inventory, plan)
+    tree = git(repo, "write-tree")
+    assert not git(repo, "ls-tree", tree, "--", "file.txt")
+    assert not (repo / "file.txt").exists()
+
+    inventory_file = tmp_path / "inventory.json"
+    plan_file = tmp_path / "plan.json"
+    inventory_file.write_text(json.dumps(inventory), encoding="utf-8")
+    plan_file.write_text(json.dumps(plan), encoding="utf-8")
+    assert preservation_main([
+        "validate", "--inventory", str(inventory_file), "--plan", str(plan_file),
+        "--repo-root", str(repo),
+    ]) == 0
+    assert "CONFLICT_PRESERVATION_VALIDATE=pass" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("conflicted_gitlink", [False, True])
+def test_empty_preservation_allows_gitlink_deletion(
+    tmp_path: Path, conflicted_gitlink: bool
+) -> None:
+    fixture = gitlink_merge_conflicted_repo if conflicted_gitlink else gitlink_conflicted_repo
+    repo, base, ours, theirs = fixture(tmp_path)[:4]
+    inventory = capture_inventory(
+        repo, base=base, ours=ours, theirs=theirs, user_paths=["module"]
+    )
+    plan = plan_for(inventory)
+    plan["paths"].append({
+        "path": "module",
+        "owner": "integration_executor",
+        "disposition": "manual",
+        "operation": "manual",
+        "rationale": "the user approved removal of the dependency",
+        "expected_edit_delta": "remove the module gitlink from the resolved tree",
+        "unaffected_content": [],
+    })
+    validate_plan(inventory, plan, repo=repo, readback=False)
+    (repo / "file.txt").write_text("feature\nuser-change\n", encoding="utf-8")
+    git(repo, "add", "file.txt")
+    git(repo, "update-index", "--force-remove", "--", "module")
+    validate_plan(inventory, plan, repo=repo)
+    validate_readback(repo, inventory, plan)
+    tree = git(repo, "write-tree")
+    assert not git(repo, "ls-tree", tree, "--", "module")
+
+
+@pytest.mark.parametrize("preservation", ["hunk", "blob"])
+def test_explicit_preservation_rejects_missing_regular_file(
+    tmp_path: Path, preservation: str
+) -> None:
+    repo, base, ours, theirs = conflicted_repo(tmp_path)
+    inventory = capture_inventory(repo, base=base, ours=ours, theirs=theirs)
+    plan = plan_for(inventory)
+    if preservation == "blob":
+        plan["paths"][0]["unaffected_content"] = [{
+            "path": "file.txt",
+            "expected_blob": inventory["paths"][0]["stages"]["ours"],
+        }]
+    git(repo, "rm", "-f", "--", "file.txt")
+    with pytest.raises(ConflictPreservationError, match="preserved path is unavailable"):
+        validate_plan(inventory, plan, repo=repo)
+
+
+def test_empty_preservation_still_requires_resolved_index_and_matching_plan(tmp_path: Path) -> None:
+    repo, base, ours, theirs = conflicted_repo(tmp_path)
+    inventory = capture_inventory(repo, base=base, ours=ours, theirs=theirs)
+    plan = plan_for(inventory)
+    plan["paths"][0]["unaffected_content"] = []
+    with pytest.raises(ConflictPreservationError, match="still has unmerged paths"):
+        validate_plan(inventory, plan, repo=repo)
+    git(repo, "rm", "-f", "--", "file.txt")
+    plan["head"] = "wrong-head"
+    with pytest.raises(ConflictPreservationError, match="head does not match"):
+        validate_plan(inventory, plan, repo=repo)
+    plan["head"] = ours
+    plan["paths"] = []
+    with pytest.raises(ConflictPreservationError, match="paths must exactly match"):
+        validate_plan(inventory, plan, repo=repo)
+
+
+def test_mixed_keep_replace_and_delete_resolution(tmp_path: Path) -> None:
+    repo, base, _ours, theirs, _gitlink = gitlink_conflicted_repo(tmp_path)
+    git(repo, "merge", "--abort")
+    for path in ("keep.txt", "replace.txt", "obsolete_helper.sh"):
+        (repo / path).write_text(f"original {path}\n", encoding="utf-8")
+    git(repo, "add", "keep.txt", "replace.txt", "obsolete_helper.sh")
+    commit(repo, "add independent files before integration")
+    ours = git(repo, "rev-parse", "HEAD")
+    git(repo, "merge", "--no-edit", "main", check=False)
+    inventory = capture_inventory(repo, base=base, ours=ours, theirs=theirs)
+    plan = plan_for(inventory)
+    keep_entry = next(entry for entry in inventory["paths"] if entry["path"] == "keep.txt")
+    for path, disposition, delta, content in (
+        ("keep.txt", "keep", "retain the original file", keep_entry["unaffected_content"]),
+        ("replace.txt", "replace", "replace the file with approved new content", []),
+        ("obsolete_helper.sh", "manual", "delete the obsolete helper", []),
+        ("module", "manual", "delete the obsolete dependency", []),
+    ):
+        plan["paths"].append({
+            "path": path,
+            "owner": "integration_executor",
+            "disposition": disposition,
+            "operation": "manual",
+            "rationale": f"approved resolution: {delta}",
+            "expected_edit_delta": delta,
+            "unaffected_content": content,
+            **({"reconstruction_map": [delta]} if disposition == "replace" else {}),
+        })
+    validate_plan(inventory, plan, repo=repo, readback=False)
+    (repo / "file.txt").write_text("feature\nuser-change\n", encoding="utf-8")
+    (repo / "replace.txt").write_text("approved new content\n", encoding="utf-8")
+    git(repo, "add", "file.txt", "replace.txt")
+    git(repo, "rm", "-f", "--", "obsolete_helper.sh")
+    git(repo, "update-index", "--force-remove", "--", "module")
+    validate_plan(inventory, plan, repo=repo)
+    tree = git(repo, "write-tree")
+    assert git(repo, "show", f"{tree}:keep.txt") == "original keep.txt"
+    assert git(repo, "show", f"{tree}:replace.txt") == "approved new content"
+    assert not git(repo, "ls-tree", tree, "--", "obsolete_helper.sh", "module")
+
+    (repo / "keep.txt").write_text("unapproved change\n", encoding="utf-8")
+    git(repo, "add", "keep.txt")
+    with pytest.raises(ConflictPreservationError, match="does not match expected blob"):
         validate_plan(inventory, plan, repo=repo)
 
 
