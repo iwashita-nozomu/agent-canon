@@ -3,7 +3,8 @@
 contract policy
 responsibility Defines the repository-topic clone lifecycle contract for generic topic/workspace clones.
 upstream design ../design/dependency-manifest-design.md repository-topic clone intent
-upstream design ../../agents/skills/repository-topic-clone.md operator-facing route
+downstream design ../../agents/skills/repository-topic-clone.md operator-facing policy consumer
+downstream design ../tools/repository_topic_clone.md CLI reference consumer
 downstream implementation ../../tools/repository/workspace/repository_topic_clone.py lifecycle implementation
 downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates lifecycle and cleanup gates
 @dependency-end
@@ -72,18 +73,15 @@ independent clone も同じ path、marker、writer packet、branch identity の�
   `dependency_module_change.py status` は adapter-only の read command であり、generic
   lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
 
-```bash
-python3 tools/repository/workspace/repository_topic_clone.py prepare \
-  --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
-  --owner-evidence <evidence-file> \
-  --allowed-path <relative-path>
+コマンドの引数と使用例は [CLI 参照の基本操作](../tools/repository_topic_clone.md#基本操作) を使います。
 
-python3 tools/repository/workspace/repository_topic_clone.py merge-main \
-  --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
-  --owner-evidence <evidence-file>
-```
+### 競合の再開
+
+競合で停止した merge の再開・完了は `finalize-merge` またはその alias
+`resume-merge` だけが行います。両方とも保存された inventory と plan を current checkout に
+対して検証し、unmerged state、hunk identity、unaffected content の readback が通らなければ
+commit しません。`conflict_preservation.py validate` 単体は診断用です。
+操作構文は [CLI 参照の競合の再開](../tools/repository_topic_clone.md#競合の再開) を使います。
 
 ## クリーンアップ
 
@@ -112,14 +110,7 @@ python3 tools/repository/workspace/repository_topic_clone.py merge-main \
   clone と空の topic root を削除します。proof 不足、衝突、unknown dirty/staged/untracked
   state は typed hold として保持し、manual deletion へ迂回しません。
 
-```bash
-python3 tools/repository/workspace/repository_topic_clone.py cleanup \
-  --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
-  --owner-evidence <evidence-file> \
-  [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
-  [--publication-readback <publication-readback.json>]] [--apply]
-```
+削除の実行構文は [CLI 参照の基本操作](../tools/repository_topic_clone.md#基本操作) を使います。
 
 ## 例外/フォールバック
 
