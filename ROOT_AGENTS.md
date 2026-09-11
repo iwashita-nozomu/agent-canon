@@ -98,6 +98,12 @@ Preserve mismatched or unknown checkouts and do not treat their unverified
 input as the declared pin. This does not introduce an AgentCanon dependency
 into a source-free consumer.
 
+Before a branch or annex operation, read the applicable repository's branch and
+storage owners. Keep Git branch metadata and any annex payload as separate
+concerns, and let those owners authorize data operations. This common base
+defines the read edge only; it does not name a source-repository path or
+prescribe an annex command, so a generated consumer root remains self-contained.
+
 Before forming, changing, or delegating a team, read the applicable repository
 team owner and the selected orchestration skill, then follow the selected typed
 route's definitions for logical role, model/profile, skills, authority, and
