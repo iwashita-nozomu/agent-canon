@@ -15,10 +15,15 @@ downstream implementation ../../tools/validation/semantic/logging/check_log_help
 
 ## 基本方針
 
-- 名前から owner の責務と対象が読み取れるようにします。
+- `GitHub repository + branch + repository root からの相対 path` を一続きの文脈として評価し、そこで対象と責務が読み取れれば十分です。file や directory の名前単体に完全な説明を求めません。
+- repository、branch、親 directory がすでに示す説明を下位の名前に繰り返さず、その階層で不足する区別だけを表します。短縮によって同じ文脈で曖昧になる語は残します。
 - 省略や抽象語は、既存の naming family と意味が衝突しない場合に限ります。
-- 近くのファイル名や一時的な作業段階ではなく、概念、責務、入力、変換、出力を根拠にします。
+- 名前は安定した概念と責務を根拠にし、入力・変換・出力をすべて列挙する説明文にはしません。
+- 永続 file は `main` 統合後の repository と path でも意味が通じるようにし、一時的な branch/topic の説明を filename へ複製しません。branch の Issue 番号など、各 owner が定める必須識別子は保持します。
 - 共通規約はこの文書に置き、言語や topic に固有の規約は対応する owner 文書へ置きます。
+
+例えば `agent-canon @ <issue-branch> : documents/rule/naming.md` で意味は通じます。
+filename を `agent-canon-naming-rules.md` にして repository と親 directory の説明を重ねません。
 
 ## 新規責務名の制限
 
@@ -35,7 +40,8 @@ downstream implementation ../../tools/validation/semantic/logging/check_log_help
 
 ## 識別子と生成物
 
-- 関数、tool、theorem、artifact、branch、run、report の名前は、対象概念と責務が検索できる粒度にします。
+- 関数、tool、theorem、artifact、branch、run、report も、利用者に見える文脈と名前を合わせて対象と責務を検索・識別できる粒度にします。
+- 公開 API や単体配布 artifact では、利用者に見えない repository/branch/path を省略の根拠にしません。衝突回避に必要な区別と外部固定名は保持します。
 - proof や generated artifact は探索手順ではなく、対象 theorem profile、public root、projection などの安定した対象を表します。
 - Python helper / local function は、`helper_function_inventory.py` が推定する role と整合する action token を含めます。
 - Python のログ用 helper 関数は [documents/conventions/coding-conventions-logging.md](../conventions/coding-conventions-logging.md) に従い、`_log` から始めます。
@@ -47,12 +53,15 @@ downstream implementation ../../tools/validation/semantic/logging/check_log_help
 - 対象概念: 何を表す名前か。
 - 責務語彙: owner が使う domain 上の語。
 - 既存 family: 近い file、function、theorem、artifact の名前。
-- 採用名: 作成または rename 後の名前。
-- 避ける名前: 責務を隠す、過剰な互換維持を招く、または探索手順に依存する候補。
+- 採用名: 文脈（repository・branch・相対 path など）と組み合わせた作成または rename 後の名前。
+- 避ける名前: 上位の説明を繰り返す、責務を隠す、過剰な互換維持を招く、または探索手順に依存する候補。
 
 名前が未確定なら、worker に新しい語彙を発明させず、design へ戻します。
 
 ## 検証
+
+レビューでは名前と利用者に見える文脈を合わせ、上位の説明の重複と必要な区別の欠落を確認します。
+短い名前や同じ単語の反復だけを機械的な違反にしません。
 
 ログ helper の命名は、次の checker で検証します。
 
