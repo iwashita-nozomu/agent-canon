@@ -1,10 +1,14 @@
 <!--
 @dependency-start
 contract policy
-responsibility Documents 文書規約正本の入口。
+responsibility Routes readers to individual rule owners without redefining their clauses.
 upstream design ../README.md documents index
 upstream design ../design/README.md design canon reader route
 upstream design ../structure/repo-structure-contract.toml machine validator companion
+downstream design naming.md naming policy owner
+downstream design directory-structure.md document placement and authority owner
+downstream design dependency-module-changes.md dependency identity and pin owner
+downstream design repository-topic-clone.md generic checkout lifecycle owner
 downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py convention validation
 downstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py structure validation
 @dependency-end
@@ -12,21 +16,22 @@ downstream implementation ../../tools/validation/semantic/structure/repo_structu
 
 # 文書規約
 
-このディレクトリは、文書の filename、配置、構成を決める規約の正本です。
-各規約は、読者が次の責務判断を再現できるように、owner と検証責任を明示します。
+この索引は、判断対象から個別規約の正本へ案内します。
+規約の条件と検証責任は、次の各 owner 文書で確認します。
 
 ## 読者の入口
 
-- [命名規約](naming.md): filename、identifier、artifact、運用名の決め方。
-- [ディレクトリ構成規約](directory-structure.md): 文書の配置、分割、正本境界の決め方。
-- [依存モジュール変更規約](dependency-module-changes.md): `.gitmodules`、独立 source clone、vendor pin projection、topic lifecycle、cleanup の共通契約。
-- [設計正本の入口](../design/README.md): target state と実装境界を固定する設計文書。
+| 判断対象 | 規約の正本 |
+| --- | --- |
+| filename、identifier、artifact、運用名 | [命名規約](naming.md) |
+| 文書の配置、分割、正本と evidence の境界 | [ディレクトリ構成規約](directory-structure.md) |
+| dependency の identity、gitlink、pin、projection | [依存モジュール変更規約](dependency-module-changes.md) |
+| repository-topic checkout の作成、再利用、merge、cleanup | [repository-topic clone ルール](repository-topic-clone.md) |
+
+個別の target state と実装境界は [設計正本の入口](../design/README.md) からたどります。
 
 ## 所有境界
 
-`documents/rule/` は命名・配置・構成判断の一般規約を持ちます。
-`documents/design/` は個別の target state、実装境界、設計上の前提を持ちます。
-machine validator の期待値は `documents/structure/repo-structure-contract.toml` に置きます。
-生成された report、log、raw evidence、generated artifact、issue は evidence または運用の owner に属し、設計正本にはしません。
-
-規約の本文は日本語で書き、path、identifier、ToolCall、external fixed name は原表記を保ちます。
+配置と正本の区別は [ディレクトリ構成規約の正本の境界](directory-structure.md#正本の境界)、
+文書 filename と本文の言語は [命名規約の文書 filename](naming.md#文書-filename) が所有します。
+この索引では、それらの条件を再定義しません。
