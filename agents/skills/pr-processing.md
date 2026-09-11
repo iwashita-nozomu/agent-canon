@@ -199,6 +199,34 @@ post_merge_base_head=<sha or none>
 
 Before merge/ready/close/update, read fresh remote state and confirm authority. After the write, read back the PR/issue state. These write controls apply in both single and queue modes.
 
+### Preserve publication intent through dispatch
+
+Resolve the requested operation before selecting a write tool, and carry that
+same operation, repository-qualified target, authority, and actual payload to
+the transport call and readback. Available write permissions or tool discovery
+are not publication intent.
+
+- For read/discovery, inspect tool schemas and existing remote state only.
+  Never use create/update/delete, an empty Issue, or create-then-close to test
+  a connector, payload shape, or write access; do not move such a probe to
+  another repository. If read-only evidence cannot establish access, report
+  that uncertainty without a mutation.
+- For an existing Issue update or comment, resolve that Issue and invoke the
+  matching operation. A missing target, unavailable action, or failed update
+  does not authorize a replacement Issue.
+- For an explicitly authorized new Issue, complete the existing finding and
+  duplicate/owner matching route, resolve the destination repository, and
+  prepare the real title/body before dispatch. Once those prerequisites are
+  satisfied, execute the actual create once and read back its identity and
+  content; do not add a dummy preflight or an extra approval round.
+
+Immediately before invocation, compare the selected API action and payload
+with that resolved intent. A kind, target, or authority mismatch stops the
+write. If a create response is ambiguous, read back existing remote state
+before considering recovery; never blindly repeat create or treat an error
+as permission for a different mutation. Reuse the existing publication
+transport and evidence rather than adding another dispatcher or registry.
+
 For bug work, including handoff before a PR is complete, consume
 [Bug reproduction evidence](../../documents/conventions/coding-conventions-testing.md#22-bug-reproduction-evidence)
 for the Issue-linked source, execution result, and post-fix disposition. This
