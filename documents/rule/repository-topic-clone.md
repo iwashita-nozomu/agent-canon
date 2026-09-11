@@ -52,6 +52,8 @@ linked worktree は native Git の shared refs/config と per-worktree index を
 writer packet と task marker は各 worktree に属し、別 worktree の状態を共有・上書きしません。
 independent clone も同じ path、marker、writer packet、branch identity の検証を通ります。
 
+mode の選択・作成は lifecycle command が行い、manual clone や手動 worktree 作成へ迂回しません。
+
 ## clone ライフサイクル
 
 - `prepare` は必ず `workspace/<topic-slug>/<repo-name>` の computed path を返す。

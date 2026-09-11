@@ -30,7 +30,7 @@ repository-topic checkout の操作を選び、
 
 共通入口は `python3 tools/repository/workspace/repository_topic_clone.py` です。
 選択した操作だけを実行し、引数は [CLI 参照](../../documents/tools/repository_topic_clone.md#基本操作)
-から組み立てます。handoff の identity、owner evidence、allowed paths をその操作へ渡します。
+から組み立てます。handoff の identity と owner evidence を引き継ぎ、`prepare` には allowed paths も渡します。
 
 | 操作 | 実行前に読む正本 |
 | --- | --- |
