@@ -7,6 +7,7 @@ upstream design ./README.md shared public skill canon
 upstream design ../../documents/design/responsibility-cleanup.md responsibility-unit cleanup contract
 upstream design ./dependency-analysis.md dependency and reachability owner
 upstream design ./refactor-loop.md behavior-preserving refactor owner
+upstream design ../internal-routines/incremental-code-change.md opt-in coverage traversal and incremental update sequence
 upstream design ./change-review.md findings-first review owner
 upstream design ./responsibility-cleanup.md responsibility-unit dispatch owner
 downstream implementation ../../.codex/personal/skills/code-cleanup/SKILL.md runtime discovery shim
@@ -30,6 +31,11 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 - behavior-preserving refactor の後に findings-first review を行う
 
 ## Route
+
+全対象の走査と逐次修正、またはタスク内の重複読取・引継ぎ・再レビューの修正を
+依頼された場合は、[依存順走査による逐次コード変更](../internal-routines/incremental-code-change.md)
+をこのrouteの走査・更新順として使います。通常の局所修正に全走査を追加しません。
+同じ `reuse_survey` と依存根拠を使い、検証・レビュー・commitの正本を置き換えません。
 
 1. file/worker slice より先に current module/helper/type/test/docs を調べ、一つの
    shared asset universe を作る。split / extraction または suspected predecessor

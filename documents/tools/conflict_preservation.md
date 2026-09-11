@@ -52,6 +52,15 @@ target is covered by the inventory/plan, the packet files exist below the
 active clone's `.agent-canon/` evidence scope, and `HEAD`, `MERGE_HEAD`, and
 the target stage entries still equal the captured snapshot. Regular target
 stages are checked through their blob references; gitlinks are checked through
-their mode/OID identity. Broad
+their mode/OID identity. For each base/ours/theirs stage, absence from both
+the captured and current index is preserved as absence, as on the deleted
+side of a modify/delete conflict. A stage appearing or disappearing on only
+one side, or an explicitly malformed stage entry, is still rejected. Broad
 reset, clean, reclone, multi-source replacement, and unbounded pathspecs are
 held for explicit finalization.
+
+An empty `unaffected_content` list permits an approved deletion only when the
+resolved index has no entry for that path. If a historical gitlink remains as a
+resolved mode `160000` entry, the plan must explicitly carry `expected_gitlink`
+and readback checks its mode/OID. This identity check does not require the
+foreign gitlink commit to exist in the superproject object database.
