@@ -498,6 +498,16 @@ def _non_empty(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _has_gitlink_stage(entry: object) -> bool:
+    if not isinstance(entry, Mapping):
+        return False
+    stages = entry.get("stages")
+    return isinstance(stages, Mapping) and any(
+        isinstance(stage, Mapping) and stage.get("mode") == "160000"
+        for stage in stages.values()
+    )
+
+
 def _require_fields(packet: Mapping[str, object], fields: Sequence[str], label: str) -> None:
     missing = [field for field in fields if not _non_empty(packet.get(field))]
     if missing:
@@ -694,13 +704,21 @@ def _read_path(repo: Path, path: str) -> bytes:
 
 def _index_entry(repo: Path, path: str) -> dict[str, str]:
     """Read one resolved index entry, including its mode and object identity."""
+    entry = _try_index_entry(repo, path)
+    if entry is None:
+        raise ConflictPreservationError(f"resolved index entry is missing: {path}")
+    return entry
+
+
+def _try_index_entry(repo: Path, path: str) -> dict[str, str] | None:
+    """Read a resolved index entry, returning ``None`` for an absent path."""
     result = subprocess.run(
         ["git", "-C", str(repo), "ls-files", "--stage", "-z", "--", path],
         check=False,
         capture_output=True,
     )
     if result.returncode != 0 or not result.stdout:
-        raise ConflictPreservationError(f"resolved index entry is missing: {path}")
+        return None
     records = [record for record in result.stdout.split(b"\0") if record]
     if len(records) != 1:
         raise ConflictPreservationError(f"resolved index entry is not unique: {path}")
@@ -738,6 +756,16 @@ def validate_readback(repo: Path, inventory: Mapping[str, object], plan: Mapping
     planned = plan.get("paths")
     if not isinstance(planned, list):
         raise ConflictPreservationError("readback requires planned paths")
+    entries = inventory.get("paths")
+    inventory_by_path = (
+        {
+            str(entry.get("path")): entry
+            for entry in entries
+            if isinstance(entry, Mapping) and isinstance(entry.get("path"), str)
+        }
+        if isinstance(entries, list)
+        else {}
+    )
     for item in planned:
         if not isinstance(item, Mapping):
             continue
@@ -746,6 +774,19 @@ def validate_readback(repo: Path, inventory: Mapping[str, object], plan: Mapping
             continue
         content = item.get("unaffected_content")
         assert isinstance(content, list)
+        resolved = _try_index_entry(repo, path)
+        if (
+            _has_gitlink_stage(inventory_by_path.get(path))
+            and resolved is not None
+            and resolved.get("mode") == "160000"
+            and not any(
+                isinstance(preserved, Mapping) and "expected_gitlink" in preserved
+                for preserved in content
+            )
+        ):
+            raise ConflictPreservationError(
+                f"{path}: mode 160000 requires expected_gitlink preservation"
+            )
         gitlink_content = [
             preserved
             for preserved in content

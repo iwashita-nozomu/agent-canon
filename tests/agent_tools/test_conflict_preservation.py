@@ -342,6 +342,12 @@ def test_gitlink_modify_delete_preserves_absent_stage_identity(
 
 def test_gitlink_tree_capture_and_readback_preserve_foreign_oid(tmp_path: Path) -> None:
     repo, base, ours, theirs, ours_gitlink = gitlink_conflicted_repo(tmp_path)
+    missing_object = subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "-e", ours_gitlink],
+        check=False,
+        capture_output=True,
+    )
+    assert missing_object.returncode != 0
     inventory = capture_inventory(repo, base=base, ours=ours, theirs=theirs)
     module = next(entry for entry in inventory["paths"] if entry["path"] == "module")
     assert module["stages"]["ours"] == {"mode": "160000", "oid": ours_gitlink}
@@ -371,7 +377,7 @@ def test_gitlink_tree_capture_and_readback_preserve_foreign_oid(tmp_path: Path) 
     validate_plan(inventory, plan, repo=repo)
 
 
-def test_gitlink_readback_validates_only_explicit_preservation(tmp_path: Path) -> None:
+def test_gitlink_readback_requires_explicit_matching_preservation(tmp_path: Path) -> None:
     repo, base, ours, theirs, ours_gitlink, _theirs_gitlink = gitlink_merge_conflicted_repo(
         tmp_path
     )
@@ -398,7 +404,8 @@ def test_gitlink_readback_validates_only_explicit_preservation(tmp_path: Path) -
             "unaffected_content": [],
         }
     )
-    validate_plan(inventory, plan, repo=repo)
+    with pytest.raises(ConflictPreservationError, match="expected_gitlink preservation"):
+        validate_plan(inventory, plan, repo=repo)
 
     plan["paths"][-1]["unaffected_content"] = [
         {

@@ -90,12 +90,13 @@ reset、reclone、overwrite、regeneration は inventory と reconstruction map 
 拒否され、clean な `conflict_paths=empty` だけでは成功になりません。
 
 保持条件は plan の各 path にある `unaffected_content` への明示的な指定だけです。
-inventory に path が存在することや、過去の stage が gitlink (`160000`) であることから、
-存在や型の保持を自動的に要求しません。`unaffected_content: []` は保持条件が空であることを
-表し、通常ファイル・gitlink の削除も妨げません。ただし、これは削除済みであることの証明では
-ありません。承認済み削除は既存の `manual` disposition、`rationale`、`expected_edit_delta`
-に記録し、解消後の Git index/tree の差分で確認します。新しい delete disposition、absence
-schema、削除専用の判定は追加しません。
+ただし、過去の stage に gitlink (`160000`) があり、解消後も gitlink が残る場合は、
+`expected_gitlink` による mode/OID の readback を必須とします。`unaffected_content: []` は
+解消後の index にその path が存在しない実際の削除（または absent stage）に限って保持条件を
+空にできます。通常ファイル・gitlink の削除は妨げませんが、削除済みであることは解消後の
+Git index/tree の差分で確認します。承認済み削除は既存の `manual` disposition、`rationale`、
+`expected_edit_delta` に記録します。新しい delete disposition、absence schema、削除専用の
+判定は追加しません。
 
 保持を明示した `expected_blob`、`hunk_identity`、`expected_gitlink` の消失・不一致は引き続き
 拒否します。plan の identity と inventory の path coverage、未解決 index の検出も維持します。
