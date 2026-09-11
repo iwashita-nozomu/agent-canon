@@ -4,6 +4,8 @@ contract template
 responsibility Provides the canonical planning and provenance README for an experiment topic.
 upstream design ../../../documents/experiments/README.md experiment directory and registry route.
 upstream design ../../../documents/design/experiment-topic-template.md single-source topic scaffold and result layout.
+upstream design ../../../documents/operations/annex.md pointer/payload boundary and native annex operation readback.
+upstream implementation ../../../tools/experiments/artifacts/save_experiment_result_annex.py explicit raw retention owner.
 downstream implementation ./provenance.toml records machine-readable plan and provenance.
 downstream implementation ./run.py provides the runnable topic scaffold and atomic summary publication.
 downstream implementation ../../../tools/experiments/lifecycle/create_experiment_topic.py materializes this topic pair.
@@ -32,6 +34,11 @@ topic record に整理します。評価指標、比較方法、研究上の成�
 - `config.yaml`: topic 固有の実験設定。
 - `report/`: 人間向けの report 出力領域。
 - `result/`: run ごとの機械生成結果領域。大規模な保持物は契約に従って annex へ移送する。
+
+pointer/payload の境界と native annex 操作の正本は
+[documents/operations/annex.md](../../documents/operations/annex.md) です。この README は
+topic に固有の適用だけを定め、annex の全体規約を複製しません。`result/<run-id>/summary/`
+などの Git pointer/metadata と、外部 annex worktree に保持する payload は別々に読み戻します。
 
 ## Topic files
 
@@ -111,13 +118,22 @@ HTML または画像を `summary/` など契約された出力先へ書きます
 cleanup policy は `provenance.toml` と summary snapshot の両方で読み戻せるようにします。raw は
 要約から再計算できるよう保持し、summary は比較・レビューに必要な最小証跡として保持します。
 
-`.gitignore` は未追跡 payload にだけ効きます。既に通常 Git で追跡された payload は、まず既存の
-`save_experiment_result_annex.py` owner で圧縮 archive を作り、manifest の source digest、annex key、
-archive digest を読み戻し、設定済み remote がある場合は `git annex copy --to <remote>` と取得側の
-`git annex get` を含む readback で content availability を確認してから `git rm --cached` で index
-だけから外します。作業 tree の入力やログを先に移動・削除してはいけません。remote が無い場合は
-local-only retention と明記し、remote durability を主張しません。payload の分類は拡張子ではなく
-`data/`、canonical `result/<run-id>/raw/` と compact summary/source/config/report の役割で行います。
+`.gitignore` は未追跡 payload にだけ効きます。既に通常 Git で追跡された payload は、既存の
+[`save_experiment_result_annex.py`](../../tools/experiments/artifacts/save_experiment_result_annex.py)
+owner で圧縮 archive を作り、manifest の source digest、annex key、archive digest を読み戻してから
+移行します。設定済みの special remote へ payload を保持する場合だけ、owner が指定した exact path に
+対して `git annex copy --to <remote>`、取得側では `git annex get` を行い、content availability と
+checksum を別に読み戻します。その readback が完了するまで `git rm --cached` を実行しません。
+これは index entry だけを外す操作であり、作業 tree の入力やログを移動・削除する操作ではありません。
+
+Git branch の通常の `push` は pointer/metadata の共有であって、annex payload の transfer ではありません。
+special remote が無い場合は、archive を source checkout の外にある設定済みの local annex worktree / spool
+へ保持し、local-only retention と明記します。source tree に payload を戻して remote durability を主張したり、
+未指定 remote へ広く同期したりしません。source checkout の branch/index/既存 dirty paths を保全し、annex
+worktree の clean 状態、archive key/content location、source/archive checksum をそれぞれ読み戻します。編集が必要な場合だけ owner の指示で
+`git annex unlock` を使い、手動 symlink、`.git/annex` 内部 metadata、広い `git annex sync`、確認を迂回する
+`git annex drop --force` は使いません。payload の分類は拡張子ではなく `data/`、canonical
+`result/<run-id>/raw/` と compact summary/source/config/report の役割で行います。
 
 稼働中 run は archive 対象の完成結果ではありません。process が利用している入力、ignored raw、log、
 dirty working tree を保全し、terminal state と compact evidence が確定した後だけ retention 判断を
