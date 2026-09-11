@@ -26,7 +26,7 @@ description = "Every discoverable Codex skill shim must be loadable and dependen
 id = "SKILL-SHIM-GENERIC-1"
 critical = true
 description = "Starts with YAML frontmatter and includes required name/description fields."
-required_regex = ["\\A---\\n", "\\nname:\\s*_?[a-z0-9]+(?:-[a-z0-9]+)*", "\\ndescription:\\s*\\S"]
+required_regex = ["\\A---\n", "\nname:\\s*_?[a-z0-9]+(?:-[a-z0-9]+)*", "\ndescription:\\s*\\S"]
 
 [[evals.checklist]]
 id = "SKILL-SHIM-GENERIC-2"
@@ -1799,49 +1799,53 @@ id = "agent-log-analysis-canonical-dashboard-api-skill"
 target = ".codex/personal/skills/agent-log-analysis/SKILL.md"
 canonical_target = "agents/skills/agent-log-analysis.md"
 kind = "skill"
-description = "The runtime agent-log-analysis skill must call the AgentCanon source dashboard API before reading evidence."
+description = "The runtime log-analysis skill reuses existing evidence without making acquisition or repair a read prerequisite."
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-SHIM-1"
 critical = true
-description = "Requires archive resolution plus the source dashboard API command."
-required_regex = ["runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out"]
+description = "Keeps canonical acquisition available while existing snapshots need no fresh generation, archive clean state, or foreign repair."
+required_regex = ["runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out", "neither fresh generation", "archive sync/clean", "foreign dirty repair", "analysis prerequisite"]
+forbidden_regex = ["該当 repo_key の sync / migration を先に解消"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-SHIM-2"
 critical = true
-description = "Keeps event-file drilldown exceptional and routes missing compact fields to the dashboard API owner."
-required_regex = ["dashboard_api_contract_gap", "dashboard API owner", "Event-file drilldown", "schema debugging", "corruption audit"]
+description = "Missing summaries or fields allow bounded snapshot-qualified drilldown and limit unsupported claims instead of requiring dashboard repair."
+required_regex = ["dashboard_api_contract_gap", "bounded, snapshot-qualified drilldown", "explicit reason", "Do not wait for dashboard repair", "Missing evidence limits the affected claim", "absent fields are not zero"]
+forbidden_regex = ["rerun it after the source tool is repaired"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-SELECTION-ROUTE-SHIM-1"
 critical = true
 description = "Routes selection evidence by skill, tool, and workflow responsibility."
-required_regex = ["skill selection findings", "tool selection findings", "workflow selection findings", "tools/catalog\\.yaml", "agents/TASK_WORKFLOWS\\.md"]
+required_regex = ["skill_selection", "tool_selection", "workflow_selection", "tools/catalog\\.yaml", "agents/TASK_WORKFLOWS\\.md"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-EVAL-ACCUMULATION-SHIM-1"
 critical = true
-description = "Routes eval family gaps to the accumulated eval producer/checker skill instead of raw dashboard guessing."
-required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "producer/checker/archive loop"]
+description = "Eval gaps are reportable without producer reruns; selected verification and repair retain their existing owners and safety."
+required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "without automatically running", "only selected repair", "Issue recording does not require", "read-only targets", "external outputs", "archive/publication integrity"]
 
 [[evals]]
 id = "agent-log-analysis-canonical-dashboard-api-doc"
 target = "agents/skills/agent-log-analysis.md"
 kind = "skill-doc"
-description = "The human agent-log-analysis skill must define AgentCanon as source dashboard owner over the mounted log archive evidence."
+description = "The human log-analysis skill separates snapshot-bound reading from selected acquisition, maintenance, and repair."
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-DOC-1"
 critical = true
-description = "Documents archive resolution and source dashboard API output."
-required_regex = ["external log archive", "runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out"]
+description = "Documents existing-evidence reuse with the canonical source dashboard retained only for selected acquisition."
+required_regex = ["runtime_log_archive_git\\.py", "generate_agent_runtime_dashboard\\.py", "--compact-out", "--api-out", "neither fresh generation", "archive sync/clean", "foreign dirty repair", "analysis prerequisite"]
+forbidden_regex = ["該当 repo_key の sync / migration を先に解消"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-API-DOC-2"
 critical = true
-description = "Keeps raw JSONL inspection exceptional and routes missing compact fields to the dashboard API owner."
-required_regex = ["dashboard_api_contract_gap", "dashboard API owner", "event file drilldown", "schema debugging", "破損 audit"]
+description = "Bounds raw drilldown, records missing coverage, and permits reporting without dashboard repair."
+required_regex = ["dashboard_api_contract_gap", "bounded, snapshot-qualified drilldown", "explicit reason", "Do not wait for dashboard repair", "Missing evidence limits the affected claim", "absent fields are not zero"]
+forbidden_regex = ["rerun it after the source tool is repaired"]
 
 [[evals.checklist]]
 id = "AGENT-LOG-SELECTION-ROUTE-DOC-1"
@@ -1852,8 +1856,8 @@ required_regex = ["skill_selection", "tool_selection", "workflow_selection", "to
 [[evals.checklist]]
 id = "AGENT-LOG-EVAL-ACCUMULATION-DOC-1"
 critical = true
-description = "Routes missing or stale accumulated eval families to the dedicated producer/checker loop."
-required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "run_accumulated_agent_evals\\.py"]
+description = "Observing missing or stale eval evidence does not activate repair or block Issue recording; selected operations keep their safeguards."
+required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", "without automatically running", "only selected repair", "Issue recording does not require", "read-only targets", "external outputs", "archive/publication integrity"]
 
 [[evals]]
 id = "runtime-log-repair-skill"
@@ -1902,8 +1906,8 @@ description = "Accumulated eval repair must use registered producers, compact ch
 [[evals.checklist]]
 id = "AGENT-EVAL-ACCUMULATION-SHIM-1"
 critical = true
-description = "Starts with the compact accumulation checker."
-required_regex = ["eval_accumulation_check\\.py", "--compact-out", "eval-accumulation-before\\.json"]
+description = "Only selected collection or repair starts the compact checker loop; observing a gap does not authorize producers."
+required_regex = ["eval_accumulation_check\\.py", "--compact-out", "eval-accumulation-before\\.json", "only to selected eval collection/repair", "not by itself", "block Issue recording"]
 
 [[evals.checklist]]
 id = "AGENT-EVAL-ACCUMULATION-SHIM-2"
@@ -1926,8 +1930,8 @@ description = "The human accumulated eval skill must define producer/checker/arc
 [[evals.checklist]]
 id = "AGENT-EVAL-ACCUMULATION-DOC-1"
 critical = true
-description = "Defines the compact checker and registered producer loop."
-required_regex = ["eval_accumulation_check\\.py", "run_accumulated_agent_evals\\.py", "registered producer"]
+description = "Defines the registered loop only for selected eval collection or repair, not for read-only gap observation."
+required_regex = ["eval_accumulation_check\\.py", "run_accumulated_agent_evals\\.py", "registered producer", "only to selected eval collection/repair", "not by itself", "block Issue recording"]
 
 [[evals.checklist]]
 id = "AGENT-EVAL-ACCUMULATION-DOC-2"
