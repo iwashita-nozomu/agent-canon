@@ -183,8 +183,9 @@ class HostLease:
         _write_new(self.marker, json.dumps(record, sort_keys=True) + "\n")
 
     def release_proven_quiescent(self) -> None:
-        self.marker.unlink()
-        _sync_directory(self.root)
+        if self.marker.exists() or self.marker.is_symlink():
+            self.marker.unlink()
+            _sync_directory(self.root)
 
     def __exit__(self, *_: object) -> None:
         if self.fd is not None:
@@ -216,6 +217,8 @@ def read_result(path: Path) -> dict[str, Any]:
     try:
         first = terminal = None
         end_count = 0
+        stop_seen = False
+        seen_once: set[str] = set()
         # Bound memory by one event, not the length of a long-lived run log.
         with path.open(encoding="utf-8") as handle:
             for line in handle:
@@ -224,21 +227,46 @@ def read_result(path: Path) -> dict[str, Any]:
                 row = json.loads(line)
                 if not isinstance(row, dict):
                     raise ValueError("invalid event")
-                if first is None:
+                event = row.get("event")
+                if not isinstance(event, str) or event not in {
+                    "start", "admission", "container_created", "admitted",
+                    "sample", "stop", "end",
+                }:
+                    raise ValueError("invalid event type")
+                if event == "start":
+                    if first is not None:
+                        raise ValueError("duplicate start event")
                     first = row
+                elif first is None:
+                    raise ValueError("event before start")
+                if event in {"admission", "container_created", "admitted", "stop", "end"}:
+                    if event in seen_once:
+                        raise ValueError("duplicate lifecycle event")
+                    seen_once.add(event)
+                if event == "stop":
+                    stop_seen = True
+                    if (not isinstance(row.get("reason"), str)
+                            or not row["reason"]
+                            or type(row.get("quiescent")) is not bool
+                            or "exit_code" not in row
+                            or (row["exit_code"] is not None
+                                and type(row["exit_code"]) is not int)):
+                        raise ValueError("invalid stop event")
                 terminal = row
-                end_count += row.get("event") == "end"
+                end_count += event == "end"
         if (first is None or terminal is None or first.get("event") != "start"
                 or terminal.get("event") != "end" or end_count != 1):
             raise ValueError("no complete terminal record")
-        if (not isinstance(first.get("run_id"), str)
+        if (not isinstance(first.get("run_id"), str) or not first["run_id"]
                 or terminal.get("run_id") != first["run_id"]
                 or terminal.get("status") not in {"ok", "failed"}
                 or not isinstance(terminal.get("reason"), str)
+                or not terminal["reason"]
                 or "exit_code" not in terminal
                 or (terminal["exit_code"] is not None and type(terminal["exit_code"]) is not int)
                 or (terminal["status"] == "ok" and
-                    (terminal["exit_code"] != 0 or terminal["reason"] != "completed"))):
+                    (stop_seen or terminal["exit_code"] != 0
+                     or terminal["reason"] != "completed"))):
             raise ValueError("invalid terminal record")
         return terminal
     except (OSError, ValueError, AttributeError, TypeError):
@@ -283,6 +311,13 @@ def _finite_limit(value: str, code: str) -> int:
     return int(value)
 
 
+def _cgroup_counter(path: Path, code: str) -> int:
+    value = path.read_text().strip()
+    if not value.isdecimal():
+        raise AdmissionError(code)
+    return int(value)
+
+
 def effective_limits(paths: HostPaths, pid: int, request: BuildRequest) -> dict[str, Any]:
     if type(pid) is not int or pid <= 0:
         raise AdmissionError("container_pid_unreadable")
@@ -308,24 +343,57 @@ def effective_limits(paths: HostPaths, pid: int, request: BuildRequest) -> dict[
     if memory > request.memory_bytes or pids > request.pids_limit or cpu > request.cpu_count or swap != "0":
         raise AdmissionError("effective_limits_exceed_plan")
     required = request.overhead_bytes + request.jobs * max(request.compiler_peak_bytes, request.linker_peak_bytes)
-    # Ancestors may only tighten limits, but a tighter memory ancestor can make
-    # the declared build budget infeasible. Never confuse the leaf request with
-    # the amount available to this subtree.
+    # Ancestors may only tighten limits, but their current usage also consumes
+    # the capacity available to this container. Check the residual at every
+    # decision/GO observation instead of treating an ancestor max as free.
     ancestor = group.parent
     effective_memory = memory
+    ancestor_memory_remaining: int | None = None
+    ancestor_pids_remaining: int | None = None
     while ancestor != paths.cgroup:
-        limit = (ancestor / "memory.max").read_text().strip()
-        if limit != "max":
-            effective_memory = min(effective_memory, _finite_limit(limit, "invalid_ancestor_memory_limit"))
+        memory_limit_text = (ancestor / "memory.max").read_text().strip()
+        if memory_limit_text != "max":
+            memory_limit = _finite_limit(memory_limit_text, "invalid_ancestor_memory_limit")
+            if required > memory_limit:
+                raise AdmissionError("effective_memory_below_build_budget")
+            memory_current = _cgroup_counter(
+                ancestor / "memory.current", "ancestor_memory_usage_unreadable"
+            )
+            if memory_current > memory_limit:
+                raise AdmissionError("ancestor_memory_usage_exceeds_limit")
+            remaining = memory_limit - memory_current
+            effective_memory = min(effective_memory, memory_limit)
+            ancestor_memory_remaining = (
+                remaining if ancestor_memory_remaining is None
+                else min(ancestor_memory_remaining, remaining)
+            )
+            if remaining < required:
+                raise AdmissionError("ancestor_memory_residual_insufficient")
+        pids_limit_text = (ancestor / "pids.max").read_text().strip()
+        if pids_limit_text != "max":
+            pids_limit = _finite_limit(pids_limit_text, "invalid_ancestor_pids_limit")
+            pids_current = _cgroup_counter(
+                ancestor / "pids.current", "ancestor_pids_usage_unreadable"
+            )
+            if pids_current > pids_limit:
+                raise AdmissionError("ancestor_pids_usage_exceeds_limit")
+            remaining = pids_limit - pids_current
+            ancestor_pids_remaining = (
+                remaining if ancestor_pids_remaining is None
+                else min(ancestor_pids_remaining, remaining)
+            )
+            if remaining < request.jobs:
+                raise AdmissionError("ancestor_pids_residual_insufficient")
         ancestor = ancestor.parent
     if required > effective_memory:
         raise AdmissionError("effective_memory_below_build_budget")
-    current = {}
-    for key, filename in (("memory_current", "memory.current"), ("swap_current", "memory.swap.current")):
-        value = (group / filename).read_text().strip()
-        if not value.isdecimal():
-            raise AdmissionError("cgroup_usage_unreadable")
-        current[key] = int(value)
+    memory_current = _cgroup_counter(group / "memory.current", "cgroup_usage_unreadable")
+    if memory_current > memory or memory - memory_current < required:
+        raise AdmissionError("cgroup_memory_residual_insufficient")
+    pids_current = _cgroup_counter(group / "pids.current", "cgroup_usage_unreadable")
+    if pids_current > pids or pids - pids_current < request.jobs:
+        raise AdmissionError("cgroup_pids_residual_insufficient")
+    swap_current = _cgroup_counter(group / "memory.swap.current", "cgroup_usage_unreadable")
     # PID plus start time is an identity; a recycled integer PID is not.
     process_stat = (paths.proc / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()
     start_time = _finite_limit(process_stat[19], "container_start_identity_unreadable")
@@ -333,7 +401,12 @@ def effective_limits(paths: HostPaths, pid: int, request: BuildRequest) -> dict[
     return {"cgroup": str(group), "device": identity.st_dev, "inode": identity.st_ino,
             "memory_max": memory, "effective_memory_max": effective_memory,
             "cpu_count": cpu, "pids_max": pids, "swap_max": 0,
-            "pid": pid, "process_start_time": start_time, **current}
+            "pid": pid, "process_start_time": start_time,
+            "memory_current": memory_current, "memory_remaining": memory - memory_current,
+            "pids_current": pids_current, "pids_remaining": pids - pids_current,
+            "ancestor_memory_remaining": ancestor_memory_remaining,
+            "ancestor_pids_remaining": ancestor_pids_remaining,
+            "swap_current": swap_current}
 
 
 class Docker:
@@ -445,9 +518,6 @@ def execute(request: BuildRequest, paths: HostPaths) -> dict[str, Any]:
     try:
         journal.emit("start", run_id=run_id, request=asdict(request), argv=argv)
         with HostLease(paths.locks) as lease:
-            lease.reserve({"run_id": run_id, "events": str(journal.path),
-                           "docker_host": request.docker_host, "daemon_id": request.daemon_id,
-                           "container_name": f"agent-canon-host-build-{run_id}"})
             cid: str | None = None
             container_attempted = False
             reason = "completed"
@@ -461,6 +531,12 @@ def execute(request: BuildRequest, paths: HostPaths) -> dict[str, Any]:
                 if host["memory_bytes"]["MemAvailable"] < request.memory_bytes + request.host_reserve_bytes:
                     raise AdmissionError("host_memory_budget_unavailable")
                 journal.emit("admission", host=host, reserved_memory=request.memory_bytes)
+                # The admission decision is durable before the lease marker
+                # claims work. A failed decision journal must not leave a
+                # reservation that has no persisted basis.
+                lease.reserve({"run_id": run_id, "events": str(journal.path),
+                               "docker_host": request.docker_host, "daemon_id": request.daemon_id,
+                               "container_name": f"agent-canon-host-build-{run_id}"})
                 container_attempted = True
                 quiescent = False
                 created = docker.call(*container_argv(request, run_id, directory, argv))
@@ -505,10 +581,12 @@ def execute(request: BuildRequest, paths: HostPaths) -> dict[str, Any]:
                     if any(limits[key] != value for key, value in frozen.items()):
                         raise AdmissionError("effective_limits_changed")
                     host = host_observation(paths)
+                    if host["memory_bytes"]["MemAvailable"] < request.host_reserve_bytes:
+                        # Handle a stop-required observation before any
+                        # potentially blocking journal or output fsync.
+                        raise AdmissionError("host_reserve_exhausted")
                     journal.emit("sample", pid=state["Pid"], effective_limits=limits, host=host)
                     _sync_outputs(directory)
-                    if host["memory_bytes"]["MemAvailable"] < request.host_reserve_bytes:
-                        raise AdmissionError("host_reserve_exhausted")
                     time.sleep(0.2)
             except (Exception, KeyboardInterrupt) as error:
                 reason = error.code if isinstance(error, AdmissionError) else type(error).__name__
@@ -529,7 +607,19 @@ def execute(request: BuildRequest, paths: HostPaths) -> dict[str, Any]:
                         exit_code = state.get("ExitCode") if quiescent else None
                     except Exception:
                         quiescent = False
-                journal.emit("stop", reason=reason, container_id=cid, quiescent=quiescent, exit_code=exit_code)
+                try:
+                    journal.emit("stop", reason=reason, container_id=cid, quiescent=quiescent, exit_code=exit_code)
+                except OSError:
+                    # The child was resolved above. If the cgroup proves
+                    # empty, a transient stop-log fsync failure must not turn
+                    # a finished lease into a permanent host block.
+                    if quiescent and frozen is not None:
+                        try:
+                            if _cgroup_quiescent(paths, frozen):
+                                lease.release_proven_quiescent()
+                        except (AdmissionError, OSError):
+                            pass
+                    raise
             if quiescent and frozen is not None:
                 quiescent = _cgroup_quiescent(paths, frozen)
             if not quiescent:
@@ -538,7 +628,13 @@ def execute(request: BuildRequest, paths: HostPaths) -> dict[str, Any]:
                 # No terminal event and no lease removal: recovery must prove
                 # exact-container quiescence, not infer it from observer death.
                 raise AdmissionError("container_quiescence_unverified")
-            _sync_outputs(directory)
+            try:
+                _sync_outputs(directory)
+            except OSError:
+                # Quiescence has already been proven; preserve interrupted
+                # readback semantics while allowing the next safe admission.
+                lease.release_proven_quiescent()
+                raise
             if cid is not None:
                 docker.call("rm", cid)
             if reason == "completed" and state.get("OOMKilled") is True:
@@ -547,7 +643,13 @@ def execute(request: BuildRequest, paths: HostPaths) -> dict[str, Any]:
             result = {"status": status, "reason": reason, "exit_code": exit_code,
                       "container_oom_reported": state.get("OOMKilled"), "run_id": run_id,
                       "events": str(journal.path)}
-            journal.emit("end", **result)
+            try:
+                journal.emit("end", **result)
+            except OSError:
+                # A terminal record whose fsync failed is not a successful
+                # result, but proven quiescence makes the lease releasable.
+                lease.release_proven_quiescent()
+                raise
             lease.release_proven_quiescent()
             return result
     except AdmissionError as error:

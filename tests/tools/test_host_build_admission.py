@@ -68,12 +68,16 @@ class Fixture(unittest.TestCase):
         write(self.paths.proc / "42/cgroup", "0::/delegated/build\n")
         # Fields following comm start at stat field 3; starttime is field 22.
         write(self.paths.proc / "42/stat", "42 (fixture timeout) " + " ".join(["S"] + ["0"]*18 + ["1234"]) + "\n")
-        write(self.group.parent / "memory.max", "max\n")
+        for name, content in {
+            "memory.max": "max\n", "pids.max": "max\n",
+            "memory.current": "0\n", "pids.current": "0\n",
+        }.items():
+            write(self.group.parent / name, content)
         for name, content in {
             "cgroup.controllers": "cpu memory pids\n", "cgroup.procs": "42\n", "cgroup.events": "populated 1\n",
             "memory.max": str(self.request.memory_bytes), "memory.swap.max": "0",
             "cpu.max": "200000 100000", "pids.max": "64", "memory.current": "1024",
-            "memory.swap.current": "0"}.items():
+            "memory.swap.current": "0", "pids.current": "1"}.items():
             write(self.group / name, content)
 
     def events(self) -> list[Path]:
@@ -137,6 +141,30 @@ class ObservationTests(Fixture):
     def test_tighter_ancestor_can_reject_budget(self) -> None:
         (self.group.parent / "memory.max").write_text(str(128*MIB))
         with self.assertRaisesRegex(admission.AdmissionError, "below_build_budget"):
+            admission.effective_limits(self.paths, 42, self.request)
+
+    def test_ancestor_residual_memory_and_pids_are_admitted_at_current_usage(self) -> None:
+        (self.group.parent / "memory.max").write_text(str(512*MIB))
+        (self.group.parent / "memory.current").write_text(str(512*MIB - 224*MIB + 1))
+        (self.group.parent / "pids.max").write_text("8")
+        (self.group.parent / "pids.current").write_text("7")
+        with self.assertRaisesRegex(admission.AdmissionError, "ancestor_memory_residual_insufficient"):
+            admission.effective_limits(self.paths, 42, self.request)
+        (self.group.parent / "memory.current").write_text(str(128*MIB))
+        with self.assertRaisesRegex(admission.AdmissionError, "ancestor_pids_residual_insufficient"):
+            admission.effective_limits(self.paths, 42, self.request)
+        (self.group.parent / "pids.current").write_text("1")
+        result = admission.effective_limits(self.paths, 42, self.request)
+        self.assertEqual(result["ancestor_memory_remaining"], 384*MIB)
+        self.assertEqual(result["ancestor_pids_remaining"], 7)
+
+    def test_leaf_residual_usage_is_checked(self) -> None:
+        (self.group / "memory.current").write_text(str(self.request.memory_bytes - 1))
+        with self.assertRaisesRegex(admission.AdmissionError, "cgroup_memory_residual_insufficient"):
+            admission.effective_limits(self.paths, 42, self.request)
+        (self.group / "memory.current").write_text("1024")
+        (self.group / "pids.current").write_text("63")
+        with self.assertRaisesRegex(admission.AdmissionError, "cgroup_pids_residual_insufficient"):
             admission.effective_limits(self.paths, 42, self.request)
 
     def test_unknown_host_memory_pressure_and_mount_refused(self) -> None:
@@ -376,6 +404,25 @@ class LifecycleTests(Fixture):
         self.assertEqual(result["reason"], "host_reserve_exhausted")
         self.assertIn(("kill", "--signal=KILL", CID), fake.calls)
 
+    def test_reserve_exhaustion_is_decided_before_blocking_sample_log(self) -> None:
+        observation = admission.host_observation(self.paths)
+        low = {**observation, "memory_bytes": {**observation["memory_bytes"], "MemAvailable": 1}}
+        emit = admission.Journal.emit
+        events: list[str] = []
+
+        def observe_emit(journal, event, **fields):
+            events.append(event)
+            if event == "sample":
+                raise OSError("synthetic blocking sample fsync")
+            return emit(journal, event, **fields)
+
+        with patch.object(admission, "host_observation", side_effect=[observation, observation, low]), \
+                patch.object(admission.Journal, "emit", observe_emit):
+            fake, result = self.run_fixture("forever")
+        self.assertEqual(result["reason"], "host_reserve_exhausted")
+        self.assertNotIn("sample", events)
+        self.assertIn(("kill", "--signal=KILL", CID), fake.calls)
+
     def test_post_lock_host_change_never_opens_gate(self) -> None:
         observation = admission.host_observation(self.paths)
         low = {**observation, "memory_bytes": {**observation["memory_bytes"], "MemAvailable": 1}}
@@ -428,7 +475,7 @@ class LifecycleTests(Fixture):
             with admission.HostLease(self.paths.locks):
                 pass
 
-    def test_log_failure_is_not_success_and_retains_unresolved_evidence(self) -> None:
+    def test_log_failure_is_not_success_but_releases_after_quiescence(self) -> None:
         emit = admission.Journal.emit
         broken = False
         def fail_after_launch(journal, event, **fields):
@@ -444,7 +491,7 @@ class LifecycleTests(Fixture):
                 admission.execute(self.request, self.paths)
         self.assertIn(("kill", "--signal=KILL", CID), fake.calls)
         self.assertEqual(admission.read_result(self.events()[0])["status"], "interrupted")
-        self.assertTrue((self.paths.locks / "host-build-active.json").exists())
+        self.assertFalse((self.paths.locks / "host-build-active.json").exists())
 
     def test_root_exit_does_not_release_still_populated_cgroup(self) -> None:
         fake = FakeDocker(self, "stale_children")
@@ -467,6 +514,25 @@ class LifecycleTests(Fixture):
         self.assertEqual(result["status"], "failed")
         self.assertIs(result["container_oom_reported"], False)
 
+    def test_quiescent_output_fsync_failure_releases_marker_but_is_interrupted(self) -> None:
+        fake = FakeDocker(self, exit_code=0)
+        original = admission._sync_outputs
+        calls = 0
+
+        def fail_once(directory: Path) -> None:
+            nonlocal calls
+            calls += 1
+            if calls > 1:
+                raise OSError("synthetic output fsync failure")
+            return original(directory)
+
+        with patch.object(admission, "Docker", return_value=fake), \
+                patch.object(admission, "_sync_outputs", fail_once):
+            with self.assertRaises(OSError):
+                admission.execute(self.request, self.paths)
+        self.assertFalse((self.paths.locks / "host-build-active.json").exists())
+        self.assertEqual(admission.read_result(self.events()[0])["status"], "interrupted")
+
 
 class ResultTests(Fixture):
     def test_missing_torn_and_contradictory_end_are_interrupted(self) -> None:
@@ -479,6 +545,12 @@ class ResultTests(Fixture):
         for rows in examples:
             path.write_text("".join(json.dumps(row)+"\n" for row in rows))
             self.assertEqual(admission.read_result(path), {"status": "interrupted", "exit_code": None, "oom": "unknown"})
+        stop = {"event": "stop", "reason": "monitor_stalled", "quiescent": True, "exit_code": 137}
+        path.write_text("\n".join(json.dumps(row) for row in (start, stop, end)) + "\n")
+        self.assertEqual(admission.read_result(path), {"status": "interrupted", "exit_code": None, "oom": "unknown"})
+        duplicate_start = "\n".join(json.dumps(row) for row in (start, start, end)) + "\n"
+        path.write_text(duplicate_start)
+        self.assertEqual(admission.read_result(path), {"status": "interrupted", "exit_code": None, "oom": "unknown"})
         path.write_text(json.dumps(start)+"\n"+json.dumps(end))
         self.assertEqual(admission.read_result(path)["status"], "interrupted")
         path.write_text(path.read_text()+"\n")
