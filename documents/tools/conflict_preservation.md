@@ -58,3 +58,9 @@ side of a modify/delete conflict. A stage appearing or disappearing on only
 one side, or an explicitly malformed stage entry, is still rejected. Broad
 reset, clean, reclone, multi-source replacement, and unbounded pathspecs are
 held for explicit finalization.
+
+An empty `unaffected_content` list permits an approved deletion only when the
+resolved index has no entry for that path. If a historical gitlink remains as a
+resolved mode `160000` entry, the plan must explicitly carry `expected_gitlink`
+and readback checks its mode/OID. This identity check does not require the
+foreign gitlink commit to exist in the superproject object database.
