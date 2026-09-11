@@ -4,7 +4,7 @@
 @dependency-start
 contract workflow
 responsibility Connects bounded coverage traversal, incremental repair, evidence invalidation, and dependency-complete commit boundaries without a second workflow engine.
-upstream design ../skills/code-cleanup.md owns the shared asset universe and streaming semantic cleanup
+downstream design ../skills/code-cleanup.md consumes the shared asset universe and streaming semantic cleanup
 upstream design ../skills/dependency-analysis.md owns dependency discovery and the Change Impact Packet
 upstream design ../skills/refactor-loop.md owns behavior-preserving repair batches and selected validation
 upstream design ../../documents/operations/BRANCH_SCOPE.md owns dependency-complete commit planning and exact-tree validation
