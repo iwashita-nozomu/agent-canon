@@ -59,6 +59,18 @@ credentials, and runtime semantics with consumer owners. For a
 source-specific AgentCanon root, keep those source responsibilities with the
 source checkout's owners.
 
+When numerical results disagree, first investigate defects in the algorithm
+and its implementation against the governing equations and specification,
+including assumptions, units, indexing, update order, and boundary conditions.
+Correct identified algorithmic defects before considering numerical adjustments.
+Do not hide unexplained discrepancies with correction factors, offsets,
+clipping, arbitrary epsilons, or relaxed test tolerances. Numerical remedies
+are justified only after algorithmic correctness has been checked and the
+remaining discrepancy is attributable to rounding, conditioning, or
+approximation, with an error analysis and validation against an independent
+reference or invariant. Keep the investigation and validation with the
+applicable repository's algorithm and numerical owners.
+
 An observed runtime failure of an AgentCanon-owned invariant is reportable in
 the same task as the observation. The first record does not wait for a repeated
 occurrence, dashboard evidence, repair completion, or confirmed cause; preserve
@@ -85,6 +97,20 @@ only after the trace shows that no edge applies, never from an unperformed
 inspection. Re-read this identity and dependency state after a directory,
 branch, dependency checkout, or pin change; unchanged ordinary commands do not
 require duplicate readback.
+
+Before a branch or annex operation, read the applicable repository's branch and
+storage owners. Keep Git branch metadata and any annex payload as separate
+concerns, and let those owners authorize data operations. This common base
+defines the read edge only; it does not name a source-repository path or
+prescribe an annex command, so a generated consumer root remains self-contained.
+
+Before forming, changing, or delegating a team, read the applicable repository
+team owner and the selected orchestration skill, then follow the selected typed
+route's definitions for logical role, model/profile, skills, authority, and
+handoff. Candidate role lists are not activation instructions, and logical-role
+coverage is not a physical-instance count. Keep consumer-owned team guidance
+self-contained; a source-specific checkout may name its canonical AgentCanon
+team owners, but a consumer root must not import or copy those source paths.
 
 ## Runtime Owner Map
 
@@ -129,6 +155,21 @@ sufficient operation. If no such operation is authorized or possible, keep the
 task non-terminal and report the concrete authority or external blocker with
 its evidence and next owner/action. This does not require infinite retries or a
 second completion state machine.
+
+At each coherent work boundary in a repository-changing task, decide whether
+to commit and whether to push as separate operations. Commit a coherent,
+reviewed unit after the selected validation when the request and ownership
+support it; if the work is incomplete or mixes user-owned changes,
+preserve it and state the concrete reason and next condition in the existing
+work log or final status. Decide push independently from its sharing,
+handoff, remote-backup, or PR purpose, the existing authority, and the
+designated destination. Read-only, local-only, no-push, no-change, and genuine
+external-failure cases remain valid. Do not force-push, mutate `main`, overwrite
+unknown user files, create a new remote, or merge across scope. A committed but
+unpushed child result is an intermediate handoff, not final publication; the
+next authorized owner must launch the selected push operation when its purpose
+and conditions are met. This is decision guidance, not an unconditional
+commit/push gate or a new receipt requirement.
 
 ## Validation Routing
 

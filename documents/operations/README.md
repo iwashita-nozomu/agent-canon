@@ -14,6 +14,7 @@ upstream design ../README.md documents 索引と正本境界。
 ## 構成
 
 - [BRANCH_SCOPE.md](BRANCH_SCOPE.md): branch と Git の作業境界。
+- [annex.md](annex.md): Git の pointer/metadata と git-annex payload の操作境界。
 - [orphan-lifecycle.md](orphan-lifecycle.md): branch・PR・worktree の意味差分 inventory、有限分類、cleanup admission の正本。
 - [FILE_CHECKLIST_OPERATIONS.md](FILE_CHECKLIST_OPERATIONS.md): 作業別 checklist。
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md): 障害対応の入口。
