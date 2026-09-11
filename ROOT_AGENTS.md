@@ -110,6 +110,13 @@ Preserve mismatched or unknown checkouts and do not treat their unverified
 input as the declared pin. This does not introduce an AgentCanon dependency
 into a source-free consumer.
 
+When a task-owned temporary clone is no longer needed, use the applicable
+repository cleanup owner immediately rather than waiting for task or PR closeout.
+First establish that no active work depends on it and no unpreserved local state
+would be lost; unknown or user-owned clones remain untouched. Record removal
+or the specific retention reason in the existing task result. This is checkout
+cleanup, not authorization to delete remote branches or a shared workspace.
+
 Before a branch or annex operation, read the applicable repository's branch and
 storage owners. Keep Git branch metadata and any annex payload as separate
 concerns, and let those owners authorize data operations. This common base

@@ -37,7 +37,7 @@ repository-topic checkout の操作を選び、
 | `prepare` | [事前条件と Checkout mode](../../documents/rule/repository-topic-clone.md#事前条件)、[作成・再利用と writer packet](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
 | `merge-main` | [事前条件](../../documents/rule/repository-topic-clone.md#事前条件)、[merge と authority](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
 | `finalize-merge` / `resume-merge` | [競合の再開条件](../../documents/rule/repository-topic-clone.md#競合の再開) と [再開コマンド](../../documents/tools/repository_topic_clone.md#競合の再開) |
-| `cleanup` | [復元可能性・marker・任意 evidence・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
+| `cleanup`（不要になった時点） | [起動・保持判断と復元可能性・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
 
 操作結果を read back し、失敗時は
 [例外/フォールバック](../../documents/rule/repository-topic-clone.md#例外フォールバック)
