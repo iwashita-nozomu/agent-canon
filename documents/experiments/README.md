@@ -15,6 +15,8 @@ ExperimentRunner lifecycle、結果と可視化の保持を扱います。実験
 
 ## 構成
 
+- [host-build-admission.md](host-build-admission.md): GPU と独立した compiler/linker の host RAM・並列度・実効制限・中断ログの契約。
+
 - [experiment-registry.md](experiment-registry.md): 実験登録の契約。
 - [../design/experiment-topic-template.md](../design/experiment-topic-template.md): topic scaffold、module owner、raw/summary result layout の設計正本。
 - [experiment-runner-ff97-lifecycle.md](experiment-runner-ff97-lifecycle.md)、[../design/experiment_runner.md](../design/experiment_runner.md):

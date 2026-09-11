@@ -8,6 +8,7 @@ upstream design ./catalog.yaml public skill and capability projection
 upstream design ./skill-dependencies.yaml prerequisite and reviewer order
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json C++ validation profile owner
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse C++ projection
+upstream design ../../documents/experiments/host-build-admission.md compiler/linker host safety admission
 @dependency-end
 -->
 
@@ -30,6 +31,21 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
   SIMD / vectorization、LTO / IPO / PGO、並列性能への影響または改善を主張する
 - `bootstrap_agent_run.py` の changed path 判定で `cpp_reviewer` が自動で足された
 
+## Host build admission
+
+通常の C/C++、Clang/Enzyme、linker 実行にも、GPU の有無と独立に
+[host build admission](../../documents/experiments/host-build-admission.md) を先に適用します。
+project-owned image・build argv・必要な検証対象は維持し、同 owner の guarded request
+から実行します。`--parallel` の省略値、`-j1`、requested Docker flags、GPU admission
+成功だけを host RAM・CPU・PIDs の hard limit 成立と扱いません。別 session も同じ
+host lease を使い、制限・予算・指定環境を確認できなければ build を開始しません。
+
+指定環境の起動失敗、対話認証要求、読取り不能を、別 daemon の起動、cgroup 無効化、
+無制限 host 実行で回避しません。未対応の configure/static-analysis 入口が compiler を
+起動する場合も、未検証の経路を裸で実行せず同 owner に blocker を残します。
+利用者の再実行禁止は縮小 build・別 target・小規模 GPU にも適用し、既存 evidence と
+fixture-only 検証へ限定します。禁止を解く根拠に過去の別許可を使いません。
+
 ## Required Checks
 
 - project-native configure / build / test evidence
@@ -41,7 +57,7 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
   compiler flags, or provider-specific diagnostics.
 - `ctest` があるならその結果
 - CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
-  `cmake --build "$ROOT/build/cpp/<profile>" --parallel`、
+  `cmake --build "$ROOT/build/cpp/<profile>"` を上記 admission の build argv として渡した結果、
   `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure` の結果
 - install contract がある場合は `cmake --install "$ROOT/build/cpp/<profile>"` の結果
 - 性能変更が activation 条件を満たす場合は、repository-owned benchmark / profiler / workload
