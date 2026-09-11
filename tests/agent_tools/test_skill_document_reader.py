@@ -159,5 +159,125 @@ class SkillDocumentReaderTest(unittest.TestCase):
             self.assertIn("SKILL_DOCUMENT_READER_ERROR=heading_not_found", missing_result.stderr)
 
 
+    def test_admission_projection_keeps_metadata_without_repeating_text(self) -> None:
+        """Only the serialized body is removed; all positions and EOF flags survive."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            compact = self.write_document(root, "# Compact\nshort\n")
+            owner = root / "owner.md"
+            sections = ("First", "Second", "Last")
+            owner.write_text(
+                "".join(f"## {heading}\n" + "本文を再送しない\n" * 400 for heading in sections),
+                encoding="utf-8",
+            )
+            result = admit_implementation_read(
+                compact, tuple((owner, heading) for heading in sections)
+            )
+            expected = []
+            for chunk in result.owner_sections:
+                entry = chunk.as_json()
+                self.assertTrue(entry.pop("text"))
+                expected.append(entry)
+            projection = result.as_json()
+            self.assertEqual(projection["owner_sections"], expected)
+            self.assertEqual(projection["implementation_read"], "ready")
+            self.assertTrue(projection["compact_file_eof"])
+            self.assertEqual([entry["file_eof"] for entry in expected], [False, False, True])
+
+    def test_cli_admit_omits_text_in_json_and_text_formats(self) -> None:
+        """Both output formats share the metadata projection, including empty inputs."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            owner = root / "owner.md"
+            owner.write_text("## Operation\nBODY_MUST_NOT_BE_REPEATED\n", encoding="utf-8")
+            for compact_text, owners, status in (
+                ("# Compact\n", ["--owner", f"{owner}#Operation"], "ready"),
+                ("", ["--owner", f"{owner}#Operation"], "locked"),
+                ("# Compact\n", [], "ready"),
+            ):
+                compact = self.write_document(root, compact_text)
+                outputs = []
+                for output_format in ("json", "text"):
+                    with self.subTest(status=status, owners=bool(owners), format=output_format):
+                        result = subprocess.run(
+                            [sys.executable, str(READER), "admit", "--compact", str(compact),
+                             *owners, "--format", output_format],
+                            cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                        )
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        if output_format == "json":
+                            payload = json.loads(result.stdout)
+                        else:
+                            payload = {
+                                key: json.loads(value)
+                                for key, value in (line.split("=", 1) for line in result.stdout.splitlines())
+                            }
+                        outputs.append(payload)
+                        self.assertEqual(payload["implementation_read"], status)
+                        self.assertNotIn("BODY_MUST_NOT_BE_REPEATED", result.stdout)
+                        for section in payload["owner_sections"]:
+                            self.assertNotIn("text", section)
+                            self.assertTrue(section["section_eof"])
+                self.assertEqual(outputs[0], outputs[1])
+
+    def test_cli_chunk_preserves_body_in_both_formats(self) -> None:
+        """The content route still returns every UTF-8 byte with resumable offsets."""
+        with tempfile.TemporaryDirectory() as temporary:
+            text = "## Operation\n日本語の本文\nline=value\n"
+            path = self.write_document(Path(temporary), text)
+            for output_format in ("json", "text"):
+                offset = 0
+                parts = []
+                while True:
+                    result = subprocess.run(
+                        [sys.executable, str(READER), "chunk", "--path", str(path),
+                         "--heading", "Operation", "--offset", str(offset),
+                         "--max-bytes", "17", "--format", output_format],
+                        cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    payload = json.loads(result.stdout) if output_format == "json" else {
+                        key: json.loads(value)
+                        for key, value in (line.split("=", 1) for line in result.stdout.splitlines())
+                    }
+                    self.assertEqual(payload["byte_start"], offset)
+                    self.assertGreater(payload["next_offset"], offset)
+                    self.assertLessEqual(len(payload["text"].encode("utf-8")), 17)
+                    parts.append(payload["text"])
+                    offset = payload["next_offset"]
+                    if payload["section_eof"]:
+                        self.assertTrue(payload["file_eof"])
+                        break
+                self.assertEqual("".join(parts), text)
+
+    def test_cli_admission_failures_do_not_emit_partial_success(self) -> None:
+        """Metadata-only output must not suppress input errors or manufacture readiness."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            compact = self.write_document(root, "# Compact\n")
+            owner = root / "owner.md"
+            for body, heading, limit, error in (
+                (b"## Operation\nbody\n", "Missing", "4096", "heading_not_found"),
+                (b"## Operation\n## Operation\n", "Operation", "4096", "heading_ambiguous"),
+                (b"## Operation\n\xff", "Operation", "4096", "invalid_utf8"),
+                ("## Operation\n日本語\n".encode("utf-8"), "Operation", "1", "max_bytes_splits_utf8"),
+                (b"## Operation\n", "Operation", "0", "invalid_max_bytes"),
+                (None, "Operation", "4096", "read_failed"),
+            ):
+                with self.subTest(error=error):
+                    if body is None:
+                        owner.unlink()
+                    else:
+                        owner.write_bytes(body)
+                    result = subprocess.run(
+                        [sys.executable, str(READER), "admit", "--compact", str(compact),
+                         "--owner", f"{owner}#{heading}", "--max-bytes", limit],
+                        cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                    )
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn(f"SKILL_DOCUMENT_READER_ERROR={error}", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

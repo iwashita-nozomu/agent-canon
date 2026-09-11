@@ -54,6 +54,15 @@ Each tool that writes requires an external runtime/output root or an explicit
 target mutation capability. Read-only tools must not create a source-local
 fallback when that capability is absent.
 
+## Skill reader output
+
+`skill-document-reader` の本文取得は `chunk`、見出し一覧は `index` を使います。
+必要な状態確認に選択する `admit` は、JSON/textとも参照節の位置・EOFとready/lockedだけを返し、
+`owner_sections[].text` を再出力しません。本文が必要なcallerは `chunk` の `next_offset` を辿って取得します。
+状態の位置情報は各節の最終chunkのもので、未読部分を含む全文ではありません。
+`admit` はファイル側の読取状態であり、モデルが内容を読んだ証拠でも、新たな必須の読了gateでもありません。
+本文・権限・失敗の意味を状態確認や短い要約で代用せず、既存の読取・実行境界を維持します。
+
 ## Validation
 
 Validate the selected owner rather than every tool family:
