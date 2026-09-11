@@ -93,6 +93,7 @@ GO file を待つだけです。GO の前に GNU timeout の存在、host procfs
 停止対象はこの run の ID/label に一致する container だけです。全体 `pkill` は行いません。
 PID namespace の init 終了に加え、観測済み cgroup の `populated=0` または kernel による
 cgroup 削除を確認してから lease を解放します。root exit だけで残存子孫を無視しません。
+実行中、quiescence が未証明、または cleanup に失敗した場合は marker を保持します。
 
 これは正常に動作する Linux kernel/daemon の制約です。OS/GPU driver 障害、停止不能な
 kernel I/O、host 全体の停止をユーザー空間の timeout で封じ込めたとは主張しません。
@@ -116,10 +117,14 @@ UTC 時刻、停止理由、raw exit code を逐次 flush/fsync します。stdo
 WSL 再起動を OOM の根拠にしません。Docker の `OOMKilled` はその container の報告として
 別 field に保持し、事故の最終原因には外挿しません。
 
-interrupted run は自動再試行・自動 lease 解除をしません。引継ぎ先は marker の exact
-socket/daemon ID/container name、events の container ID/label/cgroup identity を使って
-停止済みかを read-only に確認し、証拠を既存 Issue に残します。marker の存在だけを理由に
-削除して再実行することは不可です。readback 不能なら未解決のまま環境 owner へ返します。
+interrupted run は自動再試行しません。active、quiescence 未証明、または cleanup 失敗の
+marker は自動 lease 解除せず、引継ぎ先が marker の exact socket/daemon ID/container name、
+events の container ID/label/cgroup identity を使って停止済みかを read-only に確認し、証拠を
+既存 Issue に残します。journal/output の fsync 失敗だけで、かつ exact cgroup quiescence が
+証明済みなら marker を解放できますが、結果の `--result` はなお
+`status=interrupted, exit_code=null, oom=unknown` であり、自動再実行の許可にはなりません。
+marker の存在だけを理由に削除して再実行することは不可です。readback 不能なら未解決のまま
+環境 owner へ返します。
 
 ## 検証と非目標
 
