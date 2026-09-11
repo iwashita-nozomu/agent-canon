@@ -161,9 +161,9 @@ in the Codex host runtime.
 - OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - tool、hook、eval、skill、experiment の結果を書き出すときは `result-artifact-writeout` を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
 - tool、checker、hook、static analysis、構造解析で問題を探して report / repair packet を作るときは `tool-finding-report` を使い、raw artifact、structured full artifact、mechanical priority order、任意の impact、prompt feedback decision を分けます。finding の取捨選択は上位 workflow が行います。
-- skill / tool / workflow / hook / eval の蓄積ログを分析するときは `agent-log-analysis` を使い、raw JSONL の広域検索より先に structured summary を生成して読みます。
+- skill / tool / workflow / hook / eval の蓄積ログを分析するときは [agent-log-analysis](agent-log-analysis.md) を使い、既存 structured summary を再利用します。要約不足は対象限定の読取と制限の明示で扱い、分析前の archive 保守・dashboard 修理を要求しません。
 - structured summary、prompt excerpt、run bundle、hook / routing / eval evidence から durable skill issue 候補を作るときは `issue-finding-report` を使い、抽象原因、重複検索、dependency-expanded edit scope、multi-agent partition を先に固定します。
-- accumulated eval family が missing / stale / fail のときは `agent-eval-accumulation` を使い、registered producer、compact checker、log archive sync の順に戻します。eval report を手で生成しません。
+- accumulated eval family の収集・修理を選択した場合だけ [agent-eval-accumulation](agent-eval-accumulation.md) の registered producer / compact checker / archive loop を使います。missing / stale / fail の観測・Issue 記録だけでは再実行せず、eval report を手で生成しません。
 - PR を処理、merge、conflict 解消、ready 化、Issue triage、queue cleanup するときは `pr-processing` を使い、mutation authority、merge order、validation evidence、Issue action table を先に固定します。
 - AgentCanon source、共有 bootstrap runtime、parent 側の development clone 運用を更新するときは `agent-canon-update` を使います。source PR と parent project change は分け、parent に pin、vendor checkout、root projection を追加しません。
 - agent-runtime 更新 branch や AgentCanon pin 更新の分離が必要なときは `agent-update-branch` を使います。

@@ -575,12 +575,12 @@ skill_families:
         - ["durable", "issue"]
         - ["issue", "finding"]
   - id: agent-log-analysis
-    purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
+    purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs from existing structured evidence or bounded snapshot-qualified drilldown without requiring repair.
     canonical_doc: agents/skills/agent-log-analysis.md
     shim: .codex/personal/skills/agent-log-analysis/SKILL.md
     discovery:
       name: agent-log-analysis
-      description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; first convert raw logs into a structured dashboard summary through the AgentCanon source generate-agent-runtime-dashboard tool before reading or interpreting evidence."
+      description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; reuse existing structured summaries and use bounded snapshot-qualified drilldown when needed. Archive maintenance, dashboard repair, and eval reruns are separate selected operations, not analysis prerequisites."
     tool_commands:
       required: []
       conditional:
@@ -678,12 +678,12 @@ skill_families:
         - ["AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING"]
         - ["AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS"]
   - id: agent-eval-accumulation
-    purpose: Repair missing, stale, or failing AgentCanon accumulated eval evidence by running registered producers, validating family accumulation, and archiving append-only reports.
+    purpose: Collect or repair accumulated AgentCanon eval evidence only when selected, using registered producers, family validation, and append-only archive reports.
     canonical_doc: agents/skills/agent-eval-accumulation.md
     shim: .codex/personal/skills/agent-eval-accumulation/SKILL.md
     discovery:
       name: agent-eval-accumulation
-      description: "Use when accumulated AgentCanon eval evidence is missing, stale, or failing; runs registered eval producers, validates eval family accumulation, and stores evidence through the log archive instead of hand-writing reports."
+      description: "Use when AgentCanon eval collection or repair is selected to establish required evidence; runs registered producers, validates family accumulation, and archives reports. Read-only observation of missing, stale, or failing evidence alone does not activate this repair loop."
     tool_commands:
       required: []
       conditional:
