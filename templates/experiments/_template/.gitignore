@@ -1,0 +1,6 @@
+# Topic-local payload boundary. Keep source/config/report and compact result evidence trackable.
+/data/
+/result/*/raw/
+/result/*/work/
+/result/*/tmp/
+/result/*/logs/

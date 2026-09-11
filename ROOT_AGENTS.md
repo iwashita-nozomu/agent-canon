@@ -90,13 +90,25 @@ details belong to the source-specific [AGENTS.md](AGENTS.md) and its canonical o
 Before selecting or editing a repository surface, inspect its actual location,
 canonical owner, callers, and consumers. Establish the actual working
 directory and Git root, branch, and `HEAD`, then trace the selected owner's
-dependency and consumer edges. Inspect the actual `HEAD` of every in-scope
-dependency checkout and its pin when present; a named path is only a candidate
-until that trace confirms the responsible replaceable unit. Record no dependency
-only after the trace shows that no edge applies, never from an unperformed
-inspection. Re-read this identity and dependency state after a directory,
-branch, dependency checkout, or pin change; unchanged ordinary commands do not
-require duplicate readback.
+dependency and consumer edges. At each existing branch/checkout readback
+boundary, include the actual clones under the task's `workspace/<...>`, not
+only the parent checkout or its declared pins. For each in-scope dependency,
+inspect its resolved path, repository identity, branch or detached state,
+actual `HEAD`, dirty state, and declared pin against the source actually read
+by the selected build/import/execution route. A dependency development clone
+and the consumer's pinned checkout are distinct observations; a named path is
+only a candidate until that trace confirms the responsible replaceable unit.
+Record no dependency only after the trace shows that no edge applies, never
+from an unperformed inspection. Re-read the affected identity and dependency
+state after a directory, branch, dependency checkout, PR revision, pin, or
+source-resolution change; unchanged ordinary commands do not require duplicate
+readback. Consumer execution that needs a dependency change uses an exact
+published PR commit through the consumer-owned pin before it runs, rather than
+an unpublished local edit or moving branch. Dependency-local development
+validation remains separate from validation of that pinned consumer input.
+Preserve mismatched or unknown checkouts and do not treat their unverified
+input as the declared pin. This does not introduce an AgentCanon dependency
+into a source-free consumer.
 
 Before a branch or annex operation, read the applicable repository's branch and
 storage owners. Keep Git branch metadata and any annex payload as separate
