@@ -80,8 +80,52 @@ template の直接コピーや別の scaffold fallback を使いません。
 
 `spot run`、途中停止した partial run、都合のよい subset、途中編集で継ぎ足した run は
 formal evidence にしません。失敗・停止は `Stop Reason:` と `Restart Decision:` を記録し、
-必要なら新しい `run_name` で最初から実行します。debug / smoke を残す場合は、その種別を
-artifact と report に明記します。
+再実行は選択したprotocolと下記admissionが許可する場合だけ、新しい `run_name` で
+最初から実行します。debug / smoke を残す場合は、その種別をartifact と report に明記します。
+
+## Long-running GPU and crash-recovery admission
+
+長時間GPU実験の開始・延長、またはhost / WSL / GPUのクラッシュ報告後の再実行では、
+以下を既存の `Execution Plan` と `Restart Decision:` に記録してから実行を判断します。
+この節は診断の実行許可ではありません。静的確認のみ・再実行禁止という依頼は、縮小版、
+CPUテスト、1更新のGPU診断にも優先します。通常のrunへ不要な診断段階を追加しません。
+
+クラッシュ報告後は同じ高負荷設定を再投入せず、まず権限内で既存のWSL / Linux / Windows
+ログ、最後に確認した進捗、実行identityを読むことから始めます。読めないログと未確認の
+原因を残し、権限昇格や事故の再現で穴を埋めません。ログ不在、GPU使用率100%、過去の
+短いrunの成功は、正常終了、OOM、効率、安全性の証拠にしません。
+
+実行を選ぶ場合の必要条件は次のとおりです。一つでも未確認なら開始せず、該当する
+既存の環境・runner・topic ownerへ不足する証拠を返します。
+
+- compileとexperiment runを別段階にし、各段階のCPU並列度、有限のメモリ上限、
+  全体期限、停止条件を固定します。選択済み環境で実際に有効な制限をread backし、
+  引数に指定しただけの上限やGPU割当成功をhard limit成立と取り違えません。
+  rootlessを含め制限が無効・無制限・読取不能なら停止し、別daemonや無制限hostへ
+  迂回しません。予算は見積りとhost余力に基づき、過去の平均時間やRSSを上界と
+  みなしません。制限・監視・停止の実装は既存環境／runner ownerが所有します。
+- 長時間学習をBuildKit `RUN`で実行しません。run開始前にhostの永続保存先とbindを
+  確認し、command / environment identity、時刻、通算更新数、CPU / GPUメモリ、
+  GPU使用率、進捗、stdout / stderr、停止理由、取得できた終了コードを逐次保存します。
+  producerのflushと保存先の永続化を確認し、終了時exportや `capture_output` のみへ
+  依存しません。監視や保存が維持できなければownerの停止条件に従います。
+- GPUの一回の起動へ全反復を詰めず、topic / backend ownerが選んだ短い更新単位を
+  使います。分割の境界でparameter、Adamのmoment、通算step、乱数状態などの
+  更新状態を保持し、optimizerを初期化し直しません。`S_{k+1} = F(S_k)` の状態を
+  次の単位へ渡す責務と、分割前後の数値的な対応の検証は親の数値ownerにあります。
+  1 invocationとは一つの論理runであり、一回のGPU起動を意味しません。topicに
+  第二runnerや独自resume protocolを追加せず、ownerの対応がなければhandoffします。
+- クラッシュ後の診断は、許可された非GPU静的確認、小規模CPUテスト、明示的に
+  許可され上限を確認した1更新のGPU診断の順に、各段階の結果を見て判断します。
+  前段成功だけで次段を自動起動しません。長時間再試行は改めて安全条件と実行許可を
+  確認します。ユーザー空間timeoutでOS / kernel / GPU driverの障害を封じ込めたとは
+  主張せず、必要な条件を確認できなければ診断成功後でも長時間runを止めます。
+
+失敗・切断時も既存の事故ログと進捗は保持し、通常の一時artifact削除から除外します。
+具体的なfile / 保存先 / readbackは `result-artifact-writeout` の責務のままです。
+終端証拠がなければ完了未確認のpartial / interruptedとして扱い、終了コードやOOMを
+推測して埋めません。既存processの同定と、許可されたrunの停止条件はrunner ownerに
+従い、他runの停止・一括kill・新しい監視基盤の追加をこの節から認可しません。
 
 ## Implementation Boundary
 
@@ -149,7 +193,7 @@ artifact reader / renderer であり、formal run launcher、test surface、conf
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read [agents/skills/experiment-lifecycle.md](experiment-lifecycle.md).
+1. Read [agents/skills/experiment-lifecycle.md](experiment-lifecycle.md); apply [Long-running GPU and crash-recovery admission](#long-running-gpu-and-crash-recovery-admission) before an applicable run or rerun.
 1. Keep execution steps, result paths, and report locations consistent with this skill and the topic README.
 1. Select only the preparation, implementation, static-check, execution, or report phase required by the topic protocol; do not turn optional phases into universal gates.
 1. Classify a run as `debug`/`smoke`, `verified`, or `formal`. Do not promote spot, subset, or partial runs to formal comparison evidence; stopped runs require `Stop Reason:` and `Restart Decision:` plus a fresh run identity when rerun.
@@ -163,7 +207,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Keep GPU/JAX execution-environment ownership in the scheduler or caller environment. Experiment topic code and checked-in configs stay free of hard-coded per-run environment assignment such as GPU visibility, JAX platform, allocator, or preallocation overrides unless the task is explicitly an environment-contract change.
 1. Preserve available GPU parallelism by default. Do not force a topic to single-GPU or serial execution by adding `max_workers: 1`, GPU visibility filters, single-device JAX platform settings, or equivalent throttles unless the user explicitly requests serial debugging or the run plan records a concrete environment limit. `gpu_max_slots: 1` means one worker slot per GPU; it must not be used as a substitute for reducing the visible GPU set.
 1. When a Python process remains after an interrupted or failed experiment, identify the parent `run.py`, child worker, process group, and elapsed time before calling it residual. Treat active parent/worker processes as a still-running experiment and stop them only when the user asks for abort or cleanup.
-1. If the user restricts validation, distinguish non-persistent static checks from checks that leave artifacts. Static checks that do not create durable outputs are allowed. Experiment runs, visualization.py renderer execution, smoke checks, report generators, or any validation that writes result/log/report artifacts must not be run unless the user asks for them; when such a command is run and creates transient artifacts, delete those artifacts immediately after the run and report the cleanup.
+1. If the user restricts validation, distinguish non-persistent static checks from checks that leave artifacts. Static checks that do not create durable outputs are allowed. Experiment runs, visualization.py renderer execution, smoke checks, report generators, or any validation that writes result/log/report artifacts must not be run unless the user asks for them; when such a command is run and creates transient artifacts, delete only disposable artifacts after the run and report the cleanup. Preserve crash diagnostics and progress under the crash-recovery admission contract; do not treat them as disposable outputs.
 1. Keep checked-in experiment settings in `experiments/<topic>/config.yaml`; run artifacts must include a topic config snapshot, commonly `config_snapshot.json`, written by `run.py`.
 1. Keep topic-specific metrics, observations, thresholds, comparisons, and research-success judgments with the topic or research owner. Treat run state, exit status, artifact presence, and readback as operational evidence; do not promote them to a universal research acceptance gate.
 1. Require `experiments/<topic>/README.md` to describe the experiment content, question, comparison target, standard commands, config source, visualization visualization.py renderer, output schema, and run_name convention before formal execution.
