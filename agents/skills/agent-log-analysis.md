@@ -22,62 +22,75 @@ contain only repository-local owner paths.
 
 ## Reader Map
 
-- Purpose: turns accumulated AgentCanon logs into structured dashboard evidence
-  before interpreting routing misses, skill gaps, or workflow behavior.
+- Purpose: interpret accumulated AgentCanon logs using existing structured
+  evidence by default, with bounded drilldown when it cannot answer the question.
 - Use When: analyzing skill, tool, workflow, hook, eval, wave, or subagent logs
   for repeated misses or selection gaps.
-- Section path: Purpose and Use When define the trigger; Required Flow is the
-  mandatory checklist; Boundaries and Finding Route Packet define what may be
-  claimed and handed off.
-- Boundary: do not read raw logs broadly before generating the structured summary.
+- Section path: Required Flow owns read-only analysis; Selected Acquisition And
+  Repair owns optional follow-up; Boundaries and Finding Route Packet separate
+  supported claims from repair work.
+- Boundary: analysis does not require archive maintenance, dashboard repair, or
+  eval reruns. Do not expand raw logs broadly or claim evidence that is absent.
 
 ## Purpose
 
-skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tree
-ではなく dashboard API / structured summary に変換してから
-分析するための skill です。
+skill、tool、workflow、hook、eval の蓄積ログを、既存の dashboard API /
+structured summary を既定入力として分析する skill です。
+必要な要約がない場合は、対象を限定した読取で確認できる範囲を報告します。
+
+既存 snapshot `S` に対する分析 `A(S)` は、archive を別の snapshot に更新する
+操作の成功を必要としません。鮮度・欠落・対象範囲は結論を制限する根拠であり、
+周辺システムの修理を分析の終了条件へ加える理由ではありません。
 
 ## Use When
 
 - user が skill / tool / workflow / hook のログ分析、弱い skill、routing miss、selection gap、蓄積分析を求めている
 - user が skill が呼ばれない、呼び出しが遅い、関連 skill 候補が狭い、
   または違う後続 surface に route されるという runtime feedback を出している
-- `.agent-canon/log-archive/**`、`reports/**`、event file を読みそうな調査で、先に要約が必要
+- `.agent-canon/log-archive/**`、`reports/**`、event file から対象を限定して調査する
 - dashboard や improvement guide の signal をもとに、どの skill / tool / workflow を直すか判断する
 - token 消費を抑えながら AgentCanon runtime evidence を見る
-- accumulated eval family の missing / stale / fail を見つけ、producer / checker loop
-  に戻す必要がある
-- structured evidence を durable skill issue 候補に変換する前段分析を行う
+- accumulated eval family の missing / stale / fail を観測・報告する
+- 蓄積 evidence を durable skill issue 候補に変換する前段分析を行う
 
 ## Required Flow
 
-1. 通常分析の入力を structured API / Markdown summary に固定します。
-1. AgentCanon 側では external log archive の mount / branch 状態だけを確認します。
+1. 質問、読む repository / artifact、snapshot、期間、coverage を取得済みの
+   evidence から特定します。保存済み記録を現行 runtime の再現と扱いません。
+   読める snapshot の分析に `ensure`、`sync`、`check-clean`、最新版化、
+   foreign dirty の解消を要求しません。mutable な入力は観測時点と範囲を明示します。
+1. 既存の `agent-log-analysis-api.json` または
+   `agent-log-analysis-compact.md` などの structured summary を再利用します。
+   両形式の用意や再生成は不要です。必要な項目がない場合は
+   `dashboard_api_contract_gap` として不足を記録し、API 修理を待たず、既知の
+   path・期間・行範囲に限定した `tail`、focused parser、path 限定
+   `git grep -n`、connector の読取で調査を進めます。drilldown の理由と範囲を
+   明示し、無制限な raw JSONL 展開は行いません。
+1. 質問に必要な API field と、その snapshot での意味・coverage を確認します。
+   通常の観点は `unknown_event_count`、`status_by_hook_family`、
+   `failure_by_hook_family`、`skip_by_hook_family`、
+   `namespace_debt_by_hook_family`、`oop_applicability` です。欠落をゼロ・成功に
+   変換せず、証拠がない主張だけを unknown / 未検証にします。未選択の観点を
+   埋めるための一律 checklist や否定値の記録は作りません。
+1. eval family の missing / stale / fail は、既存の checker output や report の
+   snapshot とともに観測事項として扱います。必要なら Issue へ記録しますが、
+   観測だけで `agent-eval-accumulation`、producer 再実行、過去ログ移行へ
+   自動的に進みません。追加の検査・収集が必要な場合は次の節に従います。
+1. 観測、解釈、修正先、未確認仮説、調査範囲の制限を分けて報告します。
+   Issue 起票が依頼範囲なら、取得できた summary / checker output / bounded
+   excerpt と snapshot を `issue-finding-report` に渡します。分析と起票は
+   修理完了を待ちません。取得不能な入力はそのまま示し、証拠を作りません。
 
-1. Source-bound runtime-event collection requires the runtime owner to provide
-   `AGENT_CANON_CODEX_SESSION_ROOT` for the active container-local session
-   directory. It does not inspect host `HOME`, `CODEX_HOME`, or
-   `~/.codex/sessions`; an absent root is a fail-closed source absence.
+## Selected Acquisition And Repair
 
-```bash
-python3 tools/runtime/archive/runtime_log_archive_git.py ensure
-python3 tools/runtime/archive/runtime_log_archive_git.py status --porcelain
-python3 tools/runtime/archive/runtime_log_archive_git.py sync
-python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain
-```
+追加操作は、依頼された成果物または特定の主張に必要な証拠取得のためにだけ
+選びます。新規収集、archive 保守・公開、dashboard API 修理、eval 修理は
+読取分析とは別の操作です。実際に選択した操作の権限・入力・検証境界を
+各 owner から消費し、その失敗を成功へ変換しません。独立した確認済み観測は
+報告でき、修理待ちを元の分析の終了条件へ追加しません。
 
-1. archive hygiene は `sync`、`check-clean`、dashboard 生成、final `sync`
-   の順で扱います。望ましい閉じ状態は
-   `RUNTIME_LOG_ARCHIVE_CLEAN=yes` です。直前 command の runtime hook が
-   current repo key の live hook file だけを追記し、
-   `RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no` の場合は、その path を
-   `live_hook_tail_dirty` として記録し、dashboard 生成へ進みます。closeout
-   では final `sync` の `RUNTIME_LOG_ARCHIVE_SYNC=pass`、foreign dirty
-   なし、live hook tail path を evidence にします。foreign dirty key がある場合は
-   該当 repo_key の sync / migration を先に解消します。
-1. source repo root から AgentCanon source dashboard tool を呼びます。tool が
-   AgentCanon root と mounted log archive を解決するため、`<source-root>` は
-   解析対象 repo の root とします。
+新しい structured summary が必要で実行可能な場合は、既存の source dashboard
+owner を使います。tool が AgentCanon root と mounted log archive を解決します。
 
 ```bash
 ./bootstrap.sh --control-parent-root <control-parent-root> \
@@ -91,44 +104,46 @@ python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain
 The outer `--root` selects the registered read-only target for the shared
 container. The dashboard arguments are evaluated inside that container, and
 the relative report paths are resolved below the external runtime root; the
-source checkout is never used as an output directory.
+source checkout is never used as an output directory. An unavailable tool
+limits new evidence, not access to already readable evidence.
 
-1. `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` を
-   既定入力として読みます。log archive repo は append-only evidence を所有し、
-   AgentCanon source dashboard が集計、移動平均、routing evidence cell を
-   所有します。
-1. structured summary で足りない観点がある場合は、AgentCanon source
-   dashboard API owner に `dashboard_api_contract_gap` として修復を route してから
-   API / report profile を拡張します。
-1. API JSON では、少なくとも次の field を normal analysis contract として確認します: `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, `oop_applicability`。IssueWorker の公開結果を扱う場合は、`github_issue_refs` と `issue_publication_action_counts` を private archive の published receipt から読み、`issue_worker.qualified` などの candidate counts と混ぜません。receipt に Issue/private body、digest、fingerprint、認証情報がないことも確認します。
-1. IssueWorker の publisher は GitHub mutation 前に external runtime/spool の receipt route を確認します。成功後は canonical `bootstrap.sh ... tool run/exec issue-sync -- --stage-publication-receipt` で resident container の body-free receipt を spool へ書き、host shell の private-log sync 後に dashboard が published namespace を読みます。route がない成功や pending 消失から公開済みとは推定しません。
-1. eval family gap を見るときは、dashboard の推測ではなく
-   `eval_accumulation_check.py --compact-out ...` を走らせます。missing / stale / fail
-   があれば `$agent-eval-accumulation` に移り、`run_accumulated_agent_evals.py`、
-   再 check、archive sync の順で閉じます。
-1. event file drilldown は tool 実装、schema debugging、破損 audit、または API が明示した drilldown path に限定します。読む場合は理由を明示し、`tail`、focused parser、または path 限定 `git grep -n` を使います。
-1. user-facing report では、観測値、解釈、修正先、未確認仮説を分けます。
-1. structured evidence を durable skill issue に変換する場合は、`issue-finding-report`
-   に渡し、抽象原因、重複検索、dependency-expanded edit scope、multi-agent
-   partition をそこで固定します。
+Source-bound runtime-event collection, only when selected, requires the runtime
+owner to provide `AGENT_CANON_CODEX_SESSION_ROOT` for the active container-local
+session directory. It does not inspect host `HOME`, `CODEX_HOME`, or
+`~/.codex/sessions`; an absent root is a fail-closed source absence for that
+collection operation, not a blocker on reading archived snapshots.
+
+An eval-family verification may use `eval_accumulation_check.py --compact-out ...`
+when its result is needed. Its missing / stale / fail output is reportable
+without repair. Only selected eval repair uses
+[agent-eval-accumulation](agent-eval-accumulation.md)'s producer/checker/archive
+loop. Archive writes and synchronization use
+[the archive owner](../../documents/runtime/runtime-log-archive.md), not a
+second sync/clean protocol in this analysis skill. Foreign dirty state remains
+untouched by read-only analysis.
 
 ## Boundaries
 
 - この skill は log archive API、structured summary、routing miss、selection gap、
   missed / late skill invocation、over-constrained related-skill coverage、
   wave execution reconciliation の観測と解釈を所有します。
-- 実際の prompt / workflow / tool 修正は、下の route packet を作ってから対象
-  skill / role へ渡します。
-- Token budget、baseline、role footprint、efficiency decision の所有は
-  `$tokens` に渡し、この skill は token evidence の観測と route packet
-  作成だけを行います。
-- durable issue 作成は `issue-finding-report` の責務です。この skill は issue
-  作成に必要な structured evidence と finding route packet を渡します。
-- Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
-- Full dashboard は human review 用です。agent の通常分析入力は
-   `generate-agent-runtime-dashboard` の API output、structured summary、
-  generated evidence cell を既定にします。
-- Normal analysis reads structured API fields first. `unknown_event_count` routes missing event taxonomy, `status_by_hook_family` routes status distribution, `failure_by_hook_family` routes failure ownership, `skip_by_hook_family` routes skipped hook ownership, `namespace_debt_by_hook_family` routes legacy namespace debt, and `oop_applicability` routes OOP hook applicability findings.
+- log archive repo は append-only evidence、AgentCanon source dashboard は
+  集計、移動平均、routing evidence cell を所有します。bounded drilldown を
+  新しい集計正本や欠落データの推定値へ変えません。
+- 実際の prompt / workflow / tool 修正を選択した場合は、下の route packet を
+  対象 skill / role へ渡します。finding の記録だけでは修理を起動しません。
+- Token budget、baseline、role footprint、efficiency decision は `$tokens` が
+  所有します。token coverage / moving-average evidence がなければ token の
+  主張は unsupported とし、件数から使用量を推定しません。
+- IssueWorker の公開実績は `github_issue_refs` と
+  `issue_publication_action_counts` の published receipt を読み、
+  `issue_worker.qualified` などの candidate counts と混ぜません。receipt に
+  Issue/private body、digest、fingerprint、認証情報を含めません。receipt 欠落や
+  pending 消失から公開済みとは推定しません。実際の GitHub publication / remote
+  readback と post-publication receipt は
+  [issue-finding-report](issue-finding-report.md) の既存 owner に委譲します。
+- Durable report を書く場合だけ `$result-artifact-writeout` を使います。
+  分析の結論を報告・Issue 化するために、archive 全体の clean 化を要求しません。
 
 ## Archive branch policy
 
@@ -170,15 +185,17 @@ independent.
 Log analysis から修復 wave へ進むときは、次の structured route packet を
 handoff message、tool result、または coordination/resumption 用の durable
 file に残します。repo-changing work alone does not require a run bundle or a
-file-backed packet.
+file-backed packet. The table's closeout gates apply only to selected repair
+work, not to analysis or Issue recording. Missing evidence stays explicit;
+producing a packet does not authorize its repair action.
 
 ```text
 finding_class=<wave_execution|skill_selection|tool_selection|workflow_selection|workflow_attribution|eval_gap|token_coverage|archive_hygiene|prompt_or_config_drift|structure_boundary>
-evidence_cells=<structured dashboard section or API field paths>
+evidence_cells=<available summary/API fields or snapshot-bound excerpt locators and gaps>
 route_target=<skill-or-role>
 instance_partition=<repo_key|hook_family|skill_name|workflow_name|issue_id|path_scope>
 required_packet=<structured handoff or durable artifact path when needed>
-closeout_gate=<command or evidence field>
+closeout_gate=<selected repair command or evidence field>
 ```
 
 | finding_class | route_target | required_packet | closeout_gate |
@@ -188,9 +205,9 @@ closeout_gate=<command or evidence field>
 | `tool_selection` | `tools/catalog.yaml`, owning tool docs, and invocation guidance | Selection Evidence drilldown row, tool catalog entry, owning tool doc path | tool catalog validation and dashboard miss rate after reset window |
 | `workflow_selection` | [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) and owning workflow guide | Selection Evidence drilldown row, workflow registry row, owning workflow doc path | workflow selection eval or dashboard miss rate after reset window |
 | `workflow_attribution` | `agent-learning` or hook owner role | Workflow Attribution drilldown, missing event class, hook namespace | dashboard workflow missing count reduced or exemption recorded |
-| `eval_gap` | `agent-eval-accumulation` | eval accumulation structured output, missing / stale / fail families | `eval_accumulation_check.py` pass or issue updated |
+| `eval_gap` | `agent-eval-accumulation` when repair is selected | existing checker output or snapshot-bound missing / stale / fail evidence | selected repair's `eval_accumulation_check.py` pass or unresolved finding recorded |
 | `token_coverage` | `tokens` + runtime logging owner | Token Consumption drilldown and token moving-average status | token comparison / summary evidence present or unsupported claim recorded |
-| `archive_hygiene` | `result-artifact-writeout` or log archive owner | `runtime_log_archive_git.py status/check-clean` output | `RUNTIME_LOG_ARCHIVE_CLEAN=yes` |
+| `archive_hygiene` | `result-artifact-writeout` or log archive owner when maintenance is selected | available archive state and affected snapshot / paths | selected archive operation's own validation; clean state is not an analysis gate |
 | `prompt_or_config_drift` | `prompt_config_reviewer` | affected prompt/config path and structured evidence cell | reviewed patch or routing issue updated |
 | `structure_boundary` | `structure-refactor` | evidence cell plus candidate path / view boundary | structure repair contract or structure issue updated |
 
@@ -202,39 +219,37 @@ validation, or review boundaries. Suggested same-role instance id:
 
 ## Runtime Contract Clauses
 
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+The runtime discovery adapter delegates these operating clauses to this canonical owner.
 
-1. Read the API JSON or compact Markdown as the default analysis input. The
-   archive repo owns append-only evidence; the AgentCanon source dashboard owns
-   aggregation, moving averages, and routing evidence cells.
-1. Classify missing actual wave rows before proposing reconciliation as
-   `overplanning`, `logging_gap`, or `unresolved`. Do not backfill overplanning
-   or unresolved rows; only a supported logging gap routes to logging repair.
-   Group findings by owning replaceable responsibility and compatible context,
-   not one agent, packet, wave, or review per finding.
-1. Confirm the API JSON includes the normal analysis fields `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, and `oop_applicability`.
-1. When `generate_agent_runtime_dashboard.py` lacks a needed compact field,
-   record `dashboard_api_contract_gap`, route that finding to the dashboard API owner,
-   and rerun it after the source tool is repaired.
-1. For eval family gaps, run `python3 eval/checkers/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
-1. Event-file drilldown is for tool development, schema debugging, corruption audit, or an API-named drilldown path; record an explicit rationale before reading it.
-1. Answer token-use questions from the API token coverage/moving-average fields. If token status is missing, say token claims are unsupported.
-1. Report observations separately from interpretation, repair target, and unknowns.
-1. When the user asks to turn structured evidence into durable skill issues, hand
-   the structured API output, structured Markdown summary, and Finding Route Packet to
-   `$issue-finding-report`.
-1. If the analysis drives a prompt, skill, workflow, or tool change, write the `Finding Route Packet` from [agents/skills/agent-log-analysis.md](agent-log-analysis.md) before editing or spawning the repair wave. A structured handoff message or tool result satisfies it; use a durable file only for coordination or resumption. The packet must include `finding_class`, `evidence_cells`, `route_target`, `instance_partition`, `required_packet`, and `closeout_gate`.
-1. Route by finding class:
-   wave execution findings to `$subagent-bootstrap`;
-   skill selection findings to the affected skill plus `prompt_config_reviewer`;
-   tool selection findings to `tools/catalog.yaml` plus the owning tool docs;
-   workflow selection findings to [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) plus the owning
-   workflow guide; workflow attribution findings to `$agent-learning` or the
-   logging owner; token coverage findings to `$tokens` and the logging owner;
-   eval gaps to
-   `$agent-eval-accumulation`; archive hygiene findings to
-   `$result-artifact-writeout` or the log archive owner; prompt/config drift to
-   `prompt_config_reviewer`; and structure-boundary findings to
-   `$structure-refactor`.
-1. When one structured summary contains independent findings, split same-role review instances by `repo_key`, `hook_family`, `skill_name`, `workflow_name`, `issue_id`, or path scope. Use an instance id shaped like `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>`.
-1. If the user asks for a durable report, pair this skill with `$result-artifact-writeout`.
+1. Follow Required Flow for read-only analysis. Reuse an existing API JSON or
+   compact Markdown summary; neither fresh generation, both output formats,
+   archive sync/clean, nor foreign dirty repair is an analysis prerequisite.
+1. When a needed field or summary is unavailable, record
+   `dashboard_api_contract_gap` and use a bounded, snapshot-qualified drilldown
+   with an explicit reason. Do not wait for dashboard repair or broaden raw
+   log access. Missing evidence limits the affected claim, not other findings.
+1. Check the question-relevant API fields and coverage described in Required
+   Flow. Report observations, interpretation, repair target, and unknowns
+   separately; absent fields are not zero or successful observations.
+1. Record eval missing / stale / fail evidence without automatically running
+   producers or migrating old logs. Selected verification may run the existing
+   checker; only selected repair uses `$agent-eval-accumulation`'s loop.
+1. Apply Selected Acquisition And Repair only to operations actually selected.
+   Preserve collection source authority, read-only targets, external outputs,
+   credentials, and archive/publication integrity. Do not claim an unavailable
+   collection, failed write, or missing publication receipt succeeded.
+1. Classify missing actual wave rows as `overplanning`, `logging_gap`, or
+   `unresolved` before reconciliation. Only supported logging gaps are eligible
+   for repair; never backfill overplanning or unresolved rows as executions.
+1. Answer token-use questions from token coverage/moving-average evidence.
+   Without it, say token claims are unsupported.
+1. For durable Issues, give `$issue-finding-report` the available evidence,
+   snapshot, limitations, and tentative cause. Issue recording does not require
+   a dashboard repair, eval rerun, or archive maintenance success.
+1. Before a selected prompt, skill, workflow, or tool repair, use Finding Route
+   Packet and its owner table. A structured handoff or tool result suffices;
+   durable files are for coordination/resumption, not every finding.
+1. Group findings by owning replaceable responsibility and compatible context;
+   split instances only across independent boundaries. Use
+   `<role_type>:<repo_key>:<finding_class>:<partition>:<seq>` when needed.
+1. For a requested durable report, pair this skill with `$result-artifact-writeout`.
