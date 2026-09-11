@@ -87,6 +87,22 @@ commit しません。`conflict_preservation.py validate` 単体は診断用で�
 
 ## クリーンアップ
 
+- task owner は作業用 clone が不要になり、以下の安全条件が成立した時点で既存の
+  cleanup authority に従って削除します。調査・検証・依存更新などの利用終了時に判断し、
+  タスク全体の完了、PR merge、定期掃除まで先送りしません。具体的な次工程がない
+  「また使うかもしれない」だけの保持はしません。失敗・中断した作業でも、必要な
+  診断資料を保全し、安全条件を満たした clone は同じ扱いにします。
+- tool 起動前に task owner が exact path の所有と利用終了を確認します。別の agent、
+  process、container mount、実行時の依存解決先が使用中、または所有・使用状態が不明なら
+  保持します。未回収の変更、保持が必要な local-only refs/commits、stash、untracked/ignored
+  成果物、submodule/annex content が削除対象内にしかない場合も保持し、必要な内容と
+  復元方法を clone 外で確認してから再判定します。clean な `git status` や経過時間だけで
+  削除可能とは判定しません。既存 tool の proof を、この利用・保全確認の代わりにしません。
+- 削除後は exact path の不存在を確認し、linked-worktree では worktree list からの消失も
+  確認します。既存 task/Issue の結果に削除 path と復元先、または保持 path・理由・解除条件を
+  記録し、closeout では未解決の保持対象だけを引き継ぎます。新しい台帳は作りません。
+  clone の削除は remote branch、clone 外の local refs、無関係な checkout、workspace 全体の
+  削除を認可しません。
 - `cleanup` は selected Git toplevel と computed clone identity を検証してから proof preflight
   を開始します。既存 clone の proof-gated removal は root `.gitignore` の後続 drift だけでは
   停止せず、ignore ownership の create preconditionと cleanup の exact-root gateを分離します。
@@ -96,7 +112,7 @@ commit しません。`conflict_preservation.py validate` 単体は診断用で�
   placement=`workspace-continuation`、owner-evidence SHA がすべて一致する場合だけ read-only
   compatibility として ready を認めます。partial/mismatch/unknown role・placement は typed
   hold とし、dry-run は Git config marker を書き換えません。
-- cleanup は closeout の明示 dispatch として canonical tool を呼び、request から計算した
+- cleanup は上記の利用終了時、または closeout の残存確認時に canonical tool を呼び、request から計算した
   exact clone path、owner evidence/marker、URL、branch、clean non-detached state を検証します。
   linked-worktree は保持された local branch と共有 Git common objects の readback で復元可能性を
   確認し、remote branch を要求しません。`independent-clone` は fetch した `origin/<branch>` の
