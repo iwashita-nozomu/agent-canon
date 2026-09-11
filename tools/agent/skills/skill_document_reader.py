@@ -76,11 +76,14 @@ class SkillReadAdmission:
     implementation_read: str
 
     def as_json(self) -> dict[str, object]:
-        """Return the transient admission state as JSON-compatible data."""
+        """Return read positions and EOF state, not previously read section text."""
         return {
             "compact_path": self.compact_path,
             "compact_file_eof": self.compact_file_eof,
-            "owner_sections": [chunk.as_json() for chunk in self.owner_sections],
+            "owner_sections": [
+                {key: value for key, value in chunk.as_json().items() if key != "text"}
+                for chunk in self.owner_sections
+            ],
             "implementation_read": self.implementation_read,
         }
 
@@ -339,7 +342,10 @@ def implementation_read_state(
 def build_parser() -> argparse.ArgumentParser:
     """Build the reader CLI."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("index", "chunk", "admit"))
+    parser.add_argument(
+        "command", choices=("index", "chunk", "admit"),
+        help="index lists headings; chunk returns text; admit reports EOF metadata only.",
+    )
     parser.add_argument("--path", type=Path, help="Markdown document path.")
     parser.add_argument("--heading", help="Exact heading or unique heading title.")
     parser.add_argument("--offset", type=int, default=0, help="Zero-based file byte offset.")
@@ -358,10 +364,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _render_text(value: object) -> str:
     """Render a compact human-readable response without losing chunk text."""
-    if isinstance(value, DocumentChunk):
-        payload = value.as_json()
-        return "\n".join(f"{key}={json.dumps(item, ensure_ascii=False)}" for key, item in payload.items())
-    if isinstance(value, SkillReadAdmission):
+    if isinstance(value, (DocumentChunk, SkillReadAdmission)):
         payload = value.as_json()
         return "\n".join(f"{key}={json.dumps(item, ensure_ascii=False)}" for key, item in payload.items())
     if isinstance(value, tuple):
