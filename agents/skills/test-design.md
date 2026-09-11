@@ -43,6 +43,44 @@ post-fix consolidation, consume
 Preserving a reproduction does not activate this skill or require an additional
 per-Issue test when the existing validation owners already close the risk.
 
+## Contract-derived behavioral tests
+
+Code, including test code, executes the conditions, operations, and state
+transitions that are written; names, comments, and intentions do not supply
+missing behavior. Read the implementation to find how it can violate the
+contract, not to define what the expected result must be.
+
+1. Derive expected results from the approved contract, a mathematical property,
+   or an independently justified reference. Explain that basis in the existing
+   `oracle`; do not copy the production algorithm or bless its current output
+   as the sole correctness oracle. Include required behavior absent from the
+   implementation, not just branches that already exist.
+2. Trace the actual input-to-observable path and choose the smallest inputs or
+   state sequences that expose a concrete wrong condition, missing operation,
+   or incorrect state update. Use contract-relevant boundaries, error paths,
+   and side effects rather than nominal examples alone; do not freeze private
+   implementation details or demand every category for every test.
+3. Exercise the owning implementation at the selected observation level.
+   Fixtures must reach the target behavior; mocks may isolate dependencies but
+   must not replace the logic under test. An assertion only about a canned mock
+   result does not validate that logic. Check real wiring when that boundary
+   owns the unresolved risk.
+4. Confirm that the selected case is collected, runs, and reaches its assertion.
+   For a reproduced bug, replay the same input and oracle before and after the
+   fix. If discrimination is otherwise unclear, use a small intentional fault
+   such as a reversed condition, omitted update, or constant result. The
+   assertion must reject the target contract violation, not an unrelated setup
+   failure; skips, no-crash results, and coverage alone are not correctness
+   evidence. A pass supports only the exercised contract, not all intentions.
+
+For example, an integer-range contract `0 <= n < 3` accepts `0` and `2` and
+rejects `-1` and `3`. These contract-derived expectations distinguish an omitted
+lower bound, `<` changed to `<=`, and unconditional acceptance or rejection;
+computing expected values with the same faulty predicate would hide the bug.
+
+Apply this reasoning within `contract / counterexample / oracle`; do not add a
+mandatory packet, mutation-testing framework, or redundant regression suite.
+
 ## Validation failure response
 
 When a selected check fails, classify the `failing contract`, `observation level`,
