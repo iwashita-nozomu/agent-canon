@@ -8,6 +8,7 @@ upstream design ../skills/catalog.yaml enumerates public skill families
 upstream design ../skills/README.md defines the public skill surface contract
 downstream design ../canonical/CODEX_WORKFLOW.md routes internal review routines through workflow stages
 downstream design chatgpt-codex-routing.md owns request modality before Codex workflow admission
+downstream design incremental-code-change.md connects opt-in coverage traversal and incremental repair
 @dependency-end
 -->
 
@@ -35,6 +36,7 @@ skill, entrypoint, or routine that calls it.
 | Group | Files | Public Route |
 | ----- | ----- | ------------ |
 | Request modality routing | [chatgpt-codex-routing.md](chatgpt-codex-routing.md) | root entrypoints before `$agent-orchestration` |
+| Incremental code change | [incremental-code-change.md](incremental-code-change.md) | `$code-cleanup` when coverage traversal or in-task token-waste repair is requested |
 | Review routines | [code-review.md](code-review.md), [critical-review.md](critical-review.md), [project-review.md](project-review.md), [report-review.md](report-review.md), [comprehensive-review.md](comprehensive-review.md) | `$change-review`, `$research-workflow`, `$comprehensive-development`, `$report-writing` |
 | Academic review routines | [citation-evidence-review.md](citation-evidence-review.md), [logic-gap-review.md](logic-gap-review.md), [notation-definition-review.md](notation-definition-review.md) | `$academic-writing`, `$paper-writing`, `$prose-reasoning-graph` |
 | Docs review routines | [docs-completeness-review.md](docs-completeness-review.md), [docs-consistency-review.md](docs-consistency-review.md) | `$document-canon-cleanup`, `$md-style-check` |
