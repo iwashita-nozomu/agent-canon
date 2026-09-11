@@ -258,6 +258,88 @@ def test_capture_preserves_foreign_gitlink_stage_identity(tmp_path: Path) -> Non
         validate_snapshot(repo, inventory, ["file.txt"])
 
 
+@pytest.mark.parametrize("deleted_side", ("ours", "theirs"))
+def test_gitlink_modify_delete_preserves_absent_stage_identity(
+    tmp_path: Path, deleted_side: str
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-b", "main")
+    (repo / "file.txt").write_text("base\nuser-old\n", encoding="utf-8")
+    base_oid, modified_oid = "a" * 40, "b" * 40
+    git(repo, "update-index", "--add", "--cacheinfo", f"160000,{base_oid},module")
+    commit(repo, "base")
+    base = git(repo, "rev-parse", "HEAD")
+    git(repo, "switch", "-c", "feature")
+    revisions = {}
+    for side in ("ours", "theirs"):
+        if side == "theirs":
+            git(repo, "switch", "main")
+        (repo / "file.txt").write_text(
+            "feature\nuser-change\n" if side == "ours" else "main\nuser-old\n",
+            encoding="utf-8",
+        )
+        if side == deleted_side:
+            git(repo, "update-index", "--force-remove", "--", "module")
+        else:
+            git(repo, "update-index", "--add", "--cacheinfo", f"160000,{modified_oid},module")
+        commit(repo, side)
+        revisions[side] = git(repo, "rev-parse", "HEAD")
+    git(repo, "switch", "feature")
+    assert "modify/delete" in git(repo, "merge", "--no-edit", "main", check=False)
+    for oid in (base_oid, modified_oid):
+        result = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", oid], capture_output=True)
+        assert result.returncode != 0
+
+    inventory = capture_inventory(repo, base=base, **revisions)
+    module = next(entry for entry in inventory["paths"] if entry["path"] == "module")
+    present_side = "theirs" if deleted_side == "ours" else "ours"
+    assert module["stages"] == {
+        "base": {"mode": "160000", "oid": base_oid},
+        present_side: {"mode": "160000", "oid": modified_oid},
+    }
+    validate_snapshot(repo, inventory, ["file.txt", "module"])
+
+    module["stages"][deleted_side] = None
+    with pytest.raises(ConflictPreservationError, match=f"stage {deleted_side} is missing"):
+        validate_snapshot(repo, inventory, ["module"])
+    del module["stages"][deleted_side]
+    stage_number = "2" if deleted_side == "ours" else "3"
+    set_index_entries(repo, [f"160000 {modified_oid} {stage_number}\tmodule\n"])
+    with pytest.raises(ConflictPreservationError, match=f"stage {deleted_side} is missing"):
+        validate_snapshot(repo, inventory, ["module"])
+    present_number = "3" if deleted_side == "ours" else "2"
+    git(repo, "update-index", "--force-remove", "--", "module")
+    set_index_entries(repo, [f"160000 {modified_oid} {present_number}\tmodule\n"])
+    with pytest.raises(ConflictPreservationError, match="stage base is missing"):
+        validate_snapshot(repo, inventory, ["module"])
+    set_index_entries(repo, [f"160000 {base_oid} 1\tmodule\n"])
+    validate_snapshot(repo, inventory, ["module"])
+
+    (repo / "file.txt").write_text("feature\nuser-change\n", encoding="utf-8")
+    git(repo, "add", "file.txt")
+    git(repo, "update-index", "--force-remove", "--", "module")
+    git(repo, "update-index", "--add", "--cacheinfo", f"160000,{modified_oid},module")
+    plan = plan_for(inventory)
+    plan["paths"].append(
+        {
+            "path": "module",
+            "owner": "integration_executor",
+            "disposition": "keep",
+            "operation": "manual",
+            "rationale": "retain the modified gitlink after a modify/delete conflict",
+            "expected_edit_delta": "stage the selected mode and OID without fetching the submodule",
+            "unaffected_content": [
+                {
+                    "path": "module",
+                    "expected_gitlink": {"mode": "160000", "oid": modified_oid},
+                }
+            ],
+        }
+    )
+    validate_plan(inventory, plan, repo=repo)
+
+
 def test_gitlink_tree_capture_and_readback_preserve_foreign_oid(tmp_path: Path) -> None:
     repo, base, ours, theirs, ours_gitlink = gitlink_conflicted_repo(tmp_path)
     inventory = capture_inventory(repo, base=base, ours=ours, theirs=theirs)

@@ -201,6 +201,8 @@ def validate_snapshot(
         if not isinstance(expected_stages, Mapping) or not isinstance(current_stages, Mapping):
             raise ConflictPreservationError(f"stage inventory is missing for target path: {path}")
         for stage in ("base", "ours", "theirs"):
+            if stage not in expected_stages and stage not in current_stages:
+                continue
             expected = expected_stages.get(stage)
             observed = current_stages.get(stage)
             if not isinstance(expected, Mapping) or not isinstance(observed, Mapping):
