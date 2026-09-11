@@ -1415,32 +1415,50 @@ description = "The tokens skill must use observed runtime evidence, adaptive rol
 [[evals.checklist]]
 id = "TOKEN-WF-1"
 critical = true
-description = "Activates token analysis only from observed evidence and preserves the selected execution topology."
-required_regex = ["observed token-efficiency evidence", "Activate this skill only when", "does not infer them from task", "size", "team topology"]
+description = "Activates token diagnosis from observed evidence, excludes normal task-budget activation, and keeps execution ownership with orchestration."
+required_regex = [
+  "explicit token diagnosis/measurement",
+  "observed duplicate reads",
+  "normal task budget, task size, or adaptive execution decision alone",
+  "selection, roles, teams, and context packets remain with",
+  "\\$agent-orchestration",
+  "Do not automatically collect logs",
+]
 
 [[evals.checklist]]
 id = "TOKEN-WF-3"
 critical = true
-description = "Preserves normal owner-selected validation, review, and closeout for changed responsibilities."
-required_regex = ["normal owner-selected validation", "normal closeout route", "Required validation", "review", "changed responsibility"]
+description = "Preserves normal validation, review, required checks, and closeout instead of replacing them with token evidence."
+required_regex = [
+  "normal validation",
+  "validation, review, cleanup, and publication",
+  "Token evidence does not replace owner-selected dependency review",
+  "required checks",
+  "Issue/PR readback",
+]
 
 [[evals.checklist]]
 id = "TOKEN-WF-4"
 critical = true
-description = "Requires equivalent measured token comparison without a hard ratio threshold."
+description = "Requires equivalent behavior envelopes and marks missing measurements unmeasured without claiming a reduction."
 required_regex = [
-  "equivalent behavior envelopes",
+  "both source sessions",
+  "equivalent\\s+behavior envelopes",
   "compare_codex_token_footprints\\.py",
-  "structured artifacts",
-  "unmeasured",
-  "reduction claim",
+  "Missing sessions or required measurements mean `unmeasured`",
+  "not a reduction claim",
+  "Do not manufacture baselines",
 ]
 
 [[evals.checklist]]
 id = "TOKEN-TOOL-FIRST-1"
 critical = true
-description = "Uses the existing checker and role evaluator as the source of structured token evidence."
-required_regex = ["existing token-footprint checker", "role evaluator", "structured artifacts", "normal result-artifact route"]
+description = "Uses the existing token-footprint checker, role evaluator, and selected result-artifact route as evidence owners."
+required_regex = [
+  "eval/checkers/compare_codex_token_footprints\\.py",
+  "Use the role\\s+evaluator only for unresolved role attribution",
+  "Preserve\\s+selected artifacts through the normal result-artifact route",
+]
 
 [[evals]]
 id = "communication-protocol-pre-edit-context"
