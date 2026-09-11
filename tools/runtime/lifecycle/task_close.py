@@ -96,6 +96,7 @@ from tools.agent.orchestration.autonomous_convergence import validate_closeout_p
 from tools.agent.orchestration.packets import normalize_owner_guarantee_packet, owner_receipt_is_compatible, owner_receipt_key
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
+COMMIT_PUSH_COMPLETE_STATUSES = {"yes", "not_applicable"}
 DOCUMENT_STRUCTURE_MISSING_VALUES = {"", "missing", "none", "not_applicable"}
 DOCUMENT_SPLIT_DECISION_PREFIXES = (
     "keep:",
@@ -1722,8 +1723,8 @@ def main() -> int:
         "final_review_artifact_complete": not final_review_blockers,
         "report_active_run_match": active_run_matches(active_run, report_dir),
         "report_artifact_placement_clean": not report_artifact_blockers,
-        "commit_created": closeout.get("commit_created") == "yes",
-        "push_completed": closeout.get("push_completed") == "yes",
+        "commit_created": closeout.get("commit_created") in COMMIT_PUSH_COMPLETE_STATUSES,
+        "push_completed": closeout.get("push_completed") in COMMIT_PUSH_COMPLETE_STATUSES,
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
     }
     ready = all(closeout_checks.values())
