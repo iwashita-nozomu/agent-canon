@@ -59,6 +59,18 @@ credentials, and runtime semantics with consumer owners. For a
 source-specific AgentCanon root, keep those source responsibilities with the
 source checkout's owners.
 
+When numerical results disagree, first investigate defects in the algorithm
+and its implementation against the governing equations and specification,
+including assumptions, units, indexing, update order, and boundary conditions.
+Correct identified algorithmic defects before considering numerical adjustments.
+Do not hide unexplained discrepancies with correction factors, offsets,
+clipping, arbitrary epsilons, or relaxed test tolerances. Numerical remedies
+are justified only after algorithmic correctness has been checked and the
+remaining discrepancy is attributable to rounding, conditioning, or
+approximation, with an error analysis and validation against an independent
+reference or invariant. Keep the investigation and validation with the
+applicable repository's algorithm and numerical owners.
+
 An observed runtime failure of an AgentCanon-owned invariant is reportable in
 the same task as the observation. The first record does not wait for a repeated
 occurrence, dashboard evidence, repair completion, or confirmed cause; preserve
