@@ -15,11 +15,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "eval" / "producers" / "generate_agent_improvement_guide.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
+from eval.producers.generate_agent_improvement_guide import latest_skill_source_epoch  # noqa: E402
 
 
 class GenerateAgentImprovementGuideTest(unittest.TestCase):
@@ -44,6 +47,34 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         else:
             os.environ["AGENT_CANON_LOG_ROOT"] = self._previous_log
         self._runtime_temp.cleanup()
+
+    def test_latest_skill_source_epoch_tolerates_unreadable_private_skill_view(self) -> None:
+        """A private shim permission error must not block canonical reset lookup."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canonical = root / "agents" / "skills" / "oop-readability-check.md"
+            canonical.parent.mkdir(parents=True)
+            canonical.write_text("# canonical\n", encoding="utf-8")
+            original_exists = Path.exists
+
+            def exists_with_unreadable_private_view(path: Path) -> bool:
+                if ".codex/personal/skills/" in path.as_posix():
+                    raise PermissionError(13, "permission denied", path.as_posix())
+                return original_exists(path)
+
+            with (
+                patch.object(Path, "exists", exists_with_unreadable_private_view),
+                patch(
+                    "eval.producers.generate_agent_improvement_guide.subprocess.run",
+                    return_value=SimpleNamespace(returncode=0, stdout="123\n"),
+                ) as run,
+            ):
+                epoch = latest_skill_source_epoch(root, "oop-readability-check")
+
+        self.assertEqual(epoch, 123)
+        command = run.call_args.args[0]
+        self.assertIn("agents/skills/oop-readability-check.md", command)
+        self.assertNotIn(".codex/personal/skills/oop-readability-check/SKILL.md", command)
 
     def test_generates_guidance_from_issues_eval_knowledge_and_hook_logs(self) -> None:
         """The guide should summarize every evidence family."""

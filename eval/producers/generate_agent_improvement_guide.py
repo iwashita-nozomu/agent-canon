@@ -778,11 +778,16 @@ def latest_skill_source_epoch(root: Path | None, skill: str) -> int:
     """Return latest Git commit epoch for source paths that define one skill."""
     if root is None:
         return NO_RESET_EPOCH
-    paths = [
-        path.as_posix()
-        for path in skill_source_path_candidates(skill)
-        if (root / path).exists()
-    ]
+    paths: list[str] = []
+    for path in skill_source_path_candidates(skill):
+        try:
+            exists = (root / path).exists()
+        except OSError:
+            # The generated private view may be unreadable in a rootless
+            # tool container; keep canonical source candidates available.
+            continue
+        if exists:
+            paths.append(path.as_posix())
     if not paths:
         return NO_RESET_EPOCH
     try:
