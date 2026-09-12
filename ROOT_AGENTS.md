@@ -11,53 +11,35 @@ downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_
 @dependency-end
 -->
 
-This is the common base for a repository root [AGENTS.md](AGENTS.md), including a consumer
-root and a source-specific AgentCanon root. A consumer keeps its generated file
-as a regular tracked file by composing this base with its own specific
-instructions. A source-specific AgentCanon [AGENTS.md](AGENTS.md) reads the shared entry
-behavior explicitly and retains its own reader map; the consumer-only maps and
-routes below do not apply to that source root. These are explicit
-reads/composition, not a live projection, runtime import, updater, vendor
-checkout, submodule, or symlink.
+This common base supplies shared entry behavior for consumer and source-specific
+repository roots. It does not own task procedures, command recipes, role
+lifecycles, implementation policy, validation schemas, or source-editing policy.
 
 ## Repository Role
 
-For a consumer root, the consumer repository owns its product source, build
-environment, tests, documentation, CI, and tracked instruction extension.
-AgentCanon does not become a second source of truth for those surfaces. The
-generated root file is self-contained after it is committed and remains usable
-when the AgentCanon source checkout and runtime are unavailable. For a
-source-specific AgentCanon root, the source checkout owns AgentCanon's source
-and canonical owner map; its source-specific [AGENTS.md](AGENTS.md) takes precedence for
-those responsibilities, while consumer-only guidance below does not redirect
-source work.
+A consumer owns its product source, build environment, tests, documentation,
+CI, credentials, runtime semantics, and instruction extension. Its root
+[AGENTS.md](AGENTS.md) is a regular tracked file composed from this base and its own
+specific instructions, usable without an AgentCanon checkout or runtime.
+Composition is not a live projection, runtime import, updater, vendor checkout,
+submodule, or symlink.
+
+The AgentCanon source checkout owns its source and canonical owner map. Its
+source-specific [AGENTS.md](AGENTS.md) takes precedence for those responsibilities;
+this base's consumer maps and routes do not redirect source work. Details stay
+with the applicable repository's specific instructions and canonical owners.
 
 ## Reader Map
 
-For a consumer root, use only the following consumer-owned map:
-
-| Task intent | Applicable reader |
-| --- | --- |
-| product implementation and behavior | the consumer's source and design owners |
-| build, test, and execution environment | the consumer's build and test owners |
-| repository structure and file responsibility | the consumer's structure documentation |
-| consumer-specific agent instructions | the appended consumer-owned section of this file |
-| AgentCanon maintenance (consumer roots) | a separately selected AgentCanon development checkout |
-| observed AgentCanon runtime defect | the applicable repository-specific Issue owner | immediate Issue record or qualified no-mutation handoff |
-
-For a source-specific AgentCanon root, the source checkout's [AGENTS.md](AGENTS.md) Reader
-Map and canonical owners are the local authority. The common base supplies
-shared entry behavior without reassigning source responsibilities.
+For a consumer root, use the [Runtime Owner Map](#runtime-owner-map) below and
+the appended consumer-specific instructions. For a source-specific root, use
+that checkout's [AGENTS.md](AGENTS.md) Reader Map and canonical owners.
 
 ## Always-On Boundary
 
 The explicit user request and the current repository-specific canonical owner
 are the source of truth. Preserve unknown dirty, staged, untracked, branch,
-and worktree state until the applicable Git safety owner classifies it. For a
-consumer root, keep consumer product behavior, environment policy, tests, CI,
-credentials, and runtime semantics with consumer owners. For a
-source-specific AgentCanon root, keep those source responsibilities with the
-source checkout's owners.
+and worktree state until the applicable Git safety owner classifies it.
 
 When numerical results disagree, first investigate defects in the algorithm
 and its implementation against the governing equations and specification,
@@ -80,12 +62,6 @@ dotfile, credential, consumer, or ownership-unknown failures stay with their
 applicable owner or qualified handoff and are not attributed to AgentCanon by
 proximity. This common base exposes that reporting scope without selecting an
 external checkout, credential, or publication implementation.
-
-This common base establishes the shared root instruction boundary. It does not
-re-own task procedures, command recipes, role lifecycles, implementation policy,
-validation schemas, or AgentCanon source-editing policy. Consumer details belong
-to the consumer-specific section or the consumer's own canonical owner; source
-details belong to the source-specific [AGENTS.md](AGENTS.md) and its canonical owners.
 
 Before selecting or editing a repository surface, inspect its actual location,
 canonical owner, callers, and consumers. Establish the actual working
@@ -142,21 +118,14 @@ For a consumer root, use only the following consumer-owned map:
 | repository structure and file placement | consumer structure owner | consumer structure route |
 | root instruction extension | consumer-specific section in this file | consumer instruction route |
 | AgentCanon source maintenance (consumer roots) | selected AgentCanon development checkout | AgentCanon maintenance route |
-| observed AgentCanon runtime defect | applicable repository-specific Issue owner | immediate Issue record or qualified handoff |
-
-For a source-specific AgentCanon root, the source checkout's [AGENTS.md](AGENTS.md) and
-its canonical owners supply the owner and validation route.
+| observed AgentCanon runtime defect | applicable repository-specific Issue owner | immediate Issue record or qualified no-mutation handoff |
 
 ## Task Entry
 
-Start with this common base and the applicable source- or consumer-specific
-instructions. Resolve the task owner and repository-specific validation oracle
-from those surfaces. For a consumer root, use its appended consumer-specific
-instructions and select a separate qualified AgentCanon development checkout
-when the task changes AgentCanon itself. For a source-specific AgentCanon root,
-continue with that checkout's [AGENTS.md](AGENTS.md) Reader Map and canonical owner; keep
-consumer trees unchanged unless the consumer task explicitly owns the resulting
-generated file.
+Resolve the task owner and validation oracle through the applicable Reader Map.
+For AgentCanon changes from a consumer root, select a separate qualified
+AgentCanon development checkout. Keep consumer trees unchanged unless the
+consumer task explicitly owns the resulting generated file.
 
 When a root [AGENTS.md](AGENTS.md) begins with the literal `@ROOT_AGENTS.md`, read this
 common base first and then continue into that file's source- or consumer-specific
@@ -193,7 +162,6 @@ commit/push gate or a new receipt requirement.
 ## Validation Routing
 
 Use the validation route owned by the changed repository-specific responsibility.
-Validate the changed contract and its failure semantics, then use the applicable
-consumer or source closeout route when required. A generated consumer root file
-does not authorize unrelated AgentCanon checks, product checks, or runtime
-changes; a source-specific root follows its source owner route.
+Validate the changed contract and its failure semantics, then use that owner's
+closeout route when required. A generated consumer root file does not authorize
+unrelated AgentCanon checks, product checks, or runtime changes.
