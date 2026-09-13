@@ -170,8 +170,7 @@ Start with this common base and the applicable source- or consumer-specific
 instructions. Resolve the task owner and repository-specific validation oracle
 from those surfaces. For a consumer root, use its appended consumer-specific
 instructions and select a separate qualified AgentCanon development checkout
-when the task changes AgentCanon itself. For a
-source-specific AgentCanon root,
+when the task changes AgentCanon itself. For a source-specific AgentCanon root,
 continue with that checkout's [AGENTS.md](AGENTS.md) Reader Map and canonical owner; keep
 consumer trees unchanged unless the consumer task explicitly owns the resulting
 generated file.
