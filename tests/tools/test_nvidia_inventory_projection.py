@@ -116,19 +116,19 @@ class NvidiaInventoryProjectionTest(unittest.TestCase):
                 observation, occupancy = _observe(
                     _xml("G", "G"), frozenset({candidate})
                 )
-            self.assertEqual(ancestry.call_count, 2)
-            self.assertEqual(observation.processes, ())
-            self.assertEqual(observation.unknown_gpu_ids, INVENTORY)
-            self.assertEqual(dict(observation.unit_states), {candidate: "UNKNOWN"})
-            self.assertEqual(
-                observation.process_inventory_visibility["allocated_ids"],
-                (candidate,),
-            )
-            self.assertEqual(set(occupancy.unknown_uuids), INVENTORY)
-            self.assertEqual(
-                dict(occupancy.unit_states), {GPU_A: "UNKNOWN", GPU_B: "UNKNOWN"}
-            )
-            self.assertEqual(occupancy.occupied_uuids, ())
+                self.assertEqual(ancestry.call_count, 2)
+                self.assertEqual(observation.processes, ())
+                self.assertEqual(observation.unknown_gpu_ids, INVENTORY)
+                self.assertEqual(dict(observation.unit_states), {candidate: "UNKNOWN"})
+                self.assertEqual(
+                    observation.process_inventory_visibility["allocated_ids"],
+                    (candidate,),
+                )
+                self.assertEqual(set(occupancy.unknown_uuids), INVENTORY)
+                self.assertEqual(
+                    dict(occupancy.unit_states), {GPU_A: "UNKNOWN", GPU_B: "UNKNOWN"}
+                )
+                self.assertEqual(occupancy.occupied_uuids, ())
 
     def test_unselected_unknown_is_not_free_or_added_to_caller_allocation(self) -> None:
         """A free candidate and an unresolved different GPU remain distinct."""
@@ -173,13 +173,13 @@ class NvidiaInventoryProjectionTest(unittest.TestCase):
                 observation, occupancy = _observe(
                     _xml(kind, None), frozenset({GPU_B})
                 )
-            self.assertEqual(observation.unknown_gpu_ids, frozenset())
-            self.assertEqual(observation.processes[0].kind, expected_kind)
-            self.assertEqual(occupancy.occupied_uuids, (GPU_A,))
-            self.assertEqual(
-                dict(occupancy.unit_states), {GPU_A: "BUSY", GPU_B: "FREE"}
-            )
-            self.assertEqual(dict(observation.unit_states), {GPU_B: "FREE"})
+                self.assertEqual(observation.unknown_gpu_ids, frozenset())
+                self.assertEqual(observation.processes[0].kind, expected_kind)
+                self.assertEqual(occupancy.occupied_uuids, (GPU_A,))
+                self.assertEqual(
+                    dict(occupancy.unit_states), {GPU_A: "BUSY", GPU_B: "FREE"}
+                )
+                self.assertEqual(dict(observation.unit_states), {GPU_B: "FREE"})
 
 
 if __name__ == "__main__":
