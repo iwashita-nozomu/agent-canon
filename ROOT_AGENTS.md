@@ -59,6 +59,23 @@ credentials, and runtime semantics with consumer owners. For a
 source-specific AgentCanon root, keep those source responsibilities with the
 source checkout's owners.
 
+Before implementing a guard, retry, fallback, or other abnormal-condition
+handling, first determine whether the condition can occur under the current
+contract and supported execution environment. Identify the triggering
+input/state and assess reachability from observations, specifications, code,
+or mathematical and engineering analysis. Distinguish established possibility,
+exclusion by maintained invariants, and unresolved uncertainty. Absence of
+incidents does not prove impossibility; a hypothetical failure alone does not
+establish reachability. Do not add handling for excluded conditions or turn
+uncertainty into speculative production code; investigate the missing premise
+first. Preventive handling does not require a real incident or unsafe
+reproduction when specifications or analysis establish possibility. Only after
+that judgment, use impact and existing guarantees to select the smallest
+necessary remedy at the responsible owner and validate it against the
+identified condition. Preserve existing required safety and external-boundary
+checks. Record the judgment and grounds in the existing Issue or design record,
+not a new gate or report.
+
 When numerical results disagree, first investigate defects in the algorithm
 and its implementation against the governing equations and specification,
 including assumptions, units, indexing, update order, and boundary conditions.
@@ -153,7 +170,8 @@ Start with this common base and the applicable source- or consumer-specific
 instructions. Resolve the task owner and repository-specific validation oracle
 from those surfaces. For a consumer root, use its appended consumer-specific
 instructions and select a separate qualified AgentCanon development checkout
-when the task changes AgentCanon itself. For a source-specific AgentCanon root,
+when the task changes AgentCanon itself. For a
+source-specific AgentCanon root,
 continue with that checkout's [AGENTS.md](AGENTS.md) Reader Map and canonical owner; keep
 consumer trees unchanged unless the consumer task explicitly owns the resulting
 generated file.
