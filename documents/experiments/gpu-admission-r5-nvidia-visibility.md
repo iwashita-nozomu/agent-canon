@@ -36,6 +36,12 @@ MIG unit の unknown は MIG と physical parent、physical unit の unknown は
 UNKNOWN に閉じます。compute-only の process list、短い UUID、integer GPU index は
 absence の証明になりません。
 
+observation が保持する `unknown_gpu_ids` は、候補外も含む観測済み inventory の
+uncertainty を保持します。candidate filter で UNKNOWN を捨てた後に full inventory を
+再分類してはいけません。allocation-scoped な `unit_states` と visibility witness は
+選択範囲を示すものであり、候補外の FREE を証明しません。full-inventory projection は
+元の UNKNOWN を保持し、scope が未証明の unit を FREE として補完しません。
+
 `accounted_processes` は NVIDIA の accounting mode が保持する終了済みを含む履歴であり、
 現在の GPU 占有を表す process inventory ではありません。したがって parser はこの要素を
 未知の process scope として拒否せず、`processes`、`compute_processes`、
@@ -49,6 +55,26 @@ container が欠落する場合や permission/unknown marker がある場合の 
 で検証し、read race、PID reuse、cycle、depth 超過、不一致を typed failure にします。
 `pstree -sp` は bounded diagnostic と capability detection だけであり、proc が完全なら
 実行継続できます。probe は signal/kill を実行しません。
+
+### WSL の namespace 境界
+
+WSLg system distro は user distro と異なる PID namespace を持ちます。NVIDIA XML の
+PID に対応する local `/proc/<pid>` がないことは、process の不在や GPU の空きを
+意味しません。現行の local-namespace identity contract で結合できない holder は
+UNKNOWN のままとし、同じ数値 PID の別 namespace process とも同一視しません。
+
+`/Xwayland` という名前、type `G`、used memory `N/A`、empty compute-app query は
+cross-namespace completeness の証明でも graphics-sharing の許可でもありません。
+現行の conservative occupancy は検証できた graphics / compute holder を BUSY とし、
+未証明の identity は UNKNOWN とします。対応する host observation を追加する場合は、
+既存 owner 内で namespace-qualified identity、UUID binding、観測範囲の完全性と
+freshness を実機 evidence により確立する必要があります。graphics-sharing policy の
+導入を observation 修正に隠してはいけません。
+
+WSLg の namespace 構成は [Microsoft WSLg architecture](https://github.com/microsoft/wslg#wslg-system-distro)、
+WSL の NVML query 制約は [NVIDIA CUDA on WSL guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
+を参照します。これらの資料だけで特定 host の observation capability が成立したとは
+扱いません。
 
 ## 実行時の evidence
 
