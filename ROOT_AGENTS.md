@@ -41,6 +41,23 @@ The explicit user request and the current repository-specific canonical owner
 are the source of truth. Preserve unknown dirty, staged, untracked, branch,
 and worktree state until the applicable Git safety owner classifies it.
 
+Preserve the problem class, valid input domain, and output guarantees required
+by the explicit user request and applicable canonical contract. A bounded
+change scope is not permission to narrow that problem. Do not add fixed
+dimensions, shapes, distributions, or other preconditions merely to fit a
+chosen algorithm, library, test fixture, implementation convenience, or
+performance target. Distinguish restrictions inherent in the governing problem
+from limitations of the chosen method; choose or derive a suitable method
+instead of promoting the latter into the specification. Do not reject or skip
+valid cases, or silently truncate or project them into a different problem,
+and call the result complete. Unresolved coverage remains an implementation
+gap, not invalid input or authorization to shrink the contract. Narrowing
+requires explicit user direction. Validate through the applicable implementation
+and test owners, including valid cases beyond the motivating example and cases
+a shortcut would exclude. Prefer the simplest implementation that preserves
+this domain and its guarantees; this does not authorize speculative
+generalization, new frameworks, or unrelated library or consumer changes.
+
 Before implementing a guard, retry, fallback, or other abnormal-condition
 handling, first determine whether the condition can occur under the current
 contract and supported execution environment. Identify the triggering
@@ -81,9 +98,24 @@ proximity. This common base exposes that reporting scope without selecting an
 external checkout, credential, or publication implementation.
 
 Before selecting or editing a repository surface, inspect its actual location,
-canonical owner, callers, and consumers. Establish the actual working
-directory and Git root, branch, and `HEAD`, then trace the selected owner's
-dependency and consumer edges. At each existing branch/checkout readback
+canonical owner, callers, and consumers. For library-backed work, inspect the
+caller and the relevant public API, including nested configuration and existing
+extension points, before proposing library edits. Distinguish a caller's
+convenience gap from a defect or missing capability in the library's own
+contract. Keep use-case selection, orchestration, environment setup, and
+presentation with their owning callers; do not move them into a reusable core
+merely to shorten a caller, remove textual duplication, or anticipate future
+reuse. Change a library only when the required behavior belongs to its
+abstraction and an evidenced contract defect or capability gap requires it,
+within the authorized scope. One valid caller can demonstrate a library defect;
+do not hide it in a caller workaround or require multiple callers for a
+correctness fix. Prefer direct use or composition of existing APIs when
+sufficient, without adding an unnecessary wrapper, helper, mode, or
+generalization layer. Record the owner choice and rejected alternative in the
+existing Issue / PR rationale, not a new gate or report.
+
+Establish the actual working directory and Git root, branch, and `HEAD`, then
+trace the selected owner's dependency and consumer edges. At each existing branch/checkout readback
 boundary, include the actual clones under the task's `workspace/<...>`, not
 only the parent checkout or its declared pins. For each in-scope dependency,
 inspect its resolved path, repository identity, branch or detached state,
