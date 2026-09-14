@@ -48,8 +48,10 @@ local topic branch も残しません。branch 名は request の exact `--branc
 「復旧用」「また使うかもしれない」を理由に保持しません。remote PR branch は open PR の参照先なので
 local cleanup の対象外です。merge 後の remote branch cleanup は publication owner の closeout に委譲します。
 
-この local branch cleanup は repository-topic lifecycle が作成・所有した branch に限定します。
-shared/unknown branch を探索して消す処理や、cleanup 前に recoverability を再判定する gate は追加しません。
+この local branch cleanup は repository-topic lifecycle が作成・所有した branch に限定し、
+owner evidence と exact request identity を cleanup authority として使います。別の recoverability 判定や
+追加の operation-level destructive approval は要求しません。shared/unknown branch を探索して消す処理も
+追加しません。
 
 操作結果を read back し、失敗時は
 [例外/フォールバック](../../documents/rule/repository-topic-clone.md#例外フォールバック)
