@@ -71,8 +71,16 @@ first. Preventive handling does not require a real incident or unsafe
 reproduction when specifications or analysis establish possibility. Only after
 that judgment, use impact and existing guarantees to select the smallest
 necessary remedy at the responsible owner and validate it against the
-identified condition. Preserve existing required safety and external-boundary
-checks. Record the judgment and grounds in the existing Issue or design record,
+identified condition. Do not make guards or preflight checks stricter than the
+governing contract: avoid environment, directory-layout, or exact-version
+restrictions when the required capability suffices, and repeated checks of
+invariants already guaranteed at the same trust boundary. An unavailable
+optional tool or diagnostic must not block an otherwise supported path.
+Validate untrusted inputs at the owning boundary rather than coupling reusable
+code to one caller's setup. Prefer no new check unless it closes an evidenced
+gap without unnecessarily reducing portability or reuse. Preserve required
+authorization, safety, and external-boundary checks; do not suppress their
+failures. Record the judgment and grounds in the existing Issue or design record,
 not a new gate or report.
 
 When numerical results disagree, first investigate defects in the algorithm
