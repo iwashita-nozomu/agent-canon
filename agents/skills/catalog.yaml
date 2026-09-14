@@ -1621,17 +1621,17 @@ skill_families:
         - ["preallocation", "experiment"]
         - ["visualization.py", "artifact", "experiment"]
   - id: gpu-execution
-    purpose: Route GPU/CUDA/JAX/XLA/IREE execution through provider-independent full-UUID admission by default, with the managed ExperimentRunner adapter only for managed experiment lifecycle contracts.
+    purpose: Route ordinary GPU/CUDA/JAX/XLA/IREE workloads through native project Docker device selection, with strict full-UUID admission or managed ExperimentRunner lifecycle only when those contracts are required.
     canonical_doc: agents/skills/gpu-execution.md
     shim: .codex/personal/skills/gpu-execution/SKILL.md
     discovery:
       name: gpu-execution
-      description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE execution, free-GPU admission, full UUID or MIG selection, nvidia-smi evidence, arbitrary pytest/benchmark/diagnostic argv, managed ExperimentRunner runs, GPU validation blockers, or preallocation-disabled JAX/XLA execution."
+      description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE execution, selecting an available GPU index or UUID for native Docker, optional free-GPU admission or reservation, nvidia-smi evidence, arbitrary pytest/benchmark/diagnostic argv, managed ExperimentRunner runs, GPU validation blockers, or preallocation-disabled JAX/XLA execution."
     tool_commands:
       required: []
       conditional:
+      - {"executable": "docker", "argv": ["run", "--rm", "--gpus", "device=<selected-GPU>", "<image>", "<argv...>"]}
       - {"executable": "python3", "argv": ["tools/experiments/execution/run_gpu_command.py", "--gpu-count", "1", "--min-free-memory", "<bytes>", "--", "<argv...>"]}
-      - {"tool_id": "run-gpu-container", "operation_id": "default"}
       - {"tool_id": "run-managed-experiment", "operation_id": "default", "argv_suffix": ["--topic", "<topic>", "--variant", "<variant>", "--", "<inner", "argv...>"]}
       - {"executable": "python3", "argv": ["-m", "pytest", "tests/tools/test_run_gpu_command.py", "-q"]}
       - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
@@ -1640,7 +1640,7 @@ skill_families:
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
-      reason: GPU/CUDA/JAX/XLA execution, provider-independent direct admission, managed experiment execution, or preallocation-disabled validation is in scope
+      reason: GPU/CUDA/JAX/XLA/IREE execution, native Docker device selection, optional strict admission, managed experiment execution, or preallocation-disabled validation is in scope
       triggers:
         - ["gpu", "実行"]
         - ["gpu", "利用"]
