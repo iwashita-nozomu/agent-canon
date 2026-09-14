@@ -842,7 +842,7 @@ environment, produce resources, or duplicate tests/gates.
 - 文書変更では canonical formatter/check path が Markdown、math、Mermaid の
   format/check を一つの証跡として記録する。
 - report を閉じる前には [documents/experiments/experiment-report-style.md](../../documents/experiments/experiment-report-style.md) を確認する
-- 研究系 task では `critical-review` と `report-review` の decision state を確認し、必要なら `research-perspective-review` を追加する
+- 研究系 task では [critical-review](../internal-routines/critical-review.md) と [report-review](../internal-routines/report-review.md) の decision state を確認し、必要なら [research-perspective-review](../internal-routines/research-perspective-review.md) を追加する
 
 ### 7. Closeout
 

@@ -104,7 +104,7 @@ supporting citations or artifacts, and the message left to the reader.
 1. reader order で draft する
 1. reverse outline を取る
 1. `document_flow_reviewer` を通す
-1. `citation_evidence_reviewer` に citation review を通す
+1. `citation_evidence_reviewer` に [citation review](../internal-routines/citation-evidence-review.md) を通す
 1. `notation_definition_reviewer` に notation review を通す
 1. `logic_gap_reviewer` に logic-gap review を通す
 1. 別 reviewer に docs completeness review を通す
