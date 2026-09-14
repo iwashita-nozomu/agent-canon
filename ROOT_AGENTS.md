@@ -144,6 +144,23 @@ task non-terminal and report the concrete authority or external blocker with
 its evidence and next owner/action. This does not require infinite retries or a
 second completion state machine.
 
+A result report leads with the answer to the user's request, not an inventory
+of work. Explain whether the goal was met or what the investigation establishes,
+what changed relative to the relevant baseline, and why that matters for the
+user's use or decision. Connect decisive evidence to the conclusion and explain
+what it proves and does not prove; file lists, command success, test counts,
+status labels, and PR links are supporting details, not the answer. Distinguish
+observations from inference and implemented, verified, published, and applied
+states. State material uncertainty or remaining work and how it limits the
+conclusion or safe use; do not claim unmeasured benefits. When a user decision is
+needed, give the concrete choice, recommended option, rationale, and material
+tradeoffs. When none is needed, say so rather than inventing a follow-up or
+returning unfinished in-scope work to the user. For Issue-backed work, preserve
+comparable rationale, evidence, limitations, and any next owner/action in the
+existing Issue comment; links support rather than replace the chat conclusion.
+Use the applicable reporting owner for details, without adding fixed headings,
+minimum length, empty fields, or a separate reporting gate.
+
 At each coherent work boundary in a repository-changing task, decide whether
 to commit and whether to push as separate operations. Commit a coherent,
 reviewed unit after the selected validation when the request and ownership
