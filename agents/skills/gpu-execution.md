@@ -3,213 +3,69 @@
 <!--
 @dependency-start
 contract skill
-responsibility Routes GPU execution through provider-independent AgentCanon admission by default and the optional managed experiment adapter only when managed lifecycle contracts are required.
-upstream design ../../documents/experiments/gpu-direct-command.md direct admission state machine, exact environment, lifecycle, and route-selection contract
-upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical discovery, occupancy, lock, and admission evidence ownership
-upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA topology and full UUID boundary
-upstream design experiment-lifecycle.md managed experiment artifact boundary
-downstream design ./environment-maintenance.md consumes canonical Docker device and exact environment forwarding
-downstream implementation ../../tools/experiments/execution/run_gpu_command.py provider-independent direct-command CLI
-downstream implementation ../../tools/experiments/execution/run_managed_experiment.py optional managed provider adapter
-downstream implementation ../../tools/validation/ci/runners/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
+responsibility Runs ordinary GPU workloads by selecting an available device and using native Docker; keeps admission and managed lifecycle opt-in.
+upstream design ../../documents/experiments/gpu-direct-command.md optional admission adapter contract
+upstream design experiment-lifecycle.md optional managed experiment artifact boundary
+downstream design ./environment-maintenance.md consumes the ordinary GPU execution route
+downstream design ../../tools/README.md project execution guidance
 downstream implementation ../../.codex/personal/skills/gpu-execution/SKILL.md Codex discovery shim
-downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_contract.py single-entry Docker documentation regression contract
-upstream environment ../../agent-canon-environment.toml audited managed ExperimentRunner provider identity and runtime item
+downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_contract.py native Docker command regression
 @dependency-end
 -->
 
-## 目的
+## 通常の実行
 
-この skill は GPU/CUDA/JAX/XLA/IREE 実行を AgentCanon の厳格な admission、full UUID
-lock、固定 environment、terminal evidence に接続します。通常の pytest、benchmark、診断、
-任意 argv は provider-independent direct route を使います。topic/cases/source snapshot/
-artifact/completion coverage が必要な実験だけ managed route を使います。
+空いているGPUを指定して、プロジェクトのimageとcommandを`docker run`します。
+GPUを使うという理由だけで、専用runnerや追加の承認手順へ移りません。
 
-static test や CPU-only smoke を実機 GPU validation と取り違えず、GPU が使えない場合は
-blocker evidence を残します。
+Dockerが動くホストの`nvidia-smi`で、使用状況と空きメモリを確認します。
+観測した空きGPUのindexまたはUUIDを`GPU`、プロジェクトのimageを`IMAGE`に設定し、
+実行するcommandと引数を`"$@"`として渡します。
 
-## 適用範囲と owner 境界
-
-- GPU allocation、CUDA/NVIDIA visibility、MIG、`nvidia-smi`、JAX/XLA allocator、GPU
-  smoke/benchmark/diagnosis が対象です。
-- NVIDIA topology、process occupancy、BUSY/UNKNOWN/FREE、full UUID reservation、fresh
-  post-lock observation は `execution_resource_plan.py` が canonical owner です。
-- provider-independent plan/environment/child lifecycle は `gpu_command_admission.py`、CLI は
-  `run_gpu_command.py` が owner です。
-- topic の設計と registry、managed run artifact は `experiment-lifecycle` が所有します。
-- solver と数値 correctness は `computational-optimization`、Docker/driver/CI は
-  `environment-maintenance`、Python/C++ review は各 review skill が所有します。
-- hooks/resource projection の public schema は変更しません。
-
-## Route selection
-
-次の条件では direct route が既定です。
-
-- pytest、benchmark、diagnostic、smoke、one-off script を一つの argv として実行する。
-- 成否が child exit、stdout、stderr、GPU admission/lifecycle evidence で定義できる。
-- topic registry、cases、source snapshot、provider artifact schema、completion coverage を
-  必要としない。
-
-```text
-python3 tools/experiments/execution/run_gpu_command.py \
-  --gpu-count 1 \
-  --min-free-memory <bytes> \
-  -- <argv...>
+```bash
+nvidia-smi
+docker run --rm --gpus "device=$GPU" "$IMAGE" "$@"
 ```
 
-次の contract が一つでも必要な場合だけ managed route を使います。
+`GPU`は一つのdeviceを指定します。既に空きを確認したGPUが指定されている場合は、
+同じ確認や利用許可の質問を繰り返さず、その指定で実行します。indexを固定の空きGPUと
+仮定せず、remote Dockerではclient側のGPU一覧をdaemon側の一覧と取り違えません。
 
-- experiment topic/variant/run identity と registry command
-- case expansion と resource estimate/capacity wire schema
-- source/config snapshot と provider-owned artifact manifest
-- provider lifecycle result、worker coverage、completion coverage
+通常経路に`run_gpu_command.py`、`run_gpu_container.sh`、XML解析、PIDの名前空間照合、
+UUID lock、post-lock再観測、plan/fingerprint/receiptを要求しません。
+最小空きメモリ値の手入力や、JAXを使わないcommandへのJAX/XLA設定も不要です。
+必要な設定、mount、資源上限はプロジェクトの既存Docker実行設定を使います。
 
-```text
-python3 -m tools.experiments.execution.run_managed_experiment \
-  --topic <topic> --variant <variant> -- <inner argv...>
-```
+## 空き確認と失敗の扱い
 
-managed route だけが `experiment-runner-admitted` の存在、contract identity、request/result
-schema を検証します。direct route は provider、registry、topic、cases、snapshot、artifact、
-completion coverage を参照しません。
+空きの確認はその時点の観測であり、排他予約ではありません。既知の他者の計算を奪ったり、
+そのprocessを停止したりせず、空きを判断できない場合は不明と伝えます。
+表示用processが存在することや、別名前空間のPIDを解決できないことだけを理由に、
+通常実行へ厳格なadmissionのUNKNOWN判定を持ち込みません。
 
-## Direct admission contract
+Dockerの終了コードと実際のエラーをそのまま扱います。個別GPUの指定に失敗しても、
+無断で`--gpus all`へ広げたり、別daemonへ切り替えたり、driver設定を書き換えたりしません。
+既存の資源上限、権限境界、利用者の再実行禁止は変更しません。
 
-```text
-strict nvidia-smi -L
-  -> executable physical/MIG leaves
-  -> S0 BUSY/UNKNOWN/FREE + memory
-  -> full UUID lock
-  -> distinct S_lock
-  -> race/memory validation
-  -> immutable plan
-  -> exact environment
-  -> shell=False child
-  -> descendant quiescence
-  -> one-attempt lock release
-```
+## 必要な場合だけ使う経路
 
-XML topology/process hierarchy が UUID binding authority です。query-compute-apps は XML
-PID の一意 join 後の supplement だけです。`FREE` だけが eligible で、UNKNOWN、MIG parent
-closure、topology drift、visibility drift、memory shortage、lock contention は fail-closed です。
-integer index と UUID prefix は使用しません。
+排他予約が明示的に必要な場合だけ、[admission設計](../../documents/experiments/gpu-direct-command.md)
+の既存adapterを使います。ここではその実装や検証条件を緩めません。
+managedなtopic、case、snapshot、artifact lifecycleが必要な場合だけ、
+[experiment-lifecycle](experiment-lifecycle.md)へ進みます。
+通常のpytest、benchmark、診断を実行するだけなら、どちらも前提にしません。
 
-plan は argv/cwd、candidate inventory、MIG joins、initial/post-lock event、unit states、selected
-memory、全 reservation ID、全 lock device/inode、admission fingerprint を environment 生成前に
-固定して書き出します。
+## 検証と報告
 
-## Environment
+指定GPU、実行command、終了コード、必要な出力を既存の作業記録へ残します。
+GPUを使ったという主張は、そのcommandが実際にGPU backendを使用した結果で確認します。
+JAXを使う場合だけ、container内で`jax.default_backend() == "gpu"`を確認します。
+CPU-onlyやfake commandの成功を実機GPU検証と扱わず、実機未実行ならその点を明記します。
 
-selected full physical/MIG UUID の visibility は plan freeze 後にだけ生成します。
+局所回帰テスト:
 
 ```text
-CUDA_VISIBLE_DEVICES=<selected full UUID list>
-NVIDIA_VISIBLE_DEVICES=<same list>
-JAX_PLATFORMS=cuda
-XLA_PYTHON_CLIENT_PREALLOCATE=false
-XLA_PYTHON_CLIENT_ALLOCATOR=platform
-XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR=false
+python3 -m unittest discover -s tests/agent_tools -p test_gpu_execution_docker_all_contract.py -v
 ```
 
-JAX は admitted child 内で初めて import します。`JAX_PLATFORMS=cuda` により GPU backend が
-ない場合の CPU fallback を成功扱いしません。継承した secret 値は plaintext evidence に
-書かず、fingerprint では値を hash して exact environment に束縛します。
-
-## Docker GPU wiring
-
-admitted child が Docker container を起動する public 経路は一つだけです。caller は
-`--gpus`、`--device`、CDI qualified device、runtime mode を選ばず、常に
-repository-owned shell adapter を同じ形で呼びます。
-
-```text
-python3 tools/experiments/execution/run_gpu_command.py \
-  --gpu-count 1 --min-free-memory <bytes> -- \
-  bash tools/validation/ci/runners/run_gpu_container.sh \
-    --image <canonical-image> -- <argv...>
-```
-
-shell adapter は6変数の存在、CUDA/NVIDIA visibility一致、full UUID/MIG identityを
-Docker起動前に確認します。その後、接続先Docker daemonが`docker info`の
-`DiscoveredDevices`として公開するCDI inventoryだけをread-onlyで観測します。client hostの
-CDI specや`nvidia-ctk`を別のauthorityにしません。
-
-selected identityの全てについてexact `nvidia.com/gpu=<full UUID/MIG>` がdaemon inventoryに
-存在する場合だけ、同じ順序の個別`--device`引数を構成します。exact mappingが一つでも欠ける、
-`nvidia.com/gpu=all`しかない、index名しかない、またはinventory fieldを読めない場合は、同じ
-entrypointの内部で既存の`--gpus all` injectionを選びます。UUIDをinteger indexへ推測変換せず、
-partial CDIとall injectionを混在させません。
-
-どちらのinjectionでも6個の値を同じ`docker run` argvへ`-e NAME=VALUE`として明示します。
-device injectionはcontainerへdevice/libraryを渡す機構、admitted environmentはlock済みcompute
-setへvisibilityを狭める機構として分離します。capability判定後のworkload `docker run`は一度だけ
-実行し、失敗後に別injection方式で再実行しません。
-
-JAX は host 側や既存 container state で先に import せず、上記 exact environment を受けた
-新規 container child 内で初めて import します。container 内で `jax.default_backend()` が
-`gpu` でない結果は CPU fallback であり、GPU validation pass ではありません。
-
-## Child lifecycle
-
-direct adapter は argv array、`shell=False`、新しい session で一度だけ child を起動します。
-Linux subreaper と PID/starttime/ancestry/session/process-group/adoption evidence で
-AgentCanon-started descendants の transitive closure を追跡します。既存 runner child は対象外
-です。signal/kill は送りません。
-
-`Popen` 後の内部例外も descendant quiescence が成立するまで保持します。root と全 descendant
-が停止する前に lock を release しません。release は一回だけ試行し、ambiguous close を再試行
-で上書きしません。
-
-## Managed route
-
-managed route は従来どおり shell なしで次を一度だけ起動します。
-
-```text
-experiment-runner-admitted --request <path> --result <path>
-request schema: agentcanon-managed-run/v1
-result schema:  agentcanon-managed-run-result/v1
-```
-
-request/result fingerprint、worker/process group、quiescence、completion coverage、cleanup、
-terminal evidence が成立するまで reservation を保持します。provider repository/contract
-identity は `agent-canon-environment.toml` と一致させます。direct route の導入は managed wire
-schema、provider identity、既存 completion coverage を変更しません。
-
-## Validation と blocker
-
-provider-independent owner tests:
-
-```text
-python3 -m pytest tests/tools/test_run_gpu_command.py -q
-```
-
-実機 JAX smoke:
-
-```text
-python3 tools/experiments/execution/run_gpu_command.py \
-  --gpu-count 1 --min-free-memory 2147483648 -- \
-  python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
-```
-
-Docker 実機 smoke:
-
-```text
-python3 tools/experiments/execution/run_gpu_command.py \
-  --gpu-count 1 --min-free-memory 2147483648 -- \
-  bash tools/validation/ci/runners/run_gpu_container.sh \
-    --image <canonical-image> -- \
-    python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
-```
-
-GPU-heavy test/benchmark も同じ direct adapter の `--` 後へ argv として渡します。managed
-regression は既存 `tests/tools/test_run_managed_experiment.py` で確認します。
-
-GPU またはDocker GPU injectionが利用不可なら `gpu_validation_blocker=<reason>`、未実行 claim、
-`nvidia-smi`/Docker diagnostic/stderr を closeout に記録します。fake test、static pass、CPU-only
-smoke は実機 GPU pass ではありません。
-
-## Closeout
-
-closeout は選択した route、candidate/selected full UUID、plan/admission/environment fingerprint、
-内部選択した`individual-cdi`または`gpus-all` injection、選択理由、start/end、raw exit、
-stdout/stderr hash、descendant quiescence、release evidence、targeted tests、managed regression、
-`gpu_validation_blocker`を参照します。
+Dockerのindex/UUID指定は[公式GPU文書](https://docs.docker.com/engine/containers/gpu/)を参照します。

@@ -42,18 +42,18 @@ bootstrap-owned ignored `.runtime/` under the install checkout:
 | `project-container` | parent project | product build, test runner, GPU | project-owned Docker/test contract |
 | `source` | AgentCanon checkout | policy/docs/design edits | explicit mutation only; no runtime output |
 
-For a project-owned GPU workload, keep GPU admission and the child command in
-the single Docker adapter.  The caller supplies the image and command only;
-the adapter selects its internal CDI or `--gpus all` injection route from the
-daemon's observed capabilities:
+For a project-owned GPU workload, follow
+[gpu-execution](../agents/skills/gpu-execution.md): inspect availability, select
+an available GPU index or UUID, and run the project image with native Docker.
+No AgentCanon runner or admission environment is required for ordinary runs.
 
-```bash
-run_gpu_container.sh --image <image> -- <argv...>
+```text
+docker run --rm --gpus device=<selected-GPU> <image> <argv...>
 ```
 
 This is a project execution route, not a requirement of the AgentCanon tool
-container.  The wrapper receives the admitted, full-UUID environment and does
-not expose a public runtime-mode or GPU-selection argument.
+container. The [admission adapter](../documents/experiments/gpu-direct-command.md)
+is optional and applies only when reservation is explicitly required.
 
 The AgentCanon runtime uses one shared image and at most one resident container
 per authorized control root. It does not create project/task-specific images,

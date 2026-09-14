@@ -5,7 +5,7 @@ contract skill
 responsibility Owns the expected Dockerfile-to-image-to-test structure for repository environments.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-upstream design ./gpu-execution.md canonical Docker device injection and exact GPU environment forwarding
+upstream design ./gpu-execution.md ordinary GPU Docker execution and optional admission boundary
 downstream implementation ./dependency-design.md dependency placement under the expected structure
 downstream implementation ./environment-cleanup.md environment cleanup route
 downstream implementation ./devcontainer-exec.md targeted running-container execution boundary
@@ -106,12 +106,11 @@ CIで同じimageとtest commandを再利用できる状態にします。
   その処理がなくても`docker run`の標準テスト一式は成功しなければなりません。
 - local developer convenienceだけを理由にhost-global installやproject image外のbootstrapを
   canonical routeへ昇格させません。
-- GPU imageはdeviceなしでbuild可能にします。GPU backend/deviceを必要とする標準テストは、
-  GPU runner上で`gpu-execution`のadmission後に同じimageを
-  `run_gpu_container.sh --image <image> -- <command...>`で起動します。callerはinjection方式を
-  選ばず、同skillのwrapperがDocker daemonのexact CDI inventoryから個別CDIまたは
-  `--gpus all`を内部選択し、full UUID visibilityと6個のexact environment値を同じrun argvへ
-  渡します。
+- GPU imageはdeviceなしでbuild可能にします。GPUを必要とする標準テストは、
+  [gpu-execution](gpu-execution.md)に従い、空いているGPUを指定して同じimageを
+  `docker run --rm --gpus device=<selected-GPU> <image> <command...>`で起動します。
+  通常実行に専用admissionやJAX/XLA設定を要求せず、排他予約が必要な場合だけ
+  同skillの任意経路を選びます。
 - Dockerfile、Dev Container、Compose、CI、READMEの project image target と command を同じ変更でそろえます。
 - Project runners reuse the image tag selected by the current environment owner and
   runtime pack across checkouts. They perform one native local-tag presence lookup;
@@ -138,8 +137,8 @@ CIで同じimageとtest commandを再利用できる状態にします。
 
 - bootstrap container contract testと実lifecycle readbackをcompletion evidenceにします。
 - supported profileごとに上記を実行します。
-- GPU deviceを必要とするtestはGPU runner上で`gpu-execution`のcontainer smokeを実行し、
-  container内のfresh JAX importとGPU backendを確認します。
+- GPU deviceを必要とするtestはGPU runner上で実行し、対象commandが実際にGPU backendを
+  使用したことを確認します。JAXのbackend確認はJAXを使用する場合だけ行います。
 - focused policy testで、Dockerfile外のdependency導入とDev Container/CIのalternate
   environment constructionを拒否します。
 - 文書変更はrepositoryのcanonical docs checkで検証します。

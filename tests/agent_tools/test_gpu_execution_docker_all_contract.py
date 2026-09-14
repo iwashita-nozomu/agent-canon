@@ -1,26 +1,26 @@
-"""Regression tests for the single Docker GPU entrypoint and internal routing."""
+"""Execute the documented ordinary GPU command with recording native-tool fakes."""
 
 # @dependency-start
 # contract test
-# responsibility Tests one public Docker GPU entrypoint, internal CDI/all selection, and environment-skill alignment.
-# upstream design ../../agents/skills/gpu-execution.md canonical Docker GPU child wiring
-# upstream design ../../agents/skills/environment-maintenance.md canonical image validation boundary
-# upstream design ../../documents/experiments/gpu-direct-command.md injection selection contract
-# upstream design ../../tools/README.md public Docker GPU invocation documentation
-# upstream implementation ../../tools/validation/ci/runners/run_gpu_container.sh route-selecting shell adapter
+# responsibility Checks native Docker device selection, argument preservation, and exit behavior without GPU admission prerequisites.
+# upstream design ../../agents/skills/gpu-execution.md ordinary GPU command under test
+# upstream design ../../agents/skills/environment-maintenance.md image execution guidance
+# upstream design ../../documents/experiments/gpu-direct-command.md optional admission boundary
+# upstream design ../../tools/README.md project GPU execution guidance
 # @dependency-end
 
 from __future__ import annotations
 
-import unittest
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-GPU_SKILL = PROJECT_ROOT / "agents" / "skills" / "gpu-execution.md"
-ENVIRONMENT_SKILL = PROJECT_ROOT / "agents" / "skills" / "environment-maintenance.md"
-DESIGN = PROJECT_ROOT / "documents" / "experiments" / "gpu-direct-command.md"
-TOOLS_README = PROJECT_ROOT / "tools" / "README.md"
-WRAPPER = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_gpu_container.sh"
+GPU_SKILL = PROJECT_ROOT / "agents/skills/gpu-execution.md"
 GPU_ENVIRONMENT_NAMES = (
     "CUDA_VISIBLE_DEVICES",
     "NVIDIA_VISIBLE_DEVICES",
@@ -32,71 +32,73 @@ GPU_ENVIRONMENT_NAMES = (
 
 
 class GpuExecutionDockerRoutingContractTest(unittest.TestCase):
-    """Keep one caller contract while the adapter chooses one injection route."""
+    """Test the shell example itself, not a second implementation of its argv."""
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.gpu_text = GPU_SKILL.read_text(encoding="utf-8")
-        cls.environment_text = ENVIRONMENT_SKILL.read_text(encoding="utf-8")
-        cls.design_text = DESIGN.read_text(encoding="utf-8")
-        cls.tools_readme_text = TOOLS_README.read_text(encoding="utf-8")
-        cls.wrapper_text = WRAPPER.read_text(encoding="utf-8")
-        cls.combined = cls.gpu_text + cls.environment_text + cls.design_text
+    def test_native_device_selection_without_admission_environment(self) -> None:
+        text = GPU_SKILL.read_text(encoding="utf-8")
+        command = text.split("```bash\n", 1)[1].split("```", 1)[0]
+        payload = ["python3", "script with spaces.py", "literal; echo not-a-command"]
+        for gpu in ("1", "GPU-01234567-89ab-cdef-0123-456789abcdef"):
+            for exit_code in (0, 23, 125):
+                with self.subTest(gpu=gpu, exit_code=exit_code):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        calls_path = root / "calls.jsonl"
+                        fake = (
+                            f"#!{sys.executable}\n"
+                            "import json, os, pathlib, sys\n"
+                            "name = pathlib.Path(sys.argv[0]).name\n"
+                            "with open(os.environ['GPU_TEST_CALLS'], 'a') as output:\n"
+                            "    output.write(json.dumps([name, *sys.argv[1:]]) + '\\n')\n"
+                            "sys.exit(int(os.environ['GPU_TEST_EXIT']) if name == 'docker' else 0)\n"
+                        )
+                        for name in ("nvidia-smi", "docker"):
+                            executable = root / name
+                            executable.write_text(fake, encoding="utf-8")
+                            executable.chmod(0o755)
+                        environment = {
+                            key: value for key, value in os.environ.items()
+                            if key not in GPU_ENVIRONMENT_NAMES
+                        }
+                        environment.update(
+                            PATH=f"{root}{os.pathsep}{os.defpath}",
+                            GPU=gpu,
+                            IMAGE="project:test",
+                            GPU_TEST_CALLS=str(calls_path),
+                            GPU_TEST_EXIT=str(exit_code),
+                        )
+                        result = subprocess.run(
+                            ["bash", "-c", command, "gpu-example", *payload],
+                            env=environment,
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
+                            check=False,
+                        )
+                        self.assertEqual(result.returncode, exit_code, result.stderr)
+                        calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
+                        self.assertEqual(calls, [
+                            ["nvidia-smi"],
+                            ["docker", "run", "--rm", "--gpus", f"device={gpu}",
+                             "project:test", *payload],
+                        ])
 
-    def test_public_invocation_has_no_runtime_mode_argument(self) -> None:
-        self.assertIn("run_gpu_container.sh", self.gpu_text)
-        self.assertIn("--image <canonical-image> -- <argv...>", self.gpu_text)
-        self.assertIn("--image <image> [--name <name>] -- <argv...>", self.design_text)
-        self.assertNotIn("--image <canonical-image> --gpus", self.gpu_text)
-        self.assertNotIn("--image <image> --gpus", self.design_text)
-        self.assertIn(
-            "run_gpu_container.sh --image <image> -- <argv...>",
-            self.tools_readme_text,
+    def test_environment_and_tool_guidance_use_the_canonical_skill(self) -> None:
+        for relative in ("agents/skills/environment-maintenance.md", "tools/README.md"):
+            with self.subTest(path=relative):
+                text = (PROJECT_ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn("gpu-execution.md", text)
+                self.assertNotIn("run_gpu_container.sh --image", text)
+
+    def test_admission_contract_is_explicitly_optional(self) -> None:
+        text = (PROJECT_ROOT / "documents/experiments/gpu-direct-command.md").read_text(
+            encoding="utf-8"
         )
-        self.assertNotIn(
-            "run_gpu_container.sh --image <image> --gpus all",
-            self.tools_readme_text,
-        )
-        self.assertIn(
-            "usage: run_gpu_container.sh --image IMAGE [--name NAME] -- COMMAND",
-            self.wrapper_text,
-        )
-        self.assertNotIn("--gpus)\n", self.wrapper_text)
-        self.assertNotIn("--device)\n", self.wrapper_text)
-
-    def test_adapter_owns_one_exclusive_capability_branch(self) -> None:
-        self.assertIn("DiscoveredDevices", self.combined)
-        self.assertIn("individual-cdi", self.combined)
-        self.assertIn("gpus-all", self.combined)
-        self.assertIn("nvidia.com/gpu=<full UUID/MIG>", self.gpu_text)
-        self.assertIn("docker info --format", self.wrapper_text)
-        self.assertIn("docker_command+=(--device", self.wrapper_text)
-        self.assertIn("docker_command+=(--gpus all)", self.wrapper_text)
-        self.assertIn("exact_uuid_devices_discovered", self.wrapper_text)
-        self.assertIn("exact_uuid_devices_not_discovered", self.wrapper_text)
-
-    def test_both_routes_keep_exact_full_uuid_environment(self) -> None:
-        self.assertIn("full UUID", self.combined)
-        self.assertIn("integer index", self.combined)
-        self.assertIn("-e NAME=VALUE", self.gpu_text)
-        for name in GPU_ENVIRONMENT_NAMES:
-            with self.subTest(name=name):
-                self.assertIn(name, self.gpu_text)
-                self.assertIn(name, self.wrapper_text)
-
-    def test_contract_rejects_alternate_legacy_runtime_mechanisms(self) -> None:
-        self.assertNotIn("no-cgroups=true", self.combined)
-        self.assertNotIn("nvidia-container-runtime", self.combined)
-        self.assertNotIn("--runtime=nvidia", self.combined)
-        self.assertNotIn("nvidia-ctk cdi generate", self.combined)
-
-    def test_environment_owner_delegates_gpu_wiring_to_single_entrypoint(self) -> None:
-        self.assertIn("agents/skills/gpu-execution.md", self.environment_text)
-        self.assertIn(
-            "run_gpu_container.sh --image <image> -- <command...>",
-            self.environment_text,
-        )
-        self.assertIn("container内のfresh JAX import", self.environment_text)
+        self.assertIn("## Applicability", text)
+        self.assertIn("only when reservation is explicitly required", text)
+        self.assertNotIn("Use the direct route by default", text)
+        self.assertIn("## Admission state machine", text)
+        self.assertIn("## Child lifecycle and lock retention", text)
 
 
 if __name__ == "__main__":

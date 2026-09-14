@@ -1,9 +1,9 @@
-# Provider-independent GPU direct command admission
+# Optional provider-independent GPU command admission
 
 <!--
 @dependency-start
 contract design
-responsibility Defines the provider-independent GPU admission state machine, direct-command adapter, exact environment, lifecycle evidence, and direct-versus-managed selection boundary.
+responsibility Defines the optional GPU admission adapter; ordinary Docker execution is owned by the GPU skill.
 upstream design ./gpu-admission-r5-source-packet.md canonical GPU discovery, occupancy, reservation, and plan ownership
 upstream design ./gpu-admission-r5-nvidia-visibility.md strict NVIDIA topology and full UUID evidence boundary
 downstream implementation ../../tools/experiments/execution/execution_resource_plan.py canonical NVIDIA evidence, BUSY/UNKNOWN/FREE classification, UUID lock, and admission receipt owners
@@ -16,6 +16,17 @@ downstream implementation ../../tests/tools/test_run_gpu_container.py Docker arg
 downstream design ../../agents/skills/gpu-execution.md route selection and operator workflow
 @dependency-end
 -->
+
+## Applicability
+
+Use this contract only when reservation is explicitly required. Ordinary GPU
+pytest, benchmark, diagnosis, and one-off container commands follow
+[gpu-execution](../../agents/skills/gpu-execution.md): select an available GPU
+and use native Docker. They do not require this adapter, its UUID locks,
+exact environment, immutable plan, or lifecycle receipts.
+
+The rules below describe the existing optional admitted route only. They do
+not override the ordinary route or change the admission implementation.
 
 ## Purpose
 
@@ -30,8 +41,8 @@ is not a prerequisite for direct pytest, benchmark, diagnosis, or one-off GPU co
 
 ## Route selection
 
-Use the direct route by default when the requested unit is an argv and success is defined by its
-exit status plus stdout/stderr:
+When reservation is required for an arbitrary argv without a managed experiment
+lifecycle, use the provider-independent admission adapter:
 
 ```text
 python3 tools/experiments/execution/run_gpu_command.py \
@@ -129,7 +140,7 @@ values are cryptographically bound in fingerprints without being written in plai
 
 GPU selection and Docker device injection remain separate responsibilities. Direct admission
 selects and locks full physical/MIG UUIDs and materializes the six exact environment values
-above. Docker GPU execution exposes one public invocation shape:
+above. Within this optional admitted route, the Docker adapter has one invocation shape:
 
 ```text
 bash tools/validation/ci/runners/run_gpu_container.sh \
@@ -209,7 +220,7 @@ python3 -m pytest tests/tools/test_run_gpu_command.py -q
 python3 -m pytest tests/tools/test_run_gpu_container.py -q
 ```
 
-A real GPU JAX smoke must import JAX only inside the admitted child:
+Validation of this optional adapter imports JAX only inside the admitted child:
 
 ```text
 python3 tools/experiments/execution/run_gpu_command.py \
@@ -219,8 +230,8 @@ python3 tools/experiments/execution/run_gpu_command.py \
   'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
 ```
 
-A real Docker GPU smoke uses the same public wrapper invocation on both CDI-capable and all-only
-hosts:
+A real Docker smoke of the optional adapter uses the same wrapper invocation on both
+CDI-capable and all-only hosts:
 
 ```text
 python3 tools/experiments/execution/run_gpu_command.py \
@@ -231,7 +242,7 @@ python3 tools/experiments/execution/run_gpu_command.py \
   'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
 ```
 
-A GPU-heavy test or benchmark uses the same adapter, for example:
+A GPU-heavy test or benchmark requiring reservation uses the same adapter, for example:
 
 ```text
 python3 tools/experiments/execution/run_gpu_command.py \
