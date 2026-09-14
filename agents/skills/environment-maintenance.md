@@ -25,6 +25,11 @@ downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_
 - Boundary: source、data、model、credential、GPU driver/device などの runtime input は
   image 外に置けますが、標準環境の構築には使いません。
 
+通常のcommand実行は、current repository ownerが選ぶ既存の経路・設定を使います。
+CPU/GPUを使うことや任意設定の未確認だけで、この保守workflowを起動しません。
+環境の変更・修復が依頼範囲にある場合だけ、以下の構築・acceptanceを適用します。
+既存経路での実行前に、環境再構築や無関係なprofileの整備を追加要求しません。
+
 AgentCanon source is the exception to project-local Dev Container discovery:
 its Python/Rust/LSP dependencies belong to the shared image built by
 `bootstrap.sh` and `bootstrap/`. A parent project may keep its own
@@ -129,6 +134,12 @@ CIで同じimageとtest commandを再利用できる状態にします。
 
 ## Validation
 
+変更した環境のownerに沿って検証します。以下のbootstrap例とlifecycle readbackは
+AgentCanon tool runtimeのimage/lifecycle変更に限ります。project環境の変更は
+project-owned build/runと該当profileのcanonical full testで検証し、AgentCanon
+bootstrapを前提にしません。文書のみの変更は文書・参照整合の検証に限定し、
+image buildや実機acceptanceを実施したとは報告しません。
+
 ```bash
 ./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install
 ./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> start
@@ -136,7 +147,7 @@ CIで同じimageとtest commandを再利用できる状態にします。
 ```
 
 - bootstrap container contract testと実lifecycle readbackをcompletion evidenceにします。
-- supported profileごとに上記を実行します。
+- 変更の影響を受けるsupported profileを検証します。未使用profileの整備を開始条件にしません。
 - GPU deviceを必要とするtestはGPU runner上で実行し、対象commandが実際にGPU backendを
   使用したことを確認します。JAXのbackend確認はJAXを使用する場合だけ行います。
 - focused policy testで、Dockerfile外のdependency導入とDev Container/CIのalternate
@@ -144,6 +155,8 @@ CIで同じimageとtest commandを再利用できる状態にします。
 - 文書変更はrepositoryのcanonical docs checkで検証します。
 
 ## Completion
+
+以下は環境実装を変更した場合の終了条件であり、通常実行や文書のみの変更には適用しません。
 
 - canonical Docker imageをbuildできる。
 - buildしたimageを`docker run`し、repositoryの標準テスト一式が追加setupなしで全て成功する。
