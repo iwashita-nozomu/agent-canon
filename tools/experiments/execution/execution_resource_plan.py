@@ -3803,7 +3803,7 @@ class NvidiaInventoryProbe:
         unknown_gpu_ids = _close_unknown_gpu_units(
             process_parse.unknown_gpu_ids,
             tuple(parsed_devices.values()),
-            allocated,
+            frozenset(parsed_devices),
             xml_binding_unknown=process_parse.xml_binding_unknown,
         )
         unit_states = _classify_gpu_unit_states(

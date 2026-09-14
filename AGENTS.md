@@ -16,25 +16,11 @@ downstream implementation tools/validation/semantic/runtime/check_agent_runtime_
 @dependency-end
 -->
 
-This tree is the standalone AgentCanon source of truth. This file is a reader
-and owner map only, using the shared entry behavior in [ROOT_AGENTS.md](ROOT_AGENTS.md) and
-adding the source-specific AgentCanon map below.
-The leading `@ROOT_AGENTS.md` is an explicit read reference: callers must read
-that file first and then this source-specific Reader Map; this marker is not an
-assertion that any runtime automatically expands or imports the file. Task
-procedures, command recipes, role lifecycles, implementation policy, and
-closeout schemas remain in the canonical surfaces named below.
-
 ## Repository Role
 
-Use this entrypoint when the detected repository root is the AgentCanon source
-checkout. A default `project_template` or derived repository owns its tracked
-instructions directly and does not acquire live AgentCanon runtime behavior by
-mentioning this repository. [ROOT_AGENTS.md](ROOT_AGENTS.md) supplies common root instructions;
-the consumer-only maps and routes in that base do not redirect this source
-checkout. This file retains the source-specific AgentCanon reader map. A
-consumer's generated root file remains governed by its explicit composition
-and its own specific instructions.
+Use this entrypoint for the standalone AgentCanon source checkout. Its
+source-specific owner maps below supplement the common base; they do not apply
+to a consumer's generated instructions.
 
 Directory-local [AGENTS.md](AGENTS.md) files may narrow behavior for their subtree. They
 must add only the responsibility owned by that subtree and must not copy a
@@ -60,17 +46,8 @@ root, workflow, or Skill policy for visibility.
 
 ## Always-On Boundary
 
-The explicit user request and the current tracked canonical owner are the
-source of truth. Preserve unknown dirty, staged, untracked, branch, and worktree
-state until the Git safety owner classifies it. Follow the selected owner and
-its validation route rather than inventing a fallback, wrapper, compatibility
-path, or local copy of policy.
-
-Implementation sufficiency is not defined in this entrypoint. The implementation
-owner selects the smallest contract-complete owning unit and records material
-mathematical, domain, or engineering grounds and a validation oracle. Detailed
-admission and blocker rules belong to the implementation and review Skills, not
-here.
+Follow the selected owner and its validation route rather than inventing a
+fallback, wrapper, compatibility path, or local copy of policy.
 
 ## Runtime Owner Map
 
@@ -85,34 +62,19 @@ here.
 
 ## Task Entry
 
-Resolve request modality through
-[agents/internal-routines/chatgpt-codex-routing.md](agents/internal-routines/chatgpt-codex-routing.md) before repository
-orchestration. A `chatgpt` route closes in conversation without workspace
-execution. A `codex` route hands its typed scope and validation oracle to
-`agent-orchestration` before task-shape skill selection.
-
-Resolve the task shape and canonical owner from the reader map and public Skill
-registry only after Codex admission. Read the selected owner surface before
+Apply the ChatGPT / Codex Reader Map row before repository orchestration.
+Only after Codex admission, resolve the task shape and canonical owner through
+the Reader Map and public Skill registry, and read the selected owner before
 editing. A bounded request with an identified owner, path, and targeted
 validation stays bounded; broader design, orchestration, research, or subagent
 machinery activates only when its owner-defined condition is present.
 
-Before forming, changing, or delegating a team, follow the team-composition
-Reader Map row above. Read the selected typed route and its role/model/skills/
-authority/handoff sources; do not infer activation from a candidate role list,
-replace a selected model, or omit a selected role without an evidence-backed
-handoff update to the responsible owner.
-
-Read-only web, connector, and supplied-material analysis remain ChatGPT work
-unless the requested result depends on repository-local state, command
-observation, mutation, iterative validation, or durable repository delivery.
-Repository-changing work follows the selected Skill and workflow; this
-entrypoint does not restate their sequence.
+Use the team-composition Reader Map row for the shared team-selection boundary.
+Do not replace a selected model or omit a selected role without an
+evidence-backed handoff update to the responsible owner.
 
 ## Validation Routing
 
-Use the validation route owned by the changed responsibility and active runtime
-profile. Validate the contract and failure semantics that changed, then use the
-canonical closeout owner for repository-wide evidence when the selected route
-requires it. Do not turn the examples or commands in another owner into a
-universal checklist.
+Use the active runtime profile and the validation / closeout Reader Map row
+for source-wide evidence when required by the selected route. Examples or
+commands in another owner are not a universal checklist.
