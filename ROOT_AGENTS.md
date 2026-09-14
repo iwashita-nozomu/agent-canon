@@ -41,6 +41,23 @@ The explicit user request and the current repository-specific canonical owner
 are the source of truth. Preserve unknown dirty, staged, untracked, branch,
 and worktree state until the applicable Git safety owner classifies it.
 
+Preserve the problem class, valid input domain, and output guarantees required
+by the explicit user request and applicable canonical contract. A bounded
+change scope is not permission to narrow that problem. Do not add fixed
+dimensions, shapes, distributions, or other preconditions merely to fit a
+chosen algorithm, library, test fixture, implementation convenience, or
+performance target. Distinguish restrictions inherent in the governing problem
+from limitations of the chosen method; choose or derive a suitable method
+instead of promoting the latter into the specification. Do not reject or skip
+valid cases, or silently truncate or project them into a different problem,
+and call the result complete. Unresolved coverage remains an implementation
+gap, not invalid input or authorization to shrink the contract. Narrowing
+requires explicit user direction. Validate through the applicable implementation
+and test owners, including valid cases beyond the motivating example and cases
+a shortcut would exclude. Prefer the simplest implementation that preserves
+this domain and its guarantees; this does not authorize speculative
+generalization, new frameworks, or unrelated library or consumer changes.
+
 Before implementing a guard, retry, fallback, or other abnormal-condition
 handling, first determine whether the condition can occur under the current
 contract and supported execution environment. Identify the triggering
