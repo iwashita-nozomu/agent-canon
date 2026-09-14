@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/responsibility-rationale.md PR queue activation rationale
 upstream design agent-orchestration.md execution-time-aware work-conservation contract
 upstream design ../../documents/agent-canon/agent-canon-update-route.md source PR versus parent pin route
+upstream design ../internal-routines/github-connected-work.md current-session GitHub transport and partial-validation delivery route
 upstream design ../internal-routines/github-status-lifecycle.md deterministic GitHub Issue status-label reconciliation and evidence contract
 upstream design ../../documents/conventions/coding-conventions-testing.md Issue-linked bug reproduction evidence owner
 upstream implementation ../../tools/repository/github/github_publish.py publishes PRs and writes summary artifacts
@@ -17,6 +18,14 @@ downstream implementation ../../.codex/personal/skills/pr-processing/SKILL.md ex
 ## Purpose
 
 Process PRs/issues with fresh base/head/diff/check/authority state and explicit publication readback. Queue-wide snapshots and dependency DAGs are an optimization/safety mechanism for interacting candidates, not a prerequisite for every PR.
+
+## Work from the current connected session
+
+For authorized Issue work or PR delivery from ChatGPT or another session with
+GitHub tools, use [GitHub connected work](../internal-routines/github-connected-work.md).
+It adapts the current transport, not the implementation, branch, validation,
+or status policy. Invoke this existing skill as `$pr-processing`; a second
+public skill, generated shim, or local environment installation is not required.
 
 ## Single-candidate fast path
 
