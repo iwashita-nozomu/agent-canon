@@ -64,9 +64,24 @@ proximity. This common base exposes that reporting scope without selecting an
 external checkout, credential, or publication implementation.
 
 Before selecting or editing a repository surface, inspect its actual location,
-canonical owner, callers, and consumers. Establish the actual working
-directory and Git root, branch, and `HEAD`, then trace the selected owner's
-dependency and consumer edges. At each existing branch/checkout readback
+canonical owner, callers, and consumers. For library-backed work, inspect the
+caller and the relevant public API, including nested configuration and existing
+extension points, before proposing library edits. Distinguish a caller's
+convenience gap from a defect or missing capability in the library's own
+contract. Keep use-case selection, orchestration, environment setup, and
+presentation with their owning callers; do not move them into a reusable core
+merely to shorten a caller, remove textual duplication, or anticipate future
+reuse. Change a library only when the required behavior belongs to its
+abstraction and an evidenced contract defect or capability gap requires it,
+within the authorized scope. One valid caller can demonstrate a library defect;
+do not hide it in a caller workaround or require multiple callers for a
+correctness fix. Prefer direct use or composition of existing APIs when
+sufficient, without adding an unnecessary wrapper, helper, mode, or
+generalization layer. Record the owner choice and rejected alternative in the
+existing Issue / PR rationale, not a new gate or report.
+
+Establish the actual working directory and Git root, branch, and `HEAD`, then
+trace the selected owner's dependency and consumer edges. At each existing branch/checkout readback
 boundary, include the actual clones under the task's `workspace/<...>`, not
 only the parent checkout or its declared pins. For each in-scope dependency,
 inspect its resolved path, repository identity, branch or detached state,
