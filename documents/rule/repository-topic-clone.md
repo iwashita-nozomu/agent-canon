@@ -89,29 +89,27 @@ commit しません。`conflict_preservation.py validate` 単体は診断用で�
 
 repository-topic checkout は、変更を正規の反映先へ運ぶための一時 material です。
 変更の durability は publish/integration owner が PR head、remote branch、または integration target
-への反映で先に成立させます。cleanup はその durability を再判定する第二ゲートではありません。
+への反映で先に成立させます。cleanup はその durability を local branch retention の理由として
+もう一度持ち直す工程ではありません。
 
 - task owner は対象 checkout の利用が終わり、先行する publish/integration operation が完了したら、
   canonical `cleanup --apply` を直ちに実行します。タスク全体の終了、PR merge、定期掃除まで
   checkout 回収を先送りしません。「また使うかもしれない」「復旧用に残す」は保持理由にしません。
 - cleanup が扱う対象は request から計算した exact clone path と、その lifecycle が所有する
   topic material だけです。別 agent / user の shared checkout、unknown branch、workspace 全体を
-  探索して消しません。owner evidence、marker、URL、branch identity は削除対象の同定に使い、
-  recoverability の追加 proof には使いません。
+  探索して消しません。owner evidence、marker、URL、branch identity は削除対象の同定に使います。
 - `linked-worktree` は worktree/topic path と、その request 専用の local topic branch を同じ
-  closeout material として回収します。local branch を worktree から切り離して残すことを既定に
-  しません。remote PR branch は open PR の参照先なので local cleanup では削除せず、merge 後の
-  remote branch cleanup は publication owner が扱います。
-- `independent-clone` は clone directory 自体を回収します。local branch は clone とともに消えるため、
-  branch retention 用の別処理や registry は作りません。
+  closeout material として回収します。local branch を worktree から切り離して復旧用に残すことを
+  既定にしません。linked-worktree の local branch cleanup に別の recoverability gate や追加の
+  destructive-approval round は設けません。remote PR branch は open PR の参照先なので local cleanup
+  では削除せず、merge 後の remote branch cleanup は publication owner が扱います。
+- `independent-clone` の既存 cleanup admission と receipt contract はこの変更では触りません。
+  clone directory の回収後は clone-local branch も material とともに消えます。
 - cleanup 実行後は exact clone path が存在しないことを read back し、linked-worktree では対象
   worktree と local topic branch が残っていないことを確認します。sibling worktree / sibling branch、
   remote PR branch、無関係な refs は保持します。
-- task-owned checkout に未反映の変更が残る状態は cleanup が救済する対象ではなく、先行する
-  publish/integration workflow の未完了です。cleanup 側に remote-head equality、main containment、
-  age、再利用見込み、recoverability などの追加 admission gate を増やしません。
 - clone と topic root は同一 receipt で扱い、空になった topic root も同じ closeout で削除します。
-  管理外 path への退避、stash、別 registry への移送で material retention を延命しません。
+  管理外 path への退避や別 registry で一時 material retention を延命しません。
 
 削除の実行構文は [CLI 参照の基本操作](../tools/repository_topic_clone.md#基本操作) を使います。
 
