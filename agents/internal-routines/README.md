@@ -36,6 +36,7 @@ skill, entrypoint, or routine that calls it.
 | Group | Files | Public Route |
 | ----- | ----- | ------------ |
 | Request modality routing | [chatgpt-codex-routing.md](chatgpt-codex-routing.md) | root entrypoints before `$agent-orchestration` |
+| GitHub-connected work | [github-connected-work.md](github-connected-work.md) | `$pr-processing` when current-session GitHub transport is available |
 | Incremental code change | [incremental-code-change.md](incremental-code-change.md) | `$code-cleanup` when coverage traversal or in-task token-waste repair is requested |
 | Review routines | [code-review.md](code-review.md), [critical-review.md](critical-review.md), [project-review.md](project-review.md), [report-review.md](report-review.md), [comprehensive-review.md](comprehensive-review.md) | `$change-review`, `$research-workflow`, `$comprehensive-development`, `$report-writing` |
 | Academic review routines | [citation-evidence-review.md](citation-evidence-review.md), [logic-gap-review.md](logic-gap-review.md), [notation-definition-review.md](notation-definition-review.md) | `$academic-writing`, `$paper-writing`, `$prose-reasoning-graph` |
