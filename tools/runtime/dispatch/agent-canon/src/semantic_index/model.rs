@@ -47,9 +47,7 @@ pub(super) fn responsibility_scope_bucket(path: &str) -> &'static str {
     if normalized.starts_with("tests/") {
         return "test-surfaces";
     }
-    if normalized.starts_with("tools/")
-        || normalized == "helper_inventory_guard_policy.json"
-    {
+    if normalized.starts_with("tools/") {
         return "shared-tooling";
     }
     if normalized == "CONTAINER_OPERATIONS.md"
