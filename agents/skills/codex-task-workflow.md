@@ -69,6 +69,17 @@ owns checkout drift and cleanup; `pr-processing` owns GitHub Issue/PR publicatio
 and remote merge. Do not turn this local integration route into a second
 publication or validation policy.
 
+## Execution route
+
+Use `agents/task_catalog.yaml#execution_route_policy` through the
+[execution-time owner](agent-orchestration.md#execution-time-aware-work-conservation-contract).
+For the selected `bounded_fast_path`, execute `route -> execute -> verify_close`
+without creating the coordination artifacts described below or receipts for
+unselected gates. Keep exact-diff review, selected validation, current-main
+integration, authorized PR publication, and Issue/user evidence. Route selection
+is not completion evidence. Only `coordination` uses the existing run-bundle
+closeout; unavailable validation remains `need verification` without broad fallback.
+
 ## Purpose
 
 Codex が会話コンテキストに依存せず、毎回同じ順序で task を進めるための標準フローです。

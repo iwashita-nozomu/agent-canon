@@ -10,7 +10,7 @@
 # upstream design ../../templates/agents/schedule.md schedule projection
 # upstream implementation ../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py production contract checker
 # upstream implementation ../../tools/agent/skills/skill_tool_commands.py selected-skill command packet
-# downstream implementation ../../.codex/personal/skills/agent-orchestration/SKILL.md runtime discovery shim
+# upstream design ../../agents/skills/catalog.yaml runtime shim registration and maintenance phase
 # @dependency-end
 
 from __future__ import annotations
@@ -49,7 +49,6 @@ CONTRACT_FIXTURE_PATHS = (
     "agents/skills/catalog.yaml",
     "agents/task_catalog.yaml",
     "templates/agents/schedule.md",
-    ".codex/personal/skills/agent-orchestration/SKILL.md",
     "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py",
 )
 
@@ -169,7 +168,7 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
             root = self.fixture_root(temporary_directory)
             self.append(
                 root,
-                ".codex/personal/skills/agent-orchestration/SKILL.md",
+                "agents/skills/pr-processing.md",
                 "\n- Prompt keywords route ready nodes.\n",
             )
             self.assert_rejected(root, "keyword_based_routing")
@@ -235,6 +234,31 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
             self.assertIsInstance(marker, str)
             self.assertIn(" ".join(marker.lower().split()), text, marker)
 
+    def test_rejects_universal_or_missing_checker_and_runtime_registration(self) -> None:
+        for mutation in ("required", "missing", "runtime"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = self.fixture_root(directory)
+                path = root / "agents/skills/catalog.yaml"
+                data = yaml.safe_load(path.read_text())
+                owner = next(item for item in data["skill_families"] if item["id"] == "agent-orchestration")
+                if mutation == "runtime":
+                    owner["canonical_doc"] = "agents/skills/pr-processing.md"
+                else:
+                    command = {"tool_id": "check-execution-time-aware-orchestration", "operation_id": "default"}
+                    owner["tool_commands"]["maintenance"].remove(command)
+                    if mutation == "required":
+                        owner["tool_commands"]["required"].append(command)
+                path.write_text(yaml.safe_dump(data, sort_keys=False))
+                category = "consumer_reference_mismatch" if mutation == "runtime" else "required_command_route"
+                self.assert_rejected(root, category)
+
+    def test_rejects_unconditional_schedule_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.fixture_root(directory)
+            path = root / "agents/task_catalog.yaml"
+            path.write_text(path.read_text().replace("applies_to: coordination", "applies_to: repo-changing execution"))
+            self.assert_rejected(root, "consumer_reference_mismatch")
+
     def test_runtime_catalog_and_schedule_project_the_owner(self) -> None:
         task_catalog = yaml.safe_load(self.read("agents/task_catalog.yaml"))
         self.assertEqual(
@@ -244,14 +268,11 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         self.assertIn(OWNER_REF, self.read("templates/agents/schedule.md"))
 
         runtime_spec = self.consumer("runtime-shim")
-        runtime_path = runtime_spec["path"]
-        self.assertIsInstance(runtime_path, str)
-        runtime = " ".join(self.read(runtime_path).lower().split())
-        runtime_markers = runtime_spec.get("required_markers")
-        self.assertIsInstance(runtime_markers, list)
-        for marker in runtime_markers:
-            self.assertIsInstance(marker, str)
-            self.assertIn(" ".join(marker.lower().split()), runtime, marker)
+        self.assertEqual(runtime_spec["path"], "agents/skills/catalog.yaml")
+        skills = yaml.safe_load(self.read(runtime_spec["path"]))["skill_families"]
+        owner = next(skill for skill in skills if skill["id"] == "agent-orchestration")
+        self.assertEqual(owner["canonical_doc"], OWNER_REF.split("#", 1)[0])
+        self.assertEqual(owner["shim"], ".codex/personal/skills/agent-orchestration/SKILL.md")
 
         schedule_spec = self.consumer("schedule")
         path = schedule_spec["path"]

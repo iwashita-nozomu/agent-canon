@@ -90,6 +90,38 @@ An executable renderer path is a command, never a ToolID. Runtime ordering is
 owner ToolCall first and one task-matching adapter ToolCall second. The adapter
 owns syntax/layout only and remains downstream of the canonical owner.
 
+## Execution closeout routing
+
+The execution route is owned by `agents/task_catalog.yaml#execution_route_policy`.
+Pass already established owner/topology facts as JSON, or use `-` to read JSON
+from stdin without creating an artifact:
+
+```bash
+python3 tools/agent/orchestration/route.py --area closeout --format json \
+  --execution-context '{"roots":1,"owners":1,"writers":1,"scope_resolved":true,"contract_resolved":true,"validation":"git diff --check","coordination":[]}'
+```
+
+Counts are positive integers. Scope and public-contract boundaries must be
+resolved, and the selected validation oracle must be named. The `coordination`
+list contains only observed `dependency`, `collision`, `publication`, or
+`resumption` requirements between work units, not merely the presence of a PR.
+Multiple roots, owners, or writers also select the
+existing coordinated route. Missing facts are unresolved, not implicit consent
+to either execution route. Risk and changed-file counts do not select this path.
+
+For a bounded task, output contains `states: [route, execute, verify_close]`,
+no shell closeout command and no inactive gate records. Coordinated output
+instead includes the existing `task_close.py --run-id <run-id>` command and
+its full scheduling projection. With no context, `--area closeout` asks for
+route selection and does not advertise a nonexistent lightweight checker.
+
+Optional `validation_status` is `pending` (default), `pass`, `failed`, or
+`unavailable`. The last is reported as `need verification`; failed checks are
+not converted to a verification gap or pass. Commands are returned as data,
+never executed, and route selection is not proof of task completion. The
+[owning skill](../../agents/skills/agent-orchestration.md#execution-time-aware-work-conservation-contract)
+retains exact-diff, validation, main-integration, publication, and Issue evidence.
+
 ## Explicit capability routing
 
 Capability mode is the explicit, fail-closed route for a single catalog
