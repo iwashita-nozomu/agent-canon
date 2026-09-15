@@ -103,6 +103,34 @@ authorization, safety, and external-boundary checks; do not suppress their
 failures. Record the judgment and grounds in the existing Issue or design record,
 not a new gate or report.
 
+Run the current repository owner's existing entrypoint with its configured
+settings and standard tool defaults. Manual environment selection for ordinary
+execution is prohibited: do not ask the user to choose an environment or inject
+host/container, OS/WSL, CPU/GPU backend, runtime, or profile selectors through
+ad-hoc command flags, environment variables, or configuration edits. Existing
+tools resolve their own configured settings and defaults; missing optional
+selectors are not inputs to solicit or fill.
+Do not insert environment classification, inventory, or rediscovery before
+ordinary tasks, sessions, or commands, including installed-tool probes. Reuse
+supplied, still-applicable context without repeating probes or confirmation.
+A new task or an unknown optional setting is not a reason to investigate, stop,
+reconfigure, or restart a working route. Do not replace manual selection with
+new auto-detection, flags, profiles, environment variables, fallbacks, wrappers,
+or persistent detection/cache state. Do not invent missing settings merely to
+normalize environments or avoid rediscovery.
+Environment diagnosis is limited to an explicit request, an actual relevant
+failure, an observed change to a required premise, or a concrete evidenced
+risk. Resolve only the missing decision-relevant fact and stop the diagnosis
+when it is resolved; diagnosis alone does not authorize setup or repair.
+Environment changes and their rebuild/full-profile acceptance must belong to
+the authorized task, not become prerequisites for ordinary execution.
+Preserve the selected command's required safety checks, permissions, resource
+limits, and rerun prohibitions; prior success does not override contrary
+current evidence. When blocked, identify the concrete prerequisite or risk and
+its evidence, stop only affected commands, and continue independent authorized
+work. Do not silently switch a required backend, weaken validation, or treat
+an unrun command as passed.
+
 When numerical results disagree, first investigate defects in the algorithm
 and its implementation against the governing equations and specification,
 including assumptions, units, indexing, update order, and boundary conditions.
