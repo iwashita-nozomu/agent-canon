@@ -171,27 +171,11 @@ bounded route では、existing tool の実行と patching を tool-owned eviden
 
 ### Skill read admission
 
-Generated discovery `SKILL.md` is the complete compact Skill, so its whole
-file is read in bounded UTF-8-safe chunks. The reader returns the path,
-heading, one-based line range, half-open byte range, `next_offset`,
-`section_eof`, and `file_eof`; callers continue with `next_offset` until the
-required EOF flag is true. Canonical `agents/skills/<skill>.md` remains the
-owner prose and is read only by indexed, task-relevant heading sections.
-
-```bash
-bootstrap.sh --control-parent-root <root> tool run --root <registered-project> \
-  skill-document-reader -- index --path <skill.md>
-bootstrap.sh --control-parent-root <root> tool run --root <registered-project> \
-  skill-document-reader -- chunk --path <skill.md> \
-    --heading "## <section>" --offset <next_offset>
-```
-
-The transient owner-first update sets `implementation_read=ready` only when
-the compact Skill reaches `file_eof=true` and every explicitly delegated
-canonical section reaches `section_eof=true`. A truncated response, a section
-prefix, an unverified delegated path, or a missing heading remains locked.
-This readback creates no per-read receipt, identifier, approval gate, or
-duplicate Skill body.
+The canonical [`agent-orchestration` Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace)
+owns compact `SKILL.md` EOF/section-EOF/readback requirements and the
+no-duplicate-receipt/body rule. This workflow preserves its existing-tool-before-read
+exception and sets `implementation_read=ready` only after that owner trace and
+any delegated sections reach their required EOF.
 
 ```bash
 git grep -l "topic keywords" -- <responsibility-scoped dirs> \
