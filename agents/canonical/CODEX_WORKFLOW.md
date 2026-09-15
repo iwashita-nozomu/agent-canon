@@ -836,7 +836,7 @@ environment, produce resources, or duplicate tests/gates.
 - Source freeze 後は canonical formatter/check path と選択した非 Python static
   evidence を一度記録する。別 CI、別 formatter、別 checker、checker-retest
   は W2 completion gate にならない。
-- Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を write-capable subagent handoff に渡す。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
+- 編集前の補助診断は [Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) に従い、変更した契約の検証と区別する。
 - tool / checker / hook / reviewer / subagent feedback から実装へ進む場合は `$tool-finding-report` で finding packet を作り、raw artifact、structured artifact、impact、prompt feedback decision を handoff に渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` は次の write-capable subagent 起動前に prompt を修正し、`workflow_monitor.py --runtime-feedback ... action=prompt_repair` で記録する
 - agent runtime / skill 変更では active profile に応じて `make agent-checks` または relevant subchecks を使う
 - 文書変更では canonical formatter/check path が Markdown、math、Mermaid の

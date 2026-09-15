@@ -245,7 +245,7 @@ structured handoff または、coordination/resumption が必要な場合の dur
   machine token のまま実行し、typed failure semantics を保持します。
 - `tool_evidence`: `dynamic_skill_routing` の候補、`tool_catalog_matches`、実行済み
   tool packet の結果。
-- `tool_reuse_ledger` と `pre_edit_rejection_prediction`: selected write-capable implementer には、既存 tool を使うか拒否した理由と `tool_rejection_preflight.py` の結果または pending blocker を渡します。
+- `tool_reuse_ledger`: selected write-capable implementer には、既存 tool を使うか拒否した理由を渡します。予測検査の扱いは [Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) に従います。
 
 The worker prompt begins with the parent-selected `reuse_survey` assets and
 test paths when known; for split or extraction work, the splitter inspects
