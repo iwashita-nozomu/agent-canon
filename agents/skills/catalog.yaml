@@ -38,8 +38,7 @@ skill_families:
       name: agent-orchestration
       description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
     tool_commands:
-      required:
-      - {"tool_id": "check-execution-time-aware-orchestration", "operation_id": "default"}
+      required: []
       conditional:
       - {"tool_id": "agent-search", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/search/search.py", "--query-file", "<request.txt>", "--providers", "text,semantic,vector,tool,header-deps,code-deps", "--format", "json"]}
       - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory"]}
@@ -48,6 +47,7 @@ skill_families:
       - {"executable": "agent-canon", "argv": ["docs"]}
       - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "--runtime-root", "<runtime>", "status"]}
       maintenance:
+      - {"tool_id": "check-execution-time-aware-orchestration", "operation_id": "default"}
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:

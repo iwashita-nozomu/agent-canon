@@ -920,7 +920,7 @@ def emit_bootstrap_output(
         )
     )
     print("TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation")
-    print("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending")
+    print("PRE_EDIT_REJECTION_PREDICTION_STATUS=optional_diagnostic")
     print(
         "PRE_EDIT_REJECTION_COMMAND="
         +

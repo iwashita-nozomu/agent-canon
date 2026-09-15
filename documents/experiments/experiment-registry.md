@@ -170,12 +170,11 @@ make experiment-check
 この checker は、path の存在、必須 field、command の placeholder、branch / worktree metadata の妥当性を確認します。
 registered command から `{config_path}` が欠ける場合も fail します。
 
-実験実行面の変更では、`tool_rejection_preflight.py` の
-`experiment_execution_surface_guard` を patch 前の routing evidence にします。
-対象は managed runner、registry checker、この registry contract、experiment
-workflow、project `experiments/registry.toml` です。検証は
-project `experiments/registry.toml` がある checkout では
-`python3 -m tools.validation.ci.checks.check_experiment_registry` を実行し、
-runner / registry checker behavior は
-`python3 -m pytest tests/tools/test_run_managed_experiment.py -q` を標準にし、
-formal run は実験計画の実行段階で扱います。
+実験実行面の検証は [experiment-lifecycle](../../agents/skills/experiment-lifecycle.md#boundary)
+の変更契約に従います。`tool_rejection_preflight.py` の
+`experiment_execution_surface_guard` は
+[Optional Rejection Prediction](../../agents/COMMUNICATION_PROTOCOL.md#optional-rejection-prediction)
+の補助診断であり、patch 前の必須 evidence ではありません。
+registry checker (`check_experiment_registry.py`) と runner の
+`tests/tools/test_run_managed_experiment.py` は、それぞれの契約変更を検証します。
+この文書の説明だけの変更に runner test や formal run を要求しません。

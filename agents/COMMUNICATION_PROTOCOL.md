@@ -329,10 +329,6 @@ descendants, unknown descendants, missing handback, and reservation leaks fail.
 - `pre_handoff_gate_status`
 - `artifacts`
 - `repo_changes`
-- `pre_edit_rejection_prediction`
-- `predicted_tool_rejection_gates`
-- `rejection_preflight_command`
-- `gate_specific_repair_plan`
 - `design_issue_blocker`
 - `open_questions`
 - `status`
@@ -542,24 +538,29 @@ entire repo docs into the prompt. If a subagent needs more context, it asks for
 an expanded packet path; parent updates the capsule and records the change in
 the Agent Wave Ledger.
 
-Before the parent edits directly or a write-capable subagent starts repository
-edits, the parent runs or cites:
+### Optional Rejection Prediction
+
+Select required checks from the changed contract and its owning validation route.
+When those are known, proceed directly; path-based rejection prediction is an
+optional diagnostic, not an edit, handoff, or completion gate:
 
 ```bash
 python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>
 ```
 
-The handoff work log includes the resulting
-`TOOL_REJECTION_PREDICTED_GATE` lines or an explicit
-`TOOL_REJECTION_PREFLIGHT=pass` observation. If a predicted gate names OOP
-readability, helper inventory, dependency headers, GitHub workflow checks, hook
-runtime alignment, skill mirror sync, AgentCanon tool source routing, tool
-catalog, agent protocol convention, responsibility scope, or log-surface
-inventory, the implementer receives the gate-specific command and a repair plan
-before editing. The `responsibility_scope` gate records the owning
-`responsibility-scope.toml` scope, owner, class, and protecting tools for each
-planned path, so the implementation surface stays inside the declared owner
-contract.
+Use it only to resolve uncertainty about relevant checks. Predictions are
+candidates, not observed failures or authority to add checks and repairs.
+An unavailable or unused predictor does not block otherwise authorized work;
+do not require a pending blocker, pass, or skip record for it. Required
+validation, authorization, and safety checks retain their own failure semantics.
+
+Only when diagnostic results inform the work, carry them in the existing handoff
+or work log using `pre_edit_rejection_prediction`, `predicted_tool_rejection_gates`,
+`rejection_preflight_command`, and `gate_specific_repair_plan` as applicable.
+These are optional fields, not a second receipt. The diagnostic
+`responsibility_scope` gate records the `responsibility-scope.toml` scope,
+owner, class, and protecting tools for each planned path; it does not replace
+the owner's contract or prove that those checks ran.
 
 ## CompletionCoverage v1 Schema Contract
 

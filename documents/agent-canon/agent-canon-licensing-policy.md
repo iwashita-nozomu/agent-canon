@@ -22,7 +22,8 @@ The license boundary is explicit:
 - Third-party skills or assets in AgentCanon's internal `vendor/` directory must
   record upstream URL, revision, and license metadata before they are enabled.
 - Devcontainer-installed third-party tools are not vendored into the
-  repository; their licenses remain recorded in the dependency-tool inventory.
+  repository; dated evidence is recorded in the [dependency-tool inventory](../tools/dependency-tools-and-licenses.md).
+  Follow its staleness and revalidation policy rather than treating the old table as current installation guidance.
 
 When adding a new shared surface, update the dependency header, the surface
 manifest if the path is exposed to parent repositories, and any README section
