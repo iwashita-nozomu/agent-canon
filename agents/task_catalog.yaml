@@ -6,6 +6,7 @@
 # downstream design canonical/CODEX_SUBAGENTS.md Codex subagent inventory consumes task routing
 # downstream design ../templates/agents/schedule.md execution-time-aware schedule projection
 # downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
+# downstream implementation ../tools/agent/orchestration/route.py consumes exclusive execution routes
 # @dependency-end
 version: 2
 
@@ -58,9 +59,23 @@ review_activation_policy:
     empty_reviewer_or_template_files: do_not_materialize
     selected_outputs_only: true
 
+# These are facts from the selected owner route, not prompt/size heuristics.
+execution_route_policy:
+  singletons: [roots, owners, writers]
+  resolved: [scope_resolved, contract_resolved]
+  coordination_reasons: [dependency, collision, publication, resumption]
+  routes:
+    bounded_fast_path:
+      states: [route, execute, verify_close]
+      next_action: report_selected_results_and_publication_readback
+      commands: []
+    coordination:
+      next_action: run_existing_coordinated_closeout
+      commands: ["python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>"]
+
 execution_time_policy:
   owner_ref: "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
-  applies_to: repo-changing execution
+  applies_to: coordination
   projection: templates/agents/schedule.md#Execution-Time-Aware Plan
   graph_activation: only_when_selected_ordering_or_collision_edges_exist
   graph_scope: selected_dependency_and_collision_edges_only
