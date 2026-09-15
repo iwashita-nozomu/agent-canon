@@ -45,28 +45,12 @@ container 側に checkout-mode の別 flag はなく、exact target metadata か
 write-capable handoff の各 allowed path は repeated `--allowed-path <relative-path>` で渡します。
 
 作成・再利用・writer packet・merge の authority は
-[clone ライフサイクル](../rule/repository-topic-clone.md#clone-ライフサイクル) を参照します。
-
-`linked-worktree` の closeout では、変更を先に PR head / integration target へ反映した後、
-`cleanup --apply` の成功に続けて同じ request が所有する local topic branch も削除します。
-local branch retention を復旧手段にしないため、この branch cleanup に別の recoverability gate や
-追加の destructive-approval round は設けません。branch 名は request の exact `<task-branch>` を使い、
-別 branch を探索しません。remote PR branch は open PR の参照先なので残し、merge 後の remote branch
-cleanup は publication owner に委譲します。
-
-```bash
-python3 tools/repository/workspace/repository_topic_clone.py cleanup \
-  --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --checkout-mode linked-worktree \
-  --owner-evidence <evidence-file> --apply
-
-git -C <parent-root> branch -D -- <task-branch>
-```
-
-上の `git branch -D` は canonical repository-topic lifecycle が作成・所有した exact local branch に
-限定した closeout 操作です。shared/unknown branch へ適用しません。`independent-clone` の既存 cleanup
-admission/receipt はこの変更では変えません。
-
+[clone ライフサイクル](../rule/repository-topic-clone.md#clone-ライフサイクル)、
+復元可能性・marker・任意 publication evidence・削除可否は
+[クリーンアップ](../rule/repository-topic-clone.md#クリーンアップ) を確認してから操作します。
+`linked-worktree` の `cleanup --apply` は worktree/topic path のみを回収し、request の local topic branch
+を保持します。この command に branch deletion authority を追加せず、branch 操作は既存 owner の別 operation
+として扱います。
 `merge-main` の成功結果は ancestor proof を返します。
 adapter の `status` と `projected_clone_path` は directory を作らない read-only projection です。
 

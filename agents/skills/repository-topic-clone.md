@@ -15,7 +15,7 @@ downstream implementation ../../tools/validation/semantic/runtime/check_agent_ru
 
 ## 目的
 
-repository-topic checkout の lifecycle、normal merge、publish 後の一時 material cleanup を
+repository-topic checkout の lifecycle、normal merge、receipted cleanup を
 `workspace/<topic-slug>/<repo-name>` の責務境界で扱います。
 
 ## 使用 route
@@ -37,21 +37,11 @@ repository-topic checkout の操作を選び、
 | `prepare` | [事前条件と Checkout mode](../../documents/rule/repository-topic-clone.md#事前条件)、[作成・再利用と writer packet](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
 | `merge-main` | [事前条件](../../documents/rule/repository-topic-clone.md#事前条件)、[merge と authority](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
 | `finalize-merge` / `resume-merge` | [競合の再開条件](../../documents/rule/repository-topic-clone.md#競合の再開) と [再開コマンド](../../documents/tools/repository_topic_clone.md#競合の再開) |
-| `cleanup`（publish/integration 後） | [一時 material の回収](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
+| `cleanup`（不要になった時点） | [起動・保持判断と復元可能性・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
 
-`cleanup` は durability を判定する第二ゲートではありません。変更を PR head / integration target へ
-反映する責務は publish/integration owner が先に閉じます。その後は canonical lifecycle が作った
-checkout を一時 material として回収します。
-
-`linked-worktree` では `cleanup --apply` で worktree/topic path を削除した後、同じ request の
-local topic branch も残しません。branch 名は request の exact `--branch` をそのまま使い、
-「復旧用」「また使うかもしれない」を理由に保持しません。remote PR branch は open PR の参照先なので
-local cleanup の対象外です。merge 後の remote branch cleanup は publication owner の closeout に委譲します。
-
-この local branch cleanup は repository-topic lifecycle が作成・所有した branch に限定し、
-owner evidence と exact request identity を cleanup authority として使います。別の recoverability 判定や
-追加の operation-level destructive approval は要求しません。shared/unknown branch を探索して消す処理も
-追加しません。
+`linked-worktree` の `cleanup --apply` は request の exact worktree/topic path を回収しますが、
+local topic branch は保持します。branch の削除権限をこの lifecycle に追加せず、既存の cleanup authority
+と復旧可能性の契約をそのまま適用します。
 
 操作結果を read back し、失敗時は
 [例外/フォールバック](../../documents/rule/repository-topic-clone.md#例外フォールバック)
