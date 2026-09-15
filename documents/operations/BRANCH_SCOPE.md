@@ -80,22 +80,24 @@ workspace の repository は更新対象にせず、全 toolchain の無制限�
 | --- | --- |
 | clone identity | resolved path、Git root、remote の owner/repository、branch または detached、actual `HEAD` の full SHA |
 | local state | staged / unstaged / untracked の有無と、今回の入力に関係する差分。親 repository の状態で代用しない |
-| 宣言した依存 | 選択した consumer tree / index の gitlink、manifest / lock 等の pin、その所有 path、対応する依存 PR と採用 SHA（変更時） |
-| 実際の入力 | build / import / 実行設定が読む checkout path と SHA、local override の有無。cache / install / 生成物を読む場合は採用 pin 由来であること |
+| 宣言した依存 | 選択した consumer tree / index の gitlink、manifest / lock 等の依存宣言（pin があればその値）、その所有 path、対応する依存 PR と採用 SHA（変更時） |
+| 実際の入力 | build / import / 実行設定が読む checkout path と SHA、local override の有無。cache / install / 生成物を読む場合は宣言した依存由来であること |
 
-依存の source 開発 clone と、consumer が読む pin checkout は別々に扱います。
+依存の source 開発 clone と、consumer が読む checkout は別々に扱います。
 開発 clone の新しい HEAD だけを見て consumer の更新済みとは判断せず、consumer が
-読む入力を宣言 pin と照合します。pin 用の clean detached checkout は正常であり、
-branch attach や全依存の最新 main 化を要求しません。依存側の修正に着手する場合は、
-その repository の最新 main 起点、または関連 Issue の active branch を使い、
-branch 名には対応する Issue 番号を含めます。未知の dirty state は保持します。
+pin を持つ場合はその入力を宣言 pin と照合します。pin 用の clean detached checkout
+は正常であり、branch attach や全依存の最新 main 化を要求しません。依存側の修正に
+着手する場合は、その repository の最新 main 起点、または関連 Issue の active branch
+を使い、branch 名には対応する Issue 番号を含めます。未知の dirty state は保持します。
 
-依存変更を要する実行は
+依存変更を要する実行で、consumer の既存契約が exact pin を要求する場合は
 [依存モジュール変更規約](../rule/dependency-module-changes.md) の PR → exact pin →
 consumer 実行の順序に従います。pin と実際の入力が不一致、dirty な依存入力、
 または由来を確認できない場合は、その入力を使う実行・検証を止め、具体的な
 path / SHA / 未確認事項を残します。黙って branch を切り替えたり、reset / clean /
 stash、別 clone や cache で不一致を隠したりしません。依存しない作業まで止めません。
+pin を要求しない consumer には既存の依存宣言と解決機構を使い、実際の入力を
+記録します。この手順を満たすための pin や SHA 一致 guard は新設しません。
 
 directory、branch、HEAD、依存 PR の revision、pin、local override / mount 等の
 入力解決先が変わったら、影響する対象を次の操作前に再確認します。同じ境界の
@@ -136,10 +138,11 @@ directory、branch、HEAD、依存 PR の revision、pin、local override / moun
    影響する範囲で確認します。既存の言語 tool、依存宣言、検証経路を使い、
    changed files の一覧や過去の作業要約だけで依存が閉じたとは判断しません。
 2. 各前提を、base / 祖先で充足、先行 commit で提供、同一 commit に包含、
-   固定済み external input、未解決のいずれかに分類します。外部依存は既存の
-   lock、commit、artifact / image digest 等で必要な identity と取得経路を
-   確定します。取得する SHA 等が未固定の別 branch の変更、将来の PR、可変な
-   latest、偶然の local install / cache を充足済みの前提にしません。
+   宣言済み external input、未解決のいずれかに分類します。外部依存は既存の
+   manifest / lock 等に従い、必要な API・version 範囲と取得経路を確定します。
+   検証時に実入力の identity を記録し、新規 pin や SHA のコード埋込みは要求
+   しません。将来の PR、未公開の必須修正、偶然の local install / cache を
+   充足済みの前提にしません。既存の exact pin 契約は引き続き守ります。
 3. 先行変更を必要とする関係を順序付けします。同時に変えないと契約が壊れる
    変更群は一つの commit にまとめます。変更単位間の依存 graph に循環が
    あれば、その強連結成分を一単位に畳むか、各段階で契約が成立する設計へ
@@ -156,7 +159,7 @@ directory、branch、HEAD、依存 PR の revision、pin、local override / moun
 
 | 単位 / SHA | 目的・保持する契約 / owner / path | 前提単位・外部依存 identity | 検証 command・期待結果・実測結果 |
 | --- | --- | --- | --- |
-| 計画時の単位 ID、確定後の SHA | 変更と既存 consumer への影響 | base、先行 / 同一単位、固定入力、未解決 | 対象 tree ごとの結果または未実施理由 |
+| 計画時の単位 ID、確定後の SHA | 変更と既存 consumer への影響 | base、先行 / 同一単位、宣言入力、未解決 | 対象 tree ごとの結果または未実施理由 |
 
 例えば、既存 API を保つ新 API とそのテストを先に追加し、次に利用側を移行し、
 参照がなくなってから旧 API を削除する分割は、各段階を検証できる場合に成立します。
@@ -167,7 +170,7 @@ directory、branch、HEAD、依存 PR の revision、pin、local override / moun
 
 ### Commit Correctness Contract
 
-各 commit は、その祖先を含む tracked tree と固定済みの外部入力から、必要な
+各 commit は、その祖先を含む tracked tree と既存の依存宣言に従う外部入力から、必要な
 動作と選択済み validation が成立する単位です。後続 commit や作業中の tree で
 成功しても、その commit の成功とはみなしません。任意の base へ単独で
 cherry-pick できることまでは要求しません。
@@ -176,7 +179,7 @@ cherry-pick できることまでは要求しません。
 要求は最終 `T_n` だけでなく全ての `i` について次が成立することです。
 
 ```text
-required_inputs(T_i) are available in T_i or fixed E_i
+required_inputs(T_i) are available in T_i or declared E_i
 selected_validation(T_i, E_i) = pass
 ```
 
@@ -191,7 +194,7 @@ selected_validation(T_i, E_i) = pass
 - 既存の Git safety / worktree owner に従い、隔離した checkout または候補 tree
   から、その時点の設定・lock・生成手順で検証します。作業用 tree にしかない
   未 commit / untracked source、後続 commit の fixture、由来不明の生成物に
-  依存させません。tracked な生成手順と固定入力からの再生成は認めます。
+  依存させません。tracked な生成手順と記録した入力からの再生成は認めます。
   既存の user-owned tree を reset / clean / stash で変えず、検証出力は許可された
   ignored / external 領域へ出し、tracked tree が不変であることを確認します。
 - 分割、並べ替え、squash、rebase、競合解決で tree / 依存 / 検証条件が変わった
