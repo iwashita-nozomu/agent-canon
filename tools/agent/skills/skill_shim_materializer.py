@@ -52,7 +52,6 @@ from tools.agent.skills.skill_route_catalog import (
     load_skill_catalog,
     load_skill_dependency_map,
     load_skill_route_rules,
-    validate_catalog_schemas,
 )
 from tools.agent.skills.skill_tool_commands import SkillCommandPacket, packet_for_skill
 
@@ -503,14 +502,9 @@ def _source_snapshot_digest(
 def build_context(
     root: Path, *, output_root: Path | None = None, image_build: bool = False
 ) -> BuildContext:
-    """Load and validate the complete canonical input universe."""
+    """Load canonical inputs and validate their materialization relationships."""
     root = root.resolve()
     output = (output_root or root).resolve()
-    if not image_build:
-        try:
-            validate_catalog_schemas(root)
-        except ValueError as exc:
-            raise MaterializerError("catalog_schema_invalid", str(exc)) from exc
     skill_ids, entries = _catalog_entries(root)
     try:
         if image_build:

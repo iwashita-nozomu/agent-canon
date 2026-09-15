@@ -23,6 +23,7 @@ import tempfile
 import tomllib
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -55,6 +56,21 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("tool_id", item)
         self.assertNotIsInstance(item, str)
 
+    def test_catalog_loading_needs_no_authoring_tools_or_schema_files(self) -> None:
+        """Routing reads its two inputs without launching validation subprocesses."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            inputs = root / "agents" / "skills"
+            inputs.mkdir(parents=True)
+            for name in ("catalog.yaml", "skill-dependencies.yaml"):
+                shutil.copyfile(PROJECT_ROOT / "agents" / "skills" / name, inputs / name)
+            with patch.dict("os.environ", {"PATH": ""}), patch.object(
+                subprocess, "run", side_effect=AssertionError("unexpected subprocess")
+            ):
+                rules = catalog_module.load_skill_route_rules(root)
+        self.assertIsInstance(rules, tuple)
+        self.assertIn("task-routing", {rule.skill for rule in rules})
+
     def run_route(self, *args: str) -> subprocess.CompletedProcess[str]:
         """Run route.py with arguments."""
         if not any(arg == "--mode" or arg.startswith("--mode=") for arg in args):
@@ -79,27 +95,6 @@ class RouteToolTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
-        )
-
-    def provide_catalog_schema_inputs(self, root: Path) -> None:
-        """Provide explicit local schemas and catalog sources to a fixture root."""
-        schema_root = root / "schemas" / "agent-canon"
-        schema_root.mkdir(parents=True, exist_ok=True)
-        for schema in (
-            "skill-catalog.schema.json",
-            "skill-dependencies.schema.json",
-            "tool-catalog.schema.json",
-            "yamllint.yaml",
-        ):
-            shutil.copyfile(
-                PROJECT_ROOT / "schemas" / "agent-canon" / schema,
-                schema_root / schema,
-            )
-        tools_root = root / "tools"
-        tools_root.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(
-            PROJECT_ROOT / "tools" / "catalog.yaml",
-            tools_root / "catalog.yaml",
         )
 
     def write_canonical_skill_fixture(
@@ -135,7 +130,6 @@ class RouteToolTest(unittest.TestCase):
         dependency_path.write_text(
             yaml.safe_dump(source_dependencies, sort_keys=False), encoding="utf-8"
         )
-        self.provide_catalog_schema_inputs(root)
 
     def visualization_tool_call(
         self,
@@ -2193,7 +2187,6 @@ class RouteToolTest(unittest.TestCase):
             root = Path(tmp_dir)
             catalog = root / "agents" / "skills" / "catalog.yaml"
             catalog.parent.mkdir(parents=True)
-            self.provide_catalog_schema_inputs(root)
             (root / "agents/skills/skill-dependencies.yaml").write_text(
                 "version: 1\nskill_dependencies: {}\n", encoding="utf-8"
             )
@@ -2209,7 +2202,7 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("SKILL_ROUTER_ERROR=", result.stderr)
-        self.assertIn("catalog-yaml-invalid", result.stderr)
+        self.assertIn("agents/skills/catalog.yaml YAML parse failed", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_prompt_route_duplicate_catalog_skill_fails_structured(self) -> None:
@@ -2590,72 +2583,6 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn(f"ROUTE_SOURCE_ROOT_FAILURE={code}", result.stderr)
 
-    def test_skill_routing_schema_rejects_unknown_stage_policy(self) -> None:
-        """Catalog owner rejects stage-policy values outside its schema."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_catalog(
-                root,
-                "\n".join(
-                    [
-                        "  - id: task-routing",
-                        "    purpose: Fixture.",
-                        "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
-                        "    discovery:",
-                        "      name: task-routing",
-                        "      description: Fixture.",
-                        "    tool_commands:",
-                        "      required: []",
-                        "      conditional: []",
-                        "    routing:",
-                        "      stage_policy: explicit_only",
-                        "      reason: fixture",
-                        "      triggers:",
-                        "        - [routing]",
-                    ]
-                ),
-            )
-            with self.assertRaises(catalog_module.CapabilityRootError) as raised:
-                catalog_module.load_skill_route_rules(root)
-            self.assertEqual(
-                raised.exception.code,
-                "catalog-schema-invalid:agents/skills/catalog.yaml",
-            )
-
-    def test_skill_routing_schema_rejects_non_string_reason(self) -> None:
-        """Catalog owner rejects non-string routing reasons."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_catalog(
-                root,
-                "\n".join(
-                    [
-                        "  - id: task-routing",
-                        "    purpose: Fixture.",
-                        "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
-                        "    discovery:",
-                        "      name: task-routing",
-                        "      description: Fixture.",
-                        "    tool_commands:",
-                        "      required: []",
-                        "      conditional: []",
-                        "    routing:",
-                        "      stage_policy: active",
-                        "      reason: 3",
-                        "      triggers:",
-                        "        - [routing]",
-                    ]
-                ),
-            )
-            with self.assertRaises(catalog_module.CapabilityRootError) as raised:
-                catalog_module.load_skill_route_rules(root)
-            self.assertEqual(
-                raised.exception.code,
-                "catalog-schema-invalid:agents/skills/catalog.yaml",
-            )
-
     def test_skill_dependency_schema_rejects_unknown_skill(self) -> None:
         """Dependency owner rejects references absent from the catalog."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -2904,7 +2831,7 @@ class CapabilityRouteTest(unittest.TestCase):
             result = self.run_route(
                 "--root", str(root), "--capability", "oop_type_design"
             )
-        self.assert_failure_code(result, "capability-root-catalog-invalid")
+        self.assert_failure_code(result, "duplicate-capability-definition:oop_type_design")
 
     def test_capability_route_rejects_multiple_capabilities(self) -> None:
         """The first capability version does not arbitrate multiple IDs."""
