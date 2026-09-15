@@ -25,10 +25,11 @@ downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_
 - Boundary: source、data、model、credential、GPU driver/device などの runtime input は
   image 外に置けますが、標準環境の構築には使いません。
 
-通常のcommand実行は、current repository ownerが選ぶ既存の経路・設定を使います。
-CPU/GPUを使うことや任意設定の未確認だけで、この保守workflowを起動しません。
-環境の変更・修復が依頼範囲にある場合だけ、以下の構築・acceptanceを適用します。
-既存経路での実行前に、環境再構築や無関係なprofileの整備を追加要求しません。
+通常実行は共通入口の境界に従い、指定済みの経路・設定を直接使います。
+新しいtask/session、CPU/GPUの利用、任意設定の未確認だけで環境判定や本Skillを
+起動しません。環境変更が依頼範囲にある場合だけ、Required Change Fields以降の
+構築・acceptanceを適用します。実失敗の限定調査から、setup・修復・未使用profileや
+設定項目の補完を自動的に追加せず、通常実行の前提にも戻しません。
 
 AgentCanon source is the exception to project-local Dev Container discovery:
 its Python/Rust/LSP dependencies belong to the shared image built by

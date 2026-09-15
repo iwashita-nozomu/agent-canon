@@ -76,20 +76,26 @@ checks. Record the judgment and grounds in the existing Issue or design record,
 not a new gate or report.
 
 Use the existing execution route and settings selected by the current
-repository owner. Do not stop, reconfigure, or restart a working command solely
-to normalize GPU/CPU settings, tune performance, inspect unused backends, or
-satisfy unrelated probes or checkers. Limit environment investigation and
-changes to the selected command's requirements, explicit user instructions, or
-an evidenced failure or risk; reuse still-applicable observations instead of
-repeating preflights or user confirmation. Missing optional configuration is
-not execution failure. Preserve required safety, permissions, resource limits,
-and rerun prohibitions; prior success does not override contrary current
-evidence. When blocked, identify the concrete prerequisite or risk and its
-evidence, limit the stop to affected commands, and continue independent
-authorized work. Do not silently switch a required backend, weaken validation,
-or treat an unrun command as passed. Environment redesign, rebuild, and
-full-profile acceptance belong to in-scope environment changes, not ordinary
-execution.
+repository owner directly. Do not insert environment classification, inventory,
+or rediscovery before ordinary tasks, sessions, or commands: this includes
+host/container, OS/WSL, CPU/GPU, installed tools, and runtime/profile selection.
+Reuse supplied, still-applicable context without repeating probes or user
+confirmation. A new task or an unknown optional setting is not a reason to
+investigate, stop, reconfigure, or restart a working route. Do not add flags,
+profiles, environment variables, fallbacks, or persistent detection/cache state
+merely to normalize environments, fill unused settings, or avoid rediscovery.
+Environment diagnosis is limited to an explicit request, an actual relevant
+failure, an observed change to a required premise, or a concrete evidenced
+risk. Resolve only the missing decision-relevant fact and stop the diagnosis
+when it is resolved; diagnosis alone does not authorize setup or repair.
+Environment changes and their rebuild/full-profile acceptance must belong to
+the authorized task, not become prerequisites for ordinary execution.
+Preserve the selected command's required safety checks, permissions, resource
+limits, and rerun prohibitions; prior success does not override contrary
+current evidence. When blocked, identify the concrete prerequisite or risk and
+its evidence, stop only affected commands, and continue independent authorized
+work. Do not silently switch a required backend, weaken validation, or treat
+an unrun command as passed.
 
 When numerical results disagree, first investigate defects in the algorithm
 and its implementation against the governing equations and specification,
