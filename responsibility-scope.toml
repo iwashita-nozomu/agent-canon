@@ -182,10 +182,9 @@ issues = []
 id = "shared-tooling"
 owner = "agent-canon"
 class = "tooling"
-description = "Shared tool implementations, tool catalog, compiled tooling, and helper policy."
+description = "Shared tool implementations, tool catalog, and compiled tooling."
 paths = [
   "tools/**",
-  "helper_inventory_guard_policy.json",
 ]
 exclude_paths = [
   "eval/**",
