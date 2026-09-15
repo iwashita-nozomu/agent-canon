@@ -123,6 +123,27 @@ def test_duplicate_dependency_array_value_is_rejected(tmp_path: Path) -> None:
     assert "unique" in result.stdout + result.stderr
 
 
+@pytest.mark.parametrize("field, value", [("stage_policy", "explicit_only"), ("reason", 3)])
+def test_invalid_routing_fields_are_rejected_by_explicit_schema(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    """Schema authoring errors are rejected by the explicit native owner, not routing."""
+    check_jsonschema, _ = native_tools()
+    data = yaml.safe_load((ROOT / "agents/skills/catalog.yaml").read_text(encoding="utf-8"))
+    entry = next(item for item in data["skill_families"] if item["id"] == "task-routing")
+    entry["routing"][field] = value
+    document = tmp_path / "catalog.yaml"
+    document.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    result = subprocess.run(
+        [check_jsonschema, "--schemafile", str(SCHEMA_ROOT / "skill-catalog.schema.json"), str(document)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert field in result.stdout + result.stderr
+
+
 def test_wrong_tool_entry_type_is_rejected(tmp_path: Path) -> None:
     """Tool entry booleans remain closed and typed by the native schema."""
     check_jsonschema, _ = native_tools()
