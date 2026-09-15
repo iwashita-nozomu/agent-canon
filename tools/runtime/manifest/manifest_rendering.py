@@ -627,7 +627,6 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "implementation_surface_route",
     "repo_tool_routing_policy",
     "tool_reuse_ledger",
-    "pre_edit_rejection_prediction",
     "dependency_files_header_plan",
     "next_review_gate",
     "checkout_identity",
@@ -1503,7 +1502,7 @@ def manifest_run_lines(
             "    implementation_surface_route_status: pending",
             f"    implementation_surface_route_command: {public_command_for_spec(spec, ('python3', 'tools/analysis/search/search.py', '--query-file', '<request-or-design-question.txt>', '--providers', 'text,semantic,vector,tool,header-deps,code-deps', '--format', 'json'))!r}",
             "    tool_reuse_ledger_status: required_before_custom_implementation",
-            "    pre_edit_rejection_prediction_status: pending",
+            "    pre_edit_rejection_prediction_status: optional_diagnostic",
             f"    pre_edit_rejection_command: {public_command_for_spec(spec, ('python3', 'tools/validation/semantic/tools/tool_rejection_preflight.py', '--root', '.', '<planned-edit-paths>'))!r}",
             "  standard_wave_sequence:",
             "    activation: candidate_sequence_selected_per_wave",
@@ -2518,7 +2517,6 @@ def render_subagent_prompt_packet(
     lines.append(f"{indent}    - tool_route")
     lines.append(f"{indent}    - tool_call_tokens")
     lines.append(f"{indent}    - tool_evidence")
-    lines.append(f"{indent}    - tool_rejection_prediction")
     lines.append(f"{indent}  checkout_identity:")
     lines.append(f"{indent}    command: {CHECKOUT_IDENTITY_COMMAND!r}")
     lines.append(f"{indent}    fields:")

@@ -169,16 +169,15 @@ artifact reader / renderer であり、formal run launcher、test surface、conf
 - run artifact は、選択した producer / protocol が実際に生成すると宣言したものだけを要求します。存在する artifact は `result-artifact-writeout` に渡して role / checksum / readback を記録し、生成対象でない optional artifact の placeholder や limitation は作りません。
 - smoke / formal の入口は project `Makefile` に置く場合も、内側では同じ managed runner が topic `run.py` を inner command として呼びます。
 - run は source checkout、既定では `main` で実行します。run identity / terminal status はこの skill、実在する file / role / checksum / readback は `result-artifact-writeout` が所有します。durable retention が必要な場合だけ `python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"` を明示的に実行します。archive は annex worktree の `experiments/<topic>/result/<run_name>.tar.gz` に一度だけ作成し、remote push はこの操作に含めません。
-- experiment execution surface を変更する task は、patch 前に
-  `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>`
-  を実行し、`experiment_execution_surface_guard` の handoff を解決します。
-  対象 surface は `tools/validation/ci/checks/check_experiment_registry.py`、[documents/experiments/experiment-registry.md](../../documents/experiments/experiment-registry.md)、
-  `experiments/registry.toml`、topic `run.py` entrypoint です。
-  この場合は `test-design` を併用します。project `experiments/registry.toml`
-  がある checkout では `python3 -m tools.validation.ci.checks.check_experiment_registry` を実行します。
-  runner / registry checker behavior を変える場合は
+- experiment execution surface の変更は `test-design` と、その owner の検証経路を使います。
+  `tool_rejection_preflight.py` の `experiment_execution_surface_guard` は
+  [Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) の候補診断です。
+  registry 契約を変更し、project `experiments/registry.toml` がある場合は
+  `python3 -m tools.validation.ci.checks.check_experiment_registry` を実行します。
+  runner / registry checker behavior は
   `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` で確認します。
-  formal experiment run は明示された run plan の実行段階で扱います。
+  文書の説明だけの変更に runner test や formal experiment run を追加せず、
+  formal run は明示された run plan の実行段階で扱います。
 - result artifact の保存は `result-artifact-writeout` に委譲します。reader-facing report は要求された場合だけ `report-writing`、HTML artifact は要求された場合だけ `html-output` を追加し、run state、artifact state、report state、publication state を一つの wrapper に再統合しません。
 - experiment plan、rerun plan、result report、HTML view の構造が非自明な場合は、run や report 生成の前に `structure-planning` を使い、first artifact、source-to-structure map、metric contract、invalid interpretation、validation gate を固定します。
 - experiment plan / report の structure contract には OOP 観点を入れます。
@@ -216,7 +215,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When reviewing an experiment topic, add `$experiment-review` and check the managed runner route, GPU/JAX environment ownership, artifact schema, and visualization.py renderer readiness.
 1. Ensure every topic run has `result/<run-id>/raw/` and `result/<run-id>/summary/`; compact outputs use `summary/summary.json` and `summary/cases.jsonl`, with no root-level fallback.
 1. Require only producer-declared artifacts. Record references to files that actually exist through `$result-artifact-writeout`; do not impose a universal summary/case/visualization.py renderer/log inventory or create synthetic missing-artifact limitations for outputs the producer did not select.
-1. For planned edits to experiment execution surfaces, run `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` and resolve the `experiment_execution_surface_guard` handoff before patching. This surface includes `tools/validation/ci/checks/check_experiment_registry.py`, [documents/experiments/experiment-registry.md](../../documents/experiments/experiment-registry.md), `experiments/registry.toml`, and topic `run.py` entrypoints. Pair this skill with `$test-design`; run `python3 -m tools.validation.ci.checks.check_experiment_registry` when project `experiments/registry.toml` exists, use `python3 -m pytest tests/tools/test_run_managed_experiment.py -q` for runner or registry checker behavior changes, and reserve long experiment runs for an explicit run plan.
+1. For experiment execution surface changes, use the owner-selected validation in [Boundary](#boundary). Rejection prediction is optional; documentation-only changes do not require a runner test or formal run.
 1. Use `$structure-planning` before experiment planning, rerun planning, result report generation, or HTML view generation when the structure is nontrivial; fix first artifact, source-to-structure map, OOP structure contract, metric contract, invalid interpretations, and validation gate before running or writing.
 1. For experiment plans and reports, require the OOP structure contract to list reused modules/classes/functions/protocols, objects created/mutated/passed/written by each step, the factory/function boundary where variants differ, and dependency direction across orchestration, domain logic, metrics, visualization, and artifact I/O before section order is drafted.
 1. For experiment plans or reports with nontrivial paragraph order or causal/evidence transitions, ask `$structure-planning` to use `agent-canon semantic-index discourse-relations --profile experiment-report` or `--profile methods-protocol` as advisory edge evidence.
