@@ -27,31 +27,17 @@ else:
     from tools.agent.orchestration.implementation_dispatch import _capacity_projection as __capacity_projection
     from tools.agent.orchestration.implementation_dispatch import _closeout_projection as __closeout_projection
 
-if __package__:
-    from tools.runtime.manifest.manifest_rendering import build_manifest as _build_manifest
-    from tools.runtime.manifest.manifest_rendering import has_template as _has_template
-    from tools.runtime.manifest.manifest_rendering import render_template as _render_template
-    from tools.runtime.manifest.manifest_rendering import (
-        initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
-    )
-else:
-    from tools.runtime.manifest.manifest_rendering import build_manifest as _build_manifest
-    from tools.runtime.manifest.manifest_rendering import has_template as _has_template
-    from tools.runtime.manifest.manifest_rendering import render_template as _render_template
-    from tools.runtime.manifest.manifest_rendering import (
-        initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
-    )
+from tools.runtime.manifest.manifest_rendering import build_manifest as _build_manifest
+from tools.runtime.manifest.manifest_rendering import has_template as _has_template
+from tools.runtime.manifest.manifest_rendering import render_template as _render_template
+from tools.runtime.manifest.manifest_rendering import (
+    initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
+)
 
-if __package__:
-    from tools.agent.skills.skill_tool_commands import (
-        validate_command_plan_executables as _validate_command_plan_executables,
-    )
-    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
-else:
-    from tools.agent.skills.skill_tool_commands import (  # type: ignore[no-redef]
-        validate_command_plan_executables as _validate_command_plan_executables,
-    )
-    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
+from tools.agent.skills.skill_tool_commands import (
+    validate_command_plan_executables as _validate_command_plan_executables,
+)
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
 
 if __package__:
     from .packets import (
@@ -139,37 +125,20 @@ else:
         task_ids,
     )
 
-if __package__:
-    from tools.runtime.authority.writer_target import validate_mathematical_writer_target
-else:
-    from tools.runtime.authority.writer_target import validate_mathematical_writer_target  # type: ignore[no-redef]
+from tools.runtime.authority.writer_target import validate_mathematical_writer_target
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import (
-        ReportBundleArtifactPathError,
-        load_directory_snapshot,
-        make_run_id,
-        resolve_report_bundle_artifact_path,
-        resolve_report_root,
-        resolve_role_write_scope,
-        schedule_wave_row,
-        validate_role_write_scope,
-        write_directory_snapshot,
-        write_workspace_change_snapshot,
-    )
-else:
-    from tools.repository.workspace.workspace_scope import (
-        ReportBundleArtifactPathError,
-        load_directory_snapshot,
-        make_run_id,
-        resolve_report_bundle_artifact_path,
-        resolve_report_root,
-        resolve_role_write_scope,
-        schedule_wave_row,
-        validate_role_write_scope,
-        write_directory_snapshot,
-        write_workspace_change_snapshot,
-    )
+from tools.repository.workspace.workspace_scope import (
+    ReportBundleArtifactPathError,
+    load_directory_snapshot,
+    make_run_id,
+    resolve_report_bundle_artifact_path,
+    resolve_report_root,
+    resolve_role_write_scope,
+    schedule_wave_row,
+    validate_role_write_scope,
+    write_directory_snapshot,
+    write_workspace_change_snapshot,
+)
 
 if __package__:
     from .packets import (
@@ -247,50 +216,27 @@ else:
         workflow_topology_policy_violations,
     )
 
-if __package__:
-    from tools.runtime.manifest.manifest_rendering import (
-        checkout_identity_policy_output_lines,
-        contract_complete_implementation_policy_output_lines,
-        coordination_capability_policy_output_lines,
-        default_quality_check_policy_output_lines,
-        format_subagent_role_instance_wave_chunks,
-        format_subagent_wave,
-        format_subagent_wave_chunks,
-        language_review_candidates,
-        pre_handoff_gate_status_output_lines,
-        pre_handoff_scope_policy_output_lines,
-        repo_tool_routing_policy_output_lines,
-        required_output_templates_missing,
-        selected_skill_command_packets,
-        same_role_subagent_policy_output_lines,
-        standard_agent_wave_sequence_output_lines,
-        subagent_wave_record_command,
-        suggested_public_skills,
-        user_facing_language_policy_output_lines,
-        writer_target_policy_output_lines,
-    )
-else:
-    from tools.runtime.manifest.manifest_rendering import (
-        checkout_identity_policy_output_lines,
-        contract_complete_implementation_policy_output_lines,
-        coordination_capability_policy_output_lines,
-        default_quality_check_policy_output_lines,
-        format_subagent_role_instance_wave_chunks,
-        format_subagent_wave,
-        format_subagent_wave_chunks,
-        language_review_candidates,
-        pre_handoff_gate_status_output_lines,
-        pre_handoff_scope_policy_output_lines,
-        repo_tool_routing_policy_output_lines,
-        required_output_templates_missing,
-        selected_skill_command_packets,
-        same_role_subagent_policy_output_lines,
-        standard_agent_wave_sequence_output_lines,
-        subagent_wave_record_command,
-        suggested_public_skills,
-        user_facing_language_policy_output_lines,
-        writer_target_policy_output_lines,
-    )
+from tools.runtime.manifest.manifest_rendering import (
+    checkout_identity_policy_output_lines,
+    contract_complete_implementation_policy_output_lines,
+    coordination_capability_policy_output_lines,
+    default_quality_check_policy_output_lines,
+    format_subagent_role_instance_wave_chunks,
+    format_subagent_wave,
+    format_subagent_wave_chunks,
+    language_review_candidates,
+    pre_handoff_gate_status_output_lines,
+    pre_handoff_scope_policy_output_lines,
+    repo_tool_routing_policy_output_lines,
+    required_output_templates_missing,
+    selected_skill_command_packets,
+    same_role_subagent_policy_output_lines,
+    standard_agent_wave_sequence_output_lines,
+    subagent_wave_record_command,
+    suggested_public_skills,
+    user_facing_language_policy_output_lines,
+    writer_target_policy_output_lines,
+)
 
 if __package__:
     from .tool_calls import (
@@ -312,10 +258,7 @@ else:
 
 def dispatch_issue_worker(*args: object, **kwargs: object) -> object:
     """Expose the logical IssueWorker route through the AgentTeam facade."""
-    if __package__:
-        from tools.repository.github.issue_worker_dispatch import dispatch_issue_worker as dispatch
-    else:
-        from tools.repository.github.issue_worker_dispatch import dispatch_issue_worker as dispatch  # type: ignore[no-redef]
+    from tools.repository.github.issue_worker_dispatch import dispatch_issue_worker as dispatch
     return dispatch(*args, **kwargs)  # type: ignore[arg-type]
 
 del annotations
@@ -518,10 +461,7 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
     # Keep the compatibility facade on the exact publisher used by bootstrap.
     # The import is deliberately lazy because bootstrap imports this facade to
     # prepare its bundle before invoking the publisher with monitoring.
-    if __package__:
-        from tools.runtime.lifecycle.bootstrap_agent_run import publish_prepared_run
-    else:
-        from tools.runtime.lifecycle.bootstrap_agent_run import publish_prepared_run  # type: ignore[no-redef]
+    from tools.runtime.lifecycle.bootstrap_agent_run import publish_prepared_run
     return publish_prepared_run(spec, prepared, report_root)
 
 
