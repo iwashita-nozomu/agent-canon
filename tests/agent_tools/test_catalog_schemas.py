@@ -4,7 +4,7 @@
 # upstream implementation ../../schemas/agent-canon/skill-catalog.schema.json owns skill catalog shape
 # upstream implementation ../../schemas/agent-canon/skill-dependencies.schema.json owns dependency shape
 # upstream implementation ../../schemas/agent-canon/tool-catalog.schema.json owns tool catalog shape
-# upstream implementation ../../tools/agent/skills/skill_route_catalog.py owns native preflight argv
+# upstream implementation ../../tools/agent/skills/skill_route_catalog.py owns explicit native validation argv
 # @dependency-end
 """Focused positive/negative tests for catalog schema admission."""
 
@@ -14,10 +14,12 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
 import yaml
 
-from tools.agent.skills.skill_route_catalog import validate_catalog_schemas
+from tools.agent.skills.skill_route_catalog import CapabilityRootError, validate_catalog_schemas
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_ROOT = ROOT / "schemas" / "agent-canon"
@@ -32,11 +34,39 @@ def native_tools() -> tuple[str, str]:
     return check_jsonschema, yamllint
 
 
-def test_canonical_catalogs_pass_native_preflight() -> None:
+def test_canonical_catalogs_pass_explicit_native_validation() -> None:
     """All canonical sources pass YAML and per-file JSON Schema admission."""
     records = validate_catalog_schemas(ROOT)
     assert len(records) == 3
     assert all(item["exit_code"] == 0 for item in records)
+
+
+@pytest.mark.parametrize("failure", [None, "missing", "yaml", "schema"])
+def test_explicit_validation_executes_and_reports_failures(tmp_path: Path, failure: str | None) -> None:
+    """Explicit checks execute afresh; missing tools and rejected input propagate."""
+    success = subprocess.CompletedProcess([], 0)
+    rejected = subprocess.CompletedProcess([], 1)
+    outcomes = {
+        None: [success] * 8,
+        "missing": FileNotFoundError("yamllint"),
+        "yaml": [rejected],
+        "schema": [success, rejected],
+    }
+    with patch.object(subprocess, "run", side_effect=outcomes[failure]) as run:
+        if failure is None:
+            first = validate_catalog_schemas(tmp_path)
+            assert validate_catalog_schemas(tmp_path) == first
+            assert len(first) == 3
+            assert [call.args[0][0] for call in run.call_args_list] == (
+                ["yamllint"] + ["check-jsonschema"] * 3
+            ) * 2
+        elif failure == "missing":
+            with pytest.raises(FileNotFoundError, match="yamllint"):
+                validate_catalog_schemas(tmp_path)
+        else:
+            code = "catalog-yaml-invalid" if failure == "yaml" else "catalog-schema-invalid"
+            with pytest.raises(CapabilityRootError, match=code):
+                validate_catalog_schemas(tmp_path)
 
 
 def test_schema_refs_are_local_only() -> None:

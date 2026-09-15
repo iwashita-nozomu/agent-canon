@@ -18,7 +18,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -96,9 +95,6 @@ CATALOG_SCHEMA_PATHS = {
     SKILL_DEPENDENCY_MAP_PATH: CATALOG_SCHEMA_ROOT / "skill-dependencies.schema.json",
     TOOL_CATALOG_PATH: CATALOG_SCHEMA_ROOT / "tool-catalog.schema.json",
 }
-_SCHEMA_PREFLIGHT_CACHE: dict[
-    Path, tuple[tuple[tuple[str, int, int], ...], tuple[Mapping[str, object], ...]]
-] = {}
 PRIVATE_SKILL_PREFIX = "_"
 CAPABILITY_ID_RE = re.compile(r"^[a-z0-9_]+$")
 VisualizationOwnerSkill = Literal["code-visualization"]
@@ -355,35 +351,16 @@ class CapabilityRootError(ValueError):
 
 
 def validate_catalog_schemas(root: Path) -> tuple[Mapping[str, object], ...]:
-    """Run pinned native YAML and JSON Schema validation for catalog sources.
+    """Validate catalog sources when explicitly requested by an authoring check.
 
-    This is an admission/preflight operation.  The loaders below intentionally
-    consume its typed-compatible YAML values and retain only cross-document
-    relations and projection checks.
+    Normal catalog loading does not call external validators. Invoke the selected
+    tools directly and let their execution report missing tools or invalid input.
     """
     root = root.resolve()
-    fingerprint = tuple(
-        (
-            path.as_posix(),
-            path.stat().st_mtime_ns,
-            path.stat().st_size,
-        )
-        for path in tuple(root / path for path in CATALOG_SCHEMA_PATHS)
-    )
-    cached = _SCHEMA_PREFLIGHT_CACHE.get(root)
-    if cached is not None and cached[0] == fingerprint:
-        return cached[1]
-    yamllint = shutil.which("yamllint")
-    check_jsonschema = shutil.which("check-jsonschema")
-    if yamllint is None or check_jsonschema is None:
-        missing = "yamllint" if yamllint is None else "check-jsonschema"
-        raise CapabilityRootError(f"catalog-schema-tool-unavailable:{missing}")
     documents = tuple(root / path for path in CATALOG_SCHEMA_PATHS)
     config = root / CATALOG_SCHEMA_ROOT / "yamllint.yaml"
-    if not config.is_file():
-        raise CapabilityRootError("catalog-schema-config-missing")
     yaml_result = subprocess.run(
-        [yamllint, "--strict", "--config-file", str(config), *(str(path) for path in documents)],
+        ["yamllint", "--strict", "--config-file", str(config), *(str(path) for path in documents)],
         cwd=root,
         check=False,
         capture_output=True,
@@ -395,7 +372,7 @@ def validate_catalog_schemas(root: Path) -> tuple[Mapping[str, object], ...]:
     for document, schema in zip(documents, CATALOG_SCHEMA_PATHS.values()):
         schema_path = root / schema
         result = subprocess.run(
-            [check_jsonschema, "--schemafile", str(schema_path), str(document)],
+            ["check-jsonschema", "--schemafile", str(schema_path), str(document)],
             cwd=root,
             check=False,
             capture_output=True,
@@ -414,9 +391,7 @@ def validate_catalog_schemas(root: Path) -> tuple[Mapping[str, object], ...]:
                 "exit_code": result.returncode,
             }
         )
-    validated = tuple(results)
-    _SCHEMA_PREFLIGHT_CACHE[root] = (fingerprint, validated)
-    return validated
+    return tuple(results)
 
 
 @dataclass(frozen=True)
@@ -925,8 +900,7 @@ def freeze_skill_rule_mapping(
 
 
 def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
-    """Load prompt-routing rules from a natively schema-validated catalog."""
-    validate_catalog_schemas(root)
+    """Load prompt-routing rules and their cross-catalog relationships."""
     data = load_skill_catalog(root)
     families = object_sequence(data.get("skill_families"), "skill_families")
     public_skill_ids = _skill_ids_from_catalog(data)
