@@ -110,7 +110,7 @@ def test_duplicate_dependency_array_value_is_rejected(tmp_path: Path) -> None:
     """Duplicate dependency references are structural uniqueItems violations."""
     check_jsonschema, _ = native_tools()
     data = yaml.safe_load((ROOT / "agents/skills/skill-dependencies.yaml").read_text(encoding="utf-8"))
-    data["skill_dependencies"]["agent-orchestration"]["successors"].append("task-routing")
+    data["skill_dependencies"]["agent-orchestration"]["successors"] = ["task-routing", "task-routing"]
     document = tmp_path / "dependencies.yaml"
     document.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     result = subprocess.run(
