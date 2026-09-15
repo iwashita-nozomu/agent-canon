@@ -69,6 +69,26 @@ authorize speculative generalization or unrelated library or consumer changes.
 Keep the decision with the existing implementation and review owners, without
 adding a checker, report, or approval gate to enforce simplicity.
 
+Whenever adding or changing code or an API, always keep the necessity rationale
+in the responsible repository's durable design document, not only in task
+records. Explain the concrete requirement and caller/consumer, what would remain
+unmet without the code/API, and the mathematical or engineering grounds and
+assumptions for the chosen approach. Compare direct use or composition of
+existing APIs and simpler alternatives; justify any additional mechanism only
+by the remaining gap. A behavior description, signature, or generic claim of
+future usefulness or safety is not a necessity rationale. For removals, explain
+why it is no longer needed or which mechanism now meets the requirement.
+Establish the rationale before implementation and keep it aligned with the
+change in the same PR. Connect its design section to the relevant implementation
+paths/symbols at responsibility-unit granularity. Reuse an adequate, still-current
+design explanation by reference instead of copying it for each function or edit;
+add or update a concise section under existing design conventions when needed.
+Chat, Issue/PR discussion, and code comments may support or link to that section
+but never replace its explanation. If necessity cannot be justified, reconsider
+the implementation rather than inventing a reason. Use the existing design and
+review owners; do not add a checker, schema, approval gate, or unrelated
+retrospective documentation task.
+
 Do not add exact version pins, hard-coded commit SHAs, or SHA-equality guards
 merely for precaution or generic claims of reproducibility. Use the repository's
 existing dependency declarations and native resolution mechanism. A new exact

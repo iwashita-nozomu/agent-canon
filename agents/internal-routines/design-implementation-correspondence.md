@@ -4,6 +4,7 @@
 contract agent-runtime
 responsibility Documents the universal design-to-implementation correspondence routine for repository-changing work.
 upstream design ../canonical/CODEX_WORKFLOW.md implementation entry and design-integrity route
+upstream design ../../ROOT_AGENTS.md common code/API necessity-rationale persistence boundary
 downstream implementation ../../tools/agent/orchestration/route.py selects capability and stage routes
 downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py transports design fingerprints and handoff state
 downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design-backed claims
@@ -24,8 +25,14 @@ upstream design ../../documents/design/semantic-responsibility-contract.md seman
 semantics、ownership、path、runtime contract のいずれかを変更する実装、または
 request が明示的に design workflow を選択した場合にだけ active です。owner、path、
 targeted validation が固定され、これらの契約を変更しない bounded edit は通常の
-owner route として短い owner/path/validation note で完了し、DIC の traversal、clause
+owner route として短い owner/path/validation note で扱い、DIC の traversal、clause
 fingerprint、forward/reverse closure packet は要求しません。
+
+この activation gate は対応付け手順の選択だけを決めます。コード/API の必要性の保存は、
+[ROOT_AGENTS.md の共通境界](../../ROOT_AGENTS.md#always-on-boundary) に従い、
+DIC の選択有無によらず設計文書で行います。bounded edit の note には、その設計節への
+参照を含めます。必要性の記述だけを理由に DIC を起動したり、fingerprint、packet、
+別の台帳を要求したりしません。
 
 ## Responsibility / Owner Boundaries
 
