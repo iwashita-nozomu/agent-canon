@@ -5,6 +5,7 @@
 contract skill
 responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../ROOT_AGENTS.md shared post-edit formatting boundary
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md responsibility-owned validation selection
 downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior
@@ -36,6 +37,8 @@ marker is not readback evidence.
 ## Purpose
 
 Markdown の体裁、見出し、リンク、可読性を崩さずに保ちます。
+編集後の整形は [ROOT_AGENTS.md の Validation Routing](../../ROOT_AGENTS.md#validation-routing)
+に従い、整形した最終差分に対して必要な検証まで閉じます。
 formatter を実行した場合は、体裁修正だけで完了にせず、同じ入口で周辺チェックまで閉じます。
 この skill 単独で扱うのは typo / link / format-only の文書変更です。
 repo-changing task 全体が bounded owner 修正として閉じる場合は通常の owner route
@@ -144,6 +147,8 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
 - 文書間の矛盾や stale route は docs consistency review を使います。
 
 ## Final Guard
+
+この確認で再編集した場合は、[Default Sequence](#default-sequence) の最終整形からやり直します。
 
 - formatter と checker が pass しても、最後に変更箇所の table、文中数式、
   inline code を確認します。文中数式は `$...$`、literal な code/path/value は backtick

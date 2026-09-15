@@ -286,6 +286,19 @@ commit/push gate or a new receipt requirement.
 ## Validation Routing
 
 Use the validation route owned by the changed repository-specific responsibility.
+Formatting is part of completing edits, not an optional repair after lint fails.
+Before final validation, staging, and commit or handoff, run the repository's
+configured formatter on the task's edited files and review and include its diff.
+Repeat after later edits, generation, fixers, or conflict resolution; an earlier
+result does not cover changed content. A combined command that actually formats
+the final files satisfies this step; tests or check-only lint do not. Preserve
+unrelated or user-owned changes and the repository's existing formatting scope.
+Do not add a formatter, configuration, hook, environment probe, or repository-wide
+reformat to satisfy this rule. If no formatter is configured, do not invent one.
+If the selected formatter fails or cannot run, record the command, affected files,
+and reason in the existing Issue / PR or task result; hand off as unverified,
+not as formatting-complete.
+
 Validate the changed contract and its failure semantics, then use that owner's
 closeout route when required. A generated consumer root file does not authorize
 unrelated AgentCanon checks, product checks, or runtime changes.
