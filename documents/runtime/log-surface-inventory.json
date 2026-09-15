@@ -13539,54 +13539,6 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_PREFLIGHT_CHECKLIST",
-      "line": 696,
-      "path": "tools/runtime/lifecycle/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS",
-      "line": 697,
-      "path": "tools/runtime/lifecycle/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_PREFLIGHT_COMMAND",
-      "line": 692,
-      "path": "tools/runtime/lifecycle/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_PREFLIGHT_NEXT",
-      "line": 695,
-      "path": "tools/runtime/lifecycle/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_PREFLIGHT_REASON",
-      "line": 694,
-      "path": "tools/runtime/lifecycle/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_PREFLIGHT_STATUS",
-      "line": 693,
-      "path": "tools/runtime/lifecycle/bootstrap_agent_run.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
       "field": "AGENT_REPORT_COLLECTION_STATUS",
       "line": 932,
       "path": "tools/runtime/lifecycle/bootstrap_agent_run.py",
@@ -20463,7 +20415,6 @@
     "tools/runtime/manifest/surface_manifest.py",
     "tools/runtime/manifest/tool_catalog.py",
     "tools/runtime/source/__init__.py",
-    "tools/runtime/source/agent_canon_preflight.py",
     "tools/runtime/source/agent_canon_source_root.py",
     "tools/runtime/source/export_static_seed.py",
     "tools/runtime/support/__init__.py",

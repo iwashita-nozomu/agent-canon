@@ -3,7 +3,6 @@
 # responsibility Defines AgentCanon update TODOs for parent repository agents.
 # upstream design agent-canon-parent-repo-latest-checklist.md parent repo latest-state workflow
 # downstream implementation ../../tools/agent/orchestration/agent_canon_update_todos.py reads and routes these tasks
-# downstream implementation ../../tools/runtime/source/agent_canon_preflight.py exposes task-start routing status
 # @dependency-end
 
 manifest_kind = "agent_canon_update_tasks"

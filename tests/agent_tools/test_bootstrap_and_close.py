@@ -2,7 +2,6 @@
 # contract test
 # responsibility Tests run bootstrap and close behavior.
 # upstream design ../../tools/README.md validated automation surface
-# upstream implementation ../../tools/runtime/source/agent_canon_preflight.py preflight routing under test
 # upstream implementation ../../tools/agent/orchestration/packets.py owns packet normalization under test
 # upstream implementation ../../tools/agent/orchestration/tool_calls.py owns typed lifecycle tool calls under test
 # upstream implementation ../../tools/agent/orchestration/team_config.py owns team configuration under test
@@ -1475,7 +1474,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn(str((report_dir / path).resolve()), read_paths)
             self.assertIn(path, stdout)
 
-    def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
+    def test_bootstrap_uses_source_workspace_without_classification(self) -> None:
         """Source AgentCanon runs do not require a derived-repo update target."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             source_root = PROJECT_ROOT
@@ -1484,11 +1483,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     sys.executable,
                     str(BOOTSTRAP_SCRIPT),
                     "--task",
-                    "source canon preflight smoke",
+                    "source canon workspace smoke",
                     "--owner",
                     "codex",
                     "--run-id",
-                    "source-canon-preflight",
+                    "source-canon-workspace",
                     "--workspace-root",
                     str(source_root),
                     "--report-root",
@@ -1501,16 +1500,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=source_checkout_selected", result.stdout
-            )
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_CHECKLIST=documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
-                result.stdout,
-            )
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
-            )
+            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
 
     def test_bootstrap_materializes_explicit_active_design_packet(self) -> None:
         """The run bootstrap persists and routes one typed packet end to end."""
@@ -1534,7 +1524,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(report_root),
                     "--active-design-packet",
                     json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -1603,7 +1592,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         str(report_root),
                         "--active-design-packet",
                         json.dumps(packet, separators=(",", ":")),
-                        "--skip-agent-canon-preflight",
                     ],
                     cwd=PROJECT_ROOT,
                     check=False,
@@ -1642,11 +1630,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     sys.executable,
                     str(BOOTSTRAP_SCRIPT),
                     "--task",
-                    "shared canon preflight route",
+                    "shared canon workspace route",
                     "--owner",
                     "codex",
                     "--run-id",
-                    "shared-canon-preflight",
+                    "shared-canon-workspace",
                     "--workspace-root",
                     str(workspace_root),
                     "--report-root",
@@ -1659,60 +1647,41 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_free_parent",
-                result.stdout,
-            )
+            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
             self.assertFalse((workspace_root / "plan-sentinel").exists())
             self.assertFalse((workspace_root / "ensure-sentinel").exists())
 
-    def test_bootstrap_reports_parent_repo_latest_checklist(self) -> None:
-        """Parent repos should expose the AgentCanon latest-state checklist at task start."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            seed_workspace_config(workspace_root)
-            checklist = (
-                workspace_root
-                / "documents"
-                / "agent-canon"
-                / "agent-canon-parent-repo-latest-checklist.md"
-            )
-            checklist.parent.mkdir(parents=True)
-            checklist.write_text("# Checklist\n", encoding="utf-8")
-            subprocess.run(["git", "init"], cwd=workspace_root, check=True)
+    def test_bootstrap_uses_workspace_without_git_or_checklist_classification(self) -> None:
+        """Git and checklist presence are not task-entry routing inputs."""
+        for git_workspace, checklist_present in ((False, False), (False, True), (True, False), (True, True)):
+            with self.subTest(git_workspace=git_workspace, checklist_present=checklist_present):
+                with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+                    workspace_root = Path(tmp_dir) / "workspace"
+                    report_root = Path(tmp_dir) / "reports"
+                    seed_workspace_config(workspace_root)
+                    if git_workspace:
+                        subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+                    if checklist_present:
+                        checklist = workspace_root / "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md"
+                        checklist.parent.mkdir(parents=True)
+                        checklist.write_text("# Checklist\n", encoding="utf-8")
+                    result = subprocess.run(
+                        [
+                            sys.executable, str(BOOTSTRAP_SCRIPT),
+                            "--task", "selected workspace smoke", "--owner", "codex",
+                            "--run-id", "selected-workspace", "--workspace-root", str(workspace_root),
+                            "--report-root", str(report_root),
+                        ],
+                        cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
+                    self.assertIn(f"WORKSPACE_ROOT={workspace_root}", result.stdout)
+                    self.assertTrue((report_root / "selected-workspace/team_manifest.yaml").is_file())
+                    monitoring = (report_root / "selected-workspace/workflow_monitoring.md").read_text(encoding="utf-8")
+                    self.assertNotIn("agent_canon_preflight=", monitoring)
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "parent checklist smoke",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "parent-checklist",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_CHECKLIST=documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
-                result.stdout,
-            )
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
-            )
-
-    def test_bootstrap_ignores_external_clone_for_source_free_parent_preflight(
+    def test_bootstrap_ignores_external_clone_for_source_free_parent(
         self,
     ) -> None:
         """Parent task entry neither runs nor mutates a separately selected clone."""
@@ -1735,7 +1704,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             # AgentCanon is selected from an ignored external development
             # clone.  The parent fixture must not grow a vendor checkout or a
-            # source projection merely to run preflight.
+            # source projection merely to start a run.
             source_root = (
                 workspace_root / "workspace" / "agent-canondevelop" / "agent-canon"
             )
@@ -1852,17 +1821,14 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 f"REPORT_DIR={report_root / 'parent-dirty-unrelated'}",
                 result.stdout,
             )
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_free_parent",
-                result.stdout,
-            )
+            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
             self.assertEqual(source_before, snapshot_external_source(source_root))
             self.assertTrue(
                 (report_root / "parent-dirty-unrelated" / "schedule.md").is_file()
             )
 
-    def test_source_free_parent_eval_artifact_is_not_agentcanon_preflight_state(self) -> None:
+    def test_source_free_parent_diagnostics_do_not_trigger_canon_sync(self) -> None:
         """Parent-local diagnostics remain parent-owned and do not trigger canon sync."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -1937,10 +1903,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(blocked.returncode, 0, blocked.stderr)
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_free_parent",
-                blocked.stdout,
-            )
+            self.assertNotIn("AGENT_CANON_PREFLIGHT_", blocked.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
             self.assertTrue(capture.is_file())
 
@@ -1967,10 +1930,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_free_parent",
-                resumed.stdout,
-            )
+            self.assertNotIn("AGENT_CANON_PREFLIGHT_", resumed.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
 
     def test_bootstrap_emits_workflow_skills_and_language_review_candidates(
@@ -2000,7 +1960,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(report_root),
                     "--changed-path",
                     "src/example.cpp",
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2012,7 +1971,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             expected_active, expected_write = expected_workflow_spawn_budget(
                 "comprehensive_development"
             )
-            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
+            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
             self.assertIn(
                 f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
@@ -2077,7 +2036,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2159,7 +2117,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2229,7 +2186,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                     "--select-agent-type",
                     "implementer=spark_worker:approved-bounded-slice",
                 ],
@@ -2289,7 +2245,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                     "--select-agent-type",
                     "implementer=diff_triage_reviewer:not-an-implementer",
                 ],
@@ -2373,7 +2328,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         str(workspace_root),
                         "--report-root",
                         str(report_root),
-                        "--skip-agent-canon-preflight",
                     ],
                     cwd=PROJECT_ROOT,
                     check=False,
@@ -2428,7 +2382,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(report_root),
                     "--run-id",
                     "test-academic-wave-order",
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2506,7 +2459,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(report_root),
                     "--changed-path",
                     "python/example.py",
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2585,7 +2537,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                     "--workspace-root",
                     str(workspace_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2594,7 +2545,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
+            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
             self.assertIn(
                 f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
             )
@@ -2671,7 +2622,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2712,7 +2662,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2800,7 +2749,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -2886,7 +2834,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         str(workspace_root),
                         "--report-root",
                         str(report_root),
-                        "--skip-agent-canon-preflight",
                     ],
                     cwd=PROJECT_ROOT,
                     check=False,
@@ -3035,7 +2982,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -3079,7 +3025,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -3386,7 +3331,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                     "--workspace-root",
                     str(workspace_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -5473,7 +5417,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -5682,7 +5625,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
