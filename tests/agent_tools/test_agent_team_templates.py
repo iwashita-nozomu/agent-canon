@@ -23,6 +23,8 @@ from types import SimpleNamespace
 from typing import cast
 from unittest.mock import patch
 
+import yaml
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
@@ -35,7 +37,10 @@ from tools.agent.orchestration.agent_team import (  # noqa: E402
 from tools.agent.orchestration.implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
 from tools.runtime.authority.writer_target import WriterTarget  # noqa: E402
 from tools.runtime.manifest.manifest_rendering import (  # noqa: E402
+    COMMON_PROMPT_MUST_INCLUDE,
     language_review_candidates,
+    manifest_run_lines,
+    render_subagent_prompt_packet,
     public_command_for_layout,
     render_code_template,
     render_template,
@@ -60,6 +65,47 @@ from tools.runtime.authority.checkout_identity import resolve_checkout_identity 
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
+
+    def test_prompt_packets_do_not_require_rejection_prediction(self) -> None:
+        """Optional diagnostics must not become mandatory handoff fields."""
+        self.assertNotIn("pre_edit_rejection_prediction", COMMON_PROMPT_MUST_INCLUDE)
+        packet = yaml.safe_load("\n".join(render_subagent_prompt_packet(
+            {"subagent_prompt": {"purpose": "fixture"}}, "",
+        )))["subagent_prompt_packet"]
+        self.assertNotIn("tool_rejection_prediction", packet["required_tool_fields"])
+        for field in ("tool_route", "tool_call_tokens", "tool_evidence"):
+            self.assertIn(field, packet["required_tool_fields"])
+
+    def test_manifest_keeps_prediction_available_without_a_pending_gate(self) -> None:
+        """An unselected diagnostic stays available without blocking implementation."""
+        config = load_team_config()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir)
+            spec = RunBundleSpec(
+                config=config,
+                report_dir=report_root / "run",
+                report_root=report_root,
+                run_id="run",
+                task="optional preflight",
+                owner="test",
+                created_at_iso="2026-09-15T00:00:00Z",
+                roles=(),
+                workspace_root=PROJECT_ROOT,
+                agentcanon_source_root=PROJECT_ROOT,
+                active_design_packet=resolve_active_design_packet_config(config),
+                task_catalog=load_task_catalog(config),
+            )
+            # This unit fixture has no selected Skills; catalog validation is
+            # exercised by the existing bootstrap integration tests.
+            with patch(
+                "tools.runtime.manifest.manifest_rendering.suggested_public_skills",
+                return_value=(),
+            ):
+                manifest = yaml.safe_load("\n".join(manifest_run_lines(spec, None)))
+        defaults = manifest["run"]["implementation_gate_defaults"]
+        self.assertEqual(defaults["pre_edit_rejection_prediction_status"], "optional_diagnostic")
+        self.assertIn("tool_rejection_preflight.py", defaults["pre_edit_rejection_command"])
+        self.assertEqual(defaults["tool_reuse_ledger_status"], "required_before_custom_implementation")
 
     def test_project_cpp_tests_select_cpp_reviewer_without_python_reviewer(self) -> None:
         """Out-of-tree project C++ tests route only to the native reviewer."""
