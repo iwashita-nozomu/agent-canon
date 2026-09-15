@@ -54,9 +54,20 @@ and call the result complete. Unresolved coverage remains an implementation
 gap, not invalid input or authorization to shrink the contract. Narrowing
 requires explicit user direction. Validate through the applicable implementation
 and test owners, including valid cases beyond the motivating example and cases
-a shortcut would exclude. Prefer the simplest implementation that preserves
-this domain and its guarantees; this does not authorize speculative
-generalization, new frameworks, or unrelated library or consumer changes.
+a shortcut would exclude.
+
+Make the simplest complete implementation the default, not a later refactor.
+Start with direct use or composition of existing APIs and straightforward code
+at the current owner. Introduce abstractions, configuration, execution paths,
+or state only when a concrete current requirement cannot be met more simply;
+justify that necessity with mathematical or engineering grounds. Hypothetical
+reuse, design-pattern uniformity, or test-double convenience alone is not such
+a reason. Minimize concepts, state, branches, and dependencies while preserving
+the required domain, correctness, safety, and failure semantics. Neither fewer
+lines nor a smaller diff justifies omitted behavior, and completeness does not
+authorize speculative generalization or unrelated library or consumer changes.
+Keep the decision with the existing implementation and review owners, without
+adding a checker, report, or approval gate to enforce simplicity.
 
 Before implementing a guard, retry, fallback, or other abnormal-condition
 handling, first determine whether the condition can occur under the current
