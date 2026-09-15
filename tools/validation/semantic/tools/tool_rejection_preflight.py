@@ -388,8 +388,8 @@ def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Predict tool/hook rejection gates that should be run or explained "
-            "before a write-capable subagent edits planned paths."
+            "Optionally predict candidate tool/hook checks for planned paths. "
+            "Prediction is diagnostic, not edit authorization or required validation."
         )
     )
     parser.add_argument("paths", nargs="*", help="Planned edit paths.")

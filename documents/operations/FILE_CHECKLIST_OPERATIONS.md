@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents 作業別チェックリスト for this repository.
 upstream design ../contracts/github-first-module-and-devcontainer-policy.md environment ownership boundary
+upstream design ../runtime/runtime-profiles-and-check-matrix.md responsibility-owned documentation validation
 @dependency-end
 -->
 
@@ -62,11 +63,9 @@ bash tools/validation/ci/checks/run_python_quality_checks.sh
 
 ## 3. 文書変更
 
-手順:
-
-```bash
-tools/bin/agent-canon docs check <changed-file>.md
-```
+変更した文書 owner の検査を使います。選択基準は
+[Runtime Profiles And Check Matrix](../runtime/runtime-profiles-and-check-matrix.md#check-matrix)
+を参照し、この checklist から追加の汎用 checker を起動しません。
 
 確認:
 

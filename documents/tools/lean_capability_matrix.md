@@ -69,6 +69,9 @@ Primary and near-primary sources used for this matrix:
 | Machine-to-machine proof interaction | Pantograph, Lean REPL, LeanDojo-style harnesses | The task needs tactic execution state, proof search, benchmark data, or a persistent agent harness. | Future proof-search backend for generated frontier nodes. | Treat as optional backend infrastructure; do not make normal local proof checks depend on heavyweight services. |
 | Environment and dependencies | Lake, `lean-toolchain`, `lean_proof_env.py` | A proof needs Mathlib/Aesop/Plausible/LeanSearchClient or a stable checked environment. | Pin dependencies once for an active proof package; use the reusable proof env for probes and fallback checks. | Do not spend every proof retry rediscovering the same environment boundary. |
 
+複数のproof targetを機械実行するときの入力・終了状態は
+[lean_recursive_proof_search.py](lean_recursive_proof_search.md) を参照します。
+
 ## Default Lean Attempt Order
 
 For each selected frontier node:

@@ -50,7 +50,8 @@ class RouteToolTest(unittest.TestCase):
     def test_route_reexports_structured_skill_command_items(self) -> None:
         """Route consumers receive typed catalog items from the shared loader."""
         catalog = route_module.load_skill_tool_commands(PROJECT_ROOT)
-        item = catalog["agent-orchestration"].required[0]
+        self.assertEqual(catalog["agent-orchestration"].required, ())
+        item = catalog["agent-orchestration"].maintenance[0]
         self.assertIsInstance(item, dict)
         self.assertIn("tool_id", item)
         self.assertNotIsInstance(item, str)

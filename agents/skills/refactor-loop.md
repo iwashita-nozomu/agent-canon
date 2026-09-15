@@ -186,7 +186,7 @@ or writing.
    validated decision point、または stable reusable behavior がある場合だけ許可します。
 1. 新機能追加は同じ pass に混ぜません。必要なら先に分離します。
 1. delete、rename、move、module split は `Files To Remove Or Move:` として先に列挙します。
-1. old path と new path の対応を `Path Mapping:` として残します。
+1. old path と new path の対応を `Path Mapping:` として残します。既存の記録先がない場合は [refactor safety case](../../templates/agents/refactor_safety_case.md) を使えます。同じ情報を別artifactへ二重記録しません。
 1. 大規模 repo では `Current Responsibility Map:` と `Target Responsibility Map:` を先に作り、OOP 的に責務、状態、契約、adapter を最小境界へ分けます。
 1. full tool finding、mechanical priority order、baseline packet、impact、
    repair packet は、behavior-changing / regression-prone code refactor、

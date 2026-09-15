@@ -4,7 +4,7 @@ contract reference
 responsibility Documents Linux / WSL Host Requirements for this repository.
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and mount ownership policy
 upstream design ../design/devcontainer/parent-devcontainer-policy.md default and optional profile contract
-upstream design ../design/devcontainer/parent-dependency-manifest-followup.md dependency and source identity contract
+upstream design ../runtime/bootstrap-runtime.md shared runtime and project dependency ownership boundary
 @dependency-end
 -->
 
