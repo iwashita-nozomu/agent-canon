@@ -54,9 +54,20 @@ and call the result complete. Unresolved coverage remains an implementation
 gap, not invalid input or authorization to shrink the contract. Narrowing
 requires explicit user direction. Validate through the applicable implementation
 and test owners, including valid cases beyond the motivating example and cases
-a shortcut would exclude. Prefer the simplest implementation that preserves
-this domain and its guarantees; this does not authorize speculative
-generalization, new frameworks, or unrelated library or consumer changes.
+a shortcut would exclude.
+
+Make the simplest complete implementation the default, not a later refactor.
+Start with direct use or composition of existing APIs and straightforward code
+at the current owner. Introduce abstractions, configuration, execution paths,
+or state only when a concrete current requirement cannot be met more simply;
+justify that necessity with mathematical or engineering grounds. Hypothetical
+reuse, design-pattern uniformity, or test-double convenience alone is not such
+a reason. Minimize concepts, state, branches, and dependencies while preserving
+the required domain, correctness, safety, and failure semantics. Neither fewer
+lines nor a smaller diff justifies omitted behavior, and completeness does not
+authorize speculative generalization or unrelated library or consumer changes.
+Keep the decision with the existing implementation and review owners, without
+adding a checker, report, or approval gate to enforce simplicity.
 
 Do not add exact version pins, hard-coded commit SHAs, or SHA-equality guards
 merely for precaution or generic claims of reproducibility. Use the repository's
@@ -80,8 +91,16 @@ first. Preventive handling does not require a real incident or unsafe
 reproduction when specifications or analysis establish possibility. Only after
 that judgment, use impact and existing guarantees to select the smallest
 necessary remedy at the responsible owner and validate it against the
-identified condition. Preserve existing required safety and external-boundary
-checks. Record the judgment and grounds in the existing Issue or design record,
+identified condition. Do not make guards or preflight checks stricter than the
+governing contract: avoid environment, directory-layout, or exact-version
+restrictions when the required capability suffices, and repeated checks of
+invariants already guaranteed at the same trust boundary. An unavailable
+optional tool or diagnostic must not block an otherwise supported path.
+Validate untrusted inputs at the owning boundary rather than coupling reusable
+code to one caller's setup. Prefer no new check unless it closes an evidenced
+gap without unnecessarily reducing portability or reuse. Preserve required
+authorization, safety, and external-boundary checks; do not suppress their
+failures. Record the judgment and grounds in the existing Issue or design record,
 not a new gate or report.
 
 When numerical results disagree, first investigate defects in the algorithm
