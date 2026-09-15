@@ -576,7 +576,6 @@ class WaterfallGateCheckTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                     "--report-root",
                     str(report_root),
-                    "--skip-agent-canon-preflight",
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,

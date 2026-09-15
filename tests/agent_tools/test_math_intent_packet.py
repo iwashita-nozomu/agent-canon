@@ -396,7 +396,6 @@ def run_bootstrap(
                 str(runtime),
                 "--workspace-root",
                 str(PROJECT_ROOT),
-                "--skip-agent-canon-preflight",
                 "--no-language-review-candidates",
                 *args,
             ],

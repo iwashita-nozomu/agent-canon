@@ -42,8 +42,6 @@ if __package__:
 else:
     from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
-from tools.runtime.source.agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
-
 if __package__:
     from tools.agent.orchestration.packets import (
         ACTIVE_DESIGN_PACKET_SCHEMA,
@@ -450,11 +448,6 @@ def build_parser(
         default=".",
         help="Workspace root used to resolve run-local reports and current-checkout path authority.",
     )
-    parser.add_argument(
-        "--skip-agent-canon-preflight",
-        action="store_true",
-        help="Skip the automatic read-only AgentCanon update-plan preflight.",
-    )
     return parser
 
 
@@ -645,7 +638,6 @@ def emit_bootstrap_output(
     catalog: TaskCatalog,
     context: BootstrapRunContext,
     workspace_root: Path,
-    preflight: AgentCanonPreflightResult,
     runtime: BootstrapRuntime,
     writer_targets: Mapping[str, object] | None = None,
 ) -> None:
@@ -689,12 +681,6 @@ def emit_bootstrap_output(
     public_layout = getattr(repository_roots, "layout", None)
     if public_layout is None:
         raise RuntimeError("runtime_roots_invalid:layout_missing")
-    print("AGENT_CANON_PREFLIGHT_COMMAND=bash bootstrap.sh --help")
-    print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
-    print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
-    print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
-    print(f"AGENT_CANON_PREFLIGHT_CHECKLIST={preflight.checklist_path}")
-    print(f"AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS={preflight.checklist_status}")
     print(f"RUN_ID={context.run_id}")
     print(f"REPORT_DIR={context.report_dir}")
     print(f"TASK_AUTHORITY={context.report_dir / 'task_authority.yaml'}")
@@ -975,7 +961,6 @@ def record_bootstrap_monitoring(
     selected_skills: tuple[str, ...],
     review_roles: tuple[str, ...],
     task_text: str,
-    preflight_status: str,
     source_root: Path | None = None,
 ) -> None:
     """Record bootstrap monitoring evidence."""
@@ -991,7 +976,6 @@ def record_bootstrap_monitoring(
                 f"review={','.join(review_roles) or '-'}"
             ),
             f"stage owner routing active_roles={','.join(role.id for role in roles)}",
-            f"agent_canon_preflight={preflight_status}",
             "web_research_not_required: bootstrap does not decide external research",
         ],
         interventions=[
@@ -1219,14 +1203,6 @@ def main(
     except (RuntimeError, OSError) as exc:
         print(str(exc), flush=True)
         return 1
-    try:
-        preflight = run_agent_canon_preflight(
-            workspace_root,
-            skip=args.skip_agent_canon_preflight,
-        )
-    except RuntimeError as exc:
-        print(str(exc), flush=True)
-        return 1
     context = resolve_bootstrap_context(
         args,
         config,
@@ -1351,7 +1327,6 @@ def main(
                 selected_skills,
                 review_roles,
                 args.task,
-                preflight.status,
                 repository_roots.agentcanon_source_root,
             ),
         )
@@ -1364,7 +1339,6 @@ def main(
         catalog=catalog,
         context=context,
         workspace_root=workspace_root,
-        preflight=preflight,
         runtime=runtime,
         writer_targets=writer_targets,
     )

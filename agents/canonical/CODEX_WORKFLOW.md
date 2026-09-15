@@ -70,12 +70,11 @@ Cross-Cutting Packet:
 
 ### Agent Canon Freshness
 
-task 開始時は read-only worktree check で、現在の AgentCanon source checkout と親の作業領域を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合は repository-topic lifecycle の選択済み checkout-mode で standalone topic branch / PR route に入ります。
+task 開始時は選択済みの `--workspace-root` と source/runtime root を使います。ファイル配置や Git 状態から source/parent を再分類せず、分類結果や checklist を追加の開始手順にしません。AgentCanon 自身の更新が必要な場合だけ、選択済み checkout-mode の standalone topic branch / PR route に入ります。
 
 - AgentCanon source/runtime変更は standalone source checkout から `$agent-canon-update` と `$pr-processing` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへlive root view、vendor、submodule pinを同期しません。consumer root [AGENTS.md](../../AGENTS.md) は、親が明示 composer で common [ROOT_AGENTS.md](../../ROOT_AGENTS.md) と consumer-specific text を合成して通常 file として管理します。
 - 親で source の変更が必要な場合は、repository-topic lifecycle が親の `<anchor>/workspace/<topic>/agent-canon` に選択済み mode の checkout を用意し、完了時に exact path の cleanup proof を取ります。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
 - standalone AgentCanon source branch が remote main と divergeしている場合はfail-closedとし、source branchのrebase/merge判断、AgentCanon PR、merge後main readbackを完了してから実装へ戻ります。
-- `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。親から起動したときは AgentCanon source checkout の存在、runtime root の containment、source-unchanged readbackを確認します。`skipped_source_canon` は AgentCanon source checkout がこの task の owner でない場合だけ妥当です。
 
 ### Branch Reuse Default
 
