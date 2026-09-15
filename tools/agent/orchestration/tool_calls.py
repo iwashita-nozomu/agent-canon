@@ -17,20 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-if __package__:
-    from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
-    from tools.runtime.authority.writer_target import (
-        WriterTarget,
-        validate_mathematical_writer_target,
-        validate_spawn_handoff,
-    )
-else:
-    from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
-    from tools.runtime.authority.writer_target import (  # type: ignore[no-redef]
-        WriterTarget,
-        validate_mathematical_writer_target,
-        validate_spawn_handoff,
-    )
+from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
+from tools.runtime.authority.writer_target import (
+    WriterTarget,
+    validate_mathematical_writer_target,
+    validate_spawn_handoff,
+)
 
 from tools.runtime.lifecycle.update_lifecycle_contract import (
     materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
