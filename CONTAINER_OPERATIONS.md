@@ -126,8 +126,10 @@ Active tasks, current and rollback generations, unpublished spool, and
 pre-existing Docker resources are retained.
 
 Do not use `docker system prune`. Stop/remove only exact image and container
-IDs recorded as owned by this installation. Before and after an operation,
-read back labels, digest, limits, mounts, health, and resource absence.
+IDs recorded as owned by this installation. Before and after a selected
+resource-changing lifecycle operation, read back the affected labels, digest,
+limits, mounts, health, and required removal evidence. Do not repeat this
+lifecycle inventory around ordinary tool commands.
 
 ## Build and installation
 
@@ -145,7 +147,8 @@ are host-owned and stay outside the exchange.
 
 ## Target and mount rules
 
-Register each exact project root before execution:
+Register an unregistered exact project root before its first execution.
+Reuse its registration while the selected root and access mode are unchanged:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> \
@@ -232,14 +235,18 @@ readback. See [Runtime Log Archive](documents/runtime/runtime-log-archive.md).
 
 ## Cleanup and recovery
 
-Use this lifecycle for a normal session:
+For ordinary work, reuse the selected installed runtime, registered target,
+and existing execution route. Run the requested `tool run` or `exec` operation
+directly; a new task or session does not require environment discovery or a
+replay of installation, registration, status, collection, or teardown.
+Select lifecycle operations only for an explicit lifecycle request or the
+specific state change required by the authorized task. Installation/setup is
+not a per-session checklist; task completion does not itself authorize
+collection, synchronization, stopping, garbage collection, or uninstallation
+of a shared runtime.
 
-```text
-install -> start -> target add -> status -> codex prepare -> codex launch
-  -> tool run or exec -> eval collect -> eval sync -> stop -> gc -> uninstall
-```
-
-`status` is the first recovery operation. `rollback` requires zero active tasks
+For an observed runtime failure, `status` is the first recovery operation,
+not a preflight for every command. `rollback` requires zero active tasks
 and activates the last verified generation. `stop` removes the owned container
 but retains state and spool. `gc` removes only exact eligible owned objects.
 `uninstall` requires no active task and removes this installation's managed

@@ -58,6 +58,8 @@ does not import a pin or run a source synchronization wrapper after merge.
 
 ## Evidence and closeout
 
+For the source-to-parent evidence boundary, read [Source publication handoff](source-publication-parent-handoff.md).
+
 The update record names the source branch/commit, qualified Issue/PR, selected
 validation, runtime root, and cleanup readback. A source-invariant check must
 show the source tree unchanged after status/plan inspection. Task-owned Docker

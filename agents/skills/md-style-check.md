@@ -6,6 +6,7 @@ contract skill
 responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design code-visualization.md sole public visualization owner and typed projection contract
+upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md responsibility-owned validation selection
 downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior
 @dependency-end
 -->
@@ -46,7 +47,7 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 
 ## Use When
 
-- `.md` を触る
+- `.md` の変更を、その repository の文書 owner が定める方法で検証する
 - 文書整理や report 整備を行う
 - user request が plain `md-style-check` または `$md-style-check` を挙げている
 - docs lint、link check、heading hierarchy、markdown math、docs-check failure、Markdown style drift を直す
@@ -55,6 +56,19 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 - substantive な文書変更は `prose-reasoning-graph` と `structure-planning` の構造解析後に、この skill で Markdown checks を閉じる
 
 ## Required Checks
+
+Select checks from the changed repository's documentation owner and
+[validation matrix](../../documents/runtime/runtime-profiles-and-check-matrix.md).
+Project-owned documentation uses its project-owned validation directly, not as
+a fallback after trying AgentCanon. A Markdown edit or this skill's selection
+alone does not require an AgentCanon checker. Do not probe, install, register,
+or repair an unselected AgentCanon checker, or record its omission as skipped
+or as a verification gap. If no automated check is prescribed, review the changed
+document against the owner's contract. A genuinely required check that fails
+or is unavailable remains unresolved; another check's pass does not replace it.
+
+The following command examples apply only when AgentCanon source validation
+or the project documentation owner explicitly selects the AgentCanon tool:
 
 - `tools/bin/agent-canon docs check <paths...>`
 - `tools/bin/agent-canon docs format <paths...>` when formatter repair is needed
@@ -89,7 +103,7 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
 
 - typo / link / format-only route では、runtime `SKILL.md` 読了を docs tool 実行や patching の前提にしない
 - owner boundary、existing-tool route、targeted validation が evidence に残っている
-- changed Markdown files have been checked with `tools/bin/agent-canon docs check`
+- changed Markdown files have been validated through the documentation owner's selected route
 - 見出し階層が飛んでいない
 - command、path、file reference の書式が揃っている
 - 絶対パスリンクや repo 内リンクが壊れていない
@@ -106,22 +120,21 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
 - table 内の文中数式や inline code が raw `|` で列分割されていない
 - Mermaid fenced block と math delimiter が repo 標準に揃っている
 - 体裁修正の結果、意味や正本リンクを壊していない
-- formatter / fixer 実行後に `tools/bin/agent-canon docs check <paths...>` を通している
+- formatter / fixer 実行後も、同じ owner が選択した必要な検査で変更を確認している
 
 ## Default Sequence
 
-1. changed Markdown files を固定します。
+1. changed Markdown files と、その文書 owner の検査・修正経路を [Required Checks](#required-checks) に従って固定します。
 1. display math がある file は、double-dollar delimiter を独立行に置き、前後に空行を置きます。KaTeX / math fence の中に Markdown display delimiter を入れません。
 1. 文中数式 / inline math は `$...$`（例: `$(式)$`）で書き、code span や文中の double-dollar display delimiter と混ぜません。
 1. 数式を `text` / `plaintext` / `txt` / `plain` の fenced block に入れず、
    `math` / `latex` / `tex` の fenced block も使わず、`$...$` か standalone
    double-dollar block へ正規化します。info token の大文字小文字は問いません。
-1. command option や実行例が必要な場合は、実装 file を読む前に `tools/bin/agent-canon docs -h` を見ます。
-1. 文書全体を読む前に `tools/bin/agent-canon docs check <paths...>` を実行し、lint、link、math、Mermaid、heading を同時に見ます。`DOCS_CHECK=pass`、`DOCS_CHECK_FINDING=...`、`DOCS_CHECK_REPORT_BEGIN` の structured report は tool-covered property の正本判定として扱います。
+1. command option や実行例が必要な場合は、選択済み tool の help を見ます。
+1. 自動検査が選択されている場合は実行し、その report を検査対象 property の判定根拠にします。検査対象外の性質まで pass と扱いません。
 1. finding がある場合だけ、修正に必要な path / line / 近傍 slice を読みます。tool が見た property を subagent や reviewer に再読解させません。
-1. formatting drift がある場合は `tools/bin/agent-canon docs format <paths...>` を使い、その command が続けて走らせる adjacent check の結果まで確認します。
-1. markdown math drift は `tools/bin/agent-canon docs fix-math <paths...>`、Mermaid drift は `tools/bin/agent-canon docs fix-mermaid <paths...>` で機械修正し、修正後の check 結果を evidence に残します。
-1. formatter や fixer が display delimiter を escape したり、余分な double-dollar delimiter を作ったりした場合は、display math の block 形を直してから `tools/bin/agent-canon docs check <paths...>` を再実行します。
+1. formatting、math、Mermaid の drift は owner の選択済み formatter / fixer があれば利用して修正し、同じ owner の必要な検査で修正後を確認します。command がその検査を既に実行した場合は結果を再利用し、重ねて起動しません。
+1. formatter や fixer が display delimiter を escape したり、余分な double-dollar delimiter を作ったりした場合は、display math の block 形を直してから選択済みの検査を再実行します。
 1. 体裁違反、broken link、見出し drift を修正します。
 1. 文書間の矛盾や内容不足が見えたら、それぞれ docs consistency review、docs completeness review へ分岐します。
 
@@ -137,7 +150,7 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
   で分け、reader-facing な文書・skill 参照は [`05_docs.md`](../../documents/conventions/common/05_docs.md) の標準相対 Markdown link
   にします。table cell の中に raw `|` を含む数式や code を置くと
   Markdown の列として解釈されるため、式を display math へ出す、短い名前へ置換する、
-  または table 外の本文へ移してから、`tools/bin/agent-canon docs check <paths...>` を再実行します。
+  または table 外の本文へ移してから、選択済みの文書検査で変更を確認します。
 - format-only として閉じる場合は、`structure_contract=skipped` と理由が
   run bundle、work log、PR body、または closeout evidence に残っていることを確認します。
 - docs formatter / fixer / checker failure を修復へ回す場合は、
@@ -160,18 +173,17 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. For typo/link/format-only edits, do not require runtime `SKILL.md` reading
    before running the docs tool or patching. Keep owner, existing-tool route,
    and targeted-validation evidence.
-1. Use the unified Rust entrypoint as the canonical tool: `tools/bin/agent-canon docs check <paths...>` for checks and `tools/bin/agent-canon docs format <paths...>` for formatter repairs.
-1. Use `tools/bin/agent-canon docs -h` for command options and examples before reading implementation files.
+1. Follow [Required Checks](#required-checks) for owner selection and command applicability. Use the project-owned route directly for project documentation; the conditional AgentCanon examples are not a second required gate.
+1. Use the selected tool's help for command options and examples before reading implementation files.
 1. Before formatting files with display math, normalize display math to standalone double-dollar delimiter lines with blank lines around the block. Do not nest Markdown display delimiters inside KaTeX / math fenced blocks.
 1. Inline math in prose must use `$...$` (for example, `$(式)$`). Do not put math in inline code backticks, and do not use double-dollar display delimiters inside a sentence. Reserve double-dollar delimiters for display math on standalone delimiter lines.
 1. Mathematical expressions must not be placed in fenced code blocks labeled `text`, `plaintext`, `txt`, `plain`, `math`, `latex`, or `tex`; these first info tokens are checked case-insensitively. Convert those to `$...$` for inline math or a standalone double-dollar block. The checker reports one finding at a declared math-like fence and payload-line findings for text-like syntax.
-1. For tool-covered Markdown style, link, heading, math, and Mermaid properties, run the Rust docs tool before reading whole documents or spawning reviewers. Trust `DOCS_CHECK=pass`, `DOCS_CHECK_FINDING=...`, and the `DOCS_CHECK_REPORT_BEGIN` structured report; open only the reported path and nearby lines when a repair needs prose context.
-1. After any docs formatter or fixer runs, treat the adjacent check as part of the same operation: run `tools/bin/agent-canon docs check <paths...>` or record why the command was unavailable.
-1. Use `tools/bin/agent-canon docs fix-math <paths...>` and `tools/bin/agent-canon docs fix-mermaid <paths...>` for mechanical math or Mermaid repairs.
-1. If the docs formatter or fixer escapes display delimiters or creates duplicate display delimiters, repair the block form and rerun `tools/bin/agent-canon docs check <paths...>`.
+1. Use the selected documentation check's report for the properties it covers; open only the reported path and nearby lines when a repair needs prose context. Do not attribute untested properties to that report.
+1. After a formatter or fixer runs, validate the result through the same owner's required checks. Reuse an adjacent check already run by that command rather than repeating it or adding another checker.
+1. Use the owner-selected formatter/fixer when available for math or Mermaid repairs. If it escapes or duplicates display delimiters, repair the block form and recheck the changed result through that route.
 1. Check heading hierarchy, command/path formatting, Mermaid fenced blocks, markdown math, and broken links together.
 1. Treat broken links and heading drift as real findings.
-1. Last, inspect formatter-sensitive inline math and inline code in tables. A table cell must not contain a raw `|` inside backticks or inline math; if the formatter escapes backticks or splits a cell, split the expression out of the table, replace the cell with a short name, or otherwise repair the rendered Markdown, then rerun `tools/bin/agent-canon docs check <paths...>`.
+1. Last, inspect formatter-sensitive inline math and inline code in tables. A table cell must not contain a raw `|` inside backticks or inline math; if the formatter escapes backticks or splits a cell, split the expression out of the table, replace the cell with a short name, or otherwise repair the rendered Markdown, then validate the changed result through the selected documentation route.
 1. If a docs formatter/fixer/checker failure drives repair, record the
    validation-failure-response packet (`failing_contract`, `observation_level`,
    `cause_classification`, `intent_preservation`, and `evidence`). Use

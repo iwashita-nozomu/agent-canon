@@ -49,6 +49,6 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Boundary
 
-- 変更差分のレビューは `code-review` を使います。
+- 変更差分のレビューは [`change-review`](../skills/change-review.md) を使います。
 - repo-wide review の最上位入口としては `project-review` を使います。
 - profile の activation と check の対応は runtime profile/check matrix が所有します。

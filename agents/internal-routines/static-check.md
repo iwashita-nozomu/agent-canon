@@ -23,7 +23,7 @@ upstream implementation ../../tools/validation/ci/runners/run_standalone_static_
 
 ## Core References
 
-- [agents/internal-routines/static-validation.md](static-validation.md)
+- [runtime profile/check matrix](../../documents/runtime/runtime-profiles-and-check-matrix.md)
 - [documents/tools/README.md](../../documents/tools/README.md)
 - `tools/validation/ci/runners/run_standalone_static_gate_unit.sh`
 - `tools/validation/ci/runners/run_all_checks.sh`
@@ -78,7 +78,6 @@ COMMON=(
 ## Boundary
 
 - profile activation は runtime profile/check matrix が正本です。
-- `static-validation` は選択結果の意味を説明する入口であり、別の default gate を追加しません。
 - `run_all_checks.sh` は read-only target内で再利用する既存 check bodyです。Host checkoutからの direct full-confidence routeは使用しません。
 - GitHub metadata、receipt publication、control-parent transactionを持つ `check_agent_canon_pr.sh` の移行は別責務です。
-- 深い diff review は `change-review` または `code-review` を使います。
+- 深い diff review は [`change-review`](../skills/change-review.md) を使います。
