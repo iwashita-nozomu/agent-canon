@@ -10,6 +10,10 @@ downstream implementation ../../tools/experiments/execution/run_managed_experime
 @dependency-end
 -->
 
+NVIDIA XML topology、PID結合、UNKNOWN伝播の詳細は
+[NVIDIA visibility boundary](gpu-admission-r5-nvidia-visibility.md) を参照します。
+この参照は選択済みR5 strict admissionの詳細であり、通常GPU経路の追加gateではありません。
+
 ## 目的と境界
 
 この packet は、review で `APPROVE` された GPU/MIG admission と managed-run

@@ -38,12 +38,19 @@ skill, entrypoint, or routine that calls it.
 | Request modality routing | [chatgpt-codex-routing.md](chatgpt-codex-routing.md) | root entrypoints before `$agent-orchestration` |
 | GitHub-connected work | [github-connected-work.md](github-connected-work.md) | `$pr-processing` when current-session GitHub transport is available |
 | Incremental code change | [incremental-code-change.md](incremental-code-change.md) | `$code-cleanup` when coverage traversal or in-task token-waste repair is requested |
-| Review routines | [code-review.md](code-review.md), [critical-review.md](critical-review.md), [project-review.md](project-review.md), [report-review.md](report-review.md), [comprehensive-review.md](comprehensive-review.md) | `$change-review`, `$research-workflow`, `$comprehensive-development`, `$report-writing` |
+| Review routines | [critical-review.md](critical-review.md), [project-review.md](project-review.md), [report-review.md](report-review.md), [comprehensive-review.md](comprehensive-review.md) | [responsibility-cleanup](../skills/responsibility-cleanup.md), research workflow validation, and the selected project review |
 | Academic review routines | [citation-evidence-review.md](citation-evidence-review.md), [logic-gap-review.md](logic-gap-review.md), [notation-definition-review.md](notation-definition-review.md) | `$academic-writing`, `$paper-writing`, `$prose-reasoning-graph` |
-| Docs review routines | [docs-completeness-review.md](docs-completeness-review.md), [docs-consistency-review.md](docs-consistency-review.md) | `$document-canon-cleanup`, `$md-style-check` |
-| Research routines | [experiment-change-loop.md](experiment-change-loop.md), [experiment-workflow.md](experiment-workflow.md), [research-perspective-review.md](research-perspective-review.md) | `$experiment-lifecycle`, `$adaptive-improvement-loop`, `$research-workflow` |
-| Runtime and validation adapters | [artifact-placement.md](artifact-placement.md), [codex-cli.md](codex-cli.md), [static-check.md](static-check.md), [static-validation.md](static-validation.md), [project-health.md](project-health.md), [from_another_agent.md](from_another_agent.md) | workflow stages, tool checks, and project review |
+| Docs review routines | [docs-completeness-review.md](docs-completeness-review.md), [docs-consistency-review.md](docs-consistency-review.md) | [long-form-writing](../skills/long-form-writing.md) and the selected document review |
+| Research routines | [experiment-change-loop.md](experiment-change-loop.md), [research-perspective-review.md](research-perspective-review.md) | `$experiment-lifecycle`, `$adaptive-improvement-loop`, `$research-workflow` |
+| Validation and project health | [static-check.md](static-check.md), [project-health.md](project-health.md) | selected validation profiles and [project-review](project-review.md) |
+| GitHub status | [github-status-lifecycle.md](github-status-lifecycle.md) | [pr-processing](../skills/pr-processing.md) when Issue status reconciliation is requested |
 | Subagent startup routines | [subagent-startup.md](subagent-startup.md) | `$subagent-bootstrap`, `route.py --area agents` |
+
+Artifact placement is owned directly by [ARTIFACT_PLACEMENT.md](../canonical/ARTIFACT_PLACEMENT.md).
+For Codex entry and task continuation, use [repo-onboarding](../skills/repo-onboarding.md);
+its Issue/PR handoff is the task-state source, not a separate global TODO note.
+Diff review uses [change-review](../skills/change-review.md), and a single experiment
+uses [experiment-lifecycle](../skills/experiment-lifecycle.md).
 
 ## Contract
 

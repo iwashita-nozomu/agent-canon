@@ -32,12 +32,10 @@ research workflow, and adaptive backlog tuning.
 
 ## Core References
 
-- [agents/internal-routines/experiment-workflow.md](experiment-workflow.md)
 - [agents/skills/research-workflow.md](../skills/research-workflow.md)
 - [agents/internal-routines/critical-review.md](critical-review.md)
 - [agents/internal-routines/report-review.md](report-review.md)
 - [agents/skills/experiment-lifecycle.md](../skills/experiment-lifecycle.md)
-- [agents/skills/research-workflow.md](../skills/research-workflow.md)
 - [templates/agents/experiment_change_loop.md](../../templates/agents/experiment_change_loop.md)
 
 ## Inputs
@@ -114,7 +112,7 @@ research workflow, and adaptive backlog tuning.
 experiment runner の completion gate へ戻しません。
 
 - 外部調査そのものは `literature-survey` を使います。
-- 単一 run の設計と出力整理は `experiment-workflow` を使います。
+- 単一 run の設計と出力整理は [`experiment-lifecycle`](../skills/experiment-lifecycle.md) を使います。
 - 研究系変更の outer loop は `research-workflow` を使います。
 - tuning、調査、比較改善を backlog 付きで継続反復する outer loop では `adaptive-improvement-loop` を使います。
 - methodology、artifact、reporting policy を大きく変える場合は `research-perspective-review` を追加します。

@@ -62,4 +62,4 @@ manifest metadataで確認します。別 variant の同名 run や旧 topic-onl
 ## Boundary
 
 - 実験の比較妥当性そのものは `critical-review` を併用します。
-- run 設計や rerun loop の進行は `experiment-lifecycle` または `experiment-change-loop` を使います。
+- run 設計や rerun loop の進行は [`experiment-lifecycle`](../skills/experiment-lifecycle.md) または [単一変更の反復](experiment-change-loop.md) を使います。
