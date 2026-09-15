@@ -5,6 +5,7 @@
 contract skill
 responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../ROOT_AGENTS.md shared post-edit formatting boundary
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior
 @dependency-end
@@ -35,7 +36,8 @@ marker is not readback evidence.
 ## Purpose
 
 Markdown の体裁、見出し、リンク、可読性を崩さずに保ちます。
-formatter を実行した場合は、体裁修正だけで完了にせず、同じ入口で周辺チェックまで閉じます。
+編集後の整形は [ROOT_AGENTS.md の Validation Routing](../../ROOT_AGENTS.md#validation-routing)
+に従い、整形した最終差分に対して必要な検証まで閉じます。
 この skill 単独で扱うのは typo / link / format-only の文書変更です。
 repo-changing task 全体が bounded owner 修正として閉じる場合は通常の owner route
 と組み合わせ、owner boundary、existing-tool route、targeted validation を残します。
@@ -56,8 +58,9 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 
 ## Required Checks
 
-- `tools/bin/agent-canon docs check <paths...>`
-- `tools/bin/agent-canon docs format <paths...>` when formatter repair is needed
+- repository が選択した formatter を編集後に実行する。AgentCanon docs formatter が
+  選択済みなら `tools/bin/agent-canon docs format <paths...>` を使う
+- `tools/bin/agent-canon docs check <paths...>` を整形後の最終差分に対して実行する
 - `tools/bin/agent-canon docs fix-math <paths...>` when math delimiter repair is needed
 - `tools/bin/agent-canon docs fix-mermaid <paths...>` when Mermaid repair is needed
 
@@ -83,13 +86,14 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
 - Markdown の体裁、見出し階層、リンクが repo ルールに揃っている
 - broken link や heading drift が未解決のまま残っていない
 - 体裁の問題と中身の問題が分けて整理されている
-- formatter を走らせた差分では、隣接する Markdown lint、link、math、Mermaid、heading checks が同じ evidence に残っている
+- 編集後に整形した最終差分について、必要な Markdown lint、link、math、Mermaid、heading checks の結果が残っている
 
 ## Mandatory Checklist
 
 - typo / link / format-only route では、runtime `SKILL.md` 読了を docs tool 実行や patching の前提にしない
 - owner boundary、existing-tool route、targeted validation が evidence に残っている
-- changed Markdown files have been checked with `tools/bin/agent-canon docs check`
+- changed Markdown files have been formatted under the shared boundary, then
+  checked with `tools/bin/agent-canon docs check`
 - 見出し階層が飛んでいない
 - command、path、file reference の書式が揃っている
 - 絶対パスリンクや repo 内リンクが壊れていない
@@ -119,11 +123,14 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
 1. command option や実行例が必要な場合は、実装 file を読む前に `tools/bin/agent-canon docs -h` を見ます。
 1. 文書全体を読む前に `tools/bin/agent-canon docs check <paths...>` を実行し、lint、link、math、Mermaid、heading を同時に見ます。`DOCS_CHECK=pass`、`DOCS_CHECK_FINDING=...`、`DOCS_CHECK_REPORT_BEGIN` の structured report は tool-covered property の正本判定として扱います。
 1. finding がある場合だけ、修正に必要な path / line / 近傍 slice を読みます。tool が見た property を subagent や reviewer に再読解させません。
-1. formatting drift がある場合は `tools/bin/agent-canon docs format <paths...>` を使い、その command が続けて走らせる adjacent check の結果まで確認します。
 1. markdown math drift は `tools/bin/agent-canon docs fix-math <paths...>`、Mermaid drift は `tools/bin/agent-canon docs fix-mermaid <paths...>` で機械修正し、修正後の check 結果を evidence に残します。
 1. formatter や fixer が display delimiter を escape したり、余分な double-dollar delimiter を作ったりした場合は、display math の block 形を直してから `tools/bin/agent-canon docs check <paths...>` を再実行します。
 1. 体裁違反、broken link、見出し drift を修正します。
 1. 文書間の矛盾や内容不足が見えたら、それぞれ docs consistency review、docs completeness review へ分岐します。
+1. 最後の編集・fixer の後に、選択済み formatter を changed Markdown files に実行し、
+   整形差分を確認してから必要な検証を行います。AgentCanon docs formatter が選択済みなら
+   `tools/bin/agent-canon docs format <paths...>` と、その command が続けて走らせる
+   adjacent check の結果まで確認します。
 
 ## Boundary
 
@@ -131,6 +138,8 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
 - 文書間の矛盾や stale route は docs consistency review を使います。
 
 ## Final Guard
+
+この確認で再編集した場合は、[Default Sequence](#default-sequence) の最終整形からやり直します。
 
 - formatter と checker が pass しても、最後に変更箇所の table、文中数式、
   inline code を確認します。文中数式は `$...$`、literal な code/path/value は backtick
@@ -160,7 +169,10 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. For typo/link/format-only edits, do not require runtime `SKILL.md` reading
    before running the docs tool or patching. Keep owner, existing-tool route,
    and targeted-validation evidence.
-1. Use the unified Rust entrypoint as the canonical tool: `tools/bin/agent-canon docs check <paths...>` for checks and `tools/bin/agent-canon docs format <paths...>` for formatter repairs.
+1. Apply the shared [post-edit formatting boundary](../../ROOT_AGENTS.md#validation-routing)
+   before completion. Use the repository-selected formatter; when that is AgentCanon,
+   run `tools/bin/agent-canon docs format <paths...>` after edits and validate the
+   formatted result with `tools/bin/agent-canon docs check <paths...>`.
 1. Use `tools/bin/agent-canon docs -h` for command options and examples before reading implementation files.
 1. Before formatting files with display math, normalize display math to standalone double-dollar delimiter lines with blank lines around the block. Do not nest Markdown display delimiters inside KaTeX / math fenced blocks.
 1. Inline math in prose must use `$...$` (for example, `$(式)$`). Do not put math in inline code backticks, and do not use double-dollar display delimiters inside a sentence. Reserve double-dollar delimiters for display math on standalone delimiter lines.
