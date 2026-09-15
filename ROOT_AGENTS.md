@@ -75,15 +75,21 @@ identified condition. Preserve existing required safety and external-boundary
 checks. Record the judgment and grounds in the existing Issue or design record,
 not a new gate or report.
 
-Use the existing execution route and settings selected by the current
-repository owner directly. Do not insert environment classification, inventory,
-or rediscovery before ordinary tasks, sessions, or commands: this includes
-host/container, OS/WSL, CPU/GPU, installed tools, and runtime/profile selection.
-Reuse supplied, still-applicable context without repeating probes or user
-confirmation. A new task or an unknown optional setting is not a reason to
-investigate, stop, reconfigure, or restart a working route. Do not add flags,
-profiles, environment variables, fallbacks, or persistent detection/cache state
-merely to normalize environments, fill unused settings, or avoid rediscovery.
+Run the current repository owner's existing entrypoint with its configured
+settings and standard tool defaults. Manual environment selection for ordinary
+execution is prohibited: do not ask the user to choose an environment or inject
+host/container, OS/WSL, CPU/GPU backend, runtime, or profile selectors through
+ad-hoc command flags, environment variables, or configuration edits. Existing
+tools resolve their own configured settings and defaults; missing optional
+selectors are not inputs to solicit or fill.
+Do not insert environment classification, inventory, or rediscovery before
+ordinary tasks, sessions, or commands, including installed-tool probes. Reuse
+supplied, still-applicable context without repeating probes or confirmation.
+A new task or an unknown optional setting is not a reason to investigate, stop,
+reconfigure, or restart a working route. Do not replace manual selection with
+new auto-detection, flags, profiles, environment variables, fallbacks, wrappers,
+or persistent detection/cache state. Do not invent missing settings merely to
+normalize environments or avoid rediscovery.
 Environment diagnosis is limited to an explicit request, an actual relevant
 failure, an observed change to a required premise, or a concrete evidenced
 risk. Resolve only the missing decision-relevant fact and stop the diagnosis
