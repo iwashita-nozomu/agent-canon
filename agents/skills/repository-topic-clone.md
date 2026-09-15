@@ -39,6 +39,10 @@ repository-topic checkout の操作を選び、
 | `finalize-merge` / `resume-merge` | [競合の再開条件](../../documents/rule/repository-topic-clone.md#競合の再開) と [再開コマンド](../../documents/tools/repository_topic_clone.md#競合の再開) |
 | `cleanup`（不要になった時点） | [起動・保持判断と復元可能性・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
 
+`linked-worktree` の `cleanup --apply` は request の exact worktree/topic path を回収しますが、
+local topic branch は保持します。branch の削除権限をこの lifecycle に追加せず、既存の cleanup authority
+と復旧可能性の契約をそのまま適用します。
+
 操作結果を read back し、失敗時は
 [例外/フォールバック](../../documents/rule/repository-topic-clone.md#例外フォールバック)
 に従って次の操作または状態保持を判断します。
