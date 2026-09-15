@@ -54,9 +54,29 @@ and call the result complete. Unresolved coverage remains an implementation
 gap, not invalid input or authorization to shrink the contract. Narrowing
 requires explicit user direction. Validate through the applicable implementation
 and test owners, including valid cases beyond the motivating example and cases
-a shortcut would exclude. Prefer the simplest implementation that preserves
-this domain and its guarantees; this does not authorize speculative
-generalization, new frameworks, or unrelated library or consumer changes.
+a shortcut would exclude.
+
+Make the simplest complete implementation the default, not a later refactor.
+Start with direct use or composition of existing APIs and straightforward code
+at the current owner. Introduce abstractions, configuration, execution paths,
+or state only when a concrete current requirement cannot be met more simply;
+justify that necessity with mathematical or engineering grounds. Hypothetical
+reuse, design-pattern uniformity, or test-double convenience alone is not such
+a reason. Minimize concepts, state, branches, and dependencies while preserving
+the required domain, correctness, safety, and failure semantics. Neither fewer
+lines nor a smaller diff justifies omitted behavior, and completeness does not
+authorize speculative generalization or unrelated library or consumer changes.
+Keep the decision with the existing implementation and review owners, without
+adding a checker, report, or approval gate to enforce simplicity.
+
+Do not add exact version pins, hard-coded commit SHAs, or SHA-equality guards
+merely for precaution or generic claims of reproducibility. Use the repository's
+existing dependency declarations and native resolution mechanism. A new exact
+constraint needs an explicit requirement or a demonstrated compatibility,
+integrity, or reproducibility need; keep it at the dependency owner rather than
+copying it into code or tests. Preserve existing required lockfiles, gitlinks,
+and integrity checks. Recording the actual resolved version or SHA is evidence,
+not authorization to turn that observation into a permanent execution constraint.
 
 Before implementing a guard, retry, fallback, or other abnormal-condition
 handling, first determine whether the condition can occur under the current
@@ -135,13 +155,15 @@ Record no dependency only after the trace shows that no edge applies, never
 from an unperformed inspection. Re-read the affected identity and dependency
 state after a directory, branch, dependency checkout, PR revision, pin, or
 source-resolution change; unchanged ordinary commands do not require duplicate
-readback. Consumer execution that needs a dependency change uses an exact
-published PR commit through the consumer-owned pin before it runs, rather than
-an unpublished local edit or moving branch. Dependency-local development
-validation remains separate from validation of that pinned consumer input.
-Preserve mismatched or unknown checkouts and do not treat their unverified
-input as the declared pin. This does not introduce an AgentCanon dependency
-into a source-free consumer.
+readback. If the consumer's existing dependency contract requires an exact pin,
+execution that needs a dependency change uses a published PR commit through
+that consumer-owned pin before it runs. Otherwise use the consumer's declared
+resolution and record the actual input; do not introduce a pin or a SHA check
+to follow this workflow. Dependency-local development validation remains
+separate from consumer validation, and an unpinned run must not be reported as
+pinned-input verification. Preserve mismatched or unknown checkouts and do not
+treat their unverified input as the declared pin. This does not introduce an
+AgentCanon dependency into a source-free consumer.
 
 When a task-owned temporary clone is no longer needed, use the applicable
 repository cleanup owner immediately rather than waiting for task or PR closeout.
