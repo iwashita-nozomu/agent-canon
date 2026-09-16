@@ -36,8 +36,8 @@ downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces c
 1. [AGENTS.md](../../AGENTS.md) を読む
 1. [agents/skills/README.md](../skills/README.md) と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) で task family を決める
-1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の structured output を取る
-1. read-only worktree check で、必要なら AgentCanon source の repository-topic checkout を使うかを分類する。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` とし、どちらも `<anchor>/workspace/<topic>/<repo>` に置く。更新が必要なら current checkout を保持し、standalone topic branch / PR workflow に入る。source branch の dirty / unpushed / divergent state は evidence として保持し、detached state は source owner identity repair へ route する。編集候補を選ぶ前に [`Checkout Identity Readback`](../COMMUNICATION_PROTOCOL.md#checkout-identity-readback) を一度取得し、owner/path/validation に関係する依存 edge ごとに実依存 checkout の HEAD と参照 pin（存在する場合）を確認します。依存なしは未調査の既定値にせず、依存/consumer trace で edge が無い根拠を確認して記録します。cwd、branch、または依存 checkout/pin が変わった場合だけ identity と依存 HEAD を再読し、状態が変わらない通常 command では繰り返しません
+1. implementation owner または対象差分の validation route が未解決の場合だけ、canonical router / semantic-index / dependency review のうち、その判断に必要な既存の出力を使う。解決済みの owner と実行経路は再利用し、runtime profile の未指定を環境調査や再構築の開始理由にしない
+1. 作業対象の checkout と Git identity を確認する。AgentCanon source 自体の変更が要求範囲にある場合だけ、その repository-topic checkout を選ぶ。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` とし、どちらも `<anchor>/workspace/<topic>/<repo>` に置く。current checkout の dirty / unpushed / divergent state は evidence として保持する。編集候補を選ぶ前に [`Checkout Identity Readback`](../COMMUNICATION_PROTOCOL.md#checkout-identity-readback) を一度取得し、owner/path/validation に関係する依存 edge ごとに実依存 checkout の HEAD と参照 pin（存在する場合）を確認します。依存なしは未調査の既定値にせず、依存/consumer trace で edge が無い根拠を確認して記録します。cwd、branch、または依存 checkout/pin が変わった場合だけ identity と依存 HEAD を再読し、状態が変わらない通常 command では繰り返しません
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
 1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
 1. 実装を伴う task では `$codex-task-workflow` と、選択された task-family Skill を読む
@@ -70,12 +70,15 @@ Cross-Cutting Packet:
 
 ### Agent Canon Freshness
 
-task 開始時は read-only worktree check で、現在の AgentCanon source checkout と親の作業領域を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合は repository-topic lifecycle の選択済み checkout-mode で standalone topic branch / PR route に入ります。
+通常のコード・文書変更は、既存の作業経路で要求差分へ着手します。環境診断・変更の
+適用条件は [ROOT_AGENTS.md の Always-On Boundary](../../ROOT_AGENTS.md#always-on-boundary)
+に従います。この節は、task 開始ごとの source/parent 環境分類、freshness preflight、
+AgentCanon の更新・再構築を要求しません。
 
-- AgentCanon source/runtime変更は standalone source checkout から `$agent-canon-update` と `$pr-processing` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへlive root view、vendor、submodule pinを同期しません。consumer root [AGENTS.md](../../AGENTS.md) は、親が明示 composer で common [ROOT_AGENTS.md](../../ROOT_AGENTS.md) と consumer-specific text を合成して通常 file として管理します。
-- 親で source の変更が必要な場合は、repository-topic lifecycle が親の `<anchor>/workspace/<topic>/agent-canon` に選択済み mode の checkout を用意し、完了時に exact path の cleanup proof を取ります。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
-- standalone AgentCanon source branch が remote main と divergeしている場合はfail-closedとし、source branchのrebase/merge判断、AgentCanon PR、merge後main readbackを完了してから実装へ戻ります。
-- `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。親から起動したときは AgentCanon source checkout の存在、runtime root の containment、source-unchanged readbackを確認します。`skipped_source_canon` は AgentCanon source checkout がこの task の owner でない場合だけ妥当です。
+- AgentCanon source/runtime の変更が今回の要求範囲にある場合だけ、standalone source checkout から `$agent-canon-update` と `$pr-processing` に入ります。親repoへlive root view、vendor、submodule pinを同期しません。consumer root [AGENTS.md](../../AGENTS.md) は、親が明示 composer で common [ROOT_AGENTS.md](../../ROOT_AGENTS.md) と consumer-specific text を合成して通常 file として管理します。
+- 親で AgentCanon source の変更を所有する場合だけ、repository-topic lifecycle の `<anchor>/workspace/<topic>/agent-canon` checkout と既存 cleanup route を使います。親の product test、Docker、CI、GPU は親の既存 entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
+- Issue 修正の作業 branch は開始時と PR 公開前に最新 main を取り込み、競合があればその変更範囲で解消します。包含済みなら merge は no-op です。これは作業 source の統合であり、runtime 更新や環境構築ではありません。別の AgentCanon 保守 PR の merge・配布完了を、本題へ戻る前提にしません。
+- 必要な検証が実行不能なら、失敗した command、理由、未検証の性質を既存 Issue / PR に残し、その操作と独立した編集・差分確認・PR 公開を続けます。未実施を成功扱いせず、対象外の環境修理・再構築や他 Issue の完了を終了条件へ追加しません。診断だけで環境変更は認可されません。
 
 ### Branch Reuse Default
 
@@ -178,10 +181,10 @@ exception and sets `implementation_read=ready` only after that owner trace and
 any delegated sections reach their required EOF.
 
 ```bash
-git grep -l "topic keywords" -- <responsibility-scoped dirs> \
+git grep -l \"topic keywords\" -- <responsibility-scoped dirs> \\
   | sed -n '1,200p' > reports/search_hits.txt
-bash tools/analysis/dependencies/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \\
+  --report-dir reports/dependency-review \\
   --search-hits-file reports/search_hits.txt
 ```
 
@@ -356,7 +359,7 @@ handoff context です。worker は選択済み asset と tests から読み始�
 
 ### File Dependency Manifest
 
-新規作成・編集する canonical design / workflow / tool / policy / template text file では、ファイル冒頭に `@dependency-start` / `@dependency-end` marker を持つ dependency manifest block を置きます。Routine notes、generated reports、closed issue records、archive / compatibility records は scanner の classification に従います。
+新規作成・編集する canonical design / workflow / tool / policy / template text file では、ファイル冒頭に `@dependency-start` / `@dependency-end` marker を持つ dependency manifest block を置きます。Routine notes、generated reports、closed issue records、archive / compatibility records は scanner のclassification に従います。
 設計正本は [documents/design/dependency-manifest-design.md](../../documents/design/dependency-manifest-design.md) です。
 旧 `Dependency Files:` block は新規・変更 file では使いません。
 
@@ -367,7 +370,7 @@ handoff context です。worker は選択済み asset と tests から読み始�
 - 依存として書くのは、その file を理解・実行・検証するために読むべき repo 内の正本 file です。dependency list は実際の責務関係に基づけます
 - upstream は「編集前に読む file」、downstream は「編集後に影響確認する file」として分けます
 - 依存が無い direction は行を置きません。`none` placeholder は置きません
-- Markdown は title 直後、Python / shell / TOML / YAML など comment 可能な file は shebang / encoding marker 直後、C-like file は先頭 comment block に置きます
+- Markdown は title 直後、Python / shell / TOML / YAML / YAML など comment 可能な file は shebang / encoding marker 直後、C-like file は先頭 comment block に置きます
 - line comment しかない format では `# @dependency-start` のように line comment wrapping を使います
 - commentless format や generated / binary / vendored external file は scan tool の分類に従い、必要なら同じ変更の design / manifest / README に理由を残します
 
@@ -409,9 +412,9 @@ bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
 
 分類規則:
 - code / docs / tools / runtime をまとめて rework するなら `Comprehensive Development`
-- Docker / CI / dependency を触るなら `Platform And Environment`
-  - `environment-maintenance` と `environment_change_proposal.md` を先に起こし、code requirement と blocked command を固定する
-  - Host にrepo-local virtual environmentを作らず、AgentCanon environment validationはbootstrap container contractと実lifecycle readbackを使う。project environmentはproject-owned validatorへ委譲する
+- Docker / CI / dependency の設定・構築契約の変更が要求範囲にある場合だけ `Platform And Environment`
+  - `environment-maintenance` の既存手順で、必要な変更とその根拠を扱う。既存環境を使うコード変更や検証不能という事実だけでは、この family や `environment_change_proposal.md` を起動しない
+  - Host にrepo-local virtual environmentを作らず、認可された AgentCanon environment 変更の検証だけに bootstrap container contract と実 lifecycle readback を使う。project environmentはproject-owned validatorへ委譲する
 - 外部調査や比較実験が必要なら `Research-Driven Change`
 - tuning、比較改善、探索的 protocol refinement を backlog 付きで回すなら `Adaptive Improvement Loop`
   - Agile outer loop とし、1 extension ごとに 1 waterfall run-id / 1 waterfall pass / 1 decision state へ分解する
@@ -472,7 +475,7 @@ terminal readiness predicate.
 Codex では、まず `$agent-orchestration` を起点にし、[agents/skills/README.md](../skills/README.md) から current stage と contract に必要な skill を選びます。
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、[documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md) と `agents/canonical/` に寄せます。
-repo-changing task では `python3 tools/agent/orchestration/route.py --prompt "<request>" --mode repo-changing --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は `agents/task_catalog.yaml#workflow_activation_policy` が child handoff を要求する typed route で current stage に入った時点だけ active にします。prompt-only bounded routing では `--mode routing-only` を使い、child を要求しません。
+repo-changing task では `python3 tools/agent/orchestration/route.py --prompt \"<request>\" --mode repo-changing --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は `agents/task_catalog.yaml#workflow_activation_policy` が child handoff を要求する typed route で current stage に入った時点だけ active にします。prompt-only bounded routing では `--mode routing-only` を使い、child を要求しません。
 `bootstrap_agent_run.py` は `--task` 文面から prompt-derived
 skill を追加し、選択済み skill ごとの repo tool route を
 `run.repo_tool_routing_policy` に出します。repo tool route は skill ごとに
@@ -622,11 +625,11 @@ Codex runtime が `/agent` を提供する場合は subagent inventory の確認
 
 標準コマンド:
 
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "short task summary" \
-      --task-id T1 \
-      --owner "codex" \
-      --workspace-root "$PWD"
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \\
+      --task \"short task summary\" \\
+      --task-id T1 \\
+      --owner \"codex\" \\
+      --workspace-root \"$PWD\"
 
 bundle 出力には少なくとも次が含まれます。
 
@@ -646,43 +649,43 @@ handoff には `allowed_paths`、`do_not_read`、context artifact path、expecte
 
 研究・実験つき変更:
 
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "research-backed change" \
-      --task-id T4 \
-      --owner "codex" \
-      --workspace-root "$PWD"
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \\
+      --task \"research-backed change\" \\
+      --task-id T4 \\
+      --owner \"codex\" \\
+      --workspace-root \"$PWD\"
 
 環境変更:
 
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "platform or environment change" \
-      --task-id T8 \
-      --owner "codex" \
-      --workspace-root "$PWD"
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \\
+      --task \"platform or environment change\" \\
+      --task-id T8 \\
+      --owner \"codex\" \\
+      --workspace-root \"$PWD\"
 
 学術文章:
 
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "academic writing task" \
-      --task-id T10 \
-      --owner "codex" \
-      --workspace-root "$PWD"
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \\
+      --task \"academic writing task\" \\
+      --task-id T10 \\
+      --owner \"codex\" \\
+      --workspace-root \"$PWD\"
 
 包括的開発:
 
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "comprehensive development pass" \
-      --task-id T12 \
-      --owner "codex" \
-      --workspace-root "$PWD"
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \\
+      --task \"comprehensive development pass\" \\
+      --task-id T12 \\
+      --owner \"codex\" \\
+      --workspace-root \"$PWD\"
 
 反復改善:
 
-    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-      --task "adaptive improvement loop" \
-      --task-id T13 \
-      --owner "codex" \
-      --workspace-root "$PWD"
+    python3 tools/runtime/lifecycle/bootstrap_agent_run.py \\
+      --task \"adaptive improvement loop\" \\
+      --task-id T13 \\
+      --owner \"codex\" \\
+      --workspace-root \"$PWD\"
 
 Adaptive Improvement Loop では、outer run の `experiment_change_loop.md` に `Extension Backlog` を持ち、各 extension で別の waterfall run-id を作ります。
 次の extension へ進む前に、直前 extension で選択された `waterfall-gate-check`、review、`task-close`、および commit / push の判断・結果を完了させます。未選択の review artifact や full rerun は作りません。
@@ -690,7 +693,7 @@ Adaptive Improvement Loop では、outer run の `experiment_change_loop.md` に
 `--task-id` を指定しても、`agents/task_catalog.yaml` の task-default specialist と `default_for_tasks` review pack は候補です。owner-critical decision または distinct unresolved claim/risk が有効化したものだけ materialize し、空の reviewer/template artifact は生成しません。
 language-specific reviewer は `bootstrap_agent_run.py` が `--changed-path` か workspace の `git status --short` から自動で足します。
 run bundle を起こしたら、`user_request_contract.md` を planning 前に埋めます。stage artifact、handoff、review では clause ID を明示します。
-各 waterfall gate を次段へ進める前に `make waterfall-gate-check ARGS="--report-dir <reports/agents/run-id> --gate <gate>"` で中間 gate を確認します。
+各 waterfall gate を次段へ進める前に `make waterfall-gate-check ARGS=\"--report-dir <reports/agents/run-id> --gate <gate>\"` で中間 gate を確認します。
 
 包括的開発の固定 Codex stack:
 
@@ -759,12 +762,12 @@ cost を無視して review coverage を優先する run では、research-drive
 - 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認する
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書で reader-facing 構成を変える場合は `long-form-writing` を DSL-to-prose adapter として読み、docs-impact がある distinct unresolved reader-path claim を owning gate が判定できない場合だけ `docs-completeness-review` を追加する
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を読み、notation / logic reviewer は distinct unresolved claim が owning gate の範囲を超える場合だけ選択する
-- 投稿論文や thesis chapter の draft では `paper-writing` を読み、citation evidence reviewer は distinct unresolved citation claim が残る場合だけ追加する
+- 投稿論文や thesis chapter の draft では、`paper-writing` を読み、citation evidence reviewer は distinct unresolved citation claim が残る場合だけ追加する
 - contract-only wrapper や checker-owned validation だけの変更では、static contract validation と canonical command evidence を validation route に置く。
   Approved typed contract evidence remains the completion criterion.
 - validation tool の autofix は changed contract、changed lines、または task plan が名指しした checker-owned property に結び付く finding に適用し、広い validation で出た既存 style debt は residual evidence と repair route に分ける
 - 研究・実験系の変更では active experiment profile の risk に応じて `report_reviewer` と research perspective reviewers を選ぶ
-- JAX export / native runtime の task では、対象 implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は `jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
+- JAX export / native runtime の task では、対象 implementation slice で `generic callable path`、`specialized coeff path`、`export-based generic path` のどれを触るか宣言する。generic path は、`jax.export` artifact producer と consumer/runtime smoke を完了条件に含める
 - cross-process export worker には serializable manifest と reconstruction recipe を渡す
 - `LoadedProgram` のような runtime materialization は runtime vertex / lifetime scope として扱う
 - まず導入済みライブラリ、既存 code path、既存 helper、既存 style を調べ、再利用と拡張を優先する
