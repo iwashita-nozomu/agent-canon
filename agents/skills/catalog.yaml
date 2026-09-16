@@ -1362,7 +1362,7 @@ skill_families:
     visualization_role: adapter
     tool_id: agent_canon.visualization.adapter.document_mermaid
     argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
-    purpose: Check Markdown formatting, heading structure, and link hygiene for format-only docs work; pair substantive document edits with prose-reasoning-graph and structure-planning.
+    purpose: Check Markdown formatting, heading structure, and link hygiene; use the changed document's owner for substantive meaning and invoke structural skills only when their applicability conditions identify a genuine structural decision.
     canonical_doc: agents/skills/md-style-check.md
     shim: .codex/personal/skills/md-style-check/SKILL.md
     discovery:
