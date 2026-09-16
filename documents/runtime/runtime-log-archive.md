@@ -96,6 +96,47 @@ All report manifests and snapshots use paths relative to that same explicit
 archive checkout (`agent-reports/<repo-key>/...`); `$RUNTIME` is only the
 producer spool and staging boundary.
 
+## Operational responsibility and delivery routing
+
+Continuous delivery and retry of produced evidence belong to the AgentCanon
+runtime, not to an interactive agent or a log-analysis Skill. The existing
+host scheduler owns automatic activation; the existing archive publishers own
+snapshot, append, push, remote readback, and pending retention. The archive
+repository remains the passive destination and policy owner.
+
+| Observation | Responsible owner and route |
+| --- | --- |
+| No expected record was produced | The selected hook, runtime, or eval producer and its declared input/spool binding; do not invent events or collect unselected evals. |
+| Produced evidence remains pending, or no automatic retry reaches the archive | The bootstrap host scheduler and existing archive publication adapters; trace activation to the appropriate publisher and its result. |
+| Published evidence is counted incorrectly or its archive Actions fail | The existing `agent-canon-log` dashboard reader or workflow, not the delivery scheduler. |
+| Source dashboard fields or analysis evidence are missing | The source dashboard owner and `agent-log-analysis`; continue supported snapshot analysis without requiring delivery or dashboard repair. |
+| Archive layout, branch, migration, or retention needs maintenance | The log repository policy owner; artifact placement uses the existing writeout owner. |
+
+The existing automatic entrypoint is `agent-canon-sync.timer` and its one-shot
+service under `bootstrap/host/scheduler/systemd/user/`. Its current host `sync`
+implementation updates source and resident state but does not drain pending
+hook, eval, or private-feedback publications. Private-feedback synchronization
+currently runs after successful managed tool/exec or Codex completion.
+[Issue #1199](https://github.com/iwashita-nozomu/agent-canon/issues/1199) tracks
+connecting automatic delivery to the existing publishers. This routing contract
+does not claim that periodic archive delivery is already implemented or active.
+
+The engineering requirement is progress for already-produced pending evidence
+without a later successful conversation or a source revision change. Reuse the
+existing scheduler, spool, publisher, and readback boundaries rather than adding
+a daemon, another queue/publisher, session discovery, or manual sync duties to
+each task. Keep source-sync and archive-publication results independent. Source
+`up_to_date`, resident health, retention success, or a local commit does not
+prove delivery; only the selected publisher's remote readback does.
+
+Network and credentials remain in the host adapter, and resident processing
+remains offline. A failed or uncertain publication retains pending evidence;
+repair validation uses the existing isolated spool/bare-remote and scheduler
+fixtures. Live-host observation is additional evidence when available, not a
+requirement to recreate a failure before recording or routing it. Explicitly
+selected manual recovery remains supported, but is neither the automatic retry
+mechanism nor a prerequisite for reading existing evidence.
+
 ## Collection contract
 
 `eval collect` runs existing producers in the shared tool container and writes
