@@ -7,6 +7,8 @@ responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../ROOT_AGENTS.md shared post-edit formatting boundary
 upstream design code-visualization.md sole public visualization owner and typed projection contract
+upstream design report-writing.md report evidence and optional structure boundary
+upstream design structure-planning.md actual structural decision owner
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md responsibility-owned validation selection
 downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior
 @dependency-end
@@ -31,8 +33,8 @@ marker is not readback evidence.
 - Section path: Purpose, Use When, Required Checks, and Core References orient
   the route; Expected Outcome, Mandatory Checklist, Default Sequence, Boundary,
   and Final Guard are the operational rules.
-- Boundary: substantive document structure or responsibility changes require
-  structure-planning and prose-reasoning before this style gate.
+- Boundary: use the changed document's owner for meaning and evidence;
+  [Purpose](#purpose) defines when structural work is relevant.
 
 ## Purpose
 
@@ -43,10 +45,11 @@ formatter を実行した場合は、体裁修正だけで完了にせず、同�
 この skill 単独で扱うのは typo / link / format-only の文書変更です。
 repo-changing task 全体が bounded owner 修正として閉じる場合は通常の owner route
 と組み合わせ、owner boundary、existing-tool route、targeted validation を残します。
-section order、reader path、claim support、source map、canonical route、
-document responsibility が変わる substantive な文書変更では、
-`prose-reasoning-graph` と `structure-planning` を先に通し、
-format-only route では `structure_contract=skipped` と理由を evidence に残します。
+文書の意味と根拠は変更 owner が確認し、Markdown の変更だけを理由に構造解析を
+前置しません。見出し配置、reader path、責務分割など実際の構造設計が必要な場合だけ
+[structure-planning](structure-planning.md) の適用条件に従います。
+報告は [report-writing](report-writing.md) に従い、主張・根拠・結論の修正だけで
+prose graph や構造計画を要求しません。未選択の構造解析に skip 記録は不要です。
 
 ## Use When
 
@@ -56,7 +59,6 @@ format-only route では `structure_contract=skipped` と理由を evidence に�
 - docs lint、link check、heading hierarchy、markdown math、docs-check failure、Markdown style drift を直す
 - docs formatter、Mermaid formatter、math fixer、または `agent-canon docs` が scope にある
 - formatter 後の lint、link、math、Mermaid、heading の確認が抜けている
-- substantive な文書変更は `prose-reasoning-graph` と `structure-planning` の構造解析後に、この skill で Markdown checks を閉じる
 
 ## Required Checks
 
@@ -156,8 +158,6 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
   にします。table cell の中に raw `|` を含む数式や code を置くと
   Markdown の列として解釈されるため、式を display math へ出す、短い名前へ置換する、
   または table 外の本文へ移してから、選択済みの文書検査で変更を確認します。
-- format-only として閉じる場合は、`structure_contract=skipped` と理由が
-  run bundle、work log、PR body、または closeout evidence に残っていることを確認します。
 - docs formatter / fixer / checker failure を修復へ回す場合は、
    validation-failure-response packet の `failing_contract`、`observation_level`、
    `cause_classification`、`intent_preservation`、`evidence` を記録します。
@@ -174,7 +174,9 @@ The runtime discovery adapter delegates these required operating clauses to this
    [`05_docs.md`](../../documents/conventions/common/05_docs.md).
 1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
 1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, or `agent-canon docs` failures.
-1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Use it with the normal owner route when the whole task is a bounded repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add the canonical [`prose-reasoning-graph`](prose-reasoning-graph.md) and [`structure-planning`](structure-planning.md) skills before prose edits; retain `$prose-reasoning-graph` and `$structure-planning` as invocation syntax when dispatching them. For the format-only route, record `structure_contract=skipped` with the reason.
+1. Use this skill with the changed document's owner. Follow [Purpose](#purpose)
+   for structural-work applicability; Markdown or claim/evidence edits alone do
+   not require prose-graph/structure planning or a record of unselected work.
 1. For typo/link/format-only edits, do not require runtime `SKILL.md` reading
    before running the docs tool or patching. Keep owner, existing-tool route,
    and targeted-validation evidence.

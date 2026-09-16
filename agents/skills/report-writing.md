@@ -21,7 +21,20 @@ The canonical rationale is [documents/design/responsibility-rationale.md](../../
 
 ## Source packet
 
-Before drafting, identify the audience/decision, the source artifacts or stable IDs, directly observed facts, inferred claims, material limitations/uncertainty, and the requested next action. Add provenance needed to interpret the evidence. Do not create placeholder fields for evidence classes that do not apply.
+Draft from the existing task record: audience/decision, source artifacts or
+stable IDs, observed facts, inferred claims, material uncertainty, and any
+requested next action. Add only provenance needed to interpret the evidence.
+Do not create placeholder fields or a new ledger. Report preparation alone does
+not justify another environment/tooling survey or rerunning settled checks;
+investigate only a specific gap that can change the answer or required validation.
+
+At normal work boundaries, keep material findings with their evidence and
+current interpretation in the existing task/Issue record. Carry forward results
+that affect the answer, alternatives, scope, or limitations, including
+counterevidence, rejected explanations with reasons, and unresolved hypotheses
+labelled as such. Compress repeated observations rather than silently dropping
+a distinct material result. A finding need not produce a code change to belong
+in the report; reporting it does not authorize out-of-scope repair.
 
 When external references support a material claim, use an existing durable source
 note or create a source packet with the URL/DOI, access date, source identity,
@@ -35,7 +48,7 @@ A report is acceptable when:
 
 - every material factual or recommendation claim has source support or is explicitly identified as inference;
 - observations and interpretations are distinguishable;
-- limitations that could change the reader's decision are present;
+- material investigated findings, counterevidence, and limitations that could change the reader's decision are present, not only evidence selected to support the conclusion;
 - raw evidence and reader synthesis are not conflated;
 - the next action or conclusion is scoped to what the evidence supports;
 - the report does not become a second policy/source-of-truth surface.
@@ -44,7 +57,12 @@ No fixed heading count is required. A compact status may satisfy these obligatio
 
 ## Finding closure
 
-Close accepted blocking findings before finalizing. A finding is blocking when it identifies a material factual error, unsupported claim, broken source mapping, or other defect that can change the reader's interpretation or action.
+Close accepted blocking findings about the report before finalizing. These
+include material factual errors, unsupported claims, broken source mappings,
+and omitted material results or counterevidence that can change the reader's
+interpretation or action. Correcting the report does not require repairing every
+underlying problem it reports; distinguish report accuracy from implementation
+completion.
 
 Style/advisory findings, demonstrated tool false positives, explicitly out-of-scope findings, and accepted risks may remain with a short reason. Completion is **not** raw `finding_count == 0`; do not rewrite indefinitely to appease an advisory checker. Rerun only the checker/review surface affected by a changed claim or section.
 
@@ -62,4 +80,10 @@ Use a report reviewer when claim impact, external publication, ambiguity, or evi
 
 ## Completion evidence
 
-Read back the report artifact plus the evidence actually selected for it: source packet/provenance, material limitations, selected review result, and any explicitly requested presentation/HTML validation. Do not require fixed seven-section structure or fixed optional closeout fields.
+In the selected review, compare the report with the existing material findings
+and source record in both directions: written claims have support or are labelled
+as inference, and decision-relevant investigated results are not omitted.
+Read the relevant provenance, limitations, review result, and explicitly requested
+presentation/HTML validation without reopening settled investigation or adding
+a checker. Scale detail to useful results and decision complexity, not elapsed
+time, tool counts, fixed seven-section structure, or optional closeout fields.
