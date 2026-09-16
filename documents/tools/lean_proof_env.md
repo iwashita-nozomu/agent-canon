@@ -21,7 +21,7 @@ interface probe, and generated-stub checker.
 
 Use [lean_capability_matrix.md](lean_capability_matrix.md) to select proof
 features. The helper owns its generated package defaults; installed toolchains
-are declared in `.devcontainer/dependencies.toml`.
+are declared in `bootstrap/container/image/dependencies.toml`.
 
 ## Reader Map
 
