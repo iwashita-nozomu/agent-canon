@@ -19,15 +19,9 @@ topic-local Lake package when those dependencies are part of the durable theorem
 surface; this tool remains the shared smoke check, counterexample probe, agent
 interface probe, and generated-stub checker.
 
-Use [lean_capability_matrix.md](lean_capability_matrix.md) before deciding
-whether a proof attempt belongs in a topic-local package or in this reusable
- environment. In AgentCanon devcontainers, `.devcontainer/dependencies.toml`
- carries separate exact `elan` release-asset and `lean-toolchain` records.
- The release record verifies architecture-specific SHA256 checksums before
- exposing `elan-init`; the Lean record pins
- `leanprover/lean4:v4.30.0`. This helper can run `lake update`, `lake build`,
- and `lake env lean` in fresh containers without host-global Lean setup,
- environment-version overrides, or a moving toolchain installer script.
+Use [lean_capability_matrix.md](lean_capability_matrix.md) to select proof
+features. The helper owns its generated package defaults; installed toolchains
+are declared in `bootstrap/container/image/dependencies.toml`.
 
 ## Reader Map
 
@@ -101,15 +95,6 @@ The tool writes:
 - `AgentCanonLeanProofEnvSmoke.lean` for `smoke`
 - `AgentCanonLeanProofEnvAgent.lean` for `agent-smoke`
 - `AgentCanonLeanProofEnvCounterexample.lean` for `counterexample-smoke`
-
-By default it pins `leanprover/lean4:v4.30.0` and Mathlib `v4.30.0`, matching
-the current Lean toolchain used by the proof artifacts. Use `--lean-toolchain`
-and `--mathlib-rev` together when updating the proof environment. Mathlib
-brings the tested Aesop, Plausible, and LeanSearchClient package set through
-its Lake manifest for this pinned toolchain. Do not add Mathlib, Aesop,
-Plausible, or LeanSearchClient ad hoc for a single throwaway proof attempt;
-either use this reusable environment, or make the topic-local package
-explicitly own those dependencies as part of its checked theorem surface.
 
 `--execute` runs `lake update`, `lake build`, and then `lake env lean ...` in the
 generated environment. Without `--execute`, the tool is a deterministic setup
