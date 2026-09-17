@@ -185,6 +185,28 @@ applicable owner or qualified handoff and are not attributed to AgentCanon by
 proximity. This common base exposes that reporting scope without selecting an
 external checkout, credential, or publication implementation.
 
+When authoring, revising, or reviewing Issues, do not make completion depend on
+empirical measurements that cannot be obtained within the authorized scope.
+Require a measurement only when it is decision-relevant and its data, method,
+and authorized execution route are identifiable from available facts; do not
+add environment discovery or a new preflight gate to establish this. Do not
+demand unrecorded historical baselines, unavailable internal telemetry,
+uncontrollable comparisons, or finite observations as proof of permanent
+non-recurrence. Use evidence appropriate to the claim, such as specifications,
+mathematical or engineering analysis, source review, or reproducible tests,
+and state what it establishes and its limits. Correct unnecessary or infeasible
+measurement clauses with reasons in the existing Issue, preserving unmeasured
+outcomes as limitations rather than automatic completion blockers or mandatory
+follow-up Issues. Do not merely relabel such clauses as pending or needing
+verification. A measurement required by the explicit request or governing
+contract cannot be silently waived: keep the affected claim unverified, record
+the concrete constraint and any feasible next step, and continue independent
+work without claiming full completion. An unrun measurement in this session
+alone does not establish infeasibility. Never present estimates, proxies, or
+static checks as empirical results, or claim unmeasured improvement. Keep this
+judgment with the applicable Issue and validation owners; do not add unrelated
+instrumentation, environment setup, or reporting machinery to satisfy it.
+
 Before selecting or editing a repository surface, inspect its actual location,
 canonical owner, callers, and consumers. For library-backed work, inspect the
 caller and the relevant public API, including nested configuration and existing
