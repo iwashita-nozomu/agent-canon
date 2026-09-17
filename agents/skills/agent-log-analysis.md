@@ -154,6 +154,13 @@ IDs remain metadata only. Migration inventory and retention are read-only
 policy-owner workflows; this skill consumes dashboard evidence and does not
 restate or implement their schema.
 
+Missing deliveries, retained pending inputs, or absent automatic retries follow
+[the runtime delivery owner](../../documents/runtime/runtime-log-archive.md#operational-responsibility-and-delivery-routing),
+not a per-task manual sync or artifact-writeout workaround. Distinguish a missing
+producer record from failed delivery, and do not infer the cause from an old
+archive head. Recording or routing this finding does not select repair or make
+repair a prerequisite for this analysis.
+
 ## Work Amplification And Wave Interpretation
 
 Work amplification is an evidence relationship, not a raw file, line, spawn, or
@@ -207,7 +214,7 @@ closeout_gate=<selected repair command or evidence field>
 | `workflow_attribution` | `agent-learning` or hook owner role | Workflow Attribution drilldown, missing event class, hook namespace | dashboard workflow missing count reduced or exemption recorded |
 | `eval_gap` | `agent-eval-accumulation` when repair is selected | existing checker output or snapshot-bound missing / stale / fail evidence | selected repair's `eval_accumulation_check.py` pass or unresolved finding recorded |
 | `token_coverage` | `tokens` + runtime logging owner | Token Consumption drilldown and token moving-average status | token comparison / summary evidence present or unsupported claim recorded |
-| `archive_hygiene` | `result-artifact-writeout` or log archive owner when maintenance is selected | available archive state and affected snapshot / paths | selected archive operation's own validation; clean state is not an analysis gate |
+| `archive_hygiene` | [runtime delivery or archive maintenance owner](../../documents/runtime/runtime-log-archive.md#operational-responsibility-and-delivery-routing), according to the observed boundary | available producer, pending/publication, or archive evidence and affected snapshot / paths; absent evidence remains unknown | selected owner's validation only; manual sync and clean state are not analysis gates |
 | `prompt_or_config_drift` | `prompt_config_reviewer` | affected prompt/config path and structured evidence cell | reviewed patch or routing issue updated |
 | `structure_boundary` | `structure-refactor` | evidence cell plus candidate path / view boundary | structure repair contract or structure issue updated |
 

@@ -5,6 +5,7 @@ contract skill
 responsibility Documents runtime-log-repair for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design agent-log-analysis.md structured dashboard analysis and finding route packets
+upstream design ../../documents/runtime/runtime-log-archive.md runtime delivery and archive maintenance ownership
 upstream design agent-eval-accumulation.md accumulated eval repair loop
 upstream design result-artifact-writeout.md durable raw and summary artifact writeout
 upstream design issue-finding-report.md durable issue candidate writing
@@ -48,10 +49,11 @@ required follow-up skill、validation gate を固定してから修復へ進み�
 
 ## Required Flow
 
-1. Start from `agent-log-analysis` dashboard artifacts:
-   `agent-log-analysis-api.json` and `agent-log-analysis-compact.md`. If these
-   are missing or stale for the current request, run `$agent-log-analysis`
-   first; do not read raw JSONL broadly as a substitute.
+1. Reuse the evidence selected by `$agent-log-analysis`: an existing API JSON
+   or compact summary, or a bounded snapshot-qualified excerpt when the needed
+   summary is unavailable. Preserve its scope, age, and missing fields. Neither
+   both formats, regeneration, archive sync, nor clean state is a prerequisite
+   for routing a supported finding; do not expand raw JSONL broadly.
 1. Classify each repair item by owner:
    `hook_failure`, `wave_execution`, `workflow_attribution`,
    `reference_capture`, `skill_selection`, `tool_selection`, `eval_gap`,
@@ -60,10 +62,10 @@ required follow-up skill、validation gate を固定してから修復へ進み�
 
 ```text
 repair_class=<hook_failure|wave_execution|workflow_attribution|reference_capture|skill_selection|tool_selection|eval_gap|archive_hygiene|prompt_or_config_drift>
-dashboard_evidence=<compact section or API field path>
+dashboard_evidence=<compact section, API field, or snapshot-qualified excerpt and evidence gaps>
 owner_surface=<canonical skill/tool/workflow/hook/document path>
 repair_route=<skill-or-role>
-required_input=<dashboard artifact, eval output, or owner path>
+required_input=<available summary/excerpt, eval output, or owner path>
 non_goals=<raw log analysis, schema change, durable issue writing, or owner-specific internals excluded>
 closeout_gate=<command or dashboard field that proves routed repair completion>
 ```
@@ -71,14 +73,18 @@ closeout_gate=<command or dashboard field that proves routed repair completion>
 1. Route owner work without absorbing it into this skill:
    - skill/tool/workflow selection repair -> `$task-routing` plus affected owner
    - eval family repair -> `$agent-eval-accumulation`
+   - missing delivery, pending publication, or absent automatic retry ->
+     [runtime delivery owner](../../documents/runtime/runtime-log-archive.md#operational-responsibility-and-delivery-routing)
+   - archive layout, branch, retention, or archive dashboard/Actions problems ->
+     the corresponding log-repository owner in that same responsibility map
    - raw/summary artifact placement -> `$result-artifact-writeout`
    - durable issue candidates -> `$issue-finding-report`
    - subagent wave mechanics -> `$subagent-bootstrap`
    - recurrence learning -> `$agent-learning`
 1. For hook failure, workflow attribution, wave reconciliation, and reference
-   capture repairs, cite the dashboard evidence cell and the owner path named by
-   the dashboard summary before touching hook, monitoring, schedule, reference,
-   or closeout tooling.
+   capture repairs, cite the available evidence locator and the verified owner
+   path before touching hook, monitoring, schedule, reference, or closeout
+   tooling. An unavailable summary does not justify inventing an owner or cause.
 1. Verify closeout with the owner-selected gate and, when the repair changes
    dashboard-producing behavior or routing, rerun the focused route/eval/check
    that covers the changed owner. A full dashboard rerun is evidence only when
@@ -100,6 +106,9 @@ evidence and does not duplicate those policy definitions.
 
 - Raw log compaction and dashboard API schema belong to `$agent-log-analysis`
   and `generate_agent_runtime_dashboard.py`.
+- Continuous delivery and retry belong to the existing runtime scheduler and
+  archive publishers, as defined by the linked delivery owner. Do not replace
+  them with per-task manual sync, a new daemon, or artifact-writeout duties.
 - Eval producer loops belong to `$agent-eval-accumulation`.
 - Artifact placement and durable raw/summary writeout belong to
   `$result-artifact-writeout`.
@@ -115,16 +124,17 @@ evidence and does not duplicate those policy definitions.
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
 1. Read [agents/skills/runtime-log-repair.md](runtime-log-repair.md).
-1. Start from `$agent-log-analysis` dashboard artifacts:
-   `reports/agent-runtime-dashboard/agent-log-analysis-api.json` and
-   `reports/agent-runtime-dashboard/agent-log-analysis-compact.md`. If they are
-   missing or stale for the request, run `$agent-log-analysis` first.
-1. Do not read raw JSONL broadly for normal repair routing; raw event drilldown
-   stays with `$agent-log-analysis` tool development, schema debugging, or an
-   API-named drilldown path.
+1. Follow Required Flow's evidence reuse boundary: one existing summary or a
+   bounded snapshot-qualified excerpt is sufficient for a supported finding.
+   Missing or stale evidence limits the claim, not independent owner routing.
+1. Keep bounded raw-event drilldown with `$agent-log-analysis`; do not require
+   both summary formats, regeneration, sync, or clean state before routing.
 1. Build a Runtime Log Repair Packet with `repair_class`,
    `dashboard_evidence`, `owner_surface`, `repair_route`, `required_input`,
    `non_goals`, and `closeout_gate` before editing or launching repair work.
+1. Route delivery and archive-maintenance findings through Required Flow's
+   responsibility map; analysis and artifact writeout do not own continuous
+   publication or retry. Source/retention success is not delivery evidence.
 1. Route repairs to owners: eval gaps to `$agent-eval-accumulation`, durable
    artifacts to `$result-artifact-writeout`, issue candidates to
    `$issue-finding-report`, wave mechanics to `$subagent-bootstrap`,
