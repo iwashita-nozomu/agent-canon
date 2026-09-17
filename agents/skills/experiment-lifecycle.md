@@ -23,6 +23,9 @@ The reproducibility core records source identity, effective configuration, execu
 
 Topic-specific metrics, observations, thresholds, comparisons, and research-success judgments belong to the topic or research owner. This skill records the declared protocol and operational evidence, but it does not turn execution state, exit status, artifact presence, or readback into a universal research acceptance gate.
 
+Failed-run disposition belongs to [Failed experiment cleanup](#failed-experiment-cleanup).
+The writeout, reproducibility, and annex routes below do not override that decision.
+
 ## Use When
 
 - experiment directory の初期化
@@ -83,6 +86,38 @@ formal evidence にしません。失敗・停止は `Stop Reason:` と `Restart
 再実行は選択したprotocolと下記admissionが許可する場合だけ、新しい `run_name` で
 最初から実行します。debug / smoke を残す場合は、その種別をartifact と report に明記します。
 
+## Failed experiment cleanup
+
+失敗した実験は、原因が物理的特性による場合を除き直ちに削除します。失敗の確定は
+既存の topic protocol と実際の観測に基づく判断であり、汎用の数値閾値や終了コードを
+新たな研究成否判定器にしません。実行中、未実施、終端未確認というだけでは失敗と
+断定しません。一方、失敗が確定した後の原因未確定は保持理由にしません。
+
+保持する唯一の例外は、対象系や装置の物理法則・特性・限界が原因だと、支配式、仕様、
+既存の観測等との因果関係を説明できる場合です。NaN/Inf、未収束、OOM、timeout、
+クラッシュという症状だけでは物理的原因を示せません。実装・設定・数値計算の不備を
+物理的特性へ言い換えず、例外の根拠と解釈限界を既存の Issue または実験記録に残します。
+保持は実験の成功認定ではありません。
+
+削除対象は、その失敗実験だけに属するコード・設定と、run の raw、summary、log、
+checkpoint、図表、report 等の生成物です。共有の実装・入力、成功 run、独立した有効
+case は残し、topic 全体を消すのは全体が失敗実験専用の場合に限ります。削除した入口を
+指す registry・README 等の直接参照も同じ範囲で除きます。無効化、退避ディレクトリ、
+念のための annex/archive で削除を代替しません。保存済み payload の削除は既存の
+storage owner の権限で行い、Git 履歴、remote branch、共有のシステム事故ログ、他者の
+データまで一括削除する権限にはしません。
+
+既存 runner の安全な停止・writer 終了と削除対象の所有範囲を確認したら、次の実験、
+修正完了、review、PR merge、定期掃除を待たず削除します。長い原因調査、再実測、
+archive 完了を前提にしません。権限や実行中 writer によって削除できない部分だけは、
+具体的な対象・理由・次の owner/action を既存記録へ残し、削除済みとは報告しません。
+
+既存 Issue または task record には run/source identity、失敗の事実、原因の根拠または
+未確定、削除範囲と結果を簡潔に残します。失敗実験一式や raw/log 全文を別名で保存せず、
+削除済み artifact を現存・再検証可能な証拠として引用しません。これは失敗と処置を
+追跡する記録であり、失敗実装の維持ではありません。物理的特性に起因する知見の保持と、
+実装上の失敗の処分を区別し、保存判断を artifact writer に二重所有させません。
+
 ## Long-running GPU and crash-recovery admission
 
 長時間GPU実験の開始・延長、またはhost / WSL / GPUのクラッシュ報告後の再実行では、
@@ -121,8 +156,9 @@ CPUテスト、1更新のGPU診断にも優先します。通常のrunへ不要�
   確認します。ユーザー空間timeoutでOS / kernel / GPU driverの障害を封じ込めたとは
   主張せず、必要な条件を確認できなければ診断成功後でも長時間runを止めます。
 
-失敗・切断時も既存の事故ログと進捗は保持し、通常の一時artifact削除から除外します。
-具体的なfile / 保存先 / readbackは `result-artifact-writeout` の責務のままです。
+失敗が確定した run の専用事故ログ・進捗にも
+[Failed experiment cleanup](#failed-experiment-cleanup) を適用し、一律には保持しません。
+保持対象の file / 保存先 / readback は `result-artifact-writeout` の責務のままです。
 終端証拠がなければ完了未確認のpartial / interruptedとして扱い、終了コードやOOMを
 推測して埋めません。既存processの同定と、許可されたrunの停止条件はrunner ownerに
 従い、他runの停止・一括kill・新しい監視基盤の追加をこの節から認可しません。
@@ -192,7 +228,7 @@ artifact reader / renderer であり、formal run launcher、test surface、conf
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read [agents/skills/experiment-lifecycle.md](experiment-lifecycle.md); apply [Long-running GPU and crash-recovery admission](#long-running-gpu-and-crash-recovery-admission) before an applicable run or rerun.
+1. Read [agents/skills/experiment-lifecycle.md](experiment-lifecycle.md); apply [Long-running GPU and crash-recovery admission](#long-running-gpu-and-crash-recovery-admission) before an applicable run or rerun, and [Failed experiment cleanup](#failed-experiment-cleanup) immediately after confirmed failure, before carry-over or retention.
 1. Keep execution steps, result paths, and report locations consistent with this skill and the topic README.
 1. Select only the preparation, implementation, static-check, execution, or report phase required by the topic protocol; do not turn optional phases into universal gates.
 1. Classify a run as `debug`/`smoke`, `verified`, or `formal`. Do not promote spot, subset, or partial runs to formal comparison evidence; stopped runs require `Stop Reason:` and `Restart Decision:` plus a fresh run identity when rerun.
@@ -206,7 +242,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Keep GPU/JAX execution-environment ownership in the scheduler or caller environment. Experiment topic code and checked-in configs stay free of hard-coded per-run environment assignment such as GPU visibility, JAX platform, allocator, or preallocation overrides unless the task is explicitly an environment-contract change.
 1. Preserve available GPU parallelism by default. Do not force a topic to single-GPU or serial execution by adding `max_workers: 1`, GPU visibility filters, single-device JAX platform settings, or equivalent throttles unless the user explicitly requests serial debugging or the run plan records a concrete environment limit. `gpu_max_slots: 1` means one worker slot per GPU; it must not be used as a substitute for reducing the visible GPU set.
 1. When a Python process remains after an interrupted or failed experiment, identify the parent `run.py`, child worker, process group, and elapsed time before calling it residual. Treat active parent/worker processes as a still-running experiment and stop them only when the user asks for abort or cleanup.
-1. If the user restricts validation, distinguish non-persistent static checks from checks that leave artifacts. Static checks that do not create durable outputs are allowed. Experiment runs, visualization.py renderer execution, smoke checks, report generators, or any validation that writes result/log/report artifacts must not be run unless the user asks for them; when such a command is run and creates transient artifacts, delete only disposable artifacts after the run and report the cleanup. Preserve crash diagnostics and progress under the crash-recovery admission contract; do not treat them as disposable outputs.
+1. If the user restricts validation, distinguish non-persistent static checks from checks that leave artifacts. Static checks that do not create durable outputs are allowed. Experiment runs, visualization.py renderer execution, smoke checks, report generators, or any validation that writes result/log/report artifacts must not be run unless the user asks for them; when such a command is run and creates transient artifacts, delete only disposable artifacts after the run and report the cleanup. Apply [Failed experiment cleanup](#failed-experiment-cleanup) to confirmed failed experiments, including their run-owned crash diagnostics and progress; do not apply a blanket preservation exception.
 1. Keep checked-in experiment settings in `experiments/<topic>/config.yaml`; run artifacts must include a topic config snapshot, commonly `config_snapshot.json`, written by `run.py`.
 1. Keep topic-specific metrics, observations, thresholds, comparisons, and research-success judgments with the topic or research owner. Treat run state, exit status, artifact presence, and readback as operational evidence; do not promote them to a universal research acceptance gate.
 1. Require `experiments/<topic>/README.md` to describe the experiment content, question, comparison target, standard commands, config source, visualization visualization.py renderer, output schema, and run_name convention before formal execution.
