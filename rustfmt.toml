@@ -1,0 +1,5 @@
+# Language edition belongs to the owning Cargo manifest, not this style file.
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
