@@ -17,11 +17,12 @@ downstream design ../../agents/skills/comprehensive-development.md implementatio
 
 ## Purpose
 
-[AGENTS.md](../../AGENTS.md) と [ROOT_AGENTS.md](../../ROOT_AGENTS.md) は常時ロードされ得るため、task-specific policy の
-保存場所ではなく、repository identity と canonical owner を解決する入口に限定します。
+[AGENTS.md](../../AGENTS.md) と [ROOT_AGENTS.md](../../ROOT_AGENTS.md) は常時ロードされ得ますが、
+同じ配布責務ではありません。前者は AgentCanon source checkout の identity と canonical owner
+への案内、後者は source-free consumer にも配る共通制約と最小限の owner 案内を所有します。
+共通制約を保持することと、task-specific な詳細手順を所有することを区別します。
 詳細手順を Skill から入口へ複製すると、activation boundary、instruction budget、変更理由、
-validation owner が混線します。本設計は「薄い」という形容を、見出し名や byte 数ではなく
-検証可能な構造不変条件として定義します。
+validation owner が混線します。本設計は文書の短さではなく、適用範囲と読取経路を定義します。
 
 ## Model
 
@@ -34,8 +35,10 @@ canonical owner を `owner(r)` とします。
 - `H(e) = A(e)`: 許可された reader / owner sections だけが、定義順で存在する。
 - `P(e) = ∅`: fenced command、番号付き手順、command recipe、nested procedure heading を
   入口に持たない。
-- material な各 `r` について、入口は `owner(r)` への一つの route を持ち、同じ policy を
+- task-specific な各 `r` について、入口は `owner(r)` への一つの route を持ち、同じ policy を
   本文で再定義しない。
+- 共通制約は ROOT に保持し、source は明示読取、consumer は本文合成で同じ base を使う。
+  source-specific AGENTS は共通制約を再定義せず、適用先の owner を解決する。
 - convention marker contract の集合を `C` とすると、`∀c ∈ C, paths(c) ∩ E = ∅`。
   入口は operational marker の canonical surface にならない。
 - standalone source、explicit live integration、static-seed consumer の identity を混同しない。
@@ -71,9 +74,39 @@ Consumer root [AGENTS.md](../../AGENTS.md) は、この [ROOT_AGENTS.md](../../R
 これは consumer composition とは別の explicit read であり、自動展開、runtime import、
 wrapper、source copy を意味しません。ROOT の consumer map / owner route は consumer root
 にだけ適用し、source-specific AGENTS が source owner と validation route を保持します。
-これらの節は identity、owner edge、activation boundary の要約だけを持ちます。
+source 入口の節は identity、owner edge、activation boundary の案内に限定します。
+ROOT はそれに加え、単独配布に必要な共通制約を保持します。これは詳細手順の移管先ではありません。
 subagent sequence、Git environment variables、update command、design receipt、experiment setting、
 validation menu、closeout token は、それぞれの owner surface に置きます。
+
+## Ownership and distribution boundary
+
+| 文書 / 配布物 | 所有する内容 | 置かない内容 |
+| --- | --- | --- |
+| AgentCanon 自身の `AGENTS.md` | source identity、共通 base の読取方法、AgentCanon 固有の owner/path・runtime・検証への案内 | 共通制約の再定義、consumer 固有設定、詳細手順 |
+| `ROOT_AGENTS.md` | repository 共通の行動制約、consumer が単独で読める owner 案内 | source 専用の入口説明、source checkout を必要とする実行手順 |
+| consumer-specific source | その製品の owner、build/test、配置、追加指示 | AgentCanon source 入口や内部 workflow のコピー |
+| consumer の生成 `AGENTS.md` | ROOT と consumer-specific source の合成結果 | AgentCanon 自身の `AGENTS.md` の合成、参照先を配らない include |
+
+source の読取経路は `AGENTS.md -> ROOT_AGENTS.md -> AGENTS.md の source owner map`、
+consumer の配布単位は `ROOT_AGENTS.md の本文 + consumer-owned specific source` です。
+同じ `AGENTS.md` という名前でも、前者は source 入口、後者は consumer 所有の出力です。
+共通規則を source の Skill へのリンクだけに置き換えると、AgentCanon checkout のない
+consumer では必要な規則が読めません。composer は二つの入力本文を合成するだけで、
+参照の再帰展開や source AGENTS の自動取込を行いません。
+
+新しい記述は適用先と変更理由で配置します。共通の制約は ROOT、AgentCanon 固有の
+owner/path は source AGENTS、製品固有の指示は consumer-specific source、具体的な手順や
+acceptance rule は既存の Skill / workflow / internal routine に置きます。入口の owner 変更は
+共通制約の無効化ではありません。文書分割だけを理由に全参照先の読了を必須にしません。
+
+この境界に従い、source identity と `@ROOT_AGENTS.md` の解釈は source AGENTS に集約し、
+directory-local instructions、owner を迂回しない規則、限定作業の activation boundary、
+他 owner の検証例を一律チェックリストにしない規則は ROOT に集約します。
+実装の単純さ・問題領域保持・設計根拠・環境選択抑止・数値結果保持・format/report の共通制約は
+配布先でも必要なため保持します。AgentCanon defect の報告と source maintenance の案内も
+consumer からの handoff に必要であり、source 専用と誤判定して削除しません。
+新しい loader、分割 manifest、同期機構、checker は追加しません。
 
 ## Responsibility migration
 
