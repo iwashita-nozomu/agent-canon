@@ -36,8 +36,8 @@ downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces c
 1. [AGENTS.md](../../AGENTS.md) を読む
 1. [agents/skills/README.md](../skills/README.md) と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) で task family を決める
-1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の structured output を取る
-1. read-only worktree check で、必要なら AgentCanon source の repository-topic checkout を使うかを分類する。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` とし、どちらも `<anchor>/workspace/<topic>/<repo>` に置く。更新が必要なら current checkout を保持し、standalone topic branch / PR workflow に入る。source branch の dirty / unpushed / divergent state は evidence として保持し、detached state は source owner identity repair へ route する。編集候補を選ぶ前に [`Checkout Identity Readback`](../COMMUNICATION_PROTOCOL.md#checkout-identity-readback) を一度取得し、owner/path/validation に関係する依存 edge ごとに実依存 checkout の HEAD と参照 pin（存在する場合）を確認します。依存なしは未調査の既定値にせず、依存/consumer trace で edge が無い根拠を確認して記録します。cwd、branch、または依存 checkout/pin が変わった場合だけ identity と依存 HEAD を再読し、状態が変わらない通常 command では繰り返しません
+1. implementation owner または対象差分の validation route が未解決の場合だけ、canonical router / semantic-index / dependency review のうち、その判断に必要な既存の出力を使う。解決済みの owner と実行経路は再利用し、runtime profile の未指定を環境調査や再構築の開始理由にしない
+1. 作業対象の checkout と Git identity を確認する。AgentCanon source 自体の変更が要求範囲にある場合だけ、その repository-topic checkout を選ぶ。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` とし、どちらも `<anchor>/workspace/<topic>/<repo>` に置く。current checkout の dirty / unpushed / divergent state は evidence として保持する。編集候補を選ぶ前に [`Checkout Identity Readback`](../COMMUNICATION_PROTOCOL.md#checkout-identity-readback) を一度取得し、owner/path/validation に関係する依存 edge ごとに実依存 checkout の HEAD と参照 pin（存在する場合）を確認します。依存なしは未調査の既定値にせず、依存/consumer trace で edge が無い根拠を確認して記録します。cwd、branch、または依存 checkout/pin が変わった場合だけ identity と依存 HEAD を再読し、状態が変わらない通常 command では繰り返しません
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
 1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
 1. 実装を伴う task では `$codex-task-workflow` と、選択された task-family Skill を読む
@@ -70,12 +70,15 @@ Cross-Cutting Packet:
 
 ### Agent Canon Freshness
 
-task 開始時は read-only worktree check で、現在の AgentCanon source checkout と親の作業領域を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合は repository-topic lifecycle の選択済み checkout-mode で standalone topic branch / PR route に入ります。
+通常のコード・文書変更は、既存の作業経路で要求差分へ着手します。環境診断・変更の
+適用条件は [ROOT_AGENTS.md の Always-On Boundary](../../ROOT_AGENTS.md#always-on-boundary)
+に従います。この節は、task 開始ごとの source/parent 環境分類、freshness preflight、
+AgentCanon の更新・再構築を要求しません。
 
-- AgentCanon source/runtime変更は standalone source checkout から `$agent-canon-update` と `$pr-processing` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへlive root view、vendor、submodule pinを同期しません。consumer root [AGENTS.md](../../AGENTS.md) は、親が明示 composer で common [ROOT_AGENTS.md](../../ROOT_AGENTS.md) と consumer-specific text を合成して通常 file として管理します。
-- 親で source の変更が必要な場合は、repository-topic lifecycle が親の `<anchor>/workspace/<topic>/agent-canon` に選択済み mode の checkout を用意し、完了時に exact path の cleanup proof を取ります。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
-- standalone AgentCanon source branch が remote main と divergeしている場合はfail-closedとし、source branchのrebase/merge判断、AgentCanon PR、merge後main readbackを完了してから実装へ戻ります。
-- `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。親から起動したときは AgentCanon source checkout の存在、runtime root の containment、source-unchanged readbackを確認します。`skipped_source_canon` は AgentCanon source checkout がこの task の owner でない場合だけ妥当です。
+- AgentCanon source/runtime の変更が今回の要求範囲にある場合だけ、standalone source checkout から `$agent-canon-update` と `$pr-processing` に入ります。親repoへlive root view、vendor、submodule pinを同期しません。consumer root [AGENTS.md](../../AGENTS.md) は、親が明示 composer で common [ROOT_AGENTS.md](../../ROOT_AGENTS.md) と consumer-specific text を合成して通常 file として管理します。
+- 親で AgentCanon source の変更を所有する場合だけ、repository-topic lifecycle の `<anchor>/workspace/<topic>/agent-canon` checkout と既存 cleanup route を使います。親の product test、Docker、CI、GPU は親の既存 entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
+- Issue 修正の作業 branch は開始時と PR 公開前に最新 main を取り込み、競合があればその変更範囲で解消します。包含済みなら merge は no-op です。これは作業 source の統合であり、runtime 更新や環境構築ではありません。別の AgentCanon 保守 PR の merge・配布完了を、本題へ戻る前提にしません。
+- 必要な検証が実行不能なら、失敗した command、理由、未検証の性質を既存 Issue / PR に残し、その操作と独立した編集・差分確認・PR 公開を続けます。未実施を成功扱いせず、対象外の環境修理・再構築や他 Issue の完了を終了条件へ追加しません。診断だけで環境変更は認可されません。
 
 ### Branch Reuse Default
 
@@ -409,9 +412,9 @@ bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
 
 分類規則:
 - code / docs / tools / runtime をまとめて rework するなら `Comprehensive Development`
-- Docker / CI / dependency を触るなら `Platform And Environment`
-  - `environment-maintenance` と `environment_change_proposal.md` を先に起こし、code requirement と blocked command を固定する
-  - Host にrepo-local virtual environmentを作らず、AgentCanon environment validationはbootstrap container contractと実lifecycle readbackを使う。project environmentはproject-owned validatorへ委譲する
+- Docker / CI / dependency の設定・構築契約の変更が要求範囲にある場合だけ `Platform And Environment`
+  - `environment-maintenance` の既存手順で、必要な変更とその根拠を扱う。既存環境を使うコード変更や検証不能という事実だけでは、この family や `environment_change_proposal.md` を起動しない
+  - Host にrepo-local virtual environmentを作らず、認可された AgentCanon environment 変更の検証だけに bootstrap container contract と実 lifecycle readback を使う。project environmentはproject-owned validatorへ委譲する
 - 外部調査や比較実験が必要なら `Research-Driven Change`
 - tuning、比較改善、探索的 protocol refinement を backlog 付きで回すなら `Adaptive Improvement Loop`
   - Agile outer loop とし、1 extension ごとに 1 waterfall run-id / 1 waterfall pass / 1 decision state へ分解する
