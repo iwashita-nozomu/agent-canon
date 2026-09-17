@@ -41,8 +41,9 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 1. file/worker slice より先に、今回の責務を担う current module/helper/type/test/docs と、
    標準ライブラリ、採用済み framework/dependency、既存 CLI の公開機能を一つの
    shared asset universe で比較する。provider の比較は
-   [SEP-08](../../documents/conventions/software-engineering-principles.md#sep-08-dry-and-abstraction-admission)
-   に従い、既存の呼出元・依存宣言・公開 API（設定・拡張点を含む）の必要範囲を読む。
+   [SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+   を使い、既存の呼出元・公開 API から最小の利用案と要求・保証の対応を作る。
+   disposition の根拠はその対応から導き、名前やシグネチャの一致だけで決めない。
    同名のローカル実装がないことを、再利用先がない根拠にしない。split / extraction
    または suspected predecessor の現行欠落では、同じ universe を `git log`、`-S`、
    deleted paths、prior PR / Issue、predecessor tests、関連 design docs まで必要範囲で
@@ -68,7 +69,7 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    compiler、JIT の変更で吸収しない。
 5. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
    responsibility slices と `allowed_paths` はこの asset universe と disposition から導き、
-   同じ asset に触れる slices を一つへ merge する。既存 provider が同じ contract を
+   同じ asset に触れる slices を一つへ merge する。既存 provider の利用案が要求 contract を
    満たすなら、その直接利用・設定・合成へ置換し、第三の helper へ再実装しない。
    candidate がない場合も、ローカル検索ゼロだけで新 surface を admission しない。
    SEP-08 の capability 比較で残った具体的な不足責務だけを新設理由にする。実在する
