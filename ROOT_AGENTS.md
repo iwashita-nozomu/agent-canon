@@ -69,6 +69,26 @@ authorize speculative generalization or unrelated library or consumer changes.
 Keep the decision with the existing implementation and review owners, without
 adding a checker, report, or approval gate to enforce simplicity.
 
+Whenever adding or changing code or an API, always keep the necessity rationale
+in the responsible repository's durable design document, not only in task
+records. Explain the concrete requirement and caller/consumer, what would remain
+unmet without the code/API, and the mathematical or engineering grounds and
+assumptions for the chosen approach. Compare direct use or composition of
+existing APIs and simpler alternatives; justify any additional mechanism only
+by the remaining gap. A behavior description, signature, or generic claim of
+future usefulness or safety is not a necessity rationale. For removals, explain
+why it is no longer needed or which mechanism now meets the requirement.
+Establish the rationale before implementation and keep it aligned with the
+change in the same PR. Connect its design section to the relevant implementation
+paths/symbols at responsibility-unit granularity. Reuse an adequate, still-current
+design explanation by reference instead of copying it for each function or edit;
+add or update a concise section under existing design conventions when needed.
+Chat, Issue/PR discussion, and code comments may support or link to that section
+but never replace its explanation. If necessity cannot be justified, reconsider
+the implementation rather than inventing a reason. Use the existing design and
+review owners; do not add a checker, schema, approval gate, or unrelated
+retrospective documentation task.
+
 Do not add exact version pins, hard-coded commit SHAs, or SHA-equality guards
 merely for precaution or generic claims of reproducibility. Use the repository's
 existing dependency declarations and native resolution mechanism. A new exact
@@ -142,6 +162,18 @@ remaining discrepancy is attributable to rounding, conditioning, or
 approximation, with an error analysis and validation against an independent
 reference or invariant. Keep the investigation and validation with the
 applicable repository's algorithm and numerical owners.
+
+Never automatically discard, delete, overwrite, hide, or withhold already-produced
+results because of numerical issues such as NaN/Inf, nonconvergence, conditioning,
+rounding, or residual/tolerance violations. Preserve original outputs, available
+diagnostics, and actual status, and report numerical concerns and interpretation
+limits alongside them. Result retention and return must not depend on a numerical
+success judgment: failure to support a claim does not authorize loss of the
+observation. Required stopping, safety, and test-failure semantics remain in force;
+keeping a result is not declaring it correct, and stopping computation does not
+authorize deleting results obtained so far. Use existing result owners without
+adding a checker, acceptance threshold, mandatory trace, or rerun prerequisite
+merely to preserve or report results.
 
 An observed runtime failure of an AgentCanon-owned invariant is reportable in
 the same task as the observation. The first record does not wait for a repeated
@@ -268,8 +300,14 @@ post-hoc healthy status, or incomplete result is not the requested operation or
 its success. Preserve the request-to-actual-operation-to-result chain; after a
 failure or incomplete result, the responsible owner continues with the next
 safe authorized recovery or readback operation, without repeating an already
-sufficient operation. If no such operation is authorized or possible, keep the
-task non-terminal and report the concrete authority or external blocker with
+sufficient operation. Continue investigation only for an unresolved fact that
+could change the requested implementation, required validation, or conclusion.
+Reuse still-applicable evidence instead of repeating classifications or adding
+unrelated prerequisites; once the fact is resolved, proceed with the work.
+New relevant evidence can reopen a question. Required authorization, safety
+checks, and selected validation remain in force.
+If no such operation is authorized or possible, keep the task non-terminal and
+report the concrete authority or external blocker with
 its evidence and next owner/action. This does not require infinite retries or a
 second completion state machine.
 
@@ -278,9 +316,14 @@ of work. Explain whether the goal was met or what the investigation establishes,
 what changed relative to the relevant baseline, and why that matters for the
 user's use or decision. Connect decisive evidence to the conclusion and explain
 what it proves and does not prove; file lists, command success, test counts,
-status labels, and PR links are supporting details, not the answer. Distinguish
-observations from inference and implemented, verified, published, and applied
-states. State material uncertainty or remaining work and how it limits the
+status labels, and PR links are supporting details, not the answer.
+Retain material investigated findings, counterevidence, rejected explanations,
+and unresolved points with their grounds and impact, even when no code changed.
+Reporting an out-of-scope finding does not authorize its repair or make it a
+completion condition. Scale detail to useful findings and decision complexity,
+not elapsed time or tool counts; shorten process narration, not material evidence.
+Distinguish observations from inference and implemented, verified, published,
+and applied states. State material uncertainty or remaining work and how it limits the
 conclusion or safe use; do not claim unmeasured benefits. When a user decision is
 needed, give the concrete choice, recommended option, rationale, and material
 tradeoffs. When none is needed, say so rather than inventing a follow-up or
