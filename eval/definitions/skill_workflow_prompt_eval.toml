@@ -1529,7 +1529,7 @@ required_regex = ["layout drift", "layout review", "reference visibility", "Clos
 
 [[evals]]
 id = "codex-workflow-runtime-preflight"
-target = "agents/canonical/CODEX_WORKFLOW.md"
+target = "agents/canonical/CODEX_BOOTSTRAP.md"
 kind = "workflow"
 description = "The Codex workflow must route token-saving and goal-driven requests."
 

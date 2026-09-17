@@ -355,7 +355,7 @@ USER_FACING_LANGUAGE_RULE = (
 )
 
 CONTRACT_COMPLETE_IMPLEMENTATION_POLICY_SOURCE = (
-    "agents/canonical/CODEX_WORKFLOW.md#Implementation"
+    "agents/canonical/CODEX_IMPLEMENTATION.md#5-implementation"
 )
 
 CONTRACT_COMPLETE_IMPLEMENTATION_SCOPE_BASIS = "contract_required_behavior"

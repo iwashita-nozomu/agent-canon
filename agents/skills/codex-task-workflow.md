@@ -168,7 +168,7 @@ selected validation route activates them. A wave is launchable only when its
 owner, replaceable responsibility, context, write authority, and validation
 route are ready. A stage update is progress readback, not a final report: while
 required work or its result remains unresolved, keep the request active and
-continue through the existing [../canonical/CODEX_WORKFLOW.md#completion-readiness](../canonical/CODEX_WORKFLOW.md#completion-readiness)
+continue through the existing [../canonical/CODEX_COMPLETION.md#completion-readiness](../canonical/CODEX_COMPLETION.md#completion-readiness)
 route.
 
 ## Required Output

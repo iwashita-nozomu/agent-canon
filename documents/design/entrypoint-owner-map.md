@@ -10,6 +10,14 @@ downstream implementation ../../tools/validation/semantic/entrypoint/check_entry
 downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml canonical marker ownership projection
 downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py contract regression
 downstream design ../../agents/skills/comprehensive-development.md implementation-basis consumer
+downstream design ../../agents/canonical/ROOT_DELIVERY.md responsibility-specific detail owner
+downstream design ../../agents/canonical/ROOT_EXECUTION.md responsibility-specific detail owner
+downstream design ../../agents/canonical/ROOT_IMPLEMENTATION.md responsibility-specific detail owner
+downstream design ../../agents/canonical/CODEX_BOOTSTRAP.md responsibility-specific detail owner
+downstream design ../../agents/canonical/CODEX_COMPLETION.md responsibility-specific detail owner
+downstream design ../../agents/canonical/CODEX_IMPLEMENTATION.md responsibility-specific detail owner
+downstream design ../../agents/canonical/CODEX_INTAKE.md responsibility-specific detail owner
+downstream design ../../agents/canonical/CODEX_ROUTING.md responsibility-specific detail owner
 @dependency-end
 -->
 
@@ -128,3 +136,45 @@ source symlink、vendor/submodule projection、nested directory [AGENTS.md](../.
 consumer の具体的な追加文は consumer 側の `documents/agent-canon/consumer-root-instructions.md`
 が所有し、AgentCanon の [ROOT_AGENTS.md](../../ROOT_AGENTS.md) はその共通 base だけを所有します。static-seed allowlist は
 role/config のままとし、生成された root [AGENTS.md](../../AGENTS.md) は consumer の tracked output として扱います。
+
+## Responsibility-based document split
+
+ROOT の詳細判断を入口へ積み重ねると、実装・環境・Git・報告という異なる変更理由が
+常時読取の一単位に結合する。Codex Workflow も intake から closeout までの全文が
+同じ path のため、必要な局面だけを読む責務と機械的な section locator が混線していた。
+分割は既存の規則・適用条件・例外を保持し、次の責務を直接選べるようにする。
+
+| Surface | Responsibility | Activation |
+| --- | --- | --- |
+| `ROOT_AGENTS.md` | portable common constraints and consumer owner map | root entry |
+| [ROOT_IMPLEMENTATION.md](../../agents/canonical/ROOT_IMPLEMENTATION.md) | implementation, necessity, reachability, numerical decisions | relevant source-side implementation decision |
+| [ROOT_EXECUTION.md](../../agents/canonical/ROOT_EXECUTION.md) | configured execution, checkout, cleanup, team boundaries | relevant source-side execution operation |
+| [ROOT_DELIVERY.md](../../agents/canonical/ROOT_DELIVERY.md) | Issue evidence, continuation, reporting, commit/push, formatting | relevant source-side evidence or delivery operation |
+| [CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) | direct phase reader map and startup routing | Codex admission |
+| [CODEX_INTAKE.md](../../agents/canonical/CODEX_INTAKE.md) | intake and checkout/context continuity | intake or relevant state change |
+| [CODEX_ROUTING.md](../../agents/canonical/CODEX_ROUTING.md) | family, skills, profile, placement | unresolved route selection |
+| [CODEX_BOOTSTRAP.md](../../agents/canonical/CODEX_BOOTSTRAP.md) | run bootstrap, goals, adaptive materialization | selected run/goal/token route |
+| [CODEX_IMPLEMENTATION.md](../../agents/canonical/CODEX_IMPLEMENTATION.md) | design admission and implementation | design or implementation |
+| [CODEX_COMPLETION.md](../../agents/canonical/CODEX_COMPLETION.md) | validation, coverage, terminal-owner delegation | validation or closeout |
+
+ROOT は consumer で必要な禁止・義務・適用条件を自分の本文に保持する。source の詳細は
+source-specific AGENTS の条件付き Reader Map からのみ選ぶ。consumer に source 文書の
+存在を要求しない。portable base と source 向け詳細という配布上の差を、全詳細の二重コピーや
+新たな全件読取条件に変えない。規則の意味を変える変更では両適用面への影響を確認する。
+
+composer は exact base/specific bytes を扱う既存実装のままにする。include DSL、再帰的
+loader、追加公開 API、配布ファイル追加は不要であり、output だけで consumer が読める
+性質を維持する。既存 owner を単にリンクへ置換して consumer の規則を欠落させる案、
+全分割先を無条件展開して入口の読取量を変えない案は採用しない。
+
+`tools/agent/orchestration/packets.py` の designer / implementer は、従来の
+`4. Run Bootstrap` と `5. Implementation` をそれぞれの正本で読み切る。同じ意味の
+section heading を維持し、locator の path だけを分離する。`agents/agents_config.json`、
+manifest の source reference、publication/review evidence も移動した規則の直接 owner を指す。
+既存 convention/runtime checker と prompt eval は marker/regex を削らず、本文の新しい
+所有先へ付け替える。入口に marker を複製して通過させない。
+
+検証は entrypoint grammar、source-free composition、section locator、既存 marker/eval、
+移動本文・リンクの対応を対象とする。行数/bytes は文書量の観測であり、実 agent の token、
+速度、品質の実測値ではない。新たな checker、承認、全 profile 実行、他 Issue の完了は
+この分割の条件にしない。

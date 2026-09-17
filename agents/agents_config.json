@@ -1821,7 +1821,7 @@
       "clause_registry": [
         {
           "clause_id": "CANON-ADF",
-          "source_ref": "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate"
+          "source_ref": "agentcanon:agents/canonical/CODEX_IMPLEMENTATION.md#section:design-integrity-gate"
         },
         {
           "clause_id": "CANON-SOURCE-PACKET",
@@ -1846,7 +1846,7 @@
           "role:designer"
         ],
         "source_refs": [
-          "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate",
+          "agentcanon:agents/canonical/CODEX_IMPLEMENTATION.md#section:design-integrity-gate",
           "agentcanon:templates/agents/design_brief.md#section:abstract-design-frame"
         ],
         "dependency_refs": [
@@ -1871,7 +1871,7 @@
         ],
         "source_refs": [
           "agentcanon:templates/agents/design_brief.md#section:implementation-source-packet",
-          "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate"
+          "agentcanon:agents/canonical/CODEX_IMPLEMENTATION.md#section:design-integrity-gate"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
@@ -1895,7 +1895,7 @@
         ],
         "source_refs": [
           "agentcanon:templates/agents/design_brief.md#section:design-side-effect-map",
-          "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate"
+          "agentcanon:agents/canonical/CODEX_IMPLEMENTATION.md#section:design-integrity-gate"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
@@ -1920,7 +1920,7 @@
         ],
         "source_refs": [
           "agentcanon:templates/agents/design_brief.md#section:design-to-implementation-trace",
-          "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:5.-implementation"
+          "agentcanon:agents/canonical/CODEX_IMPLEMENTATION.md#section:5.-implementation"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
