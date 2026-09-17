@@ -10,6 +10,7 @@ downstream design ./object-oriented-design.md OOP and SOLID specialization
 downstream design ../../agents/skills/comprehensive-development.md cross-surface design and delivery consumer
 downstream design ../../agents/skills/refactor-loop.md behavior-preserving refactor consumer
 downstream design ../../agents/skills/change-review.md findings-first review consumer
+downstream design ../../agents/skills/codex-task-workflow.md implementation and review-remedy decision consumer
 downstream design ../../documents/notes/knowledge/coding_decision_methods.md external method and source note
 @dependency-end
 -->
@@ -188,8 +189,10 @@ KISS は「最短の code」や「最小の diff」ではありません。要�
 - invariant、schema、compatibility relation
 - independent checker、workflow、receipt、generated view
 
-error handling、cleanup、migration、test、documentation を削って短くした実装は単純ではなく、
-未閉鎖の責務を別の場所へ移しただけです。
+要求上必要な error handling、cleanup、migration、test、documentation を削って短くした実装は
+単純ではなく、未閉鎖の責務を別の場所へ移しただけです。どの異常処理が必要かは
+[到達可能性と追加修正の必要性](#reachability-and-remedy-necessity) で判断し、
+重複防御を温存する理由にはしません。
 
 ### SEP-07 YAGNI
 
@@ -197,12 +200,45 @@ error handling、cleanup、migration、test、documentation を削って短く�
 
 - current requirement または approved target state
 - concrete caller / consumer
-- reproduced または静的に到達可能な failure
+- reproduced または静的に到達可能な failure に対する未充足の要求
 - stable extension point を必要とする複数実装
 - external boundary を隔離する adapter need
 
 YAGNI は、要求済み behavior、必要な compatibility migration、failure handling、cleanup、validation
 を後回しにする理由ではありません。完成した target state に不要な将来 surface を作らない原則です。
+
+#### Reachability and remedy necessity
+
+異常を表す局所式が書けること、現行の実行でそこへ到達できること、到達した結果が
+要求を満たさないことは別です。異常仮説から修正を導くときは、現在の有効な入口、
+contract が許す入力・状態、制御・データフロー、観測される結果を必要範囲だけ
+対応付けます。外部境界が拒否・防御する責務を持つ不正入力も判断対象に含めます。
+
+保証の根拠は実際の parser、constructor、型の強制、制御フロー等に求め、その後の
+mutation、別入口、並行変更、I/O が保証を壊し得るかを確認します。型注釈だけや
+過去に事故がなかったことを到達不能の証拠にしません。同じ境界で維持される不変条件と、
+存在確認後も外部から変化し得る状態を区別します。到達する場合も、既存 owner の
+例外伝播、拒否、cleanup、recovery が既に要求を満たしていないかを先に照合します。
+
+| 判断 | 根拠の例 | 次の行動 |
+| --- | --- | --- |
+| 到達不能 | parser が非空を強制し、同じ内部境界でその保証を壊す経路がない | 内部の空入力を理由に修正を要求しない |
+| 既存保証で対応済み | 失敗は起こり得るが、既存 API の例外伝播や cleanup が要求どおり | 追加の catch、guard、fallback を要求しない |
+| 未確認 | 入口や保証の成立・維持に関する判断前提が未確認 | 安全とも欠陥とも断定せず、判断を変える不足前提だけを調べる |
+| 到達可能で契約不足あり | 現行入口からの実行や仕様上の外部障害で、要求された結果・失敗処理が満たされない | その不足を閉じる最も単純な修正と対象検証を既存 owner で選ぶ |
+
+private helper を mock で直接呼び、実際の入口では作れない状態を注入しただけでは、
+到達可能な不具合の証拠になりません。test double は成立する入力・状態・外部障害を
+表現します。局所 algorithm が独立した契約を持つ場合の owner-local test は妨げません。
+外部入力、存在確認後の変更、仕様上の I/O 失敗などの可能性が契約や解析で示せるなら、
+実事故や危険な再現を要求しません。ただし可能性だけで追加対策を決めず、既存保証で
+埋まらない要求を対応付けます。必要な authorization、安全検証、外部境界の検証は保ちます。
+
+到達不能・既存保証済みなら、既存の Issue、design、review の記録に理由を短く残して
+元作業へ戻ります。その仮説を production 対策、回帰 test、必須後続 Issue、完了条件に
+変換しません。未確認も投機的な対策へ変換せず、必要な前提の調査に留めます。
+これは判断支援であり、新しい checker、schema、status、帳票、approval gate、全件監査を
+要求しません。実装・review の利用側は、この判断と既存の根拠を参照し、分類規則を複製しません。
 
 ### SEP-08 DRY and abstraction admission
 
