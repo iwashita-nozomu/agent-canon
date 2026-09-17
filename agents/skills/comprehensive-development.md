@@ -51,6 +51,32 @@ implementation target は SEP-09 の complete target state から導きます。
 OOP / SOLID specialization は class、state、inheritance、`Protocol`、public object model が material に
 変わる場合だけ選びます。
 
+## Existing Capability Before Implementation
+
+implementation target と mechanism の選択では、共通原則 SEP-06/07 と
+[SEP-08](../../documents/conventions/software-engineering-principles.md#sep-08-dry-and-abstraction-admission)
+を次の順で使います。新しい public API だけでなく、private helper や既存 file 内への追加も対象です。
+
+1. 現在の caller、既存実装、標準ライブラリ、採用済み依存・framework・CLI の公開 API を
+   必要範囲で読み、設定・拡張点・直接利用・合成で要求を満たす案を基準にします。
+2. 必要な入出力、domain semantics、state / lifecycle、failure semantics と基準案の保証を
+   比較し、満たす部分と具体的な不足だけを分けます。名称、引数形、配置、style の違いや
+   根拠のない性能期待を能力不足とせず、利用する API に合わせて要求領域を狭めません。
+3. 充足する部分は既存 owner へ委譲し、不足がなければ自作しません。引数・型の適合だけなら
+   caller 側の最小の変換にとどめ、必要な adapter に provider の algorithm、state、parser、
+   retry 等を再所有させません。実際に残る不足だけを適切な owner で実装します。
+
+既存候補が足りない場合は、既知の適切な library と自作の保守・依存コストも比較します。
+依存ゼロのための再実装も、再利用のためだけの新規依存・wrapper・基盤導入も目的にしません。
+調査は現在の要求と判断を変える候補に限り、十分な選択が決まれば実装へ進みます。全候補の
+不存在証明、全 repository / package 調査、provider 内部の再検証を開始条件にしません。
+
+採用 API、委譲できる範囲、残る不足と数理的・工学的な選択理由は、既存の設計文書の該当節へ
+簡潔に残し、同じ参照を task packet / handoff に渡します。充足済みの責務を自作した方が
+正本・状態・検証対象が増える点も比較し、追加 report、schema、checker は作りません。
+検証は変更した domain contract と consumer/provider の接続へ向け、既存 provider 自体の
+再実装や全機能の再テストを、この変更の完了条件にしません。
+
 ## Contract-Complete Implementation Basis
 
 この skill が束ねる implementation は、行数、file 数、diff の小ささを completion condition にしません。
@@ -65,9 +91,9 @@ material な mechanism decision は、既存の task packet / design trace に�
 | --- | --- |
 | contract | input / output、invariant、failure semantics、compatibility のうち変更に関係するもの |
 | owner | state、effect、recovery、validation を閉じる canonical owner と complete owning unit |
-| mechanism | 採用する algorithm、architecture、protocol、resource strategy、migration route |
+| mechanism | 直接利用・合成する既存 API と、不足分に必要な algorithm、architecture、protocol、resource strategy、migration route |
 | basis | 数理導出、proof obligation、complexity / error bound、conditioning、停止条件、公式仕様、domain model、workload model、measurement、benchmark、failure analysis、標準のうち判断を支える evidence |
-| alternatives | 少なくとも現実に競合した候補、棄却理由、cost / risk / compatibility trade-off |
+| alternatives | 既存機能を使う基準案と現実に競合した候補、具体的な不足・棄却理由、cost / risk / compatibility trade-off |
 | oracle | contract を判定できる test、static property、proof、measurement、readback |
 
 material な decision のうち、正しさに関係する理由を名前、型、構造から復元できず、現実的な変更で
@@ -147,6 +173,7 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 
 1. family を `Comprehensive Development` に固定します。
 1. current requirement と owning contract を読み、material な engineering principle clause、canonical owner、forbidden interpretation を固定します。
+1. [Existing Capability Before Implementation](#existing-capability-before-implementation) で既存機能を使う基準案と残る不足を決めてから、mechanism と implementation target を選びます。
 1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
 1. material かつ code から理由を復元できない decision は、共通コメント規約に従って最も狭い安定 owner の近傍へ残し、変更された既存コメントも同じ差分で同期します。
 1. regression / fixture / mock を追加する場合は、canonical invariant、minimal counterexample、existing oracle への統合可能性、representation independence、duplicate truth、旧 regression の consolidation、completion oracle を先に確認します。
