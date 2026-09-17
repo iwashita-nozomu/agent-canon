@@ -143,6 +143,18 @@ approximation, with an error analysis and validation against an independent
 reference or invariant. Keep the investigation and validation with the
 applicable repository's algorithm and numerical owners.
 
+Never automatically discard, delete, overwrite, hide, or withhold already-produced
+results because of numerical issues such as NaN/Inf, nonconvergence, conditioning,
+rounding, or residual/tolerance violations. Preserve original outputs, available
+diagnostics, and actual status, and report numerical concerns and interpretation
+limits alongside them. Result retention and return must not depend on a numerical
+success judgment: failure to support a claim does not authorize loss of the
+observation. Required stopping, safety, and test-failure semantics remain in force;
+keeping a result is not declaring it correct, and stopping computation does not
+authorize deleting results obtained so far. Use existing result owners without
+adding a checker, acceptance threshold, mandatory trace, or rerun prerequisite
+merely to preserve or report results.
+
 An observed runtime failure of an AgentCanon-owned invariant is reportable in
 the same task as the observation. The first record does not wait for a repeated
 occurrence, dashboard evidence, repair completion, or confirmed cause; preserve
