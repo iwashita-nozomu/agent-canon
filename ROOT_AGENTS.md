@@ -69,6 +69,38 @@ authorize speculative generalization or unrelated library or consumer changes.
 Keep the decision with the existing implementation and review owners, without
 adding a checker, report, or approval gate to enforce simplicity.
 
+Do not add or extend a public API without an explicit user request or approval
+covering that public change. This includes exported or re-exported functions,
+types and methods, endpoints, and supported parameters or CLI commands/options.
+A general feature, bug-fix, or cleanup request is not authorization to enlarge
+the public contract. Reuse an already explicit authorization without asking
+again, but do not treat authorization as a waiver of the investigation below.
+
+Before designing or implementing a public API addition, investigate on the
+premise that existing capabilities can satisfy the requirement. Inspect actual
+callers and the relevant current APIs and documentation, including
+configuration and extension points, standard facilities, and adopted
+dependencies. Evaluate direct use, configuration, and composition before
+proposing a new public surface. Not finding the proposed name, not having
+investigated, preferring different arguments or placement, or anticipating
+future reuse is not evidence of a missing capability. Bound the investigation
+to the required behavior and related owners; stop when evidence is sufficient
+to decide. Unavailable evidence remains unknown, not proof that a capability is
+absent or permission to add an API.
+
+When existing capabilities meet the required contract, use them without adding
+an API. Otherwise, record the examined candidates and source references, the
+concrete unmet contract, and why direct use or composition cannot meet it in
+the existing design rationale described below; propose only the smallest
+necessary public change. A demonstrated gap establishes necessity, not
+authorization. Public contracts add compatibility and maintenance obligations,
+so convenience alone does not justify expanding them. Without sufficient
+evidence and explicit authorization, leave the addition as a proposal; continue
+independent authorized work that does not enlarge the public contract.
+Existing-API use and internal fixes do not acquire a new approval requirement.
+Keep this boundary with existing design, implementation, and review owners; add
+no checker, registry, mandatory report, or separate approval system.
+
 Whenever adding or changing code or an API, always keep the necessity rationale
 in the responsible repository's durable design document, not only in task
 records. Explain the concrete requirement and caller/consumer, what would remain
