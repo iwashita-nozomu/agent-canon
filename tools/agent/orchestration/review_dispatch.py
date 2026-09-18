@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Materializes automatic independent-review candidates, frames, dispatch transitions, and decisions.
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns candidate, frame, event, lineage, and handoff schemas.
-# upstream design ../../../agents/canonical/CODEX_WORKFLOW.md owns automatic-review state transitions and APPROVE-only publication.
+# upstream design ../../../agents/canonical/CODEX_COMPLETION.md owns automatic-review state transitions and APPROVE-only publication.
 # upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md owns independent reviewer routing and same-context resume policy.
 # upstream design ../../../agents/skills/agent-orchestration.md owns automatic review workflow routing.
 # upstream design ../../../agents/skills/subagent-bootstrap.md owns review launch and resume mechanics.
@@ -433,7 +433,7 @@ def _append_automatic_event(
             "outcome": outcome,
             "evidence_refs": [
                 "agents/COMMUNICATION_PROTOCOL.md",
-                "agents/canonical/CODEX_WORKFLOW.md",
+                "agents/canonical/CODEX_COMPLETION.md",
             ],
             "artifact_refs": ["team_manifest.yaml", "work_log.md"],
             "source_binding": {

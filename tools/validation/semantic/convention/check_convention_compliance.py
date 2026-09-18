@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Verifies repository convention compliance wiring and workflow gates.
 # upstream design ../../../../documents/conventions/README.md convention index
-# upstream design ../../../../agents/canonical/CODEX_WORKFLOW.md completion readiness policy
+# upstream design ../../../../agents/canonical/CODEX_COMPLETION.md completion readiness policy
 # upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
 # upstream design ../../../../agents/TASK_WORKFLOWS.md workflow skill routing policy
 # upstream design ../../../../agents/skills/agent-orchestration.md canonical orchestration skill
@@ -102,6 +102,11 @@ CONVENTION_SOURCES = (
     "documents/conventions/object-oriented-design.md",
     "documents/conventions/REVIEW_PROCESS.md",
     "agents/canonical/CODEX_WORKFLOW.md",
+    "agents/canonical/CODEX_IMPLEMENTATION.md",
+    "agents/canonical/CODEX_BOOTSTRAP.md",
+    "agents/canonical/CODEX_COMPLETION.md",
+    "agents/canonical/CODEX_INTAKE.md",
+    "agents/canonical/CODEX_ROUTING.md",
 )
 
 TOOL_CATALOG_PATH = "tools/catalog.yaml"
@@ -349,7 +354,7 @@ WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"check_convention_compliance\.py|check_convention_compliance\.py"
     r"(?:\S+\s+){0,6}?(?:optional|not\s+required)"
 )
-CLOSEOUT_WORKFLOW_PATH = "agents/canonical/CODEX_WORKFLOW.md"
+CLOSEOUT_WORKFLOW_PATH = "agents/canonical/CODEX_COMPLETION.md"
 CLOSEOUT_OWNER_PATH = "tools/runtime/lifecycle/task_close.py"
 CLOSEOUT_WORKFLOW_DELEGATION_MARKERS = (
     "[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)",
@@ -397,7 +402,7 @@ TEST_CONTRACT_ROUTING_MARKERS = {
         "canonical command",
         "Validation repair scope",
     ),
-    "agents/canonical/CODEX_WORKFLOW.md": (
+    "agents/canonical/CODEX_IMPLEMENTATION.md": (
         "contract-only wrapper",
         "static contract validation",
         "canonical command evidence",
@@ -477,7 +482,7 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
         "design_issue_blocker",
         "implementation shortcut",
     ),
-    "agents/canonical/CODEX_WORKFLOW.md": (
+    "agents/canonical/CODEX_IMPLEMENTATION.md": (
         "legacy-route drift",
         "duplicate implementation",
         "canonical owner",

@@ -1825,7 +1825,7 @@ entries:
     docs:
       - tools/README.md
       - agents/skills/agent-orchestration.md
-      - agents/canonical/CODEX_WORKFLOW.md
+      - agents/canonical/CODEX_INTAKE.md
     tests:
       - tests/agent_tools/test_skill_document_reader.py
 
@@ -2282,7 +2282,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/canonical/CODEX_WORKFLOW.md
+      - agents/canonical/CODEX_BOOTSTRAP.md
     tests:
       - tests/agent_tools/test_bootstrap_and_close.py
 
@@ -2301,7 +2301,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - agents/canonical/CODEX_WORKFLOW.md
+      - agents/canonical/CODEX_COMPLETION.md
     tests:
       - tests/agent_tools/test_bootstrap_and_close.py
 

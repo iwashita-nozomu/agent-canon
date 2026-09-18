@@ -3,390 +3,106 @@
 <!--
 @dependency-start
 contract agent-runtime
-responsibility Provides the common, source-free base for consumer and source-specific repository root AGENTS.md files.
-upstream design documents/design/entrypoint-owner-map.md root entrypoint grammar and common/source composition boundary
-upstream design documents/conventions/software-engineering-principles.md contract-complete engineering decision policy
-downstream implementation tools/agent/templates/entrypoint_composer.py composes the regular consumer root file
-downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py validates the base grammar
+responsibility Provides the portable minimum shared by source and consumer roots.
+upstream design documents/design/entrypoint-owner-map.md reading and composition boundary
+downstream implementation tools/agent/templates/entrypoint_composer.py consumer composition
 @dependency-end
 -->
 
-This common base carries shared behavioral constraints for consumer and
-source-specific repository roots. Keep those constraints self-contained;
-repository-specific instructions resolve their owners and application.
-Task procedures, command recipes, role lifecycles, validation schemas, and
-source-editing routes remain with those owners, not in this base.
-
 ## Repository Role
 
-A consumer owns its product source, build environment, tests, documentation,
-CI, credentials, runtime semantics, and instruction extension. Its root
-[AGENTS.md](AGENTS.md) is a regular tracked file composed from this base and its own
-specific instructions, usable without an AgentCanon checkout or runtime.
-Composition is not a live projection, runtime import, updater, vendor checkout,
-submodule, or symlink.
-
-Directory-local `AGENTS.md` files may narrow behavior for their subtree. They
-must add only the responsibility owned by that subtree and must not copy a
-root, workflow, or Skill policy for visibility.
+Consumers own their product, environment, tests, credentials, and specific
+instructions. Their generated [AGENTS.md](AGENTS.md) is self-contained; no
+AgentCanon checkout or runtime is required. Specific owner maps take precedence
+for their responsibilities, not over shared constraints. Local AGENTS add only
+subtree-owned instructions, never copies of parent, workflow, or Skill policy.
 
 ## Reader Map
 
-For a consumer root, use the [Runtime Owner Map](#runtime-owner-map) below and
-the appended consumer-specific instructions. Repository-specific owner maps
-take precedence for their responsibilities without replacing shared constraints.
+Use the applicable repository's specific instructions and selected owner.
+Read only details needed for the current action; indexes, links, and dependency
+metadata are not full-reading obligations. Reuse unchanged context. Keep all
+auto-loaded instructions short; place procedures in conditionally read files.
 
 ## Always-On Boundary
 
-The explicit user request and the current repository-specific canonical owner
-are the source of truth. Preserve unknown dirty, staged, untracked, branch,
-and worktree state until the applicable Git safety owner classifies it.
+Stay within the authorized task and preserve unknown user/Git state. Preserve the
+required problem class, valid inputs, guarantees, and failure semantics; neither
+small diffs nor completeness justify shortcuts or unrelated work. Follow the
+selected owner rather than inventing a fallback, wrapper, or policy copy.
 
-Follow the selected owner and its validation route rather than inventing a
-fallback, wrapper, compatibility path, or local copy of policy.
+Public API additions/extensions (exports, types/methods, endpoints, parameters,
+CLI commands/options) require explicit user authorization for that public change;
+a general feature/fix/cleanup request is insufficient. First investigate existing
+APIs, configuration, extensions, standard facilities, and adopted dependencies on
+the premise they suffice. Use them when they do; otherwise record candidates,
+source evidence, the unmet contract, and why composition fails in the owning
+design. Necessity is not authorization, and missing evidence is not a gap.
+Without both evidence and authority, keep the addition a proposal and continue
+independent authorized work. Reuse prior explicit approval; internal fixes and
+existing-API use require no new approval system or check.
 
-Preserve the problem class, valid input domain, and output guarantees required
-by the explicit user request and applicable canonical contract. A bounded
-change scope is not permission to narrow that problem. Do not add fixed
-dimensions, shapes, distributions, or other preconditions merely to fit a
-chosen algorithm, library, test fixture, implementation convenience, or
-performance target. Distinguish restrictions inherent in the governing problem
-from limitations of the chosen method; choose or derive a suitable method
-instead of promoting the latter into the specification. Do not reject or skip
-valid cases, or silently truncate or project them into a different problem,
-and call the result complete. Unresolved coverage remains an implementation
-gap, not invalid input or authorization to shrink the contract. Narrowing
-requires explicit user direction. Validate through the applicable implementation
-and test owners, including valid cases beyond the motivating example and cases
-a shortcut would exclude.
+Prefer the simplest complete use of existing APIs. Put necessity, mathematical
+or engineering grounds, and rejected simpler alternatives in the owning design
+before code/API changes. Inspect real callers, APIs, configuration, and extension
+points; keep caller orchestration separate from reusable-library responsibility.
+Add mechanisms, dependencies, exact pins, or guards only for an evidenced current
+need, not speculation. Preserve native resolution and required integrity checks.
+When an existing dependency contract requires an exact pin, only execution that
+needs a dependency change uses a published PR commit through that consumer-owned
+pin; otherwise use the consumer's declared resolution.
+Establish reachability and existing guarantees before extra error handling;
+unknown is neither impossible nor a defect. Keep authorization and boundary safety.
 
-Make the simplest complete implementation the default, not a later refactor.
-Start with direct use or composition of existing APIs and straightforward code
-at the current owner. Introduce abstractions, configuration, execution paths,
-or state only when a concrete current requirement cannot be met more simply;
-justify that necessity with mathematical or engineering grounds. Hypothetical
-reuse, design-pattern uniformity, or test-double convenience alone is not such
-a reason. Minimize concepts, state, branches, and dependencies while preserving
-the required domain, correctness, safety, and failure semantics. Neither fewer
-lines nor a smaller diff justifies omitted behavior, and completeness does not
-authorize speculative generalization or unrelated library or consumer changes.
-Keep the decision with the existing implementation and review owners, without
-adding a checker, report, or approval gate to enforce simplicity.
+Use configured execution and defaults. Do not rediscover or manually switch
+environments, add probes/fallbacks, or rebuild for ordinary work. Diagnose only
+requested or evidenced relevant problems; stop when the decision is resolved.
+Repair requires scope and authority. Block only affected actions, preserve resource
+and rerun limits, and never replace a required backend to claim validation.
 
-Do not add or extend a public API without an explicit user request or approval
-covering that public change. This includes exported or re-exported functions,
-types and methods, endpoints, and supported parameters or CLI commands/options.
-A general feature, bug-fix, or cleanup request is not authorization to enlarge
-the public contract. Reuse an already explicit authorization without asking
-again, but do not treat authorization as a waiver of the investigation below.
+Check algorithms against equations and assumptions before numerical adjustments;
+require error analysis rather than arbitrary offsets or tolerances. Report actual
+status and limits; numerical symptoms alone do not establish research failure or
+authorize discarding non-experiment results or unconfirmed experiment observations.
+For protocol-confirmed failed experiments, immediately delete experiment-only
+code, configuration, and artifacts unless evidence establishes a physical cause.
+Unknown cause, debugging value, numerical trouble, or future reuse do not justify
+retention or waiting for closeout. Use existing experiment/storage owners with
+safe stopping and scoped authority; keep only a concise Issue/task disposition,
+not a relocated bundle. Preserve successful/shared/other-owned data and Git
+history. Do not add discard classifiers, archives, or reruns as cleanup gates.
 
-Before designing or implementing a public API addition, investigate on the
-premise that existing capabilities can satisfy the requirement. Inspect actual
-callers and the relevant current APIs and documentation, including
-configuration and extension points, standard facilities, and adopted
-dependencies. Evaluate direct use, configuration, and composition before
-proposing a new public surface. Not finding the proposed name, not having
-investigated, preferring different arguments or placement, or anticipating
-future reuse is not evidence of a missing capability. Bound the investigation
-to the required behavior and related owners; stop when evidence is sufficient
-to decide. Unavailable evidence remains unknown, not proof that a capability is
-absent or permission to add an API.
+Establish the actual in-scope checkout and dependency identities; recheck only
+changed premises. Keep required pin evidence distinct from execution inputs.
+Read Git/storage/team owners before those operations. Clean only unneeded,
+task-owned temporary checkouts; preserve unknown state and shared resources.
 
-When existing capabilities meet the required contract, use them without adding
-an API. Otherwise, record the examined candidates and source references, the
-concrete unmet contract, and why direct use or composition cannot meet it in
-the existing design rationale described below; propose only the smallest
-necessary public change. A demonstrated gap establishes necessity, not
-authorization. Public contracts add compatibility and maintenance obligations,
-so convenience alone does not justify expanding them. Without sufficient
-evidence and explicit authorization, leave the addition as a proposal; continue
-independent authorized work that does not enlarge the public contract.
-Existing-API use and internal fixes do not acquire a new approval requirement.
-Keep this boundary with existing design, implementation, and review owners; add
-no checker, registry, mandatory report, or separate approval system.
-
-Whenever adding or changing code or an API, always keep the necessity rationale
-in the responsible repository's durable design document, not only in task
-records. Explain the concrete requirement and caller/consumer, what would remain
-unmet without the code/API, and the mathematical or engineering grounds and
-assumptions for the chosen approach. Compare direct use or composition of
-existing APIs and simpler alternatives; justify any additional mechanism only
-by the remaining gap. A behavior description, signature, or generic claim of
-future usefulness or safety is not a necessity rationale. For removals, explain
-why it is no longer needed or which mechanism now meets the requirement.
-Establish the rationale before implementation and keep it aligned with the
-change in the same PR. Connect its design section to the relevant implementation
-paths/symbols at responsibility-unit granularity. Reuse an adequate, still-current
-design explanation by reference instead of copying it for each function or edit;
-add or update a concise section under existing design conventions when needed.
-Chat, Issue/PR discussion, and code comments may support or link to that section
-but never replace its explanation. If necessity cannot be justified, reconsider
-the implementation rather than inventing a reason. Use the existing design and
-review owners; do not add a checker, schema, approval gate, or unrelated
-retrospective documentation task.
-
-Do not add exact version pins, hard-coded commit SHAs, or SHA-equality guards
-merely for precaution or generic claims of reproducibility. Use the repository's
-existing dependency declarations and native resolution mechanism. A new exact
-constraint needs an explicit requirement or a demonstrated compatibility,
-integrity, or reproducibility need; keep it at the dependency owner rather than
-copying it into code or tests. Preserve existing required lockfiles, gitlinks,
-and integrity checks. Recording the actual resolved version or SHA is evidence,
-not authorization to turn that observation into a permanent execution constraint.
-
-Before implementing a guard, retry, fallback, or other abnormal-condition
-handling, first determine whether the condition can occur under the current
-contract and supported execution environment. Identify the triggering
-input/state and assess reachability from observations, specifications, code,
-or mathematical and engineering analysis. Distinguish established possibility,
-exclusion by maintained invariants, and unresolved uncertainty. Absence of
-incidents does not prove impossibility; a hypothetical failure alone does not
-establish reachability. Do not add handling for excluded conditions or turn
-uncertainty into speculative production code; investigate the missing premise
-first. Preventive handling does not require a real incident or unsafe
-reproduction when specifications or analysis establish possibility. Only after
-that judgment, use impact and existing guarantees to select the smallest
-necessary remedy at the responsible owner and validate it against the
-identified condition. Do not make guards or preflight checks stricter than the
-governing contract: avoid environment, directory-layout, or exact-version
-restrictions when the required capability suffices, and repeated checks of
-invariants already guaranteed at the same trust boundary. An unavailable
-optional tool or diagnostic must not block an otherwise supported path.
-Validate untrusted inputs at the owning boundary rather than coupling reusable
-code to one caller's setup. Prefer no new check unless it closes an evidenced
-gap without unnecessarily reducing portability or reuse. Preserve required
-authorization, safety, and external-boundary checks; do not suppress their
-failures. Record the judgment and grounds in the existing Issue or design record,
-not a new gate or report.
-
-Run the current repository owner's existing entrypoint with its configured
-settings and standard tool defaults. Manual environment selection for ordinary
-execution is prohibited: do not ask the user to choose an environment or inject
-host/container, OS/WSL, CPU/GPU backend, runtime, or profile selectors through
-ad-hoc command flags, environment variables, or configuration edits. Existing
-tools resolve their own configured settings and defaults; missing optional
-selectors are not inputs to solicit or fill.
-Do not insert environment classification, inventory, or rediscovery before
-ordinary tasks, sessions, or commands, including installed-tool probes. Reuse
-supplied, still-applicable context without repeating probes or confirmation.
-A new task or an unknown optional setting is not a reason to investigate, stop,
-reconfigure, or restart a working route. Do not replace manual selection with
-new auto-detection, flags, profiles, environment variables, fallbacks, wrappers,
-or persistent detection/cache state. Do not invent missing settings merely to
-normalize environments or avoid rediscovery.
-Environment diagnosis is limited to an explicit request, an actual relevant
-failure, an observed change to a required premise, or a concrete evidenced
-risk. Resolve only the missing decision-relevant fact and stop the diagnosis
-when it is resolved; diagnosis alone does not authorize setup or repair.
-Environment changes and their rebuild/full-profile acceptance must belong to
-the authorized task, not become prerequisites for ordinary execution.
-Preserve the selected command's required safety checks, permissions, resource
-limits, and rerun prohibitions; prior success does not override contrary
-current evidence. When blocked, identify the concrete prerequisite or risk and
-its evidence, stop only affected commands, and continue independent authorized
-work. Do not silently switch a required backend, weaken validation, or treat
-an unrun command as passed.
-
-When numerical results disagree, first investigate defects in the algorithm
-and its implementation against the governing equations and specification,
-including assumptions, units, indexing, update order, and boundary conditions.
-Correct identified algorithmic defects before considering numerical adjustments.
-Do not hide unexplained discrepancies with correction factors, offsets,
-clipping, arbitrary epsilons, or relaxed test tolerances. Numerical remedies
-are justified only after algorithmic correctness has been checked and the
-remaining discrepancy is attributable to rounding, conditioning, or
-approximation, with an error analysis and validation against an independent
-reference or invariant. Keep the investigation and validation with the
-applicable repository's algorithm and numerical owners.
-
-Report numerical concerns and interpretation limits honestly; do not hide failures
-or present invalid results as success. Numerical symptoms alone are not a
-universal research-failure judgment. Preserve non-experiment results and
-experiment observations whose failure has not been established by the applicable
-topic protocol and evidence; do not introduce an automatic numerical discard gate.
-For a confirmed failed experiment, immediately delete its experiment-only code,
-configuration, and artifacts unless evidence establishes physical properties as
-the cause. Unknown cause, numerical or implementation trouble, debugging value,
-and possible future reuse do not justify retention or waiting for task/PR closeout.
-Apply this disposition through the existing experiment lifecycle and artifact
-owners; a generic preserve-results or append-only rule must not override it.
-Keep only a concise failure, cause/evidence, and deletion or physical-retention
-record in the existing Issue or task record, not a relocated experiment bundle.
-Do not extend deletion to successful results, shared code, other owners' data,
-or Git history. Preserve required safe stopping and scoped deletion authority;
-do not add a classifier, checker, archive prerequisite, or rerun to decide cleanup.
-
-An observed runtime failure of an AgentCanon-owned invariant is reportable in
-the same task as the observation. The first record does not wait for a repeated
-occurrence, dashboard evidence, repair completion, or confirmed cause; preserve
-the error, command or action, snapshot, expected behavior, actual behavior, and
-any unresolved hypotheses through the applicable Issue owner. Generic host,
-dotfile, credential, consumer, or ownership-unknown failures stay with their
-applicable owner or qualified handoff and are not attributed to AgentCanon by
-proximity. This common base exposes that reporting scope without selecting an
-external checkout, credential, or publication implementation.
-
-When authoring, revising, or reviewing Issues, do not make completion depend on
-empirical measurements that cannot be obtained within the authorized scope.
-Require a measurement only when it is decision-relevant and its data, method,
-and authorized execution route are identifiable from available facts; do not
-add environment discovery or a new preflight gate to establish this. Do not
-demand unrecorded historical baselines, unavailable internal telemetry,
-uncontrollable comparisons, or finite observations as proof of permanent
-non-recurrence. Use evidence appropriate to the claim, such as specifications,
-mathematical or engineering analysis, source review, or reproducible tests,
-and state what it establishes and its limits. Correct unnecessary or infeasible
-measurement clauses with reasons in the existing Issue, preserving unmeasured
-outcomes as limitations rather than automatic completion blockers or mandatory
-follow-up Issues. Do not merely relabel such clauses as pending or needing
-verification. A measurement required by the explicit request or governing
-contract cannot be silently waived: keep the affected claim unverified, record
-the concrete constraint and any feasible next step, and continue independent
-work without claiming full completion. An unrun measurement in this session
-alone does not establish infeasibility. Never present estimates, proxies, or
-static checks as empirical results, or claim unmeasured improvement. Keep this
-judgment with the applicable Issue and validation owners; do not add unrelated
-instrumentation, environment setup, or reporting machinery to satisfy it.
-
-Before selecting or editing a repository surface, inspect its actual location,
-canonical owner, callers, and consumers. For library-backed work, inspect the
-caller and the relevant public API, including nested configuration and existing
-extension points, before proposing library edits. Distinguish a caller's
-convenience gap from a defect or missing capability in the library's own
-contract. Keep use-case selection, orchestration, environment setup, and
-presentation with their owning callers; do not move them into a reusable core
-merely to shorten a caller, remove textual duplication, or anticipate future
-reuse. Change a library only when the required behavior belongs to its
-abstraction and an evidenced contract defect or capability gap requires it,
-within the authorized scope. One valid caller can demonstrate a library defect;
-do not hide it in a caller workaround or require multiple callers for a
-correctness fix. Prefer direct use or composition of existing APIs when
-sufficient, without adding an unnecessary wrapper, helper, mode, or
-generalization layer. Record the owner choice and rejected alternative in the
-existing Issue / PR rationale, not a new gate or report.
-
-Establish the actual working directory and Git root, branch, and `HEAD`, then
-trace the selected owner's dependency and consumer edges. At each existing branch/checkout readback
-boundary, include the actual clones under the task's `workspace/<...>`, not
-only the parent checkout or its declared pins. For each in-scope dependency,
-inspect its resolved path, repository identity, branch or detached state,
-actual `HEAD`, dirty state, and declared pin against the source actually read
-by the selected build/import/execution route. A dependency development clone
-and the consumer's pinned checkout are distinct observations; a named path is
-only a candidate until that trace confirms the responsible replaceable unit.
-Record no dependency only after the trace shows that no edge applies, never
-from an unperformed inspection. Re-read the affected identity and dependency
-state after a directory, branch, dependency checkout, PR revision, pin, or
-source-resolution change; unchanged ordinary commands do not require duplicate
-readback. If the consumer's existing dependency contract requires an exact pin,
-execution that needs a dependency change uses a published PR commit through
-that consumer-owned pin before it runs. Otherwise use the consumer's declared
-resolution and record the actual input; do not introduce a pin or a SHA check
-to follow this workflow. Dependency-local development validation remains
-separate from consumer validation, and an unpinned run must not be reported as
-pinned-input verification. Preserve mismatched or unknown checkouts and do not
-treat their unverified input as the declared pin. This does not introduce an
-AgentCanon dependency into a source-free consumer.
-
-When a task-owned temporary clone is no longer needed, use the applicable
-repository cleanup owner immediately rather than waiting for task or PR closeout.
-First establish that no active work depends on it and no unpreserved local state
-would be lost; unknown or user-owned clones remain untouched. Record removal
-or the specific retention reason in the existing task result. This is checkout
-cleanup, not authorization to delete remote branches or a shared workspace.
-
-Before a branch or annex operation, read the applicable repository's branch and
-storage owners. Keep Git branch metadata and any annex payload as separate
-concerns, and let those owners authorize data operations. This common base
-defines the read edge only; it does not name a source-repository path or
-prescribe an annex command, so a generated consumer root remains self-contained.
-
-Before forming, changing, or delegating a team, read the applicable repository
-team owner and the selected orchestration skill, then follow the selected typed
-route's definitions for logical role, model/profile, skills, authority, and
-handoff. Candidate role lists are not activation instructions, and logical-role
-coverage is not a physical-instance count. Keep consumer-owned team guidance
-self-contained; a source-specific checkout may name its canonical AgentCanon
-team owners, but a consumer root must not import or copy those source paths.
+Record observed AgentCanon-owned failures promptly through the Issue owner;
+qualify uncertain attribution. Demand measurements only when relevant and
+obtainable by an authorized route. Explicit but unavailable requirements remain
+unverified; do not add setup, gates, or unrelated completion criteria.
 
 ## Runtime Owner Map
 
-For a consumer root, use only the following consumer-owned map:
-
-| Responsibility | Consumer-root canonical owner | Validation / reader route |
-| --- | --- | --- |
-| product implementation and behavior | consumer source and design owners | consumer implementation route |
-| build, tests, and runtime environment | consumer build and test owners | consumer execution route |
-| repository structure and file placement | consumer structure owner | consumer structure route |
-| root instruction extension | consumer-specific section in this file | consumer instruction route |
-| AgentCanon source maintenance (consumer roots) | selected AgentCanon development checkout | AgentCanon maintenance route |
-| observed AgentCanon runtime defect | applicable repository-specific Issue owner | immediate Issue record or qualified no-mutation handoff |
+| Responsibility | Consumer owner |
+| --- | --- |
+| product implementation and behavior | consumer source and design owners |
+| build, tests, and runtime environment | consumer build and test owners |
+| repository structure and file placement | consumer structure owner |
+| root instruction extension | consumer-specific section in this file |
+| AgentCanon source maintenance | selected AgentCanon development checkout |
 
 ## Task Entry
 
-Resolve the task owner and validation oracle through the applicable Reader Map.
-A bounded request with an identified owner, path, and targeted validation stays
-bounded; broader design, orchestration, research, or subagent machinery activates
-only when its owner-defined condition is present.
+Resolve the task owner and validation route. Keep bounded work bounded; broader
+design, orchestration, research, or delegation activates only under its owner's
+conditions. AgentCanon maintenance does not authorize consumer generated-file edits.
 
-For AgentCanon changes from a consumer root, select a separate qualified
-AgentCanon development checkout. Keep consumer trees unchanged unless the
-consumer task explicitly owns the resulting generated file.
-
-A progress update is not a final report. Keep the request active while required
-implementation, validation, integration, publication, cleanup, or its result
-remains unresolved. An acknowledgement, apology, promise, child claim/handoff,
-post-hoc healthy status, or incomplete result is not the requested operation or
-its success. Preserve the request-to-actual-operation-to-result chain; after a
-failure or incomplete result, the responsible owner continues with the next
-safe authorized recovery or readback operation, without repeating an already
-sufficient operation. Continue investigation only for an unresolved fact that
-could change the requested implementation, required validation, or conclusion.
-Reuse still-applicable evidence instead of repeating classifications or adding
-unrelated prerequisites; once the fact is resolved, proceed with the work.
-New relevant evidence can reopen a question. Required authorization, safety
-checks, and selected validation remain in force.
-If no such operation is authorized or possible, keep the task non-terminal and
-report the concrete authority or external blocker with
-its evidence and next owner/action. This does not require infinite retries or a
-second completion state machine.
-
-A result report leads with the answer to the user's request, not an inventory
-of work. Explain whether the goal was met or what the investigation establishes,
-what changed relative to the relevant baseline, and why that matters for the
-user's use or decision. Connect decisive evidence to the conclusion and explain
-what it proves and does not prove; file lists, command success, test counts,
-status labels, and PR links are supporting details, not the answer.
-Retain material investigated findings, counterevidence, rejected explanations,
-and unresolved points with their grounds and impact, even when no code changed.
-Reporting an out-of-scope finding does not authorize its repair or make it a
-completion condition. Scale detail to useful findings and decision complexity,
-not elapsed time or tool counts; shorten process narration, not material evidence.
-Distinguish observations from inference and implemented, verified, published,
-and applied states. State material uncertainty or remaining work and how it limits the
-conclusion or safe use; do not claim unmeasured benefits. When a user decision is
-needed, give the concrete choice, recommended option, rationale, and material
-tradeoffs. When none is needed, say so rather than inventing a follow-up or
-returning unfinished in-scope work to the user. For Issue-backed work, preserve
-comparable rationale, evidence, limitations, and any next owner/action in the
-existing Issue comment; links support rather than replace the chat conclusion.
-Use the applicable reporting owner for details, without adding fixed headings,
-minimum length, empty fields, or a separate reporting gate.
-
-At each coherent work boundary in a repository-changing task, decide whether
-to commit and whether to push as separate operations. Commit a coherent,
-reviewed unit after the selected validation when the request and ownership
-support it; if the work is incomplete or mixes user-owned changes,
-preserve it and state the concrete reason and next condition in the existing
-work log or final status. Decide push independently from its sharing,
-handoff, remote-backup, or PR purpose, the existing authority, and the
-designated destination. Read-only, local-only, no-push, no-change, and genuine
-external-failure cases remain valid. Do not force-push, mutate `main`, overwrite
-unknown user files, create a new remote, or merge across scope. A committed but
-unpushed child result is an intermediate handoff, not final publication; the
-next authorized owner must launch the selected push operation when its purpose
-and conditions are met. This is decision guidance, not an unconditional
-commit/push gate or a new receipt requirement.
+Continue safe, authorized implementation through delivery; report concrete blockers
+and the next owner when stopped. Separate commit/push authority and preserve mixed
+work; never force-push, mutate main, or publish outside scope. Report the result,
+material findings, evidence, and limits; distinguish implemented, verified,
+published, and applied. Keep comparable reasoning and results on the Issue.
 
 ## Validation Routing
 

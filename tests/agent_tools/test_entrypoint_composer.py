@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -61,6 +62,29 @@ class EntrypointComposerTest(unittest.TestCase):
             )
             self.assertEqual(second_status, "updated")
             self.assertEqual(first.render(), second.render())
+
+    def test_actual_common_base_remains_source_free_after_composition(self) -> None:
+        """The real portable base needs no source-side detail files at read time."""
+        actual_base = (REPOSITORY_ROOT / "ROOT_AGENTS.md").read_bytes()
+        with tempfile.TemporaryDirectory() as temporary:
+            base, specific, output = self._inputs(Path(temporary))
+            base.write_bytes(actual_base)
+            composer.compose(
+                base_path=base,
+                specific_path=specific,
+                output_path=output,
+                source_root=REPOSITORY_ROOT,
+            )
+            base.unlink()
+            specific.unlink()
+            parsed = composer._parse_marked(output.read_bytes())
+            self.assertEqual(parsed.base, actual_base)
+            body = re.sub(r"<!--.*?-->", "", parsed.base.decode(), flags=re.DOTALL)
+            links = re.findall(r"\[[^\]]+\]\(([^)]+)\)", body)
+            self.assertTrue(links)
+            self.assertTrue(
+                all(link.startswith("#") or link.split("#")[0] == "AGENTS.md" for link in links)
+            )
 
     def test_marked_output_refreshes_from_current_exact_sources(self) -> None:
         """A valid managed file may be refreshed when either input becomes stale."""

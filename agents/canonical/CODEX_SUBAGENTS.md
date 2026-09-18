@@ -100,7 +100,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
 - 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
-- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
+- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は [agents/canonical/CODEX_INTAKE.md](CODEX_INTAKE.md) の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
 - subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
 - fresh subagent は必要な launch ごとに [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)

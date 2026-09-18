@@ -7,7 +7,7 @@
 # downstream implementation ../../../../tests/agent_tools/test_check_entrypoint_owner_map.py focused regression
 # downstream implementation ../../../../.github/workflows/entrypoint-owner-map.yml remote verification
 # @dependency-end
-"""Validate the structural owner-map contract for root instruction files."""
+"""Validate root instruction routes and their optional source owner map."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 @dataclass(frozen=True)
 class EntrypointContract:
-    """Structural contract for one root instruction file."""
+    """Structural contract for a root entrypoint or its optional owner map."""
 
     path: str
     title: str
@@ -38,6 +38,25 @@ CONTRACTS = (
     EntrypointContract(
         path="AGENTS.md",
         title="# AgentCanon Repository Instructions",
+        headings=(
+            "## Repository Role",
+            "## Reader Map",
+            "## Always-On Boundary",
+            "## Runtime Owner Map",
+            "## Task Entry",
+            "## Validation Routing",
+        ),
+        owner_rows=(
+            (
+                "unresolved source owner",
+                "agents/canonical/SOURCE_ROUTING.md",
+                "selected row only",
+            ),
+        ),
+    ),
+    EntrypointContract(
+        path="agents/canonical/SOURCE_ROUTING.md",
+        title="# AgentCanon Source Routing",
         headings=(
             "## Repository Role",
             "## Reader Map",
@@ -89,34 +108,29 @@ CONTRACTS = (
             (
                 "product implementation and behavior",
                 "consumer source and design owners",
-                "consumer implementation route",
             ),
             (
                 "build, tests, and runtime environment",
                 "consumer build and test owners",
-                "consumer execution route",
             ),
             (
                 "repository structure and file placement",
                 "consumer structure owner",
-                "consumer structure route",
             ),
             (
                 "root instruction extension",
                 "consumer-specific section in this file",
-                "consumer instruction route",
             ),
             (
                 "AgentCanon source maintenance",
                 "selected AgentCanon development checkout",
-                "AgentCanon maintenance route",
             ),
         ),
     ),
 )
 
 MARKER_MANIFEST_PATH = "tools/validation/semantic/convention/convention_compliance_contracts.toml"
-ROOT_ENTRYPOINT_PATHS = frozenset(contract.path for contract in CONTRACTS)
+ROOT_ENTRYPOINT_PATHS = frozenset({"AGENTS.md", "ROOT_AGENTS.md"})
 
 H1_RE = re.compile(r"^#(?!#)\s+\S")
 H2_RE = re.compile(r"^##(?!#)\s+\S")

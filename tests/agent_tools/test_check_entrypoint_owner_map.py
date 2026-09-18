@@ -27,6 +27,7 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         root = Path(temporary.name)
         for contract in checker.CONTRACTS:
             source = REPOSITORY_ROOT / contract.path
+            (root / contract.path).parent.mkdir(parents=True, exist_ok=True)
             (root / contract.path).write_text(
                 source.read_text(encoding="utf-8"), encoding="utf-8"
             )
@@ -99,13 +100,38 @@ class EntrypointOwnerMapTest(unittest.TestCase):
 
     def test_rejects_missing_owner_row(self) -> None:
         root = self._fixture()
-        target = root / "AGENTS.md"
+        target = root / "agents/canonical/SOURCE_ROUTING.md"
         text = target.read_text(encoding="utf-8")
         text = "\n".join(
             line for line in text.splitlines() if "public skill registry" not in line
         ) + "\n"
         target.write_text(text, encoding="utf-8")
         self.assertIn("owner-map", self._rules(root))
+
+    def test_rejects_missing_optional_map(self) -> None:
+        root = self._fixture()
+        (root / "agents/canonical/SOURCE_ROUTING.md").unlink()
+        self.assertIn("file", self._rules(root))
+
+    def test_rejects_missing_route_to_optional_map(self) -> None:
+        root = self._fixture()
+        target = root / "AGENTS.md"
+        target.write_text(
+            "\n".join(
+                line for line in target.read_text(encoding="utf-8").splitlines()
+                if "| unresolved source owner |" not in line
+            ) + "\n",
+            encoding="utf-8",
+        )
+        self.assertIn("owner-map", self._rules(root))
+
+    def test_full_source_owner_map_is_not_automatically_loaded(self) -> None:
+        entry = (REPOSITORY_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        optional = "agents/canonical/SOURCE_ROUTING.md"
+        self.assertIn(f"]({optional})", entry)
+        self.assertNotIn("public skill registry", entry)
+        self.assertNotIn(optional, checker.ROOT_ENTRYPOINT_PATHS)
+        self.assertTrue((REPOSITORY_ROOT / optional).is_file())
 
     def test_rejects_operational_marker_surface(self) -> None:
         root = self._fixture()

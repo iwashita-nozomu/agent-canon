@@ -190,40 +190,49 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "external public API/behavior/schema unchanged\n"
     ),
     "agents/canonical/CODEX_WORKFLOW.md": (
-        "Completion Readiness\n"
-        "Design Integrity Gate owning responsibility model "
-        "Abstract Design Frame Design-To-Implementation Trace "
-        "owner, replaceable unit replaceable unit mechanism validation route unresolved branch "
+        "Codex Workflow phase reader map\n"
+    ),
+    "agents/canonical/CODEX_INTAKE.md": (
+        "Branch Reuse Default tools/runtime/authority/hook_safety.py user が別 "
+        "branch を明示 AgentCanon branch / PR workflow "
+        "branch_creation_reason=<reason> worktree_creation_reason=<reason> proven "
+        "exact task ownership session restart Git authority は操作リスクで分けます。 通常の "
+        "branch create / worktree add creation authority/reason のみを要求し "
+        "force-create または ref overwrite creation と destructive authority/reason "
+        "の両方を要求 既存 branch の checkout/switch destructive authority/reason を要求します "
+        "`latest` / `apply` / merge update wrapper worktree の "
+        "remove/move/repair/prune/force-add ambient 変数や prior segment は authority "
+        "になりません。\n"
+    ),
+    "agents/canonical/CODEX_IMPLEMENTATION.md": (
+        "Design Integrity Gate owning responsibility model Abstract Design Frame "
+        "Design-To-Implementation Trace\n"
+        "owner, replaceable unit replaceable unit mechanism validation route "
         "design_issue_blocker implementation shortcut\n"
-        "user-facing completion\n"
-        "[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)\n"
-        "sole terminal readiness predicate\n"
-        "run_repo_dependency_review.sh\n"
-        "bounded route existing tool targeted validation follow-up context\n"
+        "run_repo_dependency_review.sh bounded route existing tool targeted "
+        "validation follow-up context\n"
         "external public API/behavior/schema unchanged scoped_change "
         "dependency/consumer/migration/docs closure\n"
-        "contract-only wrapper static contract validation canonical command evidence "
-        "validation tool\n"
-        "静的解析・読み取り 主証跡 reading evidence 動作確認 broad execution "
-        "静的解析、読み取り確認、docs / targeted tests / agent checks "
-        "Runtime evidence distinct unresolved claim/risk\n"
-        "legacy-route drift duplicate implementation canonical owner "
-        "caller migration contract-complete implementation acceptance contract "
-        "design_issue_blocker implementation shortcut\n"
-        "Branch Reuse Default tools/runtime/authority/hook_safety.py user が別 branch を明示 "
-        "AgentCanon branch / PR workflow "
-        "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
-        "proven exact task ownership session restart "
-        "Git authority は操作リスクで分けます。 "
-        "通常の branch create / worktree add "
-        "creation authority/reason のみを要求し "
-        "force-create または ref overwrite "
-        "creation と destructive authority/reason の両方を要求 "
-        "既存 branch の checkout/switch "
-        "destructive authority/reason を要求します "
-        "`latest` / `apply` / merge update wrapper "
-        "worktree の remove/move/repair/prune/force-add "
-        "ambient 変数や prior segment は authority になりません。\n"
+        "legacy-route drift duplicate implementation canonical owner caller "
+        "migration contract-complete implementation acceptance contract\n"
+        "contract-only wrapper static contract validation canonical command "
+        "evidence validation tool\n"
+        "distinct unresolved claim/risk\n"
+    ),
+    "agents/canonical/CODEX_BOOTSTRAP.md": (
+        "Codex Goal Session State owner replaceable unit mechanism validation "
+        "route unresolved branch\n"
+        "Runtime evidence\n"
+    ),
+    "agents/canonical/CODEX_ROUTING.md": (
+        "distinct unresolved claim/risk\n"
+    ),
+    "agents/canonical/CODEX_COMPLETION.md": (
+        "Completion Readiness user-facing completion\n"
+        "[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)\n"
+        "sole terminal readiness predicate\n"
+        "静的解析・読み取り 主証跡 reading evidence 動作確認 broad execution\n"
+        "静的解析、読み取り確認、docs / targeted tests / agent checks\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/skills/agent-orchestration.md": (
@@ -318,7 +327,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "tests/tools/test_run_managed_experiment.py\n"
     ),
     "agents/skills/worktree-health.md": (
-        "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
+        "agents/canonical/CODEX_INTAKE.md Branch Reuse Default "
         "tools/runtime/authority/hook_safety.py "
         "branch_creation_reason=<reason> "
         "worktree_creation_reason=<reason> git worktree list --porcelain "
@@ -748,7 +757,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow = root / "agents" / "canonical" / "CODEX_COMPLETION.md"
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
                     "[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)",
@@ -761,7 +770,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "workflow_readiness:agents/canonical/CODEX_WORKFLOW.md:"
+                "workflow_readiness:agents/canonical/CODEX_COMPLETION.md:"
                 "missing-owner-delegation:[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)",
                 result.stdout,
             )
@@ -1164,7 +1173,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow = root / "agents" / "canonical" / "CODEX_IMPLEMENTATION.md"
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
                     "owning responsibility model",
@@ -1190,7 +1199,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             DESIGN_INTEGRITY_GATE_MARKERS,
         )
         self.assertIn(
-            "agents/canonical/CODEX_WORKFLOW.md",
+            "agents/canonical/CODEX_IMPLEMENTATION.md",
             DESIGN_INTEGRITY_GATE_MARKERS,
         )
         self.assertIn(
@@ -1372,7 +1381,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow = root / "agents" / "canonical" / "CODEX_INTAKE.md"
             workflow.write_text(
                 workflow.read_text(encoding="utf-8").replace(
                     "tools/runtime/authority/hook_safety.py",
@@ -1571,9 +1580,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow = root / "agents" / "canonical" / "CODEX_IMPLEMENTATION.md"
             workflow.write_text(
-                MINIMAL_REPO_FILES["agents/canonical/CODEX_WORKFLOW.md"].replace(
+                MINIMAL_REPO_FILES["agents/canonical/CODEX_IMPLEMENTATION.md"].replace(
                     "legacy-route drift ", ""
                 ),
                 encoding="utf-8",
@@ -1583,12 +1592,12 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "implementation_guardrails:agents/canonical/CODEX_WORKFLOW.md:"
+                "implementation_guardrails:agents/canonical/CODEX_IMPLEMENTATION.md:"
                 "missing-marker:legacy-route drift",
                 result.stdout,
             )
             self.assertNotIn(
-                "implementation_guardrails:agents/canonical/CODEX_WORKFLOW.md:"
+                "implementation_guardrails:agents/canonical/CODEX_IMPLEMENTATION.md:"
                 "missing-marker:compatibility-preservation drift",
                 result.stdout,
             )
