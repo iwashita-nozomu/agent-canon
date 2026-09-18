@@ -31,6 +31,17 @@ required problem class, valid inputs, guarantees, and failure semantics; neither
 small diffs nor completeness justify shortcuts or unrelated work. Follow the
 selected owner rather than inventing a fallback, wrapper, or policy copy.
 
+Public API additions/extensions (exports, types/methods, endpoints, parameters,
+CLI commands/options) require explicit user authorization for that public change;
+a general feature/fix/cleanup request is insufficient. First investigate existing
+APIs, configuration, extensions, standard facilities, and adopted dependencies on
+the premise they suffice. Use them when they do; otherwise record candidates,
+source evidence, the unmet contract, and why composition fails in the owning
+design. Necessity is not authorization, and missing evidence is not a gap.
+Without both evidence and authority, keep the addition a proposal and continue
+independent authorized work. Reuse prior explicit approval; internal fixes and
+existing-API use require no new approval system or check.
+
 Prefer the simplest complete use of existing APIs. Put necessity, mathematical
 or engineering grounds, and rejected simpler alternatives in the owning design
 before code/API changes. Inspect real callers, APIs, configuration, and extension
