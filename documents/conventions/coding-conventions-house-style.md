@@ -115,7 +115,9 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 ### 6. 状態と副作用
 
-- 設定値、結果、完了通知のような不変データは `@dataclass(frozen=True)` を使うことを必須にします。
+- 設定値、結果、完了通知の不変性と意味契約を保つことを必須とし、既存の適切な不変型を再利用します。
+  表現の選択は [Dataclass と値オブジェクト](./object-oriented-design.md#3-dataclass-と値オブジェクト) に従い、
+  `@dataclass(frozen=True)` という構文を使うためだけの型追加は要求しません。
 - mutable な dataclass は、進行中の process state や accumulator のように更新責務が明確な場合だけ許可します。
 - library code での生 `print` を禁止します。デバッグは `jax.debug.print`、構造化ログ、または明示的な CLI 出力 helper を使わなければなりません。
 - JSONL や report へ出す値は、直列化前に安全な型へ正規化しなければなりません。
