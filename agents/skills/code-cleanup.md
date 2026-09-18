@@ -5,6 +5,7 @@ contract skill
 responsibility Routes public/module code cleanup by responsibility and reachability through dependency analysis, refactor loop, and change review.
 upstream design ./README.md shared public skill canon
 upstream design ../../documents/design/responsibility-cleanup.md responsibility-unit cleanup contract
+upstream design ../../documents/conventions/software-engineering-principles.md existing provider reuse and abstraction admission owner
 upstream design ./dependency-analysis.md dependency and reachability owner
 upstream design ./refactor-loop.md behavior-preserving refactor owner
 upstream design ../internal-routines/incremental-code-change.md opt-in coverage traversal and incremental update sequence
@@ -37,11 +38,16 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 をこのrouteの走査・更新順として使います。通常の局所修正に全走査を追加しません。
 同じ `reuse_survey` と依存根拠を使い、検証・レビュー・commitの正本を置き換えません。
 
-1. file/worker slice より先に current module/helper/type/test/docs を調べ、一つの
-   shared asset universe を作る。split / extraction または suspected predecessor
-   の現行欠落では、同じ universe を `git log`、`-S`、deleted paths、prior PR /
-   Issue、predecessor tests、関連 design docs まで必要範囲で拡張する。bounded
-   non-split edit では historical scan を必須にしない。
+1. file/worker slice より先に、今回の責務を担う current module/helper/type/test/docs と、
+   標準ライブラリ、採用済み framework/dependency、既存 CLI の公開機能を一つの
+   shared asset universe で比較する。provider の比較は
+   [SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+   を使い、既存の呼出元・公開 API から最小の利用案と要求・保証の対応を作る。
+   disposition の根拠はその対応から導き、名前やシグネチャの一致だけで決めない。
+   同名のローカル実装がないことを、再利用先がない根拠にしない。split / extraction
+   または suspected predecessor の現行欠落では、同じ universe を `git log`、`-S`、
+   deleted paths、prior PR / Issue、predecessor tests、関連 design docs まで必要範囲で
+   拡張する。bounded non-split edit では historical scan を必須にしない。
 2. 各 candidate の `asset_path`、`asset_origin`、`capability`、`disposition`
    (`reuse|extend|restore|consolidate|replace|delete|reject`)、`reason`、非空の
    `test_paths` を既存 `reuse_survey` に一度だけ記録する。調査 dimension が
@@ -63,16 +69,22 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    compiler、JIT の変更で吸収しない。
 5. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
    responsibility slices と `allowed_paths` はこの asset universe と disposition から導き、
-   同じ asset に触れる slices を一つへ merge する。completed universe に candidate が
-   無ければ `decisions` は空のまま新 surface を admission し、synthetic な `reject` は
-   作らない。actual candidate がある場合だけ、全 candidate が根拠付き `reject` である
-   ことを要求する。
+   同じ asset に触れる slices を一つへ merge する。既存 provider の利用案が要求 contract を
+   満たすなら、その直接利用・設定・合成へ置換し、第三の helper へ再実装しない。
+   candidate がない場合も、ローカル検索ゼロだけで新 surface を admission しない。
+   SEP-08 の capability 比較で残った具体的な不足責務だけを新設理由にする。実在する
+   candidate の `reject` はその不足を満たせない根拠で判断し、既に満たす部分まで
+   捨てない。実在しない candidate や synthetic な `reject` は作らない。
 6. approved mechanism を `refactor-loop` へ渡し、同じ serialized `reuse_survey` と
    tests を各 write-capable child と read-only reviewer に伝播して
    behavior-preserving change として実装する。子 prompt 側で disposition を再構築しない。
 7. `change-review` で current snapshot、reachable path、contract、witness と
    worker packet と同一の asset/disposition/test-path evidence を readback する。targeted
    validation は各行ではなく owning-unit boundary で一度だけ実行する。
+
+再利用先の比較は今回の責務に限り、contract を満たす選択が決まれば終える。全 library の
+網羅調査、provider 内部の再監査、調査用の依存導入を追加しない。置換時の検証は既存の
+consumer boundary と変更した意味・接続に向け、provider の実装や test suite を複製しない。
 
 ## Tool Commands
 

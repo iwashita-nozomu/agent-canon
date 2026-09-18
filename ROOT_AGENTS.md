@@ -11,9 +11,11 @@ downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_
 @dependency-end
 -->
 
-This common base supplies shared entry behavior for consumer and source-specific
-repository roots. It does not own task procedures, command recipes, role
-lifecycles, implementation policy, validation schemas, or source-editing policy.
+This common base carries shared behavioral constraints for consumer and
+source-specific repository roots. Keep those constraints self-contained;
+repository-specific instructions resolve their owners and application.
+Task procedures, command recipes, role lifecycles, validation schemas, and
+source-editing routes remain with those owners, not in this base.
 
 ## Repository Role
 
@@ -24,22 +26,24 @@ specific instructions, usable without an AgentCanon checkout or runtime.
 Composition is not a live projection, runtime import, updater, vendor checkout,
 submodule, or symlink.
 
-The AgentCanon source checkout owns its source and canonical owner map. Its
-source-specific [AGENTS.md](AGENTS.md) takes precedence for those responsibilities;
-this base's consumer maps and routes do not redirect source work. Details stay
-with the applicable repository's specific instructions and canonical owners.
+Directory-local `AGENTS.md` files may narrow behavior for their subtree. They
+must add only the responsibility owned by that subtree and must not copy a
+root, workflow, or Skill policy for visibility.
 
 ## Reader Map
 
 For a consumer root, use the [Runtime Owner Map](#runtime-owner-map) below and
-the appended consumer-specific instructions. For a source-specific root, use
-that checkout's [AGENTS.md](AGENTS.md) Reader Map and canonical owners.
+the appended consumer-specific instructions. Repository-specific owner maps
+take precedence for their responsibilities without replacing shared constraints.
 
 ## Always-On Boundary
 
 The explicit user request and the current repository-specific canonical owner
 are the source of truth. Preserve unknown dirty, staged, untracked, branch,
 and worktree state until the applicable Git safety owner classifies it.
+
+Follow the selected owner and its validation route rather than inventing a
+fallback, wrapper, compatibility path, or local copy of policy.
 
 Preserve the problem class, valid input domain, and output guarantees required
 by the explicit user request and applicable canonical contract. A bounded
@@ -284,14 +288,13 @@ For a consumer root, use only the following consumer-owned map:
 ## Task Entry
 
 Resolve the task owner and validation oracle through the applicable Reader Map.
+A bounded request with an identified owner, path, and targeted validation stays
+bounded; broader design, orchestration, research, or subagent machinery activates
+only when its owner-defined condition is present.
+
 For AgentCanon changes from a consumer root, select a separate qualified
 AgentCanon development checkout. Keep consumer trees unchanged unless the
 consumer task explicitly owns the resulting generated file.
-
-When a root [AGENTS.md](AGENTS.md) begins with the literal `@ROOT_AGENTS.md`, read this
-common base first and then continue into that file's source- or consumer-specific
-Reader Map. The marker is a reference for the reader, not a claim of automatic
-expansion or runtime import.
 
 A progress update is not a final report. Keep the request active while required
 implementation, validation, integration, publication, cleanup, or its result
@@ -351,6 +354,7 @@ commit/push gate or a new receipt requirement.
 ## Validation Routing
 
 Use the validation route owned by the changed repository-specific responsibility.
+Examples or commands in another owner are not a universal checklist.
 Formatting is part of completing edits, not an optional repair after lint fails.
 Before final validation, staging, and commit or handoff, run the repository's
 configured formatter on the task's edited files and review and include its diff.
