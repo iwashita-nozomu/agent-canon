@@ -164,6 +164,6 @@ closeout では `python3 tools/validation/semantic/code/check_solid_evidence.py 
 
 ## Markdown ファイル修正後
 
-- `tools/bin/agent-canon docs check`
-- 相対パスと参照先の存在を確認
-- 必要なら `make ci` で Python と docs をまとめて確認
+変更文書の owner による検査選択は [md-style-check の Required Checks](../../agents/skills/md-style-check.md#required-checks)
+に従います。この Python 入口から別の汎用検査を必須化せず、選択された検査の失敗・実行不能を
+他の検査の成功で置き換えません。相対パスと参照先の整合も変更範囲で確認します。
