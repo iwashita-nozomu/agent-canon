@@ -24,10 +24,6 @@ Optional source-only index: consult the matching row only when its owner is
 unresolved. It is not a startup reading list and does not apply to generated
 consumer instructions. Known owners and unchanged decisions bypass this index.
 
-Directory-local [AGENTS.md](../../AGENTS.md) files may narrow behavior for their subtree. They
-must add only the responsibility owned by that subtree and must not copy a
-root, workflow, or Skill policy for visibility.
-
 ## Reader Map
 
 | Task intent | Canonical owner |
@@ -53,8 +49,8 @@ retain their portable rules and do not read these source-only paths.
 
 ## Always-On Boundary
 
-Follow the selected owner and its validation route rather than inventing a
-fallback, wrapper, compatibility path, or local copy of policy.
+Shared constraints remain in [ROOT_AGENTS.md](../../ROOT_AGENTS.md); this source-only
+map owns paths and owner selection, not common behavior or consumer configuration.
 
 ## Runtime Owner Map
 
@@ -72,9 +68,7 @@ fallback, wrapper, compatibility path, or local copy of policy.
 Resolve an undecided request modality through the ChatGPT / Codex row before
 repository orchestration; reuse an established admission. After Codex admission,
 resolve only the missing task shape or owner, and read the selected owner before
-editing. A bounded request with an identified owner, path, and targeted
-validation stays bounded; broader design, orchestration, research, or subagent
-machinery activates only when its owner-defined condition is present.
+editing. Apply the common base's bounded-task activation boundary.
 
 Use the team-composition row only before team selection, change, or delegation.
 Do not replace a selected model or omit a selected role without an
@@ -83,5 +77,4 @@ evidence-backed handoff update to the responsible owner.
 ## Validation Routing
 
 Use the active runtime profile and the validation / closeout Reader Map row
-for source-wide evidence when required by the selected route. Examples or
-commands in another owner are not a universal checklist.
+for source-wide evidence only when required by the selected route.

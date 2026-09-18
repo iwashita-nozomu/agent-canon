@@ -13,7 +13,9 @@ downstream implementation tools/agent/templates/entrypoint_composer.py consumer 
 
 Consumers own their product, environment, tests, credentials, and specific
 instructions. Their generated [AGENTS.md](AGENTS.md) is self-contained; no
-AgentCanon checkout or runtime is required. Source work uses its own owner map.
+AgentCanon checkout or runtime is required. Specific owner maps take precedence
+for their responsibilities, not over shared constraints. Local AGENTS add only
+subtree-owned instructions, never copies of parent, workflow, or Skill policy.
 
 ## Reader Map
 
@@ -26,7 +28,8 @@ auto-loaded instructions short; place procedures in conditionally read files.
 
 Stay within the authorized task and preserve unknown user/Git state. Preserve the
 required problem class, valid inputs, guarantees, and failure semantics; neither
-small diffs nor completeness justify shortcuts or unrelated work.
+small diffs nor completeness justify shortcuts or unrelated work. Follow the
+selected owner rather than inventing a fallback, wrapper, or policy copy.
 
 Prefer the simplest complete use of existing APIs. Put necessity, mathematical
 or engineering grounds, and rejected simpler alternatives in the owning design
@@ -70,9 +73,9 @@ unverified; do not add setup, gates, or unrelated completion criteria.
 
 ## Task Entry
 
-A leading `@ROOT_AGENTS.md` explicitly requests this base once; it is not a native
-include. Continue through the specific owner map without restarting intake.
-AgentCanon maintenance does not authorize changes to a consumer's generated files.
+Resolve the task owner and validation route. Keep bounded work bounded; broader
+design, orchestration, research, or delegation activates only under its owner's
+conditions. AgentCanon maintenance does not authorize consumer generated-file edits.
 
 Continue safe, authorized implementation through delivery; report concrete blockers
 and the next owner when stopped. Separate commit/push authority and preserve mixed
@@ -86,4 +89,5 @@ Run the configured formatter on final edits before validation or publication,
 including after generation, fixes, or conflict resolution; review its diff.
 Lint/tests are not formatting. Record unavailable commands and unverified
 properties, never a false pass. Validate the changed contract through its owner;
-do not add tools, configuration, broad reformatting, or unrelated checks.
+other owners' examples are not a universal checklist. Do not add tools,
+configuration, broad reformatting, or unrelated checks.

@@ -9,6 +9,7 @@ upstream design ./skill-dependencies.yaml prerequisite and reviewer order
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json C++ validation profile owner
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse C++ projection
 upstream design ../../documents/experiments/host-build-admission.md compiler/linker host safety admission
+upstream design ../../documents/design/cpp-debugging.md native debugging selection and evidence boundary
 @dependency-end
 -->
 
@@ -63,6 +64,15 @@ fixture-only 検証へ限定します。禁止を解く根拠に過去の別許�
 - 性能変更が activation 条件を満たす場合は、repository-owned benchmark / profiler / workload
   route による before / after evidence。特定の benchmark framework、profiler、CPU counter、
   compiler、hardware を普遍要件にはしない
+
+## Runtime debugging
+
+crash、hang、寿命違反、未初期化値、data race の調査、または明示的なデバッグ要求では
+[C++ debugging](../../documents/design/cpp-debugging.md) に従い、GDB、Valgrind Memcheck、
+既存 compiler の sanitizer から必要な診断を選びます。通常編集への全ツール必須 gate
+にはせず、project-owned runner と既存の実行許可・resource limit を維持します。
+診断 command の成功と対象 program の正常終了を混同せず、stack / diagnostic と
+未検証範囲を既存 Issue / PR に残します。
 
 ## Core References
 

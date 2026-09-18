@@ -12,7 +12,9 @@ downstream design agents/canonical/SOURCE_ROUTING.md optional source owner index
 
 ## Repository Role
 
-This file applies to the AgentCanon source checkout, not generated consumer roots.
+This source-only entrypoint is not a consumer composition input. Its leading
+`@ROOT_AGENTS.md` explicitly requests the common base once, not a native include.
+Source owner routes replace consumer routes, never the shared constraints.
 
 ## Reader Map
 
@@ -32,8 +34,8 @@ sections; links and dependency metadata never require recursive or full reading.
 
 ## Task Entry
 
-Read the common base once, then the selected owner. Reuse unchanged context;
-local AGENTS add only subtree-specific constraints, not duplicated parent policy.
+Read the selected owner after the common base. Reuse unchanged context;
+shared constraints belong to ROOT and procedures to their selected owners.
 
 ## Validation Routing
 

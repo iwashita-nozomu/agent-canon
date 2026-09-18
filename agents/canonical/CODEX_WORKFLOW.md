@@ -32,3 +32,7 @@ Required means applicable to the selected action, not mandatory on every run.
 Do not reread AGENTS, enumerate all Skills, or load every packet/phase to start.
 Select additional context only through [its read conditions](CODEX_INTAKE.md#optional-context).
 An already resolved owner, route, and validation need no new routing pass.
+
+## Completion Readiness
+
+At closeout, read [completion readiness](CODEX_COMPLETION.md#completion-readiness).
