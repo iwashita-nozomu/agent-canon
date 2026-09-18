@@ -190,9 +190,18 @@ The owner boundaries for admission are fixed:
 | decision | owner | true condition | false result |
 | --- | --- | --- | --- |
 | `should_log(parts, signals)` | `behavior_event_assembly.py` | `parts` contains a configured prompt/classifier signal or workflow/workflow-context/subagent/tool selection signal | `False`; no classifier-owned side effects; dispatcher handler result is unchanged |
-| `eligible_hook_invocation(parts, signals)` | `behavior_event_assembly.py` | active event name; finalized handler result; `payload_status="parsed"`; status is not `invalid_projection`, `blocked_secret`, `blocked_destructive_git`, `malformed_payload`; and `should_log(parts, signals)` | `skipped`, with no behavior record candidate and no monitor projection |
+| `eligible_hook_invocation(parts, signals)` | `behavior_event_assembly.py` | active event name; finalized handler result; `payload_status="parsed"`; status is not `blocked_secret`, `blocked_destructive_git`, `blocked_parent_mutation`, `malformed_payload`; and `should_log(parts, signals)` | `skipped`, with no behavior record candidate and no monitor projection |
 
-`Stop` never constructs parts. A finalized safety block is still passed once to the assembly caller, but is ineligible and cannot cause prompt/command material to be captured. A valid `PostToolUse` with an unsuccessful producer response may remain eligible for safe tool-selection evidence; an invalid projection is ineligible. The assembly owner, not the dispatcher, owns `should_log` and `eligible` and is the only place that may turn an eligible invocation into a behavior snapshot.
+`Stop` never constructs parts. A finalized safety block is still passed once to the assembly caller, but is ineligible and cannot cause prompt/command material to be captured. A parsed `PostToolUse` with an unsuccessful response or invalid resource projection remains eligible when it contains a safe behavior signal. Preserve the original handler status in the same event; do not relabel a projection failure as `pass`. The assembly owner, not the dispatcher, owns `should_log` and `eligible` and is the only place that may turn an eligible invocation into a behavior snapshot.
+
+Resource projection validity controls forwarding of `additionalContext`, not whether
+an independently safe observation exists. In particular, ordinary command output,
+non-Bash tool results, and additional metadata can fail the projection-specific
+shape without invalidating bounded tool-name and fingerprint evidence. Keep raw
+command arguments, stdout, stderr, and extra metadata out of that evidence. The
+projection validator, payload parser, safety exclusions, single spool writer, and
+post-append monitor condition retain their own contracts. Recording the failure
+allows diagnosis without guessing a producer or weakening projection validation.
 
 Dispatcher must build a typed workflow context before assembly and pass it into parts:
 

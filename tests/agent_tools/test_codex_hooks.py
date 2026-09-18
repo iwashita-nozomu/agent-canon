@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import io
 import json
 import os
 import subprocess
@@ -654,6 +655,83 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["schema"], "agent-canon.posttooluse-stop.v1")
         self.assertEqual(hook_output["hookEventName"], "PostToolUse")
         self.assertEqual(hook_output["additionalContext"], projection_stdout)
+
+    def test_post_tool_projection_failure_keeps_one_redacted_behavior_event(self) -> None:
+        """Ordinary results and foreign response shapes still record safe behavior."""
+        cases = (
+            ("Bash", {"command": "printf 'private-command-value'"},
+             {"exit_code": 0, "stderr": "private-stderr", "stdout": "ok\n"}),
+            ("Bash", {"command": "printf 'private-command-value'"},
+             {"exit_code": 0, "stderr": "", "stdout": "private-stdout"}),
+            ("apply_patch", {"patch": "private-patch-value"},
+             {"result": "private-result-value"}),
+        )
+        for tool, tool_input, response in cases:
+            with self.subTest(tool=tool, response=response), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "source"
+                root.mkdir()
+                result = self._run_hook_in_root(root, "PostToolUse", {
+                    "hookEventName": "PostToolUse",
+                    "tool_name": tool,
+                    "tool_input": tool_input,
+                    "tool_response": response,
+                })
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(result.stderr, "")
+                event = self._spooled_event(root)
+                self.assertEqual(event["status"], "invalid_projection")
+                self.assertEqual(event["record_kind"], "behavior_event")
+                self.assertEqual(event["tool_name"], tool)
+                self.assertEqual(event["selected_tools"], [tool])
+                serialized = json.dumps(event)
+                for value in ("private-command-value", "private-stderr", "private-stdout",
+                              "private-patch-value", "private-result-value"):
+                    self.assertNotIn(value, serialized)
+                self.assertNotIn("tool_response", event)
+
+    def test_projection_failure_monitor_follows_single_successful_append(self) -> None:
+        """Only a successful append projects the same safe record to the monitor."""
+        payload = {
+            "hookEventName": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "printf 'private-command-value'"},
+            "tool_response": {"exit_code": 0, "stdout": "private-stdout", "stderr": "private-stderr"},
+            "metadata": "private-metadata-value",
+        }
+        for append_status in ("spooled", "duplicate", "failed", "exception"):
+            with self.subTest(append_status=append_status), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                context = mock.Mock()
+                context.run_id.return_value = "hook-projection-failure"
+                if append_status == "exception":
+                    context.append.side_effect = OSError("fixture append failure")
+                else:
+                    context.append.return_value = mock.Mock(status=append_status)
+                with (
+                    mock.patch.object(hook_dispatcher, "hook_root", return_value=
+                        hook_dispatcher.HookRootState(root, False, hook_dispatcher.HookRootStatus.OVERRIDE)),
+                    mock.patch.object(hook_dispatcher, "resolve_report_target", return_value=root / "report"),
+                    mock.patch.object(hook_dispatcher, "HookLogContext", return_value=context),
+                    mock.patch.object(hook_dispatcher, "emit_behavior_projection") as emit,
+                    mock.patch("sys.stdout", new_callable=io.StringIO) as output,
+                ):
+                    self.assertEqual(hook_dispatcher.dispatch_event(
+                        "PostToolUse", json.dumps(payload).encode("utf-8")
+                    ), 0)
+                self.assertEqual(output.getvalue(), "")
+                context.append.assert_called_once()
+                event = context.append.call_args.args[0]
+                self.assertEqual(event["record_kind"], "behavior_event")
+                self.assertEqual(event["status"], "invalid_projection")
+                if append_status == "spooled":
+                    emit.assert_called_once()
+                    projection = emit.call_args.args[1]
+                    for key, value in projection.items():
+                        self.assertEqual(event[key], value)
+                else:
+                    emit.assert_not_called()
+                for value in ("private-command-value", "private-stdout", "private-stderr", "private-metadata-value"):
+                    self.assertNotIn(value, json.dumps(event))
 
     def test_coordination_receipt_uses_real_posttool_result(self) -> None:
         """Coordination receipts live in the base spool event, not behavior snapshots."""
