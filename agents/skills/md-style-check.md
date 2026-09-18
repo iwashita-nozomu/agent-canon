@@ -118,7 +118,7 @@ skill の identity と relation は [`catalog.yaml`](catalog.yaml) を machine-r
 - 文中数式 / inline math は `$...$`（例: `$(式)$`）で囲み、backtick の
   code span や文中の double-dollar display delimiter にしていない
 - `text` / `plaintext` / `txt` / `plain` 指定の fenced block には数式を
-  入れず、`math` / `latex` / `tex` の fenced block も使わない。これらの
+  入れず、`math` / `latex` / `tex` 指定の fenced block も使わない。これらの
   fence info の先頭 token は大文字小文字を区別せずに判定される。数式は本文中
   `$...$` または standalone double-dollar block のみを使う
 - formatter 後に escaped display delimiter や余分な double-dollar delimiter が残っていない
