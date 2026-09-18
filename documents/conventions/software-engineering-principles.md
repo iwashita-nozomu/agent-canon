@@ -8,8 +8,10 @@ upstream design ../design/semantic-responsibility-contract.md semantic action an
 upstream design ../design/responsibility-rationale.md mechanism rationale and activation boundary
 downstream design ./object-oriented-design.md OOP and SOLID specialization
 downstream design ../../agents/skills/comprehensive-development.md cross-surface design and delivery consumer
+downstream design ../../agents/skills/code-cleanup.md existing capability comparison and replacement consumer
 downstream design ../../agents/skills/refactor-loop.md behavior-preserving refactor consumer
 downstream design ../../agents/skills/change-review.md findings-first review consumer
+downstream design ../../agents/skills/codex-task-workflow.md implementation and review-remedy decision consumer
 downstream design ../../documents/notes/knowledge/coding_decision_methods.md external method and source note
 @dependency-end
 -->
@@ -188,8 +190,10 @@ KISS は「最短の code」や「最小の diff」ではありません。要�
 - invariant、schema、compatibility relation
 - independent checker、workflow、receipt、generated view
 
-error handling、cleanup、migration、test、documentation を削って短くした実装は単純ではなく、
-未閉鎖の責務を別の場所へ移しただけです。
+要求上必要な error handling、cleanup、migration、test、documentation を削って短くした実装は
+単純ではなく、未閉鎖の責務を別の場所へ移しただけです。どの異常処理が必要かは
+[到達可能性と追加修正の必要性](#reachability-and-remedy-necessity) で判断し、
+重複防御を温存する理由にはしません。
 
 ### SEP-07 YAGNI
 
@@ -197,12 +201,45 @@ error handling、cleanup、migration、test、documentation を削って短く�
 
 - current requirement または approved target state
 - concrete caller / consumer
-- reproduced または静的に到達可能な failure
+- reproduced または静的に到達可能な failure に対する未充足の要求
 - stable extension point を必要とする複数実装
 - external boundary を隔離する adapter need
 
 YAGNI は、要求済み behavior、必要な compatibility migration、failure handling、cleanup、validation
 を後回しにする理由ではありません。完成した target state に不要な将来 surface を作らない原則です。
+
+#### Reachability and remedy necessity
+
+異常を表す局所式が書けること、現行の実行でそこへ到達できること、到達した結果が
+要求を満たさないことは別です。異常仮説から修正を導くときは、現在の有効な入口、
+contract が許す入力・状態、制御・データフロー、観測される結果を必要範囲だけ
+対応付けます。外部境界が拒否・防御する責務を持つ不正入力も判断対象に含めます。
+
+保証の根拠は実際の parser、constructor、型の強制、制御フロー等に求め、その後の
+mutation、別入口、並行変更、I/O が保証を壊し得るかを確認します。型注釈だけや
+過去に事故がなかったことを到達不能の証拠にしません。同じ境界で維持される不変条件と、
+存在確認後も外部から変化し得る状態を区別します。到達する場合も、既存 owner の
+例外伝播、拒否、cleanup、recovery が既に要求を満たしていないかを先に照合します。
+
+| 判断 | 根拠の例 | 次の行動 |
+| --- | --- | --- |
+| 到達不能 | parser が非空を強制し、同じ内部境界でその保証を壊す経路がない | 内部の空入力を理由に修正を要求しない |
+| 既存保証で対応済み | 失敗は起こり得るが、既存 API の例外伝播や cleanup が要求どおり | 追加の catch、guard、fallback を要求しない |
+| 未確認 | 入口や保証の成立・維持に関する判断前提が未確認 | 安全とも欠陥とも断定せず、判断を変える不足前提だけを調べる |
+| 到達可能で契約不足あり | 現行入口からの実行や仕様上の外部障害で、要求された結果・失敗処理が満たされない | その不足を閉じる最も単純な修正と対象検証を既存 owner で選ぶ |
+
+private helper を mock で直接呼び、実際の入口では作れない状態を注入しただけでは、
+到達可能な不具合の証拠になりません。test double は成立する入力・状態・外部障害を
+表現します。局所 algorithm が独立した契約を持つ場合の owner-local test は妨げません。
+外部入力、存在確認後の変更、仕様上の I/O 失敗などの可能性が契約や解析で示せるなら、
+実事故や危険な再現を要求しません。ただし可能性だけで追加対策を決めず、既存保証で
+埋まらない要求を対応付けます。必要な authorization、安全検証、外部境界の検証は保ちます。
+
+到達不能・既存保証済みなら、既存の Issue、design、review の記録に理由を短く残して
+元作業へ戻ります。その仮説を production 対策、回帰 test、必須後続 Issue、完了条件に
+変換しません。未確認も投機的な対策へ変換せず、必要な前提の調査に留めます。
+これは判断支援であり、新しい checker、schema、status、帳票、approval gate、全件監査を
+要求しません。実装・review の利用側は、この判断と既存の根拠を参照し、分類規則を複製しません。
 
 ### SEP-08 DRY and abstraction admission
 
@@ -231,6 +268,70 @@ local docs、official primary source の readback で provider capability を比
 phase と正確な未充足 responsibility gap を対応付けます。comparison には provider の正確な input / output
 boundary と選択した command / options を含め、phase 名だけでは判断しません。覆われた phase は provider
 に委譲します。新規責務名の制限は [命名規約](../rule/naming.md) を参照し、ここでは重複した命名規約を定義しません。
+
+#### Reuse feasibility support
+
+再利用可能性は、同名 API や同じ実装構造の有無ではなく、既存機能を使う具体的な呼出が
+今回の要求を満たせるかで判断します。上の共通 abstraction の新設条件を、既存 API の
+利用条件へ転用しません。一つの caller でも利用でき、provider が正式に提供する設定・
+拡張点は新設 wrapper の flag と区別します。この節を実装・掃除の共通の判断支援とし、
+名称・配置・style の好みを能力不足にせず、新しい判定器、全項目 checklist、必須の比較表、
+schema、承認段階は作りません。
+
+1. **要求を機能の言葉へ戻す。** caller と設計から、入力の有効領域、必要な変換・結果、
+   守る意味を短く取り出します。自作予定の名前だけでなく、その操作の一般名・別名、
+   入出力の型、既存の呼出例から候補を探します。現在の helper の形や偶然の制約を
+   要求へ昇格させず、state / lifecycle、副作用、失敗、性能は判断に関係するものだけ扱います。
+2. **公開機能の使い方を読む。** current API の仕様・local help・公式資料で、実際の
+   引数、戻り値、既定値以外の設定、nested configuration、overload、拡張点を確認します。
+   一例や既定動作だけを能力の上限にしません。既存の依存宣言・解決版に合う根拠を使い、
+   その確認のための新しい pin や環境調査を追加しません。資料だけで決まれば内部監査は不要です。
+3. **最小の利用案を組み立てる。** `入力 -> 必要な変換 -> 既存 API（設定） -> 必要な変換 -> 出力`
+   を実在 API の呼出例または短い擬似コードにします。直接利用だけでなく、既存 API の
+   合成・反復・設定で埋まる差を先に試案へ含めます。試作の実行を一律必須にしません。
+   各呼出の前提を満たし、合成後に要求を保つかを見ます。引数・型・単位の違いだけでは
+   棄却せず、変換が要求に必要な情報・精度・意味を失わず、禁止された副作用を加えないかを見ます。
+4. **保証の向きを比較する。** 要求上有効な入力・状態のすべてを利用案が扱え、その結果が
+   必要な保証を含むことを確かめます。完全に同じ API 契約である必要はありません。
+   入力領域を狭める前提、出力保証の弱化、失敗の成功化で差を隠しません。合成では
+   中間状態、所有権、原子性、cleanup も関係する場合だけ含めます。性能差を理由にするなら
+   現在の workload と要求上限、計算量・コピー・I/O 等の具体的な根拠を使い、予感で棄却しません。
+
+比較の核心は「要求の入力領域が利用案の扱える領域に含まれ、利用案の保証から要求の保証が
+導ける」です。これにより、表現だけの差による誤棄却と、見た目だけの類似による誤採用を
+区別できます。形式証明や provider 全機能の再検証を要求するものではありません。
+
+| 分かったこと | 判断と次の操作 |
+| --- | --- |
+| 直接の呼出・設定で要求を満たす | そのまま利用する。新しい helper を作らない。 |
+| 最小の変換・合成で要求を満たす | 呼出側で接続する。provider の algorithm、parser、state、retry を再実装しない。 |
+| 一部を満たすが、具体的な不足が残る | 満たす部分を再利用し、不足だけを責務のある owner で実装する。適合する別候補も必要範囲で比較する。 |
+| 変換・設定・合成でも要求を満たせない根拠がある | 満たせない要求と仕様上の差または反例を示して、その利用案を棄却する。候補全体の無価値や全候補の不存在へ一般化しない。 |
+| 判断に必要な保証が未確認 | 不適合にも適合にも変換しない。判断を変える一点だけを調べ、未確認を自作の正当化にしない。 |
+
+未確認点は、まず該当する仕様節・既存 caller/test で解き、それでも必要な場合だけ最小の
+呼出確認を使います。単一成功例は全入力の保証ではなく、実行不能は能力不存在の証明でも
+ありません。十分な候補が決まれば未採用候補の調査を止めます。決められない場合も、
+その選択の不明点だけを既存 task context に残し、独立して進められる変更を止めません。
+
+**判断例（実在製品の能力を主張する例ではない）:**
+
+- 同じ意味の時間長で caller は秒、API はミリ秒を取る場合、要求領域で範囲・精度を保つ
+  変換ができれば利用可能です。丸めで必要な精度が失われるなら、その変換案は不適合です。
+- 独立した要素処理は、順序・資源・失敗の要求も満たすなら単要素 API の反復で利用可能です。
+  全件の原子的更新が必要なら、途中更新を公開する単純な反復では足りません。既存の
+  transaction / batch 機能を確認し、それでも保証できない範囲だけを不足とします。
+- 既存 parser が構文とエラーを扱い、製品固有の値域規則だけが足りないなら、parser を
+  再利用し値域規則を caller 側に置きます。製品専用 API がないことは parser の再実装理由ではありません。
+- 必要な順序保証が資料の一例に書かれていないだけなら未確認です。関連する保証・設定を
+  読まずに「非対応」とせず、保証されないことが分かった場合も同じ出力例だけで適合としません。
+
+採用 API と具体的な利用案、決め手となった要求・保証の対応、根拠の locator、残る不足だけを
+既存設計文書の該当節へ簡潔に残し、既存 `reuse_survey` / handoff ではその参照を使います。
+上の表を埋める帳票や新しい disposition enum は追加しません。既存候補が不足する場合も、
+既知の library と自作の保守・依存コストを比較し、依存ゼロのための自作や再利用のためだけの
+新依存を目的にしません。検証は今回の変換・接続・残る domain contract に向け、provider の
+実装・test suite の複製や、全 package 探索・環境再構築を完了条件にしません。
 
 ## 4. 変更単位と完全性
 

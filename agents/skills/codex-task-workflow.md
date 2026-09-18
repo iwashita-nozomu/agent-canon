@@ -12,6 +12,7 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
 upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff correspondence route
 upstream design ../../documents/design/request-intent-and-update-relation.md compact task-packet request and update projection
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
+upstream design ../../documents/conventions/software-engineering-principles.md reachability and remedy-necessity decision owner
 upstream design ./agent-orchestration.md owner-first read trace and implementation admission
 upstream implementation ../../tools/agent/skills/skill_document_reader.py bounded Skill read and EOF admission
 downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
@@ -161,6 +162,13 @@ does not create a second semantic ledger; review reads the same instance back.
 1. selected validation and review
 1. closeout
 
+読取で生じた異常仮説や tool / reviewer / subagent の修正提案を
+`selected implementation` または review 後の再実装へ渡す前に、
+[SEP-07 の到達可能性と追加修正の必要性](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)
+を適用します。判断と根拠を既存 task / finding packet で引き継ぎ、同節の結論に従って
+修正へ進むか元作業へ戻ります。提案を受けたこと自体は修正の根拠にしません。
+これは通常の移行判断であり、追加の stage、帳票、広い原因調査を要求しません。
+
 The stages are conditional route points, not a fixed plan-review-edit sequence.
 Task-catalog roles, default review packs, and related skills are candidates;
 they become work only when an owner-critical operation, unresolved branch, or
@@ -263,7 +271,7 @@ route.
 - fresh subagent に渡す prompt は chat history 依存にしない。[agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) が定義する `Fresh Subagent Context Capsule` を渡し、full transcript、raw logs、full dashboard、repo root 全体を context として渡さない
 - runtime/tool gate が write-capable spawn を阻害する場合は `WRITE_SUBAGENT_AUTHORIZATION=required` または該当 gate blocker を local/tool evidence として記録し、`selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を明示する。継続する際は `canonical_rerun_pass`、`durable_blocker_or_issue`、`router_unavailable_blocker`、`explicit revised route` 付きの approved route に限定する。The parent does not write as a recovery path.
 - 既存的な `status=blocked` の timeout 回復では、同一内容での再待機は行わず、`new state evidence` または `revised parent packet` がある場合のみ再 wait/再評価し、ユーザー向けの fallback message は出さない
-- tool / checker / hook / reviewer / subagent feedback から実装へ入る場合は `tool-finding-report` で finding packet を作り、write-capable subagent handoff に artifact path、structured findings、prompt feedback decision を渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` が出た場合は、次の write-capable subagent を起動する前に handoff prompt、skill、workflow、または task catalog prompt を修正する
+- tool / checker / hook / reviewer / subagent feedback から実装へ入る場合は、[Stages](#stages) の判断を消費し、`tool-finding-report` で finding packet を作り、write-capable subagent handoff に artifact path、structured findings、prompt feedback decision を渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` が出た場合は、次の write-capable subagent を起動する前に handoff prompt、skill、workflow、または task catalog prompt を修正する
 - prompt/config drift が shared canon surface をまたぐ場合は、親がその場で prose を増やす前に `prompt_config_reviewer` で audit し、この workflow はその監査結果と契約から導かれる差分を適用する
 - nontrivial document creation / revision では `prose-reasoning-graph` と `structure-planning` を構造先行 gate として通し、その後に `long-form-writing` / `paper-writing` / `academic-writing` へ渡す。typo / link / format-only では `md-style-check` と `structure_contract=skipped` の理由を evidence に残す
 - closeout 前に `check_dependency_headers.py --changed`、`scan_dependency_headers.sh --changed --fail-missing`、`check_dependency_header_format.sh --changed --require-header` を通す
@@ -360,7 +368,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. For optional pre-edit diagnostics, follow [Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction). Keep the implementation directory within the owner scope; prediction is not a handoff prerequisite.
 1. For fresh subagent launches, include the protocol-owned `Fresh Subagent Context Capsule` from [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) instead of chat history, full transcripts, raw logs, full dashboards, or repo-root scope.
 1. If runtime/tool gates block write-capable spawn, record local/tool evidence with `WRITE_SUBAGENT_AUTHORIZATION=required` or the specific gate blocker, `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; a different implementation route requires an explicit revised parent packet.
-1. When implementation is driven by tool/checker/hook/reviewer/subagent findings, use `$tool-finding-report` first and pass the finding packet path, structured findings, impact, and prompt feedback decision into the parent or write-capable subagent handoff.
+1. When implementation is driven by tool/checker/hook/reviewer/subagent findings, first consume the judgment in [Stages](#stages), then use `$tool-finding-report` and pass the finding packet path, structured findings, impact, and prompt feedback decision into the parent or write-capable subagent handoff.
 1. If `$tool-finding-report` classifies feedback as `handoff_prompt_gap` or `shared_skill_or_workflow_gap`, repair the handoff prompt, skill, workflow, or task catalog prompt before launching the next write-capable subagent.
 1. Require `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker`; `worker` is the default. Use `spark_worker` only for a low-risk slice selected through `--select-agent-type implementer=spark_worker:<evidence>` and recorded in stdout / manifest. If the selected candidate is blocked, record `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; changing candidates requires a revised parent packet and wave.
 1. Treat chunks, slices, checkpoints, and subpasses as internal progress only; continue until all planned work units, active clauses, selected review gates, validation, and closeout work are complete and the existing work log/final status reflects the separate commit and push decisions. Commit a coherent, reviewed unit after selected validation when appropriate; preserve incomplete or mixed work with its concrete reason and next condition. Push independently only when sharing, handoff, remote-backup, or PR purpose, authority, and destination make it appropriate. A committed but unpushed result is an intermediate handoff, not final publication, and a failed push preserves the commit while the task remains non-terminal pending safe recovery or a concrete blocker. Explicit read-only, local-only, no-push, no-change, and genuine external-failure cases remain valid; no unconditional commit/push gate is added. A final review is included only when activated by the touched contract.

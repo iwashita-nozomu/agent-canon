@@ -31,6 +31,11 @@ contract, semantic invariant, state/lifecycle owner, dependency or authority bou
 failure, testability loss, or traceability break that the changed surface creates. A principle name
 alone is not a finding.
 
+異常仮説を finding として採用する前に、
+[SEP-07 の到達可能性と追加修正の必要性](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)
+を適用します。原因調査の起動有無によらず、この判断の根拠を以下の原因証明、
+regression review、修正導出へ引き継ぎます。
+
 Review only principles that can change the decision for the actual diff. Do not require a KISS,
 YAGNI, DRY, SOLID, determinism, or traceability checklist for every PR, and do not emit
 `not applicable`, negative receipts, or empty principle sections. When principles conflict, apply
@@ -138,7 +143,7 @@ material な regression 追加では、少なくとも次の evidence-linked que
 確認します。専用 checklist receipt や checker を追加する必要はありません。
 
 - どの canonical contract / invariant が failure により反証され、その owner はどこか。
-- case はその invariant の minimal counterexample / witness になっているか。
+- case は上記 SEP-07 の判断に照らし、対象入口で成立する入力・状態に対する invariant の minimal counterexample / witness か。mock が入口の保証を無効化した架空状態だけを作っていないか。
 - 既存 property、table-driven finite state、semantic equivalence、canonical boundary acceptance に統合できない理由があるか。
 - private field、temporary path、helper topology、storage layout、deleted compatibility state を test の都合で contract 化していないか。
 - parser、classifier、state builder、lifecycle、environment setup の第二実装を test 側に作っていないか。
@@ -180,8 +185,9 @@ evidence-linked alternative could change the owner, fix surface, or validation
 route. For a straightforward finding where a type, schema, parser, compiler,
 state invariant, or targeted reproduction establishes one cause, record a
 compact direct cause proof and derive the action from it; no named receipt is
-required. Rejected, duplicate, already-covered, and unreachable findings keep
-their reason/evidence and do not acquire a cause receipt.
+required. This direct proof includes the SEP-07 judgment above; an apparently
+clear local cause does not bypass that judgment. Rejected, duplicate, already-covered,
+and unreachable findings keep their reason/evidence and do not acquire a cause receipt.
 
 For an activated finding, a solution proposal MUST NOT be derived from the
 symptom alone. Record a compact `Cause Investigation Receipt` (a cause-evidence
@@ -216,8 +222,9 @@ evidence needed to establish:
   with its evidence reference;
 - `Selected Cause` and `Expected Mechanism`: the causal explanation and the
   state/mechanism change expected to remove the symptom;
-- `Action Derivation`: the required action is derived from the selected cause
-  and expected mechanism, and names the contract and validation it preserves.
+- `Action Derivation`: the required action is derived from the selected cause,
+  expected mechanism, and residual contract gap established under SEP-07, and
+  names the contract and validation it preserves.
 
 These are evidence dimensions, not a ceremony checklist for every finding.
 Mark an inapplicable dimension as such when that itself bounds the alternative;
