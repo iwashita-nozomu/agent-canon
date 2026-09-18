@@ -21,6 +21,9 @@ Source owner routes replace consumer routes, never the shared constraints.
 Use the known task owner directly. Consult the optional map below only to resolve
 an unknown owner or request modality; read its matching row, not the whole index.
 
+When that responsibility is active, formatter settings and direct commands are
+owned by [documents/design/formatting.md](documents/design/formatting.md).
+
 ## Always-On Boundary
 
 Keep automatically loaded instructions minimal. Read only applicable detail
