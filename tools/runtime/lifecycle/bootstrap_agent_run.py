@@ -32,187 +32,93 @@ except ImportError:  # direct script/module execution
         runtime_artifact_boundary,
     )
 
-if __package__:
-    from tools.runtime.authority.writer_target import WriterTargetError, parse_writer_target
-else:
-    from tools.runtime.authority.writer_target import WriterTargetError, parse_writer_target  # type: ignore[no-redef]
+from tools.runtime.authority.writer_target import WriterTargetError, parse_writer_target
 
-if __package__:
-    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
-else:
-    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 from tools.runtime.source.agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 
-if __package__:
-    from tools.agent.orchestration.packets import (
-        ACTIVE_DESIGN_PACKET_SCHEMA,
-        ActiveDesignPacketConfig,
-        MATHEMATICAL_INTENT_PACKET_SCHEMA,
-        MathematicalIntentPacket,
-        mathematical_intent_route_config,
-        mathematical_intent_route_for_task,
-        math_intent_route_id_from_context,
-        normalize_mathematical_intent_packet,
-        parse_active_design_packet_input,
-        resolve_cross_cutting_document_packet,
-        resolve_role_document_packet,
-    )
-else:
-    from tools.agent.orchestration.packets import (
-        ACTIVE_DESIGN_PACKET_SCHEMA,
-        ActiveDesignPacketConfig,
-        MATHEMATICAL_INTENT_PACKET_SCHEMA,
-        MathematicalIntentPacket,
-        mathematical_intent_route_config,
-        mathematical_intent_route_for_task,
-        math_intent_route_id_from_context,
-        normalize_mathematical_intent_packet,
-        parse_active_design_packet_input,
-        resolve_cross_cutting_document_packet,
-        resolve_role_document_packet,
-    )
+from tools.agent.orchestration.packets import (
+    ACTIVE_DESIGN_PACKET_SCHEMA,
+    ActiveDesignPacketConfig,
+    MATHEMATICAL_INTENT_PACKET_SCHEMA,
+    MathematicalIntentPacket,
+    mathematical_intent_route_config,
+    mathematical_intent_route_for_task,
+    math_intent_route_id_from_context,
+    normalize_mathematical_intent_packet,
+    parse_active_design_packet_input,
+    resolve_cross_cutting_document_packet,
+    resolve_role_document_packet,
+)
 
-if __package__:
-    from tools.agent.orchestration.team_config import (
-        AgentTypeSelection,
-        Role,
-        RunBundleSpec,
-        TaskCatalog,
-        TeamConfig,
-        codex_agent_model_matrix_for_roles,
-        current_stage_skills,
-        default_review_pack_ids_for_task,
-        default_specialists_for_task,
-        deferred_stage_skills,
-        enable_choices,
-        expand_enabled_specialists,
-        load_task_catalog,
-        load_team_config,
-        resolve_task_spec,
-        resolve_workflow_family,
-        select_roles,
-        task_ids,
-        workflow_child_handoff_required,
-    )
-else:
-    from tools.agent.orchestration.team_config import (
-        AgentTypeSelection,
-        Role,
-        RunBundleSpec,
-        TaskCatalog,
-        TeamConfig,
-        codex_agent_model_matrix_for_roles,
-        current_stage_skills,
-        default_review_pack_ids_for_task,
-        default_specialists_for_task,
-        deferred_stage_skills,
-        enable_choices,
-        expand_enabled_specialists,
-        load_task_catalog,
-        load_team_config,
-        resolve_task_spec,
-        resolve_workflow_family,
-        select_roles,
-        task_ids,
-        workflow_child_handoff_required,
-    )
+from tools.agent.orchestration.team_config import (
+    AgentTypeSelection,
+    Role,
+    RunBundleSpec,
+    TaskCatalog,
+    TeamConfig,
+    codex_agent_model_matrix_for_roles,
+    current_stage_skills,
+    default_review_pack_ids_for_task,
+    default_specialists_for_task,
+    deferred_stage_skills,
+    enable_choices,
+    expand_enabled_specialists,
+    load_task_catalog,
+    load_team_config,
+    resolve_task_spec,
+    resolve_workflow_family,
+    select_roles,
+    task_ids,
+    workflow_child_handoff_required,
+)
 
-if __package__:
-    from tools.runtime.manifest.manifest_rendering import (
-        contract_complete_implementation_policy_output_lines,
-        checkout_identity_policy_output_lines,
-        coordination_capability_policy_output_lines,
-        default_quality_check_policy_output_lines,
-        format_subagent_role_instance_wave_chunks,
-        format_subagent_wave,
-        format_subagent_wave_chunks,
-        language_review_candidates,
-        pre_handoff_gate_status_output_lines,
-        pre_handoff_scope_policy_output_lines,
-        public_command_for_layout,
-        repo_tool_routing_policy_output_lines,
-        same_role_subagent_policy_output_lines,
-        standard_agent_wave_sequence_output_lines,
-        subagent_wave_record_command,
-        suggested_public_skills,
-        user_facing_language_policy_output_lines,
-        writer_target_policy_output_lines,
-    )
-else:
-    from tools.runtime.manifest.manifest_rendering import (
-        contract_complete_implementation_policy_output_lines,
-        checkout_identity_policy_output_lines,
-        coordination_capability_policy_output_lines,
-        default_quality_check_policy_output_lines,
-        format_subagent_role_instance_wave_chunks,
-        format_subagent_wave,
-        format_subagent_wave_chunks,
-        language_review_candidates,
-        pre_handoff_gate_status_output_lines,
-        pre_handoff_scope_policy_output_lines,
-        public_command_for_layout,
-        repo_tool_routing_policy_output_lines,
-        same_role_subagent_policy_output_lines,
-        standard_agent_wave_sequence_output_lines,
-        subagent_wave_record_command,
-        suggested_public_skills,
-        user_facing_language_policy_output_lines,
-        writer_target_policy_output_lines,
-    )
+from tools.runtime.manifest.manifest_rendering import (
+    contract_complete_implementation_policy_output_lines,
+    checkout_identity_policy_output_lines,
+    coordination_capability_policy_output_lines,
+    default_quality_check_policy_output_lines,
+    format_subagent_role_instance_wave_chunks,
+    format_subagent_wave,
+    format_subagent_wave_chunks,
+    language_review_candidates,
+    pre_handoff_gate_status_output_lines,
+    pre_handoff_scope_policy_output_lines,
+    public_command_for_layout,
+    repo_tool_routing_policy_output_lines,
+    same_role_subagent_policy_output_lines,
+    standard_agent_wave_sequence_output_lines,
+    subagent_wave_record_command,
+    suggested_public_skills,
+    user_facing_language_policy_output_lines,
+    writer_target_policy_output_lines,
+)
 
-if __package__:
-    from tools.agent.orchestration.implementation_dispatch import (
-        capacity_start_output_lines,
-        codex_runtime_max_depth,
-        codex_runtime_max_threads,
-        format_agent_type_selections,
-        parse_agent_type_selections,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_dynamic_expansion_waves,
-        recommended_initial_subagent_wave_slots,
-        validate_agent_type_selections,
-        workflow_spawn_budget,
-    )
-else:
-    from tools.agent.orchestration.implementation_dispatch import (
-        capacity_start_output_lines,
-        codex_runtime_max_depth,
-        codex_runtime_max_threads,
-        format_agent_type_selections,
-        parse_agent_type_selections,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_dynamic_expansion_waves,
-        recommended_initial_subagent_wave_slots,
-        validate_agent_type_selections,
-        workflow_spawn_budget,
-    )
+from tools.agent.orchestration.implementation_dispatch import (
+    capacity_start_output_lines,
+    codex_runtime_max_depth,
+    codex_runtime_max_threads,
+    format_agent_type_selections,
+    parse_agent_type_selections,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_dynamic_expansion_waves,
+    recommended_initial_subagent_wave_slots,
+    validate_agent_type_selections,
+    workflow_spawn_budget,
+)
 
-if __package__:
-    from tools.agent.orchestration.agent_team import (
-        PreparedRunBundle,
-        dispatch_issue_worker,
-        prepare_run_bundle,
-    )
-else:
-    from tools.agent.orchestration.agent_team import (  # type: ignore[no-redef]
-        PreparedRunBundle,
-        dispatch_issue_worker,
-        prepare_run_bundle,
-    )
+from tools.agent.orchestration.agent_team import (
+    PreparedRunBundle,
+    dispatch_issue_worker,
+    prepare_run_bundle,
+)
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import (
-        make_run_id,
-        resolve_report_root,
-        resolve_repository_roots,
-    )
-else:
-    from tools.repository.workspace.workspace_scope import (  # type: ignore[no-redef]
-        make_run_id,
-        resolve_report_root,
-        resolve_repository_roots,
-    )
+from tools.repository.workspace.workspace_scope import (
+    make_run_id,
+    resolve_report_root,
+    resolve_repository_roots,
+)
 from tools.runtime.authority.task_authority import (
     AUTHORITY_FILE_NAME,
     hash_baseline_bytes,
