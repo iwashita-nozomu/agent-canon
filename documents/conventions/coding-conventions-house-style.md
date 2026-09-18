@@ -43,7 +43,9 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 ### 1. モジュール入口
 
 - 公開モジュールと package `__init__.py` にはモジュール docstring を必須にします。
-- モジュール docstring では責務、主要な公開要素、必要なら参照文書を明記しなければなりません。
+- モジュール docstring は責務を示し、[Docstring Semantic Contract](./DOCSTRING_GUIDE.md#semantic-contract)
+  に従って型・名前・既存の静的表現から復元できない意味だけを記述しなければなりません。
+  公開要素の一覧は複製しません。
 - Python 実装ファイルでは `from __future__ import annotations` を先頭に置くことを必須にします。
 - package `__init__.py` では `__all__` による公開 API の明示を必須にします。
 - `from X import *` は禁止します。例外は package `__init__.py` だけとし、その場合でも直後に `__all__` で公開名を絞り込まなければなりません。
