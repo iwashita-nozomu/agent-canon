@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../documents/design/responsibility-rationale.md durable finding and OOP-review activation rationale
+upstream design ../../documents/design/responsibility-cleanup.md duplicate retirement and remaining-reference error contract
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first review precedence and evidence model
 upstream design ../../documents/conventions/common/03_comments.md decision-comment review policy
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue authority and packet policy
@@ -29,6 +30,11 @@ as the canonical precedence and evidence model. A material finding names the con
 contract, semantic invariant, state/lifecycle owner, dependency or authority boundary, reachable
 failure, testability loss, or traceability break that the changed surface creates. A principle name
 alone is not a finding.
+
+異常仮説を finding として採用する前に、
+[SEP-07 の到達可能性と追加修正の必要性](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)
+を適用します。原因調査の起動有無によらず、この判断の根拠を以下の原因証明、
+regression review、修正導出へ引き継ぎます。
 
 Review only principles that can change the decision for the actual diff. Do not require a KISS,
 YAGNI, DRY, SOLID, determinism, or traceability checklist for every PR, and do not emit
@@ -65,7 +71,8 @@ Treat sites as the same responsibility only when evidence aligns on the material
 
 Textual similarity, shared syntax, or a repeated helper shape is not sufficient. Conversely, syntax
 may differ while the responsibility is still duplicated when the sites independently encode the
-same policy or invariant for the same callers and change reason.
+same policy or invariant under the same material contract and change reason. Different caller
+identities do not establish distinct responsibilities.
 
 A repeated-responsibility finding is material only when evidence shows at least one concrete risk:
 
@@ -73,12 +80,13 @@ A repeated-responsibility finding is material only when evidence shows at least 
 - multiple sites act as independent authorities for the same invariant or policy;
 - the sites can drift independently and produce observably inconsistent behavior.
 
-Prefer the simplest disposition that preserves the contract: delegate to an existing canonical
-owner, extract a shared abstraction at a stable responsibility boundary that passes the canonical
-abstraction-admission test, or retain separate implementations with evidence that domain meaning,
-lifecycle, failure semantics, caller contracts, or change reasons differ. An abstraction that needs
-caller-specific flags, branches, or privileged reach-around is evidence that the boundary is not yet
-stable.
+Prefer direct use of an existing canonical owner. For a confirmed duplicate selected for retirement,
+apply [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+even when callers remain; retaining the old entrypoint or requiring all consumers to migrate is not
+a valid review action. Extract a shared abstraction only at a stable responsibility boundary that
+passes abstraction admission. Retain separate implementations only for evidenced differences in
+domain meaning, lifecycle, failure semantics, caller contracts, or change reasons. Caller-specific
+flags, branches, or privileged reach-around indicate that the abstraction boundary is not stable.
 
 Start from the diff and evidence-linked sibling implementations; do not require a repository-wide
 clone scan, a fixed rule-of-three threshold, a new checker, or a dedicated receipt. A material finding
@@ -92,7 +100,8 @@ of provider-owned phases, and return `design_issue_blocker` when the comparison 
 prospective compound-responsibility-name stop in [命名規約](../../documents/rule/naming.md).
 For deletion or refactor review, require the `$code-cleanup` line/block mapping content itself; a claim-only
 handoff without mapping rows/content is insufficient. Names, symbols, search hits, and diff size are not deletion proof; numerical meaning must be
-reconstructed before architecture or JIT changes. Follow the streaming cleanup route: do not demand speculative safety reimplementation or per-line validation without an active caller or contract.
+reconstructed before architecture or JIT changes. Follow the streaming cleanup route and RC-09 for
+retired duplicates; a remaining caller does not justify reimplementation or per-line validation.
 
 ## Code Comment Review
 
@@ -134,7 +143,7 @@ material な regression 追加では、少なくとも次の evidence-linked que
 確認します。専用 checklist receipt や checker を追加する必要はありません。
 
 - どの canonical contract / invariant が failure により反証され、その owner はどこか。
-- case はその invariant の minimal counterexample / witness になっているか。
+- case は上記 SEP-07 の判断に照らし、対象入口で成立する入力・状態に対する invariant の minimal counterexample / witness か。mock が入口の保証を無効化した架空状態だけを作っていないか。
 - 既存 property、table-driven finite state、semantic equivalence、canonical boundary acceptance に統合できない理由があるか。
 - private field、temporary path、helper topology、storage layout、deleted compatibility state を test の都合で contract 化していないか。
 - parser、classifier、state builder、lifecycle、environment setup の第二実装を test 側に作っていないか。
@@ -176,8 +185,9 @@ evidence-linked alternative could change the owner, fix surface, or validation
 route. For a straightforward finding where a type, schema, parser, compiler,
 state invariant, or targeted reproduction establishes one cause, record a
 compact direct cause proof and derive the action from it; no named receipt is
-required. Rejected, duplicate, already-covered, and unreachable findings keep
-their reason/evidence and do not acquire a cause receipt.
+required. This direct proof includes the SEP-07 judgment above; an apparently
+clear local cause does not bypass that judgment. Rejected, duplicate, already-covered,
+and unreachable findings keep their reason/evidence and do not acquire a cause receipt.
 
 For an activated finding, a solution proposal MUST NOT be derived from the
 symptom alone. Record a compact `Cause Investigation Receipt` (a cause-evidence
@@ -212,8 +222,9 @@ evidence needed to establish:
   with its evidence reference;
 - `Selected Cause` and `Expected Mechanism`: the causal explanation and the
   state/mechanism change expected to remove the symptom;
-- `Action Derivation`: the required action is derived from the selected cause
-  and expected mechanism, and names the contract and validation it preserves.
+- `Action Derivation`: the required action is derived from the selected cause,
+  expected mechanism, and residual contract gap established under SEP-07, and
+  names the contract and validation it preserves.
 
 These are evidence dimensions, not a ceremony checklist for every finding.
 Mark an inapplicable dimension as such when that itself bounds the alternative;
@@ -240,12 +251,15 @@ and `smallest patch` are explicitly prohibited as repair objectives. Select the
 complete replaceable owning responsibility unit identified by the evidence,
 even when that unit spans more than the file containing the symptom.
 
-The selected unit is complete only when the root mechanism is closed and its
-evidence-linked reachable consumers, side effects, failure handling, rollback,
-and cleanup are covered. The repair also closes the affected contract, docs,
-tests, and validation route. Keep this closure evidence-bounded: do not expand
-into unrelated repository cleanup or historical tidying that cannot change the
-selected owner, mechanism, consumers, contract, or validation.
+The selected unit closes the root mechanism and covers its required retained
+behavior, side effects, failure handling, rollback, cleanup, docs, tests, and
+selected validation. For RC-09 retirement, reachable-effects closure records
+known remaining references and their ordinary errors; it does not require
+preserving their success or expanding the authorized edit scope. Out-of-scope
+migration remains with the callers. Do not demand restoration, a compatibility
+path, or an error-only stub when deletion already produces the required error.
+Distinguish these expected reference errors from retained-owner regressions and
+unrelated failures. Do not expand into unrelated cleanup or historical tidying.
 
 Symptom suppression, a wrapper or compatibility shim that leaves the root
 mechanism open, test-only relaxation or oracle weakening, and a nearby local

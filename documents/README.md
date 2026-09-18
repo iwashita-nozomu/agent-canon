@@ -25,31 +25,33 @@ downstream implementation ../tools/runtime/dispatch/agent-canon/src/structured_a
   を読みます。root view、symlink、checked copy は現行の導線ではありません。
 - 機械可読の構造契約は [structure](./structure/) にあります。
 - cross-run の知見、比較、補助記録は [notes](./notes/) に置き、正本へ昇格した内容は所有する責務文書へ移します。
-- workflow、skill、subagent の正本は `agents/` であり、この directory に複製しません。
+- workflow、skill、subagent の正本は [agents/](../agents/) であり、この directory に複製しません。
 
 ## Directory Map
 
 | Directory | 役割 |
 | --- | --- |
-| `agent-canon/` | AgentCanon source、branch、remote、source PR、archive ownership |
-| `codex/` | Codex 設定、エージェント運用、skill、prompt 評価 |
-| `contracts/` | 親レポの bootstrap、host、remote、devcontainer、license 契約 |
-| `conventions/` | 言語、レビュー、logging、OOP、docstring の共通規約 |
-| `design/` | 数理・API・依存・build・tooling の設計境界 |
-| `experiments/` | 実験、GPU admission、ExperimentRunner、結果保持 |
-| `notes/` | cross-run insight、experiment/research summary、branch/worktree/failure の補助記録 |
-| `operations/` | branch、checklist、troubleshooting、legacy cleanup |
-| `parent-repository/` | parent repository structure と current redirect |
-| `prose-reasoning-graph/` | 文書推論グラフのDSLと分析 |
-| `rule/` | 文書配置、命名、依存変更の抽象規約 |
-| `runtime/` | bootstrap runtime、profile、log archive の契約 |
-| `structure/` | repository structure の機械可読契約 |
-| `structured-analysis/` | 構造化文書・依存・DB分析 |
-| `templates/` | 契約や設定の生成テンプレート |
-| `tools/` | 文書・依存・証明・可視化toolの読者向け説明 |
+| [agent-canon/](./agent-canon/) | AgentCanon source、branch、remote、source PR、archive ownership |
+| [codex/](./codex/) | Codex 設定、エージェント運用、skill、prompt 評価 |
+| [contracts/](./contracts/) | 親レポの bootstrap、host、remote、devcontainer、license 契約 |
+| [conventions/](./conventions/) | 言語、レビュー、logging、OOP、docstring の共通規約 |
+| [design/](./design/) | 数理・API・依存・build・tooling の設計境界 |
+| [experiments/](./experiments/) | 実験、GPU admission、ExperimentRunner、結果保持 |
+| [notes/](./notes/) | cross-run insight、experiment/research summary、branch/worktree/failure の補助記録 |
+| [operations/](./operations/) | branch、checklist、troubleshooting、legacy cleanup |
+| [parent-repository/](./parent-repository/) | parent repository structure と current redirect |
+| [parent-repository-audit/](./parent-repository-audit/) | 親 repository の責務別 audit unit と監査資料 |
+| [prose-reasoning-graph/](./prose-reasoning-graph/) | 文書推論グラフのDSLと分析 |
+| [rule/](./rule/) | 文書配置、命名、依存変更の抽象規約 |
+| [runtime/](./runtime/) | bootstrap runtime、profile、log archive の契約 |
+| [structure/](./structure/) | repository structure の機械可読契約 |
+| [structured-analysis/](./structured-analysis/) | 構造化文書・依存・DB分析 |
+| [tools/](./tools/) | 文書・依存・証明・可視化toolの読者向け説明 |
 
 各 directory の詳細は、その directory の README を読みます。root index は内容を
 再掲せず、正本と読者経路だけを示します。
+契約や設定の生成テンプレートは repository 直下の [templates/](../templates/) にあり、
+`documents/templates/` には置きません。
 
 ## 所有権
 
@@ -57,8 +59,8 @@ downstream implementation ../tools/runtime/dispatch/agent-canon/src/structured_a
 - template / derived repo の active contract は、親レポの `documents/` が所有します。
 - reports、logs、raw evidence、experiment result は `reports/` または `experiments/`
   に保存し、文書正本の代替にしません。
-- 文書を移動するときは、dependency header、参照元、checker、root view を同じ変更で
-  更新します。直下に互換Symlinkやchecked copyを残しません。
+- 文書の追加・分割・移動・削除では、[参照と到達性](./rule/directory-structure.md#参照と到達性)
+  に従って入口と直接の参照元を更新します。直下に互換Symlinkやchecked copyを残しません。
 
 ## 代表的な経路
 
