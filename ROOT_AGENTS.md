@@ -47,9 +47,16 @@ Repair requires scope and authority. Block only affected actions, preserve resou
 and rerun limits, and never replace a required backend to claim validation.
 
 Check algorithms against equations and assumptions before numerical adjustments;
-require error analysis rather than arbitrary offsets or tolerances. Retain outputs,
-diagnostics, and actual status, including NaN/Inf or nonconvergence; stopping or
-failed validation does not authorize hiding/discarding results or claiming success.
+require error analysis rather than arbitrary offsets or tolerances. Report actual
+status and limits; numerical symptoms alone do not establish research failure or
+authorize discarding non-experiment results or unconfirmed experiment observations.
+For protocol-confirmed failed experiments, immediately delete experiment-only
+code, configuration, and artifacts unless evidence establishes a physical cause.
+Unknown cause, debugging value, numerical trouble, or future reuse do not justify
+retention or waiting for closeout. Use existing experiment/storage owners with
+safe stopping and scoped authority; keep only a concise Issue/task disposition,
+not a relocated bundle. Preserve successful/shared/other-owned data and Git
+history. Do not add discard classifiers, archives, or reruns as cleanup gates.
 
 Establish the actual in-scope checkout and dependency identities; recheck only
 changed premises. Keep required pin evidence distinct from execution inputs.

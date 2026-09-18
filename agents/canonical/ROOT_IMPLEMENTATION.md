@@ -122,17 +122,22 @@ applicable repository's algorithm and numerical owners.
 
 ## Numerical result retention
 
-Never automatically discard, delete, overwrite, hide, or withhold already-produced
-results because of numerical issues such as NaN/Inf, nonconvergence, conditioning,
-rounding, or residual/tolerance violations. Preserve original outputs, available
-diagnostics, and actual status, and report numerical concerns and interpretation
-limits alongside them. Result retention and return must not depend on a numerical
-success judgment: failure to support a claim does not authorize loss of the
-observation. Required stopping, safety, and test-failure semantics remain in force;
-keeping a result is not declaring it correct, and stopping computation does not
-authorize deleting results obtained so far. Use existing result owners without
-adding a checker, acceptance threshold, mandatory trace, or rerun prerequisite
-merely to preserve or report results.
+Report numerical concerns and interpretation limits honestly; do not hide failures
+or present invalid results as success. Numerical symptoms alone are not a
+universal research-failure judgment. Preserve non-experiment results and
+experiment observations whose failure has not been established by the applicable
+topic protocol and evidence; do not introduce an automatic numerical discard gate.
+For a confirmed failed experiment, immediately delete its experiment-only code,
+configuration, and artifacts unless evidence establishes physical properties as
+the cause. Unknown cause, numerical or implementation trouble, debugging value,
+and possible future reuse do not justify retention or waiting for task/PR closeout.
+Apply this disposition through the existing experiment lifecycle and artifact
+owners; a generic preserve-results or append-only rule must not override it.
+Keep only a concise failure, cause/evidence, and deletion or physical-retention
+record in the existing Issue or task record, not a relocated experiment bundle.
+Do not extend deletion to successful results, shared code, other owners' data,
+or Git history. Preserve required safe stopping and scoped deletion authority;
+do not add a classifier, checker, archive prerequisite, or rerun to decide cleanup.
 
 ## Caller and library responsibility
 
