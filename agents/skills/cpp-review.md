@@ -26,6 +26,7 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 
 - `cpp/src/`, `cpp/include/`, `tests/cpp/`, `cpp/experiments/` 配下を触る
 - `cpp/CMakeLists.txt` や native build 設定を触る
+- CMake project の clangd / LSP 解析環境を準備する
 - public header、ABI、FFI、CLI binary の挙動を変える
 - C++ documentation / Docstring projection を触る
 - latency、throughput、memory footprint、allocation、scaling、起動時間、binary size、
@@ -46,6 +47,33 @@ host lease を使い、制限・予算・指定環境を確認できなければ
 起動する場合も、未検証の経路を裸で実行せず同 owner に blocker を残します。
 利用者の再実行禁止は縮小 build・別 target・小規模 GPU にも適用し、既存 evidence と
 fixture-only 検証へ限定します。禁止を解く根拠に過去の別許可を使いません。
+
+## CMake analysis environment
+
+CMake project の clangd / LSP 解析を準備するときは、既存の project-owned configure
+argv に `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` を加え、build directory に
+`compile_commands.json` を生成します。既存 configure preset の同等の cache 設定も
+使えます。source / build directory、toolchain、backend、依存解決は実ビルドと揃え、
+同じ構成の最新 DB が既にあれば再生成しません。configure が compiler を起動する場合は
+上記 host build admission を適用します。この生成機能は Ninja / Makefile 系が対象で、
+非対応 generator を勝手に切り替えず、生成できない範囲を未検証として残します。
+
+clangd は依存を持つ既存の開発コンテナなど、実ビルドの環境で動かし、対象 module の
+build directory を `--compile-commands-dir=<build-dir>` で指定します。DB は compiler
+argv の記録であり、依存を取得・同梱しません。参照する source、依存ヘッダー、標準
+ライブラリ、toolchain がその環境から読める必要があります。生成ヘッダーが必要なら
+既存の生成 target までを準備し、解析準備だけを理由に full build / test を要求しません。
+include path、define、言語規格を Neovim 側で手書きして第二の設定にしません。
+
+開いている workspace 内で依存を実際に include する translation unit を選び、下記の
+既存 `clangd-check` 経路で DB と compile command の読込み・依存解決・診断を確認します。
+DB 生成成功と依存込み解析成功を分け、結果と未検証範囲を Issue / PR に残します。
+ホストの Neovim とコンテナの workspace path 対応は必要ですが、コンテナ専用の外部
+ヘッダー自体をホストで開くための複製・転送は、この workspace 内解析の終了条件にしません。
+通常の docs-only 編集へ configure / build / LSP 実行を一律に追加しません。
+
+根拠は [CMake の compilation database 生成](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html)
+と [clangd の compile command 解釈](https://clangd.llvm.org/design/compile-commands) です。
 
 ## Required Checks
 
