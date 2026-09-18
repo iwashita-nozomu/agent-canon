@@ -47,8 +47,8 @@ Candidate count alone is not sufficient; activation is based on dependency evide
 
 ## Execution-Time-Aware Queue Specialization
 
-This skill consumes
-`agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`.
+This skill consumes the
+[Execution-Time-Aware Work-Conservation Contract](agent-orchestration.md#execution-time-aware-work-conservation-contract).
 Its executable fields are `dependency_dag`, `responsibility_completeness`,
 `correctness`, `decision_relevant_total_work`, `makespan_objective`,
 `critical_path`, `ready_set`, `context_reuse`,
@@ -137,7 +137,7 @@ automatic_merge_ready :=
 
 Stop when any term is unproven. Do not reuse old checks, infer conflict-owner
 intent, ignore branch-owned failure, or merge after head/base movement. The
-AgentCanon source lane in `$agent-canon-update` is the concrete regression
+AgentCanon source lane in [`$agent-canon-update`](agent-canon-update.md) is the concrete regression
 fixture for this ordering; this skill consumes that route without duplicating
 its source-update policy or machine schemas.
 
