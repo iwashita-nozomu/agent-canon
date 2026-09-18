@@ -151,6 +151,21 @@ its evidence, stop only affected commands, and continue independent authorized
 work. Do not silently switch a required backend, weaken validation, or treat
 an unrun command as passed.
 
+Bound audits, reviews, and validation by the requested task, not a backend
+inventory. A different backend is out of scope unless that backend or a
+cross-backend guarantee is explicitly included in the requested work. Leave
+its implementation, configuration, execution environment, and logs untouched;
+do not run or repair it for apparent parity, completeness, or auditability.
+Backend differences alone are not defects. For shared changes, validate the
+changed shared contract without expanding into unrelated backend internals.
+When relevant, briefly record the exclusion and reason in the existing Issue
+or PR; do not turn an excluded backend's unaudited state into a failure,
+verification debt, mandatory follow-up Issue, or completion prerequisite.
+Do not add probes, adapters, configuration, or measurements to make an excluded
+backend auditable. Preserve required in-scope behavior and shared guarantees:
+an unavailable required backend remains an in-scope unverified result, not
+permission to exclude it or substitute another backend.
+
 When numerical results disagree, first investigate defects in the algorithm
 and its implementation against the governing equations and specification,
 including assumptions, units, indexing, update order, and boundary conditions.
