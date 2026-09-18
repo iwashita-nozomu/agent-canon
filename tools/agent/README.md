@@ -10,16 +10,14 @@ downstream implementation ../runtime/manifest/tool_catalog.py validates effectiv
 
 # Internal Tool Areas
 
-This directory is the target home for helper code that should not be advertised
-as a stable user command. The existing runtime still calls many helpers through
-their historical paths; move one helper family at a time only after preserving
-the catalog entry, tests, docs, and workflow callers.
+This directory contains internal orchestration, skill, and template helpers.
+For the implementation being maintained, use its existing owner:
 
-Use these placement buckets:
+- [Skill helpers](skills/README.md): skill routing, document reading, and materialization.
+- [Orchestration](orchestration/): task routing, handoff, team, and review helpers.
+- [Templates](templates/): code, bundle, and entrypoint rendering.
 
-- `skills/`: helpers owned by one or more skills.
-- `workflows/`: task-start, closeout, routing, run-bundle, and workflow gates.
-- `compatibility/`: legacy wrappers kept only to preserve old callers.
-
-The catalog field `placement` is the mechanical source of truth. Directory
-names are migration targets, not an excuse to duplicate tool implementations.
+Public command identity, audience, and placement remain owned by
+[the tool catalog](../catalog.yaml); a directory name does not make an internal
+helper a public command. Runtime lifecycle and compatibility implementations
+remain at their actual catalog paths, not empty migration-target directories.
