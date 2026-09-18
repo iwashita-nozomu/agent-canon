@@ -127,13 +127,10 @@ SOLID 見出しへの機械投影を所有します。
 `tools/validation/semantic/code/check_solid_evidence.py` は SOLID-sensitive な Python 差分と
 OOP readability report の `scanned_paths` coverage を照合します。
 
-| Principle | Python coding contract | Static risk signal |
-|---|---|---|
-| Single responsibility | domain calculation、IO、persistence、rendering、orchestration、reporting を責務語彙で分ける。 | OOP readability の large boundary、mixed effect、vague name、helper bucket、identity/pass-through finding |
-| Open/closed | 現在の variant と利用者契約を既存 API の直接利用・合成で表し、より単純な既存手段では不足する場合だけ必要な拡張点を選ぶ。将来予測だけで registry や新 API を追加しない。 | OOP readability の `Optional` / `None` runtime routing、deep variant branch、cognitive complexity signal |
-| Liskov substitution | subtype / subclass / protocol implementation は base contract、入力条件、戻り値、例外、invariant を保存する。 | type checker、shared behavior tests、OOP readability の base class signal |
-| Interface segregation | caller が使う最小 role を `Protocol` または role-specific public surface にする。 | OOP readability の public method / field / parameter breadth signal |
-| Dependency inversion | high-level policy は stable abstraction、typed dataclass、`Protocol`、composition root へ依存を寄せる。 | OOP readability の annotation / optional boundary signal。import / layer 方向は `import_responsibility.py` と dependency review の supporting evidence |
+Single responsibility、Open/closed、Liskov substitution、Interface segregation、Dependency inversion の
+意味と共通実装判断は [SOLID との対応](./object-oriented-design.md#solid-との対応) を正本とします。
+Python 入口に第二の意味・実装契約・signal 対応表は置きません。静的 signal は semantic proof ではなく、
+正本の判断手順で caller contract と実際の evidence に照らして扱います。
 
 上記条件で SOLID / OOP review が選択された場合だけ、pytest wrapper ではなく該当 checker command を
 validation route に置きます。repo-wide の OOP review が選択された場合は `$oop-readability-check` を使い、
