@@ -27,8 +27,8 @@ downstream implementation ../../.codex/personal/skills/academic-writing/SKILL.md
 ## Purpose
 
 file / document responsibility が academic prose、scholarly note、thesis chapter、
-method note、symbol-dense claim-heavy explanation の文書を、共通 graph/DSL 構造から
-学術 prose へ射影する adapter skill です。claim、notation、logic を分離 review します。
+method note、symbol-dense claim-heavy explanation の文書を、既存の本文・根拠・構成メモから
+直接作成・改稿する skill です。claim、notation、logic を分離 review します。
 選択基準は長さではなく、文書責務と review gate です。
 
 ## Use When
@@ -50,15 +50,15 @@ method note、symbol-dense claim-heavy explanation の文書を、共通 graph/D
 
 ## Mandatory Checklist
 
+- 既存の本文・根拠・見出し・短い構成メモから直接執筆する。graph 分析は
+  [任意の分析経路](prose-reasoning-graph.md#optional-analysis-boundary)であり、
+  graph/DSL、固定 handoff、全 sentence の順序、finding 件数ゼロ、本文との往復診断を
+  通常執筆の開始・完了条件にしない。主張と根拠の対応、引用、定義、構成は本文で確認する
+
 - `claim contract` で central contribution、gap、reader、non-goal を先に固定する
 - section order、figure/table placement、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
 - claim flow、transition pair、logic-gap triage が非自明な場合は、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
-- 非自明な academic prose の新規作成・改稿では、reader-facing prose の前に `prose-reasoning-graph` の handoff を作るか受け取る
-- prose graph diagnostics は unsupported claim、weak bridge、experiment completeness、split / merge / reorder operations を logic-gap review と paragraph claim map の入力にする
-- prose graph handoff に `selected_ordering.ordered_anchors` がある場合は、全文 sentence anchor の topological order を DSL-to-prose input sequence として使う
-- graph responsibility は肯定形の academic prose contract に射影する。claim、definition、warrant、evidence relation、limitation、reviewer handoff を直接書く。否定形の boundary は Boundary / Limitation / Non-Goal slot に集約し、`ad hoc` label は責務名、evidence gap、verification route、prompt-defect classification のいずれかへ置き換える
-- reader-facing prose に入る前に DSL / projection 段階で `fix-now` finding を閉じる。claim contract、evidence map、paragraph claim map、graph-backed rewrite packet、または graph-backed unit を直し、graph diagnostics を再実行してから draft する
-- DSL / projection から prose に射影した後、同じ graph check を再実行する。閉じた DSL/projection には無かった finding が射影後に出た場合は `dsl_to_prose_prompt_defect` として academic prose-generation prompt を直す
+- 文書の責務は肯定形の academic prose contract に射影する。claim、definition、warrant、evidence relation、limitation、reviewer handoff を直接書く。否定形の boundary は Boundary / Limitation / Non-Goal slot に集約し、`ad hoc` label は責務名、evidence gap、verification route、prompt-defect classification のいずれかへ置き換える
 - `evidence map` で claim と support を section 単位で結ぶ
 - `notation ledger` を作り、symbol / term / abbreviation / unit / index を管理する
 - `paragraph claim map` を作り、各 paragraph の inferential role を固定する
@@ -83,7 +83,6 @@ method note、symbol-dense claim-heavy explanation の文書を、共通 graph/D
 1. paragraph order や discourse connective が論点なら discourse-relations JSONL を構造 evidence として添付する
 1. `evidence map` と `notation ledger` を作る
 1. `section contract` と `paragraph claim map` を作る
-1. 非自明な academic prose なら prose graph handoff を作るか受け取り、DSL / projection finding closure loop を回してから reader-facing prose に入る
 1. PDF-ready draft、数式、図版が必要なら TeX output plan を固定する
 1. run bundle を作る
 1. reader order で draft する
@@ -140,15 +139,13 @@ python3 tools/analysis/documents/doc_start.py \
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
+1. Draft and revise directly from sources, existing text, headings, and brief structure notes. Graph analysis is optional under the [analysis boundary](prose-reasoning-graph.md#optional-analysis-boundary), not a writing prerequisite. Do not require a graph/DSL, fixed handoff, whole-document sentence order, zero graph findings, or a graph-to-prose round trip. Verify claims, citations, definitions, and reader flow in the document itself.
+
 1. Read [agents/skills/academic-writing.md](academic-writing.md).
-1. Select this as the DSL-to-prose projection adapter when file/document responsibility is academic prose, scholarly note, thesis chapter, method note, or symbol-dense claim-heavy explanation; do not select it by length.
+1. Select this as the writing skill when file/document responsibility is academic prose, scholarly note, thesis chapter, method note, or symbol-dense claim-heavy explanation; do not select it by length.
 1. Use `$structure-planning` before drafting when section order, figure/table placement, claim/evidence layout, first section, or invalid interpretations are nontrivial.
 1. When claim flow or discourse connectives matter, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument`; keep TeX routing separate from discourse evidence.
-1. For nontrivial academic prose creation or revision, create or receive a `$prose-reasoning-graph` handoff before drafting; use unsupported-claim diagnostics, weak-bridge diagnostics, experiment completeness findings, and split/merge/reorder operations as advisory input to the evidence map, paragraph claim map, and logic-gap review.
-1. When the prose graph handoff includes `selected_ordering.ordered_anchors`, use that whole-document topological sentence order as the DSL-to-prose input sequence before drafting academic sections or paragraph transitions.
 1. Project academic responsibilities into positive prose contracts: state each claim, definition, warrant, evidence relation, limitation, and reviewer handoff directly. Use negative boundary wording only inside an explicit Boundary, Limitation, or Non-Goal slot, and replace `ad hoc` labels with a named responsibility, evidence gap, verification route, or prompt-defect classification.
-1. Before writing academic prose, close `fix-now` findings at the DSL/projection stage: revise the claim contract, evidence map, paragraph claim map, graph-backed rewrite packet, or graph-backed units, rerun graph diagnostics, and only draft prose after the selected profile has no active findings.
-1. After projecting DSL/projection state to academic prose, rerun the graph check. If new findings appear only after projection, record `dsl_to_prose_prompt_defect` against this skill's academic prose-generation prompt and repair it before continuing.
 1. In Codex, use `/plan` before planning when the runtime provides it, and use `/agent` to inspect available subagents when the runtime provides it.
 1. Fix a short `claim contract`: central contribution, gap, reader, and non-goal.
 1. Build an `evidence map`, `notation ledger`, and section contract before drafting prose.
