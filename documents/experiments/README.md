@@ -22,6 +22,6 @@ ExperimentRunner lifecycle、結果と可視化の保持を扱います。実験
 - [experiment-runner-ff97-lifecycle.md](experiment-runner-ff97-lifecycle.md)、[../design/experiment_runner.md](../design/experiment_runner.md):
   ExperimentRunner の lifecycle と設計。
 - [experiment-critical-review.md](experiment-critical-review.md)、[experiment-report-style.md](experiment-report-style.md): 実験レビューと報告。
-- `gpu-admission-r5-*.md`、`gpu-admission-r5-ordered-integration-interface.json`:
+- [gpu-admission-r5-source-packet.md](gpu-admission-r5-source-packet.md)、`gpu-admission-r5-ordered-integration-interface.json`:
   GPU admission の source packet と機械可読境界。
 - [result-log-retention-and-visualization.md](result-log-retention-and-visualization.md): 結果・ログ・可視化の保持規約。

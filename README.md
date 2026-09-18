@@ -156,9 +156,11 @@ and [the tool catalog](tools/catalog.yaml).
 
 | Directory | Responsibility |
 | --- | --- |
-| `agents/` | Skills, workflows, roles, communication, and task contracts |
-| `documents/` | Design, runtime, tool, and responsibility contracts |
-| `tools/` | Host adapters, checkers, Python tools, and CLI wrappers |
+| [agents/](agents/README.md) | Skills, workflows, roles, communication, and task contracts |
+| [documents/](documents/README.md) | Design, runtime, tool, and responsibility contracts |
+| [tools/](tools/README.md) | Host adapters, checkers, Python tools, and CLI wrappers |
+| [templates/](templates/README.md) | Source templates and their materialization boundaries |
+| [eval/](eval/README.md) | Evaluation definitions, implementations, and static fixtures |
 | `tools/runtime/dispatch/agent-canon/` | Compiled AgentCanon tools |
 | `tests/` | AgentCanon mechanism tests |
 | `bootstrap/` | Shared image and lifecycle manifest used by `bootstrap.sh` |
