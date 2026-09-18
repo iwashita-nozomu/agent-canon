@@ -21,7 +21,7 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 - 公開境界はモジュール docstring、`__all__`、先頭 `_` の命名で明示します。
 - コードファイル内の定義は、公開契約、公開入口、内部補助関数の読者順序で並べます。
 - コメントの意味と lifecycle は [コメント規約](./common/03_comments.md) を正本とし、非自明な関数境界では `# 責務:` を使います。
-- 入力検証、shape/dtype 正規化、例外送出は境界で先に行います。
+- 入力検証と shape/dtype 正規化は責任を持つ境界で一度行い、同一の信頼境界で保証済みの条件を再検査しません。
 - 型契約は `TypeAlias`、`Protocol`、型付き dataclass で表現し、`Any` と `cast` に逃げません。
 - class、dataclass、`Protocol`、composition、継承の判断は [オブジェクト指向設計方針](./object-oriented-design.md) に従います。
 - compatibility-preservation drift は旧入口、旧名、旧 wrapper、旧 config route を残して caller migration を先送りする状態です。
@@ -43,7 +43,9 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 ### 1. モジュール入口
 
 - 公開モジュールと package `__init__.py` にはモジュール docstring を必須にします。
-- モジュール docstring では責務、主要な公開要素、必要なら参照文書を明記しなければなりません。
+- モジュール docstring は責務を示し、[Docstring Semantic Contract](./DOCSTRING_GUIDE.md#semantic-contract)
+  に従って型・名前・既存の静的表現から復元できない意味だけを記述しなければなりません。
+  公開要素の一覧は複製しません。
 - Python 実装ファイルでは `from __future__ import annotations` を先頭に置くことを必須にします。
 - package `__init__.py` では `__all__` による公開 API の明示を必須にします。
 - `from X import *` は禁止します。例外は package `__init__.py` だけとし、その場合でも直後に `__all__` で公開名を絞り込まなければなりません。
@@ -95,7 +97,9 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 ### 4. 入力検証と正規化
 
-- 公開関数、constructor、factory は入口で引数検証を済ませなければなりません。
+- 入力検証は [共通の実装境界](../../ROOT_AGENTS.md#always-on-boundary) に従い、未信頼入力を受ける
+  owner で行わなければなりません。公開関数、constructor、factory という形式だけでは要求せず、
+  同一の信頼境界で保証済みの条件は再検査しません。必要な認可・安全性・外部境界の検査と失敗は保持します。
 - 契約違反には `ValueError` を使い、メッセージには対象の引数名と期待条件を含めなければなりません。
 - shape、dtype、device 側表現への変換は境界で一度だけ行うことを必須にします。
 - 暗黙の丸め、黙った clipping、条件付きの型すり替えを禁止します。補正が必要な場合は API か文書で明示しなければなりません。
@@ -111,7 +115,9 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 ### 6. 状態と副作用
 
-- 設定値、結果、完了通知のような不変データは `@dataclass(frozen=True)` を使うことを必須にします。
+- 設定値、結果、完了通知の不変性と意味契約を保つことを必須とし、既存の適切な不変型を再利用します。
+  表現の選択は [Dataclass と値オブジェクト](./object-oriented-design.md#3-dataclass-と値オブジェクト) に従い、
+  `@dataclass(frozen=True)` という構文を使うためだけの型追加は要求しません。
 - mutable な dataclass は、進行中の process state や accumulator のように更新責務が明確な場合だけ許可します。
 - library code での生 `print` を禁止します。デバッグは `jax.debug.print`、構造化ログ、または明示的な CLI 出力 helper を使わなければなりません。
 - JSONL や report へ出す値は、直列化前に安全な型へ正規化しなければなりません。
