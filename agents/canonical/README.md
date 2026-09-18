@@ -34,6 +34,7 @@ upstream design ../README.md agent canon overview
   - task 文書と run artifact の置き分け
 - [agents/canonical/CLI_ENTRYPOINTS.md](CLI_ENTRYPOINTS.md)
   - Codex の入口差分
+- [SOURCE_ROUTING.md](SOURCE_ROUTING.md): 未解決の source owner だけを選ぶ optional map。常時読取ではない。
 - [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md): intake / routing / bootstrap / implementation / completion の条件付き入口。
 - [ROOT_IMPLEMENTATION.md](ROOT_IMPLEMENTATION.md), [ROOT_EXECUTION.md](ROOT_EXECUTION.md), [ROOT_DELIVERY.md](ROOT_DELIVERY.md): source-specific AGENTS が必要な節だけ選ぶ詳細。
 - [agents/canonical/CODEX_SUBAGENTS.md](CODEX_SUBAGENTS.md)

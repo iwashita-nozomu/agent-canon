@@ -13,6 +13,37 @@ Read the selected section for task intake or a change to the relevant checkout/c
 Return to [Codex Workflow](CODEX_WORKFLOW.md) for phase selection; do not
 load inactive phases or restart completed intake merely by following a link.
 
+## Optional Context
+
+These are lookup routes, not a startup checklist. Read a named section only
+when its fact can change the current decision; stop once that fact is resolved.
+Reuse already loaded instructions and selected owners. Inactive rows require
+neither reading nor a `not_applicable` inventory unless an active contract asks.
+Selected Skills retain their existing full-body/EOF admission; delegated
+canonical documents require only the selected section, not every linked file.
+
+| Missing decision or active operation | Read only the matching owner/slice |
+| --- | --- |
+| Repository purpose or workflow overview is unknown | [repository README](../../README.md), [agents overview](../README.md), or [workflow index](../workflows/README.md), whichever answers it |
+| Task family or Skill route is unresolved | [routing](CODEX_ROUTING.md#contract-required-skill-set), [task families](../TASK_WORKFLOWS.md), selected `$agent-orchestration` / task-family Skill; [Skill index](../skills/README.md) only for discovery |
+| Implementation execution is active | selected `$codex-task-workflow` and task-family Skill; [implementation](CODEX_IMPLEMENTATION.md#5-implementation) |
+| Checkout/dependency identity changed or is not established | [identity readback](../COMMUNICATION_PROTOCOL.md#checkout-identity-readback), [branch reuse](#branch-reuse-default); unchanged commands do not retrigger it |
+| Subagent delegation is selected | [subagents](CODEX_SUBAGENTS.md); role candidates do not activate themselves |
+| A file must be placed or moved | [placement](ARTIFACT_PLACEMENT.md); an existing in-scope path needs no placement survey |
+| An active review requires its process | [review process](../../documents/conventions/REVIEW_PROCESS.md) |
+| Coordination is required by the selected route | [coordination](../../documents/codex/AGENTS_COORDINATION.md) |
+| Python is being edited | [Python conventions](../../documents/conventions/coding-conventions-python.md) |
+| Note creation/retention or a structured learning finding is active | [notes lifecycle](../../documents/operations/notes-lifecycle.md), selected [learning Skill](../skills/agent-learning.md) |
+| Validation obligations are unresolved | [profile/check matrix](../../documents/runtime/runtime-profiles-and-check-matrix.md); no environment-selection preflight |
+| A dependency module is being changed | [dependency owner](../../documents/rule/dependency-module-changes.md) |
+| A relevant unresolved hazard or prior failure is identified | the matching [guardrail](../../documents/notes/guardrails/README.md) or [engineering avoidance](../../documents/notes/guardrails/engineering_avoidances.md), not the entire collection |
+| Product container work is explicitly in scope | the product's own container documentation and execution owner, not an assumed `docker/README.md` in every checkout |
+
+The former Base Runtime Packet / Cross-Cutting Packet lists are represented by
+these conditions, not by an unconditional bundle. A configured route may require
+a specific slice; the index does not itself activate that route. Read generated
+`.codex/personal/skills/<selected-skill>/SKILL.md` only for a selected Skill.
+
 ## Agent Canon Freshness
 
 通常のコード・文書変更は、既存の作業経路で要求差分へ着手します。環境診断・変更の
