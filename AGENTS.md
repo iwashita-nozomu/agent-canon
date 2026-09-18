@@ -43,6 +43,7 @@ and must not be copied into generated consumer instructions.
 | AgentCanon source update and publication | [agents/skills/agent-canon-update.md](agents/skills/agent-canon-update.md), [agents/skills/pr-processing.md](agents/skills/pr-processing.md) |
 | subagent activation and handoff | [agents/skills/agent-orchestration.md](agents/skills/agent-orchestration.md), [agents/skills/subagent-bootstrap.md](agents/skills/subagent-bootstrap.md), [agents/canonical/CODEX_SUBAGENTS.md](agents/canonical/CODEX_SUBAGENTS.md) |
 | team composition, role/model/skills/authority/handoff selection | [agents/task_catalog.yaml](agents/task_catalog.yaml), [agents/skills/agent-orchestration.md](agents/skills/agent-orchestration.md), [agents/skills/subagent-bootstrap.md](agents/skills/subagent-bootstrap.md), [agents/canonical/CODEX_SUBAGENTS.md](agents/canonical/CODEX_SUBAGENTS.md) |
+| formatter settings and direct commands | [documents/design/formatting.md](documents/design/formatting.md) |
 | validation profile and closeout | [documents/runtime/runtime-profiles-and-check-matrix.md](documents/runtime/runtime-profiles-and-check-matrix.md), [agents/canonical/CODEX_WORKFLOW.md](agents/canonical/CODEX_WORKFLOW.md), `tools/runtime/lifecycle/task_close.py` |
 | GitHub Issue / PR publication and status | [agents/skills/pr-processing.md](agents/skills/pr-processing.md), [agents/internal-routines/github-status-lifecycle.md](agents/internal-routines/github-status-lifecycle.md) |
 

@@ -392,18 +392,30 @@ commit/push gate or a new receipt requirement.
 
 Use the validation route owned by the changed repository-specific responsibility.
 Examples or commands in another owner are not a universal checklist.
-Formatting is part of completing edits, not an optional repair after lint fails.
-Before final validation, staging, and commit or handoff, run the repository's
-configured formatter on the task's edited files and review and include its diff.
-Repeat after later edits, generation, fixers, or conflict resolution; an earlier
-result does not cover changed content. A combined command that actually formats
-the final files satisfies this step; tests or check-only lint do not. Preserve
-unrelated or user-owned changes and the repository's existing formatting scope.
-Do not add a formatter, configuration, hook, environment probe, or repository-wide
-reformat to satisfy this rule. If no formatter is configured, do not invent one.
-If the selected formatter fails or cannot run, record the command, affected files,
-and reason in the existing Issue / PR or task result; hand off as unverified,
-not as formatting-complete.
+Run the repository's configured formatter every time an editing batch ends,
+before final validation, staging, commit, PR publication, or handoff. Formatting
+is part of the edit, not optional repair after lint fails. Small changes,
+documentation-only changes, and already tidy-looking files are not exemptions.
+Run it on the task's edited files, review the resulting diff, and include it in
+the submitted change. Repeat after any later edit, generation, fixer, or conflict
+resolution; a previous run does not cover new content. A combined command that
+actually formats those final files satisfies this step. Tests, check-only lint,
+and an editor's format-on-save setting alone do not demonstrate that it ran.
+Read-only work does not need a formatter run. Preserve unrelated or user-owned
+changes and the repository's existing formatting scope; do not reformat the
+whole repository for a bounded task.
+
+Use tracked, tool-native settings selected by the repository owner rather than
+personal defaults or ad-hoc command overrides. Do not introduce a formatter,
+configuration, or hook during unrelated work; an explicit formatting-configuration
+request may establish or change them at their owner. If no formatter is
+configured, record that fact rather than silently choosing one. Do not add an
+environment probe, wrapper, or new validation gate merely to enforce this rule.
+Record the actual formatting command, target files, and result in the existing
+Issue / PR validation record or task result, including successful runs. If the
+selected formatter fails or cannot run, record the failure and affected scope;
+hand off as unverified, not as formatting-complete.
+Do not silently skip it or report static inspection as formatter execution.
 
 Validate the changed contract and its failure semantics, then use that owner's
 closeout route when required. A generated consumer root file does not authorize
