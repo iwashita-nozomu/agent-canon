@@ -139,6 +139,29 @@ cause proof instead; no additional cause-evidence note is required. Rejected,
 duplicate, already-covered, and unreachable findings retain their
 reason/evidence without activating cause investigation.
 
+The final goal of code-cause investigation is to pinpoint one concrete causal
+location in the code for the investigated failure. Record the source snapshot,
+file path, symbol, and exact expression, branch, call, state update, or smallest
+relevant block with its line range in the existing cause note or direct cause
+proof. For missing logic, identify the concrete point where the owning code
+fails to meet its obligation. A module name, candidate list, stack frame, or
+error/log emission site alone is not cause identification.
+
+Explain the reachable triggering input/state, the governing contract, and how
+that operation or omission produces the observed failure. Support this causal
+chain with source/specification evidence, mathematical or engineering reasoning,
+or targeted observations; a sufficient static proof does not require an extra
+run. Distinguish the causal location from where its effects become visible.
+Keep relevant interactions explicit and independent failures separate; do not
+invent one culprit merely to satisfy the goal. An unresolved location or causal
+chain remains `cause_unproven`: retain the candidates, missing evidence, and
+next discriminating check instead of declaring the search complete.
+
+This is the completion condition for diagnosis, not a one-line or one-file
+restriction on a requested repair. Do not make repair, surrounding cleanup, or
+all-consumer migration a completion condition of an investigation-only request.
+Use the existing note and handoff; do not add a schema, checker, or report.
+
 For an activated packet, record a compact cause-evidence note before the
 action. It has no fixed schema or candidate count: expand the
 changed target through evidence-linked edges and record the applicable evidence
@@ -169,12 +192,13 @@ packet. Mark an inapplicable dimension as bounded when that is supported by the
 evidence; do not manufacture a caller, side effect, sibling, or history search.
 
 The breadth is evidence-driven: do not impose an arbitrary full-repository
-scan or fixed candidate count. Stop when every alternative that could change
-the owner, fix surface, or validation has been disconfirmed or bounded. A
-static type/schema/parser/compiler/state invariant may establish a single
-cause; in that case record the invariant and why the narrower traversal is
-complete. Do not turn a symptom into a fix merely because its file appears in
-the search result. A packet is complete only when
+scan or fixed candidate count. For code causes, stop only when the concrete
+causal location and chain above are established and every alternative that
+could change the owner, fix surface, or validation is disconfirmed or bounded.
+A static type/schema/parser/compiler/state invariant may establish a single
+cause; record its concrete location and why the narrower traversal is complete.
+Do not turn a symptom into a fix merely because its file appears in the search
+result. When a repair is requested, a packet is complete only when
 `cause_hypothesis_selected -> action_derived_from_cause -> impact_and_validation_bound`
 is read back from the note. A straightforward packet may instead read back
 `direct_cause_proof -> action_derived_from_cause -> impact_and_validation_bound`.
@@ -191,10 +215,11 @@ The cause-to-action sequence is ordered, not a list of independent checks:
    owning mechanism, consumers, side effects, cleanup, and sibling surfaces.
 4. Compare only alternatives that could change that decision and record each
    as `disconfirmed`, `bounded`, or selected with its supporting evidence.
-5. Select the owning cause and state the expected mechanism. Derive the action
-   from that mechanism, then bind its reachable impact, affected contract, and
-   validation route. An unresolved cause stays analysis work; it does not
-   become a symptom-level action.
+5. Select the owning cause and explain its supported mechanism, including the
+   concrete location above for code causes. For a requested repair, derive the
+   action from that mechanism, then bind its reachable impact, affected contract,
+   and validation route. An unresolved cause stays analysis work; it does not
+   become a symptom-level action or a completed cause search.
 
 ## Root-Cause Repair Scope After Cause Selection
 
@@ -231,7 +256,7 @@ solution proposal. Otherwise return to cause/scope analysis with
 - Python code 変更では、`helper_function_inventory.py --changed --all-functions` を関数 / class / method 単位の evidence として使います。この tool は変更 Python file を報告対象にしつつ、whole-repo call graph context から direct callers / callees を保持します。変更 Python file count が 0 件の場合は `HELPER_INVENTORY_FILES=0` を scope evidence にします。
 - 修正箇所を選ぶ task では、先に `scan_code_dependencies.sh` で実コード依存を抜き、次に header dependency graph で読むべき design / docs / tests を確認します。
 - `required_action` や solution proposal より先に causal ambiguity と owner / fix / validation を変え得る alternative の有無を判定します。該当時だけ cause-evidence note を完成させ、incoming callers/entrypoints、owning mechanism/state/guards、downstream consumers/side effects/cleanup、sibling implementations/tests/docs/config を evidence-linked にたどります。straightforward finding は direct cause proof、rejected/duplicate/already-covered/unreachable finding は reason/evidence だけで閉じます。snapshot drift が原因候補になり得る場合だけ latest remote/Issue/branch history を追加します。
-- 原因候補の探索は evidence-linked な範囲で止めます。全 repo の機械的走査や固定候補数は要求せず、owner / fix / validation を変え得る代替が disconfirmed または bounded になった時点で完了します。静的 invariant が単一原因を証明する場合は、その invariant と狭い scope の十分性を direct cause proof に残します。
+- 原因探索の最終目標は、原因となるコードの具体的な一か所の特定です。[Cause Investigation Surface](#cause-investigation-surface) に従い、source snapshot、path、symbol、該当行/block と、入力/状態から現象に至る因果根拠を既存記録に残します。候補一覧・原因分類・症状の発生地点だけでは完了しません。一か所と因果関係を特定し、判断を変え得る代替を disconfirmed / bounded にしたら探索を止めます。十分な静的根拠に追加実行を要求せず、未特定は `cause_unproven` とし、根拠なく一つに断定しません。
 - activated packet の `required_action` は `Selected Cause` と `Expected Mechanism` から、straightforward packet の action は direct cause proof から導出します。症状だけの修正提案は `cause_unproven` として保留します。発生不能な分岐と過剰・重複ガードは、`reason_code=unreachable_branch|overcheck` と証拠を残して review 対象から除外します。
 - コード改善の修正箇所を選ぶ task では、この skill の `Cause Investigation Surface` と `Root-Cause Repair Scope` に従って `Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`fix_surface_validated=yes` を実装前に固定します。
 - 実装後は `Post-Change Evidence` と `Hypothesis Decision: supported|rejected|inconclusive` を残します。`rejected` または `inconclusive` の場合は、同じ実装 pass を広げず次仮説へ戻します。
@@ -366,7 +391,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Read [documents/design/dependency-manifest-design.md](../../documents/design/dependency-manifest-design.md).
 1. If the task selects or justifies a fix surface, read this skill's `Cause Investigation Surface` and `Root-Cause Repair Scope`; use `change-review` for the findings-first review after the owner is selected.
 1. For code-improvement work, do not implement until the artifact records `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `fix_surface_validated=yes`.
-1. Before `required_action` or a solution proposal, activate cause investigation only when causal ambiguity remains unresolved or an alternative could change owner/fix/validation. For an activated packet, record a compact cause-evidence note covering the applicable incoming callers/entrypoints, owning mechanism/state/guards, downstream consumers/side effects/cleanup, sibling implementations/tests/docs/config, conditional temporal evidence, reachability/overcheck analysis, alternative disposition, selected cause, expected mechanism, and action derivation. For a straightforward packet, record direct cause proof instead; rejected/duplicate/already-covered/unreachable findings need only their reason and evidence. Do not require an arbitrary full-repository scan or fixed candidate count; stop when owner/fix/validation-changing alternatives are disconfirmed or bounded, or record the invariant that proves a narrower scope sufficient.
+1. Before `required_action` or a solution proposal, activate cause investigation only when causal ambiguity remains unresolved or an alternative could change owner/fix/validation. For an activated packet, record a compact cause-evidence note covering the applicable incoming callers/entrypoints, owning mechanism/state/guards, downstream consumers/side effects/cleanup, sibling implementations/tests/docs/config, conditional temporal evidence, reachability/overcheck analysis, alternative disposition, selected cause, expected mechanism, and action derivation. For a straightforward packet, record direct cause proof instead; rejected/duplicate/already-covered/unreachable findings need only their reason and evidence. Do not require an arbitrary full-repository scan or fixed candidate count. Apply the code-location completion condition in [Cause Investigation Surface](#cause-investigation-surface), including for direct cause proof: identify one concrete causal code location and its supported mechanism, then stop once owner/fix/validation-changing alternatives are disconfirmed or bounded. An unresolved location or causal chain remains `cause_unproven`; investigation-only work does not acquire repair completion obligations.
 1. After the change, record `Post-Change Evidence` and `Hypothesis Decision: supported|rejected|inconclusive`. If the decision is `rejected` or `inconclusive`, return to hypothesis selection instead of expanding the implementation pass.
 1. Choose the mode that answers the task without hiding dependency evidence:
    - code dependency surface: run `scan_code_dependencies.sh`
