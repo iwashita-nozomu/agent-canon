@@ -226,8 +226,10 @@ PARENT_ORCHESTRATION_DOCS = {
     ROOT / "agents" / "canonical" / "CODEX_IMPLEMENTATION.md": (
         "write-capable",
         "typed blocked/retry/user-report evidence",
-        "integration executor",
         "decision-owning reviewer",
+    ),
+    ROOT / "agents" / "canonical" / "CODEX_INTAKE.md": (
+        "integration executor",
     ),
     ROOT / "agents" / "skills" / "agent-orchestration.md": (
         "write-capable child",

@@ -48,6 +48,9 @@ before code/API changes. Inspect real callers, APIs, configuration, and extensio
 points; keep caller orchestration separate from reusable-library responsibility.
 Add mechanisms, dependencies, exact pins, or guards only for an evidenced current
 need, not speculation. Preserve native resolution and required integrity checks.
+When an existing dependency contract requires an exact pin, only execution that
+needs a dependency change uses a published PR commit through that consumer-owned
+pin; otherwise use the consumer's declared resolution.
 Establish reachability and existing guarantees before extra error handling;
 unknown is neither impossible nor a defect. Keep authorization and boundary safety.
 
