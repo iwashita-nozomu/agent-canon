@@ -11,9 +11,11 @@ downstream implementation tools/validation/semantic/entrypoint/check_entrypoint_
 @dependency-end
 -->
 
-This common base supplies shared entry behavior for consumer and source-specific
-repository roots. It does not own task procedures, command recipes, role
-lifecycles, implementation policy, validation schemas, or source-editing policy.
+This common base carries shared behavioral constraints for consumer and
+source-specific repository roots. Keep those constraints self-contained;
+repository-specific instructions resolve their owners and application.
+Task procedures, command recipes, role lifecycles, validation schemas, and
+source-editing routes remain with those owners, not in this base.
 
 ## Repository Role
 
@@ -24,22 +26,24 @@ specific instructions, usable without an AgentCanon checkout or runtime.
 Composition is not a live projection, runtime import, updater, vendor checkout,
 submodule, or symlink.
 
-The AgentCanon source checkout owns its source and canonical owner map. Its
-source-specific [AGENTS.md](AGENTS.md) takes precedence for those responsibilities;
-this base's consumer maps and routes do not redirect source work. Details stay
-with the applicable repository's specific instructions and canonical owners.
+Directory-local `AGENTS.md` files may narrow behavior for their subtree. They
+must add only the responsibility owned by that subtree and must not copy a
+root, workflow, or Skill policy for visibility.
 
 ## Reader Map
 
 For a consumer root, use the [Runtime Owner Map](#runtime-owner-map) below and
-the appended consumer-specific instructions. For a source-specific root, use
-that checkout's [AGENTS.md](AGENTS.md) Reader Map and canonical owners.
+the appended consumer-specific instructions. Repository-specific owner maps
+take precedence for their responsibilities without replacing shared constraints.
 
 ## Always-On Boundary
 
 The explicit user request and the current repository-specific canonical owner
 are the source of truth. Preserve unknown dirty, staged, untracked, branch,
 and worktree state until the applicable Git safety owner classifies it.
+
+Follow the selected owner and its validation route rather than inventing a
+fallback, wrapper, compatibility path, or local copy of policy.
 
 Preserve the problem class, valid input domain, and output guarantees required
 by the explicit user request and applicable canonical contract. A bounded
@@ -68,6 +72,38 @@ lines nor a smaller diff justifies omitted behavior, and completeness does not
 authorize speculative generalization or unrelated library or consumer changes.
 Keep the decision with the existing implementation and review owners, without
 adding a checker, report, or approval gate to enforce simplicity.
+
+Do not add or extend a public API without an explicit user request or approval
+covering that public change. This includes exported or re-exported functions,
+types and methods, endpoints, and supported parameters or CLI commands/options.
+A general feature, bug-fix, or cleanup request is not authorization to enlarge
+the public contract. Reuse an already explicit authorization without asking
+again, but do not treat authorization as a waiver of the investigation below.
+
+Before designing or implementing a public API addition, investigate on the
+premise that existing capabilities can satisfy the requirement. Inspect actual
+callers and the relevant current APIs and documentation, including
+configuration and extension points, standard facilities, and adopted
+dependencies. Evaluate direct use, configuration, and composition before
+proposing a new public surface. Not finding the proposed name, not having
+investigated, preferring different arguments or placement, or anticipating
+future reuse is not evidence of a missing capability. Bound the investigation
+to the required behavior and related owners; stop when evidence is sufficient
+to decide. Unavailable evidence remains unknown, not proof that a capability is
+absent or permission to add an API.
+
+When existing capabilities meet the required contract, use them without adding
+an API. Otherwise, record the examined candidates and source references, the
+concrete unmet contract, and why direct use or composition cannot meet it in
+the existing design rationale described below; propose only the smallest
+necessary public change. A demonstrated gap establishes necessity, not
+authorization. Public contracts add compatibility and maintenance obligations,
+so convenience alone does not justify expanding them. Without sufficient
+evidence and explicit authorization, leave the addition as a proposal; continue
+independent authorized work that does not enlarge the public contract.
+Existing-API use and internal fixes do not acquire a new approval requirement.
+Keep this boundary with existing design, implementation, and review owners; add
+no checker, registry, mandatory report, or separate approval system.
 
 Whenever adding or changing code or an API, always keep the necessity rationale
 in the responsible repository's durable design document, not only in task
@@ -163,17 +199,22 @@ approximation, with an error analysis and validation against an independent
 reference or invariant. Keep the investigation and validation with the
 applicable repository's algorithm and numerical owners.
 
-Never automatically discard, delete, overwrite, hide, or withhold already-produced
-results because of numerical issues such as NaN/Inf, nonconvergence, conditioning,
-rounding, or residual/tolerance violations. Preserve original outputs, available
-diagnostics, and actual status, and report numerical concerns and interpretation
-limits alongside them. Result retention and return must not depend on a numerical
-success judgment: failure to support a claim does not authorize loss of the
-observation. Required stopping, safety, and test-failure semantics remain in force;
-keeping a result is not declaring it correct, and stopping computation does not
-authorize deleting results obtained so far. Use existing result owners without
-adding a checker, acceptance threshold, mandatory trace, or rerun prerequisite
-merely to preserve or report results.
+Report numerical concerns and interpretation limits honestly; do not hide failures
+or present invalid results as success. Numerical symptoms alone are not a
+universal research-failure judgment. Preserve non-experiment results and
+experiment observations whose failure has not been established by the applicable
+topic protocol and evidence; do not introduce an automatic numerical discard gate.
+For a confirmed failed experiment, immediately delete its experiment-only code,
+configuration, and artifacts unless evidence establishes physical properties as
+the cause. Unknown cause, numerical or implementation trouble, debugging value,
+and possible future reuse do not justify retention or waiting for task/PR closeout.
+Apply this disposition through the existing experiment lifecycle and artifact
+owners; a generic preserve-results or append-only rule must not override it.
+Keep only a concise failure, cause/evidence, and deletion or physical-retention
+record in the existing Issue or task record, not a relocated experiment bundle.
+Do not extend deletion to successful results, shared code, other owners' data,
+or Git history. Preserve required safe stopping and scoped deletion authority;
+do not add a classifier, checker, archive prerequisite, or rerun to decide cleanup.
 
 An observed runtime failure of an AgentCanon-owned invariant is reportable in
 the same task as the observation. The first record does not wait for a repeated
@@ -284,14 +325,13 @@ For a consumer root, use only the following consumer-owned map:
 ## Task Entry
 
 Resolve the task owner and validation oracle through the applicable Reader Map.
+A bounded request with an identified owner, path, and targeted validation stays
+bounded; broader design, orchestration, research, or subagent machinery activates
+only when its owner-defined condition is present.
+
 For AgentCanon changes from a consumer root, select a separate qualified
 AgentCanon development checkout. Keep consumer trees unchanged unless the
 consumer task explicitly owns the resulting generated file.
-
-When a root [AGENTS.md](AGENTS.md) begins with the literal `@ROOT_AGENTS.md`, read this
-common base first and then continue into that file's source- or consumer-specific
-Reader Map. The marker is a reference for the reader, not a claim of automatic
-expansion or runtime import.
 
 A progress update is not a final report. Keep the request active while required
 implementation, validation, integration, publication, cleanup, or its result
@@ -351,6 +391,7 @@ commit/push gate or a new receipt requirement.
 ## Validation Routing
 
 Use the validation route owned by the changed repository-specific responsibility.
+Examples or commands in another owner are not a universal checklist.
 Run the repository's configured formatter every time an editing batch ends,
 before final validation, staging, commit, PR publication, or handoff. Formatting
 is part of the edit, not optional repair after lint fails. Small changes,

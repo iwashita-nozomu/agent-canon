@@ -40,6 +40,12 @@ abstraction admission は [documents/conventions/software-engineering-principles
 
 大きめの refactor を、feature 追加ではなく挙動保存つきの再編として扱います。
 
+明示された重複旧実装の廃止には
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+を適用します。以下の挙動保存、dependency-expanded scope、二段階移行、consumer closure は、
+その廃止を active caller ゼロや全面移行待ちへ戻す条件ではありません。影響範囲と編集範囲を
+区別し、正本の保証を保ちながら旧入口を削除して、残存参照の通常エラーを記録します。
+
 ## Software Engineering Principle Route
 
 refactor は、[ソフトウェア工学原則](../../documents/conventions/software-engineering-principles.md)
@@ -75,6 +81,7 @@ refactor-loop は親 packet または変更後 responsibility graph が明示し
 
 共有 module、canonical tool、親 repository、consumer projection が同じ
 topology を構成する refactor は、次の順序を正本とします。
+ただし RC-09 の旧実装廃止だけを所有する変更には、全面移行を終了条件として追加しません。
 
 1. user-facing consumer / parent で完成形を先に確定する。責務、パス、所有境界を
    明示し、その完成構造を materialize する。
@@ -177,6 +184,7 @@ or writing.
    stage 2 は `usage-surface repair` で、caller、docs、workflow、skill、hook、
    config、report consumer を新しい surface に合わせます。test、smoke、
    behavior execution は二段完了後の return-gate validation に集約します。
+   ただし RC-09 の廃止では、対象外 consumer の移行を stage 2 として要求しません。
 1. 実装前に `Targets To Change:` として、変更する target trace を列挙します。
    実在する関数、method、class は `path:start-end:qualname`、cohesive な
    source region、behavior unit、responsibility unit は `path:start-end:region-id`
@@ -257,6 +265,7 @@ trace、behavior contract、latest diff を渡します。OOP の数値や findi
 Stopping、logging、runtime tolerance、preconditioner など、複数 algorithm
 から参照される policy / base abstraction を一本化する refactor では、依存先を
 先に個別修正しません。最初の slice は正本 surface の確定に使います。
+以下の利用側更新は、RC-09 の廃止で明示された編集範囲を拡大しません。
 
 1. `Canonical Surface:` として、責務を持つ module、public object、Info / State
    / SolveConfig ownership、既存 primitive helper の扱いを固定します。
@@ -544,6 +553,8 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
 ## Runtime Contract Clauses
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+For explicitly retired duplicate implementations, apply [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+and the boundary in [Purpose](#purpose); the clauses below do not require zero active callers or out-of-scope migration.
 
 1. Start from the dependency-expanded scope, not from the initially mentioned
    file. The editable candidate set is every file returned by dependency
@@ -601,6 +612,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    stage updates every caller, document, workflow, skill, hook, config, and
    report consumer that uses the moved surface. Put test, smoke, and behavior
    execution in return-gate validation after both stages are complete.
+   RC-09 retirement does not require a second stage for out-of-scope consumers.
 1. Explicitly list every target trace being changed before editing. Use
    `path:start-end:qualname` for actual functions, methods, and classes, or
    `path:start-end:region-id` for cohesive source regions, behavior units, and

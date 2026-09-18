@@ -18,13 +18,15 @@ downstream implementation tools/validation/semantic/runtime/check_agent_runtime_
 
 ## Repository Role
 
-Use this entrypoint for the standalone AgentCanon source checkout. Its
-source-specific owner maps below supplement the common base; they do not apply
-to a consumer's generated instructions.
+Use this entrypoint only for the standalone AgentCanon source checkout. The
+leading `@ROOT_AGENTS.md` means: read [ROOT_AGENTS.md](ROOT_AGENTS.md) first, then
+return here for source-specific owner selection. It is an explicit read, not
+automatic expansion or a runtime import.
 
-Directory-local [AGENTS.md](AGENTS.md) files may narrow behavior for their subtree. They
-must add only the responsibility owned by that subtree and must not copy a
-root, workflow, or Skill policy for visibility.
+The maps below own AgentCanon source, runtime, publication, and validation
+routes. They replace the common base's consumer map for this checkout only,
+not its shared constraints. This file is not an input to consumer composition
+and must not be copied into generated consumer instructions.
 
 ## Reader Map
 
@@ -47,8 +49,11 @@ root, workflow, or Skill policy for visibility.
 
 ## Always-On Boundary
 
-Follow the selected owner and its validation route rather than inventing a
-fallback, wrapper, compatibility path, or local copy of policy.
+Keep AgentCanon-specific paths and owner selection here; use the entrypoint
+responsibility grammar row below when changing that boundary. Shared behavior
+belongs to the common base; task procedures remain with the selected Skill,
+workflow, or internal routine. Consumer-specific instructions belong to that
+consumer, not to this source entrypoint.
 
 ## Runtime Owner Map
 
@@ -66,9 +71,7 @@ fallback, wrapper, compatibility path, or local copy of policy.
 Apply the ChatGPT / Codex Reader Map row before repository orchestration.
 Only after Codex admission, resolve the task shape and canonical owner through
 the Reader Map and public Skill registry, and read the selected owner before
-editing. A bounded request with an identified owner, path, and targeted
-validation stays bounded; broader design, orchestration, research, or subagent
-machinery activates only when its owner-defined condition is present.
+editing.
 
 Use the team-composition Reader Map row for the shared team-selection boundary.
 Do not replace a selected model or omit a selected role without an
@@ -77,5 +80,4 @@ evidence-backed handoff update to the responsible owner.
 ## Validation Routing
 
 Use the active runtime profile and the validation / closeout Reader Map row
-for source-wide evidence when required by the selected route. Examples or
-commands in another owner are not a universal checklist.
+for source-wide evidence when required by the selected route.

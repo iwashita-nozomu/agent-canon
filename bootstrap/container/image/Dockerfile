@@ -1,7 +1,8 @@
 # @dependency-start
 # contract environment
-# responsibility Defines the stable shared AgentCanon Python, Rust, and LSP environment image.
+# responsibility Defines the stable shared AgentCanon Python, Rust, LSP, and native diagnostic environment image.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
+# upstream design ../../../documents/design/cpp-debugging.md native diagnostic provisioning and execution boundary
 # upstream implementation ../../tools/runtime/container/compile.sh source-mounted Rust compilation
 # downstream implementation ../lifecycle/entrypoint.sh resident liveness and dispatch
 # @dependency-end
@@ -49,7 +50,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       ca-certificates git nodejs=18.19.1+dfsg-6ubuntu5 npm=9.2.0~ds1-2 \
-      python3.12 python3-packaging python3-yaml build-essential curl; \
+      python3.12 python3-packaging python3-yaml build-essential curl gdb valgrind; \
     case "$TARGETOS/$TARGETARCH" in \
       linux/amd64) rustup_target=x86_64-unknown-linux-gnu; rustup_sha=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c ;; \
       linux/arm64) rustup_target=aarch64-unknown-linux-gnu; rustup_sha=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c ;; \
