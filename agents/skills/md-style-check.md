@@ -17,7 +17,7 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter 
 ## Visualization Formatter Gate
 
 For Mermaid artifacts, `md-style-check` is a formatter/checker adapter to
-`code-visualization`. It receives the owner's `VisualizationSourceUniverse`,
+[`code-visualization`](code-visualization.md). It receives the owner's `VisualizationSourceUniverse`,
 canonical `ToolCall`, and `ProjectionCoverageManifest`, formats the complete
 artifact, and returns post-format readback identities for the owner's final
 coverage status. Formatting owns syntax only: it cannot repair an omission by
@@ -173,7 +173,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Check [`coding-conventions-project.md`](../../documents/conventions/coding-conventions-project.md) and
    [`05_docs.md`](../../documents/conventions/common/05_docs.md).
 1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
-1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, or `agent-canon docs` failures.
+1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math、docs-check, formatter, or `agent-canon docs` failures.
 1. Use this skill with the changed document's owner. Follow [Purpose](#purpose)
    for structural-work applicability; Markdown or claim/evidence edits alone do
    not require prose-graph/structure planning or a record of unselected work.
