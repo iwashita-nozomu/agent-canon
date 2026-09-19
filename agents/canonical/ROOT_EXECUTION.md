@@ -17,7 +17,37 @@ additional startup packet or a dependency of generated consumer instructions.
 ## Configured execution and bounded diagnosis
 
 Run the current repository owner's existing entrypoint with its configured
-settings and standard tool defaults. Manual environment selection for ordinary
+settings and standard tool defaults. This owner-defined procedure is the fixed
+execution route: entrypoint, configuration resolution, required backend,
+formatter, validation, and publication steps. Task inputs may vary through its
+documented parameters; fixed does not mean frozen argv, absolute paths, versions,
+or SHAs. Preserve native resolution and existing integrity/pin requirements.
+
+Carry the selected route through retries, resumption, and delegation. Reuse its
+owner reference and known command in the existing task/Issue or handoff; a callee
+consumes that selection rather than rerouting. Do not add a route manifest, lock,
+extra approval, or per-command proof to establish continuity.
+
+An entrypoint failure is not permission to call a lower-level implementation,
+recreate the steps in a temporary script or GitHub Actions workflow, add a wrapper,
+or substitute another backend, runtime, daemon, worker, or formatter. Use a direct
+native command or alternate transport only when the existing owner already defines
+it for that operation and its conditions hold; discovery or success alone does
+not authorize an alternative or establish equivalent validation.
+
+Use the actual failed command/result to locate and repair the cause at its owner
+first; follow directly related consumers for demonstrated in-scope defects, not
+unrelated cleanup. Retry through the same entrypoint only when reruns are allowed.
+If the route itself must change, update its owning configuration, implementation,
+and instructions as applicable within the authorized scope and existing Issue/PR
+workflow. Record the reason and validate the changed contract before claiming
+success. A failure or available tool is not authority to change the route.
+
+The engineering reason is that bypassing the entrypoint can drop its configuration,
+permissions, resource limits, or failure semantics. Success on that bypass does
+not prove the selected route; repairing its owner avoids a second implementation.
+
+Manual environment selection for ordinary
 execution is prohibited: do not ask the user to choose an environment or inject
 host/container, OS/WSL, CPU/GPU backend, runtime, or profile selectors through
 ad-hoc command flags, environment variables, or configuration edits. Existing
