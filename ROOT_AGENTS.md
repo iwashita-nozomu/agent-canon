@@ -106,7 +106,11 @@ Continue safe, authorized implementation through delivery; report concrete block
 and the next owner when stopped. Separate commit/push authority and preserve mixed
 work; never force-push, mutate main, or publish outside scope. Report the result,
 material findings, evidence, and limits; distinguish implemented, verified,
-published, and applied. Keep comparable reasoning and results on the Issue.
+published, and applied. Before writing any verification result, including progress
+or interrupted work, structure established facts, evidence, scope, and limits;
+preserve distinct findings and counterevidence. Use that same result across chat,
+Issue/PR comments, and reports through the applicable reporting owner. Keep
+comparable reasoning and results on the Issue.
 
 ## Validation Routing
 

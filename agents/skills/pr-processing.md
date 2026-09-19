@@ -9,6 +9,7 @@ upstream design agent-orchestration.md execution-time-aware work-conservation co
 upstream design ../../documents/agent-canon/agent-canon-update-route.md source PR versus parent pin route
 upstream design ../internal-routines/github-connected-work.md current-session GitHub transport and partial-validation delivery route
 upstream design ../internal-routines/github-status-lifecycle.md deterministic GitHub Issue status-label reconciliation and evidence contract
+upstream design ../internal-routines/verification-result-structuring.md mandatory pre-write result structuring
 upstream design ../../documents/conventions/coding-conventions-testing.md Issue-linked bug reproduction evidence owner
 upstream implementation ../../tools/repository/github/github_publish.py publishes PRs and writes summary artifacts
 downstream implementation ../../.codex/personal/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
@@ -205,6 +206,11 @@ post_merge_base_head=<sha or none>
 ```
 
 ## Publication boundary
+
+Before drafting, updating, or posting any Issue/PR body or comment containing
+verification results, invoke [verification result structuring](../internal-routines/verification-result-structuring.md).
+Publish from the same structured result used for chat and reports, including
+partial or blocked outcomes; retain the existing authority and readback controls.
 
 Before merge/ready/close/update, read fresh remote state and confirm authority. After the write, read back the PR/issue state. These write controls apply in both single and queue modes.
 
