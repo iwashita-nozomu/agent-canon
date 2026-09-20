@@ -26,8 +26,12 @@ auto-loaded instructions short; place procedures in conditionally read files.
 
 ## Always-On Boundary
 
-Stay within the authorized task and preserve unknown user/Git state. Preserve the
-required problem class, valid inputs, guarantees, and failure semantics; neither
+Stay within the authorized task and preserve unknown user/Git state. Preservation
+is not abandonment: inspect Git inconsistencies, repair within task authority,
+or hand off preserved state with a concrete owner/action. Unfamiliar diffs or
+absent separate instructions do not waive this duty; dirty is not itself
+inconsistent. Preserve the required problem class, valid inputs, guarantees, and
+failure semantics; neither
 small diffs nor completeness justify shortcuts or unrelated work. Follow the
 selected owner rather than inventing a fallback, wrapper, or policy copy.
 
