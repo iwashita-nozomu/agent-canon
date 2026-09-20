@@ -66,10 +66,32 @@ findings do not create another implementation or review wave.
 
 Code/doc repair remains owned by the changed surface. This skill consumes the resulting validation/review evidence and does not invent a second implementation workflow or duplicate selected gates.
 
+Before waiting for, retrying, or repairing a test, establish its requirement from
+that owner's changed contract or the requested operation. Consume the existing
+[validation boundary](agent-orchestration.md#validation-boundary-contract);
+sharing a repository or CI run, or being pending/failed, is not that requirement.
+Do not wait for or rerun unselected, unrelated tests to finish authorized work.
+Record observed unrelated failures separately, not as this Issue's verification
+gap, mandatory follow-up, or completion dependency. Do not cancel another owner's
+running tests or suppress their results.
+
+When relevance is uncertain, inspect the changed paths, test target, and existing
+failure evidence only as needed to resolve the affected action. Unknown is not
+proof of either a regression or irrelevance. Repair confirmed in-scope failures;
+keep required but unavailable verification explicit through the existing
+handoff/status owner. Neither uncertainty nor an unrelated failure blocks
+independent authorized work, and neither permits claiming required checks passed.
+
 ## Base integration and merge readiness
 
-This sequence activates only when the requested operation can merge a PR or
-declare its head handoff-ready:
+PR creation/update and review handoff use the existing
+[connected-work route](../internal-routines/github-connected-work.md#5-refresh-main-publish-the-pr-and-leave-a-durable-handoff)
+for fresh base integration, conflict resolution, scoped validation, and readback.
+They do not require `automatic_merge_ready`; publish actual validation limits
+without claiming the head is verified or merge-ready.
+
+The sequence below applies to an authorized merge. Assessing merge readiness
+alone does not authorize the merge operation:
 
 ```text
 snapshot -> refresh_base -> integrate_on_pr_branch -> resolve
@@ -135,8 +157,12 @@ automatic_merge_ready :=
   and pr_description_is_current
 ```
 
-Stop when any term is unproven. Do not reuse old checks, infer conflict-owner
-intent, ignore branch-owned failure, or merge after head/base movement. The
+If any term is unproven, withhold automatic merge and the merge-ready claim,
+not independent repair, PR publication, or Issue handoff. Required branch checks
+still block merge even when their failure is unrelated to the changed contract;
+do not bypass protection or relabel a failed check as passed/not_applicable.
+Do not reuse old checks, infer conflict-owner intent, ignore branch-owned failure,
+or merge after head/base movement. The
 AgentCanon source lane in `$agent-canon-update` is the concrete regression
 fixture for this ordering; this skill consumes that route without duplicating
 its source-update policy or machine schemas.
@@ -155,8 +181,14 @@ and branch_code_executed == false
 Billing/spending-limit, runner-allocation, or service-outage evidence can satisfy
 the annotation term. If any repository-owned step started and failed, the result
 is `branch_owned_failure`; local success cannot replace or downgrade it.
+This class records an executed CI failure, not proof that the current diff caused
+it or that it blocks every operation. Apply the scope decision above while
+preserving the actual result and any repository-required merge restriction.
 
-For an admitted unavailable executor:
+For an admitted unavailable executor, use the following alternative-evidence
+route only when the requested operation requires that evidence. Otherwise record
+the unavailable required verification through the existing handoff route; do not
+require replacement execution merely to publish a PR:
 
 1. Fix repository, PR URL, base SHA, and head SHA; use a clean checkout and
    read back dirty state.
@@ -282,4 +314,13 @@ Status reconciliation is conditional. Read-only inspection, ordinary review, and
 
 ## Completion
 
-A single PR completes when its blocking findings/required validation are closed and the requested publication state is read back. A queue completes according to its dependency graph and requested scope; unrelated candidates do not become implicit obligations.
+Completion is specific to the requested operation. PR creation/update or review
+handoff completes when the scoped change and its owning validation/review
+disposition are published and read back through the existing publication route.
+An unavailable required check remains unverified; unfinished in-scope repairs
+remain open under their owner, not implementation-complete because a PR exists.
+Merge completion additionally requires the merge conditions and post-merge
+readback above. Do not import merge-only checks or unrelated tests into a
+publication/handoff completion condition. A queue completes according to its
+dependency graph and requested scope; unrelated candidates do not become implicit
+obligations.
