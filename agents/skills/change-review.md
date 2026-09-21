@@ -7,7 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../documents/design/responsibility-rationale.md durable finding and OOP-review activation rationale
-upstream design ../../documents/design/responsibility-cleanup.md duplicate retirement and remaining-reference error contract
+upstream design ../../documents/design/responsibility-cleanup.md duplicate retirement and required consumer migration contract
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first review precedence and evidence model
 upstream design ../../documents/conventions/common/03_comments.md decision-comment review policy
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue authority and packet policy
@@ -82,9 +82,10 @@ A repeated-responsibility finding is material only when evidence shows at least 
 
 Prefer direct use of an existing canonical owner. For a confirmed duplicate selected for retirement,
 apply [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-even when callers remain; retaining the old entrypoint or requiring all consumers to migrate is not
-a valid review action. Extract a shared abstraction only at a stable responsibility boundary that
-passes abstraction admission. Retain separate implementations only for evidenced differences in
+even when callers remain. Those callers identify necessary migration work, not a reason to retain
+the old entrypoint or waive affected consumer repairs. Do not demand unrelated consumer changes.
+Extract a shared abstraction only at a stable responsibility boundary that passes abstraction admission.
+Retain separate implementations only for evidenced differences in
 domain meaning, lifecycle, failure semantics, caller contracts, or change reasons. Caller-specific
 flags, branches, or privileged reach-around indicate that the abstraction boundary is not stable.
 
@@ -253,13 +254,15 @@ even when that unit spans more than the file containing the symptom.
 
 The selected unit closes the root mechanism and covers its required retained
 behavior, side effects, failure handling, rollback, cleanup, docs, tests, and
-selected validation. For RC-09 retirement, reachable-effects closure records
-known remaining references and their ordinary errors; it does not require
-preserving their success or expanding the authorized edit scope. Out-of-scope
-migration remains with the callers. Do not demand restoration, a compatibility
-path, or an error-only stub when deletion already produces the required error.
-Distinguish these expected reference errors from retained-owner regressions and
-unrelated failures. Do not expand into unrelated cleanup or historical tidying.
+selected validation. For RC-09 retirement, this includes repairing and validating
+consumers whose contracts or connections change. Remaining-reference errors in
+retained consumers reveal missed migration, not successful completion. Distinguish
+intentional negative tests of retired entrypoints from those errors, retained-owner
+regressions, and unrelated failures. Apply RC-09's concrete authority/access-blocker
+handling; a repository or owner boundary alone does not waive necessary repairs.
+Do not demand restoration, a compatibility path, or an error-only stub when native
+errors already expose stale references. Do not expand into unrelated cleanup or
+historical tidying.
 
 Symptom suppression, a wrapper or compatibility shim that leaves the root
 mechanism open, test-only relaxation or oracle weakening, and a nearby local

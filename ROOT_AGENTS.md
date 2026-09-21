@@ -35,6 +35,11 @@ failure semantics; neither
 small diffs nor completeness justify shortcuts or unrelated work. Follow the
 selected owner rather than inventing a fallback, wrapper, or policy copy.
 
+Root dependency fixes include necessary consumer migration. Fix the root, trace
+affected uses, and repair them; active use is not a veto or a reason to retain
+the old path. Bound work by changed contracts, not the initially named files;
+report concrete authority/access blockers as incomplete migration.
+
 Public API additions/extensions (exports, types/methods, endpoints, parameters,
 CLI commands/options) require explicit user authorization for that public change;
 a general feature/fix/cleanup request is insufficient. First investigate existing
