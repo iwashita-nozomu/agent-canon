@@ -40,8 +40,9 @@ Optional document topology planning does not make this step optional.
 1. At normal work boundaries, retain established findings and evidence in the
    existing task/Issue record, rather than reconstructing them from memory at
    closeout. Before each output, reconcile that record with the results obtained
-   so far. Organize each distinct finding using the relationships below; prose
-   or a small table is enough, with no required empty fields or serialization.
+   so far. Organize each distinct finding using the relationships below. These
+   are semantic relationships, not prescribed output columns or headings;
+   no empty fields or serialization are required.
 
    | Relationship | Content |
    | --- | --- |
@@ -62,9 +63,10 @@ Optional document topology planning does not make this step optional.
    or an explicitly identified retained record. Do not silently omit facts to
    shorten the response. Unrun is not passed, partial validation is not complete
    validation, and a document edit is not evidence of runtime behavior.
-4. Write from this structure to the applicable, authorized destinations in the
-   current task. Adapt presentation, not facts or their limits. For Issue-backed
-   work, leave comparable conclusions, grounds, and limitations on the Issue and
+4. Before drafting, [choose the presentation](#choose-the-presentation) from this
+   structure. Write to the applicable, authorized destinations in the current task.
+   Adapt presentation, not facts or their limits. For Issue-backed work, leave
+   comparable conclusions, grounds, and limitations on the Issue and
    the applicable PR body/comment as well as chat; a link alone is insufficient.
    Progress updates may carry the new or corrected findings and identify the
    earlier retained results; final reports consolidate the current result.
@@ -75,6 +77,33 @@ Optional document topology planning does not make this step optional.
    claim a destination was updated without that route's readback. A blocked
    destination does not erase results or justify withholding them from another
    authorized output.
+
+## Choose the presentation
+
+After structuring the facts and before drafting or revising the output, choose
+its form by the relationship the reader needs to see. Honor explicit user and
+destination format requirements. Structuring does not imply a table, list,
+fixed headings, or the same layout for every destination.
+
+| Information relationship | Suitable form |
+| --- | --- |
+| Compare multiple targets or map them across shared attributes | Table with meaningful row and column labels |
+| Enumerate independent findings or actions with no meaningful order | Bulleted list |
+| Show execution order, dependencies, or a meaningful sequence | Numbered list |
+| Explain a conclusion, rationale, cause, context, or qualification | Prose |
+
+Choose per section when relationships differ: a short conclusion, a comparison
+table, and an explanation can coexist. Use prose for a single brief point; do
+not fragment connected reasoning into bullets or invent a comparison axis to
+justify a table. Keep cells concise and columns relevant. When long explanations,
+sparse cells, or excessive width make a table harder to read, move explanations
+to prose or use a list instead. Never omit evidence or qualifications to fit a
+layout, and keep them visibly associated with the finding they support.
+
+Before writeout, check that the form exposes the intended comparison or order,
+reads clearly at the destination's width, and preserves the facts and limits
+already structured. Change the form rather than distort the content. This is
+part of the existing writing step, not a separate approval or validation gate.
 
 ## Ownership and engineering rationale
 
