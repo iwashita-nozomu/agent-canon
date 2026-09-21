@@ -4332,13 +4332,11 @@ bootstrap_host_entrypoint() {
       target_digest=$(printf '%s' "$target_host_root" | sha256sum | awk '{print $1}')
       target_container_root="/targets/$target_digest"
       local target_container=$(_agent_canon_container_name)
-      if [[ "$target_action" == add ]] &&
-         "$AGENT_CANON_DOCKER_CMD" container inspect "$target_container" >/dev/null 2>&1; then
-        # A foreign resident is classified before any registry cleanup.  Only
-        # an AgentCanon-owned resident may enter target convergence.
-        _agent_canon_classify_existing_container "$target_container"
-        _agent_canon_prune_stale_target_manifest
-      elif [[ "$target_action" == add ]]; then
+      if "$AGENT_CANON_DOCKER_CMD" container inspect "$target_container" >/dev/null 2>&1; then
+        # Both add and remove must reject a foreign resident before teardown.
+        _agent_canon_classify_existing_container "$target_container" || return $?
+      fi
+      if [[ "$target_action" == add ]]; then
         _agent_canon_prune_stale_target_manifest
       fi
       local target_current_image target_current_image_id target_candidate target_rc=0 existing_target_digest=
@@ -4409,6 +4407,18 @@ bootstrap_host_entrypoint() {
       # resident controller has now committed the target into mounts.tsv, so
       # do not let the pre-create input participate in readback a second time.
       unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
+      if [[ "$target_action" == remove && $target_rc -eq 0 ]]; then
+        # Recreate from the committed manifest before comparing mount sets.
+        # Keep the stable resident name for recovery even if ensure fails.
+        if "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$target_candidate" >/dev/null &&
+           "$AGENT_CANON_DOCKER_CMD" rm "$target_candidate" >/dev/null &&
+           _agent_canon_ensure_container >/dev/null &&
+           _agent_canon_run_controller "$target_candidate" start >/dev/null; then
+          :
+        else
+          target_rc=$?
+        fi
+      fi
       if ((target_rc == 0)); then
         # The resident has committed the host-source/container-target record.
         # Read back the complete mount set once from the host Docker boundary;
@@ -4425,12 +4435,6 @@ bootstrap_host_entrypoint() {
         if ! _agent_canon_restore_candidate_failure "$target_candidate" "$target_current_image_id" "$target_current_image_id"; then
           _agent_canon_json_error rollback_failed "target mount replacement recovery was incomplete"
         fi
-      fi
-      if [[ "$target_action" == remove && $target_rc -eq 0 ]]; then
-        "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$(_agent_canon_container_name)" >/dev/null
-        "$AGENT_CANON_DOCKER_CMD" rm "$(_agent_canon_container_name)" >/dev/null
-        target_candidate=$(_agent_canon_ensure_container)
-        _agent_canon_run_controller "$target_candidate" start >/dev/null || target_rc=$?
       fi
       unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
       unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT
