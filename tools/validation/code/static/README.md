@@ -17,9 +17,9 @@ static-analysis entrypoints.
 
 Use this split for routing:
 
-- `python/`: Python type, logging, OOP/readability, and explicit `Any` checks.
-- `cpp/`: C and C++ readability, include, and native boundary checks.
-- `common/`: cross-language dependency, hardcoded-number, and repo review scans.
+- [python/](python/README.md): Python type, logging, OOP/readability, and explicit `Any` checks.
+- [cpp/](cpp/README.md): C and C++ readability, include, and native boundary checks.
+- [common/](common/README.md): cross-language dependency, hardcoded-number, and repo review scans.
 
 The integrated repo entrypoint is:
 

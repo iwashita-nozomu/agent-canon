@@ -143,10 +143,6 @@ path = "tools/runtime/lifecycle/update_lifecycle_contract.py"
 kind = "file"
 
 [[profile.required]]
-path = "tools/user"
-kind = "dir"
-
-[[profile.required]]
 path = "tools/analysis"
 kind = "dir"
 

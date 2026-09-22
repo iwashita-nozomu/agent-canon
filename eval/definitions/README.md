@@ -25,7 +25,7 @@ contract. These manifests stay in `eval/definitions/`; runtime outputs do not.
 All measurements, reports, packets, and logs are written to an explicit
 external bootstrap runtime spool and, when retained, the separate
 `agent-canon-log` archive (`<install-root-parent>/agent-canon-log/`).
-`agents/evals/` remains only a legacy path resolver.
+[agents/evals/](../../agents/evals/README.md) documents legacy manifest-path resolution only.
 
 ## Reader Map
 
