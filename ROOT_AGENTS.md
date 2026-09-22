@@ -63,15 +63,16 @@ pin; otherwise use the consumer's declared resolution.
 Establish reachability and existing guarantees before extra error handling;
 unknown is neither impossible nor a defect. Keep authorization and boundary safety.
 
-Use the repository owner's fixed execution route and configured defaults through
-retries, validation, and handoff. Do not rediscover or manually switch environments,
-add probes, bypass the entrypoint, or invent scripts, workflows, wrappers, or
-fallbacks to get past a failure. Fixed means the owned procedure, not hard-coded
-paths, versions, or SHAs. Diagnose only requested or evidenced relevant problems;
-stop when the decision is resolved. Route changes and repair require scope and
-authority at that owner. Block only affected actions; preserve permissions,
-resource/rerun limits, and failure semantics. Do not rebuild for ordinary work
-or replace a required backend to claim validation.
+Run the repository owner's fixed execution route with configured defaults first;
+only after failure diagnose the relevant route, stopping when resolved. Success
+needs no route probes; explicit diagnosis/setup requests remain separate. Keep
+that route through retries, validation, and handoff. Do not preflight, manually
+switch environments, bypass the entrypoint, or invent scripts, workflows,
+wrappers, or fallbacks. Fixed means the owned procedure, not hard-coded paths,
+versions, or SHAs. Preserve the entrypoint's safety checks, permissions, resource
+and rerun limits, and failure semantics. Route changes and repair require scope
+and authority at that owner. Stop only affected actions; do not rebuild for
+ordinary work or replace a required backend to claim validation.
 
 Check algorithms against equations and assumptions before numerical adjustments;
 require error analysis rather than arbitrary offsets or tolerances. Report actual
