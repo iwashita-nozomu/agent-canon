@@ -61,6 +61,7 @@ class RepoStructureContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_standalone_fixture(root)
+            self.assertFalse((root / "tools" / "user").exists())
 
             result = self.run_checker(root, "--profile", "agent_canon_standalone")
 
@@ -220,7 +221,6 @@ class RepoStructureContractTest(unittest.TestCase):
             "tools/repository",
             "tools/runtime",
             "tools/validation",
-            "tools/user",
             "tools/internal",
             "tools/ci",
             "tests/agent_tools",
@@ -356,7 +356,6 @@ class RepoStructureContractTest(unittest.TestCase):
                                     ],
                                 },
                                 {"type": "directory", "name": "validation"},
-                                {"type": "directory", "name": "user"},
                                 {"type": "directory", "name": "internal"},
                                 {"type": "directory", "name": "ci"},
                             ],

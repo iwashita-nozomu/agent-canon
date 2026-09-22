@@ -81,6 +81,31 @@ computing expected values with the same faulty predicate would hide the bug.
 Apply this reasoning within `contract / counterexample / oracle`; do not add a
 mandatory packet, mutation-testing framework, or redundant regression suite.
 
+## Regression evidence ownership
+
+[Minimal test admission](#minimal-test-admission) の `contract / counterexample / oracle` を、
+変更責務の canonical invariant と最小の完全な owner に結び、最小 witness で表します。
+期待値の根拠と assertion の識別力は [Contract-derived behavioral tests](#contract-derived-behavioral-tests)
+に従います。この共通条件は追加前の判断と review が参照し、[Activation](#activation) を広げません。
+
+- witness は [SEP-07](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)
+  に照らして対象入口で成立する入力・状態を使います。mock が入口の保証を無効化して作る
+  架空状態だけを回帰根拠にしません。
+- 同じ invariant の witness は、既存の property、table-driven / exhaustive finite-state check、
+  semantic equivalence、public/canonical entrypoint の boundary acceptance へ統合します。
+  同じ oracle を二重に保つ historical regression は統合・削除し、個別 bug ごとに増設しません。
+- private field、temporary path、helper topology、storage layout、削除済み互換状態を
+  contract 化しません。正しい alternative implementation でも同じ semantic contract を判定します。
+- parser、classifier、state construction、lifecycle、environment setup を production owner と
+  別に test 側へ再実装しません。局所 algorithm が独立した数理的・工学的 contract owner なら、
+  owner-local unit/property test は保持できます。
+
+focused test は再現、原因分離、repair diagnosis の証拠です。handoff / completion は変更責務が
+選んだ canonical boundary / acceptance oracle で判断し、実行不能なら focused pass で代用せず
+remaining verification を残します。test、fixture、mock、test-only adapter の追加数、coverage、
+mutation score、historical bug 数を単独の進捗・品質・完了条件にしません。
+既存の task packet / design trace に判断を接続し、新しい schema、checker、必須帳票は作りません。
+
 ## Validation failure response
 
 When a selected check fails, classify the `failing contract`, `observation level`,

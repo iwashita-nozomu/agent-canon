@@ -103,6 +103,16 @@ legacy execution route:
 A parity failure leaves the legacy route authoritative; no compatibility alias
 silently changes the command's execution plane or side effects.
 
+## Source maintenance guides
+
+Choose the guide for the implementation being maintained; this is not a startup
+reading list or a second command catalog.
+
+| Responsibility | Guide |
+| --- | --- |
+| Internal orchestration, skill helpers, and template rendering | [Internal tool areas](agent/README.md) |
+| Language-specific and cross-language static analysis | [Static analysis tools](validation/code/static/README.md) |
+
 ## Catalog and ownership
 
 `tools/catalog.yaml` is the machine-readable catalog. It owns command identity,

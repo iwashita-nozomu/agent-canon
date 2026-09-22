@@ -107,32 +107,10 @@ concurrency ordering、resource capacity、performance claim、reliability bound
 
 ## Regression Evidence Admission
 
-新しい regression test、fixture、mock、test-only adapter を追加すること自体を進捗や
-root-cause closure とみなしません。追加前に、現在の task packet / design trace の既存 evidence
-へ次の判断を接続します。これらのための新しい universal schema や checker は作りません。
-
-- failure が反証した canonical contract / invariant と、その最小 contract-complete owner
-- failure をその invariant の反例として表す最小 witness
-- 既存の property / table-driven / finite-state / boundary acceptance へ witness を統合できるか
-- test が private field、temporary path、helper topology、storage layout 等の replaceable representation を contract 化しないか
-- parser、classifier、state construction、lifecycle、environment setup を production owner と別に test 側で再実装しないか
-- 同じ invariant を固定する historical regression を削除・統合できるか
-- focused test が診断する property と、正式 entrypoint / consumer boundary から判定する completion oracle
-
-同じ invariant に属する複数の historical failure は、個別 bug 名ごとの test を増やすより、
-可能な限り一つの canonical oracle と最小 counterexample 集合へ収束させます。有限 relation / state
-space は table-driven または exhaustive check、入力空間に一般則がある場合は property test、
-consumer contract は public/canonical entrypoint を通る boundary acceptance を優先します。
-
-局所 algorithm 自体が独立した数学的・工学的 contract owner である場合は、owner-local unit test を
-保持して構いません。逆に、正しい alternative implementation へ置換しただけで失敗する test は、
-contract ではなく representation を固定していないか再評価します。coverage percentage、test count、
-mutation score、追加 test 数を単独の品質目的にしません。
-
-validation evidence は役割を分離します。focused test は counterexample の再現、root-cause isolation、
-repair の高速確認に使います。handoff / completion は変更責務が選んだ canonical boundary / acceptance
-oracle まで満たした evidence で判断します。canonical acceptance が環境上実行不能なら、focused pass を
-verified completion に昇格させず remaining verification として残します。
+regression test、fixture、mock、test-only adapter の追加前に、
+[test-design の共通条件](test-design.md#regression-evidence-ownership) を使って、
+既存 evidence への統合か新しい case の追加かを判断します。判断と採用した oracle を
+現在の task packet / design trace に接続し、この skill で成立条件を再定義しません。
 
 ## Use When
 
@@ -168,7 +146,7 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 1. [Existing Capability Before Implementation](#existing-capability-before-implementation) で既存機能を使う基準案と残る不足を決めてから、mechanism と implementation target を選びます。
 1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
 1. material かつ code から理由を復元できない decision は、共通コメント規約に従って最も狭い安定 owner の近傍へ残し、変更された既存コメントも同じ差分で同期します。
-1. regression / fixture / mock を追加する場合は、canonical invariant、minimal counterexample、existing oracle への統合可能性、representation independence、duplicate truth、旧 regression の consolidation、completion oracle を先に確認します。
+1. regression / fixture / mock の追加前に [Regression Evidence Admission](#regression-evidence-admission) の判断を行います。
 1. `agents/task_catalog.yaml` の `comprehensive_development` family から `spawn_budget`、`role_topology`、`roles`、`subagent_prompt` を読みます。
 1. `agents/agents_config.json` で permanent team role ownership、required output、write policy を確認します。
 1. [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) で Codex inventory、activation、runtime surface を確認します。

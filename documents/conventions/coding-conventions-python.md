@@ -118,27 +118,26 @@ Docstring の意味契約へ混ぜません。
 
 ## SOLID 設計契約
 
-Python 実装で class、dataclass、`Protocol`、継承、public API、型境界、依存方向を
-触る場合は、[オブジェクト指向設計方針](./object-oriented-design.md) と
+OOP / SOLID の起動は [オブジェクト指向設計方針の適用条件](./object-oriented-design.md#この文書の読み方)
+に従います。object contract が実質的に変わる場合だけ、Python 固有の
 `tools/validation/code/oop/python/readability.py` を SOLID principle signal の primary OOP evidence route にします。
+class や型の存在、意味を変えない annotation 修正だけでは追加検査を起動しません。
 `tools/validation/code/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` が finding kind から
 SOLID 見出しへの機械投影を所有します。
 `tools/validation/semantic/code/check_solid_evidence.py` は SOLID-sensitive な Python 差分と
 OOP readability report の `scanned_paths` coverage を照合します。
 
-| Principle | Python coding contract | Static risk signal |
-|---|---|---|
-| Single responsibility | domain calculation、IO、persistence、rendering、orchestration、reporting を責務語彙で分ける。 | OOP readability の large boundary、mixed effect、vague name、helper bucket、identity/pass-through finding |
-| Open/closed | 予測済み variant は `Protocol`、value object、registry、adapter、別 entrypoint で拡張軸に置く。 | OOP readability の `Optional` / `None` runtime routing、deep variant branch、cognitive complexity signal |
-| Liskov substitution | subtype / subclass / protocol implementation は base contract、入力条件、戻り値、例外、invariant を保存する。 | type checker、shared behavior tests、OOP readability の base class signal |
-| Interface segregation | caller が使う最小 role を `Protocol` または role-specific public surface にする。 | OOP readability の public method / field / parameter breadth signal |
-| Dependency inversion | high-level policy は stable abstraction、typed dataclass、`Protocol`、composition root へ依存を寄せる。 | OOP readability の annotation / optional boundary signal。import / layer 方向は `import_responsibility.py` と dependency review の supporting evidence |
+Single responsibility、Open/closed、Liskov substitution、Interface segregation、Dependency inversion の
+意味と共通実装判断は [SOLID との対応](./object-oriented-design.md#solid-との対応) を正本とします。
+Python 入口に第二の意味・実装契約・signal 対応表は置きません。静的 signal は semantic proof ではなく、
+正本の判断手順で caller contract と実際の evidence に照らして扱います。
 
-SOLID / OOP 境界の検証は、pytest wrapper ではなく該当 checker command を validation route に置きます。
-repo-wide review では `$oop-readability-check` を使い、Markdown / JSON report の
-SOLID principle signal counts、OOP dimension、finding kind、`path:line` を design artifact に引用します。
-closeout では `python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>`
-で、SOLID-sensitive な path と OOP readability evidence の対応を確認します。
+上記条件で SOLID / OOP review が選択された場合だけ、pytest wrapper ではなく該当 checker command を
+validation route に置きます。repo-wide の OOP review が選択された場合は `$oop-readability-check` を使い、
+Markdown / JSON report の SOLID principle signal counts、OOP dimension、finding kind、`path:line` を
+既存 design artifact に引用します。その closeout では
+`python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>`
+で選択対象の path と evidence の対応を確認します。未選択の OOP review へ追加の closeout gate を作りません。
 
 ## 目次
 
@@ -164,6 +163,6 @@ closeout では `python3 tools/validation/semantic/code/check_solid_evidence.py 
 
 ## Markdown ファイル修正後
 
-- `tools/bin/agent-canon docs check`
-- 相対パスと参照先の存在を確認
-- 必要なら `make ci` で Python と docs をまとめて確認
+変更文書の owner による検査選択は [md-style-check の Required Checks](../../agents/skills/md-style-check.md#required-checks)
+に従います。この Python 入口から別の汎用検査を必須化せず、選択された検査の失敗・実行不能を
+他の検査の成功で置き換えません。相対パスと参照先の整合も変更範囲で確認します。
