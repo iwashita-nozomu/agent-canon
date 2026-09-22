@@ -5,6 +5,7 @@ responsibility Documents skill and workflow prompt eval definitions.
 upstream design ../../agents/canonical/skills.md skill canon registry
 downstream implementation ../producers/evaluate_skill_workflow_prompts.py runs these evals
 downstream implementation ../producers/evaluate_agent_run.py runs behavior evals
+downstream implementation ../producers/generate_agent_improvement_guide.py summarizes observations without creating task obligations
 downstream implementation ../checkers/eval_accumulation_check.py validates accumulated result evidence
 downstream implementation ../producers/evaluate_workflow_selection.py runs workflow selection evals
 downstream implementation ../producers/evaluate_report_quality.py runs report quality evals
@@ -165,8 +166,8 @@ they are not promoted to canonical evidence.
 | Legacy source-tree result path | `agents/evals/results/` is not a normal read or write location; old results must be imported into the external archive and deleted from source. |
 
 The archive boundary is documented in [documents/runtime/runtime-log-archive.md](../../documents/runtime/runtime-log-archive.md).
-Run the bootstrap collection and archive sync before using accumulated evidence
-in a PR or guide:
+When a selected evaluation requires fresh archived results, use the bootstrap
+collection and archive sync. Reading an existing guide does not activate them:
 
 ```bash
 "$BOOTSTRAP" --control-parent-root "$ROOT" \
@@ -218,21 +219,34 @@ The role eval fails when a role TOML violates this contract:
 | Runtime metrics | optional `--runtime-log <path>` uses bounded fields such as `agent`, `tokens`, `latency_ms`, `retry_count`, `parent_intervention`, `format_violation`, and `output_used`. |
 | Missing metrics | `ROLE_RUNTIME_METRICS_STATUS=missing` is reported without failing the eval. |
 
-Because GitHub Actions consumes the same archived hook results, memory notes,
-skill eval reports, and `issues/open|closed/`, it generates a read-only
-Agent Improvement Guide on PRs and branch pushes.
+## Improvement guide evidence
 
-| Improvement-guide input | Required summary boundary |
-| --- | --- |
-| Prompt routing | candidate skill / workflow / tool routing inferred from prompts, without unbounded raw prompt text. |
-| Human feedback | human feedback labels and targets plus explicit human feedback labels. |
-| Skill and hook coverage | skill usage entries, skill/event coverage, hook source files, hook tool names, and hook-quality counters. |
-| Code and run evidence | code-checker target paths, repeated failure fingerprints, and `workflow_monitoring.md` tokens from run comparison tools. |
-| Token reduction | compare Codex session footprints only when token reduction is selected as the objective; otherwise record `token_efficiency_not_required`. |
+The [guide producer](../producers/generate_agent_improvement_guide.py) reads
+existing private Issue references, knowledge, eval reports, and archived hook
+observations. Its [workflow](../../.github/workflows/agent-improvement-guide.yml)
+runs on its selected producer/test paths or manual dispatch, not ordinary PRs
+or every branch push. It does not mutate those inputs or authorize a repair.
 
-| Run evidence concern | Required action |
+| Input | Interpretation |
 | --- | --- |
-| Prompt privacy | store bounded, redacted prompt excerpts, fingerprints, and counts instead of transcript text. |
-| Alternative paths | compare runs with `eval/checkers/compare_agent_run_paths.py` and record `execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`, and `static_analysis_feedback`. |
-| Token reduction | compare footprints with `eval/checkers/compare_codex_token_footprints.py` when token reduction is part of the objective. No global count, ratio, or improvement threshold is required. |
-| During-run recording | Record these events during the run with `tools/runtime/lifecycle/workflow_monitor.py --behavior-event "..."` instead of reconstructing them only at closeout. |
+| Candidate skills, workflows, and tools | Observed possibilities, not required selections. |
+| Selected skills and human feedback | Separate counters; feedback does not establish a missed selection. |
+| Failed eval reports and hook fingerprints | Evidence to inspect against the active contract before identifying the cause and repair owner. |
+| Checker and failure targets | Affected inputs, not necessarily the code that caused the failure. |
+| Missing or historical log fields | Observability limits until the producing contract establishes a violation. |
+
+Candidate, feedback, and selection counts overlap and do not share a required
+selection denominator. For example, one candidate, one feedback observation,
+and one successful selection give `candidate + feedback - selected = 1`,
+despite no established omission. This difference is not a routing-gap metric.
+Keep the original counters rather than introducing another score or threshold;
+repetition of a candidate alone must not create a repair obligation.
+
+The guide preserves report paths, failure fingerprints, targets, counts, and
+source cutover filtering for investigation. A failed report alone does not
+identify a prompt defect, and absent evidence does not establish broken
+instrumentation. Confirm the violated contract and concrete cause before
+selecting an in-scope change under the existing owner. The guide does not require
+protocol tokens, negative receipts, new checks, broad eval reruns, or skill edits.
+Recording and validation remain with the already selected workflow and task;
+reading this diagnostic report does not activate them.

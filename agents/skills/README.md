@@ -21,7 +21,7 @@ downstream implementation ../../tools/agent/skills/skill_dependency_map.py valid
 
 ## Visualization Ownership
 
-`code-visualization` is the sole public visualization skill. Visualization-
+[`code-visualization`](code-visualization.md) is the sole public visualization skill. Visualization-
 producing skills remain native fact producers or renderer/formatter adapters
 and route through its canonical `VisualizationSourceUniverse`, schema-bearing
 `ToolCall`, `ProjectionCoverageManifest`, post-format readback, and final
@@ -46,10 +46,13 @@ or copy the universal omission/granularity policy into adapter entries.
 - [AGENTS.md](../../AGENTS.md) には長い skill 説明を複製しません。
 - `.codex/personal/skills/` は ignored な生成 view です。Codex の global
   auto-discovery path は `~/.agents/skills/` です。
-- 人間が skill を明示する場合は plain text ではなく `$skill-name` を使います。
+- 人間が skill を明示的に呼び出す場合は plain text ではなく `$skill-name` を使います。
 - 例: `$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
+- スキル間の文書参照は [Markdown リンク規約](../../documents/conventions/common/05_docs.md)
+  に従い、[md-style-check](md-style-check.md) のように正本へリンクします。
+  呼出し構文とは区別し、リンクだけで起動や全読了を要求しません。
 - 新しい public skill を追加するときは `catalog.yaml` と対応文書を同時に更新します。
-- 発表資料、token効率、ローカルbranch統合は、それぞれ `$slides`、`$tokens`、`$integration` の正本へルーティングします。旧workflow文書を手順の正本にしません。
+- 発表資料、token効率、ローカルbranch統合は、それぞれ [`$slides`](slides.md)、[`$tokens`](tokens.md)、[`$integration`](integration.md) の正本へルーティングします。旧workflow文書を手順の正本にしません。
 - Workflow-routed internal routine は `agents/internal-routines/` に置きます。
 
 ## Skill Visibility Naming
@@ -67,8 +70,8 @@ workflow-only material は `agents/internal-routines/` に置きます。
 
 CLI に出す公開 skill は、user が直接選ぶ価値が高いものだけに絞ります。
 review の細粒度 checklist、CLI adapter、artifact placement、validation helper は public skill ではなく canonical docs と subagent routing に寄せます。
-workflow selection は task 開始時に使い忘れると実害が出るため、`agent-orchestration` を routing entry skill として public surface の先頭に置きます。
-subagent bootstrap は repo-changing task の stage 分離に必要なため public skill として出します。
+workflow selection は task 開始時に使い忘れると実害が出るため、[`agent-orchestration`](agent-orchestration.md) を routing entry skill として public surface の先頭に置きます。
+[subagent bootstrap](subagent-bootstrap.md) は repo-changing task の stage 分離に必要なため public skill として出します。
 
 公開 skill の id、purpose、canonical doc、discovery shim、prompt routing trigger は
 `agents/skills/catalog.yaml` が唯一の列挙正本です。必須前提、後続、順序制約、
@@ -82,9 +85,9 @@ checkout の `documents/runtime/` を暗黙に更新しません。tracked reade
 図を手で編集せず、辞書を変更して graph を再生成します。
 
 既存の Dev Container 内で一時的に `devcontainer exec --workspace-folder <root> ...`
-を使う実行・検証は `devcontainer-exec` に渡します。Dockerfile、dependency、devcontainer
-設定の変更、build、起動は `environment-maintenance` / `dependency-design` の owner に戻し、
-GPU profile の admission semantics は `gpu-execution` に残します。
+を使う実行・検証は [`devcontainer-exec`](devcontainer-exec.md) に渡します。Dockerfile、dependency、devcontainer
+設定の変更、build、起動は [`environment-maintenance`](environment-maintenance.md) / [`dependency-design`](dependency-design.md) の owner に戻し、
+GPU profile の admission semantics は [`gpu-execution`](gpu-execution.md) に残します。
 
 確認入口:
 - public skill の一覧と shim/doc/config の整合: `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
@@ -100,8 +103,8 @@ GPU profile の admission semantics は `gpu-execution` に残します。
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
 - artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、[documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md) の責務に寄せます。
 - `.codex/personal/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim を同じ変更で追加します。bootstrap が `~/.agents/skills/<skill>` をこの view にリンクするため、列挙 config は追加しません。
-- agent orchestration は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
-- subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。
+- [agent orchestration](agent-orchestration.md) は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
+- [subagent bootstrap](subagent-bootstrap.md) は public skill として出し、repo-changing task の stage separation で使います。
 - carry-over の吸い上げは `documents/notes/` と worktree log を正本にし、独立 public skill にはしません。
 - Internal / compatibility review docs の一覧と route は [internal-routines/README.md](../internal-routines/README.md) に集約します。
 
@@ -127,60 +130,60 @@ in the Codex host runtime.
 - Parent repositories add repo-specific skills only through an official
   parent- or subtree-owned `.codex/personal/skills/<skill>/SKILL.md` surface.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
-- Codex では [AGENTS.md](../../AGENTS.md) と [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
-- task ごとの skill 選択は `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。編集を明示的に許可する場合だけ `--mode repo-changing` を渡し、prompt 語彙で mode を拡張しません。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
+- Codex では [AGENTS.md](../../AGENTS.md) と [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) を先に読み、repo task の skill 選択は [`$agent-orchestration`](agent-orchestration.md) から始めます。
+- task ごとの skill 選択は `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。編集を明示的に許可する場合だけ `--mode repo-changing` を渡し、prompt 語彙で mode を拡張しません。依存 module の source clone、lifecycle、cleanup が scope の場合は [`$dependency-module-change`](dependency-module-change.md) を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
-- template clone から新 repo を始めるときは `start-repository` を使います。
-- 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。
+- template clone から新 repo を始めるときは [`start-repository`](start-repository.md) を使います。
+- 長い tool / skill 候補名を短い command に落とすときは [`task-routing`](task-routing.md) を使います。
 - specialist を使う場合の Codex-specific routing は [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) を見ます。
-- repo-changing task では `$agent-orchestration` から始めます。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正は通常の owner route で進め、execution stage で `$codex-task-workflow`、handoff / wave が ready になった stage で `$subagent-bootstrap` を追加します。
-- 文献調査が主タスクなら `literature-survey` を先に見ます。
-- 自然言語の数学的 claim を形式証明へ落とすときは `formal-proof-workflow` を使い、既存 proof / 文献探索は `literature-survey` へ接続します。
-- 実装前にアルゴリズムを設計する場合は `lean-algorithm-design` を使い、Lean 上の数学モデルと target theorem を先に検証してから production API へ渡します。
-- 既存実装または実装候補の収束性、停止性、certificate soundness、finite-precision floor、solver-chain handoff に対してアルゴリズム選択や変更候補を探索するときは `algorithm-proof-exploration` を使い、最終 theorem / counterexample / unprovable-under-assumptions claim は `formal-proof-workflow` へ接続します。
-- README、workflow、guide、migration、specification など、file responsibility が一般説明 prose の文書では `long-form-writing` を DSL-to-prose adapter として見ます。長さだけでは選びません。
-- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を先に見ます。
-- paper section まで含む論文 draft では `paper-writing` を先に見ます。
-- 研究系の task では `research-workflow` を outer loop に使います。
-- tuning、探索、比較改善を backlog 付きで継続反復する task では `adaptive-improvement-loop` を outer loop にします。
-- 実験 topic の review、`run.py` 直実行、GPU/JAX 環境所有、artifact schema、`visualization.py` readiness を確認するときは `experiment-review` を使います。
-- 既存 experiment result の保持・archive・externalization・削除を実行前に計画するときは `retention` を使い、実験実行、artifact identity/checksum、archive serialization は既存 owner に委譲します。
+- repo-changing task では [`$agent-orchestration`](agent-orchestration.md) から始めます。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正は通常の owner route で進め、execution stage で [`$codex-task-workflow`](codex-task-workflow.md)、handoff / wave が ready になった stage で [`$subagent-bootstrap`](subagent-bootstrap.md) を追加します。
+- 文献調査が主タスクなら [`literature-survey`](literature-survey.md) を先に見ます。
+- 自然言語の数学的 claim を形式証明へ落とすときは [`formal-proof-workflow`](formal-proof-workflow.md) を使い、既存 proof / 文献探索は [`literature-survey`](literature-survey.md) へ接続します。
+- 実装前にアルゴリズムを設計する場合は [`lean-algorithm-design`](lean-algorithm-design.md) を使い、Lean 上の数学モデルと target theorem を先に検証してから production API へ渡します。
+- 既存実装または実装候補の収束性、停止性、certificate soundness、finite-precision floor、solver-chain handoff に対してアルゴリズム選択や変更候補を探索するときは [`algorithm-proof-exploration`](algorithm-proof-exploration.md) を使い、最終 theorem / counterexample / unprovable-under-assumptions claim は [`formal-proof-workflow`](formal-proof-workflow.md) へ接続します。
+- README、workflow、guide、migration、specification など、file responsibility が一般説明 prose の文書では [`long-form-writing`](long-form-writing.md) を DSL-to-prose adapter として見ます。長さだけでは選びません。
+- 論文、thesis chapter、scholarly note のような学術文章では [`academic-writing`](academic-writing.md) を先に見ます。
+- paper section まで含む論文 draft では [`paper-writing`](paper-writing.md) を先に見ます。
+- 研究系の task では [`research-workflow`](research-workflow.md) を outer loop に使います。
+- tuning、探索、比較改善を backlog 付きで継続反復する task では [`adaptive-improvement-loop`](adaptive-improvement-loop.md) を outer loop にします。
+- 実験 topic の review、`run.py` 直実行、GPU/JAX 環境所有、artifact schema、`visualization.py` readiness を確認するときは [`experiment-review`](experiment-review.md) を使います。
+- 既存 experiment result の保持・archive・externalization・削除を実行前に計画するときは [`retention`](retention.md) を使い、実験実行、artifact identity/checksum、archive serialization は既存 owner に委譲します。
 - semantic delta、obligation、一次検証 owner、hard-edge closure を実装前に割り当てるときは
   [documents/design/semantic-responsibility-contract.md](../../documents/design/semantic-responsibility-contract.md) と
   `templates/documents/semantic-responsibility-contract.template.toml` を正本として使います。
-- `test-design` は owning mechanism の確立または修復後に、既存 owner と targeted validation
+- [`test-design`](test-design.md) は owning mechanism の確立または修復後に、既存 owner と targeted validation
   では閉じない test-owned runtime risk がある場合だけ起動します。contract-only wrapper は
   static contract validation と canonical command evidence を使います。
 - owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正は通常の owner route で進め、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。typo / link / format-only、Routine docs、Focused code の label もこの invariance gate を迂回しません。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route に進め、`dependency/consumer/migration/docs closure` を形成します。file 数や近接 owner だけでは route を固定しません。
-- 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
-- dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは `dependency-analysis` を使います。
-- 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に `dependency-analysis` の change-impact packet を正本入力にします。
-- directory 構造、directory README、root view、path mapping、responsibility-scope map を責務ベースで変えるときは `structure-refactor` を追加し、recursive directory responsibility graph を先に作ります。
-- ユーザーが 1 件ずつ共同デバッグする進め方を明示した場合は `user-guided-debugging` を使い、修正前の問題提示と修正後の次課題提示を固定します。
-- C / C++ 差分では `cpp-review` を既定候補にします。
-- OOP readability tool の実行、表出力、結果解釈はいずれも `oop-readability-check` を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
-- tool、hook、eval、skill、experiment の結果を書き出すときは `result-artifact-writeout` を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
-- tool、checker、hook、static analysis、構造解析で問題を探して report / repair packet を作るときは `tool-finding-report` を使い、raw artifact、structured full artifact、mechanical priority order、任意の impact、prompt feedback decision を分けます。finding の取捨選択は上位 workflow が行います。
+- 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは [`document-canon-cleanup`](document-canon-cleanup.md) を使います。
+- dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは [`dependency-analysis`](dependency-analysis.md) を使います。
+- 大規模 refactor では [`refactor-loop`](refactor-loop.md) を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に [`dependency-analysis`](dependency-analysis.md) の change-impact packet を正本入力にします。
+- directory 構造、directory README、root view、path mapping、responsibility-scope map を責務ベースで変えるときは [`structure-refactor`](structure-refactor.md) を追加し、recursive directory responsibility graph を先に作ります。
+- ユーザーが 1 件ずつ共同デバッグする進め方を明示した場合は [`user-guided-debugging`](user-guided-debugging.md) を使い、修正前の問題提示と修正後の次課題提示を固定します。
+- C / C++ 差分では [`cpp-review`](cpp-review.md) を既定候補にします。
+- OOP readability tool の実行、表出力、結果解釈はいずれも [`oop-readability-check`](oop-readability-check.md) を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
+- tool、hook、eval、skill、experiment の結果を書き出すときは [`result-artifact-writeout`](result-artifact-writeout.md) を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
+- tool、checker、hook、static analysis、構造解析で問題を探して report / repair packet を作るときは [`tool-finding-report`](tool-finding-report.md) を使い、raw artifact、structured full artifact、mechanical priority order、任意の impact、prompt feedback decision を分けます。finding の取捨選択は上位 workflow が行います。
 - skill / tool / workflow / hook / eval の蓄積ログを分析するときは [agent-log-analysis](agent-log-analysis.md) を使い、既存 structured summary を再利用します。要約不足は対象限定の読取と制限の明示で扱い、分析前の archive 保守・dashboard 修理を要求しません。
-- structured summary、prompt excerpt、run bundle、hook / routing / eval evidence から durable skill issue 候補を作るときは `issue-finding-report` を使い、抽象原因、重複検索、dependency-expanded edit scope、multi-agent partition を先に固定します。
+- structured summary、prompt excerpt、run bundle、hook / routing / eval evidence から durable skill issue 候補を作るときは [`issue-finding-report`](issue-finding-report.md) を使い、抽象原因、重複検索、dependency-expanded edit scope、multi-agent partition を先に固定します。
 - accumulated eval family の収集・修理を選択した場合だけ [agent-eval-accumulation](agent-eval-accumulation.md) の registered producer / compact checker / archive loop を使います。missing / stale / fail の観測・Issue 記録だけでは再実行せず、eval report を手で生成しません。
-- PR を処理、merge、conflict 解消、ready 化、Issue triage、queue cleanup するときは `pr-processing` を使い、mutation authority、merge order、validation evidence、Issue action table を先に固定します。
-- AgentCanon source、共有 bootstrap runtime、parent 側の development clone 運用を更新するときは `agent-canon-update` を使います。source PR と parent project change は分け、parent に pin、vendor checkout、root projection を追加しません。
-- agent-runtime 更新 branch や AgentCanon pin 更新の分離が必要なときは `agent-update-branch` を使います。
-- reader-facing な report、status report、eval summary、audit summary、decision brief、presentation narrative、PPT storyboard を書くときは `report-writing` を使い、source packet、visual asset plan、Report Quality Checklist を固定します。
-- 既存文章を graph 化し、段落接続、claim/evidence、experiment plan、split/merge/bridge/reorder operation、既存 skill handoff を出すときは `prose-reasoning-graph` を使います。
-- report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に `structure-planning` を使い、primary artifact、source map、metric / delta contract、invalid interpretation を固定します。
-- substantive な文書変更では `prose-reasoning-graph` と `structure-planning` を先に通し、typo / link / format-only では `md-style-check` と `structure_contract=skipped` の理由を evidence に残します。
-- docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、`structure-planning` の `visual_plan` で Mermaid 図を既定の primary visual 候補にします。
-- report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ `html-output` を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
-- 既存の experiment / Eval artifact を HTML で表示するときは `html-output` を直接使います。新しい実行・再実行が必要な場合だけ `experiment-lifecycle`、reader-facing な解釈や claim が必要な場合だけ `report-writing` を追加し、中間 wrapper skill は作りません。
-- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の調査とcleanup判断は `worktree-health` に集約します。
-- optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは `computational-optimization` を使い、数学契約と検証契約を実装や実験の前に固定します。
-- GPU / CUDA / JAX / XLA / IREE backend 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、JAX preallocation 無効化、GPU validation blocker を扱うときは `gpu-execution` を使い、Python 実行は ExperimentRunner に委譲します。
-- JIT-canonical IR、生成済み Lean 実装定義、theorem graph overlay から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。
-- repo-wide な実装・文書・tooling・runtime の統合変更では、上の `comprehensive-development` route を使います。
-- repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と [templates/agents/environment_change_proposal.md](../../templates/agents/environment_change_proposal.md) を使います。
-- private knowledge / feedback の検索・記録は既存の `agent-learning` owner と Rust
+- PR を処理、merge、conflict 解消、ready 化、Issue triage、queue cleanup するときは [`pr-processing`](pr-processing.md) を使い、mutation authority、merge order、validation evidence、Issue action table を先に固定します。
+- AgentCanon source、共有 bootstrap runtime、parent 側の development clone 運用を更新するときは [`agent-canon-update`](agent-canon-update.md) を使います。source PR と parent project change は分け、parent に pin、vendor checkout、root projection を追加しません。
+- agent-runtime 更新 branch や AgentCanon pin 更新の分離が必要なときは [`agent-update-branch`](agent-update-branch.md) を使います。
+- reader-facing な report、status report、eval summary、audit summary、decision brief、presentation narrative、PPT storyboard を書くときは [`report-writing`](report-writing.md) を使い、source packet、visual asset plan、Report Quality Checklist を固定します。
+- 既存文章を graph 化し、段落接続、claim/evidence、experiment plan、split/merge/bridge/reorder operation、既存 skill handoff を出すときは [`prose-reasoning-graph`](prose-reasoning-graph.md) を使います。
+- report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に [`structure-planning`](structure-planning.md) を使い、primary artifact、source map、metric / delta contract、invalid interpretation を固定します。
+- substantive な文書変更では [`prose-reasoning-graph`](prose-reasoning-graph.md) と [`structure-planning`](structure-planning.md) を先に通し、typo / link / format-only では [`md-style-check`](md-style-check.md) と `structure_contract=skipped` の理由を evidence に残します。
+- docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、[`structure-planning`](structure-planning.md) の `visual_plan` で Mermaid 図を既定の primary visual 候補にします。
+- report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ [`html-output`](html-output.md) を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
+- 既存の experiment / Eval artifact を HTML で表示するときは [`html-output`](html-output.md) を直接使います。新しい実行・再実行が必要な場合だけ [`experiment-lifecycle`](experiment-lifecycle.md)、reader-facing な解釈や claim が必要な場合だけ [`report-writing`](report-writing.md) を追加し、中間 wrapper skill は作りません。
+- stale worktree、古い `WORKTREE_SCOPE.md`、legacy action log の調査とcleanup判断は [`worktree-health`](worktree-health.md) に集約します。
+- optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark を扱うときは [`computational-optimization`](computational-optimization.md) を使い、数学契約と検証契約を実装や実験の前に固定します。
+- GPU / CUDA / JAX / XLA / IREE backend 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、JAX preallocation 無効化、GPU validation blocker を扱うときは [`gpu-execution`](gpu-execution.md) を使い、Python 実行は ExperimentRunner に委譲します。
+- JIT-canonical IR、生成済み Lean 実装定義、theorem graph overlay から、反復法と証明状態を Mermaid block chart にしたいときは [`algorithm-flowchart`](algorithm-flowchart.md) を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。
+- repo-wide な実装・文書・tooling・runtime の統合変更では、上の [`comprehensive-development`](comprehensive-development.md) route を使います。
+- repo-wide な tool 導入や Docker / CI 更新案では [`environment-maintenance`](environment-maintenance.md) と [templates/agents/environment_change_proposal.md](../../templates/agents/environment_change_proposal.md) を使います。
+- private knowledge / feedback の検索・記録は既存の [`agent-learning`](agent-learning.md) owner と Rust
   `agent-canon k/f` route を使います。stable preference は対象の [AGENTS.md](../../AGENTS.md) へ明示変更として
   直接昇格し、private logやsource treeを第二の正本にしません。
 
