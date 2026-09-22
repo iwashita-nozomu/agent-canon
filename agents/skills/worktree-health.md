@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents worktree-health for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../documents/operations/BRANCH_SCOPE.md Git state preservation, repair, and handoff owner
 upstream design ../../documents/design/request-intent-and-update-relation.md compact merge/readback and existing cleanup projection
 @dependency-end
 -->
@@ -48,13 +49,13 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 
 - active run bundle と実際の checkout 状態の差分が見えている
 - task authority drift、runtime output drift、carry-over 漏れがあれば記録されている
-- この checkout を継続してよいか、authority を直すべきか、cleanup に進むべきか判断できる
+- この checkout の継続・修復・cleanup 判断と、その readback または具体的な未解決の引継ぎがある
 
 ## Mandatory Checklist
 
 - `reports/agents/.active_run` が現在の run bundle を指し、`task_authority.yaml` の allowed / forbidden paths が current state と一致する
 - `git status --short --branch` で見える dirty state が説明可能である
-- `git diff --name-only` の変更が `task_authority.yaml` と `team_manifest.yaml` の write scope に収まっている
+- 今回編集・提出する差分が `task_authority.yaml` と `team_manifest.yaml` の write scope に収まり、既存の他者・由来未確認の差分と混同されていない
 - runtime output が active run bundle または明示された report directory に収まっている
 - run-local `work_log.md` と必要なら branch summary が current state に追随している
 - `python3 tools/repository/workspace/worktree_scope_lint.py --current` が placeholder や stale kickoff field を出していない
@@ -72,12 +73,12 @@ executor の選択と実行は各 owner route が行い、この skill は healt
 
 1. `reports/agents/.active_run`、run-local `work_log.md`、必要なら branch summary を読み、authority と carry-over 先を確認します。
 1. legacy cleanup が scope に入る場合だけ `python3 tools/repository/workspace/worktree_scope_lint.py --current` を流し、古い scope 文書の placeholder と stale field を拾います。
-1. `git status --short --branch`、`git diff --name-only`、`git worktree list --porcelain` を見て drift を洗います。
+1. [Git 状態の保全と整合性](../../documents/operations/BRANCH_SCOPE.md#git-状態の保全と整合性) に従って既存差分と途中操作を確認します。`git worktree list --porcelain` で対象 checkout を区別し、未知の差分を無視したり clean を一律に要求したりしません。
 1. branch / worktree 作成が必要に見える場合は `repository-topic-clone` の選択済み checkout-mode と [agents/canonical/CODEX_INTAKE.md](../canonical/CODEX_INTAKE.md) の Branch Reuse Default を参照し、この skill では `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と対応箇所の有無だけを確認します。手動作成は行いません。
 1. [documents/notes/guardrails/README.md](../../documents/notes/guardrails/README.md) と [documents/notes/failures/README.md](../../documents/notes/failures/README.md) を見直し、今回の drift や cleanup risk と関連する既知項目がないか確認します。
 1. legacy cleanup が scope に入る場合だけ `bash tools/validation/documentation/checks/check_worktree_scopes.sh` で repo 内の worktree scope 配置を確認します。
 1. specialist run bundle を伴う場合は、必要に応じて `validate_role_write_scope.py` で write policy 逸脱を見ます。
-1. drift や cleanup risk があれば、run-local `work_log.md` か cleanup artifact に残してから継続、修正、削除判断へ進みます。
+1. drift や cleanup risk は上記正本に従って既存 owner の修復・保全・引継ぎへ接続し、操作後の readback を run-local `work_log.md` または既存 Issue / PR に残します。記録しただけで健全・解決済みとせず、未解決なら影響する操作と次の owner/action を明示します。
 
 ## Default Commands
 
