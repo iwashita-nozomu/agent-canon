@@ -8,6 +8,7 @@ upstream design chatgpt-codex-routing.md execution admission and explicit sessio
 upstream design ../skills/pr-processing.md publication authority, integration, and readback owner
 upstream design ../../documents/operations/BRANCH_SCOPE.md branch scope and dependency-closed commit owner
 upstream design github-status-lifecycle.md Issue status and evidence owner
+upstream design verification-result-structuring.md mandatory pre-write result structuring
 downstream design ../skills/pr-processing.md exposes this routine through the existing public skill
 @dependency-end
 -->
@@ -21,6 +22,10 @@ ChatGPT などの現在セッションから、認可済み GitHub 接続で Iss
 公開は [pr-processing](../skills/pr-processing.md)、status は
 [github-status-lifecycle](github-status-lifecycle.md) に残します。新しい public skill、
 publisher、承認段階、全環境共通の capability 検査は追加しません。
+
+検証結果を含むチャット、Issue/PR 本文・コメント、レポートの作成・更新・投稿前には、
+必ず [検証結果の構造化](verification-result-structuring.md) を呼びます。
+途中・中断時も同じ構造化結果から各出力先へ反映し、公開権限と readback は本経路に残します。
 
 ## 1. Resolve the operation, then use the available connection
 

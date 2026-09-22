@@ -4,6 +4,7 @@
 contract skill
 responsibility Writes evidence-backed reader-facing reports with semantic claim/evidence, inference, limitation, and action boundaries.
 upstream design ../../documents/design/responsibility-rationale.md report semantics and finding-closure rationale
+upstream design ../internal-routines/verification-result-structuring.md mandatory pre-write structuring and finding coverage
 upstream design structure-planning.md optional structural-decision owner
 upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design code-visualization.md sole public visualization owner and typed projection contract
@@ -21,20 +22,16 @@ The canonical rationale is [documents/design/responsibility-rationale.md](../../
 
 ## Source packet
 
-Draft from the existing task record: audience/decision, source artifacts or
-stable IDs, observed facts, inferred claims, material uncertainty, and any
-requested next action. Add only provenance needed to interpret the evidence.
-Do not create placeholder fields or a new ledger. Report preparation alone does
-not justify another environment/tooling survey or rerunning settled checks;
-investigate only a specific gap that can change the answer or required validation.
+Before drafting or revising verification results, invoke
+[verification result structuring](../internal-routines/verification-result-structuring.md).
+Use its existing structured task/Issue record, including interim findings,
+counterevidence, corrections, and limitations. This step is mandatory even when
+no document topology plan or independent report review is needed.
 
-At normal work boundaries, keep material findings with their evidence and
-current interpretation in the existing task/Issue record. Carry forward results
-that affect the answer, alternatives, scope, or limitations, including
-counterevidence, rejected explanations with reasons, and unresolved hypotheses
-labelled as such. Compress repeated observations rather than silently dropping
-a distinct material result. A finding need not produce a code change to belong
-in the report; reporting it does not authorize out-of-scope repair.
+Add the audience/decision and requested next action to that source material.
+Report preparation alone does not justify another environment/tooling survey
+or rerunning settled checks; investigate only a specific gap that can change
+the answer or required validation.
 
 When external references support a material claim, use an existing durable source
 note or create a source packet with the URL/DOI, access date, source identity,
@@ -80,9 +77,9 @@ Use a report reviewer when claim impact, external publication, ambiguity, or evi
 
 ## Completion evidence
 
-In the selected review, compare the report with the existing material findings
-and source record in both directions: written claims have support or are labelled
-as inference, and decision-relevant investigated results are not omitted.
+Use [verification result structuring](../internal-routines/verification-result-structuring.md)
+for the pre-write claim/evidence and finding/output coverage check. Any selected
+review consumes the same record; it does not replace that mandatory step.
 Read the relevant provenance, limitations, review result, and explicitly requested
 presentation/HTML validation without reopening settled investigation or adding
 a checker. Scale detail to useful results and decision complexity, not elapsed
