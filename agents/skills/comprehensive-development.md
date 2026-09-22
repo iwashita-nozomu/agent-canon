@@ -57,9 +57,13 @@ implementation target と mechanism を選ぶ前に、共通原則 SEP-06/07 と
 [SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
 を使います。新しい public API だけでなく、private helper や既存 file 内への追加も対象です。
 
-現在の caller に対する最小の利用案を具体化し、要求と API の保証の対応から、直接利用、
-変換・合成、部分利用と不足、不適合、未確認を区別します。調べ方、比較の向き、判断例、
-調査の終了条件は参照先に集約し、この skill で別の判定手順や必須帳票を作りません。
+現在の caller と要求された規模に対する利用案を具体化し、要求と API の保証の対応から、
+直接利用、変換・合成、部分利用と不足、不適合、未確認を区別します。規模に応じたコストを
+決める方式の選定には、[SEP-06 の規模を先に置く方式選定](../../documents/conventions/software-engineering-principles.md#workload-and-scale-before-mechanism)
+を先に適用し、その設計参照を下の basis / alternatives と worker / review の handoff に
+接続します。現在の小さい例だけで mechanism を決め、後から根拠を付けません。
+調べ方、比較の向き、判断例、調査の終了条件は参照先に集約し、この skill で別の判定手順や
+必須帳票を作りません。
 
 採用 API、利用案、根拠、残る不足を既存設計文書へ残し、同じ参照を下の mechanism / basis /
 alternatives と task packet / handoff に接続します。実装するのは適切な owner に残る不足だけ、

@@ -12,7 +12,7 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
 upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff correspondence route
 upstream design ../../documents/design/request-intent-and-update-relation.md compact task-packet request and update projection
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
-upstream design ../../documents/conventions/software-engineering-principles.md reachability and remedy-necessity decision owner
+upstream design ../../documents/conventions/software-engineering-principles.md workload-scale and reachability/remedy decision owner
 upstream design ./agent-orchestration.md owner-first read trace and implementation admission
 upstream implementation ../../tools/agent/skills/skill_document_reader.py bounded Skill read and EOF admission
 downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
@@ -162,6 +162,12 @@ does not create a second semantic ledger; review reads the same instance back.
 1. selected validation and review
 1. closeout
 
+規模に応じた処理・資源コストを決める方式を選ぶ前に、
+[SEP-06 の規模を先に置く方式選定](../../documents/conventions/software-engineering-principles.md#workload-and-scale-before-mechanism)
+を適用し、該当する既存設計の参照を `selected implementation` と review へ引き継ぎます。
+`bounded_fast_path` でもこの判断は省略せず、同節の適用条件と既存根拠の再利用に従います。
+判断の引継ぎだけを理由に coordination、追加 stage、全項目 checklist を起動しません。
+
 読取で生じた異常仮説や tool / reviewer / subagent の修正提案を
 `selected implementation` または review 後の再実装へ渡す前に、
 [SEP-07 の到達可能性と追加修正の必要性](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)
@@ -285,6 +291,7 @@ route.
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
 1. Read [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md).
+1. 規模に応じた処理・資源コストを決める実装方式の選定では、[Stages](#stages) の規模判断を実装前に消費し、同じ設計参照を実装・review へ渡します。
 1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is selected.
 1. For AgentCanon source/runtime work, use a standalone or qualified ignored source checkout prepared by `repository-topic-clone` and follow `agent-canon-update`. The integration executor merges the AgentCanon PR and a publisher/integration child reads back source `main`; do not restore a parent vendor/submodule/root-projection route.
 1. Ordinary consultation, brainstorming, routing-only advice, and explanation-only turns are conversational turns. For those, keep MCP config inspection, shell commands, and GitHub checks in hold until the user requests state inspection, file edits, validation, PR/issue processing, CI checks, or implementation work, and continue with conversational responses until then.
