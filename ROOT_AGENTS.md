@@ -51,12 +51,15 @@ Without both evidence and authority, keep the addition a proposal and continue
 independent authorized work. Reuse prior explicit approval; internal fixes and
 existing-API use require no new approval system or check.
 
-Prefer the simplest complete use of existing APIs. Put necessity, mathematical
-or engineering grounds, and rejected simpler alternatives in the owning design
-before code/API changes. Inspect real callers, APIs, configuration, and extension
-points; keep caller orchestration separate from reusable-library responsibility.
-Add mechanisms, dependencies, exact pins, or guards only for an evidenced current
-need, not speculation. Preserve native resolution and required integrity checks.
+Minimize maintained code space after the change, not the diff. Prefer the simplest
+complete use of existing APIs; replacement includes deleting superseded code and
+obsolete support in the same owning unit, not a later cleanup. Put necessity,
+mathematical or engineering grounds, and rejected simpler alternatives in the
+owning design before code/API changes. Inspect real callers, APIs, configuration,
+and extension points; keep caller orchestration separate from reusable-library
+responsibility. Add mechanisms, dependencies, exact pins, or guards only for an
+evidenced current need, not speculation. Preserve native resolution and required
+integrity checks.
 When an existing dependency contract requires an exact pin, only execution that
 needs a dependency change uses a published PR commit through that consumer-owned
 pin; otherwise use the consumer's declared resolution.

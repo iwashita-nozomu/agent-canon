@@ -8,6 +8,7 @@ upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
+upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first refactor precedence and abstraction admission
 upstream design ./agent-orchestration.md write-capable handoff validation trust boundary and work-conservation owner
 upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py emits design evidence findings for refactor plans
@@ -40,11 +41,11 @@ abstraction admission は [documents/conventions/software-engineering-principles
 
 大きめの refactor を、feature 追加ではなく挙動保存つきの再編として扱います。
 
-明示された重複旧実装の廃止には
+通常の置換・統合と重複旧実装の廃止に
 [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-を適用します。利用中を理由に正本化を止めず、根幹の修正後に依存を辿って必要な利用側を
-更新します。旧入口の削除は移行の途中段階であり、RC-09 は usage-surface repair の
-免除ではありません。必要な利用側修正を含む範囲と、無関係な改善を区別します。
+を適用します。差分量ではなく SEP-06 の完成後のコードスペースを基準に設計し、不要な旧コードの
+削除と必要な usage-surface repair を同じ修正で閉じます。別の廃止依頼や利用者ゼロを待たず、
+無関係な改善は加えません。挙動保存は旧実装・旧構造の温存を意味しません。
 
 ## Software Engineering Principle Route
 
@@ -81,7 +82,7 @@ refactor-loop は親 packet または変更後 responsibility graph が明示し
 
 共有 module、canonical tool、親 repository、consumer projection が同じ
 topology を構成する refactor は、次の順序を正本とします。
-RC-09 の廃止でも、変更によって影響する利用側はこの手順に含めます。
+RC-09 の置換・廃止でも、変更によって影響する利用側はこの手順に含めます。
 
 1. user-facing consumer / parent で完成形を先に確定する。責務、パス、所有境界を
    明示する。
@@ -181,6 +182,7 @@ or writing.
 1. API 形状と構造を変える refactor は two-stage refactor として扱います。
    stage 1 は `forced migration` で、canonical surface、旧 entry、alias、
    wrapper、config route、generated surface の移動または削除をまとめて行います。
+   置換で不要になった旧コード・専用補助コードは RC-09 により移動ではなく削除します。
    stage 2 は `usage-surface repair` で、caller、docs、workflow、skill、hook、
    config、report consumer を新しい surface に合わせます。test、smoke、
    behavior execution は二段完了後の return-gate validation に集約します。
@@ -553,9 +555,11 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
 ## Runtime Contract Clauses
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-For explicitly retired duplicate implementations, apply [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-and [Purpose](#purpose): active callers do not veto retirement, but affected consumer migration is
-required. Stop propagation at unchanged contracts rather than exempting initially unnamed consumers.
+For implementation replacement, consolidation, or duplicate retirement, apply
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+and [Purpose](#purpose): minimize the final maintained code space, remove superseded code, and
+complete necessary consumer migration together. Do not wait for a separate retirement request or
+zero callers. Stop propagation at unchanged contracts, not at initially named files.
 
 1. Start from the dependency-expanded scope, not from the initially mentioned
    file. The editable candidate set is every file returned by dependency
@@ -609,7 +613,8 @@ required. Stop propagation at unchanged contracts rather than exempting initiall
 1. Run API-shaping and structure refactors as a two-stage refactor:
    `forced migration` first, then `usage-surface repair`. The first stage
    moves or removes the canonical surface, legacy entry, alias, wrapper,
-   config route, and generated surface as one structural migration. The second
+   config route, and generated surface as one structural migration. Under RC-09,
+   remove superseded code and its exclusive support rather than relocating it. The second
    stage updates every caller, document, workflow, skill, hook, config, and
    report consumer that uses the moved surface. Put test, smoke, and behavior
    execution in return-gate validation after both stages are complete.
