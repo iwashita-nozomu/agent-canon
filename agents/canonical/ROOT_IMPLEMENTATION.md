@@ -7,6 +7,8 @@ responsibility Owns detailed source-side implementation and numerical decision g
 upstream design ../../AGENTS.md conditional source reader map
 upstream design ../../ROOT_AGENTS.md portable common boundaries
 upstream design ../../documents/design/entrypoint-owner-map.md source and consumer split contract
+upstream design ../../documents/conventions/software-engineering-principles.md maintained code-space objective and abstraction admission
+upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 @dependency-end
 -->
 
@@ -33,18 +35,20 @@ a shortcut would exclude.
 
 ## Simplest complete implementation
 
-Make the simplest complete implementation the default, not a later refactor.
-Start with direct use or composition of existing APIs and straightforward code
-at the current owner. Introduce abstractions, configuration, execution paths,
-or state only when a concrete current requirement cannot be met more simply;
-justify that necessity with mathematical or engineering grounds. Hypothetical
-reuse, design-pattern uniformity, or test-double convenience alone is not such
-a reason. Minimize concepts, state, branches, and dependencies while preserving
-the required domain, correctness, safety, and failure semantics. Neither fewer
-lines nor a smaller diff justifies omitted behavior, and completeness does not
-authorize speculative generalization or unrelated library or consumer changes.
-Keep the decision with the existing implementation and review owners, without
-adding a checker, report, or approval gate to enforce simplicity.
+Design for the smallest maintained code space after the change, not the smallest
+diff. Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
+to the final implementation, including retained code and support mechanisms.
+Start with direct use or composition of existing APIs; admit new abstractions,
+configuration, routes, or state only for an evidenced unmet current requirement.
+Hypothetical reuse, pattern uniformity, or test-double convenience is not a gap.
+Preserve the required domain, correctness, safety, performance, and failure semantics;
+code compression or omitted behavior is not simplification.
+For replacements, include the retained owner, superseded code, and necessary
+consumer migration in the existing design before implementation, then close
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+in the same change. Do not defer deletion to a later cleanup or keep the old path
+to reduce the diff. Keep unrelated changes out; add no checker, report, or approval
+gate to enforce this objective.
 
 ## Public API additions
 
