@@ -136,29 +136,10 @@ Remote mirror/publication follows the canonical issue policy; review does not pe
 
 ## Regression Evidence Review
 
-新しい regression test、fixture、mock、test-only adapter を「再発防止が増えた」という理由だけで
-肯定しません。変更された contract に対して、その evidence が canonical invariant の反例を固定して
-いるか、それとも現在の representation を別の仕様として固定しているかを判定します。
-
-material な regression 追加では、少なくとも次の evidence-linked question が判断可能であることを
-確認します。専用 checklist receipt や checker を追加する必要はありません。
-
-- どの canonical contract / invariant が failure により反証され、その owner はどこか。
-- case は上記 SEP-07 の判断に照らし、対象入口で成立する入力・状態に対する invariant の minimal counterexample / witness か。mock が入口の保証を無効化した架空状態だけを作っていないか。
-- 既存 property、table-driven finite state、semantic equivalence、canonical boundary acceptance に統合できない理由があるか。
-- private field、temporary path、helper topology、storage layout、deleted compatibility state を test の都合で contract 化していないか。
-- parser、classifier、state builder、lifecycle、environment setup の第二実装を test 側に作っていないか。
-- 同じ invariant を所有する historical regression を統合・削除して、一つの oracle に収束できないか。
-- 正しい alternative implementation に置換しても、その test が semantic contract を同じように判定するか。
-
-focused test の pass は counterexample の再現と repair diagnosis の evidence であり、それだけを
-handoff / completion proof とみなしません。変更責務の canonical validation route が formal entrypoint、
-consumer boundary、clean replay、environment acceptance 等を要求する場合、その oracle まで確認します。
-実行不能なら verified completion へ昇格させず remaining verification として扱います。
-
-逆に、局所 algorithm 自体が独立した数学的・工学的 contract owner なら owner-local unit/property test
-は正当です。test count、coverage percentage、mutation score、historical bug 数を単独で品質尺度にして
-追加を要求しません。
+変更された regression evidence を [test-design の共通条件](test-design.md#regression-evidence-ownership)
+に照らして確認します。追加前の判断と実際の diff / 実行証拠を突き合わせ、条件を満たさない
+evidence を findings として返します。test 追加そのものを肯定せず、確認できた contract と
+remaining verification を区別します。この skill は共通条件を再定義しません。
 
 ## OOP/SOLID activation
 
@@ -172,7 +153,7 @@ Do not duplicate a second SOLID-sensitive trigger table in this skill.
 2. Read the owning contract/design, the material engineering-principle clause, and targeted validation evidence.
 3. When the changed surface adds or changes a responsibility, inspect evidence-linked sibling implementations; if `|S(R)| >= 2`, evaluate canonical ownership, stable abstraction, or evidence-backed intentional separation.
 4. Review changed comments and comments adjacent to changed logic for required local rationale, stale assumptions, and same-diff synchronization under the canonical comment policy.
-5. When regression evidence changes, review its canonical invariant/owner, minimal witness, representation independence, duplicate truth, consolidation opportunity, and completion oracle before treating added test coverage as positive evidence.
+5. When regression evidence changes, apply [Regression Evidence Review](#regression-evidence-review) to the diff and execution evidence.
 6. Report blocking correctness/safety/design findings before summary.
 7. Resolve current-scope findings in the current diff when possible.
 8. Escalate only durable residual work to the issue owner.
@@ -289,7 +270,7 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
    を evidence-linked にたどります。straightforward finding は direct cause proof
    を記録し、rejected/duplicate/already-covered/unreachable finding はその reason/evidence
    だけで閉じます。必要な場合だけ latest remote/Issue/branch history を確認します。
-1. 選択した contract surface と material engineering-principle clause に対して docs と tests が追随しているか確認します。regression を追加した場合は、canonical invariant/owner と completion oracle への従属、第二 truth の不在、consolidation の有無も確認します。
+1. 選択した contract surface と material engineering-principle clause に対して docs と tests が追随しているか確認します。regression evidence の変更は [Regression Evidence Review](#regression-evidence-review) に従います。
 1. 継承/substitutability、ownership/lifecycle、dependency inversion/DI、public object model、または typed boundary が material に変わる場合だけ `python-review` を追加し、`$oop-readability-check` と `check_solid_evidence.py` の evidence を review input にします。class、dataclass、`Protocol`、annotation、parser model、public type の存在だけでは OOP/SOLID を起動しません。
 1. 数値・solver・tolerance・convergence・residual・benchmark の test 変更では、必要な場合だけ `test-design` の Numerical Test Admission Gate と [documents/conventions/coding-conventions-testing.md](../../documents/conventions/coding-conventions-testing.md) を参照し、trigger、non-numerical alternative、oracle、budget を確認します。非数値の変更にはこの gate を追加しません。
 1. まず static checks と targeted validation を実行し、full repository
