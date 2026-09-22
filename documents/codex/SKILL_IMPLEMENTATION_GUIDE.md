@@ -9,7 +9,7 @@ upstream design README.md durable document index
 
 
 この文書は、repo で使う project skill の実装指針です。
-現在の正本は `agents/` と discovery path の skill directory です。
+AgentCanon の正本は `agents/skills/` と catalog、project 固有 skill の正本はその repository の `.agents/skills/` です。
 
 ## 正本
 
@@ -21,20 +21,22 @@ upstream design README.md durable document index
 - artifact placement canon: [agents/canonical/ARTIFACT_PLACEMENT.md](../../agents/canonical/ARTIFACT_PLACEMENT.md)
 - CLI entrypoint canon: [agents/canonical/CLI_ENTRYPOINTS.md](../../agents/canonical/CLI_ENTRYPOINTS.md)
 - Codex workflow canon: [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md)
-- Codex discovery path: `.codex/personal/skills/`
+- 生成先と Codex discovery の配置: [Skill Paths](../../agents/canonical/skills.md#skill-paths)
 
 ## 方針
 
 - skill は少数の workflow-oriented unit に保ちます。
 - numbered skill catalog は増やしません。
-- skill ごとの instructions は `SKILL.md` に集約します。
+- AgentCanon の instructions は `agents/skills/<skill>.md`、project 固有 skill は `.agents/skills/<skill>/SKILL.md` に集約します。
 - 再利用可能な workflow は skill にし、repo 全体の恒久ルールは `documents/` または `agents/` に置きます。
-- shared discovery shim は `.codex/personal/skills/` を正本にし、互換 path は同期スクリプトで更新します。
+- `.codex/personal/skills/` は ignored な生成 view です。既存の [bootstrap / materializer 経路](../../README.md#source-and-artifact-boundary) を使い、手編集や別の同期スクリプトを追加しません。
 
 ## 推奨 skill directory
 
+project 固有 skill は repository または対象 subtree に置きます。
+
 ```text
-<skill-name>/
+.agents/skills/<skill-name>/
 └── SKILL.md
 ```
 
@@ -57,6 +59,6 @@ upstream design README.md durable document index
 
 ## 整理ルール
 
-- 新しい skill を追加するときは [agents/canonical/skills.md](../../agents/canonical/skills.md) を更新します。
+- AgentCanon public skill の追加は `agents/skills/<skill>.md` と `catalog.yaml`、project 固有 skill の追加はその repository の `.agents/skills/` で行います。
 - Skill 編集の検査は変更した契約から選びます。補助診断は [Optional Rejection Prediction](../../agents/COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) に従い、文書編集の開始条件にしません。
 - Skill 内の code fence に `KEY=value` 形式の機械出力例を追加・削除した場合は `python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json` を通し、意図した field change なら `documents/runtime/log-surface-inventory.json` を再生成します。
