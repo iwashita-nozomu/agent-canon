@@ -15,11 +15,11 @@ downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI u
 
 ## Reader Map
 
-- Purpose: analyze prose as a typed graph before rewriting, reviewing, or
-  handing it to writing and research skills.
+- Purpose: provide optional typed-graph analysis of prose for a selected
+  diagnostic question or an explicitly requested graph task.
 - Section path: Purpose defines the graph boundary table; Use When selects the
   task shape; Standard Sequence gives the operational flow; Runtime Tool Result
-  Contract, Required Outputs, and Literature Boundary define outputs and limits.
+  Contract, Requested Outputs, and Literature Boundary define outputs and limits.
 - Use when: section order, reader path, claim support, split/merge/bridge
   decisions, logic holes, or graph-backed rewrite packets need evidence.
 - Boundary: graph artifacts preserve source truth and prepare handoff; they do
@@ -30,8 +30,8 @@ downstream design ../../documents/tools/prose_reasoning_graph.md documents CLI u
 
 ## Purpose
 
-`prose-reasoning-graph` is the overlay skill for analyzing prose as a typed
-graph before asking an LLM or writing skill to rewrite it. It converts existing
+`prose-reasoning-graph` is an optional overlay for analyzing prose as a typed
+graph. It converts existing
 Markdown/plain text into a SQLite-backed intermediate graph, runs layer
 diagnostics, explains graph findings in natural language, and emits handoff
 packets for existing writing, research, review, experiment, and artifact skills.
@@ -48,35 +48,32 @@ packets for existing writing, research, review, experiment, and artifact skills.
 
 ## Use When
 
-- Existing prose should be converted into a graph/DSL-like intermediate form.
-- Paragraph order, paragraph-to-paragraph connection, or paragraph-internal
-  naturalness needs evidence before rewrite.
-- A draft or substantive document addition/revision needs split, merge, bridge,
-  reorder, responsibility-coverage, or reader-path decisions before prose is
-  added.
-- A paper, scholarly note, report, or experiment plan needs logic-hole,
-  citation/evidence, or experiment-design triage before drafting.
-- An LLM should receive a compact rewrite packet rather than re-inferring the
-  whole document structure from raw prose.
+- The user requests a graph analysis of existing prose.
+- The author selects graph diagnostics to investigate a concrete question about
+  claim support, paragraph connections, or candidate structural changes.
+- An existing graph artifact is needed for a requested analysis or handoff.
+
+## Optional Analysis Boundary
+
+Ordinary writing does not require graph analysis. Draft and revise directly from
+sources, existing text, headings, and brief structure notes; review claims,
+citations, definitions, and reader flow in that text. Do not require a graph/DSL,
+fixed packet, sentence-anchor order, zero graph findings, or a graph-to-prose
+round trip before drafting, reviewing, or completing prose. A graph finding is
+advisory evidence, not a writing-admission decision or proof of a prompt defect.
+Check its claim against the source and retain genuine uncertainty or limitations.
+
+A graph's internal consistency is neither necessary nor sufficient for a sound
+argument: valid prose can have no graph, and a consistent graph can encode an
+unsupported claim. This is why evidence review belongs to the writing owner,
+while this skill owns only a selected analysis. Do not replace the removed
+prerequisite with another schema, registry, or blanket diagnostic pass.
 
 ## Standard Sequence
 
-This skill is the structure-first writing gate. For nontrivial or substantive
-document creation or revision, do not ask a writing skill to draft
-reader-facing prose from raw notes while graph findings are still open. Typos,
-link fixes, Markdown formatting, and other format-only edits may skip this gate
-when they do not change section order, responsibility coverage, claim/support,
-reader path, source map, or canonical route.
-
-1. Encode the draft or source packet into the graph/DSL.
-1. Analyze the graph.
-1. Expand, delete, or reorganize graph-backed structure while it is still
-   DSL/projection state.
-1. Rerun diagnostics.
-1. Project to prose only after graph findings are closed or explicitly owned.
-1. Rerun the same graph check after projection.
-1. Classify findings that appear only after DSL-to-prose projection as
-   `dsl_to_prose_prompt_defect` against the receiving writing skill prompt.
+The following commands apply only after graph analysis has been selected. Use
+existing graph inputs and results when they answer the selected question; do not
+make writers produce them as a prerequisite for ordinary work.
 
 1. Set an explicit external runtime root before creating graph artifacts:
    `export AGENT_CANON_RUNTIME_ROOT=<external-runtime-root>`. Let `ingest` or
@@ -116,11 +113,9 @@ reader path, source map, or canonical route.
    `rewrite-packet --op <operation-id>`. Skip this step when the current DB has
    only diagnostics and no edit-operation ids.
 1. Export `skill-handoff` and pass it to the receiving skill or reviewer.
-1. For DSL-to-prose projection, pass the `project --out` payload's
-   `selected_ordering.ordered_anchors` to the receiving writing skill as the
-   whole-document sentence sequence. The ordering is a priority topological sort
-   over the selected ordering subgraph, so the LLM receives a deterministic reader-order contract
-   before it writes sentences or sections.
+1. Treat `selected_ordering` as an optional candidate reader order from the
+   graph analysis. Review it against source prerequisites and the reader's task;
+   it does not bind the writing skill to a whole-document sentence sequence.
 1. If diagnostics include a verification route, verify before rewrite:
    `logic-gap-review` checks inference validity, `$literature-survey` and
    `citation-evidence-review` check external evidence, `$formal-proof-workflow`
@@ -141,19 +136,10 @@ reader path, source map, or canonical route.
    `$structure-planning` / `$report-writing` has adopted it, rejected it with
    renderer or reader-state evidence, combined it with prose, or preserved it as
    an explicit unresolved warning with owner and next command.
-1. When the receiving skill is a writing skill, rerun graph diagnostics after
-   each DSL/projection rewrite and keep looping until active findings for the
-   selected profile are gone. Revise the structure contract, graph-backed
-   rewrite packet, or source draft at the structural layer: add missing nodes or
-   edges, remove unsupported nodes, split or merge projection units, reorder the
-   projection, route verification children, or decide presentation candidates.
-   Only after that closure may the receiving skill write final prose. After
-   prose projection, rerun `check-document` or the same ingest/analyze/lint
-   path. If new findings appear that were absent from the closed
-   DSL/projection state, record a
-   `dsl_to_prose_prompt_defect` finding against the sentence-generation,
-   section-generation, or DSL-to-prose prompt and repair that prompt before more
-   prose rewriting.
+1. Rerun only a selected analysis affected by changed graph inputs when its
+   result is still needed. Review new findings against the source; they do not
+   automatically establish a prose-generation prompt defect. Do not require
+   graph finding closure or a post-draft graph pass to permit writing.
 1. Treat graph diagnostics as advisory evidence. Final prose, review, and
    publication authority stays with the receiving skill.
 
@@ -180,19 +166,14 @@ Full projection, diagnostics, explanation, integration, handoff, and rewrite
 packet bodies must be written with `--out`. Stdout is a status channel for pass
 markers and artifact paths.
 
-## Required Outputs
+## Requested Outputs
 
-```text
-prose_graph_db=<path>
-prose_graph_projection=<path>
-prose_graph_diagnostics=<path>
-prose_graph_explanation=<path>
-prose_graph_integration_plan=<path>
-prose_graph_handoff=<path>
-prose_graph_rewrite_packet=<path|not_required>
-prose_graph_presentation_decisions=<path|none>
-prose_graph_stats=<path>
-```
+Return the analysis result requested by the task, its source references, and the
+actual artifact paths emitted by the selected commands. Include material
+findings, evidence, limitations, and any relevant next action. There is no fixed
+`prose_graph_*` report to populate, and no need to generate unused projections,
+rewrite packets, or handoffs. Keep the selected tool's actual output and failure
+status; an unavailable analysis is not a successful check.
 
 ## Literature Boundary
 

@@ -22,7 +22,7 @@ command surface、result surface、verification route、skill handoff を説明�
 
 ## この文書の読み方
 
-この tool reference は、Prose Reasoning Graph の根拠 surface、読者と責務境界、graph visualization owner、graph contract、runtime flow、command surface、result surface、document responsibility check、profiles、verification route、skill handoff、writing loop を順に説明します。実行入口を探すときは Command Surface へ進み、出力や責務境界を確認するときは Graph Contract と Result Surface を先に読みます。DSL の正本は [documents/prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md) です。
+この tool reference は、Prose Reasoning Graph の根拠 surface、読者と責務境界、graph visualization owner、graph contract、runtime flow、command surface、result surface、document responsibility check、profiles、verification route、skill handoff、任意の writing analysis を順に説明します。実行入口を探すときは Command Surface へ進み、出力や責務境界を確認するときは Graph Contract と Result Surface を先に読みます。DSL の正本は [documents/prose-reasoning-graph/dsl-spec.md](../prose-reasoning-graph/dsl-spec.md) です。
 
 ## 根拠 Surface
 
@@ -110,7 +110,7 @@ diagnostics、edit operations、natural-language explanation、projection metada
   `project` は全文 sentence anchor を、選択された ordering subgraph の priority topological sort として
   `selected_ordering.ordered_anchors` に出します。`hard_before` は topo constraint、
   `adjacency_preferred` は soft priority として扱い、hard cycle は diagnostic に出します。
-  writing LLM はこの順序を DSL-to-prose input sequence として使います。
+  明示的な graph 分析で得た順序は構成候補であり、writing skill の必須入力や固定文順にはしません。
 - node record:
   `nodes table` は id、document id、layer、kind、text、source span、confidence、
   `payload_json` を保持します。
@@ -336,16 +336,16 @@ handoff entry は次の fields を receiving skill に渡します。
 unsupported claim や weak transition を示しますが、paper approval、citation settlement、
 PR merge、repository policy change は判断しません。
 
-## Writing Loop
+## Optional Writing Analysis
 
-writing workflow では、draft readiness を次の順で判断します。
+通常執筆は既存本文・見出し・構成メモと source を直接使って進めます。
+graph DB の作成、固定 handoff、全 sentence の順序、finding 件数ゼロ、本文との
+往復診断を開始・完了条件にしません。詳しい適用条件は
+[Optional Analysis Boundary](../../agents/skills/prose-reasoning-graph.md#optional-analysis-boundary)
+に従います。
 
-1. source document を graph DB に materialize する。
-1. `lint` と `integrate` を実行する。
-1. verification route を leaf が verified、limited、explicitly unresolved になるまで辿る。
-1. structure contract、source packet、graph-backed rewrite packet、または draft source を更新する。
-1. graph diagnostics を rerun する。
-1. selected profile の active fix-now finding が無い状態で reader-facing prose を書く。
-
-この loop は DSL / graph を先に直し、その後に prose へ射影するための runtime discipline です。
-prose 再解析で新しい finding が出る場合は、DSL から文章へ射影する prompt または rewrite pass を見直します。
+明示的に graph 分析を選んだ場合だけ、必要な入力を ingest / analyze し、選択した
+診断を source と照合します。主張に必要な証拠は既存 source・引用・検証結果から確認し、
+未確認事項は未確認と記録します。graph の入力を変え、同じ分析結果がなお必要な場合は
+その分析だけを再実行します。新しい finding を自動的に prose-generation prompt の
+欠陥と判定せず、本文・根拠・診断のどこに問題があるかを確認します。
