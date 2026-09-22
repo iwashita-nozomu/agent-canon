@@ -78,7 +78,6 @@ class GpuExecutionDockerRoutingContractTest(unittest.TestCase):
                         self.assertEqual(result.returncode, exit_code, result.stderr)
                         calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
                         self.assertEqual(calls, [
-                            ["nvidia-smi"],
                             ["docker", "run", "--rm", "--gpus", f"device={gpu}",
                              "project:test", *payload],
                         ])

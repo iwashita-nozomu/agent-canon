@@ -54,11 +54,13 @@ pin; otherwise use the consumer's declared resolution.
 Establish reachability and existing guarantees before extra error handling;
 unknown is neither impossible nor a defect. Keep authorization and boundary safety.
 
-Use configured execution and defaults. Do not rediscover or manually switch
-environments, add probes/fallbacks, or rebuild for ordinary work. Diagnose only
-requested or evidenced relevant problems; stop when the decision is resolved.
-Repair requires scope and authority. Block only affected actions, preserve resource
-and rerun limits, and never replace a required backend to claim validation.
+Run the prescribed command with configured settings and defaults first. Only
+if it fails, diagnose the relevant execution route from that failure; success
+requires no route probes. Do not preflight, manually switch environments, add
+fallbacks, or rebuild for ordinary work. Explicit diagnosis/setup requests stay
+separate. Preserve the entrypoint's safety checks, permissions, resource and rerun
+limits. Diagnosis does not authorize repair; stop only affected actions and never
+replace a required backend to claim validation.
 
 Check algorithms against equations and assumptions before numerical adjustments;
 require error analysis rather than arbitrary offsets or tolerances. Report actual

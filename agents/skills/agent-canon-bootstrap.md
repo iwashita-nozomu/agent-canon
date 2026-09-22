@@ -9,6 +9,7 @@ upstream implementation ../../tools/runtime/container/bootstrap_runtime.py typed
 upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py namespaced tool dispatch and parity boundary
 downstream design ./agent-eval-accumulation.md eval evidence collection and archive handoff
 downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py lifecycle contract tests
+downstream implementation ../../tests/agent_tools/test_execution_route_order.py command order regression
 downstream implementation ../../tests/tools/test_bootstrap_container_contract.py image and dispatch contract tests
 @dependency-end
 -->
@@ -43,10 +44,12 @@ evidence.
   Docker RPC or package fallback path. Target additions/removals update the
   strict runtime `mounts.tsv` manifest; the host applies only its validated
   target rows when replacing the resident.
-- Register a project root with `target add` before using it. Target admission
-  and the active generation are read back before dispatch. Concurrent target
-  changes are serialized by the bootstrap lifecycle; a failed candidate keeps
-  the last verified generation active.
+- The dispatcher owns required target admission and active-generation checks.
+  Invoke the prescribed tool command first; do not prepend a separate target or
+  health preflight. After a target-related rejection, use the existing target
+  owner to diagnose and, when authorized, register the exact root. Concurrent
+  target changes remain serialized; a failed candidate keeps the last verified
+  generation active.
 - `tool run` is the verified namespaced route. Internal Python/Rust/LSP tools
   are not exposed as host commands or compatibility choices. Never create flat
   host wrappers.
@@ -87,17 +90,18 @@ evidence.
 1. Resolve the task and project owner first. Use the project repository's
    normal Docker/test runner for project execution; select this skill only for
    AgentCanon tools or their lifecycle.
-2. Choose the source install root and its authorized control root, then run
-   `status`. Install/start the shared runtime only when
-   status says it is absent or stale. Keep at most one task-owned AgentCanon
-   tool container and one image generation; record IDs for cleanup.
-3. Add the exact project root as a read-only target, or request the explicit
-   target-write capability when a tool contract genuinely requires a write.
-   Read back target identity, mode, active generation, and container health.
-4. Invoke the catalog-qualified command through `tool run --root <project> <catalog-id> -- ...`.
-   Preserve the receipt's argv, cwd, input/output, exit/signal, written paths,
-   execution plane, and responsibility owner. A failure in the tool plane is
-   not a project-code failure; report the plane and exact owner separately.
+2. Reuse the source install root and authorized control root, then invoke the
+   catalog-qualified `tool run --root <project> <catalog-id> -- ...` directly.
+   Preserve argv, cwd, input/output, exit/signal, written paths, execution plane,
+   and responsibility owner from the result. Success needs no route preflight.
+3. Only after failure, diagnose the relevant route. Use `status` for an unresolved
+   runtime failure or target readback for a target rejection; do not scan every
+   surface or infer a project-code failure from a tool-plane rejection.
+4. Install/start or `target add` only for an explicit lifecycle request or an
+   authorized repair of that failure. Default new targets to read-only; writes
+   require the existing target-write authority. Read back the changed target or
+   generation, then retry only when allowed. Preserve the one-container/image
+   limit and record task-created resource IDs for cleanup.
 5. For eval work, run the registered producers, collect the run bundle, sync
    it through the archive adapter, and verify the remote repository and commit
    readback. Producer definitions and manifests come from the image-owned
@@ -123,21 +127,13 @@ bootstrap path `<repository-root>/.runtime`:
 bash bootstrap.sh \
   --repository-root . \
   --control-parent-root <authorized-parent-workspace> \
-  status
-
-bash bootstrap.sh \
-  --repository-root . \
-  --control-parent-root <authorized-parent-workspace> \
-  target add --root <project-root> --mode read-only
-
-bash bootstrap.sh \
-  --repository-root . \
-  --control-parent-root <authorized-parent-workspace> \
   tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
-Use `install`, `update`, `start`, `stop`, `rollback`, `uninstall`, and `gc --dry-run`
-with the same repository/control roots and task lifecycle evidence. `eval collect`
+After a relevant failure, `status` or target readback uses the same roots.
+Use `target add --root <project-root> --mode read-only`, `install`, `update`,
+`start`, `stop`, `rollback`, `uninstall`, or `gc --dry-run` only for the selected
+lifecycle operation, not as a checklist before ordinary execution. `eval collect`
 and `eval sync --run-id <run-id>` are the only bootstrap eval routes. Any
 non-zero result remains a typed failure; do not retry through a project
 container, a source checkout fallback, or an unqualified legacy command.
@@ -162,8 +158,8 @@ resident never imports or calls the archive publisher.
 
 ## Closeout
 
-Report the repository-qualified Issue/PR, source and image identities, target
-and active-generation readback, execution plane, tool/project responsibility,
-eval archive commit/readback, and exact task-owned cleanup. If a required
-health, parity, target, archive, or cleanup readback is missing, stop with the
-typed evidence instead of claiming completion.
+Report the repository-qualified Issue/PR, exact command/result, execution plane,
+and tool/project responsibility. Use identities and generation evidence already
+returned by execution; ordinary success does not require separate health probes.
+For selected lifecycle/eval work, report its required target, archive, and exact
+task-owned cleanup readback. Missing evidence remains unverified, not complete.

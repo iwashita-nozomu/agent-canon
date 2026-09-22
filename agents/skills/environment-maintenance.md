@@ -25,8 +25,8 @@ downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_
 - Boundary: source、data、model、credential、GPU driver/device などの runtime input は
   image 外に置けますが、標準環境の構築には使いません。
 
-通常実行は共通入口の境界に従い、既存entrypointの設定と標準ツールの既定値を
-そのまま使います。利用者への環境選択要求や、agentによる場当たり的な環境フラグ・
+通常実行は共通入口の境界に従い、既存entrypointを設定・既定値のまま先に実行し、
+失敗した場合だけ必要な経路を検証します。利用者への環境選択要求や、agentによる環境フラグ・
 環境変数・設定の手動上書きを行いません。
 新しいtask/session、CPU/GPUの利用、任意設定の未確認だけで環境判定や本Skillを
 起動しません。環境変更が依頼範囲にある場合だけ、Required Change Fields以降の
@@ -115,8 +115,8 @@ CIで同じimageとtest commandを再利用できる状態にします。
 - local developer convenienceだけを理由にhost-global installやproject image外のbootstrapを
   canonical routeへ昇格させません。
 - GPU imageはdeviceなしでbuild可能にします。GPUを必要とする標準テストは、
-  [gpu-execution](gpu-execution.md)に従い、空いているGPUを指定して同じimageを
-  `docker run --rm --gpus device=<selected-GPU> <image> <command...>`で起動します。
+  [gpu-execution](gpu-execution.md)に従い、既存のGPU・image設定を使う規定経路を
+  先に実行します。経路・空き確認は実失敗に関係する場合だけ行います。
   通常実行に専用admissionやJAX/XLA設定を要求せず、排他予約が必要な場合だけ
   同skillの任意経路を選びます。
 - Dockerfile、Dev Container、Compose、CI、READMEの project image target と command を同じ変更でそろえます。

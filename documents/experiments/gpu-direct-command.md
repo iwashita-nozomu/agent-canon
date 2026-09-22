@@ -21,9 +21,9 @@ downstream design ../../agents/skills/gpu-execution.md route selection and opera
 
 Use this contract only when reservation is explicitly required. Ordinary GPU
 pytest, benchmark, diagnosis, and one-off container commands follow
-[gpu-execution](../../agents/skills/gpu-execution.md): select an available GPU
-and use native Docker. They do not require this adapter, its UUID locks,
-exact environment, immutable plan, or lifecycle receipts.
+[gpu-execution](../../agents/skills/gpu-execution.md): run the configured project
+command first and diagnose its route only after failure. They do not require
+this adapter, its UUID locks, exact environment, immutable plan, or lifecycle receipts.
 
 The rules below describe the existing optional admitted route only. They do
 not override the ordinary route or change the admission implementation.

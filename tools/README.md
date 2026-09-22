@@ -43,8 +43,9 @@ bootstrap-owned ignored `.runtime/` under the install checkout:
 | `source` | AgentCanon checkout | policy/docs/design edits | explicit mutation only; no runtime output |
 
 For a project-owned GPU workload, follow
-[gpu-execution](../agents/skills/gpu-execution.md): inspect availability, select
-an available GPU index or UUID, and run the project image with native Docker.
+[gpu-execution](../agents/skills/gpu-execution.md): run the prescribed command
+with its configured GPU/image first; diagnose the relevant route only after
+failure. Native Docker below applies when it is already the project's route.
 No AgentCanon runner or admission environment is required for ordinary runs.
 
 ```text
@@ -78,10 +79,13 @@ is verified:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
-  target add --root <project-root> --mode read-only
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
-  tool run <verified-catalog-id> -- <args...>
+  tool run --root <project-root> <verified-catalog-id> -- <args...>
 ```
+
+Invoke the prescribed command first; the dispatcher retains its admission checks.
+Only after a relevant failure, follow [bootstrap](../agents/skills/agent-canon-bootstrap.md)
+for route diagnosis and authorized target/lifecycle repair. Do not prepend `status`
+or `target add` to every tool invocation.
 
 Parity covers argv, cwd, stdin/stdout/stderr, exit and signal behavior, and
 written paths. The dispatcher rejects unknown IDs, shell command strings, and

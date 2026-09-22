@@ -16,33 +16,34 @@ additional startup packet or a dependency of generated consumer instructions.
 
 ## Configured execution and bounded diagnosis
 
-Run the current repository owner's existing entrypoint with its configured
-settings and standard tool defaults. Manual environment selection for ordinary
-execution is prohibited: do not ask the user to choose an environment or inject
-host/container, OS/WSL, CPU/GPU backend, runtime, or profile selectors through
-ad-hoc command flags, environment variables, or configuration edits. Existing
-tools resolve their own configured settings and defaults; missing optional
-selectors are not inputs to solicit or fill.
-Do not insert environment classification, inventory, or rediscovery before
-ordinary tasks, sessions, or commands, including installed-tool probes. Reuse
-supplied, still-applicable context without repeating probes or confirmation.
-A new task or an unknown optional setting is not a reason to investigate, stop,
-reconfigure, or restart a working route. Do not replace manual selection with
-new auto-detection, flags, profiles, environment variables, fallbacks, wrappers,
-or persistent detection/cache state. Do not invent missing settings merely to
-normalize environments or avoid rediscovery.
-Environment diagnosis is limited to an explicit request, an actual relevant
-failure, an observed change to a required premise, or a concrete evidenced
-risk. Resolve only the missing decision-relevant fact and stop the diagnosis
-when it is resolved; diagnosis alone does not authorize setup or repair.
-Environment changes and their rebuild/full-profile acceptance must belong to
-the authorized task, not become prerequisites for ordinary execution.
-Preserve the selected command's required safety checks, permissions, resource
-limits, and rerun prohibitions; prior success does not override contrary
-current evidence. When blocked, identify the concrete prerequisite or risk and
-its evidence, stop only affected commands, and continue independent authorized
-work. Do not silently switch a required backend, weaken validation, or treat
-an unrun command as passed.
+For a program execution request, use this order:
+
+1. Invoke the repository owner's prescribed entrypoint with its existing settings
+   and standard defaults. Reuse known roots, selectors, and context; do not run
+   separate `status`, identity, installed-tool, backend, or availability probes
+   before the requested command.
+2. If it succeeds, continue the task without route diagnosis. If it fails, keep
+   the exact command, output, exit/signal, and execution plane. An entrypoint
+   rejection is failure evidence even when the program did not start; do not
+   replay it merely to obtain another failure record.
+3. Use that failure to inspect only the route facts needed to locate the problem.
+   A program assertion or test failure is not by itself an environment defect.
+   Stop diagnosis when the relevant decision is resolved; repair and any retry
+   still require the existing scope, authority, and rerun allowance.
+
+Do not ask the user to select an environment or inject ad-hoc host/container,
+OS/WSL, CPU/GPU, runtime, or profile overrides. Missing optional selectors and
+new tasks/sessions do not justify discovery, setup, wrappers, auto-detection,
+cache state, or fallback execution. Successful execution does not prove every
+validation property, but an additional route probe does not prove it either.
+
+Keep required safety, permission, target-admission, integrity, and resource checks
+inside the selected entrypoint. This order does not bypass a known unsafe or
+unauthorized operation. Explicit diagnosis, installation, or environment-change
+requests use their own existing owner route; do not turn those procedures into
+ordinary execution prerequisites. When blocked, preserve the concrete failure,
+stop only affected commands, and continue independent authorized work. Never
+switch a required backend, weaken validation, or report an unrun command as passed.
 
 ## Checkout and dependency identity
 

@@ -8,6 +8,7 @@ upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md Age
 upstream design ./agent-canon-bootstrap.md shared AgentCanon tool-runtime owner
 downstream implementation ../../tools/agent/skills/skill_shim_materializer.py runtime discovery shim
 downstream implementation ../../tools/agent/orchestration/route.py prompt route
+downstream implementation ../../tests/agent_tools/test_execution_route_order.py command order regression
 @dependency-end
 -->
 
@@ -40,15 +41,18 @@ devcontainer exec --workspace-folder <project-root> [--config <selector>] \
   zsh -lc '<exact-project-command>'
 ```
 
-Read back `id` and `pwd` with the same workspace/config selector before the
-requested command. Use `zsh -lic` only when interactive startup is part of the
-request. Do not add temporary probes outside an explicitly authorized target;
-if one is required, preserve unknown state and prove cleanup.
+Run this command first with the already selected workspace/config. Only after
+failure, inspect the relevant route; use `id` or `pwd` with that same selector
+only when identity or workspace is unresolved by the failure output. A successful
+command needs no such probes. Use `zsh -lic` only when interactive startup is part
+of the request. Do not add temporary probes outside an authorized target; if one
+is required, preserve unknown state and prove cleanup.
 
 ## Closeout
 
-Report the repository-qualified Issue/PR, selector, identity, workspace,
-execution plane, exact command, output, exit/signal, and any typed
+Report the repository-qualified Issue/PR, selector, workspace, identity when
+available from execution or failure diagnosis, execution plane, exact command,
+output, exit/signal, and any typed
 `container_not_running` or cleanup evidence. This skill's success proves only
 the requested command inside an existing project container; it does not prove
 AgentCanon bootstrap health, tool parity, project image build, or project test
