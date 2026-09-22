@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -32,6 +33,16 @@ from tools.agent.skills.skill_shim_materializer import (  # noqa: E402
 
 class SkillShimMaterializerTest(unittest.TestCase):
     """Verify materialization converges without a second writer."""
+
+    def test_build_context_does_not_launch_catalog_validators(self) -> None:
+        """Ordinary materialization resolves real inputs without authoring tools."""
+        with patch.object(subprocess, "run", wraps=subprocess.run) as commands:
+            context = build_context(PROJECT_ROOT)
+        self.assertIn("task-routing", context.skill_ids)
+        self.assertEqual(set(context.routes), set(context.skill_ids))
+        self.assertEqual(set(context.dependencies), set(context.skill_ids))
+        invoked = {Path(call.args[0][0]).name for call in commands.call_args_list}
+        self.assertFalse(invoked & {"yamllint", "check-jsonschema"})
 
     def test_materialize_fixed_point(self) -> None:
         """Two runs preserve all records/projections and the second run is empty."""
