@@ -32,6 +32,10 @@ Required means applicable to the selected action, not mandatory on every run.
 Do not reread AGENTS, enumerate all Skills, or load every packet/phase to start.
 Select additional context only through [its read conditions](CODEX_INTAKE.md#optional-context).
 An already resolved owner, route, and validation need no new routing pass.
+Keep them through retries and handoffs. For an actual execution failure or an
+authorized route change, read only
+[Configured execution and bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis);
+do not restart routing or invent another procedure.
 
 ## Completion Readiness
 
