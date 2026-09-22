@@ -26,10 +26,19 @@ auto-loaded instructions short; place procedures in conditionally read files.
 
 ## Always-On Boundary
 
-Stay within the authorized task and preserve unknown user/Git state. Preserve the
-required problem class, valid inputs, guarantees, and failure semantics; neither
+Stay within the authorized task and preserve unknown user/Git state. Preservation
+is not abandonment: inspect Git inconsistencies, repair within task authority,
+or hand off preserved state with a concrete owner/action. Unfamiliar diffs or
+absent separate instructions do not waive this duty; dirty is not itself
+inconsistent. Preserve the required problem class, valid inputs, guarantees, and
+failure semantics; neither
 small diffs nor completeness justify shortcuts or unrelated work. Follow the
 selected owner rather than inventing a fallback, wrapper, or policy copy.
+
+Root dependency fixes include necessary consumer migration. Fix the root, trace
+affected uses, and repair them; active use is not a veto or a reason to retain
+the old path. Bound work by changed contracts, not the initially named files;
+report concrete authority/access blockers as incomplete migration.
 
 Public API additions/extensions (exports, types/methods, endpoints, parameters,
 CLI commands/options) require explicit user authorization for that public change;
@@ -54,11 +63,15 @@ pin; otherwise use the consumer's declared resolution.
 Establish reachability and existing guarantees before extra error handling;
 unknown is neither impossible nor a defect. Keep authorization and boundary safety.
 
-Use configured execution and defaults. Do not rediscover or manually switch
-environments, add probes/fallbacks, or rebuild for ordinary work. Diagnose only
-requested or evidenced relevant problems; stop when the decision is resolved.
-Repair requires scope and authority. Block only affected actions, preserve resource
-and rerun limits, and never replace a required backend to claim validation.
+Use the repository owner's fixed execution route and configured defaults through
+retries, validation, and handoff. Do not rediscover or manually switch environments,
+add probes, bypass the entrypoint, or invent scripts, workflows, wrappers, or
+fallbacks to get past a failure. Fixed means the owned procedure, not hard-coded
+paths, versions, or SHAs. Diagnose only requested or evidenced relevant problems;
+stop when the decision is resolved. Route changes and repair require scope and
+authority at that owner. Block only affected actions; preserve permissions,
+resource/rerun limits, and failure semantics. Do not rebuild for ordinary work
+or replace a required backend to claim validation.
 
 Check algorithms against equations and assumptions before numerical adjustments;
 require error analysis rather than arbitrary offsets or tolerances. Report actual
@@ -102,7 +115,11 @@ Continue safe, authorized implementation through delivery; report concrete block
 and the next owner when stopped. Separate commit/push authority and preserve mixed
 work; never force-push, mutate main, or publish outside scope. Report the result,
 material findings, evidence, and limits; distinguish implemented, verified,
-published, and applied. Keep comparable reasoning and results on the Issue.
+published, and applied. Before writing any verification result, including progress
+or interrupted work, structure established facts, evidence, scope, and limits;
+preserve distinct findings and counterevidence. Use that same result across chat,
+Issue/PR comments, and reports through the applicable reporting owner. Keep
+comparable reasoning and results on the Issue.
 
 ## Validation Routing
 

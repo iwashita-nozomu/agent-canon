@@ -90,9 +90,9 @@ dependency、consumer、公開契約、lifecycle（[agents/skills/dependency-ana
 
 ## Duplicate Implementation Retirement
 
-RC-09 は、既存正本との責務の重複が確認され、明示的に廃止対象となった旧実装・旧入口を
-[code-cleanup](../../agents/skills/code-cleanup.md) から削除する契約です。未使用コードの
-削除や全面 consumer 移行とは区別します。
+RC-09 は、重複が確認され明示的に廃止対象となった旧実装・旧入口の削除と、必要な利用側の
+移行を [code-cleanup](../../agents/skills/code-cleanup.md) から一つの修正責務として閉じる契約です。
+未使用コードの削除や、変更と無関係な consumer の一括移行とは区別します。
 
 まず意味、適用 domain、invariant、state、side effect、I/O、failure semantics を照合し、
 残す正本が必要な責務を担うことを確認します。名前、検索件数、構文の類似だけでは重複と
@@ -100,29 +100,32 @@ RC-09 は、既存正本との責務の重複が確認され、明示的に廃�
 未使用コードは到達性と副作用から不要性を別に判断します。file 全体の削除には、その
 全寄与について削除根拠が必要です。
 
-重複が確認された廃止対象は、active caller が残っていても削除します。参照は影響情報で
-あって温存理由ではなく、利用者ゼロや全 caller の移行完了を削除の前提にしません。
-既に移行済みでも同じ責務確認を行い、不要な旧入口を残しません。
+利用中であることは移行対象を示す根拠であり、根幹の修正や旧入口の削除を止める理由では
+ありません。まず正本側の原因を修正し、既存 LSP / dependency-analysis で実際の参照を辿り、
+契約・接続が変わる caller、import、設定、生成元、tests、docs も更新します。利用側の
+契約変更がさらに伝播する場合だけ追跡を続け、契約を保存できる境界で止めます。
+利用者ゼロを削除開始の前提にせず、必要な利用側修正を削除後の別責務として放置しません。
 
-削除後の旧参照には、言語、build、import、dispatch の通常のエラーを伝播させます。
+旧参照の言語、build、import、dispatch エラーは移行漏れを見つける信号です。
+維持する利用側のエラーを記録しただけでは完了せず、その利用側を正本へ移行します。
 silent fallback、alias、互換実装、旧実装の再作成、エラーの握りつぶしで成功に見せません。
 通常の削除でエラーになる場合は、エラー専用 stub も新設しません。
 
-編集は明示された範囲内に留めます。dependency closure は影響の観測であり、残存参照の
-全面移行、別 repository、別 Issue の修正を終了条件へ追加する権限ではありません。
-[refactor-loop](../../agents/skills/refactor-loop.md) の挙動保存・二段階移行や
-[change-review](../../agents/skills/change-review.md) の reachable-effects closure は、
-この廃止契約を全 consumer の成功維持へ読み替えません。判明した参照、実際のエラー、
-未確認事項、呼出側の責務は既存 Issue / PR に残します。
+必要な利用側修正は本来の修正範囲です。最初に名前が挙がらなかった、別 repository、
+別担当という理由だけで対象外にせず、[refactor-loop](../../agents/skills/refactor-loop.md) の
+二段階移行と [change-review](../../agents/skills/change-review.md) の確認へ渡します。
+別 repository では既存 owner と権限に従い関連 PR を分けます。具体的なアクセス・権限制約で
+実施できない移行は、対象、理由、次の担当を Issue / PR に残し、移行完了とは報告しません。
+無関係な改善、契約が変わらない利用側の変更、別 Issue 全体の完了は終了条件に追加しません。
 
-検証・報告では、残す正本の正しさ、旧実装・旧入口の削除、判明した残存参照の失敗を
-分けます。意図した旧参照エラーを理由に削除を撤回せず、正本の回帰や無関係な失敗を
-期待エラー扱いしません。未実行の検証を成功扱いせず、既存検証の結果と制限を記録します。
-新 checker、互換 wrapper、台帳、全面移行 gate は追加しません。
+検証は正本の保証と、必要な利用側の接続・動作を既存の対象限定経路で確認します。
+廃止済み入口を意図的に呼ぶ負例の期待エラーと、維持する利用側の移行漏れ、正本の回帰、
+無関係な失敗を区別します。削除だけで完了とせず、未実行の検証も成功扱いにしません。
+新 checker、互換 wrapper、台帳、全 consumer 監査や全面検証 gate は追加しません。
 
-工学的には、参照の存在は実装の独自性を示しません。正本化を全 caller の移行完了と
-結合すると依存の推移閉包まで編集が拡大し、重複経路の温存を自己強化します。旧入口を
-削除し通常エラーを伝えることで、誤った経路を成功に見せず、移行責務を呼出側に保ちます。
+工学的には、参照の存在は実装の独自性を示しません。一方、提供側だけが新契約で利用側が
+旧契約のままでは依存辺の整合性が成立しません。正本と必要な利用側を一つの修正単位として
+扱い、契約が変わらない境界で止めることで、旧経路の温存と無関係な編集拡大をともに避けます。
 
 ## External Tool Evidence
 
@@ -163,7 +166,7 @@ sufficient behavior を owner の契約に従って分類します（`tools/agen
 dependency map、materialized shim、host-wiring source/input の `.codex/config.toml`、generated graph（[documents/runtime/skill-dependency-graph.md](../runtime/skill-dependency-graph.md)）、graph readback を同じ
 source snapshot から検証します（[documents/runtime/skill-dependency-graph.md](../runtime/skill-dependency-graph.md)）。失敗は実装原因を分類して同じ owner route を修正し、
 checker の条件を弱めずに再実行します（`tools/validation/semantic/skills/check_skill_tool_invocation_graph.py`）。
-RC-09 の廃止では、正本の回帰と意図した旧参照エラーを同節の契約に従って分けます。
+RC-09 の廃止では、正本と必要な利用側の移行を検証し、廃止済み入口の負例と移行漏れを区別します。
 
 `tools/agent/skills/skill_shim_materializer.py` の生成 target は
 `.codex/personal/skills/<skill>/SKILL.md` だけです。`.codex/config.toml` は materializer の
@@ -187,7 +190,7 @@ generated projection、再検証 command を記録します（[documents/design/
 | RC-06 existing-owner reuse | `responsibility-cleanup` | [agents/skills/document-canon-cleanup.md](../../agents/skills/document-canon-cleanup.md), [agents/skills/worktree-health.md](../../agents/skills/worktree-health.md), [agents/skills/agent-log-analysis.md](../../agents/skills/agent-log-analysis.md), [agents/skills/runtime-log-repair.md](../../agents/skills/runtime-log-repair.md), [agents/skills/result-artifact-writeout.md](../../agents/skills/result-artifact-writeout.md) | reuse route と既存 receipt |
 | RC-07 external evidence and rollback | owner-selected specialist | unit `external_tools`, `rollback`、`handoff` | primary source/version/license/security と rollback readback |
 | RC-08 integration and re-review | `agent-orchestration` / `change-review` | generated projections、tree/commit readback、review packet | final owner/review/validation readback |
-| RC-09 duplicate implementation retirement | `code-cleanup` / `refactor-loop` / `change-review` | [code-cleanup Route](../../agents/skills/code-cleanup.md#route), [refactor-loop Purpose](../../agents/skills/refactor-loop.md#purpose), [change-review Repeated Responsibility Review](../../agents/skills/change-review.md#repeated-responsibility-review) | 重複根拠、旧入口削除、残存参照エラー、編集範囲と正本検証の分離 |
+| RC-09 duplicate implementation retirement | `code-cleanup` / `refactor-loop` / `change-review` | [code-cleanup Route](../../agents/skills/code-cleanup.md#route), [refactor-loop Purpose](../../agents/skills/refactor-loop.md#purpose), [change-review Repeated Responsibility Review](../../agents/skills/change-review.md#repeated-responsibility-review) | 重複根拠、旧入口削除、必要な利用側移行、変更契約の検証と具体的な残件 |
 
 ## Evidence And Assumption Ledger
 
@@ -198,7 +201,7 @@ generated projection、再検証 command を記録します（[documents/design/
 | assumption | tree は構造観測であり、責務 authority は owner/dependency/contract evidence から閉じる | `RC-01`, `RC-02`, [agents/skills/structure-refactor.md](../../agents/skills/structure-refactor.md) | explicit |
 | assumption | analyzer は candidate producer であり、採用 disposition と削除 oracle は owner route が決める | `RC-02`, `RC-07`, [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md) | explicit |
 | limitation | 外部 tool の採用可否は一次資料、version、scope、false positive、license/security、install owner、rollback の evidence が揃うまで保留する | `RC-07` | explicit |
-| contract | 重複が確認された旧実装の廃止は active caller ゼロを前提とせず、正本の正しさと残存参照の通常エラーを区別する | [RC-09](#duplicate-implementation-retirement), [code-cleanup](../../agents/skills/code-cleanup.md), [refactor-loop](../../agents/skills/refactor-loop.md), [change-review](../../agents/skills/change-review.md) | explicit |
+| contract | 重複が確認された旧実装の削除開始は active caller ゼロを前提とせず、完了には必要な利用側の移行と変更契約の検証を含める | [RC-09](#duplicate-implementation-retirement), [code-cleanup](../../agents/skills/code-cleanup.md), [refactor-loop](../../agents/skills/refactor-loop.md), [change-review](../../agents/skills/change-review.md) | explicit |
 
 ## Clause IDs
 

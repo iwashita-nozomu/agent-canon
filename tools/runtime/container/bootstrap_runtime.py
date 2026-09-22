@@ -5485,6 +5485,12 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             host_root = os.environ.get("AGENT_CANON_TARGET_HOST_ROOT")
             container_root = os.environ.get("AGENT_CANON_TARGET_CONTAINER_ROOT")
             host_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST")
+            targets = dict(state.get("targets", {}))
+            # An unregistered host digest has no required mount to validate.
+            if host_digest and host_digest not in targets:
+                raise BootstrapError(
+                    "target_not_registered", "target root is not registered"
+                )
             target = runtime._target_record(
                 Path(container_root or args.root),
                 args.mode,
@@ -5492,9 +5498,8 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                 host_digest=host_digest,
             )
             target_digest = host_digest or target["digest"]
-            if target_digest not in state.get("targets", {}):
+            if target_digest not in targets:
                 raise BootstrapError("target_not_registered", "target root is not registered")
-            targets = dict(state.get("targets", {}))
             del targets[target_digest]
             _container_target_generation(state, targets)
             runtime._write_mounts(state)
