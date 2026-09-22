@@ -25,7 +25,7 @@ public/module responsibility と到達性を一つの cleanup unit として閉�
 analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup`](../../documents/design/responsibility-cleanup.md)
 の RC-02、RC-04、RC-07、RC-08 を参照します。重複旧実装の廃止は
 [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-に従い、未使用コード削除や全面 consumer 移行と区別します。
+に従い、削除と必要な利用側移行を閉じます。無関係な consumer の一括変更は加えません。
 
 ## Use When
 
@@ -65,12 +65,13 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    残っていても同じ pass で削除する。未使用コードは到達性と副作用を確認して別に判断し、
    独自責務や未確認の意味が残る候補は重複扱いしない。全寄与の判断が閉じた場合だけ
    file 全体を削除し、全 file の監査や追加 review は待たない。旧参照の通常エラーは
-   伝播させ、caller の残存を理由に wrapper、fallback、alias、互換実装を戻さない。
+   移行漏れの信号として利用側修正へ繋ぎ、wrapper、fallback、alias、互換実装を戻さない。
 4. 数値コードを削除・置換する前に equations、units、state、stopping rule、convergence contract、
    failure semantics を復元する。未解決の数学的意味は既存の semantic math owner に戻し、architecture、
    compiler、JIT の変更で吸収しない。
 5. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
-   RC-09 の廃止では残存参照を影響情報として残し、全面移行や編集範囲拡大の条件にしない。
+   根幹の修正で契約・接続が変わる利用側も修正対象に含める。RC-09 の残存参照は
+   移行漏れとして追い、影響情報を記録しただけで修正を終えない。
    responsibility slices と `allowed_paths` はこの asset universe と disposition から導き、
    同じ asset に触れる slices を一つへ merge する。既存 provider の利用案が要求 contract を
    満たすなら、その直接利用・設定・合成へ置換し、第三の helper へ再実装しない。
@@ -79,8 +80,8 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    candidate の `reject` はその不足を満たせない根拠で判断し、既に満たす部分まで
    捨てない。実在しない candidate や synthetic な `reject` は作らない。
 6. approved mechanism を `refactor-loop` へ渡し、同じ serialized `reuse_survey` と
-   tests を各 write-capable child と read-only reviewer に伝播する。挙動保存対象と
-   RC-09 による旧入口の廃止・通常エラーを区別し、子 prompt 側で disposition を再構築しない。
+   tests を各 write-capable child と read-only reviewer に伝播する。RC-09 でも旧入口の
+   廃止と必要な usage-surface repair を含め、子 prompt 側で disposition を再構築しない。
 7. `change-review` で current snapshot、reachable path、contract、witness と
    worker packet と同一の asset/disposition/test-path evidence を readback する。targeted
    validation は各行ではなく owning-unit boundary で一度だけ実行する。
