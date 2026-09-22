@@ -45,39 +45,21 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
-if __package__:
-    from tools.agent.orchestration.team_config import (
-        Role,
-        default_specialists_for_task,
-        load_task_catalog,
-        load_team_config,
-        select_roles,
-    )
-else:
-    from tools.agent.orchestration.team_config import (
-        Role,
-        default_specialists_for_task,
-        load_task_catalog,
-        load_team_config,
-        select_roles,
-    )
+from tools.agent.orchestration.team_config import (
+    Role,
+    default_specialists_for_task,
+    load_task_catalog,
+    load_team_config,
+    select_roles,
+)
 
-if __package__:
-    from tools.agent.orchestration.implementation_dispatch import (
-        declared_team_capacity_derivation,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_initial_subagent_wave,
-        workflow_spawn_budget,
-        workflow_topology_policy_violations,
-    )
-else:
-    from tools.agent.orchestration.implementation_dispatch import (
-        declared_team_capacity_derivation,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_initial_subagent_wave,
-        workflow_spawn_budget,
-        workflow_topology_policy_violations,
-    )
+from tools.agent.orchestration.implementation_dispatch import (
+    declared_team_capacity_derivation,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
+    workflow_spawn_budget,
+    workflow_topology_policy_violations,
+)
 
 COMPACT_FINDING_SAMPLE_LIMIT = 25
 DEFAULT_RESULTS_FAMILY = "codex-agent-role"

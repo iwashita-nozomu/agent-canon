@@ -29,18 +29,11 @@ from typing import IO, cast
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import (
-        resolve_report_root,
-        resolve_runtime_artifact_path,
-        schedule_wave_row,
-    )
-else:
-    from tools.repository.workspace.workspace_scope import (  # type: ignore[no-redef]
-        resolve_report_root,
-        resolve_runtime_artifact_path,
-        schedule_wave_row,
-    )
+from tools.repository.workspace.workspace_scope import (
+    resolve_report_root,
+    resolve_runtime_artifact_path,
+    schedule_wave_row,
+)
 from tools.agent.orchestration.mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,

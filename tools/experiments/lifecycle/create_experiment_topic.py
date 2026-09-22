@@ -25,16 +25,8 @@ from pathlib import Path
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-if __package__:
-    from tools.experiments.lifecycle.experiment_identity import validate_segment
-    from tools.experiments.registry.registry_lib import find_topic, load_registry, write_registry
-else:
-    from tools.experiments.lifecycle.experiment_identity import validate_segment  # type: ignore[no-redef]
-    from tools.experiments.registry.registry_lib import (  # type: ignore[no-redef]
-        find_topic,
-        load_registry,
-        write_registry,
-    )
+from tools.experiments.lifecycle.experiment_identity import validate_segment
+from tools.experiments.registry.registry_lib import find_topic, load_registry, write_registry
 
 AGENT_CANON_TEMPLATE_DIR = "vendor/agent-canon/templates/experiments/_template"
 

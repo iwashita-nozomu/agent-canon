@@ -31,10 +31,7 @@ from typing import cast
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import resolve_report_root
-else:
-    from tools.repository.workspace.workspace_scope import resolve_report_root
+from tools.repository.workspace.workspace_scope import resolve_report_root
 from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
 from tools.runtime.artifacts.report_artifact_checks import (
