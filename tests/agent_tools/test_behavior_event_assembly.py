@@ -83,6 +83,61 @@ class BehaviorEventAssemblyTest(unittest.TestCase):
         self.assertEqual(data["prompt_char_count"], 0)
         self.assertFalse(data["prompt_excerpt_truncated"])
 
+    def test_projection_failure_preserves_safe_tool_observation(self) -> None:
+        """Projection validity does not determine safe observation eligibility."""
+        payload = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "printf 'private-command-value'"},
+            "tool_response": {"stdout": "private-stdout", "stderr": "private-stderr"},
+        }
+        parts = HookInvocationParts(
+            hook_event_name="PostToolUse",
+            hook_invocation_id="projection-failure",
+            hook_payload=payload,
+            tool_selection=select_tools(payload),
+            payload_fingerprint="f" * 64,
+            timestamp="2026-01-01T00:00:00Z",
+        )
+        for status in ("pass", "invalid_projection", "unsuccessful_tool_response"):
+            with self.subTest(status=status):
+                event = record_hook_invocation(
+                    replace(parts, handler_result=FinalHandlerResult(status=status))
+                )
+                self.assertIsNotNone(event)
+                data = event.as_dict()
+                self.assertEqual(data["status"], status)
+                self.assertEqual(data["tool_name"], "Bash")
+                self.assertEqual(data["tool_command_verb"], "printf")
+                for value in ("private-command-value", "private-stdout", "private-stderr"):
+                    self.assertNotIn(value, str(data))
+
+    def test_projection_decoupling_preserves_observation_exclusions(self) -> None:
+        """Malformed, blocked, inactive, and signal-free input stays ineligible."""
+        parts = HookInvocationParts(
+            hook_event_name="PostToolUse",
+            hook_invocation_id="projection-exclusions",
+            hook_payload={"tool_name": "Bash"},
+            tool_selection=select_tools({"tool_name": "Bash"}),
+            handler_result=FinalHandlerResult(status="invalid_projection"),
+        )
+        cases = [
+            replace(parts, payload_status="malformed_payload"),
+            replace(parts, hook_event_name="Stop"),
+            replace(parts, hook_payload={}, tool_selection=None),
+        ]
+        cases.extend(
+            replace(parts, handler_result=FinalHandlerResult(status=status))
+            for status in (
+                "malformed_payload",
+                "blocked_secret",
+                "blocked_destructive_git",
+                "blocked_parent_mutation",
+            )
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                self.assertIsNone(record_hook_invocation(case))
+
     def test_context_workflow_attribution_is_explicit(self) -> None:
         """Inherited workflow evidence is represented by context fields."""
         parts = HookInvocationParts(

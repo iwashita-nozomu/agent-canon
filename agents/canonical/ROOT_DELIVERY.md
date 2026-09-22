@@ -7,6 +7,7 @@ responsibility Owns detailed source-side Issue evidence, task continuation, repo
 upstream design ../../AGENTS.md conditional source reader map
 upstream design ../../ROOT_AGENTS.md portable common boundaries
 upstream design ../../documents/design/entrypoint-owner-map.md source and consumer split contract
+upstream design ../internal-routines/verification-result-structuring.md mandatory pre-write result structuring
 @dependency-end
 -->
 
@@ -72,17 +73,18 @@ second completion state machine.
 
 ## Result reporting
 
+Before any verification-result output, including chat progress and interrupted
+handoffs, invoke [verification result structuring](../internal-routines/verification-result-structuring.md).
+Use its retained findings and coverage check for the following report.
+
 A result report leads with the answer to the user's request, not an inventory
 of work. Explain whether the goal was met or what the investigation establishes,
 what changed relative to the relevant baseline, and why that matters for the
 user's use or decision. Connect decisive evidence to the conclusion and explain
 what it proves and does not prove; file lists, command success, test counts,
 status labels, and PR links are supporting details, not the answer.
-Retain material investigated findings, counterevidence, rejected explanations,
-and unresolved points with their grounds and impact, even when no code changed.
-Reporting an out-of-scope finding does not authorize its repair or make it a
-completion condition. Scale detail to useful findings and decision complexity,
-not elapsed time or tool counts; shorten process narration, not material evidence.
+Scale detail to useful findings and decision complexity, not elapsed time or
+tool counts; preserve the internal routine's finding coverage and scope boundary.
 Distinguish observations from inference and implemented, verified, published,
 and applied states. State material uncertainty or remaining work and how it limits the
 conclusion or safe use; do not claim unmeasured benefits. When a user decision is
@@ -91,8 +93,8 @@ tradeoffs. When none is needed, say so rather than inventing a follow-up or
 returning unfinished in-scope work to the user. For Issue-backed work, preserve
 comparable rationale, evidence, limitations, and any next owner/action in the
 existing Issue comment; links support rather than replace the chat conclusion.
-Use the applicable reporting owner for details, without adding fixed headings,
-minimum length, empty fields, or a separate reporting gate.
+Keep pre-write structuring mandatory without adding fixed headings, minimum
+length, empty fields, or a separate approval gate.
 
 ## Commit and push decisions
 

@@ -9,6 +9,7 @@ upstream design agent-orchestration.md execution-time-aware work-conservation co
 upstream design ../../documents/agent-canon/agent-canon-update-route.md source PR versus parent pin route
 upstream design ../internal-routines/github-connected-work.md current-session GitHub transport and partial-validation delivery route
 upstream design ../internal-routines/github-status-lifecycle.md deterministic GitHub Issue status-label reconciliation and evidence contract
+upstream design ../internal-routines/verification-result-structuring.md mandatory pre-write result structuring
 upstream design ../../documents/conventions/coding-conventions-testing.md Issue-linked bug reproduction evidence owner
 upstream implementation ../../tools/repository/github/github_publish.py publishes PRs and writes summary artifacts
 downstream implementation ../../.codex/personal/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
@@ -47,8 +48,8 @@ Candidate count alone is not sufficient; activation is based on dependency evide
 
 ## Execution-Time-Aware Queue Specialization
 
-This skill consumes
-`agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`.
+This skill consumes the
+[Execution-Time-Aware Work-Conservation Contract](agent-orchestration.md#execution-time-aware-work-conservation-contract).
 Its executable fields are `dependency_dag`, `responsibility_completeness`,
 `correctness`, `decision_relevant_total_work`, `makespan_objective`,
 `critical_path`, `ready_set`, `context_reuse`,
@@ -164,6 +165,7 @@ do not bypass protection or relabel a failed check as passed/not_applicable.
 Do not reuse old checks, infer conflict-owner intent, ignore branch-owned failure,
 or merge after head/base movement. The
 AgentCanon source lane in `$agent-canon-update` is the concrete regression
+AgentCanon source lane in [`$agent-canon-update`](agent-canon-update.md) is the concrete regression
 fixture for this ordering; this skill consumes that route without duplicating
 its source-update policy or machine schemas.
 
@@ -237,6 +239,11 @@ post_merge_base_head=<sha or none>
 ```
 
 ## Publication boundary
+
+Before drafting, updating, or posting any Issue/PR body or comment containing
+verification results, invoke [verification result structuring](../internal-routines/verification-result-structuring.md).
+Publish from the same structured result used for chat and reports, including
+partial or blocked outcomes; retain the existing authority and readback controls.
 
 Before merge/ready/close/update, read fresh remote state and confirm authority. After the write, read back the PR/issue state. These write controls apply in both single and queue modes.
 
