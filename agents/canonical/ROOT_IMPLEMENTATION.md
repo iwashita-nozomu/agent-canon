@@ -7,6 +7,7 @@ responsibility Owns detailed source-side implementation and numerical decision g
 upstream design ../../AGENTS.md conditional source reader map
 upstream design ../../ROOT_AGENTS.md portable common boundaries
 upstream design ../../documents/design/entrypoint-owner-map.md source and consumer split contract
+upstream design ../../documents/conventions/software-engineering-principles.md reuse feasibility decision owner
 @dependency-end
 -->
 
@@ -33,10 +34,32 @@ a shortcut would exclude.
 
 ## Simplest complete implementation
 
+Before implementation, use the existing
+[reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+to locate the abstractions that already own the required behavior. Trace the
+responsibility through actual callers, usage examples, and provider dependencies;
+a failed name search or an unfamiliar location does not establish absence.
+Read the relevant contract, configuration, and extension points, not just nearby
+helpers. Settle direct use, composition, extension at the existing owner, or an
+evidenced responsibility gap before writing code, including private helpers and
+additions inside existing files. Do not implement first and search or retrofit
+onto a foundation later: that duplicates ownership before necessity is known.
+
+Connect the selected foundation's path/symbol, contract, reuse or extension plan,
+and remaining gap to the existing owning design; handoff and review reuse that
+reference. Prefer extending an existing foundation when the gap belongs to its
+contract. A new foundation needs evidence that existing candidates, composition,
+and appropriate extension cannot meet the requirement; unfamiliarity or an
+unperformed investigation is not that evidence. Preserve caller/library and
+public-API authority boundaries. Reuse sufficient current investigation, stop
+when the decision is supported, and investigate only missing premises within
+the task. Unknown keeps the affected implementation pending, not independent
+authorized work; do not require a repository-wide audit or invent a foundation
+where direct code at the correct owner suffices.
+
 Make the simplest complete implementation the default, not a later refactor.
-Start with direct use or composition of existing APIs and straightforward code
-at the current owner. Introduce abstractions, configuration, execution paths,
-or state only when a concrete current requirement cannot be met more simply;
+Introduce abstractions, configuration, execution paths, or state only when a
+concrete current requirement cannot be met more simply;
 justify that necessity with mathematical or engineering grounds. Hypothetical
 reuse, design-pattern uniformity, or test-double convenience alone is not such
 a reason. Minimize concepts, state, branches, and dependencies while preserving
