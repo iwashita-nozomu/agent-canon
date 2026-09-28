@@ -56,7 +56,7 @@ reader path の要約を置き、読者が本文を逆戻りせずに owner と�
 | GitHub Issue | `github/issue/*.yml` | GitHub Issue Form YAML | observed facts、reproduction、owner、impact、options、acceptance、non-goal |
 | GitHub PR | [github/pull-request/agent_canon.md](github/pull-request/agent_canon.md) | GitHub Markdown template | essence、dependency closure、head/review/validation/artifact/cleanup evidence |
 
-GitHub template の canonical source は `github/` 配下です。GitHub が実際に認識する
+GitHub template の canonical source と更新対象は [GitHub templates](github/README.md) を参照します。GitHub が実際に認識する
 standalone AgentCanon の `.github/ISSUE_TEMPLATE/` と `.github/PULL_REQUEST_TEMPLATE/`
 は source と同時更新する checked-in targets であり、手作業の第二正本ではありません。
 Template / derived parent の `.github` target は parent-owned regular content として

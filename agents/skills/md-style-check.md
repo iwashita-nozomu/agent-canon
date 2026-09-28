@@ -17,7 +17,7 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter 
 ## Visualization Formatter Gate
 
 For Mermaid artifacts, `md-style-check` is a formatter/checker adapter to
-`code-visualization`. It receives the owner's `VisualizationSourceUniverse`,
+[`code-visualization`](code-visualization.md). It receives the owner's `VisualizationSourceUniverse`,
 canonical `ToolCall`, and `ProjectionCoverageManifest`, formats the complete
 artifact, and returns post-format readback identities for the owner's final
 coverage status. Formatting owns syntax only: it cannot repair an omission by

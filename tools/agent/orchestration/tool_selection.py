@@ -40,7 +40,8 @@ def _tool_input(payload: object) -> dict[str, object]:
 def _command_verb(value: object) -> str:
     if not isinstance(value, str):
         return ""
-    match = re.search(r"(?:^|\s)(?:sudo\s+)?([A-Za-z0-9_.-]+)", value.strip())
+    # Retain only a complete leading bare command; never scan or unwrap arguments.
+    match = re.match(r"([A-Za-z0-9_.-]+)(?=\s|$)", value.strip())
     return match.group(1) if match else ""
 
 

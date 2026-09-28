@@ -2951,7 +2951,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 workflow_entry = next(
                     entry
                     for entry in sectioned_entries
-                    if entry["path"].endswith("agents/canonical/CODEX_WORKFLOW.md")
+                    if entry["path"].endswith("agents/canonical/CODEX_IMPLEMENTATION.md")
                 )
                 self.assertIn(
                     "5. Implementation",

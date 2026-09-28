@@ -218,7 +218,9 @@ owner = "agent-canon"
 class = "shared_policy"
 description = "Shared policy, design, operational documents, root metadata, memory, notes, and references."
 paths = [
+  ".clang-format",
   ".dockerignore",
+  ".editorconfig",
   ".gitattributes",
   ".gitignore",
   "CONTAINER_OPERATIONS.md",
@@ -226,6 +228,8 @@ paths = [
   "PHILOSOPHY.md",
   "README.md",
   "responsibility-scope.toml",
+  "ruff.toml",
+  "rustfmt.toml",
   "codex-cli-guide/**",
   "documents/**",
   "memory/**",

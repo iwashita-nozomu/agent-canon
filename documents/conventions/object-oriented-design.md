@@ -88,7 +88,7 @@ SOLID は、この文書の責務、状態、契約、公開面の規約をレ�
 投影の正本は `tools/validation/code/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
 
 - Single responsibility: 曖昧名、state 過多、副作用混在、不要 wrapper、責務語彙の広がりを同じ責務境界の risk として読む。
-- Open/closed: `Optional` / `None` / `nullptr` routing や深い分岐を、variant や entrypoint の増設で表す候補として読む。
+- Open/closed: `Optional` / `None` / `nullptr` routing や深い分岐を、現在の variant 契約と既存の拡張点に照らして確認する。signal だけで variant や entrypoint の増設を要求しない。
 - Liskov substitution: base class 過多を、置換可能な契約として読める継承かどうかの確認対象にする。
 - Interface segregation: public method / field / parameter 過多を、利用側が必要とする最小契約へ分ける候補として読む。
 - Dependency inversion: public annotation 欠落や `Optional` 境界を、具象詳細へ寄りすぎた抽象境界の risk として読む。
@@ -98,7 +98,7 @@ SOLID signal は設計レビューの入口です。最終判断では機械 fin
 | Principle | Source-informed meaning | Local implementation contract | Static risk route |
 |---|---|---|---|
 | Single responsibility | change reason / change actor で責務を切る。 | class / function / module の主語を 1 つの責務語彙に固定し、計算、IO、persistence、rendering、orchestration、reporting を分ける。 | `mixed_morphism_effect`、`vague_class_name`、`module_helper_bucket`、`instance_attributes`、`public_methods` |
-| Open/closed | 安定した policy を extension point で拡張可能にする。 | 予測済み variant は branch cascade ではなく `Protocol`、registry、adapter、variant value、別 entrypoint へ置く。 | `none_runtime_branch`、`null_runtime_branch`、`optional_boundary`、`cognitive_complexity` |
+| Open/closed | 安定した policy を extension point で拡張可能にする。 | 現在の variant と利用者契約を既存 API の直接利用・合成で表す。より単純な既存手段では満たせない不足を根拠に、必要な拡張点を選ぶ。将来予測だけで registry や新 API を追加しない。 | `none_runtime_branch`、`null_runtime_branch`、`optional_boundary`、`cognitive_complexity` |
 | Liskov substitution | subtype は supertype の証明済み性質を保存する。 | 継承は置換可能な契約の特殊化に限定し、入力条件、戻り値、例外、invariant、history property を保存する。 | `base_classes` と type checker / shared behavior contract |
 | Interface segregation | client は使う role contract だけへ依存する。 | fat Protocol / ABC / class surface を caller role ごとの role-specific contract に分ける。 | `public_methods`、`public_fields`、`parameters` |
 | Dependency inversion | high-level policy と low-level detail は stable abstraction に依存する。 | composition root / factory / adapter で具象生成を閉じ、policy layer は `Protocol`、typed value、stable interface を受ける。 | OOP primary signal は `missing_public_annotations` と `optional_boundary`。import / layer 方向は `import_responsibility.py` と dependency review の supporting evidence |

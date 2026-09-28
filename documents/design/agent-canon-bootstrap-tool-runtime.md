@@ -146,6 +146,15 @@ TOML/JSON/state/tool/check/eval を実行できます。Target は controller �
 `mounts.tsv` の strict allowlist として出力し、Host shell が scope と destination を
 検証して resident replacement の mount に反映します。
 
+Target removal commits the registry first, recreates the owned resident from the
+new manifest, then verifies the complete mount set. For registry `T` and removed
+target `d`, success requires both registry and resident targets to equal `T - {d}`.
+An unregistered host-provided digest is reported from controller state before
+checking a mount that need not exist. Replacement failures remain nonzero and use
+the existing recovery path; foreign residents are never stopped or removed.
+The [target removal regressions](../../tests/bootstrap/test_target_remove.py)
+cover this boundary without treating a fake Docker result as live acceptance.
+
 ## Bootstrap Manifest
 
 `bootstrap/host/manifest.toml` は image、container、runtime、skill、archive lease を
