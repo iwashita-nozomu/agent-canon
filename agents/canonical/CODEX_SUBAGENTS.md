@@ -699,7 +699,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - `logic_gap_reviewer`
   - claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認する
 - `long_form_writer`
-  - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書を、graph/DSL closure 後に roadmap-led で prose projection する
+  - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書を、既存の根拠と reader-facing roadmap に基づいて直接執筆・改稿する。graph 分析は明示依頼または具体的な診断目的がある場合だけ選択する
 - `test_designer`
   - owning mechanism の確立または修復後に積極的に起動し、まず activation decision と boundary classification を返す。既存のstatic analysis、checker、targeted validationの外側にある未解決oracleだけを、重複・no-crash・内部形状固定なしの論理的に最小なtest planへ落とす
 - `diff_triage_reviewer`
@@ -762,7 +762,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | 計画レビュー | 専用の `plan_reviewer` instance |
 | 詳細設計 | `detailed_designer`。既存 code path 調査が要るなら `explorer` を補助に使う。主要設計判断の downstream surface は Design Side-Effect Map に落とす |
 | 詳細設計レビュー | 専用の `detailed_design_reviewer` instance。Design Side-Effect Map が実装者へ渡せる粒度か確認する |
-| 一般説明 prose projection | `long_form_writer`。README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では `long-form-writing` を DSL-to-prose adapter として使う |
+| 一般説明 prose 執筆 | `long_form_writer`。README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では `long-form-writing` を使い、既存の根拠と reader-facing 構成から直接執筆する |
 | 学術文章起草 | `long_form_writer`。論文、thesis chapter、scholarly note では `academic-writing` を前提に draft する |
 | 論文 draft 起草 | `long_form_writer`。投稿論文や thesis chapter では `paper-writing` を前提に draft する |
 | 文書通読レビュー | 専用の `document_flow_reviewer` instance。詳細設計、README、workflow、reader-facing doc を上から順に読んで意味が通るかを見て、reader-facing side effect が reader path に現れているか確認する |

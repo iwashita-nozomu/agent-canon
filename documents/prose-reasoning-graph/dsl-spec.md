@@ -601,9 +601,13 @@ force a topology cycle.
 Current MVP projection exports emit nodes, edges, diagnostics, edit operations,
 and `selected_ordering`. The `selected_ordering` object is the whole-document
 sentence-anchor order produced by priority topological sort over the selected
-ordering subgraph. Writing adapters use `selected_ordering.ordered_anchors` as
-the DSL-to-prose input sequence, giving the LLM a deterministic reader-order
-contract for the entire source text. Projection-view implementations should
+ordering subgraph. A writing skill may inspect this as a candidate order when
+graph analysis is selected; it is not a mandatory sentence sequence or writing
+input. Ordinary writing uses source text, headings, and brief structure notes
+directly. Graph consistency cannot establish claim validity, and sound prose does
+not require graph registration. The [optional analysis boundary](../../agents/skills/prose-reasoning-graph.md#optional-analysis-boundary)
+keeps graph artifacts, fixed packets, zero-finding checks, and projection round
+trips out of normal writing admission. Projection-view implementations should
 extend that export with derived
 macro views while still emitting source anchors, selected ordering
 edges, diagnostics, and edit operations. Full internal analysis nodes are

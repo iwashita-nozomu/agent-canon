@@ -9,6 +9,7 @@ upstream design ../COMMUNICATION_PROTOCOL.md bounded context and handoff contrac
 upstream implementation ../../.codex/config.toml shared runtime limits and defaults
 upstream implementation ../../eval/checkers/compare_codex_token_footprints.py equivalent session comparison
 upstream implementation ../../eval/producers/evaluate_codex_agent_roles.py observed role evidence
+downstream design ./structure-refactor.md repairs independently activated responsibilities coupled into one read
 downstream design ./agent-log-analysis.md structured token evidence routing
 downstream design ./agent-eval-accumulation.md accumulated eval evidence route
 @dependency-end
@@ -91,6 +92,12 @@ the profile. Carry the snapshot, observation, cause hypothesis, owner, and
 selected validation to the owning route; add comparison evidence when measured.
 Missing metrics identify an owner, not an instruction to run a producer.
 Recurrence feedback belongs to `$agent-learning`.
+
+When unrelated reading comes from mixed file responsibilities, follow
+[structure-refactor](structure-refactor.md#overloaded-documents) with the exact
+sections, triggering operation, and incoming reader route. Do not merely shorten
+wording or split by byte count; repair the responsibility boundary. This route
+needs no comparison session, and its token effect remains `unmeasured` without one.
 
 ## Closeout
 
