@@ -3863,7 +3863,8 @@ class BootstrapRuntime:
             )
 
     def codex_prepare(self) -> dict[str, Any]:
-        """Install only manifest-managed links into isolated ``CODEX_HOME``."""
+        """Refresh skills, then install managed links into isolated ``CODEX_HOME``."""
+        self._materialize_skill_view()
         with self.locked():
             return self._codex_prepare_locked()
 
