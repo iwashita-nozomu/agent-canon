@@ -128,6 +128,13 @@ Resolve the task owner and validation route. Keep bounded work bounded; broader
 design, orchestration, research, or delegation activates only under its owner's
 conditions. AgentCanon maintenance does not authorize consumer generated-file edits.
 
+User-guided debugging is parent-executed: keep investigation, edits, and any
+user-requested validation in the same parent session, without subagents.
+This boundary overrides orchestrator-only and mandatory child-handoff rules
+while that cadence is active; do not delegate through existing children or
+parallel read-only work. Only an explicit user change of cadence returns to
+autonomous routing.
+
 Continue safe, authorized implementation through delivery; report concrete blockers
 and the next owner when stopped. Separate commit/push authority and preserve mixed
 work; never force-push, mutate main, or publish outside scope. Report the result,
