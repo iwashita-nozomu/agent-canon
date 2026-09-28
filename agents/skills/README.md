@@ -140,7 +140,7 @@ in the Codex host runtime.
 - 自然言語の数学的 claim を形式証明へ落とすときは [`formal-proof-workflow`](formal-proof-workflow.md) を使い、既存 proof / 文献探索は [`literature-survey`](literature-survey.md) へ接続します。
 - 実装前にアルゴリズムを設計する場合は [`lean-algorithm-design`](lean-algorithm-design.md) を使い、Lean 上の数学モデルと target theorem を先に検証してから production API へ渡します。
 - 既存実装または実装候補の収束性、停止性、certificate soundness、finite-precision floor、solver-chain handoff に対してアルゴリズム選択や変更候補を探索するときは [`algorithm-proof-exploration`](algorithm-proof-exploration.md) を使い、最終 theorem / counterexample / unprovable-under-assumptions claim は [`formal-proof-workflow`](formal-proof-workflow.md) へ接続します。
-- README、workflow、guide、migration、specification など、file responsibility が一般説明 prose の文書では [`long-form-writing`](long-form-writing.md) を DSL-to-prose adapter として見ます。長さだけでは選びません。
+- README、workflow、guide、migration、specification など、file responsibility が一般説明 prose の文書では [`long-form-writing`](long-form-writing.md) を使います。長さだけでは選びません。
 - 論文、thesis chapter、scholarly note のような学術文章では [`academic-writing`](academic-writing.md) を先に見ます。
 - paper section まで含む論文 draft では [`paper-writing`](paper-writing.md) を先に見ます。
 - 研究系の task では [`research-workflow`](research-workflow.md) を outer loop に使います。
@@ -172,7 +172,7 @@ in the Codex host runtime.
 - reader-facing な report、status report、eval summary、audit summary、decision brief、presentation narrative、PPT storyboard を書くときは [`report-writing`](report-writing.md) を使い、source packet、visual asset plan、Report Quality Checklist を固定します。
 - 既存文章を graph 化し、段落接続、claim/evidence、experiment plan、split/merge/bridge/reorder operation、既存 skill handoff を出すときは [`prose-reasoning-graph`](prose-reasoning-graph.md) を使います。
 - report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合は、本文、renderer、run、編集の前に [`structure-planning`](structure-planning.md) を使い、primary artifact、source map、metric / delta contract、invalid interpretation を固定します。
-- substantive な文書変更では [`prose-reasoning-graph`](prose-reasoning-graph.md) と [`structure-planning`](structure-planning.md) を先に通し、typo / link / format-only では [`md-style-check`](md-style-check.md) と `structure_contract=skipped` の理由を evidence に残します。
+- substantive な文書変更で未決の reader path、section order、claim/support、source map など構造判断がある場合は [`structure-planning`](structure-planning.md) を使います。graph 分析は明示依頼または具体的な診断目的がある場合に限り [`prose-reasoning-graph`](prose-reasoning-graph.md) を選びます。typo / link / format-only では [`md-style-check`](md-style-check.md) と `structure_contract=skipped` の理由を evidence に残します。
 - docs、reports、plans、workflow guides で process、dependency、ownership、routing、state、review gate、handoff が非自明な場合は、[`structure-planning`](structure-planning.md) の `visual_plan` で Mermaid 図を既定の primary visual 候補にします。
 - report の既定出力は Markdown です。user が HTML、browser view、dashboard、web page、external browser publication を明示した場合だけ [`html-output`](html-output.md) を使い、layout、ImageGen、server reuse / start command、local / external URL を固定します。
 - 既存の experiment / Eval artifact を HTML で表示するときは [`html-output`](html-output.md) を直接使います。新しい実行・再実行が必要な場合だけ [`experiment-lifecycle`](experiment-lifecycle.md)、reader-facing な解釈や claim が必要な場合だけ [`report-writing`](report-writing.md) を追加し、中間 wrapper skill は作りません。
