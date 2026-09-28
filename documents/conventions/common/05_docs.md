@@ -3,6 +3,8 @@
 contract policy
 responsibility Documents ドキュメント運用 for this repository.
 upstream design ../../../agents/skills/formal-proof-workflow.md mathematical claim grounding policy
+downstream design ../../../agents/skills/structure-planning.md applies responsibility and reading-activation split decisions
+downstream design ../../../agents/skills/structure-refactor.md repairs overloaded document boundaries
 downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/docs.rs enforces Markdown math notation and fence rules
 downstream implementation ../../../tools/validation/semantic/convention/check_convention_compliance.py validates document claim grounding
 downstream implementation ../../../tools/runtime/lifecycle/task_close.py validates document split decision closeout evidence
@@ -18,7 +20,7 @@ downstream implementation ../../../tools/runtime/lifecycle/task_close.py validat
 - この文書は、文書更新、依存関係明示、Markdown 体裁、claim grounding、
   規範表現、受け入れ条件、検証を定めます。
 - 主な順路は、要約、規約、Claim Grounding、規範表現、受け入れ条件、検証です。
-- `documents/` 配下の正本文書を作成または更新する前に読みます。
+- `documents/` 配下の正本文書を作成または更新する際、該当する節だけを読みます。
 - 境界: 個別文書の責務や正本リンクは、その文書の dependency header と
   documents index が所有します。
 
@@ -83,15 +85,21 @@ downstream implementation ../../../tools/runtime/lifecycle/task_close.py validat
 ## Document Split Decision
 
 `document_split_decision` は、文書構造変更の自動判定に使う machine-readable
-field です。本文量や分割読みの都合ではなく、文書責務、読者、source map、
+field です。本文量そのものではなく、文書責務、読者、読む契機、source map、
 validation route、更新頻度、正本 owner の組み合わせで判断します。
+読む契機は、その内容が必要になる判断・操作です。同じ owner や読者でも、
+通常実行と環境再構築のように独立して必要になる手順は別の読取責務です。
+一方を使うために他方の詳細まで読ませる構成は、見出しの追加だけで維持せず、
+既存の正本への移管を先に検討します。対応する owner がない場合だけ、独立した
+責務の optional 文書を設けます。これは文字数による機械分割ではありません。
 
-- `keep:<reason>`: 同じ owner、reader、source map、validation route、update cadence
-  で読める内容は同じ文書に残します。章、reader map、Mermaid 図、または
-  section contract で読者順序を直せる場合は `keep` を選びます。
-- `split:<new-owner-boundary>`: 新しい責務 owner、別読者、別 validation route、
-  別 source map、または独立した update cadence を持つ内容は別文書に分けます。
-- `merge:<target>`: 2 つ以上の文書が同じ owner、reader、source map、
+- `keep:<reason>`: 同じ owner、reader、読む契機、source map、validation route、
+  update cadence を持つ一つの責務は同じ文書に残します。その責務内の読者順序を
+  章、reader map、Mermaid 図、section contract で直せる場合は `keep` を選びます。
+- `split:<new-owner-boundary>`: 新しい責務 owner、別読者、独立した読む契機、
+  別 validation route、別 source map、または独立した update cadence を持つ内容は
+  別文書に分けます。
+- `merge:<target>`: 2 つ以上の文書が同じ owner、reader、読む契機、source map、
   validation route、update cadence を持ち、差し替え可能な境界を作らない場合は
   正本側へ統合します。
 - `inline:<target-section>`: 独立文書にするほどの owner boundary がなく、親文書の
@@ -105,12 +113,18 @@ validation route、更新頻度、正本 owner の組み合わせで判断しま
 
 - `structure-planning` の `document_unit` は、owner、reader、source map、
   validation route、update cadence、canonical parent、downstream consumers を
-  列として持ちます。
+  列として持ち、reader に読む契機と必要な判断を含めます。
 - `split_when` は上の `split` 条件のどれが成立したかを示します。
-- `merge_when` は同じ owner、reader、source map、validation route、update cadence
-  が揃い、別文書にしたときの差し替え可能な責務境界がないことを示します。
+- `merge_when` は同じ owner、reader、読む契機、source map、validation route、
+  update cadence が揃い、別文書にしたときの差し替え可能な責務境界がないことを示します。
 - `invalid_split_boundaries` は、本文量、token 量、読み込み chunk、章番号、近い path、
-  一時的な作業都合、同じ validation oracle を共有する連続説明を含めます。
+  一時的な作業都合、同じ validation oracle を共有する連続説明だけを分割根拠にすることです。
+  余計な読取が独立した責務の混在を示す場合は、その責務境界を修正します。
+- 移管元の重複詳細は削除し、必要な箇所に「条件 → 正本の該当節」の Markdown リンクを
+  残します。入口に全分割先の読了を要求せず、共通の安全・権限制約は単独でも保持します。
+- 代表的な作業について入口から必要な正本へ到達でき、対象外の兄弟文書を読む要求が
+  ないことを確認します。途中で読む契機が変わった場合は、その地点で該当先へ進みます。
+  文書サイズの減少と実セッションの token 削減実測は別の結果として扱います。
 - closeout の Document Structure Evidence は `document_split_decision` を記録し、
   `python3 tools/validation/semantic/convention/check_convention_compliance.py` と
   `python3 tools/runtime/lifecycle/task_close.py` がこの field の有無を確認します。

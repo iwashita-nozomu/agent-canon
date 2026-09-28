@@ -259,10 +259,9 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "structure_contract=skipped",
     ),
     "agents/skills/md-style-check.md": (
-        "prose-reasoning-graph",
         "structure-planning",
         "format-only",
-        "structure_contract=skipped",
+        "未選択の構造解析に skip 記録は不要",
     ),
     "agents/skills/README.md": (
         "prose-reasoning-graph",
@@ -271,7 +270,7 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "structure_contract=skipped",
     ),
     "agents/skills/catalog.yaml": (
-        "format-only docs work",
+        "Write general explanatory repository prose",
         "prose-reasoning-graph",
         "structure-planning",
     ),
@@ -285,7 +284,7 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "Document Structure Evidence",
         "document_structure_status",
         "structure_planning",
-        "prose_graph",
+        "graph 分析は明示依頼または具体的な診断目的で選択した場合だけ記録し",
         "md_style_check",
         "format_only_reason",
     ),
@@ -1030,7 +1029,7 @@ def check_exit_blocker_policy(root: Path) -> list[Finding]:
 
 
 def check_document_structure_routing(root: Path) -> list[Finding]:
-    """Verify docs edit routing keeps structure analysis mechanically visible."""
+    """Verify structural planning and optional graph analysis stay visible."""
     paths = tuple(DOCUMENT_STRUCTURE_ROUTING_MARKERS)
     findings = check_required_files(root, paths, "document_structure_routing")
     for path, markers in DOCUMENT_STRUCTURE_ROUTING_MARKERS.items():

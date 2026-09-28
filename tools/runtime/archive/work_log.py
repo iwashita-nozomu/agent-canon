@@ -26,13 +26,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import resolve_report_root, resolve_runtime_artifact_path
-else:
-    from tools.repository.workspace.workspace_scope import (  # type: ignore[no-redef]
-        resolve_report_root,
-        resolve_runtime_artifact_path,
-    )
+from tools.repository.workspace.workspace_scope import resolve_report_root, resolve_runtime_artifact_path
 LEDGER_SEMANTIC_KINDS = (
     "request_clause",
     "responsibility_unit",
