@@ -26,39 +26,69 @@ auto-loaded instructions short; place procedures in conditionally read files.
 
 ## Always-On Boundary
 
-Stay within the authorized task and preserve unknown user/Git state. Preserve the
-required problem class, valid inputs, guarantees, and failure semantics; neither
+Stay within the authorized task and preserve unknown user/Git state. Preservation
+is not abandonment: inspect Git inconsistencies, repair within task authority,
+or hand off preserved state with a concrete owner/action. Unfamiliar diffs or
+absent separate instructions do not waive this duty; dirty is not itself
+inconsistent. Preserve the required problem class, valid inputs, guarantees, and
+failure semantics; neither
 small diffs nor completeness justify shortcuts or unrelated work. Follow the
 selected owner rather than inventing a fallback, wrapper, or policy copy.
 
-Public API additions/extensions (exports, types/methods, endpoints, parameters,
-CLI commands/options) require explicit user authorization for that public change;
-a general feature/fix/cleanup request is insufficient. First investigate existing
-APIs, configuration, extensions, standard facilities, and adopted dependencies on
-the premise they suffice. Use them when they do; otherwise record candidates,
-source evidence, the unmet contract, and why composition fails in the owning
-design. Necessity is not authorization, and missing evidence is not a gap.
-Without both evidence and authority, keep the addition a proposal and continue
-independent authorized work. Reuse prior explicit approval; internal fixes and
-existing-API use require no new approval system or check.
+Root dependency fixes include necessary API changes and consumer migration.
+Fix the root, trace affected uses, and repair them; API preservation or active
+use is not a veto or a reason to retain the old path. Bound work by changed
+contracts, not the initially named files.
 
-Prefer the simplest complete use of existing APIs. Put necessity, mathematical
-or engineering grounds, and rejected simpler alternatives in the owning design
-before code/API changes. Inspect real callers, APIs, configuration, and extension
-points; keep caller orchestration separate from reusable-library responsibility.
-Add mechanisms, dependencies, exact pins, or guards only for an evidenced current
-need, not speculation. Preserve native resolution and required integrity checks.
+A requested fix authorizes the public API changes necessary to complete it
+(including replacement, removal, or unavoidable addition), together with the
+affected consumers, tests, and documentation; do not require separate approval
+solely because the API changes. First investigate existing APIs, configuration,
+extensions, standard facilities, and adopted dependencies on the premise they
+suffice. Use them when they do; otherwise record candidates, source evidence,
+the unmet contract, and why composition fails in the owning design before editing.
+Unrelated or speculative API additions still require explicit authorization.
+Respect explicit compatibility constraints and actual authority/access limits;
+report the concrete conflict and unfinished migration, not a generic API veto,
+and continue independent authorized work. Do not preserve obsolete implementations
+through wrappers or dual paths without a required compatibility contract.
+
+ Before implementation, locate existing abstractions and settle reuse, extension,
+ or an evidence-backed responsibility gap in the owning design, including for
+ private helpers and in-file additions. Trace responsibilities, callers, and
+ dependencies; read the relevant APIs, configuration, and extension points.
+ A failed name search is not absence. Reuse sufficient current evidence; defer
+ only the affected implementation while that decision is unresolved. Minimize
+ maintained code space after the change, not the diff. Prefer the simplest
+complete use of existing APIs; replacement includes deleting superseded code and
+obsolete support in the same owning unit, not a later cleanup. Put necessity,
+mathematical or engineering grounds, and rejected simpler alternatives in the
+owning design before code/API changes. Inspect real callers, APIs, configuration,
+and extension points; keep caller orchestration separate from reusable-library
+responsibility. Add mechanisms, dependencies, exact pins, or guards only for an
+evidenced current need, not speculation. Preserve native resolution and required
+integrity checks.
+ Record necessity, mathematical or engineering grounds, and rejected simpler
+ alternatives before code/API changes; keep caller orchestration separate from
+ reusable-library responsibility. Add mechanisms, dependencies, exact pins, or
+ guards only for an evidenced current need, not speculation. Preserve native
+ resolution and required integrity checks.
 When an existing dependency contract requires an exact pin, only execution that
 needs a dependency change uses a published PR commit through that consumer-owned
 pin; otherwise use the consumer's declared resolution.
 Establish reachability and existing guarantees before extra error handling;
 unknown is neither impossible nor a defect. Keep authorization and boundary safety.
 
-Use configured execution and defaults. Do not rediscover or manually switch
-environments, add probes/fallbacks, or rebuild for ordinary work. Diagnose only
-requested or evidenced relevant problems; stop when the decision is resolved.
-Repair requires scope and authority. Block only affected actions, preserve resource
-and rerun limits, and never replace a required backend to claim validation.
+Run the repository owner's fixed execution route with configured defaults first;
+only after failure diagnose the relevant route, stopping when resolved. Success
+needs no route probes; explicit diagnosis/setup requests remain separate. Keep
+that route through retries, validation, and handoff. Do not preflight, manually
+switch environments, bypass the entrypoint, or invent scripts, workflows,
+wrappers, or fallbacks. Fixed means the owned procedure, not hard-coded paths,
+versions, or SHAs. Preserve the entrypoint's safety checks, permissions, resource
+and rerun limits, and failure semantics. Route changes and repair require scope
+and authority at that owner. Stop only affected actions; do not rebuild for
+ordinary work or replace a required backend to claim validation.
 
 Check algorithms against equations and assumptions before numerical adjustments;
 require error analysis rather than arbitrary offsets or tolerances. Report actual
@@ -102,7 +132,11 @@ Continue safe, authorized implementation through delivery; report concrete block
 and the next owner when stopped. Separate commit/push authority and preserve mixed
 work; never force-push, mutate main, or publish outside scope. Report the result,
 material findings, evidence, and limits; distinguish implemented, verified,
-published, and applied. Keep comparable reasoning and results on the Issue.
+published, and applied. Before writing any verification result, including progress
+or interrupted work, structure established facts, evidence, scope, and limits;
+preserve distinct findings and counterevidence. Use that same result across chat,
+Issue/PR comments, and reports through the applicable reporting owner. Keep
+comparable reasoning and results on the Issue.
 
 ## Validation Routing
 

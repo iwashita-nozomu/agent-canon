@@ -6,6 +6,7 @@ upstream design ./README.md convention index and reader route
 upstream design ../../PHILOSOPHY.md top-level responsibility and source-of-truth philosophy
 upstream design ../design/semantic-responsibility-contract.md semantic action and verification-owner allocation
 upstream design ../design/responsibility-rationale.md mechanism rationale and activation boundary
+downstream design ../design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 downstream design ./object-oriented-design.md OOP and SOLID specialization
 downstream design ../../agents/skills/comprehensive-development.md cross-surface design and delivery consumer
 downstream design ../../agents/skills/code-cleanup.md existing capability comparison and replacement consumer
@@ -35,6 +36,8 @@ review finding、validation route に接続します。選ばれなかった原�
 - 最初に「所有境界」と「判断の優先順位」を読みます。
 - 新しい module、API、wrapper、tool、skill、checker、schema、document を追加する前は、
   「責務と依存境界」と「単純さと抽象化の admission」を読みます。
+- 規模に応じた処理・資源コストを決める実装方式を選ぶ前は、
+  [規模を先に置く方式選定](#workload-and-scale-before-mechanism) を読みます。
 - refactor では「変更単位と完全性」、review では「Evidence model」を読みます。
 - class、stateful object、inheritance、`Protocol`、public object model が変わる場合だけ、
   [オブジェクト指向設計方針](./object-oriented-design.md) を専門規約として追加します。
@@ -72,9 +75,9 @@ review finding、validation route に接続します。選ばれなかった原�
 7. stylistic consistency
 
 この順序は「大きい変更を優先する」という意味ではありません。上位 contract を
-完全に閉じる owning unit を選んだうえで、無関係な変更を除き、最も単純で局所的な
-実装を選びます。小さい diff、短い code、既存 style は、correctness や root cause
-より上位の目的ではありません。
+完全に閉じる owning unit を選び、無関係な変更を除いたうえで、完成後の保守対象が
+最小になる実装を選びます。局所性は責務の閉包であり、変更行数・file 数の最小化では
+ありません。小さい diff、短い code、既存 style は correctness や root cause に優先しません。
 
 ## 原則一覧
 
@@ -86,7 +89,7 @@ review finding、validation route に接続します。選ばれなかった原�
 | High cohesion / low coupling | owner 内の整合と owner 間 drift の低減 | 共有 invariant と concrete dependency graph | 見た目が似た処理を同居させる |
 | Information hiding | stable contract と内部詳細の分離 | caller が必要とする role、public behavior、effect boundary | temporary path、storage、生成順序を API にする |
 | Dependency direction | policy が detail に支配されることの防止 | caller/provider、composition root、adapter、import edge | 実装が一つしかないのに abstraction を増やす |
-| KISS | 完全な contract に対する総 semantic surface の削減 | owner、state、branch、surface、invariant の比較 | 最短 code、minimum diff、error path 省略 |
+| KISS | 完全な contract に対する変更後の保守コードスペースの最小化 | 新旧実装、owner、state、branch、surface、invariant の比較 | 最短 code、minimum diff、旧実装温存、error path 省略 |
 | YAGNI | speculative mechanism と未使用 invariant の増殖防止 | concrete caller、current requirement、reachable failure | 要求済み migration や cleanup を未完にする |
 | DRY | 同じ knowledge / policy / state の複数正本化防止 | 同じ意味、contract、change reason、owner | textual similarity だけで異なる意味を統合する |
 | Change locality | reviewable で rollback 可能な responsibility closure | owner と evidence-linked consumers / docs / tests | symptom file だけに閉じて root owner を残す |
@@ -180,20 +183,66 @@ inheritance、substitutability、interface segregation、DI container、public o
 
 ### SEP-06 KISS
 
-KISS は「最短の code」や「最小の diff」ではありません。要求された contract を完全に満たす
-候補の中から、次の総数と相互依存が少ないものを選ぶ原則です。
+KISS は、要求された contract を完全に満たす候補の中で、変更後に保守するコードスペースを
+最小にする設計原則です。「最短の code」や「最小の diff」ではなく、完成形に残る次の実体と
+相互依存を比較します。追加分だけでなく、既存実装とその維持に必要な接続も含めます。
 
-- canonical owner と source of truth
+- 実装本体、補助コード、canonical owner と source of truth
 - public surface と execution route
 - mutable state と lifecycle
 - branch、mode、selector、special case
-- invariant、schema、compatibility relation
+- dependency、invariant、schema、compatibility relation
 - independent checker、workflow、receipt、generated view
+
+差分や変更 file 数を減らすために旧実装を残す案より、不要な実装と接続を削除して完成形を
+小さくする案を選びます。置換時の削除と必要な利用側移行は
+[RC-09](../design/responsibility-cleanup.md#duplicate-implementation-retirement) で同じ修正として閉じます。
+行の圧縮、別 file への移動、必要な意味や性能保証の削減はコードスペースの削減ではありません。
 
 要求上必要な error handling、cleanup、migration、test、documentation を削って短くした実装は
 単純ではなく、未閉鎖の責務を別の場所へ移しただけです。どの異常処理が必要かは
 [到達可能性と追加修正の必要性](#reachability-and-remedy-necessity) で判断し、
 重複防御を温存する理由にはしません。
+
+#### Workload and scale before mechanism
+
+新規実装や変更で algorithm、data structure、処理単位、状態・資源管理を選ぶ場合は、
+目の前の入力例から方式を即決せず、今回の contract が要求する規模で成立する候補を
+先に絞り、その中から最も単純な方式を選びます。小さい diff や短い helper が、
+繰返し利用や入力増加を含む全体コストの小ささを意味するとは限らないためです。
+単純な rename 等、これらの判断を変えない編集へ新しい設計作業を追加しません。
+
+1. **増えるものと要求範囲を先に特定する。** 既存の仕様・設計・caller から、判断に関係する
+   入力件数・要素サイズ、反復呼出、同時実行、保持期間等を選びます。既知の通常規模、
+   要求上の範囲、時間・メモリ等の制約とその根拠を区別し、小さい fixture や今回の実行値を
+   上限へ昇格させません。未知の上限や将来負荷は捏造せず、許される成長と未確認点を残し、
+   方式選択を変える一点だけを確認します。
+2. **既存機能を使う基準案の全体コストを見積もる。** 直接利用・合成から始め、必要な時間、
+   ピークメモリ、I/O・外部呼出数を規模の関数として捉えます。前処理、反復される全走査、
+   コピー・中間データ、保持状態、同時実行による増幅も関係するものだけ含めます。
+   例えば n 件を q 回全走査する案は、一呼出の線形性だけでなく全体の n と q の積を見ます。
+   最悪時・平均時・償却のどの根拠かと、その成立前提を区別します。既存 API を使うだけで
+   合成後もスケールするとは扱いません。
+3. **要求範囲で成立する最小の方式を選ぶ。** 現実に競合する候補だけを、支配的なコスト、
+   前処理・保持・更新の負担、既存保証と照合します。Big-O の名前だけで優劣を決めず、
+   明確に限定された規模では単純な方式を残して構いません。一方、要求範囲で破綻すると
+   分かる方式を「まず動かし、後で最適化する」と採用しません。有効入力を切り捨てたり、
+   固定件数や例外分岐で対象を狭めたりして成立したことにしません。cache、並列化、分散化、
+   新 API、汎用化も、この比較で残る具体的な不足なしに追加しません。
+
+採用方式、規模の前提、支配的コストと根拠、単純な代案を退けた理由を、実装前に既存設計の
+該当節へ簡潔に残します。十分な既存説明は参照を再利用し、task / worker handoff は同じ節に
+接続します。worker が局所都合で algorithm、保持方法、反復・並行構成や前提を変える場合は、
+先に同じ判断を更新して引き継ぎ、実装後の説明付けや別の局所設計で置き換えません。
+review も同じ前提と実 diff のコストを照合し、小さい成功例だけを規模への保証にしません。
+
+解析や既存 API の保証で判断できる場合は実測を必須にしません。定数因子や実行系の特性が
+選択を左右するときだけ、既存環境で実行可能な最小の検証を使います。規模を変えた検証は
+主張を確かめる必要がある場合に選び、根拠なしに小規模の時間を要求上限へ外挿しません。
+必要な性能確認が実行不能なら対象の主張を未検証として残し、性能不足とも検証済みとも
+扱いません。そのために環境を再構築したり、独立して進められる変更を止めたりしません。
+本節は方式選定の判断支援であり、全件監査、全利用箇所の移行、巨大 benchmark、新しい
+checker、schema、帳票、承認段階を要求せず、現在の Issue の完了範囲を広げません。
 
 ### SEP-07 YAGNI
 
@@ -364,12 +413,13 @@ refactor と behavior change を分けることが rollback と review を改善
 
 ### SEP-10 Compatibility and migration closure
 
-public surface、schema、path、identity、runtime route を変更する場合、canonical target と consumer migration
-を一つの完成条件として扱います。旧 alias、wrapper、selector、generated projection を残すか削除するかを
-明示し、偶然の二重経路を作りません。
+public surface、schema、path、identity、runtime route を変更する場合、canonical target、
+不要になった旧実装・alias・wrapper・selector・generated projection の削除、必要な consumer migration
+を一つの完成条件として [RC-09](../design/responsibility-cleanup.md#duplicate-implementation-retirement) で閉じます。
 
-compatibility が必要なら、supported period、owner、read / write direction、removal condition を定義します。
-根拠のない永久 shim は source of truth と invariant を増やします。
+互換経路を残すには、明示された現行の公開契約を満たす必要性を先に示します。supported period、
+owner、read / write direction、removal condition はその必要性に従い、移行の手間や diff の小ささを
+温存理由にしません。必要な入口も正本へ接続し、旧実装を第二の source of truth として残しません。
 
 ## 5. Verification、再現性、運用
 
@@ -521,7 +571,7 @@ review finding は、具体的な contract / invariant / owner / dependency / fa
 | SEP-03 | separation of concerns、single responsibility |
 | SEP-04 | cohesion、coupling、information hiding |
 | SEP-05 | dependency direction、authority boundary |
-| SEP-06 | KISS の総 semantic surface |
+| SEP-06 | 要求規模で成立する方式選定と変更後の保守コードスペースの最小化 |
 | SEP-07 | YAGNI と speculative mechanism |
 | SEP-08 | DRY と abstraction admission |
 | SEP-09 | complete target state、evidence-bounded complete owning unit、sequencing-only waves |

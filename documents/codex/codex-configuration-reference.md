@@ -49,7 +49,7 @@ runtime surface and end with the practical change checklist and stability notes.
 | CLI `--enable` / `--disable` | single invocation | Shortcut for `features.<name>=true/false`. |
 | CLI direct flags | single invocation | Common overrides for model, profile, sandbox, approval policy, cwd, images, web search, and output mode. |
 | `.codex/agents/*.toml` / `~/.codex/agents/*.toml` | project / user | Custom subagent roles with model, sandbox, MCP, skills, and instructions overrides. |
-| `.codex/personal/skills/**/SKILL.md` and other skill roots | directory / repo / user / system | Reusable task instructions and optional scripts/resources read after skill selection. |
+| `.agents/skills/<skill>/SKILL.md` / `~/.agents/skills/<skill>/SKILL.md` | repository or subtree / user | Native skill entries; AgentCanon's generated adapter is separate. See [Skill Paths](../../agents/canonical/skills.md#skill-paths). |
 | [AGENTS.md](../../AGENTS.md) and fallback project docs | repo tree | Runtime instructions discovered from project root to current working directory. |
 | `hooks.json` or `[hooks]` | repo / user | Lifecycle automation around session start, prompt submit, tool use, stop, and permission events. |
 
@@ -74,7 +74,7 @@ codex exec --json -c sandbox_mode='"read-only"' "review this repo"
 ## Template Baseline
 
 The current shared template config explicitly owns the parent model, project
-tool-output boundary, skill registry, and child-agent registry. This is a
+tool-output boundary, and child-agent registry. This is a
 representative excerpt; `.codex/config.toml` is the complete machine-readable
 source:
 
@@ -110,10 +110,10 @@ Operational interpretation:
   context; it is not a task token cap or a reason to omit decision-relevant
   evidence.
 - Stable runtime features use Codex defaults instead of project-level feature overrides.
-- Codex discovers repo-owned skills automatically from `.codex/personal/skills/`;
-  `agents.<role>` registers child roles. Skill workflow authority remains in
-  `SKILL.md`, and role behavior and
-  model selection remain in each role TOML.
+- Repository-owned skills use `.agents/skills/`; installed AgentCanon skills use
+  the managed user entry described in [Skill Paths](../../agents/canonical/skills.md#skill-paths).
+  `agents.<role>` registers child roles; role behavior and model selection
+  remain in each role TOML.
 - Reusable runtime profiles belong to machine-local user config. This repository
   does not prescribe profile names or values, and workflow routing does not
   classify a task into a profile before runtime evidence exists.
@@ -161,7 +161,7 @@ Interpretation for this template:
 - Additional model/provider keys should usually be placed in user config or profiles unless the repo requires a shared default.
 - Absent UI, history, audio, notice, Windows, credential-store, and OAuth keys are machine-local by default.
 - Absent `hooks` does not mean hooks are unused here; this repo uses the sibling `.codex/hooks.json` surface rather than inline TOML hooks.
-- Codex automatically discovers repo-owned `.codex/personal/skills/` packages;
+- Codex discovers repo-owned `.agents/skills/` packages;
   selecting a skill still precedes reading its `SKILL.md`.
 - Absent experimental keys should stay absent unless a task explicitly owns the risk and rollback path.
 
@@ -207,7 +207,7 @@ Stable runtime features use Codex defaults. Add a project-level feature override
 | ------- | --------------- | -------------------------------- |
 | `[agents]` | `max_threads`, `max_depth`, `job_max_runtime_seconds`, and inline role entries such as `[agents.<role>]` with `config_file`, `description`, and `nickname_candidates` | task policy strings such as same-role instance rules; keep those in `agents/task_catalog.yaml` and generated `team_manifest.yaml` |
 | `.codex/hooks.json` versus `[hooks]` | hooks are stored in `.codex/hooks.json` | inline `[hooks]` entries for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, and `Stop` |
-| `.codex/personal/skills/` | skills are provided as files under `.codex/personal/skills/` and discovered automatically | a project-level skill registry that duplicates the filesystem inventory |
+| Skill files | repository `.agents/skills/` or installed user entry; AgentCanon adapters follow [Skill Paths](../../agents/canonical/skills.md#skill-paths) | a project-level skill registry that duplicates the filesystem inventory |
 
 Use this matrix during reviews: if a task proposes adding one of these absent keys, require a short reason for why it belongs in shared repo config rather than user config, a profile, CLI override, hook file, skill file, or machine-local state.
 
@@ -576,12 +576,16 @@ Template-specific hook behavior:
 
 Skills are loaded from multiple roots. Official docs describe repository, user, admin/system, bundled, and plugin-distributed skill locations. For repository work, the most relevant roots are:
 
-- `$CWD/.codex/personal/skills`
-- parent-directory `.codex/personal/skills` up to repo root
-- `$REPO_ROOT/.codex/personal/skills`
-- `$HOME/.codex/personal/skills`
+- `$CWD/.agents/skills`
+- parent-directory `.agents/skills` up to repo root
+- `$REPO_ROOT/.agents/skills`
+- `$HOME/.agents/skills`
 - `/etc/codex/skills`
 - bundled system skills
+
+AgentCanon's ignored `.codex/personal/skills/` is a generated adapter view, not
+another native discovery root. Its source and managed entry are defined in
+[Skill Paths](../../agents/canonical/skills.md#skill-paths).
 
 `[skills]` supports:
 
@@ -593,7 +597,7 @@ Operational guidance:
 
 - Keep reusable workflow logic in skills when it must be invoked repeatedly.
 - Keep current project policy in [AGENTS.md](../../AGENTS.md) and workflow docs.
-- Put repository skills in `.codex/personal/skills/<skill>/SKILL.md`; rely on automatic
+- Put repository skills in `.agents/skills/<skill>/SKILL.md`; rely on automatic
   discovery instead of enumerating enabled entries in project config.
 - If many skills exist, descriptions compete for initial prompt budget; names and descriptions must be concise and distinctive.
 
