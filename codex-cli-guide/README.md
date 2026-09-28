@@ -16,6 +16,7 @@ downstream implementation tools/validate_split.py validates split guide reconstr
 
 - 元のMarkdown本文は `source/codex_cli_guide_config_deepdive.full.md` に収録し、hook flag 表記だけ current runtime に合わせて正規化しています。
 - 章別の本文は `sections/` に分割しています。
+- 分割時の範囲・ハッシュ記録は [MANIFEST.md](MANIFEST.md) にあります。現在の本文の一致は下記の検証スクリプトで確認します。
 - `tools/validate_split.py` で、`sections/` を連結した本文が `source/` の完全版と一致することを検証できます。
 - このREADMEや各ファイル冒頭の dependency manifest は、AgentCanon の文書運用に合わせて追加したメタ情報です。検証スクリプトは `<!-- split-content-start -->` 以降だけを本文として扱います。
 

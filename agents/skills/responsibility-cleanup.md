@@ -31,7 +31,7 @@ specialist dispatch、統合、再レビューを [`responsibility-cleanup`](../
 
 ## Route
 
-1. `tree -a -J --noreport` と既存 structure/scope checker で観測を作る。
+1. `tree -a -J --noreport` と既存 structure/scope checker で観測を作る。repo-wide な棚卸しを依頼された場合の観点は [project-review](../internal-routines/project-review.md) を参照する。局所 cleanup を全体監査へ拡張しない。
 2. 近接性や analyzer finding ではなく owner、dependency、公開契約、validation、rollback で unit を閉じる。write-capable handoff の validation command 境界は `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照する。
 3. environment は `environment-cleanup`、code は `code-cleanup`、skill は `skill-cleanup` に渡す。
 4. 文書、worktree、log は既存の `document-canon-cleanup`、`worktree-health`、`agent-log-analysis`、`runtime-log-repair`、`result-artifact-writeout` を再利用する。

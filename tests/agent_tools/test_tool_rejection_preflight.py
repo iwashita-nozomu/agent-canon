@@ -22,6 +22,16 @@ TOOL = PROJECT_ROOT / "tools" / "validation" / "semantic" / "tools" / "tool_reje
 class ToolRejectionPreflightTest(unittest.TestCase):
     """Validate gate prediction from planned paths."""
 
+    def test_help_describes_prediction_as_optional_diagnostic(self) -> None:
+        """CLI guidance must not reintroduce a mandatory edit preflight."""
+        result = subprocess.run(
+            [sys.executable, str(TOOL), "--help"],
+            check=True, capture_output=True, text=True,
+        )
+        help_text = " ".join(result.stdout.split())
+        self.assertIn("Optionally predict candidate", help_text)
+        self.assertIn("not edit authorization or required validation", help_text)
+
     def test_python_tool_path_predicts_code_and_log_surface_gates(self) -> None:
         """Python tool edits should carry code, helper, dependency, and log gates."""
         result = subprocess.run(

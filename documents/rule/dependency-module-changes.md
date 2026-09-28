@@ -37,14 +37,20 @@ workspace topology、operation refusal は代替 routeではありません。
 
 ## 依存 PR → exact pin → consumer 実行
 
+以下は、consumer の既存契約が Git source を gitlink / manifest / lock 等の
+exact pin で管理する場合だけの更新手順です。pin を持たない consumer に固定を
+新設する指示ではありません。その場合は既存の依存宣言と標準の解決機構を使い、
+実際の入力を記録します。現在の SHA や version をコード・テストの定数や一致 guard
+へコピーしません。変更の Issue / PR 公開は省略せず、未成立の pinned-input 検証を
+実施済みとも報告しません。
+
 branch 確認の対象・観測項目・再確認境界は
 [Branch Scope と Git ワークフロー](../operations/BRANCH_SCOPE.md) に従います。
 `workspace/<...>` にある依存の source 開発 clone と、consumer が実際に読む
 checkout の branch / HEAD は両方確認し、manifest の pin だけで確認済みにしません。
-この順序は gitlink だけでなく、consumer owner が manifest / lock 等で管理する
-Git source の pin にも適用します。依存 adapter に別の pin 管理機構は追加しません。
+依存 adapter に別の pin 管理機構は追加しません。
 
-依存の変更が consumer の実行に必要な場合は、次の順序を守ります。
+既存 pin で管理される依存の変更が consumer の実行に必要な場合は、次の順序を守ります。
 
 1. 依存 repository の Issue と編集 scope を確定し、generic lifecycle が選ぶ
    最新 main 起点または関連 Issue の active branch で修正します。branch 名に

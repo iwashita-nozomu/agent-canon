@@ -22,7 +22,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "eval" / "producers" / "generate_agent_improvement_guide.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
-from eval.producers.generate_agent_improvement_guide import latest_skill_source_epoch  # noqa: E402
+from eval.producers.generate_agent_improvement_guide import (  # noqa: E402
+    AgentImprovementGuide,
+    EvidenceSummary,
+    HookCounterState,
+    guidance,
+    latest_skill_source_epoch,
+)
 
 
 class GenerateAgentImprovementGuideTest(unittest.TestCase):
@@ -76,6 +82,65 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("agents/skills/oop-readability-check.md", command)
         self.assertNotIn(".codex/personal/skills/oop-readability-check/SKILL.md", command)
 
+    def test_usage_counts_do_not_create_repair_obligations(self) -> None:
+        """Overlapping or repeated candidate observations do not prove an omission."""
+        empty = EvidenceSummary((), {}, (), (), HookCounterState.empty().to_counts())
+        for selected, candidate, feedback in ((0, 1, 0), (1, 1, 1), (1, 20, 20)):
+            with self.subTest(selected=selected, candidate=candidate, feedback=feedback):
+                counts = HookCounterState.empty()
+                counts.skills["agent-orchestration"] = selected
+                counts.candidate_skills["agent-orchestration"] = candidate
+                counts.feedback_targets["skill:agent-orchestration"] = feedback
+                observed = EvidenceSummary((), {}, (), (), counts.to_counts())
+                self.assertEqual(guidance(observed), guidance(empty))
+
+    def test_empty_guide_does_not_activate_recording_or_repair(self) -> None:
+        """Reading a report with no evidence does not create a workflow obligation."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "eval" / "definitions").mkdir(parents=True)
+            summary = EvidenceSummary((), {}, (), (), HookCounterState.empty().to_counts())
+            guide = AgentImprovementGuide(root, self.runtime_root).render(summary)
+        self.assertIn("No failing eval or hook evidence was found in the scanned inputs.", guide)
+        self.assertNotIn("required_tokens:", guide)
+        self.assertNotIn("next_repair_branch:", guide)
+        self.assertNotIn("github_issue_lookup_required", guide)
+        self.assertNotIn("make the actual skill/workflow/tool edits", guide)
+
+    def test_observed_failure_keeps_evidence_without_claiming_its_cause(self) -> None:
+        """A genuine hook failure remains visible with its affected input."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            log = (
+                mounted_log_archive_root(root)
+                / "hook-runs" / "legacy-import" / "test-container" / "execution.jsonl"
+            )
+            raw = json.dumps({
+                "status": "fail",
+                "event": "PostToolUse",
+                "hook_run_id": "execution-failed",
+                "payload_fingerprint": "execution-input",
+                "hook_log_namespace": "test-container",
+                "failure_fingerprint": "current-failure",
+                "commands": [{
+                    "command": ["ruff", "check", "src/product.py"],
+                    "returncode": 1,
+                    "output_snippet": "reported failure on the input",
+                }],
+            }) + "\n"
+            log.write_text(raw, encoding="utf-8")
+            reader = AgentImprovementGuide(root, self.runtime_root)
+            summary = reader.collect()
+            guide = reader.render(summary)
+            self.assertEqual(log.read_text(encoding="utf-8"), raw)
+        self.assertEqual(summary.hook_counts.failures, {"current-failure": 1})
+        self.assertEqual(summary.hook_counts.failure_targets, {"src/product.py": 1})
+        self.assertIn("current-failure", guide)
+        self.assertIn("src/product.py", guide)
+        self.assertIn("affected inputs, not established cause locations", guide)
+        self.assertIn("locate the concrete cause", guide)
+
     def test_generates_guidance_from_issues_eval_knowledge_and_hook_logs(self) -> None:
         """The guide should summarize every evidence family."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -121,8 +186,8 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("prompt", guide)
         self.assertIn("prompt_candidate_skill_counts:", guide)
         self.assertIn("result-artifact-writeout", guide)
-        self.assertIn("Skill Routing Gaps", guide)
-        self.assertIn("`result-artifact-writeout`: gap=`2` selected=`0` candidate=`1` feedback=`1`", guide)
+        self.assertNotIn("Skill Routing Gaps", guide)
+        self.assertIn("prompt_candidate_skill_counts: `{'result-artifact-writeout': 1}`", guide)
         self.assertIn("prompt_candidate_workflow_counts:", guide)
         self.assertIn("codex-task-workflow", guide)
         self.assertIn("prompt_candidate_tool_counts:", guide)
@@ -133,19 +198,22 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("skill:result-artifact-writeout", guide)
         self.assertIn("human_feedback_action_counts:", guide)
         self.assertIn("prompt_repair", guide)
-        self.assertIn("Top Failure Repair Targets", guide)
+        self.assertIn("Observed Failure Targets", guide)
         self.assertIn("tools/runtime/lifecycle/bootstrap_agent_run.py", guide)
         self.assertIn("hook_quality_counts:", guide)
         self.assertIn("unknown_event", guide)
-        self.assertIn("Hook Quality Findings", guide)
-        self.assertIn("Protocol Feedback Coverage", guide)
-        self.assertIn("hook_tool_feedback=reviewed", guide)
+        self.assertIn("Hook Observability Counters", guide)
+        self.assertNotIn("Protocol Feedback Coverage", guide)
+        self.assertNotIn("required_tokens:", guide)
         self.assertNotIn("failure-a", guide)
         self.assertIn("agent-canon-log/knowledge", guide)
-        self.assertIn("Local Codex", guide)
+        self.assertIn("a failed report alone does not identify a prompt defect", guide)
+        self.assertIn("observability limits", guide)
+        self.assertNotIn("Repair skill or workflow prompt surfaces", guide)
+        self.assertNotIn("repair unknown events", guide)
 
-    def test_skill_routing_gap_ignores_pre_cutover_skill_logs(self) -> None:
-        """Skill source updates should archive older routing signals from gap math."""
+    def test_skill_counts_ignore_pre_cutover_skill_logs(self) -> None:
+        """Skill source updates should exclude older observations from current counters."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_cutover_fixture(root)
@@ -168,15 +236,17 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             guide = output.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("`agent-orchestration`: gap=", guide)
+        self.assertIn("skill_usage_counts: `{}`", guide)
+        self.assertIn("prompt_candidate_skill_counts: `{}`", guide)
+        self.assertIn("human_feedback_target_counts: `{}`", guide)
         self.assertIn("skill_routing_signal_before_cutover_ignored", guide)
         self.assertIn(
             "skill_routing_signal_before_cutover_ignored:agent-orchestration",
             guide,
         )
 
-    def test_skill_routing_gap_keeps_post_cutover_skill_logs(self) -> None:
-        """Skill source cutover should not hide current routing pressure."""
+    def test_skill_counts_keep_post_cutover_observations_without_inventing_gaps(self) -> None:
+        """The same selected event may also be a candidate and feedback observation."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_cutover_fixture(root, include_post_cutover=True)
@@ -199,14 +269,11 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             guide = output.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(
-            "`agent-orchestration`: gap=`1` selected=`1` candidate=`1` feedback=`1`",
-            guide,
-        )
-        self.assertNotIn(
-            "`agent-orchestration`: gap=`3` selected=`1` candidate=`2` feedback=`2`",
-            guide,
-        )
+        self.assertIn("skill_usage_counts: `{'agent-orchestration': 1}`", guide)
+        self.assertIn("prompt_candidate_skill_counts: `{'agent-orchestration': 1}`", guide)
+        self.assertIn("human_feedback_target_counts: `{'skill:agent-orchestration': 1}`", guide)
+        self.assertNotIn("Skill Routing Gaps", guide)
+        self.assertNotIn("Repair skill-selection routing", guide)
 
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""

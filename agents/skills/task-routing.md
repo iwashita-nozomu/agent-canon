@@ -38,6 +38,33 @@ Historical names such as `SKILLS`, `ACTIVE_SKILLS`, `MATCHED_SKILLS`, `RELATED_S
 
 Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
 
+作業途中で新しい観測や要求変更が生じたら、次の判断に関係する
+[条件付き読込](#in-flight-skill-reads) を適用します。初回の選択だけで固定しません。
+
+## In-flight skill reads
+
+呼び出し元スキルの操作中に条件が成立したら、その条件に依存する判断・編集・再実行の
+前に、本文でリンクされた関連スキルを読みます。初回に全候補・リンク先を読みません。
+未成立の条件には進まず、既読で有効な内容は再利用します。選択済みスキルの読了と
+必要な委譲先の範囲は [Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace)
+に従い、新しい読込台帳や承認段階は作りません。
+
+このスキルから既存候補へ渡す判断点は次のとおりです。個別作業の条件はその呼び出し元に
+置き、候補辞書や選択状態の第二の正本にしません。
+
+| 作業中に成立した条件 | 依存する判断・操作の前に読む関連スキル |
+| --- | --- |
+| 新しい証拠で担当・スキル・reviewの選択を変える必要がある | [agent-orchestration](agent-orchestration.md#decision-order) で変更された判断だけを解決する |
+| tool出力のfindingを修正判断や報告へ渡す | [tool-finding-report](tool-finding-report.md) でfindingと根拠を整理する |
+| 過去の実行ログを解析し、原因や再発条件を判断する | [agent-log-analysis](agent-log-analysis.md) で必要な記録を読む |
+| 観測した問題をIssueへ記録・更新する | [issue-finding-report](issue-finding-report.md) で既存Issueと公開範囲を確認する |
+| 検証結果のartifactを保存・更新する | [result-artifact-writeout](result-artifact-writeout.md) で実在する結果と保存先を確認する |
+
+解決したら得られた根拠と必要な変更だけを既存taskへ戻し、中断した操作から続けます。
+既知のリンク先は直接使い、担当が未解決の場合だけ既存routeで選択します。
+`SELECTED_SKILLS` / `DEFERRED_CANDIDATES` は必要な変更だけを反映し、全体のroutingを
+やり直しません。読むこと自体は修復、公開、追加検証、環境変更、委譲の権限を増やしません。
+
 ## Boundary
 
 Routing chooses owners; selected skills own their execution and validation. The full LCP policy is owned by [`agent-orchestration.md#Local Capability Priority`](./agent-orchestration.md#local-capability-priority). `DEFERRED_SKILLS` remains a skill candidate projection, not operation disposition.

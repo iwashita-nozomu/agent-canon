@@ -4403,6 +4403,13 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     assert 'AGENT_CANON_PROJECT_ROOT="$codex_project"' in text
     assert 'AGENT_CANON_HOST_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT' in text
     assert '_agent_canon_run_controller "$codex_container" codex prepare' in text
+    codex_route = text.split('    codex)', 1)[1].split('    eval)', 1)[0]
+    assert codex_route.index(
+        '_agent_canon_run_controller "$codex_container" codex prepare'
+    ) < codex_route.index('_agent_canon_sync_personal_skill_view "$codex_container"')
+    assert codex_route.index(
+        '_agent_canon_sync_personal_skill_view "$codex_container"'
+    ) < codex_route.index('"$codex_executable" --project-root "$codex_project"')
     assert '"$codex_executable" --project-root "$codex_project"' in text
     assert 'if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then' in text
     controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(encoding="utf-8")

@@ -202,18 +202,12 @@ criterion に接続できる場合に採用します。
 - `Oracle`: closed-form value、known reference、invariant、residual bound、convergence
   flag など、production path と同じ bug を複製しない expected。
 - `Budget`: unit test に置ける最小 dimension、固定 seed、fixture size、runtime。
-- `Execution Target`: 数値計算、solver、optimizer、JAX / XLA / IREE lowering、
-  convergence、residual、benchmark、experiment validation を実行する GPU target。
-  CPU は計算テストの代替 target にしません。
+- `Execution Target`: 変更契約が必要とする backend と、project 所有の既存検証入口。
 
 `Numerical Trigger` がない場合は、数値テストを省きます。その場合も test plan には
 「数値テストを省いた理由」と、代わりに固定する observable behavior を 1 行で残します。
-数値 validation が必要でも、既定は GPU 上の最小 deterministic case です。
 long-running、broad benchmark、large random sweep は unit test ではなく experiment
-validation として profile、理由、ログ保存先を記録します。GPU backend で起動する
-child は先に空き GPU slot を探索します。slot が得られない場合は
-`gpu_validation_blocker=<reason>` と slot evidence を残します。CPU backend は
-user request、runtime profile、または明示 env で固定された validation target として扱います。
+validation として理由とログ保存先を記録します。
 
 ### 3.2 Contract-Only Wrapper Gate
 

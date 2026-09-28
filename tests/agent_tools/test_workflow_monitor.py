@@ -1154,6 +1154,8 @@ class WorkflowMonitorTest(unittest.TestCase):
                 "events=PostToolUse,Stop",
                 text,
             )
+            self.assertNotIn("pre_edit_rejection_prediction=", text)
+            self.assertNotIn("predicted_tool_rejection_gates=", text)
             self.assertIn("static_analysis_feedback=recorded", text)
             self.assertIn("hook_tool_feedback=reviewed", text)
             self.assertIn("parent_protocol_update=not_required", text)
@@ -1170,6 +1172,21 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertNotIn("EVAL_ACCUMULATED_REPORT=recorded", text)
             self.assertIn("runtime_feedback_not_observed", text)
             self.assertIn("diff_check_agent_decision=approve", text)
+
+    def test_explicit_prediction_evidence_is_preserved(self) -> None:
+        """Removing preset claims must not discard an explicitly supplied result."""
+        evidence = "pre_edit_rejection_prediction=warn predicted_tool_rejection_gates=responsibility_scope"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            result = subprocess.run(
+                [sys.executable, str(MONITOR_SCRIPT), "--report-dir", str(report_dir),
+                 "--behavior-event", evidence],
+                cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            self.assertIn(evidence, text)
+            self.assertNotIn("pre_edit_rejection_prediction=reviewed", text)
 
     def test_bootstrap_seeds_monitoring_with_routing_evidence(self) -> None:
         """bootstrap_agent_run should seed workflow monitoring without manual edits."""
@@ -1205,6 +1222,8 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             monitor_path = report_root / "monitor-bootstrap" / "workflow_monitoring.md"
             text = monitor_path.read_text(encoding="utf-8")
+            self.assertIn("PRE_EDIT_REJECTION_PREDICTION_STATUS=optional_diagnostic", result.stdout)
+            self.assertNotIn("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending", result.stdout)
             self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("stage owner routing active_roles=", text)

@@ -223,6 +223,27 @@ def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path
     assert all(Path(entry["target"]).is_symlink() for entry in skill_links)
 
 
+def test_codex_prepare_repairs_multiple_missing_catalog_skills(tmp_path: Path) -> None:
+    """Codex preparation refreshes the complete generated skill view."""
+    manager, _docker = _runtime(tmp_path)
+    manager.install()
+    skill_paths = [
+        ROOT / ".codex" / "personal" / "skills" / skill / "SKILL.md"
+        for skill in ("devcontainer-exec", "integration")
+    ]
+    originals = {path: path.read_bytes() for path in skill_paths}
+    for path in skill_paths:
+        path.unlink()
+    try:
+        manager.codex_prepare()
+        for path, expected in originals.items():
+            assert path.read_bytes() == expected
+    finally:
+        for path, expected in originals.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(expected)
+
+
 def test_codex_prepare_places_config_at_code_home_root(tmp_path: Path) -> None:
     """Codex reads the managed config at CODEX_HOME/config.toml."""
     manager, _docker = _runtime(tmp_path)

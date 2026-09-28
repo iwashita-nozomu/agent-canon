@@ -141,13 +141,17 @@ declaration です。`$test-design` の output は常時生成しません。own
 
 ### Mathematical Necessity Gate
 
-数理的な runtime 判定、diagnostic gate、stopping check、test oracle、
+数理的な runtime 判定、stopping check、test oracle、
 proof obligation は `mathematical necessity gate` を通します。採用条件は、
 public contract の precondition / invariant / postcondition、iteration map、
 stopping scalar、failure semantics、accepted theorem target、または approved
 design の acceptance criterion に接続できることです。接続先のない判定候補は
 algorithm-change guidance、proof / review backlog、または experiment hypothesis
 として記録します。
+
+この採用条件は、数値上の問題による結果の自動破棄を許可しません。数値診断を
+保存・返却の可否を決める gate にせず、原結果への注記として扱います。既存の
+停止条件と、停止までに得た結果の保持を分け、下記 Validation Rules に従います。
 
 For iterative solvers, convergence evidence is a theorem about the implemented
 iteration map and stopping scalar, not a runtime proof check. State the map as
@@ -215,9 +219,12 @@ surfaces when the route packet makes them part of the product contract.
 - 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route、CPU smoke、CPU-only regression をしません。
 - solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、benchmark、experiment validation などの計算テストは CPU で実行しません。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence を残します。
 - `converged=false`、`max_iter`、non-finite intermediate、constraint violation は pass evidence ではありません。
-- runtime proof-only fields or diagnostic gates are not convergence evidence;
-  use them only when they are genuine execution outputs needed by the user-facing
-  algorithm contract.
+  ただし原結果と実際の status は保持・報告し、数値判定による削除、置換、隠蔽、
+  保存・返却拒否はしません。生成済み artifact は `$result-artifact-writeout` に渡し、
+  成功例だけを残して失敗数や比較の母数を失わないようにします。
+- Proof-only fields and diagnostic gates do not establish convergence.
+  Keep genuine execution outputs required by the user-facing algorithm contract;
+  do not turn them into gates for result retention or return.
 - Final value だけでなく、first bad iteration、finite state、residual components、reference norm、tolerance、status flag を確認します。
 - Constraint つき問題では objective だけでなく feasibility と KKT / complementarity を分けます。
 - Linear solver / preconditioner では residual norm、reference norm、preconditioner summary、breakdown status を分けます。
@@ -316,11 +323,13 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Read [agents/skills/computational-optimization.md](computational-optimization.md).
 1. Use this skill for optimizer, solver, preconditioner, residual, KKT, convergence, derivative, tolerance, or numerical benchmark work.
 1. Before implementation or experiment runs, fix an optimization contract: objective or residual, variables, constraints, derivatives, algorithm state, stopping policy, numerical invariants, and failure semantics.
-1. Route mathematical runtime checks, diagnostic gates, stopping checks, test
+1. Route mathematical runtime checks, stopping checks, test
    oracles, and proof obligations through the `mathematical necessity gate`:
    connect each one to the public contract, iteration map, stopping scalar,
    failure semantics, accepted theorem target, or approved design acceptance
-   criterion before adding it to implementation or validation evidence.
+   criterion before adding it to implementation or validation evidence. This
+   necessity test never authorizes numerical result disposal; follow Validation
+   Rules for result retention and reporting without changing failure status.
 1. For iterative solvers, treat convergence evidence as a theorem about the
    implemented iteration map and stopping scalar, e.g.
    `z_next = Step_impl(Problem, Config, z)` and

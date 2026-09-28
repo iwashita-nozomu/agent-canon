@@ -68,7 +68,8 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
         "workspace_paths": [
             "agents/skills/codex-task-workflow.md",
-            "agents/canonical/CODEX_WORKFLOW.md",
+            "agents/canonical/CODEX_BOOTSTRAP.md",
+            "agents/canonical/CODEX_IMPLEMENTATION.md",
         ],
         "notes": (
             "Detailed design must read upstream documented requirements and waterfall rules before "
@@ -104,7 +105,8 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         ],
         "workspace_paths": [
             "agents/skills/codex-task-workflow.md",
-            "agents/canonical/CODEX_WORKFLOW.md",
+            "agents/canonical/CODEX_BOOTSTRAP.md",
+            "agents/canonical/CODEX_IMPLEMENTATION.md",
         ],
         "must_cite_before_edit": True,
         "notes": "Implementation must read and cite the approved design packet before editing.",
@@ -161,20 +163,16 @@ ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
             "Owner-First Readback",
             "Stages",
         ),
-        "agents/canonical/CODEX_WORKFLOW.md": (
-            "4. Run Bootstrap",
-            "5. Implementation",
-        ),
+        "agents/canonical/CODEX_BOOTSTRAP.md": ("4. Run Bootstrap",),
+        "agents/canonical/CODEX_IMPLEMENTATION.md": ("5. Implementation",),
     },
     "implementer": {
         "agents/skills/codex-task-workflow.md": (
             "Owner-First Readback",
             "Stages",
         ),
-        "agents/canonical/CODEX_WORKFLOW.md": (
-            "4. Run Bootstrap",
-            "5. Implementation",
-        ),
+        "agents/canonical/CODEX_BOOTSTRAP.md": ("4. Run Bootstrap",),
+        "agents/canonical/CODEX_IMPLEMENTATION.md": ("5. Implementation",),
     },
 }
 
