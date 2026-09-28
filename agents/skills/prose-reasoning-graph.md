@@ -175,6 +175,15 @@ findings, evidence, limitations, and any relevant next action. There is no fixed
 rewrite packets, or handoffs. Keep the selected tool's actual output and failure
 status; an unavailable analysis is not a successful check.
 
+If this analysis was selected and the task uses `closeout_gate.md`, this skill
+owns its closeout evidence: add `prose_graph_activation: selected` and
+`prose_graph: complete` only after this skill's Standard Sequence and Requested
+Outputs are satisfied. This records completion of the selected analysis task;
+it does not require zero diagnostics or findings. Do not add these fields for
+ordinary writing where graph analysis was not selected. The general
+`task_close` consumer validates supplied graph values only; it cannot infer
+selection or assess this analysis on the skill's behalf.
+
 ## Literature Boundary
 
 The graph layers are intentionally plural.

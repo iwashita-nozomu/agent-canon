@@ -831,7 +831,11 @@ def document_split_decision_ready(status: str, decision: str) -> bool:
 def document_structure_evidence_ready(
     changed_markdown: Sequence[str], evidence: dict[str, str]
 ) -> tuple[bool, bool, bool]:
-    """Return path-record, split-decision, and route readiness."""
+    """Return path-record, split-decision, and route readiness.
+
+    This consumer validates supplied graph evidence but cannot infer whether the
+    owning skill selected graph analysis or assess its analysis results.
+    """
     if not changed_markdown:
         return True, True, True
     recorded_paths = parse_document_structure_paths(
