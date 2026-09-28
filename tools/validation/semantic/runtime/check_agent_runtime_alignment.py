@@ -49,101 +49,49 @@ from typing import cast
 from tools.agent.orchestration import model_profile_registry
 import yaml
 
-if __package__:
-    from tools.agent.orchestration.team_config import (
-        ROOT,
-        Role,
-        RunBundleSpec,
-        TaskCatalog,
-        TeamConfig,
-        default_specialists_for_task,
-        load_task_catalog,
-        load_team_config,
-        resolve_role,
-        select_roles,
-        task_ids,
-    )
-else:
-    from tools.agent.orchestration.team_config import (
-        ROOT,
-        Role,
-        RunBundleSpec,
-        TaskCatalog,
-        TeamConfig,
-        default_specialists_for_task,
-        load_task_catalog,
-        load_team_config,
-        resolve_role,
-        select_roles,
-        task_ids,
-    )
+from tools.agent.orchestration.team_config import (
+    ROOT,
+    Role,
+    RunBundleSpec,
+    TaskCatalog,
+    TeamConfig,
+    default_specialists_for_task,
+    load_task_catalog,
+    load_team_config,
+    resolve_role,
+    select_roles,
+    task_ids,
+)
 
-if __package__:
-    from tools.agent.orchestration.implementation_dispatch import (
-        codex_runtime_max_depth,
-        codex_runtime_max_threads,
-        declared_team_capacity_derivation,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_initial_subagent_wave,
-        workflow_spawn_budget,
-        workflow_topology_policy_violations,
-    )
-else:
-    from tools.agent.orchestration.implementation_dispatch import (
-        codex_runtime_max_depth,
-        codex_runtime_max_threads,
-        declared_team_capacity_derivation,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_initial_subagent_wave,
-        workflow_spawn_budget,
-        workflow_topology_policy_violations,
-    )
+from tools.agent.orchestration.implementation_dispatch import (
+    codex_runtime_max_depth,
+    codex_runtime_max_threads,
+    declared_team_capacity_derivation,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
+    workflow_spawn_budget,
+    workflow_topology_policy_violations,
+)
 
-if __package__:
-    from tools.agent.orchestration.agent_team import create_run_bundle
-else:
-    from tools.agent.orchestration.agent_team import create_run_bundle
+from tools.agent.orchestration.agent_team import create_run_bundle
 
-if __package__:
-    from tools.runtime.source.agent_canon_source_root import (
-        RepositoryRoots,
-        RootResolution,
-        resolve_agent_canon_source_root,
-    )
-else:
-    from tools.runtime.source.agent_canon_source_root import (  # type: ignore[no-redef]
-        RepositoryRoots,
-        RootResolution,
-        resolve_agent_canon_source_root,
-    )
+from tools.runtime.source.agent_canon_source_root import (
+    RepositoryRoots,
+    RootResolution,
+    resolve_agent_canon_source_root,
+)
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import resolve_repository_roots
-else:
-    from tools.repository.workspace.workspace_scope import resolve_repository_roots
+from tools.repository.workspace.workspace_scope import resolve_repository_roots
 
-if __package__:
-    from tools.runtime.manifest.manifest_rendering import required_output_templates_missing
-else:
-    from tools.runtime.manifest.manifest_rendering import required_output_templates_missing
+from tools.runtime.manifest.manifest_rendering import required_output_templates_missing
 
-if __package__:
-    from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
-else:
-    from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
+from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
 
-if __package__:
-    from tools.agent.orchestration.packets import (
-        resolve_active_design_packet_config,
-        resolve_cross_cutting_document_packet,
-        resolve_role_document_packet,
-    )
-else:
-    from tools.agent.orchestration.packets import (
-        resolve_active_design_packet_config,
-        resolve_cross_cutting_document_packet,
-        resolve_role_document_packet,
-    )
+from tools.agent.orchestration.packets import (
+    resolve_active_design_packet_config,
+    resolve_cross_cutting_document_packet,
+    resolve_role_document_packet,
+)
 from tools.agent.skills.skill_route_catalog import load_skill_route_rules
 
 UTC = timezone.utc

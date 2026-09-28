@@ -58,21 +58,12 @@ def _parent_validate(path: Path, purpose: str) -> None:
         return
     ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
 
-if __package__:
-    from tools.agent.orchestration.tool_calls import (
-        CloseAgentLifecycleEvidence,
-        materialize_close_agent_tool_call,
-    )
-else:
-    from tools.agent.orchestration.tool_calls import (
-        CloseAgentLifecycleEvidence,
-        materialize_close_agent_tool_call,
-    )
+from tools.agent.orchestration.tool_calls import (
+    CloseAgentLifecycleEvidence,
+    materialize_close_agent_tool_call,
+)
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import resolve_report_root
-else:
-    from tools.repository.workspace.workspace_scope import resolve_report_root
+from tools.repository.workspace.workspace_scope import resolve_report_root
 from tools.runtime.artifacts.report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,

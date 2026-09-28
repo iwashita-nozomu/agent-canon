@@ -18,10 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal, cast
 
-if __package__:
-    from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
-else:
-    from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
+from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
 
 
 if __package__:
@@ -45,16 +42,10 @@ else:
         _as_string_tuple,
     )
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import (
-        resolve_report_bundle_artifact_path,
-        resolve_workspace_document_path,
-    )
-else:
-    from tools.repository.workspace.workspace_scope import (
-        resolve_report_bundle_artifact_path,
-        resolve_workspace_document_path,
-    )
+from tools.repository.workspace.workspace_scope import (
+    resolve_report_bundle_artifact_path,
+    resolve_workspace_document_path,
+)
 
 STANDARD_RUN_ARTIFACT_KEYS = (
     "user_request_contract",
