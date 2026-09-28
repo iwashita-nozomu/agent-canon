@@ -372,7 +372,6 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
                     str(report_root),
                     "--runtime-root",
                     str(runtime_root),
-                    "--skip-agent-canon-preflight",
                     "--issue-worker-candidate",
                     json.dumps(candidate),
                 ],
@@ -429,10 +428,10 @@ def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher(
                     str(report_root),
                     "--runtime-root",
                     str(runtime_root),
-                    "--skip-agent-canon-preflight",
                 ],
-                spawn=lambda agent_type, prompt: calls.append((agent_type, prompt))
-                or "unexpected-publisher",
+                spawn=lambda agent_type, prompt: (
+                    calls.append((agent_type, prompt)) or "unexpected-publisher"
+                ),
             )
 
         assert return_code == 0
@@ -474,12 +473,12 @@ def test_bootstrap_t15_foreign_candidate_is_handoff_without_spawn(
                 str(report_root),
                 "--runtime-root",
                 str(runtime_root),
-                "--skip-agent-canon-preflight",
                 "--issue-worker-candidate",
                 json.dumps(candidate),
             ],
-            spawn=lambda agent_type, prompt: calls.append((agent_type, prompt))
-            or "unexpected-publisher",
+            spawn=lambda agent_type, prompt: (
+                calls.append((agent_type, prompt)) or "unexpected-publisher"
+            ),
         )
 
         assert return_code == 0
@@ -505,7 +504,13 @@ def test_bootstrap_cli_materializes_spawn_handoff_without_injected_callback() ->
         result = subprocess.run(
             [
                 sys.executable,
-                str(PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"),
+                str(
+                    PROJECT_ROOT
+                    / "tools"
+                    / "runtime"
+                    / "lifecycle"
+                    / "bootstrap_agent_run.py"
+                ),
                 "--task",
                 "publish explicit feedback",
                 "--task-id",
@@ -520,7 +525,6 @@ def test_bootstrap_cli_materializes_spawn_handoff_without_injected_callback() ->
                 str(report_root),
                 "--runtime-root",
                 str(runtime_root),
-                "--skip-agent-canon-preflight",
                 "--issue-worker-candidate",
                 json.dumps(candidate),
             ],
