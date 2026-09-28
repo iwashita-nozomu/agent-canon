@@ -92,7 +92,7 @@ checked and cited.
 - paper writing:
   - `paper-writing`
 - general explanatory docs:
-  - `long-form-writing` as the DSL-to-prose adapter when file/document responsibility is README, workflow, guide, migration, specification, or similar explanatory prose
+  - `long-form-writing` when file/document responsibility is README, workflow, guide, migration, specification, or similar explanatory prose
 - academic docs:
   - `academic-writing`
 - Markdown diff:

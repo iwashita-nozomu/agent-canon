@@ -4230,8 +4230,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("DOCUMENT_STRUCTURE_STATUS=complete", result.stdout)
             self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
 
-    def test_task_close_accepts_bounded_existing_topology_route(self) -> None:
-        """A bounded Markdown edit may close with positive existing-topology evidence."""
+    def test_task_close_accepts_existing_topology_without_graph_selection_record(
+        self,
+    ) -> None:
+        """A bounded Markdown edit closes without recording graph non-selection."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -4257,7 +4259,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             (workspace_root / "README.md").write_text(
                 "# Seed\n\nUpdated.\n", encoding="utf-8"
             )
-            run_id = "test-task-close-doc-existing-topology"
+            run_id = "test-task-close-doc-existing-topology-no-graph-record"
             report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
@@ -4271,7 +4273,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "- structure_activation: format_only": "- structure_activation: not_required",
                 "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:existing-topology:README.md",
                 "- structure_planning: not_applicable": "- structure_planning: not_required",
-                "- prose_graph: not_applicable": "- prose_graph: not_selected",
                 "- structure_contract: skipped: fixture format-only route": "- structure_contract: not_required:existing-topology:README.md",
                 "- structure_owner: not_applicable": "- structure_owner: README.md owner",
                 "- structure_source: not_applicable": "- structure_source: README.md canonical source",
@@ -4281,6 +4282,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             }
             for old, new in replacements.items():
                 text = text.replace(old, new)
+            text = text.replace("- prose_graph_activation: not_selected\n", "")
+            text = text.replace("- prose_graph: not_applicable\n", "")
             closeout_path.write_text(text, encoding="utf-8")
 
             result = subprocess.run(

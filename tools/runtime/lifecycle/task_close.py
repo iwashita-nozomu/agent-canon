@@ -854,6 +854,16 @@ def document_structure_evidence_ready(
     split_decision_ready = document_split_decision_ready(
         status, evidence.get("document_split_decision", "")
     )
+    graph_activation = evidence.get("prose_graph_activation", "")
+    graph_status = evidence.get("prose_graph", "")
+    optional_graph_evidence_ready = (
+        (graph_activation == "selected" and graph_status == "complete")
+        or (graph_activation == "not_selected" and graph_status == "not_selected")
+        or (
+            graph_activation in {"", "not_applicable"}
+            and graph_status in {"", "not_applicable"}
+        )
+    )
     identity_ready = all(
         evidence.get(field, "") not in DOCUMENT_STRUCTURE_VALUE_MISSING
         for field in (
@@ -867,30 +877,21 @@ def document_structure_evidence_ready(
     required_route = (
         activation == "required"
         and evidence.get("structure_planning") == "complete"
-        and evidence.get("prose_graph_activation") in {"selected", "not_selected"}
-        and (
-            (
-                evidence.get("prose_graph_activation") == "selected"
-                and evidence.get("prose_graph") == "complete"
-            )
-            or (
-                evidence.get("prose_graph_activation") == "not_selected"
-                and evidence.get("prose_graph") == "not_selected"
-            )
-        )
+        and optional_graph_evidence_ready
         and structure_contract.startswith("required:")
         and identity_ready
     )
     existing_topology_route = (
         activation == "not_required"
         and evidence.get("structure_planning") == "not_required"
-        and evidence.get("prose_graph_activation") == "not_selected"
-        and evidence.get("prose_graph") == "not_selected"
+        and optional_graph_evidence_ready
         and structure_contract.startswith("not_required:existing-topology:")
         and identity_ready
     )
-    complete_route = status == "complete" and activation in {"required", "not_required"} and (
-        required_route or existing_topology_route
+    complete_route = (
+        status == "complete"
+        and activation in {"required", "not_required"}
+        and (required_route or existing_topology_route)
     )
     skipped_route = (
         status == "skipped"
@@ -900,7 +901,8 @@ def document_structure_evidence_ready(
             DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX
         )
         and structure_contract.startswith("skipped:")
-        and evidence.get("format_only_reason", "") not in DOCUMENT_STRUCTURE_VALUE_MISSING
+        and evidence.get("format_only_reason", "")
+        not in DOCUMENT_STRUCTURE_VALUE_MISSING
     )
     return paths_recorded, split_decision_ready, split_decision_ready and (
         complete_route or skipped_route
