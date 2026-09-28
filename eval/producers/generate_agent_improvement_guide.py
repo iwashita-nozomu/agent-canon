@@ -615,9 +615,8 @@ class AgentImprovementGuide:
             "@dependency-end",
             "-->",
             "",
-            "This generated guide is read-only evidence. Use it to choose a local",
-            "Codex repair branch; do not let the workflow rewrite",
-            "skills, workflows, tools, or private knowledge/feedback directly.",
+            "This generated guide reports observations from the scanned inputs.",
+            "It does not establish a repair scope or authorize changes.",
             "",
             "## Evidence Summary",
             "",
@@ -659,7 +658,6 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
     """Return all detailed guide sections after the summary."""
     sections: list[str] = []
     sections.extend(named_section("Improvement Guidance", guidance(summary)))
-    sections.extend(named_section("Skill Routing Gaps", skill_routing_gap_lines(summary.hook_counts)))
     sections.extend(named_section("Skill Usage Evidence", counter_lines(summary.hook_counts.skills)))
     sections.extend(named_section("Prompt Candidate Skills", counter_lines(summary.hook_counts.candidate_skills)))
     sections.extend(named_section("Prompt Candidate Workflows", counter_lines(summary.hook_counts.candidate_workflows)))
@@ -672,10 +670,15 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
     sections.extend(named_section("Hook Runtime Namespaces", counter_lines(summary.hook_counts.namespaces)))
     sections.extend(named_section("Hook Tool Evidence", counter_lines(summary.hook_counts.tools)))
     sections.extend(named_section("Code Checker Targets", counter_lines(summary.hook_counts.checker_targets)))
-    sections.extend(named_section("Top Failure Repair Targets", counter_lines(summary.hook_counts.failure_targets)))
-    sections.extend(named_section("Hook Quality Findings", counter_lines(summary.hook_counts.quality)))
-    sections.extend(named_section("Protocol Feedback Coverage", protocol_feedback_lines(summary)))
-    sections.extend(named_section("GitHub Issues", summary.github_issue_refs or ("github_issue_lookup_required",)))
+    sections.extend(named_section("Observed Failure Targets", counter_lines(summary.hook_counts.failure_targets)))
+    sections.extend(named_section("Hook Observability Counters", counter_lines(summary.hook_counts.quality)))
+    sections.extend(
+        named_section(
+            "GitHub Issues",
+            summary.github_issue_refs
+            or ("- No repository-qualified Issue URL in the scanned private packets.",),
+        )
+    )
     sections.extend(
         named_section(
             "Failed Skill Eval Reports",
@@ -828,39 +831,42 @@ def skill_source_path_candidates(skill: str) -> tuple[Path, ...]:
 
 
 def guidance(summary: EvidenceSummary) -> list[str]:
-    """Return actionable guidance lines."""
+    """Route observed failures to investigation without inferring repair authority."""
     lines: list[str] = []
     if summary.github_issue_refs:
-        lines.append("- Resolve repository-qualified GitHub Issue references before adding new workflow scope.")
-    else:
-        lines.append("- github_issue_lookup_required: no repository-qualified Issue URL is present in private packets.")
+        lines.append(
+            "- Use linked Issues to confirm the current owner and authorized scope; "
+            "their presence does not make resolving every Issue part of this task."
+        )
     if summary.failed_skill_eval_reports:
-        lines.append("- Repair skill or workflow prompt surfaces, then rerun accumulated prompt evals.")
+        lines.append(
+            "- Inspect failed eval reports against the active contract and producer; "
+            "a failed report alone does not identify a prompt defect."
+        )
     if summary.hook_counts.failures:
         lines.append(
-            "- Group hook failures by `failure_fingerprint` and fix the highest-repeat tool or OOP boundary first."
+            "- Inspect repeated hook failure fingerprints to locate the concrete "
+            "cause before choosing an in-scope repair."
         )
     if summary.hook_counts.failure_targets:
         lines.append(
-            "- Start concrete repairs from `Top Failure Repair Targets`; those are the files currently blocking hook/tool runs."
+            "- Observed Failure Targets are affected inputs, not established cause "
+            "locations; trace the failing operation to its responsible code."
         )
     if summary.hook_counts.checker_targets:
         lines.append(
-            "- Review repeated code-checker target files and decide whether the tool, skill, or target code owns the repair."
-        )
-    if skill_routing_gap_lines(summary.hook_counts) != ["- none"]:
-        lines.append(
-            "- Repair skill-selection routing for skills with high candidate or feedback pressure but low selected-skill evidence."
+            "- Inspect repeated checker targets against the selected contract; "
+            "decide whether the tool, skill, or target code owns the cause."
         )
     if summary.hook_counts.quality:
         lines.append(
-            "- Treat hook quality counters as instrumentation debt; repair unknown events, empty skill signals, or missing workflow monitor events."
+            "- Treat missing or historical fields as observability limits until "
+            "the producing contract establishes that those fields were required."
         )
     if not lines:
-        lines.append("- No immediate private-knowledge/eval/hook/Issue improvement target was detected.")
-    lines.append(
-        "- Local Codex should make the actual skill/workflow/tool edits and attach validation evidence."
-    )
+        lines.append(
+            "- No failing eval or hook evidence was found in the scanned inputs."
+        )
     return lines
 
 
@@ -904,58 +910,6 @@ def counter_lines(counter: Counter[str]) -> list[str]:
         f"- `{name}`: `{count}`"
         for name, count in counter.most_common(MAX_COUNTER_LINES)
     ]
-
-
-def skill_feedback_counts(feedback_targets: Counter[str]) -> Counter[str]:
-    """Return feedback target counts keyed by skill id."""
-    counts: Counter[str] = Counter()
-    for target, count in feedback_targets.items():
-        if target.startswith("skill:"):
-            counts[target.removeprefix("skill:")] += count
-    return counts
-
-
-def skill_routing_gap_lines(counts: HookEvidenceCounts) -> list[str]:
-    """Return bullets for skills whose candidate/feedback pressure exceeds selection."""
-    feedback = skill_feedback_counts(counts.feedback_targets)
-    rows: list[tuple[int, str, int, int, int]] = []
-    for skill in set(counts.candidate_skills) | set(feedback) | set(counts.skills):
-        selected = counts.skills[skill]
-        candidate = counts.candidate_skills[skill]
-        feedback_count = feedback[skill]
-        pressure = candidate + feedback_count
-        gap = max(pressure - selected, 0)
-        if gap:
-            rows.append((gap, skill, selected, candidate, feedback_count))
-    if not rows:
-        return ["- none"]
-    return [
-        (
-            f"- `{skill}`: gap=`{gap}` selected=`{selected}` "
-            f"candidate=`{candidate}` feedback=`{feedback_count}`"
-        )
-        for gap, skill, selected, candidate, feedback_count in sorted(rows, reverse=True)[
-            :MAX_COUNTER_LINES
-        ]
-    ]
-
-
-def protocol_feedback_lines(summary: EvidenceSummary) -> list[str]:
-    """Return required protocol-feedback guidance from accumulated evidence."""
-    lines = [
-        "- required_tokens: `hook_tool_feedback=reviewed`, `parent_protocol_update=<applied|recorded|not_required>`, `subagent_protocol_update=<applied|recorded|not_required>`, `protocol_feedback_reason=...`",
-    ]
-    if (
-        summary.hook_counts.failures
-        or summary.hook_counts.quality
-        or summary.failed_skill_eval_reports
-    ):
-        lines.append(
-            "- next_repair_branch: record the parent/subagent protocol decision in `workflow_monitoring.md` with `tools/runtime/lifecycle/workflow_monitor.py`."
-        )
-    else:
-        lines.append("- current_evidence: no failing hook, hook-quality, or skill-eval signal requires protocol repair.")
-    return lines
 
 
 def main() -> int:

@@ -39,10 +39,10 @@ to a fresh external directory and records the source commit and bundle digest.
 
 | Source view | Responsibility | Materialization rule |
 | --- | --- | --- |
-| `templates/agents/` | task-start、run bundle、review、closeout の artifact template | AgentCanon source 内で agent team が render する |
-| `templates/documents/` | README、design、experiment、host、remote execution、GitHub source | standalone AgentCanon target と source を同時に更新する |
-| `templates/code/` | parse-valid module/class/function と Docstring の materializable source | source-owned renderer が destination owner へ materialize する |
-| `templates/experiments/_template/` | runnable experiment scaffold の frozen source | source-owned experiment command が新規 topic へ copy する |
+| [templates/agents/](agents/README.md) | task-start、run bundle、review、closeout の artifact template | AgentCanon source 内で agent team が render する |
+| [templates/documents/](documents/README.md) | README、design、experiment、host、remote execution、GitHub source | standalone AgentCanon target と source を同時に更新する |
+| [templates/code/](code/README.md) | parse-valid module/class/function と Docstring の materializable source | source-owned renderer が destination owner へ materialize する |
+| [templates/experiments/_template/](experiments/_template/README.md) | runnable experiment scaffold の frozen source | source-owned experiment command が新規 topic へ copy する |
 | `templates/agents/_partials/` | reader map、review contract、finding/decision の再利用部品 | top-level agent artifact の render 時だけ展開する |
 
 ## Default Consumer Export Boundary

@@ -8,6 +8,7 @@ upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
+upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first refactor precedence and abstraction admission
 upstream design ./agent-orchestration.md write-capable handoff validation trust boundary and work-conservation owner
 upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py emits design evidence findings for refactor plans
@@ -39,6 +40,12 @@ abstraction admission は [documents/conventions/software-engineering-principles
 ## Purpose
 
 大きめの refactor を、feature 追加ではなく挙動保存つきの再編として扱います。
+
+通常の置換・統合と重複旧実装の廃止に
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+を適用します。差分量ではなく SEP-06 の完成後のコードスペースを基準に設計し、不要な旧コードの
+削除と必要な usage-surface repair を同じ修正で閉じます。別の廃止依頼や利用者ゼロを待たず、
+無関係な改善は加えません。挙動保存は旧実装・旧構造の温存を意味しません。
 
 ## Software Engineering Principle Route
 
@@ -75,11 +82,12 @@ refactor-loop は親 packet または変更後 responsibility graph が明示し
 
 共有 module、canonical tool、親 repository、consumer projection が同じ
 topology を構成する refactor は、次の順序を正本とします。
+RC-09 の置換・廃止でも、変更によって影響する利用側はこの手順に含めます。
 
 1. user-facing consumer / parent で完成形を先に確定する。責務、パス、所有境界を
-   明示し、その完成構造を materialize する。
+   明示する。
 2. shared module / canonical source/tool を、完成形を生成・維持するように一括実装する。
-3. 他の consumer projection を完成形へ移行する。
+3. 依存を辿り、影響する consumer / parent / projection を完成形へ移行・materialize する。
 4. checker / CI を完成形の観測可能な意味的性質へ更新し、旧 topology の固定を削除する。
 5. consumer、canonical tool、projection、checker / CI を含む最終 topology をまとめて検証する。
 
@@ -174,9 +182,11 @@ or writing.
 1. API 形状と構造を変える refactor は two-stage refactor として扱います。
    stage 1 は `forced migration` で、canonical surface、旧 entry、alias、
    wrapper、config route、generated surface の移動または削除をまとめて行います。
+   置換で不要になった旧コード・専用補助コードは RC-09 により移動ではなく削除します。
    stage 2 は `usage-surface repair` で、caller、docs、workflow、skill、hook、
    config、report consumer を新しい surface に合わせます。test、smoke、
    behavior execution は二段完了後の return-gate validation に集約します。
+   RC-09 でも必要な利用側修正を stage 2 に含め、残存参照のエラーだけで完了としません。
 1. 実装前に `Targets To Change:` として、変更する target trace を列挙します。
    実在する関数、method、class は `path:start-end:qualname`、cohesive な
    source region、behavior unit、responsibility unit は `path:start-end:region-id`
@@ -257,6 +267,7 @@ trace、behavior contract、latest diff を渡します。OOP の数値や findi
 Stopping、logging、runtime tolerance、preconditioner など、複数 algorithm
 から参照される policy / base abstraction を一本化する refactor では、依存先を
 先に個別修正しません。最初の slice は正本 surface の確定に使います。
+RC-09 でも、以下の必要な利用側更新は正本化と同じ修正責務に含めます。
 
 1. `Canonical Surface:` として、責務を持つ module、public object、Info / State
    / SolveConfig ownership、既存 primitive helper の扱いを固定します。
@@ -544,6 +555,11 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
 ## Runtime Contract Clauses
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+For implementation replacement, consolidation, or duplicate retirement, apply
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+and [Purpose](#purpose): minimize the final maintained code space, remove superseded code, and
+complete necessary consumer migration together. Do not wait for a separate retirement request or
+zero callers. Stop propagation at unchanged contracts, not at initially named files.
 
 1. Start from the dependency-expanded scope, not from the initially mentioned
    file. The editable candidate set is every file returned by dependency
@@ -597,10 +613,13 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Run API-shaping and structure refactors as a two-stage refactor:
    `forced migration` first, then `usage-surface repair`. The first stage
    moves or removes the canonical surface, legacy entry, alias, wrapper,
-   config route, and generated surface as one structural migration. The second
+   config route, and generated surface as one structural migration. Under RC-09,
+   remove superseded code and its exclusive support rather than relocating it. The second
    stage updates every caller, document, workflow, skill, hook, config, and
    report consumer that uses the moved surface. Put test, smoke, and behavior
    execution in return-gate validation after both stages are complete.
+   RC-09 also requires the affected consumer repairs; remaining-reference errors
+   do not complete the second stage.
 1. Explicitly list every target trace being changed before editing. Use
    `path:start-end:qualname` for actual functions, methods, and classes, or
    `path:start-end:region-id` for cohesive source regions, behavior units, and
