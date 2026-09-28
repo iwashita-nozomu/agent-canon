@@ -15,9 +15,9 @@ downstream implementation ../../tools/agent/skills/skill_dependency_map.py valid
 -->
 
 このディレクトリは、public Codex skill 文書の人間向け正本です。
-機械 discovery 用の `SKILL.md` は `.codex/personal/skills/` に materialize します。
-この view は source checkout の編集用で、Codex の global discovery は
-`~/.agents/skills/` から個別リンク経由で行います。
+機械 discovery 用の `SKILL.md` は `.codex/personal/skills/` に生成し、手編集しません。
+Codex は `~/.agents/skills/` の管理された directory link 経由で読みます。
+正本・生成先・repository 固有の入口の区別は [Skill Paths](../canonical/skills.md#skill-paths) を参照します。
 
 ## Visualization Ownership
 
@@ -38,7 +38,7 @@ or copy the universal omission/granularity policy into adapter entries.
   Skills define boundaries and maintenance.
 - Use when: adding, routing, reviewing, or explaining public AgentCanon skills.
 - Boundary: long skill behavior belongs in each `agents/skills/<skill>.md` and
-  runtime discovery belongs in `.codex/personal/skills/<skill>/SKILL.md`.
+  generated adapters are separate from [Codex discovery entries](../canonical/skills.md#skill-paths).
 
 ## Rules
 
@@ -58,8 +58,8 @@ or copy the universal omission/granularity policy into adapter entries.
 ## Skill Visibility Naming
 
 ユーザー向け skill 名は `research-workflow` のような plain hyphen-case を使います。
-catalog に登録し、この directory に文書化し、`.codex/personal/skills/<skill>/SKILL.md`
-から公開し、`.codex/config.toml` で有効化します。
+catalog に登録し、この directory に文書化します。生成 adapter は bootstrap の
+管理リンクから公開し、`.codex/config.toml` に同じ inventory を列挙しません。
 
 runtime-internal skill shim は `_runtime-helper` のように先頭 underscore を使います。
 owner surface は public catalog、public table、`.codex/config.toml` ではなく、呼び出し元の
@@ -102,7 +102,7 @@ GPU profile の admission semantics は [`gpu-execution`](gpu-execution.md) に�
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
 - artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、[documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md) の責務に寄せます。
-- `.codex/personal/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim を同じ変更で追加します。bootstrap が `~/.agents/skills/<skill>` をこの view にリンクするため、列挙 config は追加しません。
+- `.codex/personal/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim を同じ変更で追加します。bootstrap が `~/.agents/skills` directory をこの生成 view にリンクするため、列挙 config は追加しません。
 - [agent orchestration](agent-orchestration.md) は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
 - [subagent bootstrap](subagent-bootstrap.md) は public skill として出し、repo-changing task の stage separation で使います。
 - carry-over の吸い上げは `documents/notes/` と worktree log を正本にし、独立 public skill にはしません。
@@ -124,11 +124,10 @@ in the Codex host runtime.
 
 ## Codex Defaults
 
-- AgentCanon public skills are discovered automatically from
-  `.codex/personal/skills/<skill>/SKILL.md`; `.codex/config.toml` does not duplicate the
-  catalog as a second registry.
-- Parent repositories add repo-specific skills only through an official
-  parent- or subtree-owned `.codex/personal/skills/<skill>/SKILL.md` surface.
+- AgentCanon public skills use the installed `~/.agents/skills/` entry; generated
+  adapters and native discovery remain separate as defined in [Skill Paths](../canonical/skills.md#skill-paths).
+- Parent repositories add repo-specific skills through their own
+  `.agents/skills/<skill>/SKILL.md`, including subtree-owned skills.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では [AGENTS.md](../../AGENTS.md) と [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) を先に読み、repo task の skill 選択は [`$agent-orchestration`](agent-orchestration.md) から始めます。
 - task ごとの skill 選択は `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。編集を明示的に許可する場合だけ `--mode repo-changing` を渡し、prompt 語彙で mode を拡張しません。依存 module の source clone、lifecycle、cleanup が scope の場合は [`$dependency-module-change`](dependency-module-change.md) を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
@@ -191,5 +190,5 @@ in the Codex host runtime.
 
 1. `agents/skills/<family>.md` を更新する
 1. `agents/skills/catalog.yaml` を更新する
-1. `.codex/personal/skills/<family>/SKILL.md` を更新する
+1. 既存の [bootstrap / materializer 経路](../../README.md#source-and-artifact-boundary) で生成 adapter を更新する。`SKILL.md` は手編集しない
 1. 必要なら [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) と [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) の routing を更新する
