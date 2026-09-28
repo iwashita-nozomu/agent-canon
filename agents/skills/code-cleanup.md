@@ -23,15 +23,15 @@ downstream implementation ../../.codex/config.toml host skill configuration
 public/module responsibility と到達性を一つの cleanup unit として閉じ、既存の
 `dependency-analysis -> refactor-loop -> change-review` route に渡します。unit schema、
 analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup`](../../documents/design/responsibility-cleanup.md)
-の RC-02、RC-04、RC-07、RC-08 を参照します。重複旧実装の廃止は
+の RC-02、RC-04、RC-07、RC-08 を参照します。通常の置換・統合と重複旧実装の廃止は
 [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-に従い、削除と必要な利用側移行を閉じます。無関係な consumer の一括変更は加えません。
+に従い、旧コードの削除と必要な利用側移行を同じ修正で閉じます。
 
 ## Use When
 
 - public API、module responsibility、consumer reachability、dependency closure を整理する
 - analyzer finding を候補として調査し、実装 owner と refactor boundary を確定する
-- behavior-preserving refactor または明示された重複旧実装の廃止の後に findings-first review を行う
+- 実装の置換・統合・廃止を、不要な旧コードの削除と findings-first review まで閉じる
 
 ## Route
 
@@ -61,11 +61,9 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    block ごとに読み、各寄与を数学的・domain 上の意味、invariant、state transition、side effect、I/O、
    reachable caller / consumer として既存 handoff または review context に対応付ける。
    [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-   により既存正本との重複が確認され廃止対象となった旧実装・旧入口は、active caller が
-   残っていても同じ pass で削除する。未使用コードは到達性と副作用を確認して別に判断し、
-   独自責務や未確認の意味が残る候補は重複扱いしない。全寄与の判断が閉じた場合だけ
-   file 全体を削除し、全 file の監査や追加 review は待たない。旧参照の通常エラーは
-   移行漏れの信号として利用側修正へ繋ぎ、wrapper、fallback、alias、互換実装を戻さない。
+   に従い、通常の置換でも不要になる旧実装・入口・専用補助コードを同じ pass で削除する。
+   別の廃止依頼、active caller ゼロ、後続 cleanup を待たない。独自責務、未確認の意味、
+   公開互換契約の判断と必要な利用側移行は同じ RC-09 を使い、ここへ規則を複製しない。
 4. 数値コードを削除・置換する前に equations、units、state、stopping rule、convergence contract、
    failure semantics を復元する。未解決の数学的意味は既存の semantic math owner に戻し、architecture、
    compiler、JIT の変更で吸収しない。
@@ -80,11 +78,12 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    candidate の `reject` はその不足を満たせない根拠で判断し、既に満たす部分まで
    捨てない。実在しない candidate や synthetic な `reject` は作らない。
 6. approved mechanism を `refactor-loop` へ渡し、同じ serialized `reuse_survey` と
-   tests を各 write-capable child と read-only reviewer に伝播する。RC-09 でも旧入口の
-   廃止と必要な usage-surface repair を含め、子 prompt 側で disposition を再構築しない。
+   tests を各 write-capable child と read-only reviewer に伝播する。置換・廃止とも RC-09 の
+   削除と必要な usage-surface repair を含め、子 prompt 側で disposition を再構築しない。
 7. `change-review` で current snapshot、reachable path、contract、witness と
-   worker packet と同一の asset/disposition/test-path evidence を readback する。targeted
-   validation は各行ではなく owning-unit boundary で一度だけ実行する。
+   worker packet と同一の asset/disposition/test-path evidence を readback し、置換後の tree に
+   不要な旧コードが残っていないか確認する。targeted validation は各行ではなく
+   owning-unit boundary で一度だけ実行する。
 
 再利用先の比較は今回の責務に限り、contract を満たす選択が決まれば終える。全 library の
 網羅調査、provider 内部の再監査、調査用の依存導入を追加しない。置換時の検証は既存の

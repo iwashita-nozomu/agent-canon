@@ -53,12 +53,26 @@ report the concrete conflict and unfinished migration, not a generic API veto,
 and continue independent authorized work. Do not preserve obsolete implementations
 through wrappers or dual paths without a required compatibility contract.
 
-Prefer the simplest complete use of existing APIs. Put necessity, mathematical
-or engineering grounds, and rejected simpler alternatives in the owning design
-before code/API changes. Inspect real callers, APIs, configuration, and extension
-points; keep caller orchestration separate from reusable-library responsibility.
-Add mechanisms, dependencies, exact pins, or guards only for an evidenced current
-need, not speculation. Preserve native resolution and required integrity checks.
+ Before implementation, locate existing abstractions and settle reuse, extension,
+ or an evidence-backed responsibility gap in the owning design, including for
+ private helpers and in-file additions. Trace responsibilities, callers, and
+ dependencies; read the relevant APIs, configuration, and extension points.
+ A failed name search is not absence. Reuse sufficient current evidence; defer
+ only the affected implementation while that decision is unresolved. Minimize
+ maintained code space after the change, not the diff. Prefer the simplest
+complete use of existing APIs; replacement includes deleting superseded code and
+obsolete support in the same owning unit, not a later cleanup. Put necessity,
+mathematical or engineering grounds, and rejected simpler alternatives in the
+owning design before code/API changes. Inspect real callers, APIs, configuration,
+and extension points; keep caller orchestration separate from reusable-library
+responsibility. Add mechanisms, dependencies, exact pins, or guards only for an
+evidenced current need, not speculation. Preserve native resolution and required
+integrity checks.
+ Record necessity, mathematical or engineering grounds, and rejected simpler
+ alternatives before code/API changes; keep caller orchestration separate from
+ reusable-library responsibility. Add mechanisms, dependencies, exact pins, or
+ guards only for an evidenced current need, not speculation. Preserve native
+ resolution and required integrity checks.
 When an existing dependency contract requires an exact pin, only execution that
 needs a dependency change uses a published PR commit through that consumer-owned
 pin; otherwise use the consumer's declared resolution.
