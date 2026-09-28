@@ -56,9 +56,19 @@ For a program execution request, use this order:
 2. If it succeeds, continue the task without route diagnosis. If it fails, keep
    the exact command, output, exit/signal, and execution plane. An entrypoint
    rejection is failure evidence even when the program did not start; do not
-   replay it merely to obtain another failure record.
+   replay it merely to obtain another failure record. Shared cwd, hostname, or
+   checkout does not prove parent/worker execution equivalence. Keep a worker's
+   access failure scoped to that worker, not a host outage or test assertion.
+   Preserve observed parent success as counterevidence, not proof of worker repair.
 3. Use that failure to inspect only the route facts needed to locate the problem.
    A program assertion or test failure is not by itself an environment defect.
+   When isolation is implicated, compare relevant effective sandbox/approval,
+   groups/namespaces, and socket visibility/access without dumping credentials.
+   Trace the effective setting through the actual runtime version, launch, and
+   loaded configuration to its concrete owner; generated defaults alone do not
+   prove which override ran. Repair confirmed causes and affected generated
+   consumers at that owner, not through parent-only test substitution or weakened
+   permissions. Reuse existing evidence; this is not a startup probe checklist.
    Stop diagnosis when the relevant decision is resolved; repair and any retry
    still require the existing scope, authority, and rerun allowance.
 

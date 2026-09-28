@@ -63,6 +63,9 @@ Optional document topology planning does not make this step optional.
    or an explicitly identified retained record. Do not silently omit facts to
    shorten the response. Unrun is not passed, partial validation is not complete
    validation, and a document edit is not evidence of runtime behavior.
+   For parent/worker execution failures, preserve process-local scope and
+   counterevidence through the existing [execution diagnosis owner](../canonical/ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis);
+   do not generalize a child's access failure into a host/environment defect.
 4. Before drafting, [choose the presentation](#choose-the-presentation) from this
    structure. Write to the applicable, authorized destinations in the current task.
    Adapt presentation, not facts or their limits. For Issue-backed work, leave
