@@ -4471,6 +4471,12 @@ bootstrap_host_entrypoint() {
       _agent_canon_use_active_image "$(_agent_canon_container_name)"
       local codex_container codex_prepare_rc=0
       codex_container=$(_agent_canon_ensure_container)
+      # The source checkout may have advanced since install/update. Refresh the
+      # complete ignored skill view before Codex reads any discovery entry.
+      _agent_canon_run_controller "$codex_container" update || codex_prepare_rc=$?
+      ((codex_prepare_rc == 0)) || return "$codex_prepare_rc"
+      _agent_canon_sync_personal_skill_view "$codex_container" || codex_prepare_rc=$?
+      ((codex_prepare_rc == 0)) || return "$codex_prepare_rc"
       _agent_canon_run_controller "$codex_container" codex prepare || codex_prepare_rc=$?
       ((codex_prepare_rc == 0)) || return "$codex_prepare_rc"
       _agent_canon_volume_copy export codex-home "$AGENT_CANON_STATE_ROOT/codex-home"
