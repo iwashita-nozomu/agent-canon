@@ -30,9 +30,14 @@ new activation condition, or instruction to restart the workflow.
 
 Required means applicable to the selected action, not mandatory on every run.
 Do not reread AGENTS, enumerate all Skills, or load every packet/phase to start.
-Select additional context only through [its read conditions](CODEX_INTAKE.md#optional-context).
-An already resolved owner, route, and validation need no new routing pass.
-Keep them through retries and handoffs. For an actual execution failure or an
+Select additional context through [its read conditions](CODEX_INTAKE.md#optional-context)
+and the active Skill's conditional links, including during implementation and validation.
+When such a condition becomes true, read the linked Skill before the dependent
+decision or action, then return to the interrupted phase. Reuse still-valid reads;
+do not preload all related Skills or treat initial selection as permanently fixed.
+An already resolved owner, route, and validation need no new routing pass;
+only newly unresolved selection uses the routing row above.
+Keep resolved decisions through retries and handoffs. For an actual execution failure or an
 authorized route change, read only
 [Configured execution and bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis);
 do not restart routing or invent another procedure.
