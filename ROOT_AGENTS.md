@@ -21,8 +21,10 @@ subtree-owned instructions, never copies of parent, workflow, or Skill policy.
 
 Use the applicable repository's specific instructions and selected owner.
 Read only details needed for the current action; indexes, links, and dependency
-metadata are not full-reading obligations. Reuse unchanged context. Keep all
-auto-loaded instructions short; place procedures in conditionally read files.
+metadata are not full-reading obligations. Reuse unchanged context. Keep each
+file focused on a responsibility and its activation condition; route independently
+needed details to their owner at the point of use, not a startup reading list.
+Keep auto-loaded instructions short and shared constraints self-contained.
 
 ## Always-On Boundary
 
@@ -31,48 +33,37 @@ is not abandonment: inspect Git inconsistencies, repair within task authority,
 or hand off preserved state with a concrete owner/action. Unfamiliar diffs or
 absent separate instructions do not waive this duty; dirty is not itself
 inconsistent. Preserve the required problem class, valid inputs, guarantees, and
-failure semantics; neither
-small diffs nor completeness justify shortcuts or unrelated work. Follow the
-selected owner rather than inventing a fallback, wrapper, or policy copy.
+failure semantics; neither small diffs nor completeness justify shortcuts or
+unrelated work. Follow the selected owner rather than inventing a fallback,
+wrapper, or policy copy.
 
-Root dependency fixes include necessary API changes and consumer migration.
-Fix the root, trace affected uses, and repair them; API preservation or active
-use is not a veto or a reason to retain the old path. Bound work by changed
-contracts, not the initially named files.
+A requested root fix includes necessary public API replacement, removal, or
+unavoidable addition and affected consumers, tests, and documentation. Fix the
+root, then trace and repair affected uses; bound work by changed contracts, not
+the initially named files. API preservation or active use is not a veto or a
+separate-approval requirement. Respect explicit compatibility constraints and
+actual authority/access limits; report concrete conflicts and unfinished migration
+while continuing independent authorized work. Unrelated or speculative API
+additions still require explicit authorization.
 
-A requested fix authorizes the public API changes necessary to complete it
-(including replacement, removal, or unavoidable addition), together with the
-affected consumers, tests, and documentation; do not require separate approval
-solely because the API changes. First investigate existing APIs, configuration,
-extensions, standard facilities, and adopted dependencies on the premise they
-suffice. Use them when they do; otherwise record candidates, source evidence,
-the unmet contract, and why composition fails in the owning design before editing.
-Unrelated or speculative API additions still require explicit authorization.
-Respect explicit compatibility constraints and actual authority/access limits;
-report the concrete conflict and unfinished migration, not a generic API veto,
-and continue independent authorized work. Do not preserve obsolete implementations
-through wrappers or dual paths without a required compatibility contract.
+Before implementation, including private helpers and in-file additions, locate
+existing abstractions, callers, dependencies, APIs, configuration, extension points,
+standard facilities, and adopted dependencies on the premise they suffice. Settle
+reuse, composition, extension, or an evidenced responsibility gap in the owning
+design before editing. Use sufficient existing facilities; otherwise record
+candidates, source evidence, the unmet contract, and why composition fails there.
+Keep necessity, mathematical or engineering grounds, and rejected simpler
+alternatives in that design before code/API changes. A failed name search is not
+absence. Reuse current evidence; unresolved capability defers only the affected
+implementation.
 
- Before implementation, locate existing abstractions and settle reuse, extension,
- or an evidence-backed responsibility gap in the owning design, including for
- private helpers and in-file additions. Trace responsibilities, callers, and
- dependencies; read the relevant APIs, configuration, and extension points.
- A failed name search is not absence. Reuse sufficient current evidence; defer
- only the affected implementation while that decision is unresolved. Minimize
- maintained code space after the change, not the diff. Prefer the simplest
-complete use of existing APIs; replacement includes deleting superseded code and
-obsolete support in the same owning unit, not a later cleanup. Put necessity,
-mathematical or engineering grounds, and rejected simpler alternatives in the
-owning design before code/API changes. Inspect real callers, APIs, configuration,
-and extension points; keep caller orchestration separate from reusable-library
-responsibility. Add mechanisms, dependencies, exact pins, or guards only for an
-evidenced current need, not speculation. Preserve native resolution and required
-integrity checks.
- Record necessity, mathematical or engineering grounds, and rejected simpler
- alternatives before code/API changes; keep caller orchestration separate from
- reusable-library responsibility. Add mechanisms, dependencies, exact pins, or
- guards only for an evidenced current need, not speculation. Preserve native
- resolution and required integrity checks.
+Minimize maintained code space, not the diff. Prefer the simplest complete use
+of existing APIs; replacement includes deleting superseded code and obsolete
+support in the same owning unit, not later cleanup. Retain wrappers or dual paths
+only for a required compatibility contract. Keep caller orchestration separate
+from reusable-library responsibility. Add mechanisms, dependencies, exact pins,
+or guards only for an evidenced current need; preserve native resolution and
+required integrity checks.
 When an existing dependency contract requires an exact pin, only execution that
 needs a dependency change uses a published PR commit through that consumer-owned
 pin; otherwise use the consumer's declared resolution.
@@ -142,30 +133,23 @@ comparable reasoning and results on the Issue.
 
 Use the validation route owned by the changed repository-specific responsibility.
 Examples or commands in another owner are not a universal checklist.
-Run the repository's configured formatter every time an editing batch ends,
-before final validation, staging, commit, PR publication, or handoff. Formatting
-is part of the edit, not optional repair after lint fails. Small changes,
-documentation-only changes, and already tidy-looking files are not exemptions.
-Run it on the task's edited files, review the resulting diff, and include it in
-the submitted change. Repeat after any later edit, generation, fixer, or conflict
-resolution; a previous run does not cover new content. A combined command that
-actually formats those final files satisfies this step. Tests, check-only lint,
-and an editor's format-on-save setting alone do not demonstrate that it ran.
-Read-only work does not need a formatter run. Preserve unrelated or user-owned
-changes and the repository's existing formatting scope; do not reformat the
-whole repository for a bounded task.
+Run the repository's configured formatter on edited files whenever an editing
+batch ends, before final validation, staging, commit, PR publication, or handoff;
+review and include its diff. Repeat after edits, generation, fixers, or conflict
+resolution. Small, documentation-only, and tidy-looking changes are not exemptions;
+read-only work needs no run. A combined operation that formats the final files
+satisfies this rule; tests, check-only lint, static inspection, or format-on-save
+settings alone do not. Preserve unrelated/user-owned changes and the owner's
+formatting scope; do not reformat the whole repository for a bounded task.
 
-Use tracked, tool-native settings selected by the repository owner rather than
-personal defaults or ad-hoc command overrides. Do not introduce a formatter,
-configuration, or hook during unrelated work; an explicit formatting-configuration
-request may establish or change them at their owner. If no formatter is
-configured, record that fact rather than silently choosing one. Do not add an
-environment probe, wrapper, or new validation gate merely to enforce this rule.
-Record the actual formatting command, target files, and result in the existing
-Issue / PR validation record or task result, including successful runs. If the
-selected formatter fails or cannot run, record the failure and affected scope;
-hand off as unverified, not as formatting-complete.
-Do not silently skip it or report static inspection as formatter execution.
+Use tracked, tool-native owner settings, not personal defaults or ad-hoc overrides.
+Do not introduce a formatter, configuration, or hook during unrelated work;
+explicit formatting-configuration requests may establish or change them. Add no
+probe, wrapper, or validation gate to enforce this rule. Record the actual
+command, target files, and result, including success, in the existing Issue/PR
+or task record. If no formatter is configured,
+record that fact without choosing one. If it fails or cannot run, record the
+failure and affected scope and hand off as unverified, not formatting-complete.
 
 Validate the changed contract and its failure semantics, then use that owner's
 closeout route when required. A generated consumer root file does not authorize

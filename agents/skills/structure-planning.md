@@ -5,6 +5,7 @@ contract skill
 responsibility Plans document/artifact topology only when owner, reader, source-of-truth, split/merge, or validation topology is genuinely undecided.
 upstream design ../../documents/design/responsibility-rationale.md structure and visualization activation rationale
 upstream design ../../documents/rule/README.md document rule canon
+upstream design ../../documents/conventions/common/05_docs.md document responsibility and reading-activation boundary
 upstream design ../../documents/design/README.md design canon reader route
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 downstream implementation ../../.codex/personal/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
@@ -17,14 +18,14 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 
 Use `structure-planning` only when the task contains a real structural decision: a responsibility owner, canonical source, reader entry, document split/merge, section topology, presentation/storyboard topology, or validation route has more than one plausible target. A bounded claim, wording, link, paragraph, or already-owned section edit does not activate this skill merely because it is substantive.
 
-The long-lived reason and activation boundary are owned by [documents/design/responsibility-rationale.md](../../documents/design/responsibility-rationale.md). This skill owns the selected structural decision; it does not create evidence that an unselected responsibility was skipped.
+The long-lived reason and activation boundary are owned by [structure rationale](../../documents/design/responsibility-rationale.md#structure-planning-and-visualization). This skill owns the selected structural decision; it does not create evidence that an unselected responsibility was skipped.
 
 ## Activation
 
 Activate when at least one of these changes:
 
 - owner or canonical source of truth;
-- reader entry or downstream consumer;
+- reader entry, reading activation condition, or downstream consumer;
 - document split/merge/rename or section responsibility boundary;
 - validation topology or update cadence;
 - artifact/storyboard ordering where competing structures affect the reader decision.
@@ -46,7 +47,12 @@ invalid_interpretations=<material forbidden readings>
 validation_route=<owner/check>
 ```
 
-Add a split/merge decision only when a split/merge is in scope. Split on a real owner, reader, source, validation, cadence, or consumer boundary; never split for token budget, length, section count, or temporary work-queue convenience.
+When a document split/merge is in scope, read only
+[Document Split Decision](../../documents/conventions/common/05_docs.md#document-split-decision).
+Identify the task/operation that needs each responsibility, the existing owner,
+and the caller's conditional route in the selected topology. Independent reading
+conditions can separate responsibilities even under one owner; size alone cannot.
+Keep the decision in the existing structure record, not a new receipt or registry.
 
 ## Visualization selection
 
