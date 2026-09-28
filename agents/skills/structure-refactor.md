@@ -9,6 +9,8 @@ upstream design ../../documents/design/responsibility-rationale.md drift repair,
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design refactor-loop.md behavior-preserving refactor loop
+upstream design structure-planning.md unresolved responsibility and reader-route decisions
+upstream design ../../documents/conventions/common/05_docs.md document responsibility and reading-activation boundary
 upstream design dependency-analysis.md dependency and change-impact packets
 upstream design prose-reasoning-graph.md optional graph-backed prose diagnostics
 downstream implementation ../../.codex/personal/skills/structure-refactor/SKILL.md exposes this workflow as a runtime skill
@@ -31,13 +33,26 @@ When all of these are known—canonical owner, expected state, canonical repair 
 
 Examples include a stale generated/root view or a known missing projection with an existing sync owner. Do not require a full structure-repair packet or a negative receipt for this path.
 
-Escalate to full structure planning only when ownership/source is ambiguous, sources are mixed, responsibilities overlap, multiple target layouts are plausible, or the repair would otherwise create a second source of truth.
+When ownership/source is ambiguous, sources are mixed, responsibilities overlap,
+multiple target layouts are plausible, or a repair would create a second source
+of truth, read [structure-planning](structure-planning.md#minimal-structure-decision) for that
+unresolved boundary; do not turn a known repair into a full planning exercise.
 
 ## Review scope
 
 Default review scope is the changed subtree plus affected direct consumers/reverse edges and the owner boundary. Expand to recursive full-tree inventory only when root ownership changes, a broad move crosses scopes, or concrete evidence indicates overlap, an uncovered path, or broken reverse edges.
 
 Unrelated stale findings do not automatically become acceptance blockers for a bounded refactor; route durable residuals to their owner.
+
+## Overloaded documents
+
+When a file couples independently needed responsibilities and causes unrelated
+reading, apply [Document Split Decision](../../documents/conventions/common/05_docs.md#document-split-decision).
+Locate the exact mixed sections and incoming reader routes, then move details to
+their existing owner and remove the old copy. Update affected callers with a
+condition and direct section link; do not replace one large read with mandatory
+reads of every split file. Review representative applicable and inapplicable
+routes, including a mid-task change of responsibility, without a full-tree audit.
 
 ## README and prose diagnostics
 
