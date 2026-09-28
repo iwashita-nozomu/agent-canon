@@ -7,9 +7,9 @@ responsibility Owns detailed source-side implementation and numerical decision g
 upstream design ../../AGENTS.md conditional source reader map
 upstream design ../../ROOT_AGENTS.md portable common boundaries
 upstream design ../../documents/design/entrypoint-owner-map.md source and consumer split contract
- upstream design ../../documents/conventions/software-engineering-principles.md maintained code-space objective and abstraction admission
- upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
- upstream design ../../documents/conventions/software-engineering-principles.md reuse feasibility decision owner
+upstream design ../../documents/design/api-surface-traversal-policy.md traversal and API change rationale
+upstream design ../../documents/conventions/software-engineering-principles.md maintained code-space objective, abstraction admission, and reuse feasibility decision owner
+upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 @dependency-end
 -->
 
@@ -75,37 +75,39 @@ gate to enforce this objective.
 
 ## Public API additions
 
-Do not add or extend a public API without an explicit user request or approval
-covering that public change. This includes exported or re-exported functions,
-types and methods, endpoints, and supported parameters or CLI commands/options.
-A general feature, bug-fix, or cleanup request is not authorization to enlarge
-the public contract. Reuse an already explicit authorization without asking
-again, but do not treat authorization as a waiver of the investigation below.
+Do not stop a requested fix to preserve an existing API or ask for separate
+approval solely because the fix changes its public shape. The request covers
+necessary replacement, removal, signature changes, and unavoidable additions,
+with affected consumer migration, not unrelated features or speculative exports.
+An explicit compatibility requirement remains a constraint; do not invent one
+from active use, existing tests, or public visibility.
 
-Before designing or implementing a public API addition, investigate on the
-premise that existing capabilities can satisfy the requirement. Inspect actual
-callers and the relevant current APIs and documentation, including
-configuration and extension points, standard facilities, and adopted
-dependencies. Evaluate direct use, configuration, and composition before
-proposing a new public surface. Not finding the proposed name, not having
-investigated, preferring different arguments or placement, or anticipating
-future reuse is not evidence of a missing capability. Bound the investigation
-to the required behavior and related owners; stop when evidence is sufficient
-to decide. Unavailable evidence remains unknown, not proof that a capability is
-absent or permission to add an API.
+Before implementation, use [API surface traversal](../../documents/design/api-surface-traversal-policy.md)
+to inspect current abstractions, real callers, APIs, configuration, extension
+points, standard facilities, and adopted dependencies. Reuse sufficient current
+findings; not finding a name or preferring another signature is not a capability
+gap. If direct use or composition suffices, use it without a new API. Otherwise,
+record the candidates, source evidence, unmet contract, and necessary owner/API
+change in the existing design, then implement it within the requested scope.
+Unknown capability remains unknown; it neither justifies speculative additions
+nor blocks independent authorized work.
 
-When existing capabilities meet the required contract, use them without adding
-an API. Otherwise, record the examined candidates and source references, the
-concrete unmet contract, and why direct use or composition cannot meet it in
-the existing design rationale described below; propose only the smallest
-necessary public change. A demonstrated gap establishes necessity, not
-authorization. Public contracts add compatibility and maintenance obligations,
-so convenience alone does not justify expanding them. Without sufficient
-evidence and explicit authorization, leave the addition as a proposal; continue
-independent authorized work that does not enlarge the public contract.
-Existing-API use and internal fixes do not acquire a new approval requirement.
-Keep this boundary with existing design, implementation, and review owners; add
-no checker, registry, mandatory report, or separate approval system.
+Fix the root, then trace references and callers through the existing dependency
+or LSP owner and migrate affected implementations, tests, and documentation in
+the same change. Stop tracing at unchanged contracts, not at the originally
+named files. Validate required semantics and the corrected public contract;
+do not freeze defective behavior in tests or move the defect into caller
+workarounds. Remove obsolete implementation paths and dedicated support code;
+retain a compatibility entrypoint only for an actual required contract and
+connect it to the canonical implementation, not a second implementation.
+
+Keep existing safety, access, and publication authority. A concrete conflict
+with an explicit compatibility constraint or unavailable consumer write access
+requires an exact affected contract, unfinished migration, and next owner/action,
+not a generic API-preservation veto. Continue independent authorized work.
+Unrelated API additions still need explicit authorization. Keep these decisions
+with existing design, implementation, and review owners; add no checker,
+registry, mandatory report, or separate approval system.
 
 ## Necessity in durable design
 

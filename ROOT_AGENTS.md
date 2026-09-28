@@ -35,21 +35,23 @@ failure semantics; neither
 small diffs nor completeness justify shortcuts or unrelated work. Follow the
 selected owner rather than inventing a fallback, wrapper, or policy copy.
 
-Root dependency fixes include necessary consumer migration. Fix the root, trace
-affected uses, and repair them; active use is not a veto or a reason to retain
-the old path. Bound work by changed contracts, not the initially named files;
-report concrete authority/access blockers as incomplete migration.
+Root dependency fixes include necessary API changes and consumer migration.
+Fix the root, trace affected uses, and repair them; API preservation or active
+use is not a veto or a reason to retain the old path. Bound work by changed
+contracts, not the initially named files.
 
-Public API additions/extensions (exports, types/methods, endpoints, parameters,
-CLI commands/options) require explicit user authorization for that public change;
-a general feature/fix/cleanup request is insufficient. First investigate existing
-APIs, configuration, extensions, standard facilities, and adopted dependencies on
-the premise they suffice. Use them when they do; otherwise record candidates,
-source evidence, the unmet contract, and why composition fails in the owning
-design. Necessity is not authorization, and missing evidence is not a gap.
-Without both evidence and authority, keep the addition a proposal and continue
-independent authorized work. Reuse prior explicit approval; internal fixes and
-existing-API use require no new approval system or check.
+A requested fix authorizes the public API changes necessary to complete it
+(including replacement, removal, or unavoidable addition), together with the
+affected consumers, tests, and documentation; do not require separate approval
+solely because the API changes. First investigate existing APIs, configuration,
+extensions, standard facilities, and adopted dependencies on the premise they
+suffice. Use them when they do; otherwise record candidates, source evidence,
+the unmet contract, and why composition fails in the owning design before editing.
+Unrelated or speculative API additions still require explicit authorization.
+Respect explicit compatibility constraints and actual authority/access limits;
+report the concrete conflict and unfinished migration, not a generic API veto,
+and continue independent authorized work. Do not preserve obsolete implementations
+through wrappers or dual paths without a required compatibility contract.
 
  Before implementation, locate existing abstractions and settle reuse, extension,
  or an evidence-backed responsibility gap in the owning design, including for
