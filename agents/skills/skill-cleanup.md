@@ -42,11 +42,40 @@ graph/readback を一つの source-to-generated cleanup unit として既存 own
 
 1. canonical skill doc と catalog/dependency/route/tool command の source owner を固定する。
    挙動を改訂する場合は、最初の変更前に [Behavioral Tuning](#behavioral-tuning) を適用する。
+   関連スキルへの導線を追加・変更する場合は、[Caller-side wiring](#caller-side-wiring) に従う。
 2. `.codex/config.toml` を host-wiring の source/input として読み、catalog skill id に対する
    entry set、source order、path、enabled を readback する。
 3. 既存 materializer は `.codex/personal/skills/<skill>/SKILL.md` だけを生成する。
 4. `skill_dependency_map.py graph` は通常、明示した外部 runtime root に graph JSON/Mermaid を生成し、既存 checker で source/readback equality を確認する。tracked reader pair を更新する場合だけ、固定2ファイルの mutation capability と外部 before/after evidence を明示する。
-5. validation command の実行範囲は `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照し、skill-cleanup 側で別の test/full-scan policy を作らない。文書は `document-canon-cleanup`、worktree は `worktree-health`、log は `agent-log-analysis`/`runtime-log-repair`、結果は `result-artifact-writeout` を再利用する。
+5. validation command の実行範囲は [Write-Capable Handoff Validation Trust Boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary) を参照し、skill-cleanup 側で別の test/full-scan policy を作らない。作業途中の関連読込は、[Conditional maintenance reads](#conditional-maintenance-reads) の成立した条件だけを使う。
+
+## Caller-side wiring
+
+関連スキルが必要になる操作箇所に、成立条件、判断・操作の前に読む具体的な
+Markdownリンク、復帰先を書きます。例えば「ログから挙動を判断する必要が出たら
+[agent-log-analysis](agent-log-analysis.md) を読み、得られた根拠で元の判断へ戻る」とします。
+読込時点と既存contextの再利用は [task-routing](task-routing.md#in-flight-skill-reads) に従います。
+呼び出し先の `Use When`、末尾の関連一覧、catalogやdependency headerだけでは配線完了にしません。
+呼び出し先の手順を複製せず、初回の全読込リストや必須前提にも変換しません。
+
+変更したスキルと実際のcallerについて、条件成立時の到達先・復帰先と、未成立時に
+読まない経路を確認します。既存候補・owner・読了規約を再利用し、生成viewを手書きしたり、
+無関係な全スキルの再監査を完了条件に加えたりしません。
+
+## Conditional maintenance reads
+
+初回に下表の全スキルを読むのではなく、保守中に条件が成立した時点で該当先を読みます。
+既読で有効な内容は再利用し、判断が閉じたら中断した保守操作へ戻ります。
+
+| 保守中に成立した条件 | 次の判断・操作の前に読む関連スキル |
+| --- | --- |
+| 文書の正本や重複を整理する | [document-canon-cleanup](document-canon-cleanup.md) |
+| checkoutの不整合や後片付けを扱う | [worktree-health](worktree-health.md) |
+| 記録済みログから挙動を解析する | [agent-log-analysis](agent-log-analysis.md) |
+| ログの生成・保存・公開の欠落を修復する権限がある | [runtime-log-repair](runtime-log-repair.md) |
+| 実在する結果artifactを保存・更新する | [result-artifact-writeout](result-artifact-writeout.md) |
+
+条件の成立は、環境修復・破壊的操作・追加検証の権限を新たに与えません。
 
 ## Behavioral Tuning
 
