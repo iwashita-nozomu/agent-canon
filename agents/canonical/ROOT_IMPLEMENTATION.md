@@ -7,7 +7,9 @@ responsibility Owns detailed source-side implementation and numerical decision g
 upstream design ../../AGENTS.md conditional source reader map
 upstream design ../../ROOT_AGENTS.md portable common boundaries
 upstream design ../../documents/design/entrypoint-owner-map.md source and consumer split contract
-upstream design ../../documents/conventions/software-engineering-principles.md reuse feasibility decision owner
+ upstream design ../../documents/conventions/software-engineering-principles.md maintained code-space objective and abstraction admission
+ upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
+ upstream design ../../documents/conventions/software-engineering-principles.md reuse feasibility decision owner
 @dependency-end
 -->
 
@@ -34,40 +36,42 @@ a shortcut would exclude.
 
 ## Simplest complete implementation
 
-Before implementation, use the existing
-[reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-to locate the abstractions that already own the required behavior. Trace the
-responsibility through actual callers, usage examples, and provider dependencies;
-a failed name search or an unfamiliar location does not establish absence.
-Read the relevant contract, configuration, and extension points, not just nearby
-helpers. Settle direct use, composition, extension at the existing owner, or an
-evidenced responsibility gap before writing code, including private helpers and
-additions inside existing files. Do not implement first and search or retrofit
-onto a foundation later: that duplicates ownership before necessity is known.
+ Before implementation, use the existing
+ [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+ to locate abstractions that already own the required behavior. Trace actual
+ callers, usage examples, provider dependencies, contracts, configuration, and
+ extension points. A failed name search or unfamiliar location does not establish
+ absence. Settle direct use, composition, extension at the existing owner, or an
+ evidenced responsibility gap before writing code, including private helpers and
+ additions inside existing files. Unknown keeps only the affected implementation
+ pending; it does not require a repository-wide audit or justify inventing a
+ foundation.
 
-Connect the selected foundation's path/symbol, contract, reuse or extension plan,
-and remaining gap to the existing owning design; handoff and review reuse that
-reference. Prefer extending an existing foundation when the gap belongs to its
-contract. A new foundation needs evidence that existing candidates, composition,
-and appropriate extension cannot meet the requirement; unfamiliarity or an
-unperformed investigation is not that evidence. Preserve caller/library and
-public-API authority boundaries. Reuse sufficient current investigation, stop
-when the decision is supported, and investigate only missing premises within
-the task. Unknown keeps the affected implementation pending, not independent
-authorized work; do not require a repository-wide audit or invent a foundation
-where direct code at the correct owner suffices.
-
-Make the simplest complete implementation the default, not a later refactor.
-Introduce abstractions, configuration, execution paths, or state only when a
-concrete current requirement cannot be met more simply;
-justify that necessity with mathematical or engineering grounds. Hypothetical
-reuse, design-pattern uniformity, or test-double convenience alone is not such
-a reason. Minimize concepts, state, branches, and dependencies while preserving
-the required domain, correctness, safety, and failure semantics. Neither fewer
-lines nor a smaller diff justifies omitted behavior, and completeness does not
-authorize speculative generalization or unrelated library or consumer changes.
-Keep the decision with the existing implementation and review owners, without
-adding a checker, report, or approval gate to enforce simplicity.
+ Design for the smallest maintained code space after the change, not the smallest
+diff. Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
+to the final implementation, including retained code and support mechanisms.
+Start with direct use or composition of existing APIs; admit new abstractions,
+configuration, routes, or state only for an evidenced unmet current requirement.
+Hypothetical reuse, pattern uniformity, or test-double convenience is not a gap.
+Preserve the required domain, correctness, safety, performance, and failure semantics;
+code compression or omitted behavior is not simplification.
+For replacements, include the retained owner, superseded code, and necessary
+consumer migration in the existing design before implementation, then close
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+in the same change. Do not defer deletion to a later cleanup or keep the old path
+to reduce the diff. Keep unrelated changes out; add no checker, report, or approval
+gate to enforce this objective.
+ Make the simplest complete implementation the default, not a later refactor.
+ Introduce abstractions, configuration, execution paths, or state only when a
+ concrete current requirement cannot be met more simply; justify that necessity
+ with mathematical or engineering grounds. Hypothetical reuse, design-pattern
+ uniformity, or test-double convenience alone is not such a reason. Minimize
+ concepts, state, branches, and dependencies while preserving the required domain,
+ correctness, safety, and failure semantics. Neither fewer lines nor a smaller diff
+ justifies omitted behavior, and completeness does not authorize speculative
+ generalization or unrelated library or consumer changes. Keep the decision with
+ existing implementation and review owners, without adding a checker, report, or
+ approval gate to enforce simplicity.
 
 ## Public API additions
 
