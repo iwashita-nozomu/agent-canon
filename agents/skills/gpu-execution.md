@@ -3,7 +3,7 @@
 <!--
 @dependency-start
 contract skill
-responsibility Runs ordinary GPU workloads by selecting an available device and using native Docker; keeps admission and managed lifecycle opt-in.
+responsibility Runs the configured GPU command before route diagnosis; keeps admission and managed lifecycle opt-in.
 upstream design ../../documents/experiments/gpu-direct-command.md optional admission adapter contract
 upstream design experiment-lifecycle.md optional managed experiment artifact boundary
 downstream design ./environment-maintenance.md consumes the ordinary GPU execution route
@@ -15,21 +15,19 @@ downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_
 
 ## 通常の実行
 
-空いているGPUを指定して、プロジェクトのimageとcommandを`docker run`します。
-GPUを使うという理由だけで、専用runnerや追加の承認手順へ移りません。
+プロジェクトの規定entrypointを、既存のGPU・image・資源設定のまま先に実行します。
+実行前に`nvidia-smi`、backend確認、環境探索を挟みません。GPUを使うという理由だけで、
+専用runnerや追加の承認手順へ移りません。
 
-Dockerが動くホストの`nvidia-smi`で、使用状況と空きメモリを確認します。
-観測した空きGPUのindexまたはUUIDを`GPU`、プロジェクトのimageを`IMAGE`に設定し、
-実行するcommandと引数を`"$@"`として渡します。
+既存の規定経路がnative Dockerで、単一deviceの`GPU`、`IMAGE`、commandと引数が
+既に与えられている場合の形です。別の既存entrypointをこの例で置き換えません。
 
 ```bash
-nvidia-smi
 docker run --rm --gpus "device=$GPU" "$IMAGE" "$@"
 ```
 
-`GPU`は一つのdeviceを指定します。既に空きを確認したGPUが指定されている場合は、
-同じ確認や利用許可の質問を繰り返さず、その指定で実行します。indexを固定の空きGPUと
-仮定せず、remote Dockerではclient側のGPU一覧をdaemon側の一覧と取り違えません。
+成功したら経路の再確認は不要です。GPU指定を手動で選び直したり、任意設定の未確認を
+理由に止めたりしません。必要なdevice選択と資源保護は既存entrypointに任せます。
 
 通常経路に`run_gpu_command.py`、`run_gpu_container.sh`、XML解析、PIDの名前空間照合、
 UUID lock、post-lock再観測、plan/fingerprint/receiptを要求しません。
@@ -38,6 +36,9 @@ UUID lock、post-lock再観測、plan/fingerprint/receiptを要求しません�
 
 ## 空き確認と失敗の扱い
 
+実行が失敗した場合に、その出力と終了コードから必要な経路検証を行います。
+GPUの可視性・使用状況が原因候補なら、Docker daemon側の`nvidia-smi`を確認します。
+アプリのassertionだけでGPU環境不良と決めず、client側の一覧と取り違えません。
 空きの確認はその時点の観測であり、排他予約ではありません。既知の他者の計算を奪ったり、
 そのprocessを停止したりせず、空きを判断できない場合は不明と伝えます。
 表示用processが存在することや、別名前空間のPIDを解決できないことだけを理由に、

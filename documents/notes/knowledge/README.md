@@ -27,7 +27,6 @@ upstream design ../README.md notes lifecycle index
 
 ## 典型トピック
 
-- [environment_setup.md](./environment_setup.md)
 - [experiment_directory_planning.md](./experiment_directory_planning.md)
 - [experiment_operations.md](./experiment_operations.md)
 - [benchmark_vs_experiment.md](./benchmark_vs_experiment.md)

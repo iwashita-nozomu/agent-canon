@@ -27,7 +27,7 @@ axioms, or an equivalent proof escape hatch.
 Use this matrix to answer which Lean, Mathlib, Aesop, Plausible, search, and
 machine-interface features should be tried for a proof frontier before changing
 an algorithm or returning a blocker. Start with Source Sweep and Capability
-Table, then read Default Lean Attempt Order and Environment Policy for routing.
+Table, then read Default Lean Attempt Order for routing.
 Optimization/Solver Mapping and Cleanup Rule cover specialized frontiers and
 retirement of temporary proof paths.
 
@@ -67,7 +67,6 @@ Primary and near-primary sources used for this matrix:
 | Counterexample search for over-strong claims | Plausible `plausible`, `Plausible.Testable.check` | The proposition is executable over sampled finite data, or a local encoding can produce sampled witnesses. | Refute too-strong bridge candidates before treating them as algorithm blockers. | A Plausible counterexample refutes the encoded executable claim, not every analytic real-valued theorem. |
 | Agent theorem-search interface | LeanSearchClient import surface, LeanSearch/Loogle service commands | An agent needs a Lean-side theorem-search entrypoint or a service-backed search query. | Retrieve candidate lemmas for focused frontier nodes before writing local stubs. | Service calls are heuristic and may be unavailable; final proof still requires kernel/lake checking. |
 | Machine-to-machine proof interaction | Pantograph, Lean REPL, LeanDojo-style harnesses | The task needs tactic execution state, proof search, benchmark data, or a persistent agent harness. | Future proof-search backend for generated frontier nodes. | Treat as optional backend infrastructure; do not make normal local proof checks depend on heavyweight services. |
-| Environment and dependencies | Lake, `lean-toolchain`, `lean_proof_env.py` | A proof needs Mathlib/Aesop/Plausible/LeanSearchClient or a stable checked environment. | Pin dependencies once for an active proof package; use the reusable proof env for probes and fallback checks. | Do not spend every proof retry rediscovering the same environment boundary. |
 
 複数のproof targetを機械実行するときの入力・終了状態は
 [lean_recursive_proof_search.py](lean_recursive_proof_search.md) を参照します。
@@ -98,35 +97,6 @@ For each selected frontier node:
 1. If the frontier remains open, decide whether the failure is an
    implementation/code-fact gap, a missing top-level problem/config property, a
    backend axiom boundary, or an algorithmic blocker.
-
-## Environment Policy
-
-AgentCanon owns a reusable proof environment for Mathlib, Aesop, Plausible, and
-LeanSearchClient:
-
-```bash
-python3 tools/analysis/proof/lean_proof_env.py smoke \
-  --env-dir reports/formal-proof/lean-proof-env \
-  --execute
-```
-
-Use `all-smoke` when proving environment readiness for agents:
-
-```bash
-python3 tools/analysis/proof/lean_proof_env.py all-smoke \
-  --env-dir reports/formal-proof/lean-proof-env \
-  --execute
-```
-
-Use it before saying that Mathlib, Aesop, Plausible, or LeanSearchClient is unavailable.  Generated
-environment files live under `reports/formal-proof/` and are local artifacts,
-not source.  The source tree should not commit that generated Lake package.
-
-For an active repository proof theme, prefer paying the environment cost once:
-pin Lean and Mathlib/Aesop/Plausible/LeanSearchClient in the topic-local Lake
-package, keep `.lake/` ignored, and make ordinary proof attempts run through `lake build`.  Use the
-reusable proof env for exploratory checks, cross-theme probes, and fallback
-validation, not as a reason to revisit dependency setup every time.
 
 ## Optimization And Solver Mapping
 

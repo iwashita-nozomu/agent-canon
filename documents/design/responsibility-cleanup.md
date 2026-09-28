@@ -3,6 +3,7 @@
 contract design
 responsibility Defines the shared responsibility-unit cleanup contract and its existing-owner routes.
 upstream design ../rule/README.md document filename, placement, and Japanese-content rule
+upstream design ../conventions/software-engineering-principles.md maintained code-space objective and contract-complete change boundary
 upstream design ../../agents/skills/structure-refactor.md structure-first repair and ownership route
 upstream design ../../agents/skills/refactor-loop.md behavior-preserving refactor execution route
 upstream design ../../agents/skills/agent-orchestration.md routing, dispatch, and review ownership
@@ -88,6 +89,50 @@ handoff
 次の owner が消費する packet とします（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。path の候補だけで unit を分割せず、hard edge、
 dependency、consumer、公開契約、lifecycle（[agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md)）を閉じてから責務単位を確定します。
 
+## Duplicate Implementation Retirement
+
+RC-09 は、置換・統合で不要になる旧実装・旧入口の削除と、必要な利用側移行を一つの修正責務
+として閉じる契約です。重複の明示廃止だけでなく通常の実装置換にも適用し、別の削除依頼や
+後続 cleanup を待ちません。最終コードスペースの比較は
+[SEP-06](../conventions/software-engineering-principles.md#sep-06-kiss) に従います。
+
+設計時に、残す正本が担う意味、domain、invariant、state、side effect、I/O、failure semantics
+と、不要になる旧コードを既存の設計・変更対応へ結び付けます。名称や構文の類似だけで
+重複とせず、独自責務や未確認の意味は不足として残します。未使用コードは到達性と副作用で
+別に判断し、file 全体を削除する場合は全寄与の不要性を確認します。
+
+旧実装専用の helper、type、import、設定・flag、build target、dependency、fixture、docs も
+不要になれば同じ修正で削除・更新します。必要な契約を検証する test は新しい境界へ移し、
+検証を消して成功にしません。移動・改名・wrapper 化、無効化、コメントアウト、復旧用コピーは
+削除の代替ではありません。公開互換契約が必要な入口は廃止対象と区別して内部を正本へ接続し、
+利用中や小さい diff だけを旧実装維持の契約へ昇格させません。
+
+まず正本側を修正し、既存 LSP / dependency-analysis で実際の参照を辿って、契約・接続が
+変わる caller、import、設定、生成元、tests、docs を更新します。利用側の契約変更がさらに
+伝播する場合だけ追跡し、契約を保存できる境界で止めます。利用者ゼロを削除開始の前提にせず、
+必要な利用側修正を削除後の別責務として放置しません。
+
+廃止済み入口の言語、build、import、dispatch エラーは移行漏れを見つける信号です。
+維持する利用側のエラーを記録しただけでは完了せず、正本へ移行します。silent fallback、
+alias、互換実装、旧実装の再作成、エラーの握りつぶしで成功に見せません。
+通常の削除でエラーになる場合は、エラー専用 stub も新設しません。
+
+必要な利用側修正は本来の修正範囲です。最初に名前が挙がらなかった、別 repository、
+別担当という理由だけで対象外にせず、[refactor-loop](../../agents/skills/refactor-loop.md) の
+二段階移行と [change-review](../../agents/skills/change-review.md) の確認へ渡します。
+別 repository では既存 owner と権限に従い関連 PR を分けます。具体的なアクセス・権限制約で
+実施できない移行は、対象、理由、次の担当を Issue / PR に残し、移行完了とは報告しません。
+無関係な改善、契約が変わらない利用側の変更、別 Issue 全体の完了は終了条件に追加しません。
+
+検証は正本の保証、不要になった旧コードの除去、必要な利用側の接続・動作を対象にします。
+廃止済み入口を意図的に呼ぶ負例の期待エラーと、維持する利用側の移行漏れ、正本の回帰、
+無関係な失敗を区別します。削除だけで完了とせず、未実行の検証も成功扱いにしません。
+新 checker、互換 wrapper、台帳、全 consumer 監査や全面検証 gate は追加しません。
+
+参照の存在は実装の独自性を示さず、旧実装を残せばその保守対象と互換関係も残ります。
+正本・削除・必要な利用側修正を一つの単位にし、契約が変わらない境界で止めることで、
+差分を小さくするための旧経路温存と無関係な編集拡大をともに避けます。
+
 ## External Tool Evidence
 
 外部 tool または library を候補に含める場合、公式一次資料、version、scope、false positive、
@@ -127,6 +172,7 @@ sufficient behavior を owner の契約に従って分類します（`tools/agen
 dependency map、materialized shim、host-wiring source/input の `.codex/config.toml`、generated graph（[documents/runtime/skill-dependency-graph.md](../runtime/skill-dependency-graph.md)）、graph readback を同じ
 source snapshot から検証します（[documents/runtime/skill-dependency-graph.md](../runtime/skill-dependency-graph.md)）。失敗は実装原因を分類して同じ owner route を修正し、
 checker の条件を弱めずに再実行します（`tools/validation/semantic/skills/check_skill_tool_invocation_graph.py`）。
+RC-09 の置換・廃止では、正本、不要な旧コードの除去、必要な利用側移行を検証し、廃止済み入口の負例と移行漏れを区別します。
 
 `tools/agent/skills/skill_shim_materializer.py` の生成 target は
 `.codex/personal/skills/<skill>/SKILL.md` だけです。`.codex/config.toml` は materializer の
@@ -150,6 +196,7 @@ generated projection、再検証 command を記録します（[documents/design/
 | RC-06 existing-owner reuse | `responsibility-cleanup` | [agents/skills/document-canon-cleanup.md](../../agents/skills/document-canon-cleanup.md), [agents/skills/worktree-health.md](../../agents/skills/worktree-health.md), [agents/skills/agent-log-analysis.md](../../agents/skills/agent-log-analysis.md), [agents/skills/runtime-log-repair.md](../../agents/skills/runtime-log-repair.md), [agents/skills/result-artifact-writeout.md](../../agents/skills/result-artifact-writeout.md) | reuse route と既存 receipt |
 | RC-07 external evidence and rollback | owner-selected specialist | unit `external_tools`, `rollback`、`handoff` | primary source/version/license/security と rollback readback |
 | RC-08 integration and re-review | `agent-orchestration` / `change-review` | generated projections、tree/commit readback、review packet | final owner/review/validation readback |
+| RC-09 replacement and duplicate retirement | `code-cleanup` / `refactor-loop` / `change-review` | [code-cleanup Route](../../agents/skills/code-cleanup.md#route), [refactor-loop Purpose](../../agents/skills/refactor-loop.md#purpose), [change-review Repeated Responsibility Review](../../agents/skills/change-review.md#repeated-responsibility-review) | 残す正本、旧実装・専用補助コードの削除、必要な利用側移行、変更契約の検証と具体的な残件 |
 
 ## Evidence And Assumption Ledger
 
@@ -160,8 +207,9 @@ generated projection、再検証 command を記録します（[documents/design/
 | assumption | tree は構造観測であり、責務 authority は owner/dependency/contract evidence から閉じる | `RC-01`, `RC-02`, [agents/skills/structure-refactor.md](../../agents/skills/structure-refactor.md) | explicit |
 | assumption | analyzer は candidate producer であり、採用 disposition と削除 oracle は owner route が決める | `RC-02`, `RC-07`, [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md) | explicit |
 | limitation | 外部 tool の採用可否は一次資料、version、scope、false positive、license/security、install owner、rollback の evidence が揃うまで保留する | `RC-07` | explicit |
+| contract | 通常の置換・統合でも不要な旧コードを削除し、別の廃止依頼や active caller ゼロを待たず、必要な利用側移行と変更契約の検証まで閉じる | [RC-09](#duplicate-implementation-retirement), [code-cleanup](../../agents/skills/code-cleanup.md), [refactor-loop](../../agents/skills/refactor-loop.md), [change-review](../../agents/skills/change-review.md) | explicit |
 
 ## Clause IDs
 
-この文書の設計 clause は `RC-01` から `RC-08` です。各 public skill は clause を参照し、
+この文書の設計 clause は `RC-01` から `RC-09` です。各 public skill は clause を参照し、
 共通 policy を複製しません。

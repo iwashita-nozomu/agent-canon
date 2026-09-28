@@ -1175,16 +1175,16 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
         self.assertTrue(sectioned_entries)
         self.assertTrue(all("#" not in str(entry.path) for entry in sectioned_entries))
-        self.assertIn(
-            "5. Implementation",
-            {
-                section.heading
-                for entry in sectioned_entries
-                for section in entry.sections
-            },
-        )
+        for filename, heading in (
+            ("CODEX_BOOTSTRAP.md", "4. Run Bootstrap"),
+            ("CODEX_IMPLEMENTATION.md", "5. Implementation"),
+        ):
+            entry = next(
+                entry for entry in sectioned_entries if entry.path.name == filename
+            )
+            self.assertEqual({section.heading for section in entry.sections}, {heading})
         with tempfile.TemporaryDirectory() as tmp_dir:
-            missing_heading_doc = Path(tmp_dir) / "CODEX_WORKFLOW.md"
+            missing_heading_doc = Path(tmp_dir) / "CODEX_IMPLEMENTATION.md"
             missing_heading_doc.write_text("# Workflow\n", encoding="utf-8")
 
             with self.assertRaisesRegex(
@@ -1193,7 +1193,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             ):
                 resolve_document_section_locators(
                     "implementer",
-                    "agents/canonical/CODEX_WORKFLOW.md",
+                    "agents/canonical/CODEX_IMPLEMENTATION.md",
                     missing_heading_doc,
                 )
 

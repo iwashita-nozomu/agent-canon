@@ -36,6 +36,57 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - 実装コードと長時間実験の生成物は、必要に応じて branch を分けます。
 - `main` は統合先であり、試行錯誤や途中生成物の置き場にはしません。
 
+### Git 状態の保全と整合性
+
+「知らない差分」「自分の変更ではない」「別途指示されていない」は、Git の
+不整合を調べず放置する理由になりません。既存状態を保護しながら、担当作業に
+必要な整合性を保つことは作業の一部です。差分の所有者と、Git 状態を確認して
+安全に継続・修復・引継ぎする責務を混同しません。
+
+整合性は clean と同義ではありません。staged / unstaged / untracked の既存差分や
+pin 用の detached HEAD は、それだけでは異常ではありません。一方、競合 marker
+や unmerged index がなくても、merge 等の操作が完了したとは限りません。
+
+1. 開始・再開、Git 状態変更後、publication / handoff の既存確認境界で、対象
+   checkout の branch / HEAD、staged / unstaged / untracked、未解決 index、
+   merge / rebase / cherry-pick / revert / am 等の途中状態を読みます。
+   `git status`、`git diff`、`git diff --cached`、`git ls-files --unmerged` を使い、
+   必要な差分と既存の Issue / PR / 作業記録から由来と今回の影響を確認します。
+   operation の管理 path は `git rev-parse --git-path <name>` で解決し、linked
+   worktree の `.git` を通常 directory と決めつけません。未知を健全と推定せず、
+   関係と処置を判断できたところで調査を止めます。通常 command ごとの再走査、
+   全 repository の監査、新しい checker / 台帳は要求しません。
+2. 既存差分は task-owned、他者・別作業、由来未確認を区別し、内容と stage 状態、
+   未公開 commit / ref を無断で失わせたり今回の提出へ混入させたりしません。
+   同じ file の混在 hunk も対象です。clean に見せるための reset / restore /
+   clean / stash、`git add -A`、一括 commit、force push、管理 file / lock の
+   手動削除は禁止です。必要な操作自体の権限は既存 owner に従います。
+3. 自分の操作で生じた不整合、または由来・正しい復旧先・権限が確認できた担当
+   範囲の不整合は、既存 Git / integration owner で修復して読み戻します。
+   追加の指示待ちにしません。継続中の別 writer があれば同じ状態へ書き重ねず、
+   既存の協調 owner へ戻します。未知の変更の採否、他者の途中操作の continue /
+   abort、履歴の巻戻しを推測で行いません。安全に分離できる独立作業は既存
+   checkout owner で続け、元 checkout の未解決状態を分離先の clean で隠しません。
+4. commit / push / PR / handoff の前に、保持対象と実際の残差分、対象 branch、
+   自分が開始した Git 操作の終了、提出する index / commit tree と検証対象、
+   公開した場合の remote head / PR head を照合します。自分が開始した途中操作を
+   残して通常完了としません。最新 main の取込み・競合解決は既存の開始時・PR前
+   の手順に従い、履歴だけを合わせた疑似 merge にしません。意図的な local-only /
+   未 push 状態は区別し、全 ref の同期や無関係な変更の commit は要求しません。
+
+残った各差分・途中状態には、確認済みで保持する理由、修復結果、または未解決の
+引継ぎを既存 Issue / PR / 作業記録に残します。修復できない場合は、repository /
+path / branch / HEAD、観測した状態、実在する保全先、影響して止めた操作、欠けた
+権限・判断・環境、次の owner / action を明記します。owner が未確認ならその旨と
+確認先を残します。記録だけを修復済みにせず、影響しない作業まで停止しません。
+GitHub 上の readback は利用者の未観測の local checkout の健全性を証明しません。
+
+保持対象を勝手に変えないことと、認可された操作を完結させることの両方が必要です。
+単なる差分ゼロ判定では前者を、記録して放置するだけでは後者を保証できません。
+Git 状態維持を理由に、無関係な製品修正・全 branch 掃除・他 Issue の完了まで
+終了条件に広げません。実際の競合解決・checkout 分離・削除は既存 owner に委譲し、
+この節は新しい mutation 権限や Git 実装を作りません。
+
 ## 2. branch 名
 
 - 通常の実装 branch は `work/<topic>-YYYYMMDD` を使います。

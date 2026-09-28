@@ -51,7 +51,7 @@ Codex の設定は 1 ファイルではなく、複数の runtime surface で構
 | `.codex/config.toml` | repo | project runtime policy |
 | `-c key=value` | run | 一時 override |
 | `.codex/agents/*.toml` | repo/user | custom subagent |
-| `.codex/personal/skills` | dir/repo/user | workflow package |
+| `.agents/skills` / `~/.agents/skills` | repo/subtree / user | workflow package の探索入口 |
 | [AGENTS.md](../../AGENTS.md) | repo tree | 作業規律 |
 | hooks | repo/user | 起動・tool 実行時の強制処理 |
 
@@ -100,7 +100,7 @@ job_max_runtime_seconds = 3600
   `agents/model_profiles.toml` が所有し、role TOML は generated view
 - 1 tool output の context 取り込みは 4096 token まで
 - stable runtime feature は Codex の既定を使う
-- repo-owned skill は `.codex/personal/skills/` から自動探索し、child-agent registry だけを config に置く
+- repo-owned skill は `.agents/skills/` から探索し、AgentCanon の導入済み skill は管理された user 入口を使う。配置は [Skill Paths](../../agents/canonical/skills.md#skill-paths) を参照する
 - topology-derived request は direct `21` + nested `6` = `27`。platform-effective
   / current-available capacity は別入力で、27 を platform cap とは主張しない
 - AgentCanon の repo-local deterministic checks は Rust CLI / Python tool が所有する
@@ -148,7 +148,7 @@ job_max_runtime_seconds = 3600
 - user config に置くべきもの: model、provider、profile
 - machine-local なもの: TUI、history、audio、notice、Windows onboarding
 - secret を含み得るもの: provider auth、headers、OAuth、credential stores
-- repo では別 surface のもの: hooks は `hooks.json`、skills は `.codex/personal/skills`
+- repo では別 surface のもの: hooks は `hooks.json`、repo-owned skills は `.agents/skills`
 - 危険・不安定なもの: `experimental_*`
 
 ---
@@ -385,14 +385,17 @@ Codex は skill metadata で候補を選び、選択後に該当 `SKILL.md` を�
 
 # Skills discovery
 
+repository 固有 skill の入口:
+
 ```text
-.codex/personal/skills/
-  dependency-analysis/
+.agents/skills/
+  project-review/
     SKILL.md
 ```
 
-Codex は repository の `.codex/personal/skills/` を自動探索します。project config に
-同じ inventory を列挙せず、命名と説明を簡潔に保ちます。
+導入済み AgentCanon skill は `~/.agents/skills/` の管理 directory link 経由で読みます。
+`.codex/personal/skills/` は生成 view であり、公式探索先ではありません。
+正本との関係は [Skill Paths](../../agents/canonical/skills.md#skill-paths) を参照します。
 
 ---
 
@@ -514,7 +517,7 @@ credential は committed config に直書きしません。
 - `.codex/config.toml`: 責務を追える形に保つ
 - [AGENTS.md](../../AGENTS.md): workflow gate と closeout policy
 - `.codex/agents/*.toml`: role behavior
-- `.codex/personal/skills`: reusable workflow
+- `agents/skills/`: workflow 正本。`.codex/personal/skills/` は生成 adapter
 - hooks: deterministic startup
 - MCP: repo tool inventory
 - `reports/agents`: task evidence

@@ -670,10 +670,10 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   `gcongr` を候補にします。`exact?` / `apply?` / `rw?` / `simp?`、Mathlib docs、
   LeanSearch / Loogle / Moogle 系、Zulip archive で既存 theorem を探し、採用するのは
   checker で通った proof text だけです。強すぎる executable claim は、blocker 扱いの前に
-  Plausible の counterexample route で refutation を試します。活発な proof theme では
-  Mathlib/Aesop/Plausible/LeanSearchClient を topic-local Lake package に一度 pin して
-  `lake build` で使えるようにし、探索用・fallback 用には
-  `python3 tools/analysis/proof/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` を使います。
+  Plausible の counterexample route で refutation を試します。証明の実行には
+  [documents/tools/formal_proof.md](../../documents/tools/formal_proof.md) が案内する
+  再利用可能な `lean_proof_env.py` とその checker 入口を使います。耐久的な theorem
+  surface が独自依存を必要とする場合だけ、topic-local Lake package に所有させます。
   実装由来 target では、手で tactic を一つ選ぶ前に
   `lean_recursive_proof_search.py --target <name> --tactic-matrix 'exact?,apply?,simp?,aesop?,grind'`
   のような target-rooted tactic matrix を短い timeout 付きで回し、どの tactic が
@@ -759,10 +759,8 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
      再帰展開する
    - 既定 route は
      `python3 tools/analysis/proof/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
-     とする。CUDA の有限精度 claim では `AGENT_CANON_JIT_JAX_PLATFORM`、
-     `AGENT_CANON_JIT_BACKEND_TARGET`、
-     `AGENT_CANON_JIT_IREE_CUDA_TARGET` を環境変数で固定し、
-     `--xla-dump-dir <dir>` も渡して、同じ JIT root から XLA-emitted
+     とする。CUDA の有限精度 claim が対象の場合は、project の既存設定で
+     `--xla-dump-dir <dir>` を使い、同じ JIT root から XLA-emitted
      LLVM/PTX を収集する
    - IR node には `source_symbol`、runtime object、数学的 role、residual unit、
      dtype / backend assumption、proof relevance を持たせる
@@ -2015,7 +2013,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    `main`, the algorithm, or the JIT boundary.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `documents/notes/`, and `documents/` before external web search.
-1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read [documents/tools/lean_capability_matrix.md](../../documents/tools/lean_capability_matrix.md) and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/analysis/proof/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
+1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read [documents/tools/lean_capability_matrix.md](../../documents/tools/lean_capability_matrix.md) and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. Use the reusable `lean_proof_env.py` environment and the checker entrypoint documented in [documents/tools/formal_proof.md](../../documents/tools/formal_proof.md) for proof attempts; a topic-local Lake package is an optional owner only when the theorem package has durable theory dependencies. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
 1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or scope-limiting evidence.
 1. Do not mark a claim verified unless the target proof assistant or solver checks the exact artifact without placeholders, `sorry`, `Admitted`, unchecked axioms, or equivalent proof escape hatches.
 1. Do not mark a claim impossible merely because attempts failed. Use

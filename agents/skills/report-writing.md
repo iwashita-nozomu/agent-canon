@@ -4,6 +4,7 @@
 contract skill
 responsibility Writes evidence-backed reader-facing reports with semantic claim/evidence, inference, limitation, and action boundaries.
 upstream design ../../documents/design/responsibility-rationale.md report semantics and finding-closure rationale
+upstream design ../internal-routines/verification-result-structuring.md mandatory pre-write structuring and finding coverage
 upstream design structure-planning.md optional structural-decision owner
 upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design code-visualization.md sole public visualization owner and typed projection contract
@@ -21,7 +22,16 @@ The canonical rationale is [documents/design/responsibility-rationale.md](../../
 
 ## Source packet
 
-Before drafting, identify the audience/decision, the source artifacts or stable IDs, directly observed facts, inferred claims, material limitations/uncertainty, and the requested next action. Add provenance needed to interpret the evidence. Do not create placeholder fields for evidence classes that do not apply.
+Before drafting or revising verification results, invoke
+[verification result structuring](../internal-routines/verification-result-structuring.md).
+Use its existing structured task/Issue record, including interim findings,
+counterevidence, corrections, and limitations. This step is mandatory even when
+no document topology plan or independent report review is needed.
+
+Add the audience/decision and requested next action to that source material.
+Report preparation alone does not justify another environment/tooling survey
+or rerunning settled checks; investigate only a specific gap that can change
+the answer or required validation.
 
 When external references support a material claim, use an existing durable source
 note or create a source packet with the URL/DOI, access date, source identity,
@@ -35,7 +45,7 @@ A report is acceptable when:
 
 - every material factual or recommendation claim has source support or is explicitly identified as inference;
 - observations and interpretations are distinguishable;
-- limitations that could change the reader's decision are present;
+- material investigated findings, counterevidence, and limitations that could change the reader's decision are present, not only evidence selected to support the conclusion;
 - raw evidence and reader synthesis are not conflated;
 - the next action or conclusion is scoped to what the evidence supports;
 - the report does not become a second policy/source-of-truth surface.
@@ -44,7 +54,12 @@ No fixed heading count is required. A compact status may satisfy these obligatio
 
 ## Finding closure
 
-Close accepted blocking findings before finalizing. A finding is blocking when it identifies a material factual error, unsupported claim, broken source mapping, or other defect that can change the reader's interpretation or action.
+Close accepted blocking findings about the report before finalizing. These
+include material factual errors, unsupported claims, broken source mappings,
+and omitted material results or counterevidence that can change the reader's
+interpretation or action. Correcting the report does not require repairing every
+underlying problem it reports; distinguish report accuracy from implementation
+completion.
 
 Style/advisory findings, demonstrated tool false positives, explicitly out-of-scope findings, and accepted risks may remain with a short reason. Completion is **not** raw `finding_count == 0`; do not rewrite indefinitely to appease an advisory checker. Rerun only the checker/review surface affected by a changed claim or section.
 
@@ -62,4 +77,10 @@ Use a report reviewer when claim impact, external publication, ambiguity, or evi
 
 ## Completion evidence
 
-Read back the report artifact plus the evidence actually selected for it: source packet/provenance, material limitations, selected review result, and any explicitly requested presentation/HTML validation. Do not require fixed seven-section structure or fixed optional closeout fields.
+Use [verification result structuring](../internal-routines/verification-result-structuring.md)
+for the pre-write claim/evidence and finding/output coverage check. Any selected
+review consumes the same record; it does not replace that mandatory step.
+Read the relevant provenance, limitations, review result, and explicitly requested
+presentation/HTML validation without reopening settled investigation or adding
+a checker. Scale detail to useful results and decision complexity, not elapsed
+time, tool counts, fixed seven-section structure, or optional closeout fields.

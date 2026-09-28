@@ -40,8 +40,9 @@ an arbitrary AgentCanon source directory, an implicit current-directory state di
 mount as a runtime fallback.
 
 The host owns Docker, Git, GitHub, Codex launch, credentials, project builds,
-and project tests. The resident container owns only AgentCanon Python, Rust,
-and language-server tools. It receives exact allowlisted target mounts and a
+and project tests. The resident container owns AgentCanon Python, Rust,
+language-server tools, and supporting native diagnostic utilities. It receives
+exact allowlisted target mounts and a
 task-scoped exchange directory; it does not receive a Docker socket, SSH agent,
 GitHub token, host home, arbitrary Git state, or a general network. A target
 mount is the exact selected checkout/worktree root; Git metadata is read-only.
@@ -77,8 +78,13 @@ AgentCanon does not create a user or pass `--user`.
 
 `bootstrap/container/image/Dockerfile` is the sole AgentCanon tool image definition.
 It reuses dependency planning and installs the configured Python, Rust, and
-LSP tools once. It does not contain editor post-create behavior, project
-dependencies, project tests, GPU setup, or a Compose workspace lifecycle.
+LSP tools once. The existing native apt transaction also provides GDB and
+Valgrind; see [C++ debugging](documents/design/cpp-debugging.md) for their
+necessity and use. This does not add arbitrary dispatch or grant ptrace access.
+Product execution and live debugging remain with the project's existing runner
+and image; provisioning this shared image does not install tools in consumers.
+The image does not contain editor post-create behavior, project dependencies,
+project tests, GPU setup, or a Compose workspace lifecycle.
 
 `install` and `update` select the environment image from
 `bootstrap/container/image/digest.sh`, which hashes only the

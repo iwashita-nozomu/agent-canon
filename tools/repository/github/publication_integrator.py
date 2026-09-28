@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Resolves and executes canonical completion-authority publication with expected-old CAS.
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md owns active-W2 publication authority and route state.
+# upstream design ../../agents/canonical/CODEX_COMPLETION.md owns active-W2 publication authority and route state.
 # upstream design ../../documents/operations/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy.
 # upstream design ../../agents/skills/integration.md owns main integration ordering.
 # upstream design ../../agents/skills/agent-canon-update.md owns AgentCanon PR publication policy.
@@ -553,7 +553,7 @@ def resolve_publication_authority(
     attestation_core = {
         "repository_id": root.name,
         "owner_identity": "completion_authority",
-        "owner_surface": "agents/canonical/CODEX_WORKFLOW.md",
+        "owner_surface": "agents/canonical/CODEX_COMPLETION.md",
         "source_commit": source_commit,
         "source_tree": source_tree,
         "candidate_commit": candidate_commit,
