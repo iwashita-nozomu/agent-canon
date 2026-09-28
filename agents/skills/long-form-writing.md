@@ -155,5 +155,5 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Keep Mermaid diagrams as fenced `mermaid` blocks in the Markdown source, with nearby text stating what the diagram answers and what it does not claim.
 1. Draft in reader order and keep long documents scannable.
 1. Take a reverse outline after drafting.
-1. Require `document_flow_reviewer` and a separate reviewer using `docs-completeness-review`.
-1. Add `docs-consistency-review` when the draft changes multiple docs, entrypoints, or canonical routes.
+1. Require `document_flow_reviewer` and a separate reviewer using [docs-completeness-review](../internal-routines/docs-completeness-review.md).
+1. Add [docs-consistency-review](../internal-routines/docs-consistency-review.md) when the draft changes multiple docs, entrypoints, or canonical routes.

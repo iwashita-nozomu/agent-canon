@@ -36,6 +36,57 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - 実装コードと長時間実験の生成物は、必要に応じて branch を分けます。
 - `main` は統合先であり、試行錯誤や途中生成物の置き場にはしません。
 
+### Git 状態の保全と整合性
+
+「知らない差分」「自分の変更ではない」「別途指示されていない」は、Git の
+不整合を調べず放置する理由になりません。既存状態を保護しながら、担当作業に
+必要な整合性を保つことは作業の一部です。差分の所有者と、Git 状態を確認して
+安全に継続・修復・引継ぎする責務を混同しません。
+
+整合性は clean と同義ではありません。staged / unstaged / untracked の既存差分や
+pin 用の detached HEAD は、それだけでは異常ではありません。一方、競合 marker
+や unmerged index がなくても、merge 等の操作が完了したとは限りません。
+
+1. 開始・再開、Git 状態変更後、publication / handoff の既存確認境界で、対象
+   checkout の branch / HEAD、staged / unstaged / untracked、未解決 index、
+   merge / rebase / cherry-pick / revert / am 等の途中状態を読みます。
+   `git status`、`git diff`、`git diff --cached`、`git ls-files --unmerged` を使い、
+   必要な差分と既存の Issue / PR / 作業記録から由来と今回の影響を確認します。
+   operation の管理 path は `git rev-parse --git-path <name>` で解決し、linked
+   worktree の `.git` を通常 directory と決めつけません。未知を健全と推定せず、
+   関係と処置を判断できたところで調査を止めます。通常 command ごとの再走査、
+   全 repository の監査、新しい checker / 台帳は要求しません。
+2. 既存差分は task-owned、他者・別作業、由来未確認を区別し、内容と stage 状態、
+   未公開 commit / ref を無断で失わせたり今回の提出へ混入させたりしません。
+   同じ file の混在 hunk も対象です。clean に見せるための reset / restore /
+   clean / stash、`git add -A`、一括 commit、force push、管理 file / lock の
+   手動削除は禁止です。必要な操作自体の権限は既存 owner に従います。
+3. 自分の操作で生じた不整合、または由来・正しい復旧先・権限が確認できた担当
+   範囲の不整合は、既存 Git / integration owner で修復して読み戻します。
+   追加の指示待ちにしません。継続中の別 writer があれば同じ状態へ書き重ねず、
+   既存の協調 owner へ戻します。未知の変更の採否、他者の途中操作の continue /
+   abort、履歴の巻戻しを推測で行いません。安全に分離できる独立作業は既存
+   checkout owner で続け、元 checkout の未解決状態を分離先の clean で隠しません。
+4. commit / push / PR / handoff の前に、保持対象と実際の残差分、対象 branch、
+   自分が開始した Git 操作の終了、提出する index / commit tree と検証対象、
+   公開した場合の remote head / PR head を照合します。自分が開始した途中操作を
+   残して通常完了としません。最新 main の取込み・競合解決は既存の開始時・PR前
+   の手順に従い、履歴だけを合わせた疑似 merge にしません。意図的な local-only /
+   未 push 状態は区別し、全 ref の同期や無関係な変更の commit は要求しません。
+
+残った各差分・途中状態には、確認済みで保持する理由、修復結果、または未解決の
+引継ぎを既存 Issue / PR / 作業記録に残します。修復できない場合は、repository /
+path / branch / HEAD、観測した状態、実在する保全先、影響して止めた操作、欠けた
+権限・判断・環境、次の owner / action を明記します。owner が未確認ならその旨と
+確認先を残します。記録だけを修復済みにせず、影響しない作業まで停止しません。
+GitHub 上の readback は利用者の未観測の local checkout の健全性を証明しません。
+
+保持対象を勝手に変えないことと、認可された操作を完結させることの両方が必要です。
+単なる差分ゼロ判定では前者を、記録して放置するだけでは後者を保証できません。
+Git 状態維持を理由に、無関係な製品修正・全 branch 掃除・他 Issue の完了まで
+終了条件に広げません。実際の競合解決・checkout 分離・削除は既存 owner に委譲し、
+この節は新しい mutation 権限や Git 実装を作りません。
+
 ## 2. branch 名
 
 - 通常の実装 branch は `work/<topic>-YYYYMMDD` を使います。
@@ -80,22 +131,24 @@ workspace の repository は更新対象にせず、全 toolchain の無制限�
 | --- | --- |
 | clone identity | resolved path、Git root、remote の owner/repository、branch または detached、actual `HEAD` の full SHA |
 | local state | staged / unstaged / untracked の有無と、今回の入力に関係する差分。親 repository の状態で代用しない |
-| 宣言した依存 | 選択した consumer tree / index の gitlink、manifest / lock 等の pin、その所有 path、対応する依存 PR と採用 SHA（変更時） |
-| 実際の入力 | build / import / 実行設定が読む checkout path と SHA、local override の有無。cache / install / 生成物を読む場合は採用 pin 由来であること |
+| 宣言した依存 | 選択した consumer tree / index の gitlink、manifest / lock 等の依存宣言（pin があればその値）、その所有 path、対応する依存 PR と採用 SHA（変更時） |
+| 実際の入力 | build / import / 実行設定が読む checkout path と SHA、local override の有無。cache / install / 生成物を読む場合は宣言した依存由来であること |
 
-依存の source 開発 clone と、consumer が読む pin checkout は別々に扱います。
+依存の source 開発 clone と、consumer が読む checkout は別々に扱います。
 開発 clone の新しい HEAD だけを見て consumer の更新済みとは判断せず、consumer が
-読む入力を宣言 pin と照合します。pin 用の clean detached checkout は正常であり、
-branch attach や全依存の最新 main 化を要求しません。依存側の修正に着手する場合は、
-その repository の最新 main 起点、または関連 Issue の active branch を使い、
-branch 名には対応する Issue 番号を含めます。未知の dirty state は保持します。
+pin を持つ場合はその入力を宣言 pin と照合します。pin 用の clean detached checkout
+は正常であり、branch attach や全依存の最新 main 化を要求しません。依存側の修正に
+着手する場合は、その repository の最新 main 起点、または関連 Issue の active branch
+を使い、branch 名には対応する Issue 番号を含めます。未知の dirty state は保持します。
 
-依存変更を要する実行は
+依存変更を要する実行で、consumer の既存契約が exact pin を要求する場合は
 [依存モジュール変更規約](../rule/dependency-module-changes.md) の PR → exact pin →
 consumer 実行の順序に従います。pin と実際の入力が不一致、dirty な依存入力、
 または由来を確認できない場合は、その入力を使う実行・検証を止め、具体的な
 path / SHA / 未確認事項を残します。黙って branch を切り替えたり、reset / clean /
 stash、別 clone や cache で不一致を隠したりしません。依存しない作業まで止めません。
+pin を要求しない consumer には既存の依存宣言と解決機構を使い、実際の入力を
+記録します。この手順を満たすための pin や SHA 一致 guard は新設しません。
 
 directory、branch、HEAD、依存 PR の revision、pin、local override / mount 等の
 入力解決先が変わったら、影響する対象を次の操作前に再確認します。同じ境界の
@@ -136,10 +189,11 @@ directory、branch、HEAD、依存 PR の revision、pin、local override / moun
    影響する範囲で確認します。既存の言語 tool、依存宣言、検証経路を使い、
    changed files の一覧や過去の作業要約だけで依存が閉じたとは判断しません。
 2. 各前提を、base / 祖先で充足、先行 commit で提供、同一 commit に包含、
-   固定済み external input、未解決のいずれかに分類します。外部依存は既存の
-   lock、commit、artifact / image digest 等で必要な identity と取得経路を
-   確定します。取得する SHA 等が未固定の別 branch の変更、将来の PR、可変な
-   latest、偶然の local install / cache を充足済みの前提にしません。
+   宣言済み external input、未解決のいずれかに分類します。外部依存は既存の
+   manifest / lock 等に従い、必要な API・version 範囲と取得経路を確定します。
+   検証時に実入力の identity を記録し、新規 pin や SHA のコード埋込みは要求
+   しません。将来の PR、未公開の必須修正、偶然の local install / cache を
+   充足済みの前提にしません。既存の exact pin 契約は引き続き守ります。
 3. 先行変更を必要とする関係を順序付けします。同時に変えないと契約が壊れる
    変更群は一つの commit にまとめます。変更単位間の依存 graph に循環が
    あれば、その強連結成分を一単位に畳むか、各段階で契約が成立する設計へ
@@ -156,7 +210,7 @@ directory、branch、HEAD、依存 PR の revision、pin、local override / moun
 
 | 単位 / SHA | 目的・保持する契約 / owner / path | 前提単位・外部依存 identity | 検証 command・期待結果・実測結果 |
 | --- | --- | --- | --- |
-| 計画時の単位 ID、確定後の SHA | 変更と既存 consumer への影響 | base、先行 / 同一単位、固定入力、未解決 | 対象 tree ごとの結果または未実施理由 |
+| 計画時の単位 ID、確定後の SHA | 変更と既存 consumer への影響 | base、先行 / 同一単位、宣言入力、未解決 | 対象 tree ごとの結果または未実施理由 |
 
 例えば、既存 API を保つ新 API とそのテストを先に追加し、次に利用側を移行し、
 参照がなくなってから旧 API を削除する分割は、各段階を検証できる場合に成立します。
@@ -167,7 +221,7 @@ directory、branch、HEAD、依存 PR の revision、pin、local override / moun
 
 ### Commit Correctness Contract
 
-各 commit は、その祖先を含む tracked tree と固定済みの外部入力から、必要な
+各 commit は、その祖先を含む tracked tree と既存の依存宣言に従う外部入力から、必要な
 動作と選択済み validation が成立する単位です。後続 commit や作業中の tree で
 成功しても、その commit の成功とはみなしません。任意の base へ単独で
 cherry-pick できることまでは要求しません。
@@ -176,7 +230,7 @@ cherry-pick できることまでは要求しません。
 要求は最終 `T_n` だけでなく全ての `i` について次が成立することです。
 
 ```text
-required_inputs(T_i) are available in T_i or fixed E_i
+required_inputs(T_i) are available in T_i or declared E_i
 selected_validation(T_i, E_i) = pass
 ```
 
@@ -191,7 +245,7 @@ selected_validation(T_i, E_i) = pass
 - 既存の Git safety / worktree owner に従い、隔離した checkout または候補 tree
   から、その時点の設定・lock・生成手順で検証します。作業用 tree にしかない
   未 commit / untracked source、後続 commit の fixture、由来不明の生成物に
-  依存させません。tracked な生成手順と固定入力からの再生成は認めます。
+  依存させません。tracked な生成手順と記録した入力からの再生成は認めます。
   既存の user-owned tree を reset / clean / stash で変えず、検証出力は許可された
   ignored / external 領域へ出し、tracked tree が不変であることを確認します。
 - 分割、並べ替え、squash、rebase、競合解決で tree / 依存 / 検証条件が変わった

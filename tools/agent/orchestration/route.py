@@ -5,6 +5,7 @@
 # upstream design ../../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
 # upstream design ../../../agents/skills/task-routing.md task routing skill contract
 # upstream design ../../../agents/skills/catalog.yaml public skill catalog and related skill metadata
+# upstream design ../../../agents/task_catalog.yaml exclusive bounded and coordinated execution routes
 # upstream implementation ../skills/skill_route_catalog.py catalog/rule/index owner
 # upstream implementation ./capability_route.py capability preflight/decision owner
 # upstream implementation ../../validation/semantic/tools/visualization_contract.py exact D2.3 visualization ToolCall schema and validator
@@ -31,6 +32,11 @@ if __package__ in (None, ""):
     # Direct execution must import the canonical package from this checkout,
     # even when the caller's cwd is a standalone source root.
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+try:
+    import yaml
+except ModuleNotFoundError:
+    from tools.runtime.container import stdlib_yaml as yaml
 
 from tools.runtime.source.agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
 from tools.agent.orchestration.capability_route import (
@@ -281,9 +287,9 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "closeout",
         "closeout",
-        "Choose lightweight or full closeout evidence by risk.",
-        "select_closeout_gate",
-        ("python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>",),
+        "Select artifact-free or coordinated closeout from explicit execution context.",
+        "supply_execution_context_to_select_closeout",
+        (),
         (
             "closeout_profile_gate.py",
             "closeout-lite",
@@ -548,6 +554,10 @@ def build_parser(catalog: RouteCatalog) -> argparse.ArgumentParser:
     )
     parser.add_argument("--area", choices=[area.key for area in catalog.areas()])
     parser.add_argument(
+        "--execution-context",
+        help="explicit owner/topology/validation facts as JSON for --area closeout; '-' reads stdin",
+    )
+    parser.add_argument(
         "--name", action="append", default=[], help="long tool or skill name"
     )
     parser.add_argument(
@@ -608,6 +618,80 @@ def decide(area: RouteArea, risk: str, changed_paths: Sequence[str]) -> RouteDec
         skip_reason="",
         evidence=area.evidence_token(risk, changed_paths),
     )
+
+
+def decide_execution(root: Path, context: object) -> dict[str, object]:
+    """Project only the route selected by established owner/topology facts.
+
+    This plans closeout; it never executes validation or grants completion.
+    Missing facts must be resolved, not inferred from risk or changed paths.
+    """
+    catalog = yaml.safe_load((root / "agents/task_catalog.yaml").read_text(encoding="utf-8"))
+    if not isinstance(catalog, dict):
+        raise ValueError("execution-catalog-not-mapping")
+    policy = catalog.get("execution_route_policy")
+    if not isinstance(policy, dict):
+        raise ValueError("execution-route-policy-missing")
+    names: dict[str, list[str]] = {}
+    for key in ("singletons", "resolved", "coordination_reasons"):
+        values = policy.get(key)
+        if not isinstance(values, list) or not values or not all(
+            isinstance(value, str) and value for value in values
+        ) or len(set(values)) != len(values):
+            raise ValueError(f"execution-route-policy-invalid:{key}")
+        names[key] = values
+    routes = policy.get("routes")
+    if not isinstance(routes, dict) or set(routes) != {"bounded_fast_path", "coordination"}:
+        raise ValueError("execution-routes-invalid")
+    required = {*names["singletons"], *names["resolved"], "validation", "coordination"}
+    if not isinstance(context, dict) or not required <= context.keys() or (
+        context.keys() - required - {"validation_status"}
+    ):
+        raise ValueError("execution-context-fields-invalid")
+    for key in names["singletons"]:
+        if type(context[key]) is not int or context[key] < 1:
+            raise ValueError(f"execution-context-count-invalid:{key}")
+    for key in names["resolved"]:
+        if context[key] is not True:
+            raise ValueError(f"execution-context-unresolved:{key}")
+    validation = context["validation"]
+    if not isinstance(validation, str) or not validation.strip():
+        raise ValueError("execution-validation-oracle-unresolved")
+    reasons = context["coordination"]
+    if not isinstance(reasons, list) or not all(
+        isinstance(reason, str) and reason in names["coordination_reasons"] for reason in reasons
+    ):
+        raise ValueError("execution-coordination-reasons-invalid")
+    status = context.get("validation_status", "pending")
+    if status not in ("pending", "pass", "failed", "unavailable"):
+        raise ValueError("execution-validation-status-invalid")
+    bounded = all(context[key] == 1 for key in names["singletons"]) and not reasons
+    selected = "bounded_fast_path" if bounded else "coordination"
+    route = routes[selected]
+    if not isinstance(route, dict) or not isinstance(route.get("next_action"), str):
+        raise ValueError("execution-route-projection-invalid")
+    commands = route.get("commands")
+    if not isinstance(commands, list) or not all(isinstance(command, str) for command in commands):
+        raise ValueError("execution-route-commands-invalid")
+    result: dict[str, object] = {
+        "execution_route": selected,
+        "next_action": route["next_action"],
+        "commands": commands,
+        "selected_validation": validation,
+        "verification_status": "need verification" if status == "unavailable" else status,
+    }
+    if bounded:
+        states = route.get("states")
+        if not isinstance(states, list) or not states or not all(isinstance(state, str) for state in states):
+            raise ValueError("execution-route-states-invalid")
+        result["states"] = states
+    else:
+        # The full scheduling fields belong only to an activated coordination route.
+        scheduling = catalog.get("execution_time_policy")
+        if not isinstance(scheduling, dict) or scheduling.get("applies_to") != "coordination":
+            raise ValueError("execution-scheduling-policy-invalid")
+        result["execution_time_policy"] = scheduling
+    return result
 
 
 def read_prompt_file(root: Path, raw_path: str) -> str:
@@ -1399,6 +1483,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SourceRootFailure as exc:
         print(f"ROUTE_SOURCE_ROOT_FAILURE={exc.code}:{exc.detail}", file=sys.stderr)
         return 2
+
+    if args.execution_context is not None:
+        if args.area != "closeout" or prompt_text or args.name or args.list:
+            parser.error("--execution-context requires --area closeout without another route selector")
+        try:
+            raw = sys.stdin.read() if args.execution_context == "-" else args.execution_context
+            decision = decide_execution(source_root.source_root, json.loads(raw))
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            print(f"EXECUTION_ROUTE_ERROR={exc}", file=sys.stderr)
+            return 2
+        if args.format == "json":
+            print(json.dumps(decision, indent=2))
+        elif args.format == "markdown":
+            print("\n".join(f"**{key}**: `{json.dumps(value)}`" for key, value in decision.items()))
+        else:
+            print("\n".join(f"{key.upper()}={json.dumps(value)}" for key, value in decision.items()))
+        return 0
+
+    if args.area == "closeout" and not prompt_text and not args.name:
+        # Without established context, advertise selection, not a run-bundle command.
+        area = next(area for area in build_default_areas() if area.key == "closeout")
+        print(renderer.render_decision(decide(area, args.risk, args.changed)))
+        return 0
 
     if prompt_text:
         try:

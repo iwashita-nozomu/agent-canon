@@ -100,7 +100,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
 - 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
-- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は [agents/canonical/CODEX_WORKFLOW.md](CODEX_WORKFLOW.md) の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
+- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は [agents/canonical/CODEX_INTAKE.md](CODEX_INTAKE.md) の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
 - subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
 - fresh subagent は必要な launch ごとに [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
@@ -245,7 +245,7 @@ structured handoff または、coordination/resumption が必要な場合の dur
   machine token のまま実行し、typed failure semantics を保持します。
 - `tool_evidence`: `dynamic_skill_routing` の候補、`tool_catalog_matches`、実行済み
   tool packet の結果。
-- `tool_reuse_ledger` と `pre_edit_rejection_prediction`: selected write-capable implementer には、既存 tool を使うか拒否した理由と `tool_rejection_preflight.py` の結果または pending blocker を渡します。
+- `tool_reuse_ledger`: selected write-capable implementer には、既存 tool を使うか拒否した理由を渡します。予測検査の扱いは [Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) に従います。
 
 The worker prompt begins with the parent-selected `reuse_survey` assets and
 test paths when known; for split or extraction work, the splitter inspects

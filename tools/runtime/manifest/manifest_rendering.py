@@ -24,32 +24,17 @@ from typing import cast
 
 import yaml
 
-if __package__:
-    from tools.repository.workspace.parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
-else:
-    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
+from tools.repository.workspace.parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 
-if __package__:
-    from tools.runtime.authority.checkout_identity import resolve_checkout_identity
-else:
-    from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 
-if __package__:
-    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
-else:
-    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 from tools.agent.orchestration.route import decide_skills, load_skill_route_rules
 from tools.agent.skills.skill_tool_commands import (
@@ -62,139 +47,69 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
     import_decision_sufficiency_verdict,
 )
 
-if __package__:
-    from tools.agent.orchestration.packets import (
-        ActiveDesignPacketConfig,
-        active_design_packet_artifact_map,
-        active_design_packet_mapping,
-        active_design_packet_reference_projection,
-        iter_artifacts,
-        mathematical_intent_packet_mapping,
-        mathematical_intent_route_config,
-        math_intent_route_id_for_spec,
-        resolve_math_intent_packet_for_spec,
-        resolve_active_design_packet_config,
-        resolve_cross_cutting_document_packet,
-        resolve_role_document_packet,
-        role_specific_document_entries,
-        selected_role_outputs,
-    )
-else:
-    from tools.agent.orchestration.packets import (
-        ActiveDesignPacketConfig,
-        active_design_packet_artifact_map,
-        active_design_packet_mapping,
-        active_design_packet_reference_projection,
-        iter_artifacts,
-        mathematical_intent_packet_mapping,
-        mathematical_intent_route_config,
-        math_intent_route_id_for_spec,
-        resolve_math_intent_packet_for_spec,
-        resolve_active_design_packet_config,
-        resolve_cross_cutting_document_packet,
-        resolve_role_document_packet,
-        role_specific_document_entries,
-        selected_role_outputs,
-    )
+from tools.agent.orchestration.packets import (
+    ActiveDesignPacketConfig,
+    active_design_packet_artifact_map,
+    active_design_packet_mapping,
+    active_design_packet_reference_projection,
+    iter_artifacts,
+    mathematical_intent_packet_mapping,
+    mathematical_intent_route_config,
+    math_intent_route_id_for_spec,
+    resolve_math_intent_packet_for_spec,
+    resolve_active_design_packet_config,
+    resolve_cross_cutting_document_packet,
+    resolve_role_document_packet,
+    role_specific_document_entries,
+    selected_role_outputs,
+)
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import (
-        resolve_role_write_scope,
-        schedule_wave_row,
-    )
-else:
-    from tools.repository.workspace.workspace_scope import (
-        resolve_role_write_scope,
-        schedule_wave_row,
-    )
+from tools.repository.workspace.workspace_scope import (
+    resolve_role_write_scope,
+    schedule_wave_row,
+)
 
-if __package__:
-    from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
-    from tools.runtime.authority.writer_target import parse_writer_target
-else:
-    from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
-    from tools.runtime.authority.writer_target import parse_writer_target  # type: ignore[no-redef]
+from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
+from tools.runtime.authority.writer_target import parse_writer_target
 
-if __package__:
-    from tools.agent.orchestration.team_config import (
-        ROOT,
-        Role,
-        RunBundleSpec,
-        SubagentWaveSlot,
-        TeamConfig,
-        _as_mapping_tuple,
-        _as_object_mapping,
-        _as_optional_string,
-        _as_required_string,
-        _as_string_tuple,
-        normalized_public_skill_name,
-        load_task_catalog,
-        load_team_config,
-        resolve_workflow_family,
-        workflow_child_handoff_required,
-    )
-else:
-    from tools.agent.orchestration.team_config import (
-        ROOT,
-        Role,
-        RunBundleSpec,
-        SubagentWaveSlot,
-        TeamConfig,
-        _as_mapping_tuple,
-        _as_object_mapping,
-        _as_optional_string,
-        _as_required_string,
-        _as_string_tuple,
-        normalized_public_skill_name,
-        load_task_catalog,
-        load_team_config,
-        resolve_workflow_family,
-        workflow_child_handoff_required,
-    )
+from tools.agent.orchestration.team_config import (
+    ROOT,
+    Role,
+    RunBundleSpec,
+    SubagentWaveSlot,
+    TeamConfig,
+    _as_mapping_tuple,
+    _as_object_mapping,
+    _as_optional_string,
+    _as_required_string,
+    _as_string_tuple,
+    normalized_public_skill_name,
+    load_task_catalog,
+    load_team_config,
+    resolve_workflow_family,
+    workflow_child_handoff_required,
+)
 
-if __package__:
-    from tools.agent.orchestration.tool_calls import (
-        TOOL_CALL_SCHEMA,
-        materialize_dynamic_route_tool_call_token,
-        materialize_skill_tool_call_token,
-    )
-else:
-    from tools.agent.orchestration.tool_calls import (
-        TOOL_CALL_SCHEMA,
-        materialize_dynamic_route_tool_call_token,
-        materialize_skill_tool_call_token,
-    )
+from tools.agent.orchestration.tool_calls import (
+    TOOL_CALL_SCHEMA,
+    materialize_dynamic_route_tool_call_token,
+    materialize_skill_tool_call_token,
+)
 
-if __package__:
-    from tools.agent.orchestration.implementation_dispatch import (
-        _capacity_projection,
-        _CapacityRuntime,
-        _closeout_projection,
-        capacity_runtime_for_spec,
-        codex_runtime_max_depth,
-        codex_runtime_max_threads,
-        default_quality_check_agent_types,
-        default_quality_check_role_ids,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_initial_subagent_wave,
-        recommended_initial_subagent_wave_slots,
-        workflow_spawn_budget,
-    )
-else:
-    from tools.agent.orchestration.implementation_dispatch import (
-        _capacity_projection,
-        _CapacityRuntime,
-        _closeout_projection,
-        capacity_runtime_for_spec,
-        codex_runtime_max_depth,
-        codex_runtime_max_threads,
-        default_quality_check_agent_types,
-        default_quality_check_role_ids,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_initial_subagent_wave,
-        recommended_initial_subagent_wave_slots,
-        workflow_spawn_budget,
-    )
+from tools.agent.orchestration.implementation_dispatch import (
+    _capacity_projection,
+    _CapacityRuntime,
+    _closeout_projection,
+    capacity_runtime_for_spec,
+    codex_runtime_max_depth,
+    codex_runtime_max_threads,
+    default_quality_check_agent_types,
+    default_quality_check_role_ids,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
+    recommended_initial_subagent_wave_slots,
+    workflow_spawn_budget,
+)
 
 
 def _as_prompt_entry_tuple(value: object, field_name: str) -> tuple[str, ...]:
@@ -355,7 +270,7 @@ USER_FACING_LANGUAGE_RULE = (
 )
 
 CONTRACT_COMPLETE_IMPLEMENTATION_POLICY_SOURCE = (
-    "agents/canonical/CODEX_WORKFLOW.md#Implementation"
+    "agents/canonical/CODEX_IMPLEMENTATION.md#5-implementation"
 )
 
 CONTRACT_COMPLETE_IMPLEMENTATION_SCOPE_BASIS = "contract_required_behavior"
@@ -627,7 +542,6 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "implementation_surface_route",
     "repo_tool_routing_policy",
     "tool_reuse_ledger",
-    "pre_edit_rejection_prediction",
     "dependency_files_header_plan",
     "next_review_gate",
     "checkout_identity",
@@ -1125,10 +1039,7 @@ def render_template(
 
 def render_code_template(template_name: str) -> str:
     """互換 facade から package-safe code-template renderer を呼び出します."""
-    if __package__:
-        from tools.agent.templates.code_template_rendering import render_code_template as render_source
-    else:
-        from tools.agent.templates.code_template_rendering import render_code_template as render_source
+    from tools.agent.templates.code_template_rendering import render_code_template as render_source
     return render_source(template_name)
 
 
@@ -1503,7 +1414,7 @@ def manifest_run_lines(
             "    implementation_surface_route_status: pending",
             f"    implementation_surface_route_command: {public_command_for_spec(spec, ('python3', 'tools/analysis/search/search.py', '--query-file', '<request-or-design-question.txt>', '--providers', 'text,semantic,vector,tool,header-deps,code-deps', '--format', 'json'))!r}",
             "    tool_reuse_ledger_status: required_before_custom_implementation",
-            "    pre_edit_rejection_prediction_status: pending",
+            "    pre_edit_rejection_prediction_status: optional_diagnostic",
             f"    pre_edit_rejection_command: {public_command_for_spec(spec, ('python3', 'tools/validation/semantic/tools/tool_rejection_preflight.py', '--root', '.', '<planned-edit-paths>'))!r}",
             "  standard_wave_sequence:",
             "    activation: candidate_sequence_selected_per_wave",
@@ -2518,7 +2429,6 @@ def render_subagent_prompt_packet(
     lines.append(f"{indent}    - tool_route")
     lines.append(f"{indent}    - tool_call_tokens")
     lines.append(f"{indent}    - tool_evidence")
-    lines.append(f"{indent}    - tool_rejection_prediction")
     lines.append(f"{indent}  checkout_identity:")
     lines.append(f"{indent}    command: {CHECKOUT_IDENTITY_COMMAND!r}")
     lines.append(f"{indent}    fields:")

@@ -100,7 +100,8 @@ Intent preservation routes:
 
 | Changed surface | Required check |
 | --- | --- |
-| Markdown docs only | `tools/bin/agent-canon docs check`; changed-file dependency header checks |
+| AgentCanon Markdown docs only | `tools/bin/agent-canon docs check`; changed-file dependency header checks |
+| Project-owned Markdown docs only | the project documentation owner's selected validation; no additional AgentCanon checker, runtime-catalog probe, or unselected-check receipt |
 | Python code/tests | targeted `pytest`; `python3 -m pyright`; `python3 -m ruff check ...` |
 | AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; shared-surface sync; workflow/PR checks; strict dependency review as the dependency-header/graph judgment owner; standalone-source tool_drift coverage once; docs check; generated-artifact guard; standalone-source prompt/accumulated evals remain in the existing static-gates owner; derived shared gates exclude AgentCanon development prompt/accumulated eval producers and parent-owned diagnostics; standalone shared gates remain the existing static-gates owner and add no repository-wide project-quality job; derived parent workflows expose the canonical project-quality owner marker and `make ci` command; job names are not an authority; no repository-wide project-quality runner is added to the shared gate |
 | Root bootstrap or runtime lifecycle | `install -> start -> target add -> status -> codex prepare -> tool/exec`; `eval collect -> eval sync` or an explicit pending receipt; `stop -> gc -> uninstall -> resource absence readback` |

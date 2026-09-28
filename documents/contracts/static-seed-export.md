@@ -61,6 +61,10 @@ prose keyword 探索を行いません。exporter と consumer checker は全 pa
 case-normalize して、`agents/skills/`、`agents/model_profiles.toml`、
 `tools/agent_tools/`、`../../agents/`、`../../tools/` の exact prefix を拒否します。
 
+Projectionの詳細は [consumer-static設計](../design/static-seed-consumer-static-projection.md)、
+maintainerの実行・検証手順は [Static Seed Commands](../tools/export_static_seed.md) を参照します。
+consumer runtimeの追加手順ではありません。
+
 ## 生成規則
 
 maintainer は source commit を明示して export します。

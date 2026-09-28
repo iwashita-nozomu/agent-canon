@@ -90,8 +90,8 @@ method note、symbol-dense claim-heavy explanation の文書を、共通 graph/D
 1. TeX output plan が active なら `.tex` source を作り、document は `latexmk -pdf`、図版は `latexmk -pdf` と `dvisvgm` / `pdfcrop` で検証する
 1. reverse outline を取る
 1. `document_flow_reviewer` を通す
-1. `notation_definition_reviewer` に notation review を通す
-1. `logic_gap_reviewer` に logic-gap review を通す
+1. `notation_definition_reviewer` に [notation review](../internal-routines/notation-definition-review.md) を通す
+1. `logic_gap_reviewer` に [logic-gap review](../internal-routines/logic-gap-review.md) を通す
 1. 別 reviewer に docs completeness review を通す
 1. higher-order revision を終えてから line edit に入る
 1. `tools/bin/agent-canon docs check` で閉じる

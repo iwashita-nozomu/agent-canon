@@ -182,10 +182,9 @@ issues = []
 id = "shared-tooling"
 owner = "agent-canon"
 class = "tooling"
-description = "Shared tool implementations, tool catalog, compiled tooling, and helper policy."
+description = "Shared tool implementations, tool catalog, and compiled tooling."
 paths = [
   "tools/**",
-  "helper_inventory_guard_policy.json",
 ]
 exclude_paths = [
   "eval/**",
@@ -219,7 +218,9 @@ owner = "agent-canon"
 class = "shared_policy"
 description = "Shared policy, design, operational documents, root metadata, memory, notes, and references."
 paths = [
+  ".clang-format",
   ".dockerignore",
+  ".editorconfig",
   ".gitattributes",
   ".gitignore",
   "CONTAINER_OPERATIONS.md",
@@ -227,6 +228,8 @@ paths = [
   "PHILOSOPHY.md",
   "README.md",
   "responsibility-scope.toml",
+  "ruff.toml",
+  "rustfmt.toml",
   "codex-cli-guide/**",
   "documents/**",
   "memory/**",

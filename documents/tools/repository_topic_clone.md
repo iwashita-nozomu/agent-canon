@@ -48,6 +48,9 @@ write-capable handoff の各 allowed path は repeated `--allowed-path <relative
 [clone ライフサイクル](../rule/repository-topic-clone.md#clone-ライフサイクル)、
 復元可能性・marker・任意 publication evidence・削除可否は
 [クリーンアップ](../rule/repository-topic-clone.md#クリーンアップ) を確認してから操作します。
+`linked-worktree` の `cleanup --apply` は worktree/topic path のみを回収し、request の local topic branch
+を保持します。この command に branch deletion authority を追加せず、branch 操作は既存 owner の別 operation
+として扱います。
 `merge-main` の成功結果は ancestor proof を返します。
 adapter の `status` と `projected_clone_path` は directory を作らない read-only projection です。
 

@@ -33,13 +33,31 @@ A bounded non-split edit with no reuse choice may use `scope=not_applicable`, bu
 1. Before any file or worker slice, construct the single current asset universe. For code split/extraction or a missing suspected predecessor, extend that same universe with Git history/deleted paths, prior PR/Issues, predecessor tests, and relevant design documents.
 2. Assign every discovered candidate exactly one supported disposition and bind the reason and test paths. A completed universe with no candidates keeps `decisions` empty; it does not gain a synthetic `reject`. When actual candidates exist, a proposed new surface is admissible only when every candidate in the completed/bounded universe is explicitly `reject` with evidence.
 3. Build `direct_luna_handoff_packet_v1` with `tools/agent/orchestration/direct_luna_dispatch.py`. `workspace-write` fails closed on a missing/incomplete survey, duplicate candidate path, missing evidence dimension, write disposition outside `allowed_paths`, or asset/test path that crosses `do_not_read`.
-4. Spawn direct `gpt-5.6-luna` with `fork_turns="none"` and the serialized packet. The serialized `reuse_survey` is the worker/reviewer prompt evidence; do not restate or independently reconstruct it.
+4. For a necessary launch under [Context-preserving continuation](#context-preserving-continuation), spawn direct `gpt-5.6-luna` with `fork_turns="none"` and the serialized packet. The serialized `reuse_survey` is the worker/reviewer prompt evidence; do not restate or independently reconstruct it.
 5. Read back the effective child model and reasoning effort before admitting work.
 6. If the override is rejected or unavailable, return `direct_luna_unavailable`.
 7. If effective metadata is hidden or differs from the request, return `direct_luna_unverified`.
 8. Never substitute Sol, Terra, Spark, or a legacy role alias after either blocker.
 9. Accept only the packet's expected output, evidence, blockers, and validation observations as the handback.
-10. Continue by updating the same active verified child, or start a fresh Luna child with another bounded packet. Do not use unverified native resume.
+10. Continue with the same active verified child, sending only the changed objective, findings, or scope within its authority. Use the continuation rules below when reuse is not possible. Do not use unverified native resume.
+
+## Context-preserving continuation
+
+Reuse a compatible active worker through implementation and repair. Stage changes,
+packet names, or prompt shortening do not justify closing it and reloading context.
+Use existing source/design references and send only the relevant delta.
+
+An unavailable fixed worker is a blocker, not a reason to spawn a read-only Luna
+reviewer and then a new Luna writer, even with explicit identical model selection.
+Preserve the candidate and packet, report the blocked scope, and continue unaffected
+authorized work without parent implementation or model substitution.
+
+Start a fresh child only for an already selected responsibility that cannot reuse
+an existing compatible child: initial work, an actually ended/lost child, or required
+independent review. An unchanged authorization, model, or runtime blocker is not
+cleared by a new role or packet. When review is independently required, keep it
+separate from the author and reuse the reviewer for focused rechecks; return fixes
+to the same active authorized writer, not a newly spawned writer by default.
 
 ## Authority invariants
 
@@ -50,6 +68,10 @@ Luna identity never grants write access. Read-only responsibilities remain read-
 Let `P` be the physical execution-profile set and `R_active` the active logical-role instances. Static runtime configuration is `O(|P|)` and communication is `O(|R_active|)`. Adding a logical role that reuses an existing Luna profile must not add another physical team member.
 
 For an applicable survey, let `A` be the finite discovered asset set and `D` the seven supported dispositions. Admission requires a total single-valued map `d: A -> D`; duplicate paths, unclassified candidates, or missing evidence make the map undefined and therefore block the write packet. Worker and reviewer packets serialize the same `reuse_survey`, so prompt projection adds no second decision state.
+
+Model identity does not preserve context: fresh reviewer and writer instances each
+reconstruct their needed context, while compatible continuation reuses it and needs
+only the delta. This is the engineering basis, not a measured token-saving claim.
 
 ## Output
 

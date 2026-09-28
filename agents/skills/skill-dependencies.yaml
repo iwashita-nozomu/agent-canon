@@ -841,6 +841,7 @@ skill_dependencies:
     - agent-log-analysis
     - runtime-log-repair
     - result-artifact-writeout
+    - empirical-prompt-tuning
     successors: []
     order_constraints: []
     parallel_independent:

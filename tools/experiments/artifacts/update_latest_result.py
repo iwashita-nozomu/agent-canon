@@ -28,26 +28,15 @@ from pathlib import Path
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-if __package__:
-    from tools.experiments.lifecycle.experiment_identity import (
-        DuplicateJSONKeyError,
-        ExperimentIdentity,
-        contained_path,
-        load_json_file,
-        load_json_text,
-        report_relative_path,
-        validate_segment,
-    )
-else:
-    from tools.experiments.lifecycle.experiment_identity import (  # type: ignore[no-redef]
-        DuplicateJSONKeyError,
-        ExperimentIdentity,
-        contained_path,
-        load_json_file,
-        load_json_text,
-        report_relative_path,
-        validate_segment,
-    )
+from tools.experiments.lifecycle.experiment_identity import (
+    DuplicateJSONKeyError,
+    ExperimentIdentity,
+    contained_path,
+    load_json_file,
+    load_json_text,
+    report_relative_path,
+    validate_segment,
+)
 
 LATEST_JSON_PREFIX = "LATEST."
 LATEST_JSON_SUFFIX = ".json"

@@ -17,6 +17,9 @@ upstream design agent-canon-technology-bibliography.md external source-record an
 > [!IMPORTANT]
 > 本書でいう **「MoE 型」** は、モデル内部の学習済み sparse Mixture-of-Experts を指さない。アプリケーションが、タスク単位で **モデル × 推論量 × 役割プロンプト × ツール権限 × コンテキスト断片**を選ぶ「外部ルーティング型の専門家混合」を指す。したがって、正確には **task-level heterogeneous ensemble / mixture-of-agents** である。
 
+> 現行AgentCanonの実行規約へ適用する前に [policy status](gpt-5.6-benchmark-policy-status.md) を確認してください。
+> この過去レポートの固定agent数や一律の二相write手順は現行policyの正本ではありません。
+
 ## 目次
 
 1. [エグゼクティブサマリー](#1-エグゼクティブサマリー)

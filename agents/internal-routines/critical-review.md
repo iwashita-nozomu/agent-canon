@@ -46,4 +46,4 @@ upstream design ../canonical/skills.md skill canon registry
 ## Boundary
 
 - report の reader-facing 構成は `report-review` を使います。
-- 実装差分そのものの回帰 review は `change-review` または `code-review` を使います。
+- 実装差分そのものの回帰 review は [`change-review`](../skills/change-review.md) を使います。

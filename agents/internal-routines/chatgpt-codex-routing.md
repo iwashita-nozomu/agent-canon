@@ -9,6 +9,7 @@ upstream design ../../documents/design/request-intent-and-update-relation.md exp
 downstream design ../../AGENTS.md standalone repository entrypoint consumer
 downstream design ../../ROOT_AGENTS.md live-integration entrypoint consumer
 downstream design ../skills/agent-orchestration.md Codex-side workflow and owner routing consumer
+downstream design github-connected-work.md current-session transport under the execution owner
 downstream implementation ../../.codex/personal/skills/_chatgpt-codex-routing/SKILL.md private runtime discovery adapter
 downstream implementation ../../tools/agent/orchestration/chatgpt_codex_routing.py deterministic decision owner
 downstream implementation ../../tests/agent_tools/test_chatgpt_codex_routing.py finite-relation and monotonicity validation
@@ -17,8 +18,8 @@ downstream implementation ../../tests/agent_tools/test_chatgpt_codex_routing.py 
 
 ## Purpose
 
-ユーザー要求を、ChatGPT の会話内で完結させるか、Codex で repository / workspace
-を観測・変更・検証しながら進めるかに分けます。この routine は入口の modality
+ユーザー要求を、会話内で完結させるか、repository / workspace
+を観測・変更・検証する既存の Codex execution owner に渡すかに分けます。この routine は入口の modality
 だけを所有し、Codex 内の workflow、skill、owner、review、subagent、validation
 selection は `agent-orchestration` に渡します。
 
@@ -111,6 +112,21 @@ Codex route は `handoff=agent-orchestration` とし、`codex_scope` と
 `validation_oracle` が `none` でないことを要求します。入口 gate はどの workflow や
 skill を使うかを決めません。
 
+### Execution owner and session transport
+
+`route=codex` は実行責務への admission であり、それだけで別 UI / process への移動を
+要求しません。`handoff=agent-orchestration` と選択した owner の規約を保持し、現在の
+セッションにある認可済み transport で必要な操作と evidence を取得できる場合は、
+そこで実行します。GitHub 接続を用いる publication の具体的な手順は、選択された
+`pr-processing` の [GitHub connected work](github-connected-work.md) に委譲します。
+入口 gate は tool、workflow、skill の第二の選択器を持ちません。
+
+`E` が要求する明示的な Codex 実行、`R` の local/uncommitted state、`X` の実際の
+command/runtime observation は remote source の readback で代替しません。
+取得できない evidence は未検証として残し、独立して進められる認可済み作業と
+引継ぎを分けます。`explicit_chat_only` の mutation 禁止は接続先にも適用します。
+接続で進めることを理由に fact、判定式、packet schema、owner の安全境界を変えません。
+
 ## Mixed Requests
 
 一つの request に説明と実装が含まれる場合、requested deliverable の一部でも
@@ -155,7 +171,9 @@ Chat-only conflict prepends `explicit_chat_only_conflict` to the true execution 
 3. Codex fact が一つでも true の場合、具体的な `codex_scope` と
    `validation_oracle` を固定します。
 4. `python3 tools/agent/orchestration/chatgpt_codex_routing.py --input <packet.json>` で
-   deterministic packet を生成します。
+   deterministic packet を生成します。実行環境のない接続セッションでは、上記と同じ
+   有限 relation と packet fields で事実を整理し、command 未実行を記録します。
+   判定だけのために bootstrap や別 runtime を新設しません。
 5. `route=chatgpt` は会話内で閉じます。`route=codex` だけを
    `agent-orchestration` へ渡します。
 

@@ -200,14 +200,14 @@ that decision.
 1. multi-agent にする場合でも、分割境界は `差し替え可能な単位` に限る。別実装、別証明、別文書責務、別 validation oracle、別 review decision に置き換え得る境界だけを slice / wave / worker scope にする。数理的に差し替えが発生しない境界、単なる記法・読解補助・固定 context・同じ oracle を共有する連続導出は分割せず、同じ packet と同じ owner scope に残す
 1. slice、decomposition、prototype、または worker handoff の前に、involved Git roots / modules が二つ以上か、module の consumer が dependency repository にあるかを先に判定する。条件を満たしたら、deferred / candidate の `$dependency-analysis` を ACTIVE に昇格・起動してから decomposition、prototype、worker handoff に進み、既存 packet の involved-root identities、edge kinds、topological order、dependency scope / reuse facts、common validation obligations を全 child に同じ shared context として relay する。各 child はその shared context から role / module 固有の `allowed_paths`、`do_not_read`、write scope、exact validation commands を導出し、同じ共通事実と個別 authority を handoff に持つ。単一 module で dependency-repository consumer がない場合は既存 fast pathを使い、これは新しい承認・artifact・machine gateではない
 1. subagent scheduling は `CODEX_SUBAGENTS.md` が所有する typed capacity handshake と lifecycle ledger を消費し、ready dependency-DAG frontier の stage owner ごとに `vertical dynamic wave` を組みます。requested / configured / platform-effective / workflow-demand / write-cap / nested-reserved / available を分離し、既知制約の最小値を startup で read back してから reservation 成功時だけ spawn します。capacity が足りない ready work は失敗させず queue し、durable handback、全 descendant close readback、reservation release を終えた slot から再開します。固定 active/write 数、disposable capacity probe、または generated role view は scheduling authority になりません
-1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
+1. selected coordination route では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
 1. prompt-derived skill routing が必要なら `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。編集を許可する場合だけ caller が `--mode repo-changing` を明示します。`bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
 1. [agents/skills/README.md](README.md) から current stage に必要な public skill だけを足す。依存 source clone / module lifecycle が scope の場合は `$dependency-module-change` を一般 route として先に選び、AgentCanon update はその具体例として後続に置く。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
 1. repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。
 1. owner boundary、差し替え可能な単位、validation route が閉じた bounded edit は、catalog の typed route が child handoff を要求する場合だけその route で実行する。parent は既存 tool と targeted validation を選択された child packet に指定するだけで、実行結果を自ら解釈しない。public API/behavior/schema の追加、縮小、削除、rename、restriction、deprecation、意味変更だけは `scoped_change` または broader route に進め、必要な dependency/consumer/migration/docs closure を形成する
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
-1. repo-changing execution では `python3 tools/validation/semantic/convention/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
+1. workflow/tooling の変更など、選択した validation route が要求する場合だけ `python3 tools/validation/semantic/convention/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
 1. implementation が scope に入るときだけ Codex routing を出す
 1. tool が既に check した property を `explorer` や read-only reviewer に再読解させない。subagent へ渡すのは structured tool artifact と owned finding scope で、tool output が必要な抽象を欠く場合は tool contract の不足として扱う
 
@@ -390,11 +390,35 @@ not create a second scheduling policy or reduce the requested responsibility.
 The machine-readable contract is
 `agents/skills/agent-orchestration.execution-contract.toml`; its production
 checker is `tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py`.
-The selected-skill command catalog owns the required checker invocation; this
-owner and its runtime shim do not duplicate that command.
+The selected-skill command catalog owns the maintenance checker invocation.
+Select it when this contract, its checker, or a declared consumer changes, not
+merely because a repository task uses this skill. This owner and its runtime
+shim do not duplicate that command.
 Validation command scope is governed by the preceding write-capable handoff
 trust boundary; work-conservation scheduling does not authorize a worker to
 expand a selected validation route.
+
+`agents/task_catalog.yaml#execution_route_policy` is the single execution-route
+selector. Reuse established owner/topology facts through `route.py --area closeout
+--execution-context <JSON>`; no separate packet file is required. Resolve unknown
+scope, public-contract boundaries, or validation oracles before choosing either
+execution route. One root, owner, and writer with no dependency, collision,
+publication, or resumption coordination selects `bounded_fast_path`; otherwise
+use existing `coordination`. Risk labels, prompt keywords, and file/line counts
+are not route predicates.
+
+The bounded route has exactly `route -> execute -> verify_close`. It does not
+materialize a run bundle, schedule, completion coverage, child packet, broad
+review, full suite, or inactive `not_applicable` / `not_selected` gate records.
+During `verify_close`, inspect the exact diff, run only selected validation,
+integrate latest main and resolve conflicts, then publish and read back the
+Issue branch/commit/PR and record scope, results, limitations, and status in the
+Issue and user report. Existing read-only/local-only/no-change exceptions still
+apply; the route does not manufacture commit/push evidence. Unavailable selected
+validation is `need verification`, not a pass or permission for unrelated tests.
+Failed validation remains failed. The router plans these operations; selecting
+an execution route never proves their completion. The existing coordinated
+`task_close.py` predicate is unchanged and is emitted only for `coordination`.
 
 Use a dependency/overlap graph only when the selected work has real ordering,
 schema, validation, publication, or collision edges. A node is a full
