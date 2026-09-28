@@ -29,7 +29,9 @@ else:
 
 from tools.runtime.manifest.manifest_rendering import build_manifest as _build_manifest
 from tools.runtime.manifest.manifest_rendering import has_template as _has_template
-from tools.runtime.manifest.manifest_rendering import render_template as _render_template
+from tools.runtime.manifest.manifest_rendering import (
+    render_template as _render_template,
+)
 from tools.runtime.manifest.manifest_rendering import (
     initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
 )
