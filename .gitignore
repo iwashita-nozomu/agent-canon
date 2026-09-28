@@ -44,3 +44,6 @@ workspace/
 # OS/editor noise
 .DS_Store
 .ipynb_checkpoints/
+
+# Obsidian-logs
+.obsidian/
