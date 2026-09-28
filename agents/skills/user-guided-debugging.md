@@ -4,14 +4,14 @@
 contract skill
 responsibility Documents user-guided-debugging for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../ROOT_AGENTS.md shared parent-executed debugging boundary
 downstream implementation ../../.codex/personal/skills/user-guided-debugging/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 
-
 ## Purpose
 
-ユーザーが明示したときだけ、debug / repair / refactor を 1 件ずつ進め、各修正の前後でユーザーが設計判断を差し込めるようにします。
+ユーザーが明示したときだけ、debug / repair / refactor を 1 件ずつ進め、各修正の前後でユーザーが設計判断を差し込めるようにします。親エージェントが直接担当し、サブエージェントは使いません。
 
 ## Use When
 
@@ -19,13 +19,17 @@ downstream implementation ../../.codex/personal/skills/user-guided-debugging/SKI
 - finding、test failure、runtime failure、hook failure を順番に修正する
 - 修正方針にユーザーの設計判断が入る可能性が高い
 
+## Execution Ownership
+
+親エージェントが調査・原因特定・修正・ユーザーが指示した検証・結果共有を直接担当します。
+read-only の探索やレビューも含め、新規起動・既存 child の再利用・並行する別調査へ委譲しません。
+ユーザーの判断と観測が次の操作を決める直列ループなので、対話 context と規定の実行経路を分断しません。
+[共通境界](../../ROOT_AGENTS.md#task-entry) が一般の orchestrator-only / child-handoff 規定に優先します。
+
 ## Core Loop
 
 1. 次に直す対象を 1 件選ぶ。
-1. 実装修復が必要なら、その対象 issue ごとに fresh な実装 worker を修復ハンドオフ前に準備する。`worker` が既定で、`spark_worker` は eligible な bounded repair に対して parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使う。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は explicit revised parent packet と wave を必須にする。
-1. 編集前に、チャットで対象 object、問題点、根拠、修復面を短く提示する。
-   - worker は問題点提示を経ずに patch に進まない（1 問題 1 修正の可視性を維持する）。
-1. 問題点を提示する前に patch しない。
+1. 編集前に、チャットで対象 object、問題点、根拠、修復面を短く提示してから、その問題を親が修正する。
 1. 根本原因が別 object に移ったら、編集前に新しい問題点を提示する。
 1. この cadence では、修正後に test、smoke run、lint、docs check、benchmark、その他 validation command を実行しない。patch 後にユーザーが明示した場合だけ実行する。
 1. patch 後にユーザーが validation 実行を明示し、その validation が fail した場合は、次の edit 方針を示す前に
@@ -41,5 +45,5 @@ downstream implementation ../../.codex/personal/skills/user-guided-debugging/SKI
 - この skill はユーザー明示時だけ使います。
 - `agent-orchestration` の既定 routing には入れません。
 - validation 実行はこの cadence の既定動作ではありません。必要な validation route は提示できますが、実行はユーザーの明示指示後に限ります。
-- 大規模 repair wave 自体は `refactor-loop` の責務です。この skill はその中の user-visible debug cadence を規定します。
+- 難易度・複数ファイル・検証失敗を理由に自律 wave へ切り替えません。ユーザーが自律作業への切替を明示した場合だけ通常の routing に戻し、大規模 repair は [refactor-loop](refactor-loop.md) の責務とします。
 - report や artifact 作成が必要なら `tool-finding-report` / `report-writing` を併用します。

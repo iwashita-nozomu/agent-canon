@@ -81,6 +81,17 @@ and rerun limits, and failure semantics. Route changes and repair require scope
 and authority at that owner. Stop only affected actions; do not rebuild for
 ordinary work or replace a required backend to claim validation.
 
+Bound audits, reviews, and validation by the requested task; audit another backend
+only when explicitly named or required by a cross-backend guarantee. Leave its
+implementation, configuration, runtime, and logs untouched; do not run or repair
+it for parity or completeness. Backend differences alone are not defects. For
+shared changes, validate the changed shared contract without auditing unrelated
+backend internals. Briefly record exclusions in the existing Issue/PR when
+relevant; do not make them failures, verification debt, required follow-ups, or
+completion conditions. Do not add probes, adapters, settings, or measurements
+solely to audit an excluded backend. If a required in-scope backend is unavailable,
+report it as unverified; do not substitute another backend.
+
 Check algorithms against equations and assumptions before numerical adjustments;
 require error analysis rather than arbitrary offsets or tolerances. Report actual
 status and limits; numerical symptoms alone do not establish research failure or
@@ -118,6 +129,13 @@ unverified; do not add setup, gates, or unrelated completion criteria.
 Resolve the task owner and validation route. Keep bounded work bounded; broader
 design, orchestration, research, or delegation activates only under its owner's
 conditions. AgentCanon maintenance does not authorize consumer generated-file edits.
+
+User-guided debugging is parent-executed: keep investigation, edits, and any
+user-requested validation in the same parent session, without subagents.
+This boundary overrides orchestrator-only and mandatory child-handoff rules
+while that cadence is active; do not delegate through existing children or
+parallel read-only work. Only an explicit user change of cadence returns to
+autonomous routing.
 
 Continue safe, authorized implementation through delivery; report concrete blockers
 and the next owner when stopped. Separate commit/push authority and preserve mixed
