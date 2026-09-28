@@ -7,7 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../documents/design/responsibility-rationale.md durable finding and OOP-review activation rationale
-upstream design ../../documents/design/responsibility-cleanup.md duplicate retirement and required consumer migration contract
+upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and required consumer migration contract
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first review precedence and evidence model
 upstream design ../../documents/conventions/common/03_comments.md decision-comment review policy
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue authority and packet policy
@@ -21,7 +21,10 @@ The review packet consumes the active DIC-010 path+section+clause/ref closure re
 
 ## Purpose
 
-Review the actual diff and selected validation evidence findings-first. Findings must be grounded in reachable behavior, contract/design drift, or a concrete maintenance/safety failure; broad style preferences are non-blocking guidance.
+Review the actual diff, resulting in-scope code, and selected validation evidence findings-first.
+The diff is an entry point, not a boundary that hides unchanged superseded code or missing deletions.
+Findings must be grounded in reachable behavior, contract/design drift, or a concrete maintenance/safety
+failure; broad style preferences are non-blocking guidance.
 
 ## Software Engineering Principle Review
 
@@ -80,10 +83,14 @@ A repeated-responsibility finding is material only when evidence shows at least 
 - multiple sites act as independent authorities for the same invariant or policy;
 - the sites can drift independently and produce observably inconsistent behavior.
 
-Prefer direct use of an existing canonical owner. For a confirmed duplicate selected for retirement,
-apply [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-even when callers remain. Those callers identify necessary migration work, not a reason to retain
-the old entrypoint or waive affected consumer repairs. Do not demand unrelated consumer changes.
+Prefer direct use of an existing canonical owner. For implementation replacement, consolidation,
+or confirmed duplicate retirement, apply
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+without requiring a separate retirement request or zero callers. Review the resulting retained
+implementation and exclusive support, not just changed lines. A missing-deletion finding identifies
+the obsolete contribution, the retained owner that satisfies its contract, and the unnecessary
+maintenance or compatibility surface. Follow RC-09 for required public compatibility and consumer
+repairs; do not demand unrelated consumer changes or preserve the old implementation for a smaller diff.
 Extract a shared abstraction only at a stable responsibility boundary that passes abstraction admission.
 Retain separate implementations only for evidenced differences in
 domain meaning, lifecycle, failure semantics, caller contracts, or change reasons. Caller-specific
@@ -102,7 +109,7 @@ prospective compound-responsibility-name stop in [命名規約](../../documents/
 For deletion or refactor review, require the `$code-cleanup` line/block mapping content itself; a claim-only
 handoff without mapping rows/content is insufficient. Names, symbols, search hits, and diff size are not deletion proof; numerical meaning must be
 reconstructed before architecture or JIT changes. Follow the streaming cleanup route and RC-09 for
-retired duplicates; a remaining caller does not justify reimplementation or per-line validation.
+replacement and retirement; a remaining caller does not justify reimplementation or per-line validation.
 
 ## Code Comment Review
 
@@ -151,7 +158,7 @@ Do not duplicate a second SOLID-sensitive trigger table in this skill.
 
 1. Read base/head and the changed surface.
 2. Read the owning contract/design, the material engineering-principle clause, and targeted validation evidence.
-3. When the changed surface adds or changes a responsibility, inspect evidence-linked sibling implementations; if `|S(R)| >= 2`, evaluate canonical ownership, stable abstraction, or evidence-backed intentional separation.
+3. When the changed surface adds, replaces, or changes a responsibility, inspect evidence-linked sibling and superseded implementations. Apply RC-09 to missing deletions; if `|S(R)| >= 2`, evaluate canonical ownership, stable abstraction, or evidence-backed intentional separation.
 4. Review changed comments and comments adjacent to changed logic for required local rationale, stale assumptions, and same-diff synchronization under the canonical comment policy.
 5. When regression evidence changes, apply [Regression Evidence Review](#regression-evidence-review) to the diff and execution evidence.
 6. Report blocking correctness/safety/design findings before summary.
@@ -232,10 +239,12 @@ root-cause closure, not a minimum diff. `minimum-diff`, `smallest-local-patch`,
 and `smallest patch` are explicitly prohibited as repair objectives. Select the
 complete replaceable owning responsibility unit identified by the evidence,
 even when that unit spans more than the file containing the symptom.
+Among contract-complete repairs, apply SEP-06 to minimize the final maintained code space.
 
 The selected unit closes the root mechanism and covers its required retained
 behavior, side effects, failure handling, rollback, cleanup, docs, tests, and
-selected validation. For RC-09 retirement, this includes repairing and validating
+selected validation. For RC-09 replacement or retirement, this includes deleting superseded
+implementation and exclusive support, and repairing and validating
 consumers whose contracts or connections change. Remaining-reference errors in
 retained consumers reveal missed migration, not successful completion. Distinguish
 intentional negative tests of retired entrypoints from those errors, retained-owner
@@ -249,7 +258,7 @@ Symptom suppression, a wrapper or compatibility shim that leaves the root
 mechanism open, test-only relaxation or oracle weakening, and a nearby local
 patch without root mechanism closure are repair failures. A smaller diff is
 acceptable only when the evidence proves that the complete owning unit and all
-reachable effects are fully closed; size is never the selection criterion.
+reachable effects are fully closed; diff size is never the selection criterion.
 
 The action reaches
 `complete_owning_unit_selected -> root_mechanism_closed -> reachable_effects_closed ->
@@ -260,7 +269,7 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
 ## Default Sequence
 
 1. `git diff --stat` と `git diff --name-only` で変更面を固定します。
-1. 破壊的変更、削除、rename、config 変更を先に見ます。
+1. 破壊的変更、削除、rename、config 変更と、置換による削除漏れを先に見ます。
 1. 変更された責務ごとに evidence-linked sibling implementation を確認します。独立編集可能な同一責務が複数ある場合は、change reason、invariant/policy、lifecycle/effect owner、failure semantics、caller contract を照合し、canonical owner への委譲、安定した抽象化、または根拠ある分離を判定します。回数や textual similarity だけでは finding にしません。
 1. 変更された code comment と、その comment が説明する近傍 logic を対応付け、共通コメント規約の必要条件、正確性、同一差分での同期を確認します。comment density や自明な説明の有無は finding にしません。
 1. 変更面について、causal ambiguity または owner/fix/validation を変え得る

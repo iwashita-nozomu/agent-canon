@@ -26,35 +26,19 @@ if __package__ in (None, ""):
 
 import yaml
 
-if __package__:
-    from tools.agent.orchestration.packets import (
-        ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
-        ACTIVE_DESIGN_PACKET_FIELDS,
-        ACTIVE_DESIGN_PACKET_SCHEMA,
-        active_design_packet_mapping,
-        normalize_active_design_packet_config,
-    )
-else:
-    from tools.agent.orchestration.packets import (
-        ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
-        ACTIVE_DESIGN_PACKET_FIELDS,
-        ACTIVE_DESIGN_PACKET_SCHEMA,
-        active_design_packet_mapping,
-        normalize_active_design_packet_config,
-    )
+from tools.agent.orchestration.packets import (
+    ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
+    ACTIVE_DESIGN_PACKET_FIELDS,
+    ACTIVE_DESIGN_PACKET_SCHEMA,
+    active_design_packet_mapping,
+    normalize_active_design_packet_config,
+)
 
-if __package__:
-    from tools.repository.workspace.workspace_scope import (
-        ReportBundleArtifactPathError,
-        resolve_report_bundle_artifact_path,
-        resolve_report_root,
-    )
-else:
-    from tools.repository.workspace.workspace_scope import (
-        ReportBundleArtifactPathError,
-        resolve_report_bundle_artifact_path,
-        resolve_report_root,
-    )
+from tools.repository.workspace.workspace_scope import (
+    ReportBundleArtifactPathError,
+    resolve_report_bundle_artifact_path,
+    resolve_report_root,
+)
 from tools.runtime.artifacts.report_artifact_checks import (
     check_schedule_artifact,
     check_work_log_artifact,

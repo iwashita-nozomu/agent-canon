@@ -4793,7 +4793,7 @@ def render_document_check_report(
             "",
             "## Next Route",
             "",
-            "Use the diagnostics and integration artifacts first. If a diagnostic carries a verification route, verify and rerun this command before writing settled prose.",
+            "Use the diagnostics and integration artifacts first. For a selected graph analysis, if a diagnostic carries a verification route, verify and rerun this command to update that analysis; the route does not gate ordinary writing.",
             "",
         ]
     )
