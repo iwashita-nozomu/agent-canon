@@ -98,10 +98,13 @@ CIで同じimageとtest commandを再利用できる状態にします。
 - image外に残すsource/data/model/credential/device等のruntime input
 - Dev Container、Compose、CIが参照する同一image target
 - Dockerfile外installerを削除する変更面
-- validation commandとrollback
+- 置換する旧環境・専用資源、必要データの移行先、削除確認
+- validation commandと失敗時の復旧方法（旧環境の温存ではなく正本から再構築）
 
 ## Operating Rules
 
+- 再構築・置換は[environment-cleanupの廃棄手順](environment-cleanup.md#rebuild-cleanup)を使い、
+  旧環境の削除まで同じ作業で閉じます。現行shared imageの再利用規則を旧環境の保持理由にしません。
 - dependencyの追加・移動・削除がある場合は、Expected Structureを固定したうえで
   `dependency-design`へ渡し、各dependencyのimage target、provider、version/lock、
   validation commandを決めます。
@@ -165,6 +168,7 @@ image buildや実機acceptanceを実施したとは報告しません。
 - canonical Docker imageをbuildできる。
 - buildしたimageを`docker run`し、repositoryの標準テスト一式が追加setupなしで全て成功する。
 - Dev Container、Compose、CIは同じimageを使用し、起動後にenvironmentを構築しない。
+- 再構築・置換では、旧環境と専用資源の削除・不在確認まで完了している。
 
 ## Boundary
 

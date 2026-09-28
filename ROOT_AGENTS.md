@@ -74,6 +74,12 @@ and rerun limits, and failure semantics. Route changes and repair require scope
 and authority at that owner. Stop only affected actions; do not rebuild for
 ordinary work or replace a required backend to claim validation.
 
+Environment rebuilds include deleting the superseded environment and its exclusive
+resources in the same task. Stopping, renaming, relocating, or keeping it for
+backup/rollback is not completion. Migrate needed data through the existing
+environment/storage owners, verify absence, and report failed cleanup as incomplete;
+preserve current shared resources, user data, and unrelated state.
+
 Check algorithms against equations and assumptions before numerical adjustments;
 require error analysis rather than arbitrary offsets or tolerances. Report actual
 status and limits; numerical symptoms alone do not establish research failure or

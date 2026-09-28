@@ -128,8 +128,10 @@ The default limits are:
 `/tmp` is a task-local writable tmpfs. Runtime, cache, task-state, log, and
 archive-lease quotas are recorded in `bootstrap/host/manifest.toml`. At 80% of a
 quota, `gc` may remove completed and unpinned owned state using LRU order.
-Active tasks, current and rollback generations, unpublished spool, and
-pre-existing Docker resources are retained.
+Active tasks, current generations, unpublished spool, and pre-existing Docker
+resources are retained. Rollback retention during recovery does not authorize
+leaving superseded environments after a rebuild or replacement; apply the
+[rebuild cleanup boundary](#cleanup-and-recovery).
 
 Do not use `docker system prune`. Stop/remove only exact image and container
 IDs recorded as owned by this installation. Before and after a selected
@@ -260,6 +262,15 @@ container, image generations, links, and state while preserving user roots and
 pre-existing resources. Remove the runtime directory only after pending spool,
 archive lease, and rollback state have been resolved and absence has been read
 back.
+
+An authorized rebuild/replacement must also complete
+[rebuild cleanup](agents/skills/environment-cleanup.md#rebuild-cleanup) through
+this lifecycle: remove superseded containers, image generations, and exclusive
+state in the same operation, including generations retained for transactional
+recovery. Migrate required spool/data first; preserve current/shared and
+pre-existing resources. Neither later `gc` nor rollback retention waives removal.
+Successful install/update or healthy status alone is not deletion evidence;
+failed or unverified cleanup leaves the rebuild incomplete.
 
 ## Validation
 
