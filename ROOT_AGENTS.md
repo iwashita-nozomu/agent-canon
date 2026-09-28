@@ -92,6 +92,12 @@ completion conditions. Do not add probes, adapters, settings, or measurements
 solely to audit an excluded backend. If a required in-scope backend is unavailable,
 report it as unverified; do not substitute another backend.
 
+Environment rebuilds include deleting the superseded environment and its exclusive
+resources in the same task. Stopping, renaming, relocating, or keeping it for
+backup/rollback is not completion. Migrate needed data through the existing
+environment/storage owners, verify absence, and report failed cleanup as incomplete;
+preserve current shared resources, user data, and unrelated state.
+
 Check algorithms against equations and assumptions before numerical adjustments;
 require error analysis rather than arbitrary offsets or tolerances. Report actual
 status and limits; numerical symptoms alone do not establish research failure or
