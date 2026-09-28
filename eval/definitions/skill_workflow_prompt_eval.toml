@@ -214,10 +214,10 @@ required_regex = [
 ]
 
 [[evals.checklist]]
-id = "MD-STYLE-STRUCTURE-GATE-1"
+id = "MD-STYLE-STRUCTURE-ROUTING-1"
 critical = true
-description = "Routes substantive Markdown document edits through prose graph and structure planning, with format-only skip evidence."
-required_regex = ["\\$prose-reasoning-graph", "\\$structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
+description = "Keeps substantive structural design with structure-planning while md-style-check follows its owner-selected style route and treats graph analysis as optional."
+required_regex = ["structure-planning", "owner boundary", "existing-tool route", "targeted validation", "format-only"]
 
 [[evals]]
 id = "subagent-bootstrap-tool-first-gate"
@@ -283,10 +283,10 @@ required_regex = [
 ]
 
 [[evals.checklist]]
-id = "MD-STYLE-DOC-STRUCTURE-GATE-1"
+id = "MD-STYLE-DOC-STRUCTURE-ROUTING-1"
 critical = true
-description = "Separates format-only Markdown checks from substantive document structure changes."
-required_regex = ["prose-reasoning-graph", "structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
+description = "Separates format-only Markdown checks from structural design and does not require skip records for unselected analysis."
+required_regex = ["structure-planning", "typo / link / format-only", "未選択の構造解析に skip 記録は不要"]
 
 [[evals]]
 id = "report-writing-semantic-contract"
@@ -531,10 +531,11 @@ description = "Requires structure-planning before drafting when section, figure/
 required_regex = ["\\$structure-planning", "section order", "figure/table placement", "claim/evidence layout", "invalid interpretations"]
 
 [[evals.checklist]]
-id = "ACADEMIC-PROJECTION-ORDER-SHIM-1"
+id = "ACADEMIC-DIRECT-WRITING-SHIM-1"
 critical = true
-description = "Requires academic prose projection to consume whole-document selected ordering from prose graph handoff."
-required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+description = "Allows academic writing directly from sources and existing text without a graph prerequisite."
+required_regex = ["Draft and revise directly from sources, existing text, headings, and brief structure notes", "not a writing prerequisite"]
+forbidden_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
 
 [[evals.checklist]]
 id = "ACADEMIC-POSITIVE-RESPONSIBILITY-SHIM-1"
@@ -561,10 +562,11 @@ description = "Limits default TeX routing to Academic Writing rather than genera
 required_regex = ["TeX を使う既定配線はこの skill に限る", "一般の `\\$long-form-writing`"]
 
 [[evals.checklist]]
-id = "ACADEMIC-PROJECTION-ORDER-DOC-1"
+id = "ACADEMIC-DIRECT-WRITING-DOC-1"
 critical = true
-description = "Human academic writing skill requires selected ordering as the prose projection sequence."
-required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+description = "Allows academic writing directly from sources and existing text without a graph prerequisite."
+required_regex = ["Draft and revise directly from sources, existing text, headings, and brief structure notes", "not a writing prerequisite"]
+forbidden_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
 
 [[evals.checklist]]
 id = "ACADEMIC-POSITIVE-RESPONSIBILITY-DOC-1"
@@ -591,10 +593,11 @@ description = "Forbid Academic Writing's default TeX route from leaking into lon
 forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
 
 [[evals.checklist]]
-id = "LONG-FORM-PROJECTION-ORDER-DOC-1"
+id = "LONG-FORM-DIRECT-WRITING-DOC-1"
 critical = true
-description = "Human long-form writing skill requires selected ordering as the prose projection sequence."
-required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+description = "Allows long-form writing directly from sources and existing text without a graph prerequisite."
+required_regex = ["Draft and revise directly from sources, existing text, headings, and brief structure notes", "not a writing prerequisite"]
+forbidden_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
 
 [[evals.checklist]]
 id = "LONG-FORM-POSITIVE-RESPONSIBILITY-DOC-1"
@@ -615,10 +618,11 @@ description = "Forbid Academic Writing's default TeX route from leaking into pap
 forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
 
 [[evals.checklist]]
-id = "PAPER-PROJECTION-ORDER-DOC-1"
+id = "PAPER-DIRECT-WRITING-DOC-1"
 critical = true
-description = "Human paper writing skill requires selected ordering as the prose projection sequence."
-required_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
+description = "Allows paper writing directly from sources and existing text without a graph prerequisite."
+required_regex = ["Draft and revise directly from sources, existing text, headings, and brief structure notes", "not a writing prerequisite"]
+forbidden_regex = ["selected_ordering\\.ordered_anchors", "topological order", "DSL-to-prose input sequence"]
 
 [[evals.checklist]]
 id = "PAPER-POSITIVE-RESPONSIBILITY-DOC-1"
@@ -778,10 +782,11 @@ description = "Routes nontrivial long-form workflow/dependency/ownership/routing
 required_regex = ["Mermaid", "visual_plan", "workflow", "dependency", "ownership", "routing", "state transition", "review gate", "fenced `mermaid`"]
 
 [[evals.checklist]]
-id = "DOCUMENT-PROJECTION-ORDER-1"
+id = "DOCUMENT-DIRECT-WRITING-1"
 critical = true
-description = "Requires long-form prose projection to consume whole-document selected ordering from prose graph handoff."
-required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+description = "Allows long-form writing directly from sources and existing text without a graph prerequisite."
+required_regex = ["Draft and revise directly from sources, existing text, headings, and brief structure notes", "not a writing prerequisite"]
+forbidden_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
 
 [[evals.checklist]]
 id = "DOCUMENT-POSITIVE-RESPONSIBILITY-1"
@@ -794,25 +799,25 @@ id = "prose-reasoning-graph-selected-ordering-shim"
 target = ".codex/personal/skills/prose-reasoning-graph/SKILL.md"
 canonical_target = "agents/skills/prose-reasoning-graph.md"
 kind = "skill"
-description = "Runtime prose graph skill must hand whole-document selected ordering to writing adapters."
+description = "Runtime prose graph skill keeps selected ordering optional for writing skills."
 
 [[evals.checklist]]
 id = "PROSE-GRAPH-ORDER-SHIM-1"
 critical = true
-description = "Requires selected ordering to be passed as the whole-document sentence sequence."
-required_regex = ["selected_ordering\\.ordered_anchors", "whole-document sentence sequence", "priority topological sort", "deterministic reader-order contract"]
+description = "Keeps graph ordering as an optional candidate for explicitly selected analysis."
+required_regex = ["selected_ordering", "optional candidate reader order", "does not bind the writing skill to a whole-document sentence sequence"]
 
 [[evals]]
 id = "prose-reasoning-graph-selected-ordering-doc"
 target = "agents/skills/prose-reasoning-graph.md"
 kind = "skill"
-description = "Human prose graph skill must define selected ordering as the DSL-to-prose input sequence."
+description = "Human prose graph skill keeps selected ordering optional and does not bind ordinary writing."
 
 [[evals.checklist]]
 id = "PROSE-GRAPH-ORDER-DOC-1"
 critical = true
-description = "Requires selected ordering to be passed as the whole-document sentence sequence."
-required_regex = ["selected_ordering\\.ordered_anchors", "whole-document sentence sequence", "priority topological sort", "deterministic reader-order contract"]
+description = "Keeps graph ordering as an optional candidate for explicitly selected analysis."
+required_regex = ["selected_ordering", "optional candidate reader order", "does not bind the writing skill to a whole-document sentence sequence"]
 
 [[evals]]
 id = "paper-writing-structure-planning"
@@ -834,10 +839,11 @@ description = "Connects paper paragraph claim flow and transition pairs to disco
 required_regex = ["discourse-relations", "academic-argument", "transition pairs", "logic-gap"]
 
 [[evals.checklist]]
-id = "PAPER-PROJECTION-ORDER-SHIM-1"
+id = "PAPER-DIRECT-WRITING-SHIM-1"
 critical = true
-description = "Requires paper prose projection to consume whole-document selected ordering from prose graph handoff."
-required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
+description = "Allows paper writing directly from sources and existing text without a graph prerequisite."
+required_regex = ["Draft and revise directly from sources, existing text, headings, and brief structure notes", "not a writing prerequisite"]
+forbidden_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
 
 [[evals.checklist]]
 id = "PAPER-POSITIVE-RESPONSIBILITY-SHIM-1"
@@ -2240,8 +2246,8 @@ required_regex = ["html-output", "Markdown", "HTML", "external browser publicati
 [[evals.checklist]]
 id = "STRUCTURE-ROUTING-CANONICAL-1"
 critical = true
-description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
-required_regex = ["structure-planning", "prose-reasoning-graph", "experiment plan / report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; graph analysis stays optional for ordinary writing."
+required_regex = ["structure-planning", "experiment plan / report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
 
 [[evals.checklist]]
 id = "TOOL-FINDING-ROUTING-CANONICAL-1"

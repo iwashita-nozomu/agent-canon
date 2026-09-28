@@ -774,7 +774,7 @@ route を止める根拠に非数理エラーだけを使いません。
 - `$agent-orchestration` は routing skill として常に先頭に置きます
 - `repo-changing execution` が始まる stage では `$codex-task-workflow` を足します
 - `$subagent-bootstrap` は catalog の typed route が child handoff を要求する current stage で active にし、coordination / resumption / explicit subagent work で bootstrap evidence が必要な stage でも足します
-- 非自明または substantive な文書作成・追記・改稿で section order、reader path、claim support、source map、canonical route、または document responsibility が変わる場合は、共通の構造先行 gate として `prose-reasoning-graph` と `structure-planning` を足します。typo / link / format-only では `md-style-check` を使い、`structure_contract=skipped` と理由を残します
+- 非自明または substantive な文書作成・追記・改稿で未決の section order、reader path、claim support、source map、canonical route、または document responsibility を判断する必要がある場合は `structure-planning` を足します。graph 分析は明示依頼または具体的な診断目的がある場合だけ `prose-reasoning-graph` を選びます。typo / link / format-only では `md-style-check` を使い、`structure_contract=skipped` と理由を残します
 - file / document responsibility の判定結果から DSL->文章 adapter を選びます。README、workflow、guide、migration、specification などの一般説明 prose では `long-form-writing` を足します。これは長さではなく責務による選択です
 - 投稿論文や thesis chapter の draft では `paper-writing` を優先します
 - paper draft ではない scholarly note や broader academic text では `academic-writing` を使います
@@ -803,7 +803,7 @@ route を止める根拠に非数理エラーだけを使いません。
 - GPU / CUDA / JAX / XLA / IREE 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、ExperimentRunner Python 実行、JAX preallocation 無効化、GPU validation blocker が scope にある場合は `gpu-execution` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因調査と fix-surface の判断は同 skill の cause-investigation route に接続し、別 workflow 文書を overlay として作りません
 - 完了した local branch を base へ戻す必要がある場合だけ `integration` を足します。GitHub Issue/PR の publication・remote merge は `pr-processing`、checkout drift と cleanup は `worktree-health` が所有します
-- Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します。substantive な文書変更は `prose-reasoning-graph` と `structure-planning` も併用します
+- Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します。substantive な文書変更では未決の構造判断に応じて `structure-planning` を選び、graph 分析は明示依頼または具体的な診断目的がある場合だけ選択します
 - skill / tool / workflow / hook / eval の蓄積ログ分析、routing miss、selection gap、弱い skill の調査が scope にある場合は `agent-log-analysis` を足します
 - AgentCanon source、bootstrap/runtime、skill、eval/archive、または AgentCanon source PR が scope にある場合は `agent-canon-update` を足します。親repoはAgentCanon sourceをvendor/submoduleとして更新しません
 - user / reviewer feedback が agent 行動、routing miss、再発防止、task retrospective、private knowledge update を要求する場合は `agent-learning` を足します

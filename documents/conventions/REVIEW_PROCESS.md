@@ -57,7 +57,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - docs consistency review
 - Markdown / 文書差分の review
   - `md-style-check`
-  - substantive な文書変更では `structure-planning` と `prose-reasoning-graph` の evidence を確認する
+  - substantive な文書変更では、未決の構造判断があれば `structure-planning` の evidence を確認し、明示依頼または具体的な診断目的がある場合だけ `prose-reasoning-graph` の evidence を確認する
   - typo / link / format-only route では `structure_contract=skipped:<reason>` と `md-style-check` evidence を確認する
   - 長文なら docs completeness review
   - 必要なら docs consistency review
