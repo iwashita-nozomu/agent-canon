@@ -57,26 +57,15 @@ except ImportError:  # direct script/module execution
     )
 from typing import TYPE_CHECKING
 
-if __package__:
-    from tools.runtime.source.agent_canon_source_root import (
-        RepositoryRoots,
-        RootResolution,
-        resolve_agent_canon_source_root,
-    )
-    from tools.agent.orchestration.team_config import Role, TeamConfig, resolve_role
-else:
-    from tools.runtime.source.agent_canon_source_root import (  # type: ignore[no-redef]
-        RepositoryRoots,
-        RootResolution,
-        resolve_agent_canon_source_root,
-    )
-    from tools.agent.orchestration.team_config import Role, TeamConfig, resolve_role
+from tools.runtime.source.agent_canon_source_root import (
+    RepositoryRoots,
+    RootResolution,
+    resolve_agent_canon_source_root,
+)
+from tools.agent.orchestration.team_config import Role, TeamConfig, resolve_role
 
 if TYPE_CHECKING:
-    if __package__:
-        from tools.agent.orchestration.packets import ActiveDesignPacketConfig
-    else:
-        from tools.agent.orchestration.packets import ActiveDesignPacketConfig
+    from tools.agent.orchestration.packets import ActiveDesignPacketConfig
 
 GIT_STATUS_SHORT_MIN_LINE_LENGTH = 4
 
@@ -383,10 +372,7 @@ def role_allowed_artifact_files(
     active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> tuple[Path, ...]:
     """Resolve generated artifact files one role may write."""
-    if __package__:
-        from tools.agent.orchestration.packets import resolve_active_design_packet_config, selected_artifact_name
-    else:
-        from tools.agent.orchestration.packets import resolve_active_design_packet_config, selected_artifact_name
+    from tools.agent.orchestration.packets import resolve_active_design_packet_config, selected_artifact_name
     packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         sorted(

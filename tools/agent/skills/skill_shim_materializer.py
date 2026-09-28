@@ -41,10 +41,7 @@ except ModuleNotFoundError:  # clean host before the shared tool image exists
         import tools.runtime.container.stdlib_yaml as yaml  # type: ignore[no-redef]
 from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
-if __package__:
-    from tools.agent.orchestration.tool_calls import materialize_skill_tool_call_token
-else:
-    from tools.agent.orchestration.tool_calls import materialize_skill_tool_call_token
+from tools.agent.orchestration.tool_calls import materialize_skill_tool_call_token
 from tools.agent.skills.skill_dependency_map import build_graph
 from tools.agent.skills.skill_route_catalog import (
     SkillDependencyRule,
