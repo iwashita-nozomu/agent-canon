@@ -7,7 +7,6 @@
 # upstream implementation ./work_log.py reconstructs the canonical logical ledger
 # upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
 # downstream implementation ./task_close.py consumes checked CompletionCoverage at closeout
-# downstream implementation ./agent_canon_preflight.py blocks task-entry updates on eval transient captures
 # @dependency-end
 
 """Shared checks for run-bundle artifact completeness."""

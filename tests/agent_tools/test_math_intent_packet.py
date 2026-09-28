@@ -389,14 +389,19 @@ def run_bootstrap(
         result = subprocess.run(
             [
                 sys.executable,
-                str(PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"),
+                str(
+                    PROJECT_ROOT
+                    / "tools"
+                    / "runtime"
+                    / "lifecycle"
+                    / "bootstrap_agent_run.py"
+                ),
                 "--owner",
                 "test",
                 "--runtime-root",
                 str(runtime),
                 "--workspace-root",
                 str(PROJECT_ROOT),
-                "--skip-agent-canon-preflight",
                 "--no-language-review-candidates",
                 *args,
             ],

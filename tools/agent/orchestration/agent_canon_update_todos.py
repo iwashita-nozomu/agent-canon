@@ -4,7 +4,6 @@
 # responsibility Tracks AgentCanon update TODOs that parent-repo agents must apply.
 # upstream design ../../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state workflow
 # upstream design ../../../documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest
-# downstream implementation ../../runtime/source/agent_canon_preflight.py routes task-start agents through pending TODOs
 # downstream implementation ../../../tests/agent_tools/test_agent_canon_update_todos.py tests update TODO state transitions
 # @dependency-end
 """Manage parent-repository TODOs introduced by AgentCanon updates."""
