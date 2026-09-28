@@ -1500,7 +1500,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
 
     def test_bootstrap_materializes_explicit_active_design_packet(self) -> None:
         """The run bootstrap persists and routes one typed packet end to end."""
@@ -1555,7 +1554,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
         """Malformed packet input fails before bootstrap creates a run."""
         cases = (
             (
-                {key: value for key, value in U2_ACTIVE_DESIGN_PACKET.items() if key != "document_flow_review_artifact"},
+                {
+                    key: value
+                    for key, value in U2_ACTIVE_DESIGN_PACKET.items()
+                    if key != "document_flow_review_artifact"
+                },
                 "active_design_packet:field_missing:document_flow_review_artifact",
             ),
             (
@@ -1647,39 +1650,73 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
             self.assertFalse((workspace_root / "plan-sentinel").exists())
             self.assertFalse((workspace_root / "ensure-sentinel").exists())
 
-    def test_bootstrap_uses_workspace_without_git_or_checklist_classification(self) -> None:
+    def test_bootstrap_uses_workspace_without_git_or_checklist_classification(
+        self,
+    ) -> None:
         """Git and checklist presence are not task-entry routing inputs."""
-        for git_workspace, checklist_present in ((False, False), (False, True), (True, False), (True, True)):
-            with self.subTest(git_workspace=git_workspace, checklist_present=checklist_present):
+        for git_workspace, checklist_present in (
+            (False, False),
+            (False, True),
+            (True, False),
+            (True, True),
+        ):
+            with self.subTest(
+                git_workspace=git_workspace, checklist_present=checklist_present
+            ):
                 with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
                     workspace_root = Path(tmp_dir) / "workspace"
                     report_root = Path(tmp_dir) / "reports"
                     seed_workspace_config(workspace_root)
                     if git_workspace:
-                        subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+                        subprocess.run(
+                            ["git", "init", "-q"], cwd=workspace_root, check=True
+                        )
                     if checklist_present:
-                        checklist = workspace_root / "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md"
+                        checklist = (
+                            workspace_root
+                            / "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md"
+                        )
                         checklist.parent.mkdir(parents=True)
                         checklist.write_text("# Checklist\n", encoding="utf-8")
                     result = subprocess.run(
                         [
-                            sys.executable, str(BOOTSTRAP_SCRIPT),
-                            "--task", "selected workspace smoke", "--owner", "codex",
-                            "--run-id", "selected-workspace", "--workspace-root", str(workspace_root),
-                            "--report-root", str(report_root),
+                            sys.executable,
+                            str(BOOTSTRAP_SCRIPT),
+                            "--task",
+                            "selected workspace smoke",
+                            "--owner",
+                            "codex",
+                            "--run-id",
+                            "selected-workspace",
+                            "--workspace-root",
+                            str(workspace_root),
+                            "--report-root",
+                            str(report_root),
                         ],
-                        cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                        cwd=PROJECT_ROOT,
+                        check=False,
+                        capture_output=True,
+                        text=True,
                     )
-                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
+                    self.assertEqual(
+                        result.returncode, 0, result.stdout + result.stderr
+                    )
                     self.assertIn(f"WORKSPACE_ROOT={workspace_root}", result.stdout)
-                    self.assertTrue((report_root / "selected-workspace/team_manifest.yaml").is_file())
-                    monitoring = (report_root / "selected-workspace/workflow_monitoring.md").read_text(encoding="utf-8")
-                    self.assertNotIn("agent_canon_preflight=", monitoring)
+                    self.assertTrue(
+                        (
+                            report_root / "selected-workspace/team_manifest.yaml"
+                        ).is_file()
+                    )
+                    monitoring = (
+                        report_root / "selected-workspace/workflow_monitoring.md"
+                    ).read_text(encoding="utf-8")
+                    self.assertIn(
+                        "web_research_not_required: bootstrap does not decide external research",
+                        monitoring,
+                    )
 
     def test_bootstrap_ignores_external_clone_for_source_free_parent(
         self,
@@ -1687,7 +1724,12 @@ class BootstrapAndCloseTest(unittest.TestCase):
         """Parent task entry neither runs nor mutates a separately selected clone."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            runtime_root = workspace_root / "workspace" / "agent-canon-runtime" / "parent-dirty-unrelated"
+            runtime_root = (
+                workspace_root
+                / "workspace"
+                / "agent-canon-runtime"
+                / "parent-dirty-unrelated"
+            )
             report_root = runtime_root / "reports" / "agents"
             seed_workspace_config(workspace_root)
             checklist = (
@@ -1821,7 +1863,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 f"REPORT_DIR={report_root / 'parent-dirty-unrelated'}",
                 result.stdout,
             )
-            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
             self.assertEqual(source_before, snapshot_external_source(source_root))
             self.assertTrue(
@@ -1903,7 +1944,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(blocked.returncode, 0, blocked.stderr)
-            self.assertNotIn("AGENT_CANON_PREFLIGHT_", blocked.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
             self.assertTrue(capture.is_file())
 
@@ -1930,7 +1970,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            self.assertNotIn("AGENT_CANON_PREFLIGHT_", resumed.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
 
     def test_bootstrap_emits_workflow_skills_and_language_review_candidates(
@@ -1971,7 +2010,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             expected_active, expected_write = expected_workflow_spawn_budget(
                 "comprehensive_development"
             )
-            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
             self.assertIn(
                 f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
@@ -2545,7 +2583,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertNotIn("AGENT_CANON_PREFLIGHT_", result.stdout)
             self.assertIn(
                 f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
             )

@@ -1220,8 +1220,13 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             monitor_path = report_root / "monitor-bootstrap" / "workflow_monitoring.md"
             text = monitor_path.read_text(encoding="utf-8")
-            self.assertIn("PRE_EDIT_REJECTION_PREDICTION_STATUS=optional_diagnostic", result.stdout)
-            self.assertNotIn("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending", result.stdout)
+            self.assertIn(
+                "PRE_EDIT_REJECTION_PREDICTION_STATUS=optional_diagnostic",
+                result.stdout,
+            )
+            self.assertNotIn(
+                "PRE_EDIT_REJECTION_PREDICTION_STATUS=pending", result.stdout
+            )
             self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("stage owner routing active_roles=", text)
