@@ -2689,11 +2689,11 @@ class DependencyManifestToolTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "a.py").write_text(
-                "# @dependency-start\n# contract test\n# upstream implementation b.py b precedes a\n# @dependency-end\n",
+                "# @dependency-start\n# contract test\n# upstream implementation b.py b precedes a\n# downstream implementation b.py b also consumes a\n# @dependency-end\n",
                 encoding="utf-8",
             )
             (root / "b.py").write_text(
-                "# @dependency-start\n# contract test\n# downstream implementation a.py a follows b\n# @dependency-end\n",
+                "# @dependency-start\n# contract test\n# responsibility Defines the second cycle node.\n# @dependency-end\n",
                 encoding="utf-8",
             )
 
