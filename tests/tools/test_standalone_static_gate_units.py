@@ -268,3 +268,34 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
     assert "owned_by_bootstrap_container_workflow" in wrapper
     for command in ("cargo build", "tool_catalog.py", "run_accumulated_agent_evals.py", "check_github_workflows.py"):
         assert command not in wrapper
+
+
+@pytest.mark.parametrize(("remote_status", "bootstrap_status"), [(0, 0), (1, 0), (1, 17)])
+def test_unpublished_environment_uses_native_local_build(tmp_path: Path, remote_status, bootstrap_status) -> None:
+    source = tmp_path / "candidate"
+    image = source / "bootstrap/container/image"
+    image.mkdir(parents=True)
+    (image / "digest.sh").write_text("printf 'fixture-key\\n'\n")
+    bootstrap = source / "bootstrap.sh"
+    bootstrap.write_text(
+        '#!/usr/bin/env bash\n'
+        'printf "%s\\n" "$*" >> "$CALLS"\n'
+        'exit "$BOOTSTRAP_STATUS"\n'
+    )
+    bootstrap.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    docker = bin_dir / "docker"
+    docker.write_text('#!/usr/bin/env bash\nexit "$REMOTE_STATUS"\n')
+    docker.chmod(0o755)
+    calls = tmp_path / "calls"
+    result = run_shell(step("Start one shared tool runtime")["run"], root=ROOT,
+                       AGENT_CANON_CANDIDATE_SOURCE=str(source),
+                       AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
+                       GITHUB_WORKSPACE=str(ROOT), GITHUB_REPOSITORY="iwashita-nozomu/agent-canon",
+                       PATH=f"{bin_dir}:{os.environ['PATH']}", CALLS=str(calls),
+                       REMOTE_STATUS=str(remote_status), BOOTSTRAP_STATUS=str(bootstrap_status))
+    assert result.returncode == bootstrap_status
+    commands = calls.read_text().splitlines()
+    assert commands[0].endswith("install" if remote_status == 0 else "update --local-build")
+    assert len(commands) == (3 if bootstrap_status == 0 else 1)

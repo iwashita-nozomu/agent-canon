@@ -51,7 +51,10 @@ The PR diff is taken between the event's base commit and the checked-out merge
 candidate. Bootstrap runs from a disposable local `main` pointing to that same
 candidate, following the existing improvement-guide workflow's source route.
 This prevents bootstrap's normal main synchronization from replacing the PR
-code with remote main. The registered target stays read-only; the installation,
+code with remote main. The existing environment digest identifies the image.
+Published images are reused; an unpublished PR environment is built through
+`bootstrap.sh update --local-build`, without pushing a package or granting write
+credentials. A build failure remains a CI failure. The registered target stays read-only; the installation,
 cache, and reports live outside it. The runner uses the mounted candidate tools
 and the already provisioned toolchain rather than creating empty Cargo/Rustup
 homes or reading obsolete image source paths.

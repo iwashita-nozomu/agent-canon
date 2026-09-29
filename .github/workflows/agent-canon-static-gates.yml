@@ -87,7 +87,13 @@ jobs:
       - name: Start one shared tool runtime
         if: needs.select-static-units.outputs.units != ''
         run: |
-          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" install
+          key="$(bash "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap/container/image/digest.sh" "${AGENT_CANON_CANDIDATE_SOURCE}")"
+          image="ghcr.io/${GITHUB_REPOSITORY}:env-${key}"
+          if docker buildx imagetools inspect "${image}" >/dev/null 2>&1; then
+            "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" install
+          else
+            "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" update --local-build
+          fi
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" start
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
