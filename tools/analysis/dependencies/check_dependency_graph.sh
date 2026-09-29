@@ -301,7 +301,7 @@ fi
 
 while IFS= read -r manifest_file; do
   [[ -n "$manifest_file" ]] || continue
-  if ! awk -F '\t' -v file="$manifest_file" '$3 == file || $4 == file { found = 1 } END { exit(found ? 0 : 1) }' "$edges_file"; then
+  if ! awk -F '\t' -v file="$manifest_file" '$3 == file || $4 == file { found = 1 } END { exit(found ? 0 : 1) }' "$all_edges"; then
     echo "$manifest_file: isolated dependency manifest has no graph edges"
     failures=$((failures + 1))
   fi
@@ -322,27 +322,81 @@ while IFS=$'\t' read -r direction kind source target; do
 done < <(awk -F '\t' '$1 != "" && $2 != "" && $3 != "" && $4 != ""' "$edges_file")
 
 check_cycles() {
-  local direction="$1"
-  awk -F '\t' -v wanted="$direction" '
-    $1 == wanted && $2 != "" && $3 != "" && $4 != "" { adj[$3] = adj[$3] SUBSEP $4; nodes[$3] = 1; nodes[$4] = 1 }
-    function dfs(node, raw, parts, count, i, next_node) {
-      state[node] = 1; raw = adj[node]; count = split(raw, parts, SUBSEP)
-      for (i = 1; i <= count; i++) { next_node = parts[i]; if (next_node == "") continue; if (state[next_node] == 1) { print wanted " cycle includes " node " -> " next_node; found = 1; return } if (state[next_node] == 0) { dfs(next_node); if (found) return } }
-      state[node] = 2
-    }
-    END { for (node in nodes) if (state[node] == 0) { dfs(node); if (found) exit 1 } }
-  ' "$edges_file"
+  python3 - "$all_edges" "$selected_file" <<'PY'
+from __future__ import annotations
+
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+edges_path, selected_path = map(Path, sys.argv[1:])
+adj: dict[str, set[str]] = defaultdict(set)
+nodes: set[str] = set()
+for raw in edges_path.read_text(encoding="utf-8").splitlines():
+    direction, _kind, source, target = raw.split("\t", 3)
+    if not source or not target:
+        continue
+    prerequisite, consumer = (
+        (target, source) if direction == "upstream" else (source, target)
+    )
+    adj[prerequisite].add(consumer)
+    nodes.update((prerequisite, consumer))
+
+selected = (
+    {line for line in selected_path.read_text(encoding="utf-8").splitlines() if line}
+    if selected_path.exists()
+    else set()
+)
+index = 0
+stack: list[str] = []
+on_stack: set[str] = set()
+indices: dict[str, int] = {}
+lowlinks: dict[str, int] = {}
+cycles: list[tuple[str, ...]] = []
+
+def visit(node: str) -> None:
+    global index
+    indices[node] = lowlinks[node] = index
+    index += 1
+    stack.append(node)
+    on_stack.add(node)
+    for target in sorted(adj[node]):
+        if target not in indices:
+            visit(target)
+            lowlinks[node] = min(lowlinks[node], lowlinks[target])
+        elif target in on_stack:
+            lowlinks[node] = min(lowlinks[node], indices[target])
+    if lowlinks[node] != indices[node]:
+        return
+    component: list[str] = []
+    while True:
+        member = stack.pop()
+        on_stack.remove(member)
+        component.append(member)
+        if member == node:
+            break
+    component.sort()
+    if len(component) > 1 or (component and component[0] in adj[component[0]]):
+        if not selected or selected.intersection(component):
+            cycles.append(tuple(component))
+
+for node in sorted(nodes):
+    if node not in indices:
+        visit(node)
+
+for component in sorted(cycles):
+    print("dependency cycle includes " + " -> ".join(component))
+raise SystemExit(1 if cycles else 0)
+PY
 }
 
-for direction in upstream downstream; do
-  if ! check_cycles "$direction"; then
-    if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
-      echo "DEPENDENCY_GRAPH_${direction^^}_CYCLES=report_only"
-    else
-      failures=$((failures + 1))
-    fi
+if ! check_cycles; then
+  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+    echo "DEPENDENCY_GRAPH_CYCLES=report_only"
+  else
+    failures=$((failures + 1))
   fi
-done
+fi
 
 if [[ "$failures" -gt 0 ]]; then
   echo "DEPENDENCY_GRAPH=fail"
