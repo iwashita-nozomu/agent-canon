@@ -53,9 +53,11 @@ OOP / SOLID specialization は class、state、inheritance、`Protocol`、public
 
 ## Existing Capability Before Implementation
 
-implementation target と mechanism を選ぶ前に、共通原則 SEP-06/07 と
+まず [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
+で直前の明示的合意を target state に反映し、[SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
+で既存実装の削除・置換案を先に選びます。その完成形に必要な部品だけを
 [SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-を使います。新しい public API だけでなく、private helper や既存 file 内への追加も対象です。
+で比較します。private helper や既存 file 内への追加でも順序は同じです。
 
 現在の caller と要求された規模に対する利用案を具体化し、要求と API の保証の対応から、
 直接利用、変換・合成、部分利用と不足、不適合、未確認を区別します。規模に応じたコストを
@@ -66,8 +68,8 @@ implementation target と mechanism を選ぶ前に、共通原則 SEP-06/07 と
 必須帳票を作りません。
 
 採用 API、利用案、根拠、残る不足を既存設計文書へ残し、同じ参照を下の mechanism / basis /
-alternatives と task packet / handoff に接続します。実装するのは適切な owner に残る不足だけ、
-検証するのは変更した domain contract と consumer/provider の接続です。
+alternatives と task packet / handoff に接続します。必要な owner の置換と旧構造の削除も含め、
+合意した完成形を実装し、変更した domain contract と consumer/provider の接続を検証します。
 
 ## Contract-Complete Implementation Basis
 
@@ -83,9 +85,9 @@ material な mechanism decision は、既存の task packet / design trace に�
 | --- | --- |
 | contract | input / output、invariant、failure semantics、compatibility のうち変更に関係するもの |
 | owner | state、effect、recovery、validation を閉じる canonical owner と complete owning unit |
-| mechanism | 直接利用・合成する既存 API と、不足分に必要な algorithm、architecture、protocol、resource strategy、migration route |
+| mechanism | 合意した完成形の owner、削除・置換する旧実装、再利用する部品と必要な algorithm、architecture、protocol、resource strategy、migration route |
 | basis | 数理導出、proof obligation、complexity / error bound、conditioning、停止条件、公式仕様、domain model、workload model、measurement、benchmark、failure analysis、標準のうち判断を支える evidence |
-| alternatives | 既存機能を使う基準案と現実に競合した候補、具体的な不足・棄却理由、cost / risk / compatibility trade-off |
+| alternatives | 削除・置換を起点にした基準案と再利用案、完成形に残る複雑さ、具体的な不足・棄却理由、cost / risk / compatibility trade-off |
 | oracle | contract を判定できる test、static property、proof、measurement、readback |
 
 material な decision のうち、正しさに関係する理由を名前、型、構造から復元できず、現実的な変更で
@@ -142,8 +144,8 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 ## Default Sequence
 
 1. family を `Comprehensive Development` に固定します。
-1. current requirement と owning contract を読み、material な engineering principle clause、canonical owner、forbidden interpretation を固定します。
-1. [Existing Capability Before Implementation](#existing-capability-before-implementation) で既存機能を使う基準案と残る不足を決めてから、mechanism と implementation target を選びます。
+1. 最新の明示的合意と必要な contract を既存設計の target state へ反映し、material な clause、canonical owner、forbidden interpretation を固定します。
+1. [Existing Capability Before Implementation](#existing-capability-before-implementation) で削除・置換案を先に定め、完成形に必要な部品を比較して mechanism と implementation target を選びます。
 1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
 1. material かつ code から理由を復元できない decision は、共通コメント規約に従って最も狭い安定 owner の近傍へ残し、変更された既存コメントも同じ差分で同期します。
 1. regression / fixture / mock の追加前に [Regression Evidence Admission](#regression-evidence-admission) の判断を行います。

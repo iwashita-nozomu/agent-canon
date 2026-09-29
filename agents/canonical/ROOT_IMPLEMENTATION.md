@@ -36,42 +36,32 @@ a shortcut would exclude.
 
 ## Simplest complete implementation
 
- Before implementation, use the existing
- [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
- to locate abstractions that already own the required behavior. Trace actual
- callers, usage examples, provider dependencies, contracts, configuration, and
- extension points. A failed name search or unfamiliar location does not establish
- absence. Settle direct use, composition, extension at the existing owner, or an
- evidenced responsibility gap before writing code, including private helpers and
- additions inside existing files. Unknown keeps only the affected implementation
- pending; it does not require a repository-wide audit or justify inventing a
- foundation.
+Use [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
+to fix the latest explicit user agreement before selecting a mechanism. Bring the
+owning design into line with that agreement; old code, tests, or design records
+do not silently reopen it. A concrete conflict with a still-required contract,
+safety, or authority needs an explicit finding, not an invented compatibility path.
 
- Design for the smallest maintained code space after the change, not the smallest
-diff. Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
-to the final implementation, including retained code and support mechanisms.
-Start with direct use or composition of existing APIs; admit new abstractions,
-configuration, routes, or state only for an evidenced unmet current requirement.
-Hypothetical reuse, pattern uniformity, or test-double convenience is not a gap.
-Preserve the required domain, correctness, safety, performance, and failure semantics;
-code compression or omitted behavior is not simplification.
-For replacements, include the retained owner, superseded code, and necessary
-consumer migration in the existing design before implementation, then close
-[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-in the same change. Do not defer deletion to a later cleanup or keep the old path
-to reduce the diff. Keep unrelated changes out; add no checker, report, or approval
-gate to enforce this objective.
- Make the simplest complete implementation the default, not a later refactor.
- Introduce abstractions, configuration, execution paths, or state only when a
- concrete current requirement cannot be met more simply; justify that necessity
- with mathematical or engineering grounds. Hypothetical reuse, design-pattern
- uniformity, or test-double convenience alone is not such a reason. Minimize
- concepts, state, branches, and dependencies while preserving the required domain,
- correctness, safety, and failure semantics. Neither fewer lines nor a smaller diff
- justifies omitted behavior, and completeness does not authorize speculative
- generalization or unrelated library or consumer changes. Keep the decision with
- existing implementation and review owners, without adding a checker, report, or
- approval gate to enforce simplicity.
+Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
+by first considering deletion or replacement of the affected implementation.
+Identify the required semantics, retained owner, superseded code, and necessary
+consumer migration before editing. Compare the completed code space, including
+retained wrappers, state, branches, and support, not just new code or diff size.
+
+Then use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+to inspect relevant abstractions, actual callers, APIs, configuration, dependencies,
+and extension points against that target. Reuse necessary parts, not the old
+structure by default. Direct use or composition must keep the agreed result
+simplest; do not add adapters or dual paths solely to retain an existing owner.
+A failed name search is not absence. An unresolved capability defers only its
+selection; it neither blocks independent work nor justifies inventing a foundation.
+
+Close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+in the same change: remove obsolete paths and dedicated support, migrate affected
+uses, and validate the agreed contract rather than freezing superseded behavior
+in tests. Preserve required domain, correctness, safety, performance, and failure
+semantics. Deletion-first does not mean blind deletion, wholesale rewriting,
+unrelated cleanup, or a new checker, report, or approval gate.
 
 ## Public API additions
 
@@ -86,8 +76,9 @@ Before implementation, use [API surface traversal](../../documents/design/api-su
 to inspect current abstractions, real callers, APIs, configuration, extension
 points, standard facilities, and adopted dependencies. Reuse sufficient current
 findings; not finding a name or preferring another signature is not a capability
-gap. If direct use or composition suffices, use it without a new API. Otherwise,
-record the candidates, source evidence, unmet contract, and necessary owner/API
+gap. If direct use or composition is simplest for the agreed target, use it
+without a new API. Capability alone does not require preserving the old owner.
+Otherwise, record candidates, source evidence, unmet contract, and necessary owner/API
 change in the existing design, then implement it within the requested scope.
 Unknown capability remains unknown; it neither justifies speculative additions
 nor blocks independent authorized work.
@@ -125,9 +116,11 @@ change in the same PR. Connect its design section to the relevant implementation
 paths/symbols at responsibility-unit granularity. Reuse an adequate, still-current
 design explanation by reference instead of copying it for each function or edit;
 add or update a concise section under existing design conventions when needed.
-Chat, Issue/PR discussion, and code comments may support or link to that section
-but never replace its explanation. If necessity cannot be justified, reconsider
-the implementation rather than inventing a reason. Use the existing design and
+Record the latest explicit agreement in that section before editing; its older
+text must not override the agreement. Chat, Issue/PR discussion, and code comments
+may support or link to the rationale but do not replace the durable explanation.
+If necessity cannot be justified, reconsider the implementation rather than inventing
+a reason. Use the existing design and
 review owners; do not add a checker, schema, approval gate, or unrelated
 retrospective documentation task.
 

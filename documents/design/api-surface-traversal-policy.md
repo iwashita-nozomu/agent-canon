@@ -12,8 +12,12 @@ downstream design ../../agents/canonical/ROOT_IMPLEMENTATION.md applies traversa
 
 # API Surface Traversal Before Negative Conclusions
 
-Before saying that a library, module, or existing project API cannot do
-something, collect a bounded public-surface trail:
+Fix the latest explicit user agreement and consider deletion or replacement
+under [SEP-01](../conventions/software-engineering-principles.md#sep-01-contract-first)
+and [SEP-06](../conventions/software-engineering-principles.md#sep-06-kiss)
+before selecting a reuse mechanism. Traversal informs that target; it does not
+redesign the target around an existing API. Before concluding that an API cannot
+satisfy it, collect a bounded public-surface trail:
 
 1. Public import/export surface, including `__all__` or documented exports.
 1. Function/class signatures and constructor/config fields.
@@ -40,8 +44,10 @@ selected_fix_surface=<caller/config/adapter/library>
 Traversal selects the existing capability and responsible owner; it does not
 freeze the current API. Under the [API change boundary](../../agents/canonical/ROOT_IMPLEMENTATION.md#public-api-additions),
 a requested fix includes necessary public changes and affected consumer migration.
-Use an adequate existing API unchanged; otherwise correct the owning contract,
-then update affected callers, tests, and documentation in the same change.
+Reuse an existing API unchanged when it yields the simplest agreed result,
+not merely because adaptation is possible. Otherwise replace the responsible
+owner rather than retaining its scaffolding; update affected callers, tests,
+and documentation and remove superseded paths in the same change.
 Keep explicit compatibility requirements and actual access or authority limits
 visible, without inferring a freeze from public visibility or active use.
 

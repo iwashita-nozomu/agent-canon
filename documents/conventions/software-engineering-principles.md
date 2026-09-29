@@ -66,8 +66,8 @@ review finding、validation route に接続します。選ばれなかった原�
 原則が競合する場合は、次の順序で判断します。下位の原則は上位の contract を
 弱める根拠になりません。
 
-1. 明示された user / domain contract、safety、correctness
-2. semantic invariant、state / lifecycle owner、public compatibility
+1. 最新の明示的なユーザー合意と user / domain contract、safety、correctness
+2. semantic invariant、state / lifecycle owner、要求上必要な public compatibility
 3. root-cause closure、reachable failure handling、cleanup / recovery
 4. responsibility / dependency boundary、information hiding、authority boundary
 5. testability、reproducibility、operational observability
@@ -105,9 +105,13 @@ review finding、validation route に接続します。選ばれなかった原�
 
 ### SEP-01 Contract first
 
-実装は、明示された user / domain contract と、既存の public contract を先に固定します。
-入力条件、出力条件、不変条件、停止条件、失敗条件、compatibility、side effect、cleanup
-のうち、変更に関係するものを実装前に特定します。
+実装は、直前のチャットを含む最新の明示的なユーザー合意を起点に、今回の完成形と
+引き続き必要な domain / public contract を固定します。既存コード・テスト・古い設計は
+意味と移行影響を調べる資料であり、旧構造の保存要件ではありません。設計文書を合意へ
+更新し、既存実装の都合だけで決定をやり直したり、合意を黙って変更したりしません。
+安全性・有効入力・必要な保証・明示的互換契約との具体的な衝突が判明した場合だけ、
+その衝突と必要な判断を示します。未承認の提案を合意扱いせず、無関係な作業は広げません。
+入力・出力、不変条件、停止・失敗、side effect、cleanup は変更に関係するものを扱います。
 
 - test は code path をなぞるのではなく、contract、counterexample、stable oracle を固定します。
 - validation success は、別の failure class を黙って無視した結果であってはなりません。
@@ -183,9 +187,12 @@ inheritance、substitutability、interface segregation、DI container、public o
 
 ### SEP-06 KISS
 
-KISS は、要求された contract を完全に満たす候補の中で、変更後に保守するコードスペースを
-最小にする設計原則です。「最短の code」や「最小の diff」ではなく、完成形に残る次の実体と
-相互依存を比較します。追加分だけでなく、既存実装とその維持に必要な接続も含めます。
+KISS は、合意した完成形を満たす候補の中で、変更後に保守するコードスペースを最小にします。
+まず対象責務の既存実装を削除・置換する案から考え、必要な意味・保証をどの owner に残すかを
+決めます。既存構造へ継ぎ足す案を出発点にしません。これは削除の設計判断を先に置くことであり、
+意味や影響を調べる前の破壊的削除・全書換えを要求するものではありません。
+「最短の code」や「最小の diff」ではなく、完成形に残る次の実体と相互依存を比較します。
+追加分だけでなく、既存実装とその維持に必要な接続も含めます。
 
 - 実装本体、補助コード、canonical owner と source of truth
 - public surface と execution route
@@ -321,13 +328,16 @@ boundary と選択した command / options を含め、phase 名だけでは判�
 #### Reuse feasibility support
 
 再利用可能性は、同名 API や同じ実装構造の有無ではなく、既存機能を使う具体的な呼出が
-今回の要求を満たせるかで判断します。上の共通 abstraction の新設条件を、既存 API の
+合意した完成形を満たせるかで判断します。先に [SEP-01](#sep-01-contract-first) で合意を固定し、
+[SEP-06](#sep-06-kiss) で削除・置換案を選びます。再利用可能でも、旧構造を温存する変換層・
+互換分岐・状態が増え、直接の置換より完成形が複雑になる案は採用しません。必要な部品の
+再利用と、それを囲む旧構造の保存は別です。上の共通 abstraction の新設条件を、既存 API の
 利用条件へ転用しません。一つの caller でも利用でき、provider が正式に提供する設定・
 拡張点は新設 wrapper の flag と区別します。この節を実装・掃除の共通の判断支援とし、
 名称・配置・style の好みを能力不足にせず、新しい判定器、全項目 checklist、必須の比較表、
 schema、承認段階は作りません。
 
-1. **要求を機能の言葉へ戻す。** caller と設計から、入力の有効領域、必要な変換・結果、
+1. **要求を機能の言葉へ戻す。** 合意とそれに更新した設計から、入力の有効領域、必要な変換・結果、
    守る意味を短く取り出します。自作予定の名前だけでなく、その操作の一般名・別名、
    入出力の型、既存の呼出例から候補を探します。現在の helper の形や偶然の制約を
    要求へ昇格させず、state / lifecycle、副作用、失敗、性能は判断に関係するものだけ扱います。
@@ -352,9 +362,9 @@ schema、承認段階は作りません。
 
 | 分かったこと | 判断と次の操作 |
 | --- | --- |
-| 直接の呼出・設定で要求を満たす | そのまま利用する。新しい helper を作らない。 |
-| 最小の変換・合成で要求を満たす | 呼出側で接続する。provider の algorithm、parser、state、retry を再実装しない。 |
-| 一部を満たすが、具体的な不足が残る | 満たす部分を再利用し、不足だけを責務のある owner で実装する。適合する別候補も必要範囲で比較する。 |
+| 直接の呼出・設定で合意した完成形を満たす | 必要な部品をそのまま利用し、不要な周辺構造は削除する。新しい helper を作らない。 |
+| 最小の変換・合成が完成形でも最も単純 | 呼出側で接続する。provider の algorithm、parser、state、retry を再実装しない。 |
+| 一部を満たすが、具体的な不足が残る | 完成形を単純にする部分を再利用し、不足を責務のある owner で実装する。必要なら既存 owner ごと置換する。 |
 | 変換・設定・合成でも要求を満たせない根拠がある | 満たせない要求と仕様上の差または反例を示して、その利用案を棄却する。候補全体の無価値や全候補の不存在へ一般化しない。 |
 | 判断に必要な保証が未確認 | 不適合にも適合にも変換しない。判断を変える一点だけを調べ、未確認を自作の正当化にしない。 |
 
@@ -554,6 +564,7 @@ review finding は、具体的な contract / invariant / owner / dependency / fa
 
 ## Conflict examples
 
+- **Agreement vs existing structure**: 一つの直接経路への置換に合意したなら、旧 dispatcher を残すための adapter・mode は足しません。必要な parser は再利用し、不要な dispatcher と専用補助コードを削除します。
 - **DRY vs mathematical meaning**: control flow が似ていても、unit、停止条件、residual definition、breakdown semantics が異なるなら統合しません。
 - **KISS vs error handling**: error / cleanup path を削るのではなく、owner と state transition を一つにして route を減らします。
 - **YAGNI vs migration**: future extension は作りませんが、要求済み consumer migration と旧 route removal は現在の完成条件です。

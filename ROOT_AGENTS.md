@@ -46,21 +46,28 @@ actual authority/access limits; report concrete conflicts and unfinished migrati
 while continuing independent authorized work. Unrelated or speculative API
 additions still require explicit authorization.
 
-Before implementation, including private helpers and in-file additions, locate
-existing abstractions, callers, dependencies, APIs, configuration, extension points,
-standard facilities, and adopted dependencies on the premise they suffice. Settle
-reuse, composition, extension, or an evidenced responsibility gap in the owning
-design before editing. Use sufficient existing facilities; otherwise record
-candidates, source evidence, the unmet contract, and why composition fails there.
-Keep necessity, mathematical or engineering grounds, and rejected simpler
-alternatives in that design before code/API changes. A failed name search is not
-absence. Reuse current evidence; unresolved capability defers only the affected
-implementation.
+Start from the latest explicit user agreement, including the preceding chat;
+update the owning design to that target, not the target to existing code. First
+consider deleting or replacing superseded implementation, then retain only what
+the agreed result needs. Existing code, tests, or older design are evidence of
+meaning and migration impact, not a veto or a requirement to keep their shape.
+Reopen settled choices only for a concrete conflict with still-required contracts,
+safety, or authority; do not silently change the agreement or invent compatibility.
 
-Minimize maintained code space, not the diff. Prefer the simplest complete use
-of existing APIs; replacement includes deleting superseded code and obsolete
-support in the same owning unit, not later cleanup. Retain wrappers or dual paths
-only for a required compatibility contract. Keep caller orchestration separate
+Before implementation, including private helpers and in-file additions, inspect
+relevant abstractions, callers, APIs, configuration, extension points, standard
+facilities, and adopted dependencies against that target. Reuse what makes the
+completed design simplest; capability alone does not justify retaining old
+scaffolding or adding adapters, branches, and state to accommodate it. Settle
+reuse, extension, replacement, or an evidenced gap in the owning design, keeping
+necessity, source evidence, engineering grounds, and rejected simpler alternatives.
+A failed name search is not absence; unknown defers only the affected decision.
+
+Minimize maintained code space, not the diff. Replacement includes deleting
+superseded code and obsolete support in the same owning unit, not later cleanup.
+Deletion-first is a design order, not blind removal before understanding required
+semantics and migration. Retain wrappers or dual paths only for a required
+compatibility contract. Keep caller orchestration separate
 from reusable-library responsibility. Add mechanisms, dependencies, exact pins,
 or guards only for an evidenced current need; preserve native resolution and
 required integrity checks.
