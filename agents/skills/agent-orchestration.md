@@ -29,7 +29,8 @@ selection の owner だけを持ちます。
 
 - Purpose: mandatory repository-task routing that selects workflow family,
   active skills, roles, reviews, run bundle, and implementation route.
-- Section path: Purpose, Use When, and Core References orient the reader;
+- Section path (lookup routes, not a startup reading list): Purpose, Use When,
+  and Core References orient the reader;
   Decision Order and the Execution-Time-Aware Work-Conservation Contract
   contain the operational rules; Outputs, Workflow Family Mapping, Public
   Skill Selection, Entrypoint Precedence, Review And Specialist Expectations,
@@ -108,21 +109,25 @@ fixed route:
    The root row only needs to identify the routing owner; it does not need one
    row per public Skill. Record the bridge as `Reader Map row -> routing owner
    -> selected Skill` when `task-routing` performs the final selection.
-2. Read the generated discovered `SKILL.md` completely in bounded chunks. It is
-   the complete compact Skill used for discovery, not a prefix of the canonical
-   prose. Continue the same path from `next_offset` until `file_eof=true` using
-   `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`.
-   The compact Skill is the first
-   operational owner. The Skill body is the first operational owner; here that
-   body is the complete compact discovery text. If it resolves responsibility,
-   operation, and validation,
+2. Read the selected discovered `SKILL.md`'s common constraints and short
+   branch conditions first. The Skill body is the first operational owner.
+   Select the branch needed for the current action before opening its details;
+   apply this inside one file, at nested branches, and across linked Skills.
+   Resolve an unknown condition with only the evidence needed to decide it,
+   not by reading every alternative. Read every currently applicable branch and
+   its shared safety constraints; leave later stages, validation, and recovery
+   details unread until their own condition becomes true.
+   Use `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`
+   with `index`, then `chunk --heading <selected-heading>`. A named section ends
+   before the next heading, including a child heading; selecting a parent does
+   not select its descendants. Continue the selected section from `next_offset`
+   until `section_eof=true`. Reuse unchanged reads instead of restarting them.
+   If responsibility, operation, and validation are resolved,
    do not follow a registry or rationale edge merely to fill the trace. Follow a
-   task-relevant `upstream design` edge from its `@dependency-start` header only
-   when the Skill delegates a decision there or one of those three items remains
-   unresolved. Never open a `downstream implementation` edge first.
-   Canonical `agents/skills/<skill>.md` is a referenced owner document: use the
-   reader's heading index and bounded section chunks, and read only the sections
-   needed to resolve that delegated responsibility, operation, or validation.
+   task-relevant `upstream design` edge only when the active branch delegates a
+   decision or one of those items remains unresolved. Never open a
+   `downstream implementation` edge first. Apply the same section selection to
+   canonical `agents/skills/<skill>.md`; a link alone does not activate its body.
 3. Present the following short working update before implementation reading.
    It is a transient readback in the existing task update, not a new packet,
    schema, artifact, or closeout gate.
@@ -136,21 +141,20 @@ fixed route:
    implementation_read=locked|ready
    ```
 
-4. Set `implementation_read=ready` only when the generated compact Skill has
-   `file_eof=true` and every explicitly delegated canonical owner section has
-   `section_eof=true`, with each read continuing from its returned
-   `next_offset`. The canonical file itself need not reach `file_eof` when only
-   a task-relevant section is delegated. A truncated compact response, a
-   section prefix, or merely naming a delegated path leaves
-   `docs_first_status=unresolved` and `implementation_read=locked`. A known
-   source path is not sufficient by itself. This is transient readback; do not
-   create a per-read receipt, identifier, approval gate, or duplicate canonical
-   Skill body.
+4. Set `implementation_read=ready` only after the common constraints and all
+   sections needed for the current action have actually been consumed through
+   `section_eof=true`. Neither discovered nor canonical Skills require
+   `file_eof=true`; unread inactive branches do not lock the current action.
+   A required section prefix, an unresolved condition needed for this action,
+   or a named path alone leaves `docs_first_status=unresolved` and
+   `implementation_read=locked`.
    `ready` is an admission state, not a claim that source was already opened.
-   Merely naming a delegated path does not unlock implementation.
-   The existing-tool-before-read exception remains available for the tool
-   action itself; it does not satisfy the read needed to interpret or repair
-   that tool's result.
+   The optional `admit --owner PATH#HEADING ...` checks only supplied sections'
+   readability/EOF metadata, not the model's reading or selection sufficiency.
+   Merely naming a delegated path does not unlock implementation. Do not create
+   a per-read receipt, identifier, approval gate, or duplicate canonical Skill body.
+   The existing-tool-before-read exception remains available for the tool action
+   itself, not for interpreting or repairing its result without the needed reads.
 5. If the Skill body and its task-relevant delegated edge do not resolve one
    operational owner, report the unresolved item and use the bounded purpose search in
    [documents/tools/search-coordination.md](../../documents/tools/search-coordination.md). Search results nominate an owner;
@@ -162,6 +166,13 @@ the repository, or traverse every dependency-header edge. This keeps the route
 short enough for low-reasoning agents while preserving the Skill body as the
 operational owner and the existing dependency header as the only delegated
 edge owner.
+
+When authoring or revising a branched Skill, keep common constraints and a short
+`condition -> [section](#heading)` route before the details. Put branch bodies
+under separate headings or linked files, not in the common read block. Do not
+hide shared safety requirements inside an optional branch or put branch
+selection conditions only inside the branch body. This is not a whole-file split
+or a new read ledger requirement.
 
 ## Decision Order
 
@@ -849,7 +860,7 @@ route を止める根拠に非数理エラーだけを使いません。
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read [agents/skills/agent-orchestration.md](agent-orchestration.md) as the sole policy owner.
+1. Use [Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace) to read only common constraints and currently selected branches of this policy owner.
 1. When the selected execution profile is Luna, read
    [agents/skills/direct-luna-communication.md](direct-luna-communication.md) and use its bounded packet,
    effective-runtime readback, and typed blocker contract.

@@ -52,8 +52,9 @@ validation で完了し、DIC fingerprint/closure を作りません。
   from intake through validation and closeout.
 - Use When: a repo-changing task needs artifact placement, implementation
   routing, validation, reviews, or closeout evidence.
-- Section path: Purpose, Use When, and Core Reference orient the route; Stages
-  gives the operational flow; Required Output names the completion packet.
+- Section path (lookup routes, not a startup reading list): Purpose, Use When,
+  and Core Reference orient the route; Stages gives the conditional flow;
+  Required Output names the completion packet.
 - Boundary: task-specific behavior still comes from the user-request clauses,
   source packet, selected skills, and validation route.
 
@@ -100,20 +101,18 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 
 ## Owner-First Readback
 
-Before the implementation stage, consume
-[agents/skills/agent-orchestration.md#Owner-First-Read-Trace](agent-orchestration.md#owner-first-read-trace). Read the
-generated discovered `SKILL.md` in bounded chunks with
-`bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`
-until `file_eof=true`; it is the
-complete compact Skill. When that Skill delegates a decision, read only the
-indexed canonical owner sections needed for the task until
-`section_eof=true`. The current task update must name the active root Reader
-Map row, selected canonical Skill, operational owner and route, then show
-`docs_first_status=resolved` and `implementation_read=ready` only after those
-EOF conditions hold. If the trace is unresolved, implementation remains locked
-and the existing coordinated-search route owns the bounded lookup. A
-partial response, known path, or whole-file canonical read is not a substitute;
-do not create a per-read receipt, identifier, approval gate, or duplicate Skill
+Before the current implementation action, follow
+[Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace).
+Read common constraints and short branch conditions, then only the selected
+branch and its necessary delegated sections through `section_eof=true`.
+Apply this to discovered and canonical Skills, including nested branches;
+whole-file EOF and unread later-stage or recovery branches are not admission
+requirements. The existing task update names the active root Reader Map row,
+selected canonical Skill, operational owner and route, with
+`docs_first_status=resolved` and `implementation_read=ready` only after the
+currently required reads. A required prefix or unresolved current decision
+stays locked; a path or metadata-only `admit` result is not proof of reading.
+Do not create a per-read receipt, identifier, approval gate, or duplicate Skill
 body. A path named by a user, parent, handoff, or router is likewise only a
 candidate until the owner-first trace and the decision-relevant bounded
 dependency/downstream check select the replaceable unit. Merely naming a
@@ -176,6 +175,8 @@ does not create a second semantic ledger; review reads the same instance back.
 これは通常の移行判断であり、追加の stage、帳票、広い原因調査を要求しません。
 
 The stages are conditional route points, not a fixed plan-review-edit sequence.
+Stage names do not authorize preloading their details; read a stage or nested
+branch only when the current decision activates it through Owner-First Read Trace.
 Task-catalog roles, default review packs, and related skills are candidates;
 they become work only when an owner-critical operation, unresolved branch, or
 selected validation route activates them. A wave is launchable only when its
@@ -290,7 +291,7 @@ route.
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md).
+1. Read only the currently selected phase of [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md); its links do not activate later phases.
 1. 規模に応じた処理・資源コストを決める実装方式の選定では、[Stages](#stages) の規模判断を実装前に消費し、同じ設計参照を実装・review へ渡します。
 1. Route skill selection through `$agent-orchestration` first; this skill executes the selected Codex task flow after routing is selected.
 1. For AgentCanon source/runtime work, use a standalone or qualified ignored source checkout prepared by `repository-topic-clone` and follow `agent-canon-update`. The integration executor merges the AgentCanon PR and a publisher/integration child reads back source `main`; do not restore a parent vendor/submodule/root-projection route.
@@ -314,12 +315,12 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Treat `run.repo_tool_routing_policy` from `bootstrap_agent_run.py` as the selected repo-owned tool route. Carry `tool_route`, `tool_commands`, and `tool_evidence` into subagent handoff packets, and run each selected skill packet in the manifest order before replacing it with prose review.
 1. For repo-changing edits, existing tool execution and bounded owner patching
    proceed from tool-owned evidence. Existing tools may run before the Skill
-   read for the covered property, but interpretation or repair remains locked
-   until the generated compact `SKILL.md` reaches `file_eof=true` and any
-   delegated canonical section reaches `section_eof=true`. Read only the owner
-   surface needed to interpret or repair the tool result. Route bounded edits
-   through the normal owner route and record owner, existing-tool route, and
-   targeted-validation evidence.
+   read for the covered property. Before interpreting or repairing the result,
+   read only the common constraints and current branch/delegated sections selected
+   by [Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace),
+   continuing each through `section_eof=true`. Neither file EOF nor inactive
+   branch completion is required. Route bounded edits through the normal owner
+   route and record owner, existing-tool route, and targeted-validation evidence.
 1. For research-backed implementation, benchmark, external-research change,
    prior-art adoption, official-docs method claims, or literature-derived design
    decisions, the emitted `skills=...` / run-bundle skill call sequence calls

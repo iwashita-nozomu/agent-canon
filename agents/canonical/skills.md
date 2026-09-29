@@ -38,12 +38,15 @@ user directory link when the explicit control root is `$HOME`. Isolated
 path or a second registry. Runtime alignment still checks canonical docs,
 catalog IDs, and generated adapters for parity.
 
-Read the selected session's registered `SKILL.md` first, then its canonical
-owner. Resolve the adapter's relative links from its real file directory, not
-the product working directory. Only after a read failure inspect that entry's
-link target and generated state through the existing bootstrap owner; do not
-substitute a same-named file from another checkout. Explicit source maintenance
-edits the canonical owner in the selected development checkout.
+Start with the selected session's registered `SKILL.md` common constraints and
+branch conditions. Follow [Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace)
+to read only current branches and needed delegated canonical sections; selection
+does not require either file's full body. Resolve the adapter's relative links
+from its real file directory, not the product working directory. Only after a
+read failure inspect that entry's link target and generated state through the
+existing bootstrap owner; do not substitute a same-named file from another
+checkout. Explicit source maintenance edits the canonical owner in the selected
+development checkout.
 
 Naming carries the visibility boundary:
 
