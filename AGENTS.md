@@ -5,7 +5,7 @@
 contract agent-runtime
 responsibility Provides the minimal source entrypoint and conditional owner route.
 upstream design documents/design/entrypoint-owner-map.md reading boundary
-downstream design ROOT_AGENTS.md portable common constraints
+upstream design ROOT_AGENTS.md portable common constraints
 downstream design agents/canonical/SOURCE_ROUTING.md optional source owner index
 @dependency-end
 -->
