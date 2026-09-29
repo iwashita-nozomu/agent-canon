@@ -42,7 +42,8 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 
 1. [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
    で最新の明示的合意を完成形に固定し、[SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
-   で既存実装の削除・置換を先に検討する。その完成形に対して current module/helper/type/test/docs、
+   の既存機能の修正・整理として、対象構造の維持も見直す。不要・原因となる構造の削除・置換を
+   継ぎ足しより先に検討し、正しい既存部品は再利用する。current module/helper/type/test/docs、
    標準ライブラリ、採用済み dependency、既存 CLI を同じ shared asset universe で比較する。
    file/worker slice はその後に導く。provider の比較は
    [SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
@@ -102,6 +103,8 @@ bash tools/analysis/dependencies/run_repo_dependency_review.sh
 
 ## Boundary
 
+このcleanup routeを新規実装の一律前提にしません。新規部分はSEP-06の既存機能の組合せから始め、
+修正部分だけを本routeで扱います。挙動保存のrefactorは必要な挙動を保ち、構造の保存とは区別します。
 削除、rename、移動の oracle は analyzer ではなく public/module contract、到達性、validation、
 rollback の owner evidence です。`dependency-analysis`、`refactor-loop`、`change-review` の
 policy をこの skill に複製しません。search tool、asset registry、reuse database、

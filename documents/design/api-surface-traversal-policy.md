@@ -12,11 +12,13 @@ downstream design ../../agents/canonical/ROOT_IMPLEMENTATION.md applies traversa
 
 # API Surface Traversal Before Negative Conclusions
 
-Fix the latest explicit user agreement and consider deletion or replacement
-under [SEP-01](../conventions/software-engineering-principles.md#sep-01-contract-first)
-and [SEP-06](../conventions/software-engineering-principles.md#sep-06-kiss)
-before selecting a reuse mechanism. Traversal informs that target; it does not
-redesign the target around an existing API. Before concluding that an API cannot
+Fix the latest explicit user agreement under
+[SEP-01](../conventions/software-engineering-principles.md#sep-01-contract-first),
+then use the task-specific starting point in
+[SEP-06](../conventions/software-engineering-principles.md#sep-06-kiss): composition
+for new functionality, preservation review for the structure being repaired.
+Traversal informs that target; it does not redesign the target around an existing
+API or require deletion for every task. Before concluding that an API cannot
 satisfy it, collect a bounded public-surface trail:
 
 1. Public import/export surface, including `__all__` or documented exports.
@@ -42,12 +44,13 @@ selected_fix_surface=<caller/config/adapter/library>
 ## After traversal: repair and migration
 
 Traversal selects the existing capability and responsible owner; it does not
-freeze the current API. Under the [API change boundary](../../agents/canonical/ROOT_IMPLEMENTATION.md#public-api-additions),
-a requested fix includes necessary public changes and affected consumer migration.
-Reuse an existing API unchanged when it yields the simplest agreed result,
-not merely because adaptation is possible. Otherwise replace the responsible
-owner rather than retaining its scaffolding; update affected callers, tests,
-and documentation and remove superseded paths in the same change.
+freeze the current API. New functionality starts with direct use, configuration,
+and composition, implementing only the evidenced gap. Under the
+[API change boundary](../../agents/canonical/ROOT_IMPLEMENTATION.md#public-api-additions),
+a requested fix also reconsiders preservation of the affected owner. Reuse sound
+parts, but do not add adaptation solely to protect an unnecessary or defective
+structure. Correct, remove, or replace it as needed for the simplest agreed result;
+update affected callers, tests, and documentation and remove superseded paths.
 Keep explicit compatibility requirements and actual access or authority limits
 visible, without inferring a freeze from public visibility or active use.
 

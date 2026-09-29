@@ -42,26 +42,30 @@ owning design into line with that agreement; old code, tests, or design records
 do not silently reopen it. A concrete conflict with a still-required contract,
 safety, or authority needs an explicit finding, not an invented compatibility path.
 
-Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
-by first considering deletion or replacement of the affected implementation.
-Identify the required semantics, retained owner, superseded code, and necessary
-consumer migration before editing. Compare the completed code space, including
-retained wrappers, state, branches, and support, not just new code or diff size.
+Apply the task-specific starting points in
+[SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss).
+For new functionality, start with direct use, configuration, and composition of
+existing capabilities; add only the evidenced missing responsibility. For repairs
+or changes to existing functionality, reconsider preservation of the affected
+structure and consider removing or replacing unnecessary or defective mechanisms
+before layering around them. Reuse sound parts; a sufficient local correction
+need not become a replacement. Classify mixed work per responsibility, not by
+whether a file or helper is new, and keep behavior-preserving refactors within
+their agreed semantic boundary.
 
-Then use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+Use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
 to inspect relevant abstractions, actual callers, APIs, configuration, dependencies,
-and extension points against that target. Reuse necessary parts, not the old
-structure by default. Direct use or composition must keep the agreed result
-simplest; do not add adapters or dual paths solely to retain an existing owner.
+and extension points for the selected task. Compare completed code space, including
+retained wrappers, state, branches, and support, not just new code or diff size.
 A failed name search is not absence. An unresolved capability defers only its
 selection; it neither blocks independent work nor justifies inventing a foundation.
 
-Close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+When replacing or retiring an implementation, close
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
 in the same change: remove obsolete paths and dedicated support, migrate affected
 uses, and validate the agreed contract rather than freezing superseded behavior
 in tests. Preserve required domain, correctness, safety, performance, and failure
-semantics. Deletion-first does not mean blind deletion, wholesale rewriting,
-unrelated cleanup, or a new checker, report, or approval gate.
+semantics. Add no blind deletion, unrelated cleanup, checker, report, or approval gate.
 
 ## Public API additions
 
@@ -76,9 +80,10 @@ Before implementation, use [API surface traversal](../../documents/design/api-su
 to inspect current abstractions, real callers, APIs, configuration, extension
 points, standard facilities, and adopted dependencies. Reuse sufficient current
 findings; not finding a name or preferring another signature is not a capability
-gap. If direct use or composition is simplest for the agreed target, use it
-without a new API. Capability alone does not require preserving the old owner.
-Otherwise, record candidates, source evidence, unmet contract, and necessary owner/API
+gap. New functionality starts with direct use or composition before a new API.
+For a repair, existing capability does not require preserving the affected owner;
+choose the simplest complete correction, including replacement when justified.
+Record candidates, source evidence, any unmet contract, and necessary owner/API
 change in the existing design, then implement it within the requested scope.
 Unknown capability remains unknown; it neither justifies speculative additions
 nor blocks independent authorized work.
