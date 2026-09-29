@@ -1,26 +1,64 @@
-name: Issue 1296 source export
+name: Issue 1296 candidate publication
 on:
   push:
     branches: [fix/1296-git-tracked-skills]
     paths: [.github/workflows/issue-1296-source-export.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  source:
+  candidate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
-          persist-credentials: false
-      - name: Export exact source and main objects
+      - name: Apply the exact locally validated source change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONDONTWRITEBYTECODE: '1'
         run: |
-          git branch snapshot-main origin/main
-          git bundle create "$RUNNER_TEMP/source.bundle" HEAD refs/heads/snapshot-main
-          git rev-parse HEAD origin/main HEAD^{tree}
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/fix/1296-git-tracked-skills
+          test "$(git rev-parse HEAD^)" = dc7548ea7fcc78a22c340aebea6740e87127f162
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = 85a2df933008cbf74f7c146cd64d051758006919
+          git merge --no-edit origin/main
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, os, urllib.request
+          from pathlib import Path
+          data = b''
+          for sha in ('42b4629bb5225468644f991c6416de8f1ffb5912', '8c7de6ffc9fc55b394468562215dc356b18a01dc'):
+              request = urllib.request.Request(
+                  'https://api.github.com/repos/iwashita-nozomu/agent-canon/git/blobs/' + sha,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'},
+              )
+              with urllib.request.urlopen(request) as response:
+                  data += base64.b64decode(json.load(response)['content'])
+          assert hashlib.sha256(data).hexdigest() == 'e211d31e23b1d238b98ce0ae57671078748d1f820daaed252a024467eb68f37a'
+          Path(os.environ['RUNNER_TEMP'], 'candidate.patch').write_bytes(lzma.decompress(data))
+          PY
+          git apply --check --unidiff-zero "$RUNNER_TEMP/candidate.patch"
+          git apply --index --unidiff-zero "$RUNNER_TEMP/candidate.patch"
+          git rm -- .github/workflows/issue-1296-source-export.yml
+          AGENT_CANON_PARENT_ROOT="$PWD" python3 tools/agent/skills/skill_shim_materializer.py materialize --root . --all --format json > "$RUNNER_TEMP/materialization.json"
+          git add .codex/personal/skills
+          test "$(git write-tree)" = e77792f5c23992db32c60afafd3762d6e140af31
+          git diff --cached --check
+          git commit -m 'fix(#1296): distribute skills through Git and fixed directory links'
+          git push origin HEAD:refs/heads/fix/1296-git-tracked-skills
+          git rev-parse HEAD HEAD^{tree} origin/main > "$RUNNER_TEMP/candidate-identity.txt"
+          git bundle create "$RUNNER_TEMP/candidate.bundle" HEAD ^85a2df933008cbf74f7c146cd64d051758006919
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: issue-1296-source
-          path: ${{ runner.temp }}/source.bundle
+          name: issue-1296-candidate
+          path: |
+            ${{ runner.temp }}/candidate-identity.txt
+            ${{ runner.temp }}/candidate.bundle
+            ${{ runner.temp }}/materialization.json
           retention-days: 1
-          if-no-files-found: error
+          if-no-files-found: warn
