@@ -57,9 +57,9 @@ control root に `$HOME` を明示した場合、install / update は次のリ�
 ~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
 ```
 
-install / update は ignored な `~/agent-canon/.codex/personal/skills/` を
-`~/.agents/skills` へディレクトリ単位でリンクします。旧skill farmの列挙や期待値照合は
-せず、変更は `agents/skills/<skill>.md` と catalog に加えます。uninstall が削除するのは
+install / update は Git 追跡された `~/agent-canon/.codex/personal/skills/` を
+`~/.agents/skills` へディレクトリ単位でリンクします。正常なリンクは維持し、通常のスキル更新は Git pull だけで反映します。
+保守者は正本と catalog の変更に対応する adapter を同じ commit に含めます。利用時の生成・転送・全削除は行いません。uninstall が削除するのは
 AgentCanon所有のディレクトリリンクだけです。
 
 既存の regular な `~/.codex/config.toml` は内容と mode を保持したまま ignored な

@@ -78,10 +78,10 @@ _agent_canon_remove_global_links
     assert system_sentinel.read_text(encoding="utf-8") == "system\n"
 
 
-def test_shell_install_replaces_legacy_skill_farm_with_directory_link(
+def test_shell_install_preserves_unowned_skill_directory(
     tmp_path: Path,
 ) -> None:
-    """A stale per-skill farm cannot block the directory-level projection."""
+    """An unowned nonempty directory must not be deleted to install a link."""
     home = tmp_path / "home"
     repository = tmp_path / "repository"
     state = tmp_path / "state"
@@ -109,13 +109,10 @@ _agent_canon_install_global_links
     result = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
-    assert result.returncode == 0, result.stderr
-    assert legacy.is_symlink() and legacy.resolve() == source.resolve()
-    assert (home / ".codex" / "agents" / "worker.toml").is_symlink()
-    assert (home / ".codex" / "agents" / "worker.toml").resolve() == (
-        agents / "worker.toml"
-    ).resolve()
-    assert "global_link_collision" not in result.stderr
+    assert result.returncode == 2
+    assert "skill_link_collision" in result.stderr
+    assert not legacy.is_symlink()
+    assert (legacy / "stale/SKILL.md").read_text() == "stale\n"
 
 
 def test_shell_install_preserves_foreign_codex_config_symlink(tmp_path: Path) -> None:
@@ -1575,7 +1572,7 @@ def test_volume_export_rejects_fifo_before_publish(tmp_path: Path) -> None:
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     volume_name = f"agent-canon-runtime-{control_digest}"
     volume_root = tmp_path / f".fake-volume-{volume_name}"
-    skill = volume_root / "exchange" / "skill-projection"
+    skill = volume_root / "spool" / "fifo-test"
     skill.mkdir(parents=True)
     os.mkfifo(skill / "unexpected.fifo")
     state_path = tmp_path / "docker-state.json"
@@ -1609,7 +1606,7 @@ def test_volume_export_rejects_fifo_before_publish(tmp_path: Path) -> None:
                 f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
                 f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
                 f"AGENT_CANON_IMAGE_REF=image; "
-                f"_agent_canon_volume_copy export skill {str(stage)!r}"
+                f"_agent_canon_volume_copy export eval {str(stage)!r} fifo-test"
             ),
         ],
         check=False,
@@ -3540,7 +3537,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         ).stdout.strip()
 
 
-def test_public_clean_install_materializes_source_view_and_first_target(
+def test_public_clean_install_uses_tracked_skills_and_first_target(
     tmp_path: Path,
 ) -> None:
     """Install from empty state, then reconstruct over stale runtime residue."""
@@ -3549,7 +3546,7 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     origin = tmp_path / "origin.git"
     publisher = tmp_path / "publisher"
     subprocess.run(
-        ["git", "init", "--bare", str(origin)], check=True, capture_output=True
+        ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
     )
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(ROOT), str(publisher)],
@@ -3593,7 +3590,7 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     ]
     personal_skills = repository / ".codex" / "personal" / "skills"
     assert not (repository / ".runtime").exists()
-    assert not personal_skills.exists()
+    assert list(personal_skills.glob("*/SKILL.md"))
 
     installed = subprocess.run(
         [*common, "install"], check=False, capture_output=True, text=True, env=environment
@@ -3766,7 +3763,7 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
     origin = tmp_path / "origin.git"
     publisher = tmp_path / "publisher"
     subprocess.run(
-        ["git", "init", "--bare", str(origin)], check=True, capture_output=True
+        ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
     )
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(ROOT), str(publisher)],
@@ -3920,7 +3917,7 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
     origin = tmp_path / "origin.git"
     publisher = tmp_path / "publisher"
     subprocess.run(
-        ["git", "init", "--bare", str(origin)], check=True, capture_output=True
+        ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
     )
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(ROOT), str(publisher)],
@@ -3966,7 +3963,7 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         "DOCKER_HOST": docker_host,
     }
     assert not runtime.exists()
-    assert not personal_skills.exists()
+    assert list(personal_skills.glob("*/SKILL.md"))
     assert subprocess.run(
         [docker, "container", "inspect", container_name],
         check=False,
@@ -4403,13 +4400,8 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     assert 'AGENT_CANON_PROJECT_ROOT="$codex_project"' in text
     assert 'AGENT_CANON_HOST_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT' in text
     assert '_agent_canon_run_controller "$codex_container" codex prepare' in text
-    codex_route = text.split('    codex)', 1)[1].split('    eval)', 1)[0]
-    assert codex_route.index(
-        '_agent_canon_run_controller "$codex_container" codex prepare'
-    ) < codex_route.index('_agent_canon_sync_personal_skill_view "$codex_container"')
-    assert codex_route.index(
-        '_agent_canon_sync_personal_skill_view "$codex_container"'
-    ) < codex_route.index('"$codex_executable" --project-root "$codex_project"')
+    assert "_agent_canon_sync_personal_skill_view" not in text
+    assert "skill-projection" not in text
     assert '"$codex_executable" --project-root "$codex_project"' in text
     assert 'if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then' in text
     controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(encoding="utf-8")
@@ -4699,10 +4691,10 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
                     "set -eu",
                     'test -f "$CODEX_HOME/config.toml"',
                     'test -f "$CODEX_HOME/agents/worker.toml"',
-                    'test -f "$CODEX_HOME/skills/agent-orchestration/SKILL.md"',
+                    'test -f "$CODEX_HOME/skills/agent-canon/agent-orchestration/SKILL.md"',
                     'test -s "$CODEX_HOME/config.toml"',
                     'test -s "$CODEX_HOME/agents/worker.toml"',
-                    'test -s "$CODEX_HOME/skills/agent-orchestration/SKILL.md"',
+                    'test -s "$CODEX_HOME/skills/agent-canon/agent-orchestration/SKILL.md"',
                     'printf "%s\\n" "$AGENT_CANON_PROJECT_ROOT" > "$CODEX_HOME/host-stub-project"',
                 ]
             )

@@ -15,7 +15,7 @@ downstream implementation ../../tools/agent/skills/skill_dependency_map.py valid
 -->
 
 このディレクトリは、public Codex skill 文書の人間向け正本です。
-機械 discovery 用の `SKILL.md` は `.codex/personal/skills/` に生成し、手編集しません。
+機械 discovery 用の `SKILL.md` は `.codex/personal/skills/` に保守時に生成し、正本と同じ commit で配布します。
 Codex は `~/.agents/skills/` の管理された directory link 経由で読みます。
 正本・生成先・repository 固有の入口の区別は [Skill Paths](../canonical/skills.md#skill-paths) を参照します。
 
@@ -44,7 +44,7 @@ or copy the universal omission/granularity policy into adapter entries.
 
 - skill の目的、使う場面、関連正本は `agents/skills/` に書きます。
 - [AGENTS.md](../../AGENTS.md) には長い skill 説明を複製しません。
-- `.codex/personal/skills/` は ignored な生成 view です。Codex の global
+- `.codex/personal/skills/` は Git 追跡された配布 adapter です。Codex の global
   auto-discovery path は `~/.agents/skills/` です。
 - 人間が skill を明示的に呼び出す場合は plain text ではなく `$skill-name` を使います。
 - 例: `$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
@@ -190,5 +190,5 @@ in the Codex host runtime.
 
 1. `agents/skills/<family>.md` を更新する
 1. `agents/skills/catalog.yaml` を更新する
-1. 既存の [bootstrap / materializer 経路](../../README.md#source-and-artifact-boundary) で生成 adapter を更新する。`SKILL.md` は手編集しない
+1. 既存の [保守者用 materializer](../../README.md#source-and-artifact-boundary) で adapter を更新し、正本と一緒に commit する。利用時には生成しない
 1. 必要なら [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) と [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) の routing を更新する

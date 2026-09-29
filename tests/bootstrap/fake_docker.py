@@ -261,58 +261,6 @@ def _read_root_owned_bind_as_user(mount: dict, user: str) -> str | None:
     return state.read_text(encoding="utf-8")
 
 
-def _materialize_skill_exchange(state: dict, container: dict) -> None:
-    """Model resident materializer output in the writable runtime exchange."""
-    volume_mount = next(
-        (
-            mount
-            for mount in container.get("Mounts", [])
-            if mount["Destination"] == "/var/lib/agent-canon"
-        ),
-        None,
-    )
-    if volume_mount is None:
-        return
-    image_ref = container.get("Config", {}).get("Image", "")
-    image = find(state, image_ref)
-    if image is None or image[0] != "image":
-        return
-    source_root = Path(str(image[1].get("SourceRoot", "")))
-    # The fake daemon is itself the resident boundary.  Use the canonical
-    # owner shipped with this test checkout while reading all canonical inputs
-    # from the image's source snapshot, including older source snapshots used
-    # by stale-resident fixtures.
-    materializer = Path(__file__).resolve().parents[2] / "tools/agent/skills/skill_shim_materializer.py"
-    if not materializer.is_file():
-        return
-    staging_root = Path(volume_mount["Source"]) / "exchange" / "skill-projection"
-    staged_skill = staging_root / ".codex/personal/skills/agent-orchestration/SKILL.md"
-    if staged_skill.is_file():
-        return
-    staging_root.mkdir(parents=True, exist_ok=True)
-    materialized = subprocess.run(
-        [
-            sys.executable,
-            str(materializer),
-            "materialize",
-            "--root",
-            str(source_root),
-            "--output-root",
-            str(staging_root),
-            "--image-build",
-            "--all",
-        ],
-        cwd=source_root,
-        env={**os.environ, "AGENT_CANON_IMAGE_BUILD": "1"},
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    if materialized.returncode != 0:
-        return
-
-
 def _memory_bytes(value: str) -> int:
     """Parse the small Docker memory notation used by the shell adapter."""
     if value.endswith("g"):
@@ -774,14 +722,6 @@ def main(argv: list[str]) -> int:
                             members.append((source_file, name))
                     emit_tar(source_root, members)
                     readback_digest = projection_digest(source_root)
-                elif kind == "skill":
-                    source_root = backing / "exchange" / "skill-projection"
-                    if not source_root.is_dir() or source_root.is_symlink() or any(
-                        path.is_symlink() for path in source_root.rglob("*")
-                    ):
-                        return 1
-                    emit_tar(source_root.parent, [(source_root, "skill-projection")])
-                    readback_digest = tree_digest(source_root)
                 elif kind == "eval":
                     source_root = backing / "spool" / relative
                     if not source_root.is_dir() or source_root.is_symlink() or any(
@@ -1294,10 +1234,6 @@ def main(argv: list[str]) -> int:
                     'schema = "agent-canon.mount-registry.v2"\n',
                     encoding="utf-8",
                 )
-            if operation in {"install", "update"} or (
-                "codex" in command[2:] and "prepare" in command[2:]
-            ):
-                _materialize_skill_exchange(state, found[1])
             if operation:
                 print(
                     json.dumps(

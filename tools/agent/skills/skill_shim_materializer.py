@@ -10,7 +10,7 @@
 # upstream implementation ../orchestration/tool_calls.py owns skill ToolCall token materialization
 # downstream implementation ../../../tests/agent_tools/test_skill_shim_materializer.py validates migration, readback, and fixed point
 # @dependency-end
-"""Materialize the canonical thin runtime shims for all public skills."""
+"""Author Git-distributed skill adapters; never run during install or launch."""
 
 from __future__ import annotations
 
@@ -20,9 +20,7 @@ import json
 import os
 import posixpath
 import re
-import stat
 import sys
-import tempfile
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -87,17 +85,8 @@ ABSOLUTE_LOCATOR_RE = re.compile(
 )
 
 
-def _parent_boundary(
-    root: Path, purpose: str, *, image_build: bool = False
-) -> tuple[Any, Any]:
-    """Return an authenticated capability for every materializer write."""
-    if image_build:
-        if os.environ.get("AGENT_CANON_IMAGE_BUILD") != "1":
-            raise ParentRootSideEffectError(
-                ParentRootReject.HANDOFF_INVALID,
-                "image-build mode requires the Docker build capability",
-            )
-        return _ImageBuildBoundary(root), _ImageBuildAttestation(root.resolve(strict=True))
+def _parent_boundary(purpose: str) -> tuple[Any, Any]:
+    """Return the existing source-maintenance write capability."""
     configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
@@ -120,119 +109,6 @@ class MaterializerError(RuntimeError):
         self.detail = detail
         message = code if not detail else f"{code}:{detail}"
         super().__init__(message)
-
-
-@dataclass(frozen=True)
-class _ImageBuildPath:
-    """One generated target receipt for the explicit image-build mode."""
-
-    physical_path: Path
-    target_dev: int | None
-    target_ino: int | None
-
-
-@dataclass(frozen=True)
-class _ImageBuildAttestation:
-    """Trusted image-layer root supplied by the Dockerfile build step."""
-
-    root: Path
-
-
-class _ImageBuildBoundary:
-    """Provide the materializer write protocol for an ephemeral image layer."""
-
-    def __init__(self, root: Path) -> None:
-        """Bind one absolute, regular image build root."""
-        if root.is_symlink():
-            raise MaterializerError("image_build_root_invalid", str(root))
-        resolved = root.resolve(strict=True)
-        if not resolved.is_dir():
-            raise MaterializerError("image_build_root_invalid", str(root))
-        self.root = resolved
-
-    def _target(self, candidate: Path) -> Path:
-        """Resolve one target beneath the image root without following links."""
-        lexical = candidate if candidate.is_absolute() else self.root / candidate
-        if any(part == ".." for part in lexical.parts):
-            raise MaterializerError("image_build_path_escape", str(candidate))
-        try:
-            lexical.relative_to(self.root)
-        except ValueError as exc:
-            raise MaterializerError("image_build_path_escape", str(candidate)) from exc
-        current = self.root
-        for part in lexical.relative_to(self.root).parts:
-            current /= part
-            if current.is_symlink():
-                raise MaterializerError("image_build_symlink", str(current))
-        target = lexical.resolve(strict=False)
-        try:
-            target.relative_to(self.root)
-        except ValueError as exc:
-            raise MaterializerError("image_build_path_escape", str(candidate)) from exc
-        return target
-
-    def resolve_parent_owned_path(
-        self,
-        _attestation: _ImageBuildAttestation,
-        candidate: Path,
-        _purpose: str,
-        *,
-        create: bool = False,
-    ) -> _ImageBuildPath:
-        """Resolve a generated file and create its parent when requested."""
-        target = self._target(candidate)
-        if create or not target.parent.exists():
-            target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists() and not target.is_file():
-            raise MaterializerError("image_build_target_invalid", str(target))
-        target_stat = target.stat() if target.exists() else None
-        return _ImageBuildPath(
-            target,
-            target_stat.st_dev if target_stat is not None else None,
-            target_stat.st_ino if target_stat is not None else None,
-        )
-
-    @staticmethod
-    def read_parent_owned_file(receipt: _ImageBuildPath) -> bytes:
-        """Read one generated image-layer target."""
-        return receipt.physical_path.read_bytes()
-
-    def atomic_publish(
-        self,
-        receipt: _ImageBuildPath,
-        data: bytes,
-        *,
-        mode: int = 0o644,
-    ) -> _ImageBuildPath:
-        """Publish one generated file atomically into the image layer."""
-        target = self._target(receipt.physical_path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.is_symlink() or (target.exists() and not target.is_file()):
-            raise MaterializerError("image_build_target_invalid", str(target))
-        current = target.stat() if target.exists() else None
-        if receipt.target_dev is not None and (
-            current is None
-            or current.st_dev != receipt.target_dev
-            or current.st_ino != receipt.target_ino
-        ):
-            raise MaterializerError("image_build_target_changed", str(target))
-        temporary_fd, temporary_name = tempfile.mkstemp(
-            prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
-        )
-        try:
-            with os.fdopen(temporary_fd, "wb") as stream:
-                stream.write(data)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.chmod(temporary_name, stat.S_IMODE(mode))
-            os.replace(temporary_name, target)
-        finally:
-            try:
-                os.unlink(temporary_name)
-            except FileNotFoundError:
-                pass
-        published = target.stat()
-        return _ImageBuildPath(target, published.st_dev, published.st_ino)
 
 
 class PartialStopError(MaterializerError):
@@ -275,7 +151,6 @@ class BuildContext:
     packets: Mapping[str, SkillCommandPacket]
     graph: Mapping[str, object]
     source_snapshot_digest: str
-    fast_image_build: bool = False
 
 
 def _normalize_string(value: str, *, identifier: bool = False) -> str:
@@ -497,35 +372,26 @@ def _source_snapshot_digest(
 
 
 def build_context(
-    root: Path, *, output_root: Path | None = None, image_build: bool = False
+    root: Path, *, output_root: Path | None = None
 ) -> BuildContext:
     """Load canonical inputs and validate their materialization relationships."""
     root = root.resolve()
     output = (output_root or root).resolve()
     skill_ids, entries = _catalog_entries(root)
     try:
-        if image_build:
-            routes = {}
-            dependencies = {}
-            graph = {"graph_digest": "image-build-fast"}
-        else:
-            routes = {rule.skill: rule for rule in load_skill_route_rules(root)}
-            dependencies = dict(load_skill_dependency_map(root, skill_ids))
-            graph = cast(Mapping[str, object], build_graph(root))
+        routes = {rule.skill: rule for rule in load_skill_route_rules(root)}
+        dependencies = dict(load_skill_dependency_map(root, skill_ids))
+        graph = cast(Mapping[str, object], build_graph(root))
     except (OSError, ValueError, yaml.YAMLError) as exc:
         raise MaterializerError("owner_source_invalid", str(exc)) from exc
-    if not image_build and (set(routes) != set(skill_ids) or set(dependencies) != set(skill_ids)):
+    if set(routes) != set(skill_ids) or set(dependencies) != set(skill_ids):
         raise MaterializerError("owner_skill_set_mismatch")
     try:
         resolution = resolve_agent_canon_source_root(root)
-        packets = (
-            {}
-            if image_build
-            else {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
-        )
+        packets = {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
     except (OSError, ValueError) as exc:
         raise MaterializerError("command_packet_invalid", str(exc)) from exc
-    if not image_build and len(packets) != len(skill_ids):
+    if len(packets) != len(skill_ids):
         raise MaterializerError("command_packet_count_mismatch", str(len(packets)))
     return BuildContext(
         root,
@@ -537,7 +403,6 @@ def build_context(
         packets,
         graph,
         _source_snapshot_digest(root, graph, skill_ids),
-        image_build,
     )
 
 
@@ -559,35 +424,20 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
     canonical_path = context.root / canonical_doc
     if not canonical_path.is_file():
         raise MaterializerError("missing_canonical_doc", skill)
-    if context.fast_image_build:
-        tool_call_refs = [{"command_count": 0, "identity": "image-build-fast"}]
-        tool_surface_digest = domain_digest(
-            "agent-canon.skill-runtime-shim.owner.tool-surface.v2", tool_call_refs
-        )
-        packet_digest = domain_digest("skill_tool_commands.v2", tool_call_refs)
-    else:
-        packet = context.packets[skill]
-        tool_call_refs, tool_surface_digest = _tool_call_refs(packet)
-        packet_digest = domain_digest(
-            "skill_tool_commands.v2", _packet_payload(packet, context.root)
-        )
-    if context.fast_image_build:
-        route_identity = domain_digest(
-            "agent-canon.skill-runtime-shim.owner.route.v1", {"skill": skill}
-        )
-        dependency_identity = domain_digest(
-            "agent-canon.skill-runtime-shim.owner.dependency.v1", {"skill": skill}
-        )
-    else:
-        route = context.routes[skill]
-        dependency = context.dependencies[skill]
-        dependency_identity = domain_digest(
-            "agent-canon.skill-runtime-shim.owner.dependency.v1",
-            _dependency_payload(dependency),
-        )
-        route_identity = domain_digest(
-            "agent-canon.skill-runtime-shim.owner.route.v1", _route_payload(route)
-        )
+    packet = context.packets[skill]
+    tool_call_refs, tool_surface_digest = _tool_call_refs(packet)
+    packet_digest = domain_digest(
+        "skill_tool_commands.v2", _packet_payload(packet, context.root)
+    )
+    route = context.routes[skill]
+    dependency = context.dependencies[skill]
+    dependency_identity = domain_digest(
+        "agent-canon.skill-runtime-shim.owner.dependency.v1",
+        _dependency_payload(dependency),
+    )
+    route_identity = domain_digest(
+        "agent-canon.skill-runtime-shim.owner.route.v1", _route_payload(route)
+    )
     catalog_identity = domain_digest(
         "agent-canon.skill-runtime-shim.owner.catalog.v1",
         {
@@ -962,13 +812,12 @@ def materialize(
     root: Path,
     *,
     all_skills: bool = False,
-    image_build: bool = False,
     output_root: Path | None = None,
 ) -> dict[str, object]:
     """Materialize changed runtime targets using per-file temp+replace."""
     if not all_skills:
         raise MaterializerError("all_required")
-    context = build_context(root, output_root=output_root, image_build=image_build)
+    context = build_context(root, output_root=output_root)
     records, rendered, projections = build_rows(context)
     legacy = [
         classify_legacy(context, skill, rendered[skill]) for skill in context.skill_ids
@@ -976,9 +825,7 @@ def materialize(
     if any(cast(Sequence[object], row["unmatched_blocks"]) for row in legacy):
         raise LegacyMigrationError(legacy)
     _staged_readback(context, rendered)
-    boundary, attestation = _parent_boundary(
-        context.output_root, "skill-shim-materializer", image_build=image_build
-    )
+    boundary, attestation = _parent_boundary("skill-shim-materializer")
     delta_paths: list[str] = []
     replaced = 0
     for skill in sorted(context.skill_ids):
@@ -1142,11 +989,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--all", action="store_true")
     parser.add_argument(
-        "--image-build",
-        action="store_true",
-        help="Materialize into an ephemeral Docker image layer.",
-    )
-    parser.add_argument(
         "--output-root",
         type=Path,
         help="Write the generated view below this staging root instead of the source root.",
@@ -1177,11 +1019,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = materialize(
                 args.root,
                 all_skills=args.all,
-                image_build=args.image_build,
                 output_root=args.output_root,
             )
-        elif args.image_build:
-            raise MaterializerError("image_build_materialize_only")
         elif args.command == "readback":
             payload = readback(
                 args.root, all_skills=args.all, output_root=args.output_root

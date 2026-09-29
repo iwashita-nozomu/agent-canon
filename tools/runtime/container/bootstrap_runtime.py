@@ -2107,7 +2107,6 @@ class BootstrapRuntime:
         source_head: str,
     ) -> dict[str, Any]:
         """Adopt an already-pulled registry image; this route never builds locally."""
-        self._materialize_skill_view()
         with self.locked():
             state = self._read_state()
             result = self._adopt_registry_image_locked(state, image_ref, image_record, source_head)
@@ -2630,7 +2629,6 @@ class BootstrapRuntime:
                         source_head,
                     )
                 else:
-                    self._materialize_skill_view()
                     self._image(state)
                     state["state"] = "installed"
                     state.setdefault("resources", self._resource_records()).setdefault(
@@ -2678,7 +2676,6 @@ class BootstrapRuntime:
         resources = state.get("resources", {})
         image = resources.get("image", {}) if isinstance(resources, dict) else {}
         if image.get("owned") is not True:
-            self._materialize_skill_view()
             self._write_state(state)
             return self._result(
                 self._receipt(
@@ -2698,7 +2695,6 @@ class BootstrapRuntime:
             or before in {"ready", "running"}
         )
         try:
-            self._materialize_skill_view()
             self._image(state, force_build=True)
             state["state"] = "maintenance_pending"
             self._write_state(state)
@@ -3606,71 +3602,6 @@ class BootstrapRuntime:
                 )
             )
 
-    def _materialize_skill_view(self) -> dict[str, Any]:
-        """Generate the ignored project-local skill view before image/link use."""
-        if self._container_control():
-            # The resident owns the materializer write.  Generate into the
-            # writable container-runtime exchange, then let the host adapter
-            # export that exact generated tree to the live checkout.  The
-            # source image remains read-only and the host never imports the
-            # materializer's Python dependencies.
-            staging = self.paths.container_runtime / "skill-projection"
-            if staging.is_symlink():
-                raise BootstrapError(
-                    "skill_projection_path_invalid",
-                    "skill projection staging path is a symlink",
-                )
-            if staging.exists():
-                if not staging.is_dir():
-                    raise BootstrapError(
-                        "skill_projection_path_invalid",
-                        "skill projection staging path is not a directory",
-                    )
-                shutil.rmtree(staging)
-            staging.mkdir(parents=True, exist_ok=True)
-            try:
-                from tools.agent.skills.skill_shim_materializer import materialize
-
-                previous_image_build = os.environ.get("AGENT_CANON_IMAGE_BUILD")
-                os.environ["AGENT_CANON_IMAGE_BUILD"] = "1"
-                try:
-                    materializer = materialize(
-                        self.repository_root,
-                        all_skills=True,
-                        image_build=True,
-                        output_root=staging,
-                    )
-                finally:
-                    if previous_image_build is None:
-                        os.environ.pop("AGENT_CANON_IMAGE_BUILD", None)
-                    else:
-                        os.environ["AGENT_CANON_IMAGE_BUILD"] = previous_image_build
-            except Exception as exc:  # noqa: BLE001 - translate owner failure once
-                raise BootstrapError(
-                    "skill_view_materialization_failed", str(exc)
-                ) from exc
-            return {
-                "mode": "resident-exchange",
-                "materialized": True,
-                "readback_digest": materializer.get("readback_digest"),
-            }
-        tools_root = self.repository_root / "tools" / "agent_tools"
-        if str(tools_root) not in sys.path:
-            sys.path.insert(0, str(tools_root))
-        from tools.agent.skills.skill_shim_materializer import materialize
-
-        previous = os.environ.get("AGENT_CANON_PARENT_ROOT")
-        os.environ["AGENT_CANON_PARENT_ROOT"] = str(self.repository_root)
-        try:
-            return materialize(self.repository_root, all_skills=True)
-        except Exception as exc:  # noqa: BLE001 - translate owner failure once
-            raise BootstrapError("skill_view_materialization_failed", str(exc)) from exc
-        finally:
-            if previous is None:
-                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
-            else:
-                os.environ["AGENT_CANON_PARENT_ROOT"] = previous
-
     def _managed_links(self) -> list[dict[str, str]]:
         projection_root: Path | None = None
         if self._container_control():
@@ -3695,9 +3626,18 @@ class BootstrapRuntime:
                 return source
             return projection_root / relative
 
-        entries: list[dict[str, str]] = []
+        # One directory reference follows Git additions/removals without a
+        # per-file registry or a generated copy in the runtime exchange.
+        skills = self.repository_root / ".codex" / "personal" / "skills"
+        if not skills.is_dir() or skills.is_symlink():
+            raise BootstrapError("skill_source_missing", str(skills))
+        entries: list[dict[str, str]] = [{
+            "surface": "skills",
+            "source": str(projection_source(skills)),
+            "validation_source": str(skills),
+            "relative": "agent-canon",
+        }]
         for surface, source in (
-            ("skills", self.repository_root / ".codex" / "personal" / "skills"),
             ("agents", self.repository_root / ".codex" / "agents"),
             ("hooks", self.repository_root / ".codex" / "hooks"),
             ("config", self.repository_root / ".codex" / "config.toml"),
@@ -3863,8 +3803,7 @@ class BootstrapRuntime:
             )
 
     def codex_prepare(self) -> dict[str, Any]:
-        """Refresh skills, then install managed links into isolated ``CODEX_HOME``."""
-        self._materialize_skill_view()
+        """Install fixed links to Git-distributed skills into isolated ``CODEX_HOME``."""
         with self.locked():
             return self._codex_prepare_locked()
 
@@ -5188,8 +5127,6 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             before = str(state.get("state"))
             resources = state.setdefault("resources", _container_resource_state(runtime))
             resources.update(_container_resource_state(runtime))
-            if operation in {"install", "update"}:
-                runtime._materialize_skill_view()
             if operation == "install":
                 # A clean install reconstructs controller-owned lifecycle
                 # state, while host-consumed spool/archive/cache/Codex

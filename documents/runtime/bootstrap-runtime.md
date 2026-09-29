@@ -213,8 +213,8 @@ is owned by `scheduler enable`, `disable`, `status`, and `uninstall`. Hosts
 without systemd user support, macOS, and native Windows remain one-shot-only;
 no daemon, webhook listener, cron route, or `loginctl enable-linger` is added.
 `install` and `update` converge the explicit control-root Codex views. With
-`$HOME` as control root, `~/.agents/skills` is one directory link to the ignored
-source view, while `~/.codex/agents/<role>.toml`
+`$HOME` as control root, `~/.agents/skills` is one fixed directory link to the
+Git-tracked `.codex/personal/skills` distribution, while `~/.codex/agents/<role>.toml`
 to the tracked role file, and `~/.codex/config.toml` to the ignored personal
 source under the AgentCanon checkout. An existing regular Codex config is moved
 byte-for-byte (including mode) before linking; update preserves it and uninstall
@@ -222,8 +222,11 @@ restores a regular file. Foreign entries and foreign symlinks are preserved or
 reported as collisions. Project hooks and user authentication, session,
 history, cache, plugins, rules, MCP, and TUI/trust settings are outside this
 projection. `codex prepare` remains the separate runtime-local isolated home
-route. Legacy per-skill farms are not inspected; install replaces the owned
-`~/.agents/skills` directory as one link, and uninstall removes that link only.
+route: `CODEX_HOME/skills/agent-canon` links to the same distribution directory.
+A correct link is retained during updates; foreign links or directories are
+reported as collisions, not deleted. Git updates the distribution files without
+a runtime generator, exchange copy, or directory replacement. Uninstall removes
+the owned discovery link only.
 The migration never scans or removes `~/.codex/skills/.system` or another user
 entry.
 

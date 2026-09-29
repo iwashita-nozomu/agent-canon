@@ -98,10 +98,10 @@ def test_source_identity_operation_has_no_runtime_side_effects(tmp_path: Path) -
     )
 
 
-def test_direct_container_materializer_bootstraps_without_pythonpath(
+def test_direct_container_links_read_tracked_skills_without_pythonpath(
     tmp_path: Path,
 ) -> None:
-    """Direct container control loads the materializer from its source root."""
+    """Direct controller imports can resolve the tracked public skill directory."""
     control = tmp_path / "control"
     runtime = control / "runtime"
     control.mkdir()
@@ -122,8 +122,9 @@ manager = module.BootstrapRuntime(
     runtime_root,
     repository_root=repository_root,
 )
-result = manager._materialize_skill_view()
-print(json.dumps({"mode": result["mode"], "materialized": result["materialized"]}))
+links = manager._managed_links()
+public = [entry for entry in links if entry["surface"] == "skills"]
+print(json.dumps({"sources": [entry["source"] for entry in public]}))
 """
     environment = {**os.environ, "AGENT_CANON_CONTAINER_CONTROL": "1"}
     environment.pop("PYTHONPATH", None)
@@ -145,10 +146,9 @@ print(json.dumps({"mode": result["mode"], "materialized": result["materialized"]
     )
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout) == {
-        "mode": "resident-exchange",
-        "materialized": True,
+        "sources": [str(REPOSITORY_ROOT / ".codex/personal/skills")]
     }
-    assert (runtime / "container-runtime" / "skill-projection").is_dir()
+    assert not (runtime / "container-runtime" / "skill-projection").exists()
 
 
 def test_source_identity_accepts_transport_variants_and_rejects_other_repo() -> None:
@@ -1907,7 +1907,6 @@ def test_reconciliation(
         "private_log_root",
         property(lambda _manager: private_log),
     )
-    monkeypatch.setattr(BootstrapRuntime, "_materialize_skill_view", lambda _manager: {})
     monkeypatch.setattr(BootstrapRuntime, "_prune_stale_targets", lambda _manager, _state: [])
     monkeypatch.setattr(BootstrapRuntime, "_write_mounts", lambda *_args: None)
     monkeypatch.setattr(BootstrapRuntime, "_write_mount_manifest", lambda *_args: None)

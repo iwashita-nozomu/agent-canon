@@ -25,7 +25,7 @@ Keep the canonical source, generated adapter, and Codex discovery entry distinct
 | Responsibility | Path |
 | --- | --- |
 | AgentCanon source | `agents/skills/<skill>.md` and `agents/skills/catalog.yaml` |
-| Ignored generated adapter | `.codex/personal/skills/<skill>/SKILL.md`; not a native discovery root or a hand-edit target |
+| Git-distributed adapter | `.codex/personal/skills/<skill>/SKILL.md`; authored from the catalog and committed with source changes |
 | Installed AgentCanon entry | `~/.agents/skills/<skill>/SKILL.md`, through the bootstrap-managed directory link |
 | Repository-owned skill | `.agents/skills/<skill>/SKILL.md` in the owning repository or subtree |
 
@@ -34,8 +34,9 @@ Keep the canonical source, generated adapter, and Codex discovery entry distinct
 `~/.agents/skills` directory; it supports symlinked skill folders. AgentCanon's
 [bootstrap lifecycle](../../README.md#source-and-artifact-boundary) owns the
 user directory link when the explicit control root is `$HOME`. Isolated
-`codex prepare` / `codex launch` remain with that lifecycle, not a guessed global
-path or a second registry. Runtime alignment still checks canonical docs,
+`codex prepare` / `codex launch` use a single `CODEX_HOME/skills/agent-canon`
+directory link to the same distribution. Normal Git updates do not regenerate
+skills, replace the directory, or recreate an already-correct link. Runtime alignment still checks canonical docs,
 catalog IDs, and generated adapters for parity.
 
 Start with the selected session's registered `SKILL.md` common constraints and
