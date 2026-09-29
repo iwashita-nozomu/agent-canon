@@ -110,9 +110,21 @@ package = "rust"
 method = "rust-toolchain"
 version = "1.89.0"
 source = "https://static.rust-lang.org"
-components = ["rust-src", "rust-analyzer"]
+components = ["rust-src", "rust-analyzer", "rustfmt", "clippy"]
 checksums = { x86_64 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c", aarch64 = "e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c" }
 verification = { kind = "rust-toolchain", executable = "rustc", args = ["--version"], output_contains = "rustc 1.89.0" }
 deps = ["rustup-init", "build-essential", "curl"]
-provides = ["rust", "cargo", "rust-src", "rust-analyzer"]
+provides = ["rust", "cargo", "rust-src", "rust-analyzer", "rustfmt", "clippy"]
+failure_policy = "fail"
+
+[[records]]
+# Static gates collect both unittest classes and pytest functions with system Python.
+id = "python3-pytest"
+package = "python3-pytest"
+method = "apt-package"
+version = "7.4.4-1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package", executable = "pytest", args = ["--version"], output_contains = "pytest 7.4.4" }
+deps = []
+provides = ["pytest"]
 failure_policy = "fail"
