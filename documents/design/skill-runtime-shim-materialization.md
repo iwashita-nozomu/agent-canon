@@ -21,6 +21,30 @@ downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.p
 
 # Skill Runtime Shim Materialization
 
+## Git delivery contract (#1296)
+
+配布する `.codex/personal/skills/<skill>/SKILL.md` は Git 追跡ファイルです。
+本文の正本は `agents/skills/<skill>.md`、metadata/route は catalog が所有します。
+既存 materializer は保守者が source 変更と一緒に adapter を更新・commit するためだけに
+使います。install/update/sync/prepare/launch は生成器を実行しません。利用側は Git が
+配布した同じファイルを固定 directory link で読みます。個人 config は引き続き ignored です。
+
+`~/.agents/skills` は配布 directory への固定リンクです。隔離 CODEX_HOME は
+`skills/agent-canon` から同じ directory を参照し、公開 skill のファイル別一覧を管理しません。
+既存の runtime-private skill と agent/config/hook の所有境界は変えません。
+既存の正常なリンクは再作成せず、衝突した他者のリンク・ファイルは削除しません。
+旧版が所有していたファイル別リンクは既存 manifest の移行処理で取り除きます。
+
+Git 更新と無関係な全削除・再配置は、正しいリンクにも ENOENT の窓を作ります。
+そのため runtime exchange への skill 転送とその専用処理を削除します。
+原子的な世代差し替えや第二の同期器は、不要な配布機構を温存するため採用しません。
+Git の checkout 自体が複数ファイル全体を原子的に更新するとは保証しません。
+
+検証は Git 追跡された全 catalog adapter の readback、初回リンク後の Git pull による
+追加・変更・削除、正常リンクの inode 維持、他者のリンク保護、runtime から生成器が
+呼ばれないことです。skill の意味変更、consumer repo 移行、コンテナ全体の再設計は含めません。
+以下の schema と保守者向け materialization 契約は維持し、利用時生成の契約はこの節で置き換えます。
+
 ## Reader Map
 
 この設計は、AgentCanon の catalog-defined public skill について、Codex host が発見する
@@ -35,7 +59,7 @@ agents/skills/<skill>.md が所有し、この文書は本文の複製ではあ�
 現在の public skill identity は agents/skills/catalog.yaml の全 `skill_families` 行、依存関係は
 agents/skills/skill-dependencies.yaml、読者向け索引は
 [agents/canonical/skills.md](../../agents/canonical/skills.md)、host discovery は bootstrap が
-`~/.agents/skills/<skill>` から個別リンクする `.codex/personal/skills/<skill>/SKILL.md`
+`~/.agents/skills` から directory link で参照する Git 追跡済み `.codex/personal/skills/<skill>/SKILL.md`
 が所有します。
 
 Wave 4 の target state は次です。
@@ -62,7 +86,7 @@ Wave 4 の target state は次です。
   ではない。
 
 この設計は、実装済みの materializer、bootstrap、catalog、graph readback の責務と
-更新順を定義します。生成 view 自体は commit せず、source change から再生成します。
+更新順を定義します。adapter は保守時に生成し、source change と同じ commit で配布します。
 
 ## Scope and Non-Goals
 
@@ -74,8 +98,8 @@ Wave 4 の target state は次です。
 .codex/personal/skills/<skill>/SKILL.md
 ~~~
 
-これは source checkout 内の ignored view です。bootstrap が各 skill directory を
-`~/.agents/skills/<skill>` にリンクし、Codex の global skill discovery に渡します。
+これは source checkout 内の Git 追跡された配布 view です。bootstrap がその directory を
+`~/.agents/skills` に固定リンクし、Codex の global skill discovery に渡します。
 materializer はその target だけを生成し、`.codex/config.toml` に skill の列挙や
 有効化順を作りません。
 
@@ -150,7 +174,7 @@ field の値は次のように固定します。
 | discovery.name | 現在の shim frontmatter の name を migration で catalog の discovery metadata に移す。skill_id と一致 |
 | discovery.description | 現在の shim frontmatter の description を UTF-8/NFC の scalar として byte-preserving に catalog の discovery metadata へ移す。`purpose` の要約で置換しない |
 | discovery.shim_path | .codex/personal/skills/<skill_id>/SKILL.md |
-| discovery.method | `managed-global-agents-skills-discovery`。bootstrap の個別リンク経由で Codex の global skill 自動探索を使い、config 配列は作らない |
+| discovery.method | `managed-global-agents-skills-discovery`。bootstrap の固定 directory link 経由で Codex の global skill 自動探索を使い、config 配列は作らない |
 | owner.* | repository-relative POSIX locator。`canonical_ref` は `catalog.yaml#skill:<id>.canonical_doc`、`route_ref` は `catalog.yaml#skill:<id>.routing`、`command_ref` は `catalog.yaml#skill:<id>.tool_commands`、`tool_surface_ref` は `agent_team.materialize_skill_tool_call_token` の skill/phase typed identity record |
 | identity.* | 各 owner の typed projection digest。required/discovered/conditional/maintenance の非空 phase ごとに `agent_team` が materialize した ToolCall/argument-schema identity を読み、trigger、dependency、ToolID、ToolCall、argument schema の payload を shim にコピーせず、各 owner の readback が同じ digest を再計算 |
 | render.mode | 常に adapter_only。canonical prose は materialize 対象外 |
@@ -914,7 +938,7 @@ python3 eval/producers/skill_shim_evaluation.py tokens \
 | fact | shim frontmatter は catalog-derived な全件で readback され、body size は不均一になり得る | check_skill_frontmatter.py、catalog-sized inventory | observed |
 | fact | current skill_tool_commands.py は catalog structured branch で command phase を解決し、現在の `sync` は runtime file を直接編集する | tools/agent/skills/skill_tool_commands.py | observed; target state では sync surface を削除 |
 | assumption | discovery metadata を catalog に追加しても graph semantic payload は変わらない | graph builder の skill payload は id/doc/shim/command/capability/phase だけを投影 | explicit; implementation readback required |
-| assumption | Codex の `.agents/skills` 自動探索（bootstrap の個別リンク経由）は frontmatter を読み、fresh gpt-5.4-mini evaluator は adapter の canonical relative link を辿れる | official discovery contract、fresh packet artifact と observation reportで検証 | pending implementation eval |
+| assumption | Codex の `.agents/skills` 自動探索（bootstrap の固定 directory link 経由）は frontmatter を読み、fresh gpt-5.4-mini evaluator は adapter の canonical relative link を辿れる | official discovery contract、fresh packet artifact と observation reportで検証 | pending implementation eval |
 | limitation | fresh clone には dependency graph DB と semantic-index cache がなく、依存 review/semantic relations は今回実行不可 | run_repo_dependency_review.sh、semantic-index output | recorded, non-blocking for design |
 
 ## Design-To-Implementation Trace

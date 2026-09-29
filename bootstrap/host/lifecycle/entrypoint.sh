@@ -611,6 +611,7 @@ _agent_canon_validate_codex_home() {
       *//*|../*|*/../*|*/..|./*|*/./*|.) printf 'invalid\n'; continue ;;
       config.toml) expected="$allowed/config.toml" ;;
       agents/*|hooks/*) expected="$allowed/$relative_link" ;;
+      skills/agent-canon) expected="$allowed/personal/skills" ;;
       skills/*) expected="$allowed/personal/skills/${relative_link#skills/}" ;;
     esac
     target=$(readlink -f "$link" 2>/dev/null || true)
@@ -1005,37 +1006,6 @@ _agent_canon_apply_volume_export() (
         fi
       done
       ;;
-    skill)
-      [[ -d "$temporary/skill-projection" && ! -L "$temporary/skill-projection" ]] || {
-        rm -rf -- "$temporary"
-        _agent_canon_json_error volume_export_invalid "skill projection tree is missing"
-      }
-      [[ -z "$(find "$temporary" -mindepth 1 -maxdepth 1 ! -name skill-projection -print -quit)" ]] || {
-        rm -rf -- "$temporary"
-        _agent_canon_json_error volume_export_invalid "skill projection contains an unexpected path"
-      }
-      [[ -z "$(find "$temporary/skill-projection" -type l -print -quit)" ]] || {
-        _agent_canon_json_error volume_export_invalid "skill projection contains a symlink"
-        return 2
-      }
-      [[ -z "$(find "$temporary/skill-projection" ! -type d ! -type f -print -quit)" ]] || {
-        _agent_canon_json_error volume_export_invalid "skill projection contains a special file"
-        return 2
-      }
-      source_digest=$(_agent_canon_path_digest "$temporary/skill-projection") || {
-        _agent_canon_json_error volume_export_invalid "skill projection digest could not be computed"
-        return 2
-      }
-      target="$host_path/skill-projection"
-      begin_directory_transaction "$target" || {
-        _agent_canon_json_error volume_export_destination_invalid "skill projection target is not a regular directory"
-        return 2
-      }
-      mv -- "$temporary/skill-projection" "$target" || {
-        _agent_canon_json_error volume_export_failed "skill projection could not be published"
-        return 2
-      }
-      ;;
     eval)
       [[ -d "$temporary/$relative" && ! -L "$temporary/$relative" ]] || {
         rm -rf -- "$temporary"
@@ -1172,7 +1142,7 @@ _agent_canon_volume_copy() {
   fi
   [[ "$kind" == mount-registry || "$kind" == host-mounts ||
      "$kind" == private-log || "$kind" == codex-home || "$kind" == projection ||
-     "$kind" == skill || "$kind" == eval || "$kind" == guide ||
+     "$kind" == eval || "$kind" == guide ||
      "$kind" == private-feedback ]] ||
     _agent_canon_json_error volume_copy_invalid "volume copy kind is not allowlisted"
   if [[ "$direction" == import ]]; then
@@ -1277,6 +1247,7 @@ validate_codex_links() {
       *//*|../*|*/../*|*/..|./*|*/./*|.) printf "invalid\\n"; continue ;;
       config.toml) expected="$allowed/config.toml" ;;
       agents/*|hooks/*) expected="$allowed/$relative_link" ;;
+      skills/agent-canon) expected="$allowed/personal/skills" ;;
       skills/*) expected="$allowed/personal/skills/${relative_link#skills/}" ;;
     esac
     target=$(readlink -- "$link" 2>/dev/null || true)
@@ -1365,11 +1336,6 @@ else
       source_digest=$(projection_digest "$source")
       tar -cf - -C "$source" --no-recursion -T "$members"
       rm -f "$members" ;;
-    skill)
-      source="$root/exchange/skill-projection"; [ -d "$source" ] && [ ! -L "$source" ] || exit 71
-      [ -z "$(find "$source" -type l -print -quit)" ] || exit 72
-      source_digest=$(tree_digest "$source")
-      tar -cf - -C "$root/exchange" skill-projection ;;
     eval)
       source="$root/spool/$relative"; [ -d "$source" ] && [ ! -L "$source" ] || exit 73
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 74
@@ -1535,25 +1501,6 @@ _agent_canon_publish_controller_projection() {
     fi
   done
   rmdir "$staging" 2>/dev/null || true
-}
-
-_agent_canon_sync_personal_skill_view() {
-  # The resident materializer exports one complete skill tree.  Keep the
-  # host-side source directory as the only source for the global directory
-  # link; do not enumerate or validate individual skill links.
-  local container=$1
-  local personal_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal"
-  local exchange_root="$AGENT_CANON_STATE_ROOT/container-runtime"
-  local exported_skills="$exchange_root/skill-projection/.codex/personal/skills"
-  _agent_canon_volume_copy export skill "$exchange_root"
-  [[ -d "$exported_skills" && ! -L "$exported_skills" ]] ||
-    _agent_canon_json_error skill_projection_copy_failed \
-      "resident skill projection is unavailable"
-  mkdir -p "$personal_root"
-  rm -rf -- "$personal_root/skills"
-  mv -- "$exported_skills" "$personal_root/skills" ||
-    _agent_canon_json_error skill_projection_copy_failed \
-      "host personal skill directory could not be published"
 }
 
 _agent_canon_prepare_clean_install() {
@@ -3037,13 +2984,6 @@ _agent_canon_replace_resident_locked() {
       rc=$?
     fi
   fi
-  if ((rc == 0)); then
-    if _agent_canon_sync_personal_skill_view "$candidate"; then
-      :
-    else
-      rc=$?
-    fi
-  fi
   if ((rc == 0)) && [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
     if _agent_canon_install_global_links; then
       :
@@ -3889,16 +3829,26 @@ _agent_canon_install_global_links() {
   local config_source="$source_root/config.toml"
   local skills_link="$home_root/.agents/skills"
   local link source resolved mode digest
-  mkdir -p "$home_root/.agents" "$codex_home/agents" "$source_root" "$skill_source_root"
+  [[ -d "$skill_source_root" && ! -L "$skill_source_root" ]] || {
+    _agent_canon_json_error skill_source_missing "Git-distributed skills are missing: $skill_source_root"
+    return 2
+  }
+  mkdir -p "$home_root/.agents" "$codex_home/agents"
+  # A correct directory link survives ordinary Git updates unchanged.
+  if [[ -L "$skills_link" ]]; then
+    resolved=$(readlink -f -- "$skills_link" 2>/dev/null || printf '')
+    [[ "$resolved" == "$skill_source_root" ]] || {
+      _agent_canon_json_error skill_link_collision "skills link belongs to another source: $skills_link"
+      return 2
+    }
+  elif [[ -e "$skills_link" ]]; then
+    _agent_canon_json_error skill_link_collision "skills path is not a managed directory link: $skills_link"
+    return 2
+  else
+    ln -s -- "$skill_source_root" "$skills_link" || return $?
+  fi
   : > "$manifest"
   printf 'schema\tagent-canon.global-links.v1\n' >> "$manifest"
-
-  # AgentCanon owns the complete skills view. Replace the old per-skill farm as
-  # one path, so stale links cannot block a successful source pull.
-  if [[ -e "$skills_link" || -L "$skills_link" ]]; then
-    rm -rf -- "$skills_link"
-  fi
-  ln -s -- "$skill_source_root" "$skills_link"
   printf 'link\t%s\t%s\n' "$skills_link" "$skill_source_root" >> "$manifest"
 
   # A personal config is the one remaining file view.  Preserve it only when
@@ -4471,11 +4421,7 @@ bootstrap_host_entrypoint() {
       _agent_canon_use_active_image "$(_agent_canon_container_name)"
       local codex_container codex_prepare_rc=0
       codex_container=$(_agent_canon_ensure_container)
-      # Container-side Codex preparation also materializes the complete skill
-      # projection. Publish that projection before launching the host Codex.
       _agent_canon_run_controller "$codex_container" codex prepare || codex_prepare_rc=$?
-      ((codex_prepare_rc == 0)) || return "$codex_prepare_rc"
-      _agent_canon_sync_personal_skill_view "$codex_container" || codex_prepare_rc=$?
       ((codex_prepare_rc == 0)) || return "$codex_prepare_rc"
       _agent_canon_volume_copy export codex-home "$AGENT_CANON_STATE_ROOT/codex-home"
       if [[ "$codex_action" == prepare ]]; then

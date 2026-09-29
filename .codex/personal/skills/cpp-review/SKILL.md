@@ -1,0 +1,27 @@
+---
+name: cpp-review
+description: "Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior."
+---
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"6af12357c1d9e6df6113ed0bf2842c45f67edb6ffe56dc85f180533c8da8bebf"} -->
+
+<!--
+@dependency-start
+contract skill
+responsibility Exposes cpp-review for runtime discovery.
+upstream design ../../../../agents/skills/cpp-review.md owner
+@dependency-end
+-->
+
+# cpp-review
+
+## Canonical Skill
+
+Canonical workflow and policy: [cpp-review](../../../../agents/skills/cpp-review.md).
+
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+`python3 tools/agent/skills/skill_tool_commands.py show --skill cpp-review --format text`
+<!-- skill-tool-commands:end -->
+
+1. Read the canonical owner before applying this skill.

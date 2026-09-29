@@ -413,13 +413,15 @@ manifest-managed link を作ります。resident は image 内の canonical sour
 live AgentCanon checkout の `<install-root>/.codex/...` にします。従って host
 Codex が読む config は `CODEX_HOME/config.toml`、skills/agents はそれぞれの
 runtime-local surface から live checkout を参照します。加えて、control root に `$HOME` を明示した
-install/update は `~/.agents/skills` を AgentCanon checkout 内の ignored な
-`~/.codex/personal/skills` へディレクトリ単位でリンクし、`~/.codex/agents/<role>.toml` と
+install/update は `~/.agents/skills` を AgentCanon checkout 内の Git 管理された
+`.codex/personal/skills` へ固定ディレクトリリンクで接続し、`~/.codex/agents/<role>.toml` と
 `~/.codex/config.toml` は個別に管理します。最後のリンク先は AgentCanon checkout
 内の ignored な personal source で、既存の regular config は bytes と mode を保持
 して移行し、uninstall で regular file に戻します。hooks、認証、session、history、
-cache、plugin、rule、MCP、TUI/trust はこの投影に含めません。skills は個別列挙・digest・
-expected-target readback を行わず、旧farmをディレクトリlinkへ置換します。uninstall は
+cache、plugin、rule、MCP、TUI/trust はこの投影に含めません。公開 skills は
+`CODEX_HOME/skills/agent-canon` からも同じ配布ディレクトリを参照し、個別登録を持ちません。
+通常更新は Git に任せ、正常なリンクの再作成、runtime での生成・転送・削除復元を行いません。
+異なるリンク先や既存の実ディレクトリは collision として保護します。uninstall は
 その AgentCanon-owned directory link だけを削除します。Host shell が global link を
 所有し、resident Python はこの投影を書きません。
 

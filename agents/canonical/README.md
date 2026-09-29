@@ -44,7 +44,7 @@ upstream design ../README.md agent canon overview
 - `agents/skills/catalog.yaml`
   - skill family の機械可読カタログ
 - `.codex/personal/skills/`
-  - ignored な生成 adapter。正本や Codex の自動探索 root ではない
+  - Git 追跡された配布 adapter。本文の正本や Codex の自動探索 root ではない
 - `.codex/`
   - Codex project-scoped runtime config
 
