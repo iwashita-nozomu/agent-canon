@@ -1,0 +1,26 @@
+name: Issue 1296 source export
+on:
+  push:
+    branches: [fix/1296-git-tracked-skills]
+    paths: [.github/workflows/issue-1296-source-export.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Export exact source and main objects
+        run: |
+          git branch snapshot-main origin/main
+          git bundle create "$RUNNER_TEMP/source.bundle" HEAD refs/heads/snapshot-main
+          git rev-parse HEAD origin/main HEAD^{tree}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue-1296-source
+          path: ${{ runner.temp }}/source.bundle
+          retention-days: 1
+          if-no-files-found: error
