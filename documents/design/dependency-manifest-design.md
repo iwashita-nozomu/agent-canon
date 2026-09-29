@@ -4,7 +4,6 @@
 @dependency-start
 contract design
 responsibility Defines the repository-wide dependency manifest DSL and validation model.
-upstream design source-owned-dependency-validation.md source authority, PR receipt, and source/runtime boundary
 downstream design dependency-contract-kinds.toml registered dependency header contract kinds
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates changed-file manifests
 downstream implementation ../../tools/analysis/dependencies/scan_dependency_headers.sh scans manifest marker coverage
