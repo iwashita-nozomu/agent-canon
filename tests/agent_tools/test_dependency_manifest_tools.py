@@ -2684,48 +2684,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("cycle includes", result.stdout)
             self.assertIn("DEPENDENCY_GRAPH=fail", result.stdout)
 
-    def test_graph_rejects_cycle_across_mixed_direction_syntax(self) -> None:
-        """Upstream and downstream declarations form one normalized topology."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "a.py").write_text(
-                "# @dependency-start\n# contract test\n# upstream implementation b.py b precedes a\n# downstream implementation b.py b also consumes a\n# @dependency-end\n",
-                encoding="utf-8",
-            )
-            (root / "b.py").write_text(
-                "# @dependency-start\n# contract test\n# responsibility Defines the second cycle node.\n# @dependency-end\n",
-                encoding="utf-8",
-            )
-
-            result = run_tool(str(GRAPH), "--root", str(root), root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("dependency cycle includes a.py -> b.py", result.stdout)
-            self.assertIn("DEPENDENCY_GRAPH=fail", result.stdout)
-
-    def test_graph_selected_scope_detects_cycle_through_unselected_node(self) -> None:
-        """Selection filters findings, not the topology used for cycle detection."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "a.py").write_text(
-                "# @dependency-start\n# contract test\n# downstream implementation b.py b consumes a\n# @dependency-end\n",
-                encoding="utf-8",
-            )
-            (root / "b.py").write_text(
-                "# @dependency-start\n# contract test\n# downstream implementation c.py c consumes b\n# @dependency-end\n",
-                encoding="utf-8",
-            )
-            (root / "c.py").write_text(
-                "# @dependency-start\n# contract test\n# downstream implementation a.py a consumes c\n# @dependency-end\n",
-                encoding="utf-8",
-            )
-
-            result = run_tool(str(GRAPH), "--root", str(root), "a.py", root=root)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("dependency cycle includes a.py -> b.py -> c.py", result.stdout)
-            self.assertNotIn("isolated dependency manifest", result.stdout)
-
     def test_graph_can_report_cycles_without_failing(self) -> None:
         """Cycle report-only mode keeps known graph debt visible without blocking."""
         with tempfile.TemporaryDirectory() as tmp_dir:

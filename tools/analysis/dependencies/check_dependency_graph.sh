@@ -2,13 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Projects and validates dependency relations directly from tracked source manifests.
-# upstream design ../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
-# upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
-# upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
+# upstream design ../../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
+# upstream design ../../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ./source_dependency_graph.py owns source parsing, canonical binding, and review export
-# upstream implementation ./runtime_artifacts.py owns external graph scratch and TSV publication
+# upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external graph scratch and TSV publication
 # downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
-# downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
+# downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
+# downstream implementation ../../../tests/agent_tools/test_dependency_graph_cycles.py verifies normalized full-topology SCC scope
 # @dependency-end
 set -euo pipefail
 
@@ -225,15 +225,19 @@ collect_changed() {
   } | sed '/^$/d'
 }
 
+scoped=0
+: >"$selected_file"
 if [[ ${#INPUT_PATHS[@]} -gt 0 ]]; then
+  scoped=1
   printf '%s\n' "${INPUT_PATHS[@]}" | sort -u >"$selected_file"
 elif [[ "$CHANGED" -eq 1 ]]; then
+  scoped=1
   collect_changed | sort -u >"$selected_file"
 fi
 
-if [[ -s "$selected_file" ]]; then
-  awk -F '\t' 'NR == FNR { selected[$0] = 1; next } selected[$3]' "$selected_file" "$all_edges" >"$edges_file"
-  awk 'NR == FNR { selected[$0] = 1; next } selected[$0]' "$selected_file" "$manifest_files" >"$manifest_files.selected"
+if [[ "$scoped" -eq 1 ]]; then
+  awk -F '\t' 'FILENAME == ARGV[1] { selected[$0] = 1; next } selected[$3]' "$selected_file" "$all_edges" >"$edges_file"
+  awk 'FILENAME == ARGV[1] { selected[$0] = 1; next } selected[$0]' "$selected_file" "$manifest_files" >"$manifest_files.selected"
   mv "$manifest_files.selected" "$manifest_files"
 else
   cp "$all_edges" "$edges_file"
@@ -322,80 +326,73 @@ while IFS=$'\t' read -r direction kind source target; do
 done < <(awk -F '\t' '$1 != "" && $2 != "" && $3 != "" && $4 != ""' "$edges_file")
 
 check_cycles() {
-  python3 - "$all_edges" "$selected_file" <<'PY'
-from __future__ import annotations
-
+  python3 - "$all_edges" "$selected_file" "$scoped" <<'PYTHON'
 import sys
 from collections import defaultdict
 from pathlib import Path
 
-edges_path, selected_path = map(Path, sys.argv[1:])
-adj: dict[str, set[str]] = defaultdict(set)
-nodes: set[str] = set()
-for raw in edges_path.read_text(encoding="utf-8").splitlines():
-    direction, _kind, source, target = raw.split("\t", 3)
-    if not source or not target:
+edges_path, selected_path, scoped = sys.argv[1:]
+selected = set(Path(selected_path).read_text().splitlines()) if scoped == "1" else None
+adjacency = defaultdict(set)
+reverse = defaultdict(set)
+for row in Path(edges_path).read_text().splitlines():
+    direction, kind, source, target = row.split("\t")
+    if not all((direction, kind, source, target)):
+        continue  # The projection check above already records incomplete rows.
+    prerequisite, consumer = (target, source) if direction == "upstream" else (source, target)
+    adjacency[prerequisite].add(consumer)
+    reverse[consumer].add(prerequisite)
+nodes = sorted(adjacency.keys() | reverse.keys())
+
+# Iterative Kosaraju: finish the full topology before applying report scope.
+visited = set()
+finished = []
+for node in nodes:
+    if node in visited:
         continue
-    prerequisite, consumer = (
-        (target, source) if direction == "upstream" else (source, target)
-    )
-    adj[prerequisite].add(consumer)
-    nodes.update((prerequisite, consumer))
+    visited.add(node)
+    stack = [(node, iter(sorted(adjacency[node])))]
+    while stack:
+        current, neighbors = stack[-1]
+        neighbor = next(neighbors, None)
+        if neighbor is None:
+            finished.append(current)
+            stack.pop()
+        elif neighbor not in visited:
+            visited.add(neighbor)
+            stack.append((neighbor, iter(sorted(adjacency[neighbor]))))
 
-selected = (
-    {line for line in selected_path.read_text(encoding="utf-8").splitlines() if line}
-    if selected_path.exists()
-    else set()
-)
-index = 0
-stack: list[str] = []
-on_stack: set[str] = set()
-indices: dict[str, int] = {}
-lowlinks: dict[str, int] = {}
-cycles: list[tuple[str, ...]] = []
-
-def visit(node: str) -> None:
-    global index
-    indices[node] = lowlinks[node] = index
-    index += 1
-    stack.append(node)
-    on_stack.add(node)
-    for target in sorted(adj[node]):
-        if target not in indices:
-            visit(target)
-            lowlinks[node] = min(lowlinks[node], lowlinks[target])
-        elif target in on_stack:
-            lowlinks[node] = min(lowlinks[node], indices[target])
-    if lowlinks[node] != indices[node]:
-        return
-    component: list[str] = []
-    while True:
-        member = stack.pop()
-        on_stack.remove(member)
-        component.append(member)
-        if member == node:
-            break
-    component.sort()
-    if len(component) > 1 or (component and component[0] in adj[component[0]]):
-        if not selected or selected.intersection(component):
-            cycles.append(tuple(component))
-
-for node in sorted(nodes):
-    if node not in indices:
-        visit(node)
-
+visited.clear()
+cycles = []
+for node in reversed(finished):
+    if node in visited:
+        continue
+    component = set()
+    pending = [node]
+    visited.add(node)
+    while pending:
+        current = pending.pop()
+        component.add(current)
+        for neighbor in reverse[current]:
+            if neighbor not in visited:
+                visited.add(neighbor)
+                pending.append(neighbor)
+    if len(component) > 1 or node in adjacency[node]:
+        if selected is None or not component.isdisjoint(selected):
+            cycles.append(tuple(sorted(component)))
 for component in sorted(cycles):
-    print("dependency cycle includes " + " -> ".join(component))
-raise SystemExit(1 if cycles else 0)
-PY
+    print("dependency cycle includes " + ", ".join(component))
+# Keep interpreter/I/O failures distinct from report-only cycle findings.
+sys.exit(3 if cycles else 0)
+PYTHON
 }
 
-if ! check_cycles; then
-  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
-    echo "DEPENDENCY_GRAPH_CYCLES=report_only"
-  else
-    failures=$((failures + 1))
-  fi
+cycle_status=0
+check_cycles || cycle_status=$?
+if [[ "$cycle_status" -eq 3 && "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+  echo "DEPENDENCY_GRAPH_CYCLES=report_only"
+elif [[ "$cycle_status" -ne 0 ]]; then
+  failures=$((failures + 1))
 fi
 
 if [[ "$failures" -gt 0 ]]; then
