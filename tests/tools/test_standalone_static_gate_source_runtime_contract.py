@@ -24,7 +24,7 @@ SOURCE_REGRESSION_MODULES = (
     "tests.agent_tools.test_check_design_doc_claims",
     "tests.agent_tools.test_tool_drift",
     "tests.agent_tools.test_vector_search",
-    "tests.agent_tools.test_dependency_manifest_tools",
+    "tests/agent_tools/test_dependency_*.py",
 )
 
 

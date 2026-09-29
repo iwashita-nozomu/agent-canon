@@ -62,7 +62,9 @@ homes or reading obsolete image source paths.
 Selected units run independently; one failure does not prevent later selected
 units from producing evidence, and any failure fails the aggregate. Contract
 regressions use pytest, which collects both unittest classes and pytest
-functions. Merely importing a pytest module through unittest is not evidence
+functions. Dependency regressions use `tests/agent_tools/test_dependency_*.py`
+so a newly added matching regression does not require another CI file list edit.
+Merely importing a pytest module through unittest is not evidence
 that its tests ran. Temporary installation and local source transport are
 removed after the job. No publishing credential or repository write permission
 is needed.

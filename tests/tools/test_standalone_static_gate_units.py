@@ -216,6 +216,7 @@ def test_contract_collection_and_source_toolchain_owners() -> None:
     assert "python3 -m pytest -p no:cacheprovider --pyargs" in body
     assert "python3 -m unittest" not in body
     assert "tests.tools.test_standalone_static_gate_source_runtime_contract" in body
+    assert "tests/agent_tools/test_dependency_*.py" in body
     assert 'local base_ref="${UNIT_ARGS[0]:-origin/main}"' in body
     assert "RUNTIME_ROOT=/usr/local/share/agent-canon/runtime" not in text
     assert "export RUSTUP_HOME=" not in text
