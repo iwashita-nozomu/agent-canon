@@ -219,29 +219,23 @@ def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path
         assert Path(entry["target"]).resolve() == Path(entry["source"]).resolve()
     skill_links = [entry for entry in result["details"]["links"] if entry["surface"] == "skills"]
     assert skill_links
-    assert all("/.codex/personal/skills/" in entry["source"] for entry in skill_links)
+    assert len(skill_links) == 1
+    assert skill_links[0]["source"] == str(ROOT / ".codex/personal/skills")
     assert all(Path(entry["target"]).is_symlink() for entry in skill_links)
 
 
-def test_codex_prepare_repairs_multiple_missing_catalog_skills(tmp_path: Path) -> None:
-    """Codex preparation refreshes the complete generated skill view."""
+def test_codex_prepare_keeps_one_directory_link(tmp_path: Path) -> None:
+    """Git-owned skills are referenced, never regenerated or indexed per file."""
     manager, _docker = _runtime(tmp_path)
     manager.install()
-    skill_paths = [
-        ROOT / ".codex" / "personal" / "skills" / skill / "SKILL.md"
-        for skill in ("devcontainer-exec", "integration")
-    ]
-    originals = {path: path.read_bytes() for path in skill_paths}
-    for path in skill_paths:
-        path.unlink()
-    try:
-        manager.codex_prepare()
-        for path, expected in originals.items():
-            assert path.read_bytes() == expected
-    finally:
-        for path, expected in originals.items():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(expected)
+    target = manager.paths.codex_home / "skills/agent-canon"
+    assert target.is_symlink()
+    assert target.resolve() == ROOT / ".codex/personal/skills"
+    before = target.lstat()
+    manager.codex_prepare()
+    assert target.lstat().st_ino == before.st_ino
+    assert target.lstat().st_mtime_ns == before.st_mtime_ns
+    assert not (manager.paths.container_runtime / "skill-projection").exists()
 
 
 def test_codex_prepare_places_config_at_code_home_root(tmp_path: Path) -> None:
@@ -277,25 +271,19 @@ def test_container_codex_links_project_to_host_live_install_root(
     assert any(entry["surface"] == "config" for entry in links)
 
 
-def test_non_owned_image_update_materializes_absent_personal_skill_view(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The no-build update path materializes the skill view before linking it."""
+def test_non_owned_image_update_keeps_git_distributed_skills(tmp_path: Path) -> None:
+    """A runtime update must leave the Git-owned distribution untouched."""
     manager, _docker = _runtime(tmp_path)
-    monkeypatch.setenv("HOME", str(manager.paths.control_parent_root))
     manager.install()
-    skill_path = ROOT / ".codex" / "personal" / "skills" / "agent-orchestration" / "SKILL.md"
-    original = skill_path.read_bytes()
-    skill_path.unlink()
+    source = ROOT / ".codex/personal/skills"
+    before = {path: (path.read_bytes(), path.stat().st_ino, path.stat().st_mtime_ns)
+              for path in source.glob("*/SKILL.md")}
     state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
     state["resources"]["image"]["owned"] = False
     manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
-    try:
-        result = manager.update()
-        assert result["code"] == "up_to_date"
-        assert skill_path.read_bytes() == original
-    finally:
-        skill_path.write_bytes(original)
+    assert manager.update()["code"] == "up_to_date"
+    assert before == {path: (path.read_bytes(), path.stat().st_ino, path.stat().st_mtime_ns)
+                      for path in source.glob("*/SKILL.md")}
 
 
 def test_arbitrary_control_root_does_not_receive_global_codex_projection(

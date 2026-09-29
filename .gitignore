@@ -38,8 +38,9 @@ venv/
 workspace/
 .runtime/
 
-# Personal Codex config is migrated here and linked from the user's Codex home.
-.codex/personal/
+# Personal settings stay local; distributed skill adapters travel with Git.
+.codex/personal/*
+!.codex/personal/skills/
 
 # OS/editor noise
 .DS_Store

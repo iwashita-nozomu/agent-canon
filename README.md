@@ -109,9 +109,14 @@ these user-facing links:
 ~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
 ```
 
-Before building or linking, `install` and `update` materialize the catalog-owned
-skill adapters under the ignored `~/agent-canon/.codex/personal/skills/` view.
-Edit the canonical `agents/skills/<skill>.md` and catalog instead of this view.
+The catalog-owned `~/agent-canon/.codex/personal/skills/` adapters are tracked
+in Git. Once installed, the directory link remains unchanged: a normal Git pull
+updates, adds, and removes skills without runtime generation or copying.
+`codex prepare` uses one `codex-home/skills/agent-canon` directory link to the
+same distribution, not a per-file public skill registry. Maintainers edit the
+canonical `agents/skills/<skill>.md` and catalog, then use the existing
+`skill_shim_materializer.py materialize --root . --all` authoring command and
+commit its adapters with the source changes. Personal config remains ignored.
 
 An existing regular `~/.codex/config.toml` is migrated byte-for-byte to the
 ignored personal source before the link is created. Update preserves it;

@@ -29,7 +29,7 @@ AgentCanon の正本は `agents/skills/` と catalog、project 固有 skill の�
 - numbered skill catalog は増やしません。
 - AgentCanon の instructions は `agents/skills/<skill>.md`、project 固有 skill は `.agents/skills/<skill>/SKILL.md` に集約します。
 - 再利用可能な workflow は skill にし、repo 全体の恒久ルールは `documents/` または `agents/` に置きます。
-- `.codex/personal/skills/` は ignored な生成 view です。既存の [bootstrap / materializer 経路](../../README.md#source-and-artifact-boundary) を使い、手編集や別の同期スクリプトを追加しません。
+- `.codex/personal/skills/` は Git 追跡された配布 adapter です。既存の [保守者用 materializer](../../README.md#source-and-artifact-boundary) で更新して正本と一緒に commit します。利用時の生成や別の同期スクリプトは追加しません。
 
 ## 推奨 skill directory
 

@@ -45,7 +45,7 @@ graph/readback を一つの source-to-generated cleanup unit として既存 own
    関連スキルへの導線を追加・変更する場合は、[Caller-side wiring](#caller-side-wiring) に従う。
 2. `.codex/config.toml` を host-wiring の source/input として読み、catalog skill id に対する
    entry set、source order、path、enabled を readback する。
-3. 既存 materializer は `.codex/personal/skills/<skill>/SKILL.md` だけを生成する。
+3. 既存 materializer は保守時に `.codex/personal/skills/<skill>/SKILL.md` を生成し、正本と同じ commit に含める。利用時には呼ばない。
 4. `skill_dependency_map.py graph` は通常、明示した外部 runtime root に graph JSON/Mermaid を生成し、既存 checker で source/readback equality を確認する。tracked reader pair を更新する場合だけ、固定2ファイルの mutation capability と外部 before/after evidence を明示する。
 5. validation command の実行範囲は [Write-Capable Handoff Validation Trust Boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary) を参照し、skill-cleanup 側で別の test/full-scan policy を作らない。作業途中の関連読込は、[Conditional maintenance reads](#conditional-maintenance-reads) の成立した条件だけを使う。
 
