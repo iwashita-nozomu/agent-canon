@@ -66,14 +66,18 @@ single label for the whole task. Keep necessity, source evidence, engineering
 grounds, and rejected simpler alternatives in the owning design.
 A failed name search is not absence; unknown defers only the affected decision.
 
-Minimize maintained code space, not the diff. Replacement includes deleting
-superseded code and obsolete support in the same owning unit, not later cleanup.
-Understand required semantics and migration before deletion; preserve the behavior
-contract of a behavior-preserving refactor. Retain wrappers or dual paths only
-for a required compatibility contract. Keep caller orchestration separate
-from reusable-library responsibility. Add mechanisms, dependencies, exact pins,
-or guards only for an evidenced current need; preserve native resolution and
-required integrity checks.
+Actively shrink maintained code space within the affected responsibility, not just
+limit additions or minimize the diff. With the task-specific starting point above,
+seek and apply evidenced deletion, consolidation, and simplification opportunities
+in the same change; do not wait for a separate cleanup request. Review retained
+code and support too. Do not force net-negative line counts, compress or relocate
+code, or weaken required behavior, safety, or performance to claim reduction.
+Establish semantics and migration before deleting; replacement removes obsolete code
+and support while migrating necessary consumers in the same change.
+Retain wrappers or dual paths only for a required compatibility contract. Keep
+caller orchestration separate from reusable-library responsibility. Add mechanisms,
+dependencies, exact pins, or guards only for an evidenced current need; preserve
+native resolution and required integrity checks.
 When an existing dependency contract requires an exact pin, only execution that
 needs a dependency change uses a published PR commit through that consumer-owned
 pin; otherwise use the consumer's declared resolution.

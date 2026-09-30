@@ -37,35 +37,33 @@ a shortcut would exclude.
 ## Simplest complete implementation
 
 Use [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
-to fix the latest explicit user agreement before selecting a mechanism. Bring the
-owning design into line with that agreement; old code, tests, or design records
-do not silently reopen it. A concrete conflict with a still-required contract,
-safety, or authority needs an explicit finding, not an invented compatibility path.
+to align the owning design with the latest explicit agreement before choosing a
+mechanism. Old code, tests, or design do not reopen it; report concrete conflicts
+with still-required contracts, safety, or authority rather than invent compatibility.
 
-Apply the task-specific starting points in
-[SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss).
-For new functionality, start with direct use, configuration, and composition of
-existing capabilities; add only the evidenced missing responsibility. For repairs
-or changes to existing functionality, reconsider preservation of the affected
-structure and consider removing or replacing unnecessary or defective mechanisms
-before layering around them. Reuse sound parts; a sufficient local correction
-need not become a replacement. Classify mixed work per responsibility, not by
-whether a file or helper is new, and keep behavior-preserving refactors within
-their agreed semantic boundary.
+Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
+per responsibility: compose existing capabilities for new functionality; reconsider
+structure preservation for repairs. Use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+to inspect abstractions, actual callers, APIs, configuration, dependencies, and
+extension points before implementation. A failed name search is not absence;
+unknown defers only the affected decision, not independent work.
 
-Use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-to inspect relevant abstractions, actual callers, APIs, configuration, dependencies,
-and extension points for the selected task. Compare completed code space, including
-retained wrappers, state, branches, and support, not just new code or diff size.
-A failed name search is not absence. An unresolved capability defers only its
-selection; it neither blocks independent work nor justifies inventing a foundation.
+Within that starting point, actively seek and implement reductions in the affected
+owning unit. Challenge unnecessary wrappers, duplicate state, special cases, unused
+generality, and their support; do not wait for replacement or a separate cleanup
+request. Prefer deletion, direct use, consolidation, or simplification where the
+agreed contract permits. Consolidate shared responsibility, not similar syntax;
+reuse sound parts and keep sufficient local fixes local.
 
-When replacing or retiring an implementation, close
-[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-in the same change: remove obsolete paths and dedicated support, migrate affected
-uses, and validate the agreed contract rather than freezing superseded behavior
-in tests. Preserve required domain, correctness, safety, performance, and failure
-semantics. Add no blind deletion, unrelated cleanup, checker, report, or approval gate.
+For replacement or retirement, close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+in the same change: remove obsolete paths and support, migrate affected uses, and
+validate agreed behavior rather than freezing superseded implementation in tests.
+Review the completed unit, including retained code, not just the diff. Record
+material reductions and necessary growth in the existing design/PR rationale;
+line compression, relocation, and deletion quotas are not evidence of improvement.
+Preserve required domain, correctness, safety, performance, failure semantics, and
+behavior-preserving refactor contracts. Add no unrelated cleanup, checker, report,
+or approval gate.
 
 ## Public API additions
 
