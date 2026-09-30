@@ -16,24 +16,41 @@ additional startup packet or a dependency of generated consumer instructions.
 
 ## Configured execution and bounded diagnosis
 
-Run the current repository owner's existing entrypoint with its configured
-settings and standard tool defaults. This owner-defined procedure is the fixed
-execution route: entrypoint, configuration resolution, required backend,
-formatter, validation, and publication steps. Task inputs may vary through its
-documented parameters; fixed does not mean frozen argv, absolute paths, versions,
-or SHAs. Preserve native resolution and existing integrity/pin requirements.
+Run code only through the current repository owner's prescribed entrypoint and
+execution plane, with configured settings and standard tool defaults. This
+owner-defined procedure is the fixed execution route: entrypoint, configuration
+resolution, required backend, formatter, validation, and publication steps.
+Task inputs may vary through its documented parameters; fixed does not mean
+frozen argv, absolute paths, versions, or SHAs. Preserve native resolution and
+existing integrity/pin requirements.
+
+The boundary applies to repository code and code written just for the task:
+one-line commands, heredocs, imports, extracted/copied modules, reproductions,
+diagnostic helpers, isolated unit tests, and fake-backed tests. Read-only intent,
+small size, temporary placement, no live backend, or a promise to label the result
+partial does not exempt execution. The same container, interpreter, cwd, or argv
+also does not authorize skipping the prescribed entrypoint.
 
 Carry the selected route through retries, resumption, and delegation. Reuse its
 owner reference and known command in the existing task/Issue or handoff; a callee
 consumes that selection rather than rerouting. Do not add a route manifest, lock,
 extra approval, or per-command proof to establish continuity.
 
+A direct native command or conditional compatibility route is usable only when
+the owning contract prescribes it for this operation and execution plane and its
+conditions hold. Native argv examples in skills, generated adapters, or tool docs
+describe syntax, not permission to execute on the host or to choose a fallback.
+If the owner is unresolved, read the relevant existing instructions; do not probe
+alternative interpreters or backends to discover a route that happens to work.
+
 An entrypoint failure is not permission to call a lower-level implementation,
 recreate the steps in a temporary script or GitHub Actions workflow, add a wrapper,
-or substitute another backend, runtime, daemon, worker, or formatter. Use a direct
-native command or alternate transport only when the existing owner already defines
-it for that operation and its conditions hold; discovery or success alone does
-not authorize an alternative or establish equivalent validation.
+or substitute another backend, runtime, daemon, worker, or formatter. Read existing
+source, configuration, and failure logs for bounded diagnosis; any additional code
+execution must still use the applicable owner's prescribed diagnostic route.
+Native source inspection, editing, Git, and GitHub publication retain their own
+existing owner routes. A connection that permits source/PR operations does not
+provide authority to execute repository code elsewhere.
 
 Use the actual failed command/result to locate and repair the cause at its owner
 first; follow directly related consumers for demonstrated in-scope defects, not
@@ -42,10 +59,13 @@ If the route itself must change, update its owning configuration, implementation
 and instructions as applicable within the authorized scope and existing Issue/PR
 workflow. Record the reason and validate the changed contract before claiming
 success. A failure or available tool is not authority to change the route.
+Do not declare an ad-hoc command the new owner route merely to unblock execution.
 
 The engineering reason is that bypassing the entrypoint can drop its configuration,
 permissions, resource limits, or failure semantics. Success on that bypass does
 not prove the selected route; repairing its owner avoids a second implementation.
+This is an execution restriction, not only a restriction on claiming success:
+reporting an off-route run as supplementary or unverified does not authorize it.
 
 For a program execution request, use this order:
 

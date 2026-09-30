@@ -70,16 +70,21 @@ pin; otherwise use the consumer's declared resolution.
 Establish reachability and existing guarantees before extra error handling;
 unknown is neither impossible nor a defect. Keep authorization and boundary safety.
 
-Run the repository owner's fixed execution route with configured defaults first;
-only after failure diagnose the relevant route, stopping when resolved. Success
-needs no route probes; explicit diagnosis/setup requests remain separate. Keep
-that route through retries, validation, and handoff. Do not preflight, manually
-switch environments, bypass the entrypoint, or invent scripts, workflows,
-wrappers, or fallbacks. Fixed means the owned procedure, not hard-coded paths,
-versions, or SHAs. Preserve the entrypoint's safety checks, permissions, resource
-and rerun limits, and failure semantics. Route changes and repair require scope
-and authority at that owner. Stop only affected actions; do not rebuild for
-ordinary work or replace a required backend to claim validation.
+Run repository and task-helper code only through the owner's prescribed execution
+route, with configured defaults. Builds, tests (including isolated/fake tests),
+reproductions, diagnostics, imports/snippets, and formatters are not exceptions.
+A command example, available interpreter, temporary file, or partial-verification
+label does not authorize another route. Run the prescribed command first; only
+after failure diagnose the relevant route, stopping when resolved. Success needs
+no route probes; explicit diagnosis/setup requests use their own prescribed route.
+Keep the selected entrypoint and execution plane through retries and handoff;
+do not preflight, manually switch environments, bypass the entrypoint, or invent
+scripts, workflows, wrappers, or fallbacks. Fixed means the owned procedure, not
+hard-coded paths, versions, or SHAs. Preserve its safety checks, permissions,
+resource and rerun limits, and failure semantics. Route repair or change requires
+scope and authority at that owner; an unavailable route is not that authority.
+Stop only affected execution and report it unverified while continuing independent
+authorized work; never run an alternative merely to obtain a result.
 
 Bound audits, reviews, and validation by the requested task; audit another backend
 only when explicitly named or required by a cross-backend guarantee. Leave its

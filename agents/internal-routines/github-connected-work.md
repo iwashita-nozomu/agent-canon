@@ -44,6 +44,13 @@ Git の DNS 失敗は connector の失敗ではありません。同じ失敗を
 operation が実行できる transport を使います。認証・承認・接続の追加が必要と判明した
 場合はその境界で止め、token の探索、無断インストール、別 credential で迂回しません。
 
+これは source の読取・編集・公開の経路であり、repository code の代替実行環境では
+ありません。コード実行には [共通の実行境界](../canonical/ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis)
+を適用します。接続で取得した source を host Python に読み込む、部分テストだけ実行する、
+一時 GitHub Actions や script を作る、といった経路外実行は行いません。
+当該検証の規定経路である既存 CI は利用できますが、接続の write 権限や CI の存在だけを
+任意コード実行の許可にしません。
+
 ## 2. Read the owner and establish the work branch
 
 repository metadata と最新 main の SHA を読み、その SHA に固定して `AGENTS.md`、
@@ -94,10 +101,11 @@ remote readback、hosted checks を区別します。CI の緑だけで対象外
 実施済みにせず、run / job / step と対象 SHA を確認します。
 
 実行環境がない検証は未実施とし、必要な property、理由、実際の試行と結果、次の owner
-と正確な検証経路を Issue に残します。検証のためだけの Docker/GPU 設定変更、新 checker、
-無関係な全 suite は追加しません。変更自体の不良や失敗した検証を環境制約へ付け替えず、
-必要な修正は同じ範囲で続けます。安全に公開可能な差分まで止める理由にはしませんが、
-未検証の公開を validation complete や merge-ready と呼びません。
+と正確な検証経路を Issue に残します。「局所」「fake付き」「参考結果」と注記しても、
+規定経路外で実行してよいことにはなりません。検証のためだけの Docker/GPU 設定変更、
+新 checker、無関係な全 suite は追加しません。変更自体の不良や失敗した検証を環境制約へ
+付け替えず、必要な修正は同じ範囲で続けます。安全に公開可能な差分まで止める理由には
+しませんが、未検証の公開を validation complete や merge-ready と呼びません。
 
 ## 5. Refresh main, publish the PR, and leave a durable handoff
 

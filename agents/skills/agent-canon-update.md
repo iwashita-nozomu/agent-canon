@@ -99,7 +99,10 @@ migration edit, and a source-free boundary pass cannot claim product behavior.
 
 The only lifecycle entrypoint is top-level `bootstrap.sh`. It requires an
 authorized parent control root; the default runtime is the ignored,
-reconstructible `<install-root>/.runtime/`:
+reconstructible `<install-root>/.runtime/`.
+Select the commands below only for requested lifecycle work or an authorized
+repair, not as a checklist before ordinary execution. Ordinary tool execution
+uses [agent-canon-bootstrap](agent-canon-bootstrap.md#user-flow) directly.
 
 ```bash
 ROOT=<authorized-parent-root>
@@ -159,24 +162,31 @@ After update, launch a new session.
 
 ## Tool and compatibility route
 
-Preserve the existing public Rust command shape. Do not add flat global Python
-executables. A Python/Rust catalog entry may use:
+Use the selected [bootstrap route](agent-canon-bootstrap.md#command-shape).
+Preserve the existing public Rust command shape; native Python/Rust spellings
+are payload syntax, not instructions to execute on the host. Do not add flat
+global Python executables. Verified catalog operations use:
 
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" tool run --root <project-root> <verified-catalog-id> -- <args...>
 ```
 
-only after schema-v2 parity evidence verifies argv, cwd, stdin/stdout/stderr,
+Schema-v2 parity evidence must verify argv, cwd, stdin/stdout/stderr,
 exit/signal behavior, and written paths. The dispatcher rejects shell command
-strings, unknown ids, and unverified entries. Until parity is verified, keep
-the legacy exact command and invoke it through its owner or:
+strings, unknown ids, and unverified entries. For a legacy operation whose
+existing owner prescribes bootstrap `exec`, retain that exact command as its
+payload:
 
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" exec --root <registered-project> -- <existing-command> <args...>
 ```
 
-Do not infer that every internal Python file is public. A parity failure is a
-compatibility finding, not permission to silently change the command plane.
+These are operation-owned routes, not a retry ladder. A rejected `tool run`,
+parity failure, or missing runtime does not authorize switching to `exec`, host
+Python, a direct module import, or another container. Do not infer that every
+internal Python file is public. Apply the shared
+[execution boundary](../canonical/ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis)
+to tool discovery, generators, diagnostics, tests, and formatting as well.
 
 ## Side-effect and eval rules
 
@@ -243,21 +253,28 @@ archive state into the AgentCanon source checkout.
 
 ## Validation and closeout
 
-At minimum, run:
+Select validation for the changed contract from
+[Runtime Profiles And Check Matrix](../../documents/runtime/runtime-profiles-and-check-matrix.md).
+For documentation-only changes, use the owning Markdown formatter and link/header
+checks plus native `git diff --check`; do not select the runtime suites merely
+because this skill is active.
 
-```bash
-git diff --check
+For runtime/bootstrap changes, the test commands below are payloads for the
+prescribed AgentCanon tool-runtime route in
+[Tool and compatibility route](#tool-and-compatibility-route), not host commands:
+
+```text
 python3 -m pytest -q tests/bootstrap tests/tools/test_bootstrap_container_contract.py
 python3 -m pytest -q tests/agent_tools/test_runtime_artifacts.py \
   tests/agent_tools/test_tool_dispatch.py
 ```
 
-Select additional checks from
-[Runtime Profiles And Check Matrix](../../documents/runtime/runtime-profiles-and-check-matrix.md).
-For documentation-only changes, run the Markdown link/header checks and
-`git diff --check`. Test output must name whether the failure belongs to the
-AgentCanon tool runtime, host adapter, archive owner, or project execution
-environment.
+Keep the selected runtime entrypoint around each payload, including focused,
+extracted, or fake-backed tests. If it is unavailable, preserve that limitation
+and leave the affected validation unrun; do not run the payload elsewhere as
+supplementary evidence. Test output must distinguish AgentCanon tool-runtime,
+host adapter, archive, and project execution failures. Native Git/source readback
+may continue through its own owner but does not replace the unavailable checks.
 
 Before closeout, verify:
 
