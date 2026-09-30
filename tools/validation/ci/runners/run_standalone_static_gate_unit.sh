@@ -215,7 +215,9 @@ run_eval() (
     exit "${cleanup_status}"
   }
   trap cleanup_eval EXIT
-  local hook_archive="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/archive/agent-canon-log}"
+  # Static evaluations own synthetic evidence, not the shared private hook log.
+  # Keep the existing archive location and runtime-boundary validation.
+  local hook_archive="${AGENT_CANON_STATIC_RUNTIME_ROOT}/archive/agent-canon-log"
   local eval_log_dir="${temp_root}/agent-eval-runs/agent-canon-pr-gate"
   hook_archive="$(runtime_boundary_path "${hook_archive}")"
   mkdir -p "${eval_log_dir}"

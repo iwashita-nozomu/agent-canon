@@ -69,6 +69,12 @@ that its tests ran. Temporary installation and local source transport are
 removed after the job. No publishing credential or repository write permission
 is needed.
 
+The eval unit owns synthetic evaluation evidence. Its producer and checker use
+`archive/agent-canon-log` under the selected static runtime root, not the inherited
+private hook archive from the shared container. Reuse the existing runtime path
+resolver for that location; do not relax its escape check or alter bootstrap
+logging. Evaluation failures still propagate and temporary captures are cleaned.
+
 The shared image provisions `python3-pytest` for its system Python through the
 [existing dependency manifest](../../bootstrap/container/image/dependencies.toml);
 a pipx-isolated executable does not supply an importable system Python module.
