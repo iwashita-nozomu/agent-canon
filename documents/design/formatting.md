@@ -3,7 +3,7 @@
 <!--
 @dependency-start
 contract reference
-responsibility Owns AgentCanon's native formatter settings and their direct use.
+responsibility Owns AgentCanon's native formatter settings and command syntax.
 upstream design ../../ROOT_AGENTS.md editing and validation boundary
 downstream design ../../AGENTS.md source-specific reader map
 downstream implementation ../../.editorconfig editor whitespace defaults
@@ -17,21 +17,28 @@ downstream implementation ../../.vscode/settings.json editor formatting adapter
 ## Ownership and purpose
 
 AgentCanon keeps formatter settings as tracked, tool-native configuration at
-its root. This page owns their location and direct use; the mandatory execution
-boundary is [Validation Routing](../../ROOT_AGENTS.md#validation-routing).
+its root. This page owns their location and command syntax; the mandatory
+execution boundary is [Validation Routing](../../ROOT_AGENTS.md#validation-routing).
 Keep that boundary in the common root rather than copying a second formatter
 checklist into every Skill.
 
-| Surface | Configuration owner | Formatting operation |
+| Surface | Configuration owner | Native operation syntax |
 | --- | --- | --- |
 | Editor whitespace | [`.editorconfig`](../../.editorconfig) | EditorConfig-aware editor; not a substitute for a language formatter |
 | Python | [`ruff.toml`](../../ruff.toml) | `ruff format <edited Python paths...>` |
 | C, C++, CUDA | [`.clang-format`](../../.clang-format) | `clang-format -i --style=file <edited paths...>` |
-| Rust | [`rustfmt.toml`](../../rustfmt.toml) | Owning crate's existing formatting command, or `rustfmt` on edited files using its declared edition |
+| Rust | [`rustfmt.toml`](../../rustfmt.toml) | Owning crate's prescribed formatting command using its declared edition |
 | Markdown | [Existing docs tool](../tools/agent-canon.md) | `tools/bin/agent-canon docs format <edited Markdown paths...>` |
 | VS Code integration | [Settings](../../.vscode/settings.json), [recommendations](../../.vscode/extensions.json) | Format on save for Python, C/C++/CUDA and Rust using the selected native formatter |
 
-Run commands from the repository's existing working context and name the edited
+The table defines settings and argv, not a choice of execution environment.
+Use the repository owner's prescribed formatter entrypoint and execution plane
+for CLI and editor operations. An installed host executable or enabled editor
+setting does not authorize dropping a required entrypoint or container. If that
+route is unavailable, leave formatting unverified instead of running a host
+formatter, another binary, or a replacement script.
+
+Run through that route from its existing working context and name the edited
 files. Rust's language edition comes from the owning Cargo manifest and existing
 command, not a new runtime selector or a value copied into the shared style.
 A crate-wide command is appropriate only within the repository's accepted scope;
