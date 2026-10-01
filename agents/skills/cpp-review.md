@@ -8,7 +8,6 @@ upstream design ./catalog.yaml public skill and capability projection
 upstream design ./skill-dependencies.yaml prerequisite and reviewer order
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json C++ validation profile owner
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse C++ projection
-upstream design ../../documents/experiments/host-build-admission.md compiler/linker host safety admission
 upstream design ../../documents/design/cpp-debugging.md native debugging selection and evidence boundary
 @dependency-end
 -->
@@ -33,19 +32,20 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
   SIMD / vectorization、LTO / IPO / PGO、並列性能への影響または改善を主張する
 - `bootstrap_agent_run.py` の changed path 判定で `cpp_reviewer` が自動で足された
 
-## Host build admission
+## Project-owned execution
 
-通常の C/C++、Clang/Enzyme、linker 実行にも、GPU の有無と独立に
-[host build admission](../../documents/experiments/host-build-admission.md) を先に適用します。
-project-owned image・build argv・必要な検証対象は維持し、同 owner の guarded request
-から実行します。`--parallel` の省略値、`-j1`、requested Docker flags、GPU admission
-成功だけを host RAM・CPU・PIDs の hard limit 成立と扱いません。別 session も同じ
-host lease を使い、制限・予算・指定環境を確認できなければ build を開始しません。
+通常の configure / build / test / static analysis は、project-owned の規定経路を
+既定設定のまま実行します。`make run tests/cpp/nn` が入口なら、その command を先に
+実行し、失敗した場合だけ必要な経路診断を行います。Docker context / image、cgroup
+version / driver、有限の memory / CPU / PIDs 上限の事前確認は行わず、未設定・
+未確認や cgroup v1 を理由に開始を止めません。
 
-指定環境の起動失敗、対話認証要求、読取り不能を、別 daemon の起動、cgroup 無効化、
-無制限 host 実行で回避しません。未対応の configure/static-analysis 入口が compiler を
-起動する場合も、未検証の経路を裸で実行せず同 owner に blocker を残します。
-利用者の再実行禁止は縮小 build・別 target・小規模 GPU にも適用し、既存 evidence と
+資源上限が必要なら、consumer の Compose 等の既存実行設定へ宣言し、並列度も既存の
+build 設定に置きます。設定と適用はその owner の責務であり、AgentCanon の request
+JSON、host lease、別ランナーで重ねません。上限設定の追加を通常実行の前提にしません。
+
+規定経路の権限・終了コードと明示された再実行禁止を維持し、別 daemon や host 直実行へ
+迂回しません。再実行禁止は縮小 build・別 target・小規模 GPU にも適用し、既存 evidence と
 fixture-only 検証へ限定します。禁止を解く根拠に過去の別許可を使いません。
 
 ## CMake analysis environment
@@ -54,8 +54,8 @@ CMake project の clangd / LSP 解析を準備するときは、既存の projec
 argv に `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` を加え、build directory に
 `compile_commands.json` を生成します。既存 configure preset の同等の cache 設定も
 使えます。source / build directory、toolchain、backend、依存解決は実ビルドと揃え、
-同じ構成の最新 DB が既にあれば再生成しません。configure が compiler を起動する場合は
-上記 host build admission を適用します。この生成機能は Ninja / Makefile 系が対象で、
+同じ構成の最新 DB が既にあれば再生成しません。compiler を起動する configure も
+project-owned の規定経路で行います。この生成機能は Ninja / Makefile 系が対象で、
 非対応 generator を勝手に切り替えず、生成できない範囲を未検証として残します。
 
 clangd は依存を持つ既存の開発コンテナなど、実ビルドの環境で動かし、対象 module の
@@ -85,10 +85,9 @@ DB 生成成功と依存込み解析成功を分け、結果と未検証範囲�
   The build directory is explicit per module; the tool does not enumerate or add include paths,
   compiler flags, or provider-specific diagnostics.
 - `ctest` があるならその結果
-- CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
-  `cmake --build "$ROOT/build/cpp/<profile>"` を上記 admission の build argv として渡した結果、
-  `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure` の結果
-- install contract がある場合は `cmake --install "$ROOT/build/cpp/<profile>"` の結果
+- CMake project では project-owned の configure / build / test 結果を使い、既存経路が
+  まとめて実行する処理を個別 command で重ねません
+- install contract がある場合は同じ規定経路による install の結果
 - 性能変更が activation 条件を満たす場合は、repository-owned benchmark / profiler / workload
   route による before / after evidence。特定の benchmark framework、profiler、CPU counter、
   compiler、hardware を普遍要件にはしない
