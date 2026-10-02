@@ -10,6 +10,7 @@ upstream design ../../documents/design/entrypoint-owner-map.md source and consum
 upstream design ../../documents/design/api-surface-traversal-policy.md traversal and API change rationale
 upstream design ../../documents/conventions/software-engineering-principles.md maintained code-space objective, abstraction admission, and reuse feasibility decision owner
 upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
+upstream design ../../documents/notes/knowledge/unix-linux-philosophy.md primary-source rationale and limits for composable boundaries
 @dependency-end
 -->
 
@@ -61,17 +62,91 @@ consumer migration in the existing design before implementation, then close
 in the same change. Do not defer deletion to a later cleanup or keep the old path
 to reduce the diff. Keep unrelated changes out; add no checker, report, or approval
 gate to enforce this objective.
- Make the simplest complete implementation the default, not a later refactor.
- Introduce abstractions, configuration, execution paths, or state only when a
- concrete current requirement cannot be met more simply; justify that necessity
- with mathematical or engineering grounds. Hypothetical reuse, design-pattern
- uniformity, or test-double convenience alone is not such a reason. Minimize
- concepts, state, branches, and dependencies while preserving the required domain,
- correctness, safety, and failure semantics. Neither fewer lines nor a smaller diff
- justifies omitted behavior, and completeness does not authorize speculative
- generalization or unrelated library or consumer changes. Keep the decision with
- existing implementation and review owners, without adding a checker, report, or
- approval gate to enforce simplicity.
+
+When composition, interfaces, policy placement, or resource lifetime changes,
+use the applicable decision below. Other edits do not activate all sections or
+a fresh philosophy survey. Existing engineering principles remain the general
+policy owner; the optional [research note](../../documents/notes/knowledge/unix-linux-philosophy.md)
+explains the sources, tradeoffs, and limits rather than adding a second policy.
+
+## Composable interfaces and explicit mechanisms
+
+### Policy, mechanism, and representation
+
+Keep one cohesive responsibility behind a usable contract. Compose the same
+existing component in standalone and combined use; do not make a second
+implementation for a pipeline or caller variant. Under
+[SEP-03 and SEP-05](../../documents/conventions/software-engineering-principles.md),
+keep use-case selection, configuration policy, orchestration, and presentation
+with the caller, and reusable computation or mechanism with its owner.
+Do not split one invariant or atomic operation merely to make smaller files,
+functions, or processes; IPC and serialization are costs, not proof of modularity.
+
+Before adding branches or modes, inspect the data representation, valid states,
+units, and ownership. Prefer an existing type, standard data structure, or small
+table when it removes special cases without hiding different semantics.
+A new DSL, schema, interpreter, registry, or generic framework still needs the
+existing abstraction-admission evidence. Keep control flow and effects readable;
+comments explain non-obvious invariants and reasons, not a paraphrase of each line.
+
+### Program boundaries
+
+For a machine-facing CLI, keep result data on stdout and diagnostics on stderr;
+follow an existing protocol's channel contract instead when it specifies another
+boundary. Do not mix progress, decoration, or interactive prompts into data.
+Provide non-interactive inputs for automated use without bypassing authorization.
+Define the applicable input format, encoding, record boundaries, escaping, ordering,
+exit-status meanings, and validity of partial output. Reuse established formats,
+serializers, parsers, argument APIs, and native tools rather than inventing them.
+Do not parse human display output when a supported machine interface suffices,
+or interpolate untrusted input into shell command strings.
+
+Use text when it preserves the required interoperability, precision, and cost;
+keep typed in-process or binary interfaces when those better satisfy the contract.
+Do not force a numerical library through a CLI or convert every value to a string.
+A command's quiet success still has defined output and status; failures must remain
+observable. A reusable library reports errors through its API, not by unexpectedly
+printing to global streams or terminating its caller.
+
+### Streams and owned resources
+
+For streaming or process composition, account for framing, EOF, partial I/O,
+backpressure, cancellation, and descriptor ownership where they affect the
+changed contract. A byte stream is not a message protocol. Reuse guarantees of
+the selected library/runtime rather than rebuilding low-level handling.
+Do not assume unlimited buffering or a particular pipe capacity. Streaming is
+not mandatory when the operation needs global data; use the supported workload
+and existing resource owner to choose storage and processing granularity.
+Classify early consumer termination by the command contract: neither suppress
+all broken-pipe failures nor assume every deliberate short read is a defect.
+Do not impose a blanket signal handler, retry loop, shell option, or preflight.
+
+Give acquired resources an explicit lifetime owner and use the language's native
+scoped cleanup where sufficient. Handle partial acquisition, cancellation, and
+failure without double release, leaks, hidden shared state, or loss of the first
+failure. Close only owned resources; borrowed resources retain their owner's
+contract. Validate reachable cleanup paths, using the existing
+[reachability and remedy rule](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity),
+not speculative guards or repeated checks already guaranteed by the boundary.
+
+### Compatibility and evidence
+
+Check actual affected workflows, not just unchanged signatures: data meaning,
+precision, ordering, status, side effects, and required performance may change
+without an API rename. Apply [Public API additions](#public-api-additions) to
+necessary changes and migration; public visibility alone is not an API freeze.
+Linux's unusually strong user-regression policy is not permission to ignore
+undocumented usage, nor a universal ban on authorized internal replacement.
+
+Use the existing [workload and scale decision](../../documents/conventions/software-engineering-principles.md#workload-and-scale-before-mechanism)
+for algorithm and resource choices. Support claimed speedups with relevant
+measurements; do not demand new benchmarks when existing guarantees or analysis
+settle the decision, and do not call unmeasured performance verified.
+Review one complete logical change with its necessary callers, tests, and docs;
+small patches aid review but do not excuse unfinished migration. Validate the
+changed boundaries and observable results, not adherence to slogans or code shape.
+Keep rationale and evidence with the existing design/PR, without a new checklist,
+checker, report, approval stage, or runtime setup obligation.
 
 ## Public API additions
 
