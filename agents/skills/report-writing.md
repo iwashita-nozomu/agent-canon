@@ -4,7 +4,7 @@
 contract skill
 responsibility Writes evidence-backed reader-facing reports with semantic claim/evidence, inference, limitation, and action boundaries.
 upstream design ../../documents/design/responsibility-rationale.md report semantics and finding-closure rationale
-upstream design ../internal-routines/verification-result-structuring.md mandatory pre-write structuring and finding coverage
+upstream design ../internal-routines/verification-result-structuring.md reader reconstruction, pre-write structuring, and finding coverage
 upstream design structure-planning.md optional structural-decision owner
 upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design code-visualization.md sole public visualization owner and typed projection contract
@@ -22,11 +22,13 @@ The canonical rationale is [documents/design/responsibility-rationale.md](../../
 
 ## Source packet
 
-Before drafting or revising verification results, invoke
-[verification result structuring](../internal-routines/verification-result-structuring.md).
-Use its existing structured task/Issue record, including interim findings,
-counterevidence, corrections, and limitations. This step is mandatory even when
-no document topology plan or independent report review is needed.
+Before every draft or revision, use
+[reader-reproducible writing](../internal-routines/verification-result-structuring.md),
+including proposals and procedures with no verification results. Its reader
+reconstruction step applies to all content; verification findings additionally
+use its structured task/Issue record, including interim findings, counterevidence,
+corrections, and limitations. This step is mandatory even when no document
+topology plan or independent report review is needed.
 
 Add the audience/decision and requested next action to that source material.
 Report preparation alone does not justify another environment/tooling survey
@@ -45,6 +47,7 @@ A report is acceptable when:
 
 - every material factual or recommendation claim has source support or is explicitly identified as inference;
 - observations and interpretations are distinguishable;
+- the reader can reproduce the relevant procedure or reconstruct the analysis from the report and identified accessible references, with necessary premises, inputs, method, and expected or observed results distinguished;
 - material investigated findings, counterevidence, and limitations that could change the reader's decision are present, not only evidence selected to support the conclusion;
 - raw evidence and reader synthesis are not conflated;
 - the next action or conclusion is scoped to what the evidence supports;
@@ -56,10 +59,10 @@ No fixed heading count is required. A compact status may satisfy these obligatio
 
 Close accepted blocking findings about the report before finalizing. These
 include material factual errors, unsupported claims, broken source mappings,
-and omitted material results or counterevidence that can change the reader's
-interpretation or action. Correcting the report does not require repairing every
-underlying problem it reports; distinguish report accuracy from implementation
-completion.
+missing context needed for reader reconstruction, and omitted material results
+or counterevidence that can change the reader's interpretation or action.
+Correcting the report does not require repairing every underlying problem it
+reports; distinguish report accuracy from implementation completion.
 
 Style/advisory findings, demonstrated tool false positives, explicitly out-of-scope findings, and accepted risks may remain with a short reason. Completion is **not** raw `finding_count == 0`; do not rewrite indefinitely to appease an advisory checker. Rerun only the checker/review surface affected by a changed claim or section.
 
@@ -77,9 +80,10 @@ Use a report reviewer when claim impact, external publication, ambiguity, or evi
 
 ## Completion evidence
 
-Use [verification result structuring](../internal-routines/verification-result-structuring.md)
-for the pre-write claim/evidence and finding/output coverage check. Any selected
-review consumes the same record; it does not replace that mandatory step.
+Use [reader-reproducible writing](../internal-routines/verification-result-structuring.md)
+for reader reconstruction and the applicable pre-write claim/evidence and
+finding/output coverage check. Any selected review consumes the same record;
+it does not replace that mandatory step.
 Read the relevant provenance, limitations, review result, and explicitly requested
 presentation/HTML validation without reopening settled investigation or adding
 a checker. Scale detail to useful results and decision complexity, not elapsed
