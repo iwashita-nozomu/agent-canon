@@ -29,7 +29,7 @@ Repository: `iwashita-nozomu/agent-canon`。
 | --- | --- | --- |
 | 失敗時と次回判断前の入口から保存・検索 owner が選べる | ROOT に規則はあるが、source 入口と任意作業用の owner map に対応する発火条件と行が欠けていた | 基準 revision の ROOT Always-On Boundary、AGENTS Reader Map、SOURCE_ROUTING Reader Map |
 | 実装経路から同じ保存・検索 owner に到達する | ROOT_IMPLEMENTATION から Notes Lifecycle の Retrieve Before Deciding へのリンクは存在した | 基準 revision の ROOT_IMPLEMENTATION / Simplest complete implementation |
-| private 保存の実行手順へ進める | Notes Lifecycle の保存節は storage contract へリンクし、agent-learning の Operating Route への直接案内は検索節側に限られていた | 基準 revision の Notes Lifecycle / Failed Verification Record、Retrieve Before Deciding |
+| private 保存の実行手順へ進める | Notes Lifecycle の保存節は storage contract へリンクし、agent-learning への案内は検索節側にあった | 基準 revision の Notes Lifecycle / Failed Verification Record、Retrieve Before Deciding |
 
 ## Established Conclusion
 
@@ -45,12 +45,22 @@ ROOT の規則から repository instructions の Reader Map を参照し、sourc
 開き、private 記録だけ agent-learning の Operating Route と private log owner を使う。
 既知の owner と読取済みの根拠は再利用する。
 
-参照先の実在、見出し anchor、公開・private 両経路を既存の
-`tests/agent_tools/test_check_entrypoint_owner_map.py` の
-`test_failed_verification_reader_route_reaches_storage_owners` で確認する。
-実行経路は既存 Entrypoint Owner Map workflow の
-`python3 -m unittest tests.agent_tools.test_check_entrypoint_owner_map -v`。
-実行結果と exact head は追補 PR、および #1328 の追補コメントに接続する。
+2026-10-03 の既存 Entrypoint Owner Map workflow
+[run 37103570003 / job 111147649684](https://github.com/iwashita-nozomu/agent-canon/actions/runs/37103570003/job/111147649684)
+で、次の実行結果を確認した。
+
+| Check | Result |
+| --- | --- |
+| `python3 tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py --root . --format json` | `status=pass`、`findings=[]`。AGENTS、ROOT、SOURCE_ROUTING を検査。 |
+| `python3 -m unittest tests.agent_tools.test_check_entrypoint_owner_map -v` | 12 tests、全件 `OK`。追加した `test_failed_verification_reader_route_reaches_storage_owners` も `ok`。 |
+
+PR head は `9b9edb66bc0724324c8b71a8080629c8ea604774`、base は上記調査基準。
+実際の CI checkout は両者の merge ref `07f583178349555c805206dc6338d75358dda2bf`。
+ログの checkout、実行 command、各 test 名と結果を照合した。
+
+検証で確認した範囲は、入口構造、参照先 file の実在、見出し anchor、公開・private
+保存 owner への接続である。保存機能の実行結果は、その機能を使用する task の
+保存・同期・readback evidence で確認する。
 
 ## Reuse And Recheck Conditions
 
@@ -66,3 +76,4 @@ ROOT の規則から repository instructions の Reader Map を参照し、sourc
 - [Notes Lifecycle](../../operations/notes-lifecycle.md)
 - [agent-learning](../../../agents/skills/agent-learning.md#operating-route)
 - [PR #1328](https://github.com/iwashita-nozomu/agent-canon/pull/1328)
+- [参照経路の追補 PR #1329](https://github.com/iwashita-nozomu/agent-canon/pull/1329)
