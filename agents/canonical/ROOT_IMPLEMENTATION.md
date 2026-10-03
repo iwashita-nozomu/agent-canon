@@ -170,7 +170,8 @@ judgment. Specifications and sound analysis can establish a possible failure wit
 an unsafe reproduction. Preserve required authorization and external-boundary checks.
 
 Choose the simplest remedy for the demonstrated gap at its owner and verify the
-identified condition. Reuse guarantees already
+identified condition. Use the governing capability contract for guards; keep
+portability and reuse across supported environments. Reuse guarantees already
 maintained at the same trust boundary. Record the triggering condition, existing
 guarantee, checked result, and selected action in the existing design or Issue;
 persist a failed check through the existing topic-note/log owner.
