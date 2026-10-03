@@ -19,20 +19,21 @@ additional startup packet or a dependency of generated consumer instructions.
 
 ## Contract and valid domain
 
-Preserve the problem class, valid input domain, and output guarantees required
-by the explicit user request and applicable canonical contract. A bounded
-change scope is not permission to narrow that problem. Do not add fixed
-dimensions, shapes, distributions, or other preconditions merely to fit a
-chosen algorithm, library, test fixture, implementation convenience, or
-performance target. Distinguish restrictions inherent in the governing problem
-from limitations of the chosen method; choose or derive a suitable method
-instead of promoting the latter into the specification. Do not reject or skip
-valid cases, or silently truncate or project them into a different problem,
-and call the result complete. Unresolved coverage remains an implementation
-gap, not invalid input or authorization to shrink the contract. Narrowing
-requires explicit user direction. Validate through the applicable implementation
-and test owners, including valid cases beyond the motivating example and cases
-a shortcut would exclude.
+Use [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
+to distinguish required problem semantics from changeable design contracts.
+API shape, representation, internal preconditions, state transitions, and ownership
+are candidates for redesign, not immutable constraints merely because code, tests,
+or documentation already prescribe them. Compare contract-and-implementation pairs
+before choosing the simplest design, with preserved requirements, intended semantic
+changes, and necessary consumer migration explicit. Do not require equivalence to
+obsolete behavior that the authorized change is meant to correct.
+
+Keep the required input domain, output, safety, performance, and failure guarantees.
+Do not turn a method's limitations into stronger user preconditions, silently skip
+valid cases, or weaken guarantees to make implementation or proof easier. A changed
+internal precondition needs a derivation showing how every required input reaches
+it legally. A real conflict with explicit compatibility or authority needs the
+exact affected requirement and decision, not a blanket contract-preservation veto.
 
 ## Simplest complete implementation
 
@@ -48,12 +49,12 @@ to inspect abstractions, actual callers, APIs, configuration, dependencies, and
 extension points before implementation. A failed name search is not absence;
 unknown defers only the affected decision, not independent work.
 
-Within that starting point, actively seek and implement reductions in the affected
-owning unit. Challenge unnecessary wrappers, duplicate state, special cases, unused
-generality, and their support; do not wait for replacement or a separate cleanup
-request. Prefer deletion, direct use, consolidation, or simplification where the
-agreed contract permits. Consolidate shared responsibility, not similar syntax;
-reuse sound parts and keep sufficient local fixes local.
+Within that starting point, apply SEP-06's mathematical simplicity comparison,
+including contract redesign, independent state, exceptional cases, coupled
+invariants, and proof obligations across the affected unit and its consumers.
+Remove redundant representations and mechanisms when the derivation permits;
+do not wait for replacement or a separate cleanup request. Consolidate shared
+responsibility, not similar syntax; reuse sound parts and keep local fixes local.
 
 For replacement or retirement, close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
 in the same change: remove obsolete paths and support, migrate affected uses, and
@@ -64,6 +65,13 @@ line compression, relocation, and deletion quotas are not evidence of improvemen
 Preserve required domain, correctness, safety, performance, failure semantics, and
 behavior-preserving refactor contracts. Add no unrelated cleanup, checker, report,
 or approval gate.
+
+Before implementing, derive the selected contract's obligations through
+[SEP-11](../../documents/conventions/software-engineering-principles.md#sep-11-testability-and-validation-selection).
+Connect assumptions, invariants, transitions, and required termination to actual
+paths/symbols; derive tests from those properties and remaining execution risks.
+Do not treat a proof of an ideal model or passing examples as proof of the code.
+Keep unproved obligations and empirical limits explicit in the same design/review.
 
 ## Public API additions
 

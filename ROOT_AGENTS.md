@@ -49,9 +49,13 @@ additions still require explicit authorization.
 Start from the latest explicit user agreement, including the preceding chat;
 update the owning design to that target, not the target to existing code.
 Existing code, tests, or older design are evidence of meaning and migration impact,
-not a veto or a requirement to keep their shape. Reopen settled choices only for
-a concrete conflict with still-required contracts, safety, or authority; do not
-silently change the agreement or invent compatibility.
+not a veto or a requirement to keep their shape. Separate required outcomes from
+changeable API, representation, state, and responsibility contracts; compare
+contract-and-implementation alternatives for mathematical simplicity before fixing
+the design. Necessary contract changes include affected consumer migration, not a
+separate approval merely for changing a contract. Preserve explicit guarantees,
+compatibility, and authority; expose concrete conflicts rather than silently
+weakening requirements or inventing compatibility.
 
 Before implementation, including private helpers and in-file additions, inspect
 relevant abstractions, callers, APIs, configuration, extension points, standard
@@ -69,9 +73,11 @@ A failed name search is not absence; unknown defers only the affected decision.
 Actively shrink maintained code space within the affected responsibility, not just
 limit additions or minimize the diff. With the task-specific starting point above,
 seek and apply evidenced deletion, consolidation, and simplification opportunities
-in the same change; do not wait for a separate cleanup request. Review retained
-code and support too. Do not force net-negative line counts, compress or relocate
-code, or weaken required behavior, safety, or performance to claim reduction.
+in the same change; do not wait for a separate cleanup request. Prefer fewer
+independent states, special cases, coupled invariants, and proof obligations,
+including required caller conversions and support. Justify the governing laws
+and representation correspondence; do not merely compress or relocate code,
+force deletion quotas, or weaken required behavior, safety, or performance.
 Establish semantics and migration before deleting; replacement removes obsolete code
 and support while migrating necessary consumers in the same change.
 Retain wrappers or dual paths only for a required compatibility contract. Keep
@@ -189,6 +195,12 @@ or task record. If no formatter is configured,
 record that fact without choosing one. If it fails or cannot run, record the
 failure and affected scope and hand off as unverified, not formatting-complete.
 
-Validate the changed contract and its failure semantics, then use that owner's
-closeout route when required. A generated consumer root file does not authorize
-unrelated AgentCanon checks, product checks, or runtime changes.
+Base verification on deduction: derive obligations from requirements and explicit
+assumptions before implementation; show invariant establishment and preservation,
+composition, required termination, and outcomes against the actual code. Check
+assumptions and model-to-runtime gaps; never assume the conclusion or narrow valid
+inputs to make a proof pass. Tests target derived properties, counterexamples,
+and integration gaps, not proof by examples. Retain required execution checks;
+distinguish reasoned arguments, machine-checked proofs, observations, and unresolved
+claims. Use existing validation and closeout owners without new universal gates.
+A generated consumer root does not authorize unrelated checks or runtime changes.
