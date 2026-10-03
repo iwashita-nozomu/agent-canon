@@ -20,9 +20,15 @@ Read the named section when its condition applies, not every linked file at star
 Reuse still-applicable intake and decisions. A link is a read route, not an import,
 new activation condition, or instruction to restart the workflow.
 
+Before repository planning or editing, retain the chat agreement through
+[1. Intake](CODEX_INTAKE.md#1-intake). On resumption, context compaction, or handoff,
+restore that existing agreement record before the next action. Carry its locator
+and applicable clauses into each selected phase; reuse unchanged contents.
+Recover missing agreement context through Intake without restarting other phases.
+
 | When | Procedure owner | Start with |
 | --- | --- | --- |
-| Task intake; relevant checkout/context changed | [Codex Intake](CODEX_INTAKE.md) | [1. Intake](CODEX_INTAKE.md#1-intake), then the relevant intake section |
+| Task intake; agreement update or recovery; relevant checkout/context changed | [Codex Intake](CODEX_INTAKE.md) | [1. Intake](CODEX_INTAKE.md#1-intake), then the relevant intake section |
 | Select task family, skills, validation profile, or placement | [Codex Routing](CODEX_ROUTING.md) | [Task Classification](CODEX_ROUTING.md#task-classification) |
 | Selected route requires run state, goal handling, or token adaptation | [Codex Bootstrap](CODEX_BOOTSTRAP.md) | [4. Run Bootstrap](CODEX_BOOTSTRAP.md#4-run-bootstrap) or the named goal/token section |
 | Design or implementation | [Codex Implementation](CODEX_IMPLEMENTATION.md) | [Design Integrity Gate](CODEX_IMPLEMENTATION.md#design-integrity-gate), [5. Implementation](CODEX_IMPLEMENTATION.md#5-implementation) |
@@ -45,3 +51,6 @@ do not restart routing or invent another procedure.
 ## Completion Readiness
 
 At closeout, read [completion readiness](CODEX_COMPLETION.md#completion-readiness).
+Compare the delivered changes and required evidence with the agreed criteria retained
+by [1. Intake](CODEX_INTAKE.md#1-intake), then report each criterion's actual result.
+The derived TODO list is a work plan, not a replacement for those criteria.

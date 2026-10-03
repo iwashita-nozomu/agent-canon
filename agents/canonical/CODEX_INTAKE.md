@@ -91,14 +91,16 @@ AgentCanon の更新・再構築を要求しません。
 
 ## Context Sweep
 
-実装、設計変更、文書改訂、実験計画の前に、repo evidence を根拠にします。
-context sweep は `requested_scope` を保存したうえで work packet を作る手順です。
-先に user request から要求された file、workflow、check、doc、PR state と
-acceptance criteria を `requested_scope` として固定します。その範囲から必要な
-context と owner を調べ、変更面が分かった時点で [runtime profile](CODEX_ROUTING.md#runtime-profile-and-risk-selection)
-と検証を選びます。選択された router、context-pack、dependency review の根拠で
-`work_scope` を具体化し、未選択の出力を調査開始の前提にしません。選ばれなかった profile / document bucket
-は、request に無関係である evidence がある場合だけ `not_applicable` にします。
+実装、設計変更、文書改訂、実験計画の調査は、[1. Intake](#1-intake) で保存した
+合意を入力にします。目的、採用方針、制約、要求された file / workflow / check /
+doc / PR state、acceptance criteria を `requested_scope` として保持します。
+その範囲で必要な context と owner を調べ、変更面が分かった時点で
+[runtime profile](CODEX_ROUTING.md#runtime-profile-and-risk-selection) と検証を選びます。
+repo evidence と依存関係は `work_scope` の具体化に使い、各変更を合意事項と
+その成立に必要な理由へ対応付けます。根本修正に必要な契約、consumer、test、doc の
+追従も同じ変更単位に含めます。調査で見つけた独立した改善は別の所見として残し、
+本件の実装・完了条件へ加えるときは合意の変更として扱います。
+未選択の出力や無関係な bucket の網羅確認を、調査開始の前提にしません。
 Large delivery / Shared canon でも、bounded responsibility route は作業順序を
 決める artifact です。対象範囲の正本は `requested_scope` に残します。読む
 slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfaces`、
@@ -193,13 +195,32 @@ repo-changing run では `team_manifest.yaml` の
 
 ## 1. Intake
 
-- ユーザー要求から変更対象と acceptance criteria を短く固定する
-- その範囲で必要な context sweep と library sweep を行い、owner・変更面から
-  route と検証を選ぶ。調査結果による具体化を、要求範囲の無断拡張と混同しない
-- `user_request_contract.md` に must-do、must-not-do、completion-evidence の clause ID を書く
+最初の調査・計画・編集の前に、当該 task のチャットでユーザーが明示した要求、
+明示的に採用した提案と、その後の変更指示を確認します。最初の合意を基準に、
+後続の明示変更がある部分だけ更新し、残る目的・採用方針・制約・要求範囲・完了条件を
+保持します。「進めて」は、その合意を実行する指示として扱います。
+
+合意内容と依頼元が分かる要約を、既存の Issue/task 記録の一か所に残します。
+選択済み route が `user_request_contract.md` を使う場合は、そこに既存の
+must-do、must-not-do、completion-evidence の clause ID と出典を保持します。
+bounded one-writer task は既存の owner/path/validation note に含めれば足ります。
+TODO、design、handoff はこの記録を参照し、独立した仕様正本を増やしません。
+記録には合意済み事項と推測・未採用提案を区別して書き、公開先の権限に合わせて
+必要な意味と根拠を残します。開始時の update で今回実行する合意を短く示し、
+内容が確定している場合は再承認を挟まず進めます。
+
+再開、context 圧縮、引継ぎ、実装着手では、同じ合意記録と後続の明示変更を先に
+読み戻します。handoff はその参照先、適用 clause、変更部分を渡し、受け手は担当
+作業との対応を確かめます。要約や TODO から合意が抜けていた場合は、既存記録と
+該当チャットから欠けた事項を復元して計画へ戻します。合意自体を変える必要が
+判明した場合は、根拠と変更する事項をユーザーへ示し、独立して進められる
+合意済み作業を続けます。変更の明示がある部分だけ同じ記録と派生計画を更新します。
+
+- 合意の範囲で必要な context sweep と library sweep を行い、owner・変更面から
+  route と検証を選ぶ。作業単位と検証の必要性を同じ合意記録へ対応付ける
 - coordination、resumption、または selected workflow が要求する場合だけ `schedule.md` を TODO 正本として materialize し、stage plan / clause coverage / planned work units を concrete にする。bounded one-writer task は owner/path/validation note で閉じる
 - 各 clause に source bucket を付け、`current_request`、`durable_user_preference`、`repo_or_code_precedent`、`domain_or_external_constraint`、`unknown_or_open_question` を混ぜずに扱う
-- 不明点は notes、guardrails、documents、prior logs、local code / tests で解決できるかを `Requirements Resolution Sweep` に記録してから deferred / escalation を決める
+- 合意した成果の判断に必要な不明点を notes、guardrails、documents、prior logs、local code / tests で調べ、`Requirements Resolution Sweep` に根拠を残して deferred / escalation を決める
 - active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残さない
 - durable user preference は今回 request や repo evidence と結び付いたときだけ task requirement へ昇格する
 - 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する

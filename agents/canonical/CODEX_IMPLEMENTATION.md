@@ -15,9 +15,11 @@ load inactive phases or restart completed intake merely by following a link.
 
 ## 契約完全実装
 
-実装 behavior は request clauses、acceptance contract、
-`Implementation Source Packet`、`Design-To-Implementation Trace`、
-dependency-expanded scope、validation route、review gate から導きます。
+実装 behavior は [Intake の合意記録](CODEX_INTAKE.md#1-intake) の request clauses と
+acceptance contract から導きます。`Implementation Source Packet`、
+`Design-To-Implementation Trace`、dependency-expanded scope、validation route、
+review gate は、その合意を実現・検証するための派生入力です。対象と完了条件は
+同じ合意に対応付け、依存展開や review finding だけで追加しません。
 見た目の広さ、owner-bounded route、MVP、thin slice は暫定的な routing、
 wave、validation profile の signal に留めます。owner boundary や impact surface が
 違うと分かった時点で route を更新します。
@@ -31,8 +33,11 @@ repo-changing run では `team_manifest.yaml` の
 
 ## Design Integrity Gate
 
-実装前の設計判断は、近い file、現在の finding、会話印象ではなく
-owning responsibility model から始めます。選択した typed route が full staging を
+実装前の設計判断は、Intake で保持した合意を入力に、owning responsibility model
+で実現方法と必要な変更単位を導きます。明示的な合意は仕様として扱い、推測とは
+分けます。旧設計や既存実装との相違は合意に合わせて設計へ反映し、合意自体の変更が
+必要なら [Intake](CODEX_INTAKE.md#1-intake) の更新手順へ戻します。
+選択した typed route が full staging を
 要求する場合は、`Abstract Design Frame`、`Implementation Source Packet`、
 `Design Side-Effect Map`、`Design-To-Implementation Trace` をそろえます。親は edit
 authorization を持たず、catalog の `workflow_activation_policy` と選択 family の
@@ -150,6 +155,10 @@ bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
 
 ## 5. Implementation
 
+着手・再開時は [Intake](CODEX_INTAKE.md#1-intake) の同じ合意記録を読み戻し、
+選択された design と担当 slice が、その目的・採用方針・制約・完了条件を保つことを
+確かめます。食い違いは派生計画を直して解消し、合意の変更は Intake の手順で扱います。
+
 - 実装は `$codex-task-workflow` と選択された task-family Skill の owner route に従って進める
 - SEP-09 を適用し、implementation は開始前に固定した complete target state から導く。waves は定義済み work の順序だけを決め、target state を後から完成させる段階実装にはしない。禁止事項と scope exception の詳細は SEP-09 を参照し、この workflow は policy を複製しない
 - selected gate の次段移行では `waterfall_gate_check.py` を通し、`WATERFALL_GATE_READY=yes`
@@ -184,7 +193,7 @@ bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
   名前が未確定な場合は Gate 5-6 へ戻り、worker handoff 前に naming plan を確定します
 - 明示 spawn 許可がある場合、実装前の repo inventory と tool drift survey は Luna/high の通常 role TOML へ、static validation failure triage と diff-local language review も該当 decision がある場合だけ `gpt-5.6-luna/high` review role TOML へ渡します。`gpt-5.4-mini/medium` は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。`worker` は `gpt-5.6-luna/xhigh` の既定 implementer で、typed parent-packet selection がある機械的 slice だけ `spark_worker` へ渡します。`.codex/config.toml` の `gpt-5.6-sol/high` parent は統合判断と次 gate 判定に集中します
 - `spark_worker` を選択できる実装は、Abstract Design Frame から導かれた差し替え可能な単位で、public interface 変更なし、依存追加なし、仕様解釈なし、既存 test / docs の局所更新で閉じる slice だけにする。design trace と dependency-expanded handoff scope は必要 evidence であり、実際の選択には `--select-agent-type implementer=spark_worker:<evidence>` が必要です。
-- 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の path 群を明示入力し、chat 要約ではなく packet path を読ませる
+- 実装 subagent を起動するときは `IMPLEMENTATION_DOCUMENT_PACKET` の既存参照に合意記録と適用 clause を含め、担当 design とともに受け手が読み戻す。chat 要約だけで実装入力を置き換えない
 - すべての stage subagent を起動するときは `team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` を local/tool context 参照として扱い、prompt には選択済み `Fresh Subagent Context Capsule` fields を入れる
 - `spark_worker` は design trace と dependency-expanded handoff scope が揃い、typed parent-packet selection が記録された bounded implementation slice にだけ使い、設計判断、scope 判断、review 判断は frontier owner / reviewer に残す
 - chunk、slice、checkpoint、subpass の後は remaining planned work units と next gate を確認してから続行する
@@ -208,7 +217,7 @@ bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
 - 新規 helper や新規 module を足すときは、既存実装で足りる範囲と、導入済みライブラリの設定変更や薄い wrapper で足りる範囲を design packet に結び付ける
 - worker は approved design または明白な局所 precedent に由来する variable、function、class、file、CLI flag、config key、public API identifier を使う
 - implementation slice は contract-complete implementation として閉じる。request clause、acceptance contract、Implementation Source Packet、validation route を結び、implementation shortcut を見つけたら `design_issue_blocker` と evidence で design review へ戻す
-- checkpoint review は diff だけでなく Abstract Design Frame、approved design packet、Design Side-Effect Map、source packet citation の一致を確認する
+- checkpoint review は同じ合意記録に対して diff、Abstract Design Frame、approved design packet、Design Side-Effect Map、source packet citation の対応を確認する
 - role ごとの model / reasoning 設定は `.codex/agents/*.toml` に従う
 - implementation の既定 candidate は `gpt-5.6-luna/xhigh` の `worker` とし、review / quality-check は active decision ごとに一つの `gpt-5.6-luna/high` role を選びます。Abstract Design Frame と design trace から導かれた機械的 slice は explicit parent-packet selection がある場合だけ `spark_worker` を使い、execution-only experiment / log work は Luna/high の `experiment_runner` に渡します。mini/medium は明示 T14 `skill_evaluation` の `skill_evaluator` だけです。
 - parent-managed write-scope rule は `worker.toml`、`spark_worker.toml`、planning / reviewer TOML、`team_manifest.yaml` を正本にする
