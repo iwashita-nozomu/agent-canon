@@ -243,8 +243,8 @@ conflicts; they do not start a wave or authorize rollback.
 すべての非終端 subagent について、`wait_agent` timeout は polling boundary
 であり lifecycle deadline ではありません。各 blocking poll は
 `timeout_ms <= 60000` とし、全体の completion wait は required user-facing
-progress update と既存の new-state / revised-packet gate を各 poll 間で
-満たす bounded poll の反復として継続できます。timeout、empty update、
+progress update と parent の継続判断を各 poll 間で行う bounded poll の反復として
+継続できます。状態観測の結果を、次の状態観測の前提にはしません。timeout、empty update、
 応答遅延だけを理由に interrupt または cancellation を行ってはいけません。
 操作前に active runtime の status、message、interrupt、close capability を
 確認します。この runtime では非割込みの status 確認に `list_agents`、同一
@@ -259,10 +259,13 @@ workflow-monitor event、runtime / tool error、log / dashboard pointer、cause
 hypothesis を `workflow_monitoring.md` と closeout evidence に残し、現在の status
 と回収済み evidence を記録して parent decision point へ control を戻します。
 
-同種の wait または status probe を再度実行するには `new state evidence`
-または `explicit revised packet` を必須にします。scope、allowed paths、
-owner、review gate が変わる場合は explicit revised packet を記録した
-fresh follow-up wave へ切り替えます。timeout、empty status、final response
+同じ非終端 task の wait / status は新しい状態を得るための観測です。新着通知や
+packet 改訂がなくても、既存 runtime の間隔・回数・権限の制約内で次の bounded
+観測へ進めます。busy polling、無期限の同一失敗 command の反復、重複 dispatch
+は許可しません。失敗した変更操作の再実行には変わった根拠・入力が必要です。
+scope、allowed paths、owner、review gate の変更は明示した revised packet と
+既存の [context reuse / fresh-agent 条件](#runtime-contract-clauses) に従い、
+観測だけのために新しい task、packet、agent を作りません。timeout、empty status、final response
 未着は `termination_action=preserve_running_instance` と
 `resolution_decision=await_new_state|continue_disjoint_parent_work` に写像します。
 prior agent が非終端なら `write_scope=reserved` と
@@ -380,8 +383,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    `team_manifest.yaml` in handoff prompts; do not require
    `fresh_subagents_required: true` or `reuse_for_new_task: forbidden` as
    universal values.
-1. For every nonterminal subagent, treat a `wait_agent` timeout as a polling boundary rather than a lifecycle deadline. Each blocking poll must use `timeout_ms <= 60000`; an overall completion wait may span repeated bounded polls, with required user-facing progress updates and the existing new-state or revised-packet gate between polls. A timeout, empty update, or slow response alone never authorizes interruption or cancellation. Resolve the active runtime's status, message, interrupt, and close capabilities before acting: in this runtime, use `list_agents` for noninterrupting status inspection, `send_message` for same-task packet delivery, and `interrupt_agent` only after explicit user cancellation. Do not invent unavailable `send_input(interrupt=...)` or `close_agent` operations.
-1. If a bounded poll times out, returns empty status, or a run-local subagent has no final response at a wave decision point, record `subagent_no_return_investigation` with agent id, wave id, wait command and timeout, last known status, last workflow-monitor event, runtime or tool error, log / dashboard pointers, and cause hypothesis. Record the current status and recovered evidence, then return control to the parent decision point. Another wait or status probe requires `new state evidence` or `explicit revised packet`; scope, owner, allowed-path, or review-gate changes require a fresh follow-up wave from that packet. Map timeout, empty status, and absent final response to `termination_action=preserve_running_instance`, `resolution_decision=await_new_state|continue_disjoint_parent_work`, `write_scope=reserved`, and `overlapping_writer=blocked`.
+1. For every nonterminal subagent, treat a `wait_agent` timeout as a polling boundary rather than a lifecycle deadline. Each blocking poll must use `timeout_ms <= 60000`; an overall completion wait may span repeated bounded polls, with required user-facing progress updates and a parent continuation decision between polls. Apply [Subagent Return Investigation](#subagent-return-investigation); observing new state does not require already having that state or revising the task. A timeout, empty update, or slow response alone never authorizes interruption or cancellation. Resolve the active runtime's status, message, interrupt, and close capabilities before acting: in this runtime, use `list_agents` for noninterrupting status inspection, `send_message` for same-task packet delivery, and `interrupt_agent` only after explicit user cancellation. Do not invent unavailable `send_input(interrupt=...)` or `close_agent` operations.
+1. If a bounded poll times out, returns empty status, or a run-local subagent has no final response at a wave decision point, record `subagent_no_return_investigation` with agent id, wave id, wait command and timeout, last known status, last workflow-monitor event, runtime or tool error, log / dashboard pointers, and cause hypothesis. Record the current status and recovered evidence, then return control to the parent decision point. Another bounded wait or status observation follows [Subagent Return Investigation](#subagent-return-investigation), without requiring a new-state notification or revised packet. Changed scope, owner, allowed paths, or review gates require a revised packet and the existing context-reuse/fresh-agent decision, not an automatic replacement. Map timeout, empty status, and absent final response to `termination_action=preserve_running_instance`, `resolution_decision=await_new_state|continue_disjoint_parent_work`, `write_scope=reserved`, and `overlapping_writer=blocked`.
 1. Apply [Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) when using diagnostic results in a handoff; assigning write-capable work does not itself require a prediction or repair plan.
 1. Use an active runtime close operation only when that capability exists and the runtime reports `completed|errored|shutdown`, or after explicit user cancellation. When the active runtime provides no close operation, preserve the instance until a terminal status is observed and record `runtime_no_close_operation:terminal_status_observed` as `Subagent Lifecycle Evidence` in `closeout_gate.md`. A nonterminal no-return instance records `subagents_closed=no` and `lifecycle_gate=pending`.
 

@@ -2,12 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Derives dependency graph query, review, and context projections directly from tracked source manifests.
-# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and path semantics
-# upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
-# upstream implementation ./skill_projection_registry.py resolves generated skill-view owner paths
+# upstream design ../../../documents/design/dependency-manifest-design.md dependency manifest DSL and path semantics
+# upstream design ../../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
+# upstream implementation ../../agent/skills/skill_projection_registry.py resolves generated skill-view owner paths
 # downstream implementation ./graph_client.py exposes source-derived dependency query and context compatibility
 # downstream implementation ./check_dependency_graph.sh validates source-derived relations and writes review artifacts
-# downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections
+# downstream implementation ../../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections
+# downstream implementation ../../../tests/agent_tools/test_dependency_graph_cycles.py verifies snapshot and normal-path boundaries
 # @dependency-end
 """Pure tracked-source dependency projection without persisted graph runtime state."""
 
@@ -216,16 +217,11 @@ def is_text_source(path: str) -> bool:
 def resolve_source_path(
     root: Path,
     relative: str,
+    projections: Sequence[GeneratedProjection] | None = None,
 ) -> tuple[str, Path]:
     """Return repository-relative and physical source paths."""
     normalized = relative.replace("\\", "/").removeprefix("./")
-    generated_target = generated_skill_projection_target(root, normalized)
-    if generated_target is not None:
-        normalized = generated_target
-    elif normalized.startswith(GENERATED_SKILL_PREFIX) and normalized.endswith(
-        GENERATED_SKILL_SUFFIX
-    ):
-        raise SourceDependencyError(f"unknown generated skill view: {normalized}")
+    normalized = _normalize_resolved_target(root, normalized, projections)
     direct_path = root / normalized
     if direct_path.is_symlink():
         raise SourceDependencyError(f"source path is a symbolic link: {normalized}")
@@ -260,6 +256,11 @@ def _normalize_resolved_target(
     projections: Sequence[GeneratedProjection] | None = None,
 ) -> str:
     """Normalize one repository-relative target and reject stale generated views."""
+    if not (
+        normalized.startswith(GENERATED_SKILL_PREFIX)
+        and normalized.endswith(GENERATED_SKILL_SUFFIX)
+    ):
+        return normalized
     generated_target = (
         next(
             (
@@ -292,10 +293,10 @@ def resolve_dependency_targets(
     projections: Sequence[GeneratedProjection] | None = None,
 ) -> tuple[str, ...]:
     """Resolve one declaration to canonical paths, expanding registry-backed globs."""
-    if projections is None:
-        projections = generated_skill_projections(root)
     normalized = _relative_target(root, source, raw_target)
     if has_magic(normalized):
+        if projections is None:
+            projections = generated_skill_projections(root)
         matches = tuple(
             projection
             for projection in projections
@@ -317,10 +318,8 @@ def parse_manifest_document(
     projections: Sequence[GeneratedProjection] | None = None,
 ) -> SourceDependencyDocument:
     """Parse one canonical source document with the strict dependency DSL."""
-    canonical, source = resolve_source_path(root, relative)
+    canonical, source = resolve_source_path(root, relative, projections)
     text = _read_text(source, canonical)
-    if projections is None:
-        projections = generated_skill_projections(root)
     in_manifest = False
     saw_start = False
     saw_end = False
@@ -406,7 +405,7 @@ def dependency_documents(root: Path) -> tuple[SourceDependencyDocument, ...]:
         if canonical in canonical_sources:
             continue
         try:
-            canonical_relative, source = resolve_source_path(root, relative)
+            canonical_relative, source = resolve_source_path(root, relative, projections)
         except SourceDependencyError:
             # Git links, deleted paths, and unavailable generated views are not text sources.
             continue
