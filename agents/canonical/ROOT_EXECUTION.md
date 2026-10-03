@@ -35,13 +35,13 @@ native command or alternate transport only when the existing owner already defin
 it for that operation and its conditions hold; discovery or success alone does
 not authorize an alternative or establish equivalent validation.
 
-Use the actual failed command/result to locate and repair the cause at its owner
-first; follow directly related consumers for demonstrated in-scope defects, not
-unrelated cleanup. Retry through the same entrypoint only when reruns are allowed.
-If the route itself must change, update its owning configuration, implementation,
-and instructions as applicable within the authorized scope and existing Issue/PR
-workflow. Record the reason and validate the changed contract before claiming
-success. A failure or available tool is not authority to change the route.
+Incidental environment diagnosis serves the requested outcome, not a separate
+infrastructure repair project. A failed command does not make environment repair
+or exhaustive root-cause proof the next task. Repair only a demonstrated cause
+needed for the requested outcome and within scope/authority, at its owning
+configuration, implementation, and directly affected consumers. If the route must
+change, use that owner's existing Issue/PR workflow and validate the changed
+contract. A failure or available tool does not authorize a route change.
 
 The engineering reason is that bypassing the entrypoint can drop its configuration,
 permissions, resource limits, or failure semantics. Success on that bypass does
@@ -60,17 +60,27 @@ For a program execution request, use this order:
    checkout does not prove parent/worker execution equivalence. Keep a worker's
    access failure scoped to that worker, not a host outage or test assertion.
    Preserve observed parent success as counterevidence, not proof of worker repair.
-3. Use that failure to inspect only the route facts needed to locate the problem.
+3. Identify which required outcome the failure prevents before expanding diagnosis.
    A program assertion or test failure is not by itself an environment defect.
-   When isolation is implicated, compare relevant effective sandbox/approval,
-   groups/namespaces, and socket visibility/access without dumping credentials.
-   Trace the effective setting through the actual runtime version, launch, and
-   loaded configuration to its concrete owner; generated defaults alone do not
-   prove which override ran. Repair confirmed causes and affected generated
-   consumers at that owner, not through parent-only test substitution or weakened
-   permissions. Reuse existing evidence; this is not a startup probe checklist.
-   Stop diagnosis when the relevant decision is resolved; repair and any retry
-   still require the existing scope, authority, and rerun allowance.
+   Warnings, optional settings, and unavailable diagnostic tools are not new gates.
+   Do not turn a blocked verification command into a blocker of independent edits,
+   review, or authorized publication.
+4. Inspect only evidence that can change the next authorized action. Follow a
+   concrete hypothesis to the responsible code/configuration before an in-scope
+   repair; do not inventory the host or normalize every environment difference.
+   When isolation is implicated and the comparison can determine that action,
+   inspect the relevant effective sandbox/approval, groups/namespaces, or socket
+   access without credentials. Trace launch/configuration overrides only as needed;
+   generated defaults do not prove which setting ran. Do not substitute parent-only
+   tests for worker repair or weaken permissions. Retry the same entrypoint only
+   after a concrete changed premise and within existing rerun limits.
+5. End incidental diagnosis once the next action is decided, scope/access prevents
+   a remedy, or further inspection offers no actionable evidence. Reuse the observed
+   failure; do not repeat probes, retries, or environment-selection questions with
+   unchanged premises. Uncertainty about the full cause is not permission to keep
+   digging. Briefly record the failed action, evidence, affected verification, and
+   next owner/action in the existing task/Issue, then resume independent authorized
+   work without waiting for environment repair. Preserve unknown causes as unknown.
 
 Do not ask the user to select an environment or inject ad-hoc host/container,
 OS/WSL, CPU/GPU, runtime, or profile overrides. Missing optional selectors and
@@ -81,10 +91,9 @@ validation property, but an additional route probe does not prove it either.
 Keep required safety, permission, target-admission, integrity, and resource checks
 inside the selected entrypoint. This order does not bypass a known unsafe or
 unauthorized operation. Explicit diagnosis, installation, or environment-change
-requests use their own existing owner route; do not turn those procedures into
-ordinary execution prerequisites. When blocked, preserve the concrete failure,
-stop only affected commands, and continue independent authorized work. Never
-switch a required backend, weaken validation, or report an unrun command as passed.
+requests use their own existing owner route and scope; do not turn those procedures
+into ordinary execution prerequisites. Never switch a required backend, weaken
+validation, or report an unrun command as passed.
 
 ## Checkout and dependency identity
 
