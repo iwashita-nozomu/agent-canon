@@ -45,6 +45,40 @@ class EntrypointOwnerMapTest(unittest.TestCase):
     def test_repository_entrypoints_satisfy_contract(self) -> None:
         self.assertEqual(checker.run_checks(REPOSITORY_ROOT), [])
 
+    def test_accepts_source_overlay_without_common_or_phase_sections(self) -> None:
+        root = self._fixture()
+        (root / "AGENTS.md").write_text(
+            "@ROOT_AGENTS.md\n"
+            "# AgentCanon Repository Instructions\n\n"
+            "## Repository Role\n\n"
+            "Instructions for editing AgentCanon itself.\n\n"
+            "## Runtime Owner Map\n\n"
+            "| Responsibility | Canonical owner | Reader route |\n"
+            "| --- | --- | --- |\n"
+            "| unresolved source owner | "
+            "[source map](agents/canonical/SOURCE_ROUTING.md) | selected row only |\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(checker.run_checks(root), [])
+
+    def test_rejects_shared_or_phase_sections_in_source_overlay(self) -> None:
+        for heading in (
+            "Reader Map",
+            "Always-On Boundary",
+            "Task Entry",
+            "Validation Routing",
+            "Completion Readiness",
+        ):
+            with self.subTest(heading=heading):
+                root = self._fixture()
+                target = root / "AGENTS.md"
+                target.write_text(
+                    target.read_text(encoding="utf-8")
+                    + f"\n## {heading}\n\nDuplicated shared or phase policy.\n",
+                    encoding="utf-8",
+                )
+                self.assertIn("heading-sequence", self._rules(root))
+
     def test_rejects_renamed_operational_section(self) -> None:
         root = self._fixture()
         target = root / "AGENTS.md"
@@ -68,8 +102,8 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         root = self._fixture()
         target = root / "AGENTS.md"
         text = target.read_text(encoding="utf-8").replace(
-            "## Validation Routing\n",
-            "## Validation Routing\n\n```bash\npython3 tool.py\n```\n",
+            "## Repository Role\n",
+            "## Repository Role\n\n```bash\npython3 tool.py\n```\n",
             1,
         )
         target.write_text(text, encoding="utf-8")
@@ -79,7 +113,9 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         root = self._fixture()
         target = root / "AGENTS.md"
         text = target.read_text(encoding="utf-8").replace(
-            "## Task Entry\n", "## Task Entry\n\n1. Run the bootstrap command.\n", 1
+            "## Repository Role\n",
+            "## Repository Role\n\n1. Run the bootstrap command.\n",
+            1,
         )
         target.write_text(text, encoding="utf-8")
         self.assertIn("ordered-procedure", self._rules(root))

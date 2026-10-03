@@ -56,11 +56,25 @@ consumers; document reading stops at the facts needed for the current decision.
 
 ## Allowed information architecture
 
-Source AGENTS, common ROOT, and the optional source map use the same ordered headings:
-`Repository Role`, `Reader Map`, `Always-On Boundary`, `Runtime Owner Map`, `Task Entry`,
-`Validation Routing`. ROOT retains portable shared constraints. Source AGENTS starts
-with literal `@ROOT_AGENTS.md` and has one optional-map route for unknown owners.
-That directive is an explicit reading request, not a native include implementation.
+The ordered headings follow each surface's responsibility:
+
+| Surface | Ordered level-2 headings |
+| --- | --- |
+| source `AGENTS.md` | `Repository Role`, `Runtime Owner Map` |
+| common `ROOT_AGENTS.md` and optional `SOURCE_ROUTING.md` | `Repository Role`, `Reader Map`, `Always-On Boundary`, `Runtime Owner Map`, `Task Entry`, `Validation Routing` |
+
+Source AGENTS applies when editing AgentCanon itself. It starts with literal
+`@ROOT_AGENTS.md` and adds source scope and owner links, including one optional-map
+route for unknown owners. That directive is an explicit reading request, not a
+native include implementation. ROOT already supplies common reading, execution,
+and validation constraints; source AGENTS does not restate them under matching
+headings. Its Skill-path and formatter links identify AgentCanon-specific owners.
+
+`CODEX_WORKFLOW.md` owns phase selection and active auxiliary routes, not a second
+common policy or repository-entry description. Its `Reader Map` and
+`Completion Readiness` anchors remain available to existing callers. A changed
+context or observed failure selects its existing owner without copying that
+owner's procedure or ROOT's shared constraints into the phase map.
 
 The source map contains short conditional starting points. Known owners bypass it.
 Its required document rows use ordinary inline Markdown links to their canonical
@@ -71,8 +85,9 @@ Relative destinations are resolved from the containing document, not the product
 
 | Surface | Owns | Reading / distribution boundary |
 | --- | --- | --- |
-| source `AGENTS.md` | source identity, common-base read, conditional owner selection | no duplicate common policy or consumer configuration |
+| source `AGENTS.md` | AgentCanon editing scope, common-base read, source owner links | read for AgentCanon changes; excluded from consumer composition and common/phase policy |
 | optional `SOURCE_ROUTING.md` | source-specific owner and starting section | only the matching unresolved decision |
+| `CODEX_WORKFLOW.md` | Codex phase selection and active auxiliary routes | selected task phase; shared constraints remain in ROOT |
 | `ROOT_AGENTS.md` | portable common behavior and consumer owner roles | self-contained without an AgentCanon checkout |
 | consumer-specific fragment | product, build/test, placement and local instructions | maintained by the consumer |
 | generated consumer `AGENTS.md` | exact ROOT plus consumer-specific text | one regular tracked file, no live source dependency |
@@ -101,10 +116,12 @@ Runtime Contract Clauses. Its existing named anchors remain routing surfaces.
 
 ## Verification contract
 
-`check_entrypoint_owner_map.py` retains its title, ordered heading, procedure-syntax,
-required-row, optional-map, and operational-marker ownership checks. It also verifies:
+`check_entrypoint_owner_map.py` retains its title, per-surface ordered heading,
+procedure-syntax, required-row, optional-map, and operational-marker ownership
+checks. It also verifies:
 
-- source AGENTS begins with the explicit common-base directive;
+- source AGENTS begins with the explicit common-base directive and accepts only
+  its source-scope and owner-map headings, rather than requiring ROOT's structure;
 - required document rows actually link to their canonical destinations, rather than
   merely displaying those names or sending the reader to a different file;
 - those required document targets exist.
@@ -112,8 +129,9 @@ required-row, optional-map, and operational-marker ownership checks. It also ver
 Only the finite required owner-row grammar is parsed here. Existing docs tools own
 general Markdown syntax, path/anchor checks, and broader document references. The
 checker does not infer prose activation, dynamically execute routes, or claim actual
-agent reading. Existing focused tests exercise missing/moved directives, wrong or
-unlinked destinations, missing targets, equivalent relative paths, and prior grammar
+agent reading. Existing focused tests exercise the minimal source overlay, rejection
+of shared/phase sections added to it, missing/moved directives, wrong or unlinked
+destinations, missing targets, equivalent relative paths, and prior grammar
 rejections. `test_point_of_use_skill_routes.py` uses the production catalog loader
 and candidate projector to check the three repaired conditional handoffs.
 
