@@ -173,6 +173,37 @@ persisted graph status/build preparation and exits before source review. It is
 mutually exclusive with `--header-scan-only`, preventing one invocation from
 presenting optional graph preparation as dependency correctness evidence.
 
+### Normalized cycle review and snapshot reuse (Issue #1306)
+
+The existing source parser, review TSV exporter, and shell checker already own
+this work. Reuse them rather than adding a parser, database, registry, wrapper,
+or mandatory gate. Direction spelling is normalized only for cycle ordering:
+prerequisite to consumer, with reciprocal declarations coalesced. SCCs must be
+computed before selected/changed filtering because an unchanged node can close
+a cycle. Scope filters complete components by node intersection; an empty scope
+is not a full review. Incoming-only isolation and reverse lookup likewise use
+the complete topology.
+
+The former direction-specific DFS in `check_dependency_graph.sh` cannot meet
+that contract: it partitions edges and stops at one back edge. Replace that
+local algorithm with iterative SCC traversal over the existing TSV. The
+recursive SCC helper in `prose_reasoning_graph.py` owns different prose-edge
+records and importing that document-analysis module would introduce an unrelated
+dependency. Standard-library topological sorting reports a cycle, not all SCCs.
+Two iterative traversals provide O(V + E) graph work without a recursion-depth
+limit; deterministic output adds ordering costs. Do not report sorted component
+members as though they were a traversal path.
+
+`dependency_documents` acquires the existing immutable projection tuple once
+per inventory scan and passes it through source resolution and manifest parsing.
+An explicitly supplied empty tuple is authoritative, not a request to reload.
+Ordinary source paths and non-generated, non-glob targets resolve without skill
+catalog reads. Generated views still require a valid binding and available
+canonical source; full inventory discovery still validates the catalog once.
+There is no process-global cache that could conceal subsequent catalog changes.
+Root containment, missing-source, and symbolic-link rejection remain in the
+existing path owner.
+
 ## Compatibility Boundary
 
 Existing output schemas and typed fact objects are retained where practical so
@@ -189,7 +220,7 @@ combined with the authority correction.
 - removing the Rust graph CLI, SQLite schema, or graph visualization;
 - replacing dependency headers with another manifest or mirror database;
 - making malformed source warnings non-blocking;
-- changing dependency direction, kind, cycle, or bidirectional semantics;
+- changing the declaration DSL, registered kinds, or bidirectional policy;
 - changing runtime-event archive semantics;
 - adding an alternate fallback parser for persisted graph consumers;
 - renaming every graph-related symbol in the same change.

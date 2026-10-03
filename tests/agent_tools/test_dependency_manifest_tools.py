@@ -2729,7 +2729,7 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("cycle includes", result.stdout)
-            self.assertIn("DEPENDENCY_GRAPH_UPSTREAM_CYCLES=report_only", result.stdout)
+            self.assertIn("DEPENDENCY_GRAPH_CYCLES=report_only", result.stdout)
             self.assertIn("DEPENDENCY_GRAPH=pass", result.stdout)
 
     def test_repo_review_runs_all_dependency_tools(self) -> None:
@@ -2870,7 +2870,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_GRAPH_UPSTREAM_CYCLES=report_only", result.stdout)
+            self.assertIn("DEPENDENCY_GRAPH_CYCLES=report_only", result.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
     def test_repo_review_skips_dependency_review_artifacts(self) -> None:
