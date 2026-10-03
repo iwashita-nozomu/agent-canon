@@ -36,10 +36,13 @@ upstream design README.md durable document index
 公開可能な repository 固有の失敗は `documents/notes/failures/<topic>.md` に記録します。
 この repository では既存の failures area をトピック別メモとして使います。consumer が
 `documents/memo/` 等を既に所有する場合は、その配置規約に従います。
-private な再利用知識は [private log owner](../runtime/private-feedback-knowledge.md) の
-`agent-canon-log` に保存します。公開範囲に応じて一つの保存先を選びます。
+private な再利用知識は [agent-learning の Operating Route](../../agents/skills/agent-learning.md#operating-route)
+から [private log owner](../runtime/private-feedback-knowledge.md) の `agent-canon-log` に保存します。
+公開範囲に応じて一つの保存先を選びます。
 
-既存 topic を検索してから追記し、各失敗について次を簡潔に残します。
+既存 topic を検索してから追記します。新しい公開 topic を作る場合は
+[Failure Note Template](../notes/failures/FAILURE_NOTE_TEMPLATE.md) を使います。
+各失敗について次を簡潔に残します。
 
 | 項目 | 内容 |
 | --- | --- |
@@ -63,7 +66,7 @@ Issue / PR、設計、handoff には同じ topic の locator を載せます。
 ### Retrieve Before Deciding
 
 調査・設計・実装で候補を採用または却下する前に、要求、候補名、エラー、関連 owner
-から既存 topic を検索します。private 知識は [agent-learning](../../agents/skills/agent-learning.md)
+から既存 topic を検索します。private 知識は [agent-learning の Operating Route](../../agents/skills/agent-learning.md#operating-route)
 の `agent-canon k search` と `k read` を使います。
 
 見つかった記録の入力、source revision、設定、保証を現在の条件と照合します。

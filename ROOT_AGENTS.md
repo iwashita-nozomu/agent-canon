@@ -94,7 +94,11 @@ design. Investigate changed or missing decision premises to resolution.
 
 Record failed verification promptly in the owning topic memo (such as the
 repository's documents/memo area or existing notes equivalent) or authorized
-AgentCanon log. Include the goal/candidate, source revision and relevant conditions,
+AgentCanon log. At a failed check or before a related adoption/rejection decision,
+use the capture or retrieval owner selected by the
+[repository instructions](AGENTS.md#reader-map). Reuse already-read instructions
+and a resolved owner; read the action-specific section when it becomes relevant.
+Include the goal/candidate, source revision and relevant conditions,
 reproducible command or inspection, expected and actual result, evidence locator,
 verified conclusion, and conditions for reuse or rechecking. Keep observed failure
 and established cause distinct; investigate any cause needed for the decision.
@@ -185,6 +189,7 @@ and continue independent work toward the required outcome.
 | product implementation and behavior | consumer source and design owners |
 | build, tests, and runtime environment | consumer build and test owners |
 | repository structure and file placement | consumer structure owner |
+| failed verification and reuse | repository topic-note owner or authorized AgentCanon log owner |
 | root instruction extension | consumer-specific section in this file |
 | AgentCanon source maintenance | selected AgentCanon development checkout |
 

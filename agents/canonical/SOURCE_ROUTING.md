@@ -5,6 +5,7 @@ contract agent-runtime
 responsibility Routes standalone AgentCanon source-tree readers to canonical owners without re-owning task procedures.
 upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint grammar and responsibility boundary
 upstream design ../../documents/conventions/software-engineering-principles.md contract-complete engineering decision policy
+upstream design ../../documents/operations/notes-lifecycle.md failed verification capture, topic lookup, and reuse owner
 upstream design ../../agents/internal-routines/chatgpt-codex-routing.md request modality and Codex handoff owner
 upstream design ../../agents/skills/comprehensive-development.md cross-surface implementation-basis consumer
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
@@ -31,6 +32,7 @@ consumer instructions. Known owners and unchanged decisions bypass this index.
 | ChatGPT conversation closure vs Codex workspace execution | [agents/internal-routines/chatgpt-codex-routing.md](../../agents/internal-routines/chatgpt-codex-routing.md) |
 | request interpretation and task transport after Codex admission | [agents/skills/agent-orchestration.md](../../agents/skills/agent-orchestration.md), [agents/skills/codex-task-workflow.md](../../agents/skills/codex-task-workflow.md), [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) |
 | contract-complete implementation and engineering basis | [agents/canonical/ROOT_IMPLEMENTATION.md](../../agents/canonical/ROOT_IMPLEMENTATION.md) (selected decision section), [documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md), [agents/skills/comprehensive-development.md](../../agents/skills/comprehensive-development.md), task-specific implementation Skills |
+| failed verification and reuse | [Notes Lifecycle: Failed Verification Record](../../documents/operations/notes-lifecycle.md#failed-verification-record) immediately after a failed check; [Retrieve Before Deciding](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding) before a related adoption/rejection decision. Use the selected section to reach the public topic memo or private log owner. |
 | mathematical, algorithmic, and numerical obligation ownership | [documents/design/semantic-responsibility-contract.md](../../documents/design/semantic-responsibility-contract.md), [documents/design/algorithm-implementation-boundary.md](../../documents/design/algorithm-implementation-boundary.md), selected proof / optimization Skill |
 | configured execution and environment diagnosis | [agents/canonical/ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis](../../agents/canonical/ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis) |
 | design-to-implementation correspondence | [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) |
