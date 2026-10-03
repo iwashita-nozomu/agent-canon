@@ -110,7 +110,11 @@ including required caller conversions and support. Justify the governing laws
 and representation correspondence; do not merely compress or relocate code,
 force deletion quotas, or weaken required behavior, safety, or performance.
 Establish semantics and migration before deleting; replacement removes obsolete code
-and support while migrating necessary consumers in the same change.
+and support while migrating necessary consumers in the same change. Recover
+committed source from Git history and keep the maintained tree for the current
+required implementation. Remove superseded code, commented-out implementations,
+backup copies, and speculative rollback paths with their unnecessary support.
+Preserve uncommitted/untracked work and user/runtime data through their owners.
 Retain wrappers or dual paths only for a required compatibility contract. Keep
 caller orchestration separate from reusable-library responsibility. Add mechanisms,
 dependencies, exact pins, or guards only for an evidenced current need; preserve

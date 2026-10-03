@@ -101,10 +101,12 @@ RC-09 は、置換・統合で不要になる旧実装・旧入口の削除と�
 重複とせず、独自責務や未確認の意味は不足として残します。未使用コードは到達性と副作用で
 別に判断し、file 全体を削除する場合は全寄与の不要性を確認します。
 
-旧実装専用の helper、type、import、設定・flag、build target、dependency、fixture、docs も
-不要になれば同じ修正で削除・更新します。必要な契約を検証する test は新しい境界へ移し、
-検証を消して成功にしません。移動・改名・wrapper 化、無効化、コメントアウト、復旧用コピーは
-削除の代替ではありません。公開互換契約が必要な入口は廃止対象と区別して内部を正本へ接続し、
+コミット済みの旧実装は必要時に Git 履歴から復元できるため、作業ツリーには
+現在必要な実装を残します。不要な旧コードと専用の helper、type、import、設定・flag、
+build target、dependency、fixture、docs は同じ修正で削除・更新します。
+必要な保証の test と利用側は正本へ移行します。移動・改名・wrapper 化、無効化、
+コメントアウト、復旧用コピーや予防的な rollback 分岐を旧コードの保存先にしません。
+公開互換契約が必要な入口はその契約を示して正本へ接続します。
 利用中や小さい diff だけを旧実装維持の契約へ昇格させません。
 
 まず正本側を修正し、既存 LSP / dependency-analysis で実際の参照を辿って、契約・接続が
@@ -179,10 +181,12 @@ RC-09 の置換・廃止では、正本、不要な旧コードの除去、必�
 出力ではなく、`.codex/config.toml` の catalog skill id に対する entry set、source order、
 path、enabled の readback input とします。
 
-rollback は `rollback` field に対象 tree/commit、保持する source identity、復元する
-generated projection、再検証 command を記録します（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。統合前に candidate の source identity
-と tree を保存し、readback 前の削除や別 owner の状態変更を行わないことで復元可能性を
-保ちます（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。
+rollback は既存の `rollback` field に復元元の Git tree/commit と対象 path、再生成する
+projection、再検証 command を記録します。コミット済み source の保持先は Git 履歴です。
+別コピー、退避 branch/worktree、復元リハーサルを通常の削除の前提にしません。
+Git に未収録の変更・untracked の作業とユーザー/runtime データは、既存 Git/storage owner
+の手順で保護します。実際に復元が必要になった時点で対象 revision/path を選び、後続変更と
+無関係な状態を保存して適用し、変更契約を再検証します。
 
 ## Design-To-Implementation Trace
 
