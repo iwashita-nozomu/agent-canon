@@ -26,6 +26,13 @@ file focused on a responsibility and its activation condition; route independent
 needed details to their owner at the point of use, not a startup reading list.
 Keep auto-loaded instructions short and shared constraints self-contained.
 
+Order actions by the inputs they actually require, not by link direction or
+document order. Never require an observation, generated result, or later approval
+before the authorized action that produces it. Bounded observation may obtain
+new evidence without a revised task; this does not authorize repeating a failed
+mutation without changed premises. Preserve safety checks and stop only actions
+whose actual prerequisites are unresolved.
+
 ## Always-On Boundary
 
 Stay within the authorized task and preserve unknown user/Git state. Preservation

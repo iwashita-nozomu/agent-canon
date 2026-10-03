@@ -15,9 +15,9 @@ downstream design ../../documents/runtime/runtime-log-archive.md eval archive ow
 
 Use this skill when a task changes AgentCanon source, its shared tool runtime,
 bootstrap image, skills, workflow contracts, or the parent-to-AgentCanon update
-route. The goal is one source repository, one reviewed source change, one
-published AgentCanon revision, and a parent that consumes that revision without
-vendoring or copying AgentCanon internals.
+route. The source deliverable is one reviewed change and its published PR.
+When parent adoption is also requested, the parent consumes the selected revision
+through its own update contract, without vendoring or copying AgentCanon internals.
 
 Issue ownership must be explicit. `iwashita-nozomu/agent-canon#841` owns local
 bootstrap, one shared tool container, source side-effect isolation, skill
@@ -33,8 +33,9 @@ the canonical lifecycle. For a Template or derived parent, use
 parent/same-repository branch and `independent-clone` for a dependency
 repository. Do not restore a submodule, vendor checkout, root projection,
 source symlink, `notes/`, or AgentCanon test/eval directory in the parent. The
-prepared checkout is disposable and is removed only after branch, PR, main
-readback, and archive/evidence obligations are complete.
+prepared checkout is task-owned. Remove it once no active work needs it and
+the selected publication/evidence obligations preserve its state; do not retain
+it solely to wait for an unrequested merge or runtime update.
 
 Keep the source checkout clean at the start. Preserve unrelated dirty state;
 do not reset, clean, or delete an unknown path. Record the source remote,
@@ -231,19 +232,20 @@ archive state into the AgentCanon source checkout.
    remove task-created Docker resources at closeout and never run
    `docker system prune`.
 9. Commit only the Issue-owned write set, push the topic branch, and open or
-   update the AgentCanon PR through `$pr-processing`. Its body states what
-   changed, why, scope, validation, cleanup, and remaining limitations; add a
-   concise evidence comment to the same qualified Issue. `$pr-processing`
-   owns review routing and CI; merge only after the required review and CI are
-   green.
-10. After merge, fetch AgentCanon `main`, verify that the fetched `main`
-   contains the merge commit, and read the merge commit and resulting `main`
-   tree back locally. Only then update a parent revision. A parent must not
-   consume an unmerged branch or restore a vendor/submodule route.
+   update the AgentCanon PR through `$pr-processing`. Record rationale, scope,
+   validation, cleanup, limitations, and PR identity on both the PR and Issue.
+   A PR-delivery request ends with this readback and handoff; it does not
+   authorize merge, parent adoption, or runtime deployment.
+10. Only when merge or parent adoption is requested, use `$pr-processing` for
+   the required review/CI and authorized merge. After merge, verify the merge
+   commit in fetched `main` and its tree before adopting that main revision.
+   These post-merge checks are not prerequisites for opening the PR. Existing
+   consumer-owned PR-pin validation follows [dependency-module-change](dependency-module-change.md);
+   it is not main adoption or permission to restore a vendor/submodule route.
 
 ## Validation and closeout
 
-At minimum, run:
+For bootstrap/runtime implementation changes, select the applicable checks:
 
 ```bash
 git diff --check
@@ -259,12 +261,14 @@ For documentation-only changes, run the Markdown link/header checks and
 AgentCanon tool runtime, host adapter, archive owner, or project execution
 environment.
 
-Before closeout, verify:
+For PR handoff, verify the published source head, changed paths, selected
+validation, Issue/PR references, and preservation of unrelated state. Record
+missing validation as unverified, not as a passed check or an implicit request
+to rebuild the environment. Merge-commit/main readback applies only after an
+authorized merge.
 
-- source branch is clean except intended commit and its remote is pushed;
-- repository-qualified Issue identity, source branch, PR, merge commit, and
-  local `main` readback are traceable; no exact phrase or Issue number in the
-  commit message is required;
+Only when the corresponding runtime/lifecycle operation is in scope, verify:
+
 - new bootstrap session uses the explicit control/runtime roots;
 - only one owned resident container exists and its limits/readback match;
 - source, parent, foreign global Codex entries, and pre-existing Docker
