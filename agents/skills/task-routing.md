@@ -28,7 +28,7 @@ SELECTED_SKILLS=<ordered skills that should execute now>
 DEFERRED_CANDIDATES=<candidate skills + activation evidence still required>
 ```
 
-`SELECTED_SKILLS` is the one source of truth for execution. Deferred candidates do not execute until their evidence becomes true.
+`SELECTED_SKILLS` is the one source of truth for execution. Deferred candidates do not execute until their evidence becomes true. Selecting a Skill does not activate every branch inside it.
 
 LCPの `DEFERRED_SKILLS` 境界は [`agent-orchestration.md#Local Capability Priority`](./agent-orchestration.md#local-capability-priority) を参照します。ここではskill candidateの状態だけを投影します。
 
@@ -44,10 +44,11 @@ Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only
 ## In-flight skill reads
 
 呼び出し元スキルの操作中に条件が成立したら、その条件に依存する判断・編集・再実行の
-前に、本文でリンクされた関連スキルを読みます。初回に全候補・リンク先を読みません。
-未成立の条件には進まず、既読で有効な内容は再利用します。選択済みスキルの読了と
-必要な委譲先の範囲は [Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace)
-に従い、新しい読込台帳や承認段階は作りません。
+直前に、該当する節だけを読みます。同一ファイル内・入れ子の分岐と、リンクされた
+関連スキルのいずれにも [Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace)
+を適用します。初回に全候補・全分岐・リンク先を読まず、共通制約と現在必要な分岐の
+読了だけで進めます。後続stageや回復手順は必要になった時点で読み、既読で有効な内容は
+再利用します。新しい読込台帳や承認段階は作りません。
 
 このスキルから既存候補へ渡す判断点は次のとおりです。個別作業の条件はその呼び出し元に
 置き、候補辞書や選択状態の第二の正本にしません。
@@ -70,6 +71,6 @@ Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only
 Routing chooses owners; selected skills own their execution and validation. The full LCP policy is owned by [`agent-orchestration.md#Local Capability Priority`](./agent-orchestration.md#local-capability-priority). `DEFERRED_SKILLS` remains a skill candidate projection, not operation disposition.
 Before source reading, the selected route is consumed by
 [`agent-orchestration.md#Owner-First Read Trace`](./agent-orchestration.md#owner-first-read-trace):
-the selected Skill body, and only the upstream owner to which it delegates an
-unresolved decision, must resolve before a `downstream implementation` edge is
-opened.
+the selected Skill's current sections, and only the upstream sections to which
+they delegate an unresolved current decision, must resolve before a
+`downstream implementation` edge is opened.
