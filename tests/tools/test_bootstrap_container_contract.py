@@ -267,6 +267,7 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "tree",
         "clangd-language-server",
         "rust-toolchain",
+        "python3-pytest",
     }
     assert not ids & {"github-cli", "codex-cli"}
     assert {record["method"] for record in records} <= {
@@ -289,7 +290,7 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     assert jq["verification"]["executable"] == "jq"
     assert tree["verification"]["executable"] == "tree"
     rust = next(record for record in records if record["id"] == "rust-toolchain")
-    assert rust["components"] == ["rust-src", "rust-analyzer"]
+    assert rust["components"] == ["rust-src", "rust-analyzer", "rustfmt", "clippy"]
     assert rust["verification"]["executable"] == "rustc"
 
 

@@ -11,7 +11,12 @@
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "tools" / "validation" / "ci" / "runners" / "run_standalone_static_gate_unit.sh"
@@ -24,7 +29,7 @@ SOURCE_REGRESSION_MODULES = (
     "tests.agent_tools.test_check_design_doc_claims",
     "tests.agent_tools.test_tool_drift",
     "tests.agent_tools.test_vector_search",
-    "tests.agent_tools.test_dependency_manifest_tools",
+    "tests/agent_tools/test_dependency_*.py",
 )
 
 
@@ -88,3 +93,82 @@ def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots(
     assert "AGENT_CANON_TARGET_ROOT:?AGENT_CANON_TARGET_ROOT is required" in source
     assert 'AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"' in source
     assert "control_parent_root_required" not in source
+
+
+@pytest.mark.parametrize(
+    ("producer_status", "checker_status", "smoke_status", "expected_names"),
+    [
+        (0, 0, 0, ["producer", "checker", "smoke"]),
+        (7, 0, 0, ["producer"]),
+        (0, 9, 0, ["producer", "checker"]),
+        (0, 0, 11, ["producer", "checker", "smoke"]),
+    ],
+)
+def test_eval_owns_bounded_archive_and_preserves_failure_cleanup(
+    tmp_path: Path,
+    producer_status: int,
+    checker_status: int,
+    smoke_status: int,
+    expected_names: list[str],
+) -> None:
+    """Inherited private logging is not the static eval's synthetic archive."""
+    source = tmp_path / "source"
+    runtime = tmp_path / "runtime with spaces"
+    runtime.mkdir()
+    calls = tmp_path / "calls.jsonl"
+    paths = (
+        ("eval/producers/run_accumulated_agent_evals.py", "producer", producer_status),
+        ("eval/checkers/eval_accumulation_check.py", "checker", checker_status),
+        ("eval/checkers/smoke_test_research_perspective_pack.py", "smoke", smoke_status),
+    )
+    for relative, name, status in paths:
+        script = source / relative
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text(
+            "import json, os\n"
+            "from pathlib import Path\n"
+            "with Path(os.environ['CALLS']).open('a') as stream:\n"
+            f"    stream.write(json.dumps([{name!r}, "
+            "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR')]) + '\\n')\n"
+            f"raise SystemExit({status})\n",
+            encoding="utf-8",
+        )
+    text = RUNNER.read_text(encoding="utf-8")
+    body = "run_eval() (" + text.split("run_eval() (", 1)[1].split(
+        "\n)\n\nrun_workflow_container()", 1
+    )[0] + "\n)\n"
+    # Boundary double: the real resolver remains owned by runtime_artifacts.py.
+    boundary = r"""
+runtime_boundary_path() {
+  printf '%s\n' "$1" >> "$BOUNDARY_CALLS"
+  case "$1" in
+    "${AGENT_CANON_STATIC_RUNTIME_ROOT}/"*) printf '%s\n' "$1" ;;
+    *) return 42 ;;
+  esac
+}
+"""
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", boundary + body + "run_eval"],
+        cwd=source,
+        env={
+            **os.environ,
+            "ROOT": str(source),
+            "RUNTIME_ROOT": str(source),
+            "AGENT_CANON_STATIC_RUNTIME_ROOT": str(runtime),
+            "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
+            "CALLS": str(calls),
+            "BOUNDARY_CALLS": str(tmp_path / "boundary-calls"),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == (producer_status or checker_status or smoke_status), (
+        result.stdout + result.stderr
+    )
+    records = [json.loads(line) for line in calls.read_text().splitlines()]
+    assert [record[0] for record in records] == expected_names
+    archive = str(runtime / "archive/agent-canon-log")
+    assert (tmp_path / "boundary-calls").read_text().splitlines() == [archive]
+    assert all(value == archive for name, value in records if name != "smoke")
+    assert not (runtime / "eval/agent-canon-pr-gate").exists()
