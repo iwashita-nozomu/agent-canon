@@ -4,6 +4,7 @@
 # contract test
 # responsibility Verifies native debug packages and unchanged resident isolation.
 # upstream design ../../documents/design/cpp-debugging.md diagnostic tool boundary
+# upstream design ../../documents/design/runtime-debugging.md system diagnostic provisioning
 # upstream implementation ../../bootstrap/container/image/Dockerfile tool image
 # @dependency-end
 
@@ -21,11 +22,11 @@ class CppDebugToolsTests(unittest.TestCase):
     """Test the existing image transaction, not an alternative installer."""
 
     def test_native_tools_use_unpinned_apt_packages(self) -> None:
-        """The image installs both utilities through its existing transaction."""
+        """The image installs diagnostic utilities in its existing transaction."""
         text = DOCKERFILE.read_text(encoding="utf-8")
         install = text.split("apt-get install", 1)[1].split(";", 1)[0]
         arguments = shlex.split(install.replace("\\\n", " "))
-        for package in ("gdb", "valgrind"):
+        for package in ("gdb", "valgrind", "strace", "lsof", "procps"):
             with self.subTest(package=package):
                 self.assertIn(package, arguments)
         self.assertEqual(text.count("apt-get update"), 1)
