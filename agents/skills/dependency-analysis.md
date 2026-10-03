@@ -18,12 +18,12 @@ upstream implementation ../../tools/validation/semantic/documents/check_design_d
 
 - Purpose: collect dependency-header, graph, code-dependency, and
   change-impact evidence before choosing or validating edit scope.
-- Section path: Purpose and Use When explain the trigger; Required Commands
-  lists the operational tool surface; Interpretation, Change Impact Packet, and
-  Core References define how outputs feed planning and handoff. For cause repair,
-  follow Root-Cause Repair Scope: fix the cause, then trace and repair LSP-linked issues.
-- Use when: dependency manifests, changed-file gates, graph edges, reverse
-  edges, design-claim evidence, or repair-planning packets are needed.
+- Section path: for every code change, start with LSP-First Recursive Context
+  before editing; Cause Investigation Surface and Root-Cause Repair Scope own
+  cause repair. Required Commands, Interpretation, and Change Impact Packet
+  supply the selected dependency evidence and handoff details.
+- Use when: preparing any code edit, or when dependency manifests, changed-file
+  gates, graph edges, reverse edges, design claims, or repair packets are needed.
 - Boundary: code dependency evidence and dependency-header evidence remain
   separate until summarized in a structured Change Impact Packet.
   Repository-wide dependency graph projection and rendering is owned by
@@ -33,10 +33,11 @@ upstream implementation ../../tools/validation/semantic/documents/check_design_d
 ## Purpose
 
 依存 manifest の header / scan / format / graph tool と、実コード依存 scanner を目的別に起動します。
-code dependency と header dependency は別 evidence として扱い、修正箇所選定や subagent handoff では両方を structured `Change Impact Packet` manifest に統合します。大量の依存情報そのものは artifact path に置き、LLM-visible context には planning に必要な selected excerpt、summary、artifact path を載せます。
+code dependency と header dependency は別 evidence として扱い、修正箇所選定や subagent handoff では両方を structured `Change Impact Packet` manifest に統合します。大量の依存情報そのものは artifact path に置き、LLM-visible context には判断に必要なコード本文・契約の selected excerpt、summary、source locator と artifact path を載せます。
 
 ## Use When
 
+- コードを追加・修正・削除する前に、LSP で関連箇所を再帰的にたどり、本文・契約・tests を作業コンテキストへ取り込む
 - 依存 header / manifest / graph を確認したい
 - `@dependency-start` / `@dependency-end` block を追加・修正した
 - dependency edge、reverse edge、kind、cycle の問題を診断したい
@@ -91,6 +92,9 @@ bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
 
 Responsibility-first search-to-edit-scope expansion:
 
+For code edits, use the LSP traversal below before choosing edit scope. Search
+and header-graph results supplement its inspected code context.
+
 ```bash
 printf '%s\n' "search purpose or user request" > reports/search_query.txt
 agent-canon semantic-index context-pack \
@@ -130,6 +134,48 @@ bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --design-doc-claim-path documents/design/<topic>.md
 ```
 
+## LSP-First Recursive Context
+
+Activate this procedure before the first code edit, including direct cause fixes,
+renames, deletions, private helpers, and test changes. Its purpose is to establish
+the mechanism and complete affected contract before selecting a correction.
+Use the existing [LSP command owner](../../documents/tools/lsp_code_analysis.md#recursive-context-collection)
+through the repository's configured execution route. Reuse already inspected LSP
+context while its source and query premises remain current.
+
+1. Seed the current source snapshot with the requested symbols and their owning
+   files. For a new symbol, start from the existing owner, extension point, callers,
+   and relevant tests. Invoke LSP first; use its available symbol navigation to
+   resolve seeds and bound any necessary text search to missing source locations.
+2. Follow supported definitions, references, and incoming/outgoing calls, plus type
+   and implementation relations exposed by the selected LSP surface. Read the
+   reached bodies, governing types/contracts, and affected tests. Inspect source
+   for relations the tool cannot expose, keeping that evidence distinct from LSP.
+3. Recursively expand each newly relevant symbol with the same queries and source
+   reading. Keep a worklist and deduplicate by repository, source snapshot, path,
+   and symbol/range so cycles reuse inspected context. Continue in batches until
+   each relevant frontier is inspected or an inspected unchanged contract explains
+   why the change cannot propagate across it. Batch/token limits organize delivery;
+   continue outstanding work rather than declaring a fixed depth complete.
+4. Put decisive code and contract excerpts into working context with revision,
+   path, symbol, line range, relation to the target, and the behavior/obligation
+   they establish. Retain the relevant tests and unresolved questions alongside
+   them. Artifact paths, symbol names, and graph edges locate evidence; the actual
+   inspected content and its meaning support the edit and any handoff.
+5. Select the complete correction from that context, edit the owning mechanism
+   and affected uses, then refresh changed symbols and their relevant relations.
+   Expand newly affected paths before further edits and run targeted validation.
+   Reuse unchanged context and load instruction documents at their own activation
+   points; this recursion follows relevant code semantics.
+
+Record query scope and actual capability/status. A successful empty query supports
+only that scope; unsupported, failed, partial, or truncated results leave explicit
+gaps. Follow the existing owner for the next required investigation or verification,
+record failed attempts in the owning topic memo or authorized log, and continue
+independent authorized work. Preserve the fixed execution route and distinguish
+source/test evidence from LSP evidence. Close required gaps before claiming verified
+coverage. Use the existing task/Change Impact Packet; this adds no schema or checker.
+
 ## Cause Investigation Surface
 
 Dependency evidence is used to investigate the cause before it is used to
@@ -159,10 +205,11 @@ invent one culprit merely to satisfy the goal. An unresolved location or causal
 chain remains `cause_unproven`: retain the candidates, missing evidence, and
 next discriminating check instead of declaring the search complete.
 
-Fix the identified causal location next; identification is not a separate
-stopping point. Then follow [Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection)
-to trace related code with LSP and repair problems found there. Use the existing
-note and handoff; do not add a schema, checker, or report.
+Use [LSP-First Recursive Context](#lsp-first-recursive-context) while establishing
+the cause and affected contract, then follow
+[Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) to correct
+the owner and related defects. A direct cause proof reuses that context; it still
+precedes the first code edit. Keep evidence in the existing note and handoff.
 
 For an activated packet, record a compact cause-evidence note before the
 action. It has no fixed schema or candidate count: expand the
@@ -200,9 +247,9 @@ could change the owner, fix surface, or validation is disconfirmed or bounded.
 A static type/schema/parser/compiler/state invariant may establish a single
 cause; record its concrete location and why the narrower traversal is complete.
 Do not turn a symptom into a fix merely because its file appears in the search
-result. Derive the immediate owning edit and its targeted validation from the
-supported cause. Do not require a full related-surface survey before that edit;
-trace related code after the cause is fixed, as specified below.
+result. Derive the complete owning correction and targeted validation from the
+supported cause and pre-edit LSP context. Reuse already inspected relations;
+expand the remaining relevant frontier before editing.
 
 The cause-to-action sequence is ordered, not a list of independent checks:
 
@@ -216,56 +263,47 @@ The cause-to-action sequence is ordered, not a list of independent checks:
    owning mechanism, consumers, side effects, cleanup, and sibling surfaces.
 4. Compare only alternatives that could change that decision and record each
    as `disconfirmed`, `bounded`, or selected with its supporting evidence.
-5. Fix the concrete causal location using the supported mechanism, then follow
-   the LSP tracing and repair sequence below. An unresolved cause stays analysis
-   work; it does not become a symptom-level action or a completed cause search.
+5. Complete the relevant pre-edit LSP context, including for a direct cause
+   proof, then correct the causal owner and affected uses through the sequence
+   below. An unresolved cause remains investigation work until the mechanism
+   and required correction are established.
 
 ## Root-Cause Repair Scope After Cause Selection
 
-Use this order: identify the cause, fix that location, trace related code with
-LSP, and fix problems found through those relations. Do not separate diagnosis
-from repair or select a broader repair surface before fixing the known cause.
+Use this order: LSP-first recursive context and cause identification, complete
+owning correction, refreshed relation context, and targeted validation.
 
-1. Correct the identified expression, branch, call, state update, or missing
-   operation at its owner. Preserve the governing contract with the simplest
-   sufficient change. Do not suppress the symptom with a wrapper, compatibility
-   shim, weakened oracle, or caller workaround that leaves the root cause intact.
-2. After that edit, use this skill's existing [LSP usage procedure](../../documents/tools/lsp_code_analysis.md)
-   and code-dependency commands, starting from the changed symbol and file.
-   Follow references, callers/callees, definitions, and implementations supported
-   by the server. Inspect the corresponding code and relevant tests/contracts;
-   a relation is a place to inspect, not by itself a reason to edit.
-3. Fix concrete problems found along those relations, including broken calls,
-   incompatible types/contracts, or affected state and failure behavior. Do not
-   stop at listing findings. Follow newly affected relations after each repair
-   and recheck affected evidence; leave related code unchanged when it is sound.
-   Do not expand into unrelated repository work or edit sound code just to
-   synchronize every consumer.
+1. Use [LSP-First Recursive Context](#lsp-first-recursive-context) to inspect the
+   cause, relevant callers/callees, types/implementations, and tests/contracts
+   before editing. Select the complete correction from that evidence.
+2. Correct the identified expression, branch, call, state update, or missing
+   operation at its owner, together with affected uses. Preserve the governing
+   contract with the simplest sufficient change. A relation identifies code to
+   inspect; repair concrete defects while retaining sound related code.
+3. Refresh the affected LSP relations after edits and inspect newly affected
+   code before further repair. Correct broken calls, incompatible contracts,
+   and affected state/failure behavior in the same change. Preserve the complete
+   responsibility unit and explicit read-only/write-authority boundaries.
 4. Run the existing formatter and targeted validation for the final changes.
    Complete the repair when the cause is fixed and the inspected related paths
    have no unresolved problems caused by that defect or its correction. Record
-   the actual changes, relation evidence, validation, and any remaining
-   verification in the existing Issue/PR. Preserve explicit read-only and
-   write-authority boundaries.
+   actual changes, pre-edit and refreshed relation evidence, validation, and
+   remaining verification in the existing Issue/PR.
 
-LSP establishes symbol relations, not program correctness. Check the actual
-contracts and behavior at those locations. Preserve unsupported/failed/partial
-results as verification gaps, not proof of no references or no problems; use
-other available source/test evidence without claiming it was LSP verification.
-Do not roll back or defer a justified cause fix merely because an optional
-relation capability is unavailable. Broader checks are not a prerequisite to
-that fix; unresolved required verification still prevents a verified closeout.
+LSP establishes symbol relations; actual source, contracts, and targeted checks
+establish behavior. Apply the capability, failure, and coverage handling from the
+pre-edit procedure throughout repair and verification.
 
 ## Interpretation
 
 - code dependency は実 import / include / source 関係、header dependency は design / implementation / environment / test の明示文脈です。混ぜずに別々の evidence として記録します。header edge を実行・build reachability や caller の証拠に読み替えず、code edge を design ownership や文書の正本性に読み替えません。両者を結合するのは Change Impact Packet の影響範囲整理だけです。
 - Python code 変更では、`helper_function_inventory.py --changed --all-functions` を関数 / class / method 単位の evidence として使います。この tool は変更 Python file を報告対象にしつつ、whole-repo call graph context から direct callers / callees を保持します。変更 Python file count が 0 件の場合は `HELPER_INVENTORY_FILES=0` を scope evidence にします。
-- 原因箇所を特定したらまずそこを修正し、[Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) に従って既存LSP利用手順で関連をたどり、問題があれば修正します。`scan_code_dependencies.sh` の実コード依存と header dependency の design / docs / tests は区別し、関連全体の事前調査を原因修正の開始条件にしません。
+- 最初のコード編集前に [LSP-First Recursive Context](#lsp-first-recursive-context) で関連コード・契約・tests を再帰的に読み、原因と変更単位を確定して [Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) へ進みます。`scan_code_dependencies.sh` の実コード依存と header dependency の design / docs / tests は区別します。
 - `required_action` や solution proposal より先に causal ambiguity と owner / fix / validation を変え得る alternative の有無を判定します。該当時だけ cause-evidence note を完成させ、incoming callers/entrypoints、owning mechanism/state/guards、downstream consumers/side effects/cleanup、sibling implementations/tests/docs/config を evidence-linked にたどります。straightforward finding は direct cause proof、rejected/duplicate/already-covered/unreachable finding は reason/evidence だけで閉じます。snapshot drift が原因候補になり得る場合だけ latest remote/Issue/branch history を追加します。
 - 原因探索の最終目標は、原因となるコードの具体的な一か所の特定です。[Cause Investigation Surface](#cause-investigation-surface) に従い、source snapshot、path、symbol、該当行/block と、入力/状態から現象に至る因果根拠を既存記録に残します。候補一覧・原因分類・症状の発生地点だけでは完了しません。一か所と因果関係を特定し、判断を変え得る代替を disconfirmed / bounded にしたら、その原因箇所の修正へ進みます。十分な静的根拠に追加実行を要求せず、未特定は `cause_unproven` とし、根拠なく一つに断定しません。
 - activated packet の `required_action` は `Selected Cause` と `Expected Mechanism` から、straightforward packet の action は direct cause proof から導出します。症状だけの修正提案は `cause_unproven` として保留します。発生不能な分岐と過剰・重複ガードは、`reason_code=unreachable_branch|overcheck` と証拠を残して review 対象から除外します。
-- コード改善の修正箇所を選ぶ task では、この skill の `Cause Investigation Surface` と `Root-Cause Repair Scope` に従って `Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`fix_surface_validated=yes` を実装前に固定します。
-- 原因修正後のLSP関連確認・必要な修正・対象検証を行い、`Post-Change Evidence` と `Hypothesis Decision: supported|rejected|inconclusive` を残します。`rejected` または `inconclusive` の場合は、同じ実装 pass を広げず次仮説へ戻します。
+- コード改善の修正箇所を選ぶ task では、この skill の `LSP-First Recursive Context`、`Cause Investigation Surface`、`Root-Cause Repair Scope` に従って `Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`fix_surface_validated=yes` を実装前に固定します。
+- 原因修正後は編集前の LSP context を更新し、新たに影響する関連の確認・必要な修正・対象検証を行い、`Post-Change Evidence` と `Hypothesis Decision: supported|rejected|inconclusive` を残します。`rejected` または `inconclusive` の場合は、同じ実装 pass を広げず次仮説へ戻します。
 - changed-file header / scan / format failure は fix-now blocker です。
 - default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
 - `run_repo_dependency_review.sh --report-dir` は dependency header 由来の `dependency_graph.tsv` を生成します。
@@ -283,9 +321,10 @@ graph 全体を prose 化する場所ではありません。tool output は JSO
 Markdown artifact として保存し、packet には path、count、object id、現在の
 repair batch に必要な selected excerpt と structured summary を載せます。`refactor-loop`、
 implementation handoff、原因仮説の fix-surface 選定では、raw text-search hit、raw
-finding、単一 file 名だけを subagent に渡しません。原因修正では特定した箇所と因果根拠から
-最初の変更を導き、修正後に得たLSP関連と必要な追加修正を同じpacketへ反映します。
-packet全体の事前完成を、特定済みの原因箇所を直す前提にしません。
+finding、単一 file 名だけを subagent に渡しません。コード変更では最初の編集前に
+LSP で関連箇所を再帰的に読み、本文・契約・tests と因果根拠を同じ context / packet
+へ取り込みます。編集後は影響する関連と必要な追加修正を更新します。
+既存の記録へ集約し、全項目を埋める追加の帳票作成は要求しません。
 
 Change Impact Packet の scope candidates や repair slices を形成する前に、
 code-cleanup から渡された一つの shared current+historical asset universe を
@@ -396,18 +435,17 @@ agent-canon python-structure-hash-scope-plan \
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
+1. Before any code edit, activate [LSP-First Recursive Context](#lsp-first-recursive-context), including for a direct cause fix. Reuse its inspected source context through planning, implementation, handoff, and review.
 1. Read [documents/design/dependency-manifest-design.md](../../documents/design/dependency-manifest-design.md).
 1. If the task selects or justifies a fix surface, read this skill's `Cause Investigation Surface` and `Root-Cause Repair Scope`; use `change-review` for the findings-first review after the owner is selected.
 1. For code-improvement work, do not implement until the artifact records `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `fix_surface_validated=yes`.
 1. Apply [Cause Investigation Surface](#cause-investigation-surface) before deriving
    an action: use its conditional cause-evidence note or direct cause proof,
-   preserving the reason/evidence-only dispositions. For code causes, identify
-   the concrete causal location and supported mechanism, then fix that location
-   and follow [Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection):
-   use the existing LSP procedure after the fix, trace related code, and repair
-   problems found there. Do not stop at cause identification, defer the cause fix
-   for a broad survey, or treat unsupported LSP results as absence of problems.
-1. After the cause fix, LSP-related repairs, and targeted validation, record `Post-Change Evidence` and `Hypothesis Decision: supported|rejected|inconclusive`. If the decision is `rejected` or `inconclusive`, return to hypothesis selection instead of expanding the implementation pass.
+   preserving the reason/evidence-only dispositions. Identify the concrete causal
+   location and supported mechanism using the pre-edit LSP context, then follow
+   [Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) to correct
+   the owner and affected uses. Refresh relevant LSP context after the changes.
+1. After the cause fix, refreshed LSP context, related repairs, and targeted validation, record `Post-Change Evidence` and `Hypothesis Decision: supported|rejected|inconclusive`. If the decision is `rejected` or `inconclusive`, return to hypothesis selection instead of expanding the implementation pass.
 1. Choose the mode that answers the task without hiding dependency evidence:
    - code dependency surface: run `scan_code_dependencies.sh`
    - changed-file closeout gate: use `--changed`
