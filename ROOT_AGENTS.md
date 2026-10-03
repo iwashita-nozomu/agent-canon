@@ -189,14 +189,26 @@ distinguish proposed, observed, unrun, and unknown conditions. State unavailable
 withheld evidence and its limits while protecting secrets. Use existing owners
 and records without a fixed template, extra environment discovery, rerun, or gate.
 
-Continue safe authorized work through delivery. Decide commit and push separately,
-preserve mixed work, and avoid force-push, main mutation, or out-of-scope publication.
-Report the result, material findings, evidence, and limits, distinguishing
-implemented, verified, published, and applied states. Before any verification
-writeout, including progress and interrupted handoff, structure established facts,
-evidence, scope, limits, distinct findings, and counterevidence. Use the same result
-across chat, Issue/PR comments, and reports through their owners. Keep comparable
-reasoning and results on the Issue and link reusable topic records.
+Before a terminal response, compare the current result with the whole agreed
+deliverable. Continue the same task through the next required implementation,
+migration, retirement, verification, or authorized delivery action whenever it
+can proceed. Partial success, a checkpoint, draft publication, and a remaining-work
+list are progress, not permission to return. A child returns its assigned unit;
+the parent verifies and integrates it and retains overall completion ownership.
+Honor an explicit user step boundary or pause/handoff request. Otherwise, an
+incomplete handoff requires evidenced authority, safety, or execution blockers
+for the remaining operations and completion of independent actionable required
+work. Record the failed operation or restriction, blocked property, and next
+owner/action; keep this status distinct from completion and preserve rerun limits.
+
+Decide commit and push separately, preserve mixed work, and avoid force-push,
+main mutation, or out-of-scope publication. Report the result, material findings,
+evidence, and limits, distinguishing implemented, verified, published, and applied
+states. Before any verification writeout, including progress and interrupted
+handoff, structure established facts, evidence, scope, limits, distinct findings,
+and counterevidence. Use the same result across chat, Issue/PR comments, and reports
+through their owners. Keep comparable reasoning and results on the Issue and link
+reusable topic records.
 
 ## Validation Routing
 

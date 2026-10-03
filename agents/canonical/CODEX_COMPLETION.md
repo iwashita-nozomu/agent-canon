@@ -43,8 +43,10 @@ invalidated evidence. When Local Capability Priority was selected, retain its
 [existing record](../skills/agent-orchestration.md#local-capability-priority).
 
 An implemented, published, or handed-off result is not automatically verified or
-applied. Missing required verification stays explicit; unrelated checks and other
-Issues do not become completion prerequisites.
+applied. An unmet requirement returns to its next owning action through
+[Completion Readiness](#completion-readiness), rather than becoming a terminal
+response with a remaining-work list. Unrelated checks and other Issues do not
+become completion prerequisites.
 
 ## Bounded delivery
 
@@ -166,15 +168,39 @@ Use [Completion Readiness](#completion-readiness) for the selected route. Read
 
 ## Completion Readiness
 
-A progress update, acknowledgement, child claim, or post-hoc healthy status is not
-completion evidence. Keep the request-to-operation-to-result chain and continue
-safe authorized required work while a result remains unresolved. A real authority
-or external blocker includes its failed operation, affected property, evidence,
-and next owner/action; it does not require infinite retries or a new state machine.
+For either execution route, compare the current result and evidence against the
+whole agreed deliverable before a terminal response. Use the existing task/Issue
+record or selected run state; this adds no checklist artifact or terminal checker.
 
-Use [Bounded delivery](#bounded-delivery) for the selected bounded route, or the
-existing `task_close.py` result for coordination. Preserve remaining required
-verification honestly. Before reporting, apply
+When a required result is missing, perform its next authorized owning action in
+the same task, then reassess the affected evidence. A defect returns to repair;
+unmigrated consumers or remaining retired code return to implementation; an unrun
+check goes to the selected validation route; missing publication/readback goes to
+the delivery owner. Follow pending checks through their existing wait/readback
+route. A partial test pass, checkpoint, commit, draft PR, status label, or written
+remaining-work list is progress, not a reason to return control to the user.
+Recording a gap does not discharge it or require another request to continue.
+
+A child return establishes only its assigned unit and evidence. The parent verifies
+that unit, integrates it, and continues remaining required work; it does not turn
+child completion or a blocked child into overall completion. Delegate or repair
+through the already authorized route, retaining user-guided parent ownership.
+The user's explicit step boundary defines that step's deliverable; do not expand
+it to the entire project or wait for unrelated work.
+
+Return a completion result only when the selected bounded evidence or coordination
+`task_close.py` result establishes all required outcomes on the final source.
+If the user explicitly requests pause/handoff, preserve that boundary. Otherwise,
+an incomplete blocker handoff requires evidence that the next required operations
+cannot proceed under current authority, safety, or available execution routes,
+and that independent actionable required work has been completed. Identify each
+blocked property, actual failed operation or authoritative restriction, evidence,
+and the specific owner/action that can unblock it. A generic environment concern,
+untried available route, task length, or self-chosen checkpoint is not such evidence.
+Keep blocked status distinct from completion; preserve safety and rerun limits
+without bypasses, speculative environment repair, or repeated unchanged attempts.
+
+Before either result, apply
 [reader-facing writing](ROOT_DELIVERY.md#reader-facing-writing) and
 [result reporting](ROOT_DELIVERY.md#result-reporting). Issue-backed work receives
 comparable rationale, results, limitations, and exact PR/head references on the
