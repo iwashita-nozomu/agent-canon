@@ -1,25 +1,26 @@
 <!--
 @dependency-start
 contract design
-responsibility Defines the structural grammar and ownership invariant for root agent instruction entrypoints.
-upstream design ../conventions/software-engineering-principles.md single-owner, information-hiding, and contract-complete change policy
-downstream design ../../AGENTS.md minimal source-tree entrypoint
-downstream design ../../agents/canonical/SOURCE_ROUTING.md optional source owner map
-downstream design ../../ROOT_AGENTS.md common root base read by consumer and source-specific AGENTS
-downstream design ../../.github/AGENTS.md minimal GitHub subtree overlay
-downstream implementation ../../tools/agent/templates/entrypoint_composer.py consumer root composer
-downstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py structural verifier
-downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml canonical marker ownership projection
-downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py contract regression
-downstream design ../../agents/skills/comprehensive-development.md implementation-basis consumer
-downstream design ../../agents/canonical/ROOT_DELIVERY.md responsibility-specific detail owner
-downstream design ../../agents/canonical/ROOT_EXECUTION.md responsibility-specific detail owner
-downstream design ../../agents/canonical/ROOT_IMPLEMENTATION.md responsibility-specific detail owner
-downstream design ../../agents/canonical/CODEX_BOOTSTRAP.md responsibility-specific detail owner
-downstream design ../../agents/canonical/CODEX_COMPLETION.md responsibility-specific detail owner
-downstream design ../../agents/canonical/CODEX_IMPLEMENTATION.md responsibility-specific detail owner
-downstream design ../../agents/canonical/CODEX_INTAKE.md responsibility-specific detail owner
-downstream design ../../agents/canonical/CODEX_ROUTING.md responsibility-specific detail owner
+responsibility Defines root instruction ownership, conditional reader routes, and the finite entrypoint grammar.
+upstream design ../conventions/software-engineering-principles.md single-owner and contract-complete change policy
+downstream design ../../AGENTS.md source entrypoint
+downstream design ../../ROOT_AGENTS.md portable common base
+downstream design ../../agents/canonical/SOURCE_ROUTING.md source owner selection
+downstream design ../../.github/AGENTS.md GitHub subtree overlay
+downstream implementation ../../tools/agent/templates/entrypoint_composer.py consumer root composition
+downstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py structural verification
+downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml canonical marker ownership
+downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py entrypoint regression
+downstream implementation ../../tests/agent_tools/test_point_of_use_skill_routes.py conditional candidate regression
+downstream design ../../agents/canonical/ROOT_DELIVERY.md source delivery detail
+downstream design ../../agents/canonical/ROOT_EXECUTION.md source execution detail
+downstream design ../../agents/canonical/ROOT_IMPLEMENTATION.md source implementation detail
+downstream design ../../agents/canonical/CODEX_WORKFLOW.md phase selection
+downstream design ../../agents/canonical/CODEX_BOOTSTRAP.md selected run bootstrap
+downstream design ../../agents/canonical/CODEX_COMPLETION.md selected validation and closeout
+downstream design ../../agents/canonical/CODEX_IMPLEMENTATION.md selected implementation procedure
+downstream design ../../agents/canonical/CODEX_INTAKE.md intake and context continuity
+downstream design ../../agents/canonical/CODEX_ROUTING.md unresolved routing decisions
 @dependency-end
 -->
 
@@ -27,223 +28,180 @@ downstream design ../../agents/canonical/CODEX_ROUTING.md responsibility-specifi
 
 ## Purpose
 
-[AGENTS.md](../../AGENTS.md) は source 固有の入口、[ROOT_AGENTS.md](../../ROOT_AGENTS.md) は
-source-free consumer にも配る共通制約の最小本文です。共通制約の保持と task-specific な
-詳細手順の所有を区別し、入口には必要な制約と条件付きの owner 案内だけを置きます。
-詳細手順を Skill から入口へ複製すると、activation boundary、instruction budget、変更理由、
-validation owner が混線します。本設計は常時読取と条件付き読取の境界を定義します。構造検査を通ることだけを理由に、
-入口へ詳細や長い owner 一覧を残しません。
+[AGENTS.md](../../AGENTS.md) is the source entrypoint;
+[ROOT_AGENTS.md](../../ROOT_AGENTS.md) is the portable common base. Keep shared
+constraints self-contained and task-specific procedures with their owners. A short
+entrypoint is not sufficient if its links require all details to be read at startup.
+The governing goal is a usable route at the point of the dependent decision/action.
 
 ## Model
 
-入口文書の集合を `E`、文書 `e` の level-2 heading 列を `H(e)`、許可された heading 列を
-`A(e)` とします。task procedure を表す構文集合を `P(e)`、責務集合を `R`、責務 `r` の
-canonical owner を `owner(r)` とします。
+Let `E` be the entrypoints, `H(e)` their ordered level-2 headings, `A(e)` the permitted
+headings, `P(e)` procedural syntax, and `owner(r)` the canonical owner of a responsibility.
+The entrypoint invariants are `H(e) = A(e)` and `P(e) = empty`: no fenced commands,
+numbered recipes, nested procedure headings, or duplicated owner policy. An entry
+routes a task-specific responsibility to its owner instead of reimplementing it.
+Operational marker contracts are owned outside `E`.
 
-成立条件は次です。
+A reader route connects a source section, a condition decidable before the dependent
+action, and an existing destination section. Reachability, activation, and timing are
+distinct obligations. An index establishes discovery; the actual consumer's conditional
+link establishes where to apply the rule. A link or dependency header alone activates
+neither the entire document nor all its descendants. Reuse unchanged owner context.
 
-- `H(e) = A(e)`: 許可された reader / owner sections だけが、定義順で存在する。
-- `P(e) = ∅`: fenced command、番号付き手順、command recipe、nested procedure heading を
-  入口に持たない。
-- task-specific な各 `r` について、入口は `owner(r)` への一つの route を持ち、同じ policy を
-  本文で再定義しない。
-- 共通制約は ROOT に保持し、source は明示読取、consumer は本文合成で同じ base を使う。
-  source 入口は共通制約を再定義せず、適用する owner へ案内する。
-- convention marker contract の集合を `C` とすると、`∀c ∈ C, paths(c) ∩ E = ∅`。
-  入口は operational marker の canonical surface にならない。
-- standalone source、explicit live integration、static-seed consumer の identity を混同しない。
-
-構造不変条件と読取量は別に確認します。短くても command recipe を持つ入口は不適切であり、
-構造を満たしていても毎回不要な詳細を読ませる入口は短縮対象です。必須入口は最小の共通制約と
-条件付きの参照だけにし、詳しい owner 表は自動 discovery されない optional 文書へ置きます。
+These are design invariants over existing Markdown links, catalog entries, and
+workflow conditions, not a new routing registry, include language, or reading ledger.
+Code/LSP dependency traversal still follows the changed contract through affected
+consumers; document reading stops at the facts needed for the current decision.
 
 ## Allowed information architecture
 
-Standalone [AGENTS.md](../../AGENTS.md) と optional
-[SOURCE_ROUTING.md](../../agents/canonical/SOURCE_ROUTING.md) は同じ小さな見出し構造を使います。
-常時入口の owner 表は optional map への1行だけ、詳細な owner 行は後者が所有します。
+Source AGENTS, common ROOT, and the optional source map use the same ordered headings:
+`Repository Role`, `Reader Map`, `Always-On Boundary`, `Runtime Owner Map`, `Task Entry`,
+`Validation Routing`. ROOT retains portable shared constraints. Source AGENTS starts
+with literal `@ROOT_AGENTS.md` and has one optional-map route for unknown owners.
+That directive is an explicit reading request, not a native include implementation.
 
-- `Repository Role`
-- `Reader Map`
-- `Always-On Boundary`
-- `Runtime Owner Map`
-- `Task Entry`
-- `Validation Routing`
-
-Common [ROOT_AGENTS.md](../../ROOT_AGENTS.md) (shared entry base for consumer and source-specific roots):
-
-- `Repository Role`
-- `Reader Map`
-- `Always-On Boundary`
-- `Runtime Owner Map`
-- `Task Entry`
-- `Validation Routing`
-
-Consumer root [AGENTS.md](../../AGENTS.md) は、この [ROOT_AGENTS.md](../../ROOT_AGENTS.md) の bytes を先頭の論理内容として
-保持し、consumer-owned specific section を明示的に合成した regular tracked file です。
-合成元の source commit と exact input-byte digest は deterministic comment marker にのみ
-記録します。Source-specific AgentCanon [AGENTS.md](../../AGENTS.md) は先頭の literal `@ROOT_AGENTS.md`
-でこの共通 base を明示参照し、未解決の owner だけ optional Source Routing へ案内します。
-既知の owner へ直接進むときは map 自体を読みません。
-これは consumer composition とは別の explicit read であり、自動展開、runtime import、
-wrapper、source copy を意味しません。ROOT の consumer map / owner route は consumer root
-にだけ適用し、source-specific AGENTS は source owner map への条件付き route を保持します。
-source 入口は identity と条件付き owner 案内に限定します。ROOT は単独配布に必要な
-共通制約も保持しますが、詳細手順の移管先ではありません。
-subagent sequence、Git environment variables、update command、design receipt、experiment setting、
-validation menu、closeout token は、それぞれの owner surface に置きます。
+The source map contains short conditional starting points. Known owners bypass it.
+Its required document rows use ordinary inline Markdown links to their canonical
+repository paths; displayed path text or a code span is not a usable replacement.
+Relative destinations are resolved from the containing document, not the product cwd.
 
 ## Ownership and distribution boundary
 
-| 文書 / 配布物 | 所有する内容 | 置かない内容 |
+| Surface | Owns | Reading / distribution boundary |
 | --- | --- | --- |
-| source `AGENTS.md` | source identity、共通 base の読取、未解決 owner への短い route | 共通制約の再定義、consumer 固有設定、詳細手順 |
-| optional `SOURCE_ROUTING.md` | AgentCanon 固有の owner/path・runtime・検証の対応表 | 常時読取の要求、共通制約の複製 |
-| `ROOT_AGENTS.md` | 共通の行動制約、consumer が単独で読める最小 owner 案内 | source 専用入口の説明、source checkout を必要とする実行手順 |
-| consumer-specific source | 製品の owner、build/test、配置、追加指示 | AgentCanon source 入口や内部 workflow のコピー |
-| consumer 生成 `AGENTS.md` | ROOT 本文と consumer-specific source の合成 | AgentCanon source AGENTS の取込、参照先を配らない include |
+| source `AGENTS.md` | source identity, common-base read, conditional owner selection | no duplicate common policy or consumer configuration |
+| optional `SOURCE_ROUTING.md` | source-specific owner and starting section | only the matching unresolved decision |
+| `ROOT_AGENTS.md` | portable common behavior and consumer owner roles | self-contained without an AgentCanon checkout |
+| consumer-specific fragment | product, build/test, placement and local instructions | maintained by the consumer |
+| generated consumer `AGENTS.md` | exact ROOT plus consumer-specific text | one regular tracked file, no live source dependency |
 
-source は `AGENTS.md -> ROOT_AGENTS.md -> 選択済み owner`、未知の owner だけ optional map を
-経由します。consumer の配布単位は `ROOT 本文 + consumer-owned specific source` です。
-source 入口と consumer 出力は同名でも別責務です。composer は二つの本文を合成するだけで、
-参照の再帰展開や source AGENTS の自動取込を行いません。共通制約を source-only Skill への
-リンクだけにすると、source を持たない consumer で規則が欠けるため採用しません。
-
-main の責務分離を保持し、source identity と `@ROOT_AGENTS.md` の解釈は source AGENTS、
-local instruction・owner 迂回禁止・bounded activation・他 owner の例を一律検証にしない
-共通境界は ROOT に置きます。具体的な手順と acceptance rule は既存 Skill / workflow /
-internal routine が所有します。owner の変更は共通制約の無効化ではなく、文書分割は全参照先の
-読了要求ではありません。AgentCanon defect 報告と source maintenance の案内も consumer に
-必要なため保持します。loader、同期、分割 manifest を追加せず、責務分離と短縮を両立します。
+Common constraints cannot be replaced by links to source-only Skills: a source-free
+consumer would lose the rule. Compact repetition and place source-specific procedures
+behind conditional routes, while retaining valid inputs, safety/authority, root fixes,
+verification, reporting, formatting and cleanup guarantees in the portable base.
 
 ## Responsibility migration
 
-| Detailed responsibility | Canonical owner after migration |
+| Decision or operation | Existing procedure owner |
 | --- | --- |
-| implementation completeness and evidence-backed mechanism selection | [documents/conventions/software-engineering-principles.md](../conventions/software-engineering-principles.md) and selected implementation / review Skill |
-| cross-surface implementation-basis packet | [agents/skills/comprehensive-development.md](../../agents/skills/comprehensive-development.md) |
-| design correspondence | [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) |
-| structure intake | [agents/skills/structure-refactor.md](../../agents/skills/structure-refactor.md) and structure contract |
-| Git mutation safety | [agents/skills/worktree-health.md](../../agents/skills/worktree-health.md), canonical workflow, hooks |
-| AgentCanon update | [agents/skills/agent-canon-update.md](../../agents/skills/agent-canon-update.md) and update route |
-| orchestration / subagent lifecycle | orchestration and subagent canonical owners |
-| validation / closeout | runtime profile, canonical workflow, closeout tools |
+| Implementation basis and complete affected unit | ROOT_IMPLEMENTATION and engineering principles |
+| Design correspondence when selected | design-implementation-correspondence routine |
+| Execution failure, checkout, branch/storage, team | matching ROOT_EXECUTION section |
+| Reader-facing writing and delivery evidence | matching ROOT_DELIVERY section |
+| Current task phase | CODEX_WORKFLOW Reader Map |
+| Unresolved family, Skill, profile, or placement | the matching CODEX_ROUTING section |
+| Design/implementation and dependency context | CODEX_IMPLEMENTATION Reader Map |
+| Validation and delivery | CODEX_COMPLETION Reader Map |
 
-入口は上記 owner の存在と route を示しますが、owner の acceptance rule や操作順序を複製しません。
+The transport Skill `codex-task-workflow` carries these selections and results. It
+must not reproduce full implementation or closeout checklists in both prose and
+Runtime Contract Clauses. Its existing named anchors remain routing surfaces.
 
 ## Verification contract
 
-`check_entrypoint_owner_map.py` は次を fail-closed で確認します。
+`check_entrypoint_owner_map.py` retains its title, ordered heading, procedure-syntax,
+required-row, optional-map, and operational-marker ownership checks. It also verifies:
 
-- H1 が一つであること
-- level-2 heading が許可列と一致すること
-- level-3 以下の heading がないこと
-- fenced block と番号付き procedure がないこと
-- bullet / direct command recipe がないこと
-- root の最小 route と optional SOURCE_ROUTING の required owner 行が、それぞれの所有先にあること
-- optional map 自体が存在すること（検査時の読取であり、Codex の起動時読取ではない）
-- convention marker manifest が source [AGENTS.md](../../AGENTS.md) / [ROOT_AGENTS.md](../../ROOT_AGENTS.md) を operational surface として
-  再登録していないこと
+- source AGENTS begins with the explicit common-base directive;
+- required document rows actually link to their canonical destinations, rather than
+  merely displaying those names or sending the reader to a different file;
+- those required document targets exist.
 
-checker は prose の意味を推測しません。意味上の重複は review owner が判断し、構造的に再流入可能な
-surface は checker が拒否します。この分担により、自然言語 classifier を新しい policy owner に
-せず、検証可能な文書 grammar だけを機械化します。
+Only the finite required owner-row grammar is parsed here. Existing docs tools own
+general Markdown syntax, path/anchor checks, and broader document references. The
+checker does not infer prose activation, dynamically execute routes, or claim actual
+agent reading. Existing focused tests exercise missing/moved directives, wrong or
+unlinked destinations, missing targets, equivalent relative paths, and prior grammar
+rejections. `test_point_of_use_skill_routes.py` uses the production catalog loader
+and candidate projector to check the three repaired conditional handoffs.
+
+Review checks conditions before branch bodies, complete required behavior, and the
+following positive and negative scenarios. It does not replace execution evidence
+for changed code with prose or require full agent-behavior measurement for a link fix.
+
+| Scenario | Applicable route | Inactive procedure |
+| --- | --- | --- |
+| Resolved bounded document change | current owner, targeted validation, authorized delivery | DIC fingerprint, run-bundle bootstrap and coordinated task_close |
+| Selected full-staging coordination | persisted design packet and selected review/closeout | a second packet or terminal predicate |
+| C++ Docstring/convention-only change | semantic documentation/static evidence | native build and performance benchmark |
+| Numerical C++ solver performance question | computational-optimization candidate under solver condition | mandatory solver record for unrelated C++ work |
+| Public failed verification | immediate topic record, exact-record readback, reuse | private capture and behavior evaluation |
+| Private knowledge lookup | agent-learning private record/search route | automatic behavior-eval run |
+| Ordinary task/Issue report | ROOT_DELIVERY reporting owner | experiment-only report style |
+| Selected local branch integration | integration candidate and its Git owner | activation merely from listing the Skill |
+
+For connected-session validation failures, preserve the operation and its limits in
+the existing [failure topic](../notes/failures/connected-rule-routing-validation.md).
+A draft with pending materialization or unavailable formatting is not merge-ready.
+
+These checks establish source contracts and candidate behavior, not measured token
+savings, speed, compliance frequency, all-run coverage, or deployment to consumers.
 
 ## Consumer root composition
 
-`tools/agent/templates/entrypoint_composer.py` は、明示された base、consumer-specific source、
-output の三つの path と source checkout から現在 commit を読み、通常 file を同一 directory
-内で atomic に置き換えます。出力には managed marker、source commit、base/specific の exact
-byte count と SHA-256、固定 separator、二つの exact source byte 列が入ります。新規 output は
-作成でき、既存の unmarked output、directory、symlink、partial/corrupt marker は保存したまま
-typed failure になります。valid な managed output だけが current exact sources で更新されます。
-
-この composition は consumer の bootstrap/maintenance 操作です。AgentCanon runtime update、
-source symlink、vendor/submodule projection、nested directory [AGENTS.md](../../AGENTS.md) の更新を行いません。
-生成後の consumer は output だけで instruction を読め、AgentCanon checkout や runtime の存在を
-前提にしません。`AGENT.md` という singular alias はこの contract に存在しません。
+The existing `entrypoint_composer.py` retains its public API and exact base/specific
+byte handling. It atomically publishes only a coherent regular-file output with
+managed source-commit, byte-count, digest and separator markers. New outputs or valid
+managed replacements are allowed; unmarked/corrupt output, directories and symlinks
+are preserved as typed failures. No recursive expansion, source AGENTS import, new
+loader, live projection, or alternate singular `AGENT.md` alias is added.
 
 ## Template boundary
 
-`project_template` の tracked [AGENTS.md](../../AGENTS.md) は self-contained static consumer の project-owned file です。
-本設計はそれを source resolver、updater、vendor、submodule、symlink projection へ戻しません。
-consumer の具体的な追加文は consumer 側の `documents/agent-canon/consumer-root-instructions.md`
-が所有し、AgentCanon の [ROOT_AGENTS.md](../../ROOT_AGENTS.md) はその共通 base だけを所有します。static-seed allowlist は
-role/config のままとし、生成された root [AGENTS.md](../../AGENTS.md) は consumer の tracked output として扱います。
+`project_template` owns its static generated AGENTS and consumer-specific fragment.
+This source change does not update that generated file, add a vendor/submodule or
+symlink dependency, or require all consumers to adopt it before PR delivery. Existing
+static-seed role/config boundaries and source-free composition tests remain in force.
 
 ## Responsibility-based document split
 
-ROOT の詳細判断を入口へ積み重ねると、実装・環境・Git・報告という異なる変更理由が
-常時読取の一単位に結合する。Codex Workflow も intake から closeout までの全文が
-同じ path のため、必要な局面だけを読む責務と機械的な section locator が混線していた。
-分割は既存の規則・適用条件・例外を保持し、次の責務を直接選べるようにする。
+Source details remain in ROOT_IMPLEMENTATION, ROOT_EXECUTION and ROOT_DELIVERY.
+The five Codex phase owners keep their established section anchors, including
+`4. Run Bootstrap` and `5. Implementation`, for existing readers and packet producers.
+Operational markers stay in their actual canonical owner rather than being copied
+to root entrypoints to satisfy a test.
 
-| Surface | Responsibility | Activation |
-| --- | --- | --- |
-| `AGENTS.md` | minimal source entry and conditional lookup | source root entry |
-| `ROOT_AGENTS.md` | portable common constraints and consumer owner map | root entry |
-| [SOURCE_ROUTING.md](../../agents/canonical/SOURCE_ROUTING.md) | expanded source owner and validation map | unresolved source owner only |
-| [ROOT_IMPLEMENTATION.md](../../agents/canonical/ROOT_IMPLEMENTATION.md) | implementation, necessity, reachability, numerical decisions | relevant source-side implementation decision |
-| [ROOT_EXECUTION.md](../../agents/canonical/ROOT_EXECUTION.md) | configured execution, checkout, cleanup, team boundaries | relevant source-side execution operation |
-| [ROOT_DELIVERY.md](../../agents/canonical/ROOT_DELIVERY.md) | Issue evidence, continuation, reporting, commit/push, formatting | relevant source-side evidence or delivery operation |
-| [CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) | direct phase reader map and startup routing | Codex admission |
-| [CODEX_INTAKE.md](../../agents/canonical/CODEX_INTAKE.md) | intake and checkout/context continuity | intake or relevant state change |
-| [CODEX_ROUTING.md](../../agents/canonical/CODEX_ROUTING.md) | family, skills, profile, placement | unresolved route selection |
-| [CODEX_BOOTSTRAP.md](../../agents/canonical/CODEX_BOOTSTRAP.md) | run bootstrap, goals, adaptive materialization | selected run/goal/token route |
-| [CODEX_IMPLEMENTATION.md](../../agents/canonical/CODEX_IMPLEMENTATION.md) | design admission and implementation | design or implementation |
-| [CODEX_COMPLETION.md](../../agents/canonical/CODEX_COMPLETION.md) | validation, coverage, terminal-owner delegation | validation or closeout |
+Bounded execution consumes existing structured task evidence. Full staging, DIC,
+child handoff, and coordinated completion have separate explicit conditions before
+their detail sections. `task_close.py` remains the single coordinated terminal owner;
+bounded delivery uses the existing `execution_route_policy` instead of materializing
+a new ledger to satisfy unrelated fields. Family selection comes from task_catalog,
+not an independently maintained six-family prose list.
 
-ROOT は consumer で必要な禁止・義務・適用条件を自分の本文に保持する。source の詳細は
-source-specific AGENTS から到達する optional Source Routing の該当行で選ぶ。consumer に source 文書の
-存在を要求しない。portable base と source 向け詳細という配布上の差を、全詳細の二重コピーや
-新たな全件読取条件に変えない。規則の意味を変える変更では両適用面への影響を確認する。
-
-composer は exact base/specific bytes を扱う既存実装のままにする。include DSL、再帰的
-loader、追加公開 API、配布ファイル追加は不要であり、output だけで consumer が読める
-性質を維持する。既存 owner を単にリンクへ置換して consumer の規則を欠落させる案、
-全分割先を無条件展開して入口の読取量を変えない案は採用しない。
-
-`tools/agent/orchestration/packets.py` の designer / implementer は、従来の
-`4. Run Bootstrap` と `5. Implementation` をそれぞれの正本で読み切る。同じ意味の
-section heading を維持し、locator の path だけを分離する。`agents/agents_config.json`、
-manifest の source reference、publication/review evidence も移動した規則の直接 owner を指す。
-既存 convention/runtime checker と prompt eval は marker/regex を削らず、本文の新しい
-所有先へ付け替える。入口に marker を複製して通過させない。
-
-検証は entrypoint grammar、source-free composition、section locator、既存 marker/eval、
-移動本文・リンクの対応を対象とする。行数/bytes は文書量の観測であり、実 agent の token、
-速度、品質の実測値ではない。新たな checker、承認、全 profile 実行、他 Issue の完了は
-この分割の条件にしない。
+Source execution failures route directly to Notes Lifecycle. Artifact creation routes
+to document placement/naming and consumer-reference updates at the moment a document
+is created, split, moved or retired. Skill dictionary entries expose conditional
+candidates without changing prerequisite order; public failure notes stay with their
+owning Notes Lifecycle rather than widening private-learning discovery metadata.
 
 ## Codex automatic loading and on-demand reading
 
-一次資料（2026-09-18確認）は [AGENTS.md discovery](https://developers.openai.com/codex/guides/agents-md/)
-と [Skills progressive disclosure](https://developers.openai.com/codex/skills/) です。Codex は起動時に
-適用される global/project AGENTS（override、設定された fallback を含む）を指示へ取り込みます。
-Skill は discovery 時の名前・説明等と、選択時の本文を区別します。`.github/AGENTS.md` も
-その subtree に適用されると自動読取対象になるため、仕様説明・全体索引を除き、局所制約と
-既存の GitHub template / PR owner への条件付き参照だけにします。ROOT_AGENTS という名前や
-`@` 記法を native include とみなしてはいけません。この repo では明示読取と consumer への
-本文合成によって ROOT が実効的な共通読取量へ加算されます。
+The discovery distinction is documented by the existing
+[AGENTS guidance](https://developers.openai.com/codex/guides/agents-md/) and
+[Skill progressive disclosure](https://developers.openai.com/codex/skills/).
+This design relies on explicit common-base reading and static consumer composition;
+it does not reinterpret ROOT's name or `@` as a native include.
 
-最小化する対象は常時本文だけでなく、そこから無条件に読むよう指示された資料の集合です。
-HTML comment の dependency metadata も渡される文字量に含まれ、別ファイルへの分割後に
-「全資料を読む」と命じれば読取量は減りません。下位 AGENTS、fallback 名への変更、同じ
-説明を Skill description へ詰める方法も on-demand 化ではありません。
+For entry `A` and needed, not-yet-read sections `S(task)`, the design reading amount
+is `bytes(A) + sum(bytes(s) for s in S(task))`. This counts selected document bytes,
+not actual model tokens or measured performance. Keep automatic/subtree instructions
+thin and do not move the same full-reading obligation to fallback names, comments,
+Skill descriptions, or linked files.
 
-入口を `A`、task に必要でまだ context にない detail section 集合を `S(task)` とすると、
-読取量は `bytes(A) + sum(bytes(s) for s in S(task))` に局所化します。これは選択単位の
-設計上の量であり、実 token 数、速度、遵守率の測定ではありません。未知の owner の場合だけ
-短い入口 → optional map の該当行 → owner の該当節へ進み、既知の owner は map を迂回します。
-Skill の選択済み本文/EOF 規則は維持し、未選択 Skill と無関係な canonical 文書は読みません。
+[Skill Paths](../../agents/canonical/skills.md#skill-paths) already defines partial
+canonical reading and real-file-relative links. Root/common instructions now expose
+that meaning for thin generated adapters. Advertised commands are logical packets
+executed through the existing CLI owner; adapters remain pointers and need no new
+copy of procedure or generator schema. The existing materializer still owns generated
+adapter updates: `build_record` hashes the catalog, dependency dictionary, and canonical
+Skill bytes. Changing the dictionary invalidates every adapter record digest, so a
+coherent delivery regenerates and reads back the complete adapter set with that owner.
+A thin body does not exempt its provenance from regeneration. Verify the affected
+graph projection through its existing owner as well; do not hand-edit digest comments.
+Reuse resolved roots and routes without setup or preflight probes.
 
-旧 CODEX_WORKFLOW の Start Here と二つの packet 一覧は、条件付き Reader Map と
-[Optional Context](../../agents/canonical/CODEX_INTAKE.md#optional-context) の条件表へ置き換えます。
-移動先の全文読取を要求するだけの変更にはしません。設定済みの owner、admission、作業経路を
-再判定せず、inactive 項目の棚卸しや not_applicable 帳票も既存 active contract が求める場合だけです。
-
-ROOT の共通制約は portable な要約、source 詳細は既存 ROOT_IMPLEMENTATION / EXECUTION /
-DELIVERY に保持します。composer とその公開 API は変更せず、生成物へ source-only path の
-読取依存を追加しません。新しい loader、include DSL、読取 budget 設定、常設の文字数 gate は不要です。
-検証範囲はこの入口と直接 owner、リンク/anchor、既存 grammar、source-free composition に限定し、
-他 PR の統合や全 consumer への配布、全エージェントの実測を終了条件に含めません。
+The scope is this entry/owner/consumer reading contract and its direct tests. Runtime
+reconstruction, all-profile validation, unrelated Issue closure, template deployment,
+and all-agent empirical evaluation are not added as completion requirements.

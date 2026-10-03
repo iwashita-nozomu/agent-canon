@@ -1,6 +1,6 @@
 # @dependency-start
 # contract test
-# responsibility Verifies the root entrypoint owner-map grammar and regression failures.
+# responsibility Verifies root entrypoint grammar, the common-base directive, and actual required owner destinations.
 # upstream design ../../documents/design/entrypoint-owner-map.md structural contract
 # upstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py verifier under test
 # @dependency-end
@@ -14,7 +14,6 @@ from pathlib import Path
 
 from tools.validation.semantic.entrypoint import check_entrypoint_owner_map as checker
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -25,18 +24,19 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
-        for contract in checker.CONTRACTS:
-            source = REPOSITORY_ROOT / contract.path
-            (root / contract.path).parent.mkdir(parents=True, exist_ok=True)
-            (root / contract.path).write_text(
-                source.read_text(encoding="utf-8"), encoding="utf-8"
-            )
-        manifest_source = REPOSITORY_ROOT / checker.MARKER_MANIFEST_PATH
-        manifest_target = root / checker.MARKER_MANIFEST_PATH
-        manifest_target.parent.mkdir(parents=True, exist_ok=True)
-        manifest_target.write_text(
-            manifest_source.read_text(encoding="utf-8"), encoding="utf-8"
+        paths = {contract.path for contract in checker.CONTRACTS}
+        paths.add(checker.MARKER_MANIFEST_PATH)
+        paths.update(
+            marker
+            for contract in checker.CONTRACTS
+            for markers in contract.owner_rows
+            for marker in markers
+            if marker.endswith(".md")
         )
+        for path in paths:
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((REPOSITORY_ROOT / path).read_bytes())
         return root
 
     def _rules(self, root: Path) -> set[str]:
@@ -49,7 +49,8 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         root = self._fixture()
         target = root / "AGENTS.md"
         target.write_text(
-            target.read_text(encoding="utf-8") + "\n## Emergency Operations\n\nDo the thing.\n",
+            target.read_text(encoding="utf-8")
+            + "\n## Emergency Operations\n\nDo the thing.\n",
             encoding="utf-8",
         )
         self.assertIn("heading-sequence", self._rules(root))
@@ -58,9 +59,7 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         root = self._fixture()
         target = root / "ROOT_AGENTS.md"
         text = target.read_text(encoding="utf-8").replace(
-            "## Task Entry\n",
-            "## Task Entry\n\n### Retry Procedure\n",
-            1,
+            "## Task Entry\n", "## Task Entry\n\n### Retry Procedure\n", 1
         )
         target.write_text(text, encoding="utf-8")
         self.assertIn("nested-heading", self._rules(root))
@@ -80,9 +79,7 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         root = self._fixture()
         target = root / "AGENTS.md"
         text = target.read_text(encoding="utf-8").replace(
-            "## Task Entry\n",
-            "## Task Entry\n\n1. Run the bootstrap command.\n",
-            1,
+            "## Task Entry\n", "## Task Entry\n\n1. Run the bootstrap command.\n", 1
         )
         target.write_text(text, encoding="utf-8")
         self.assertIn("ordered-procedure", self._rules(root))
@@ -101,9 +98,10 @@ class EntrypointOwnerMapTest(unittest.TestCase):
     def test_rejects_missing_owner_row(self) -> None:
         root = self._fixture()
         target = root / "agents/canonical/SOURCE_ROUTING.md"
-        text = target.read_text(encoding="utf-8")
         text = "\n".join(
-            line for line in text.splitlines() if "public skill registry" not in line
+            line
+            for line in target.read_text(encoding="utf-8").splitlines()
+            if "public skill registry" not in line
         ) + "\n"
         target.write_text(text, encoding="utf-8")
         self.assertIn("owner-map", self._rules(root))
@@ -116,13 +114,12 @@ class EntrypointOwnerMapTest(unittest.TestCase):
     def test_rejects_missing_route_to_optional_map(self) -> None:
         root = self._fixture()
         target = root / "AGENTS.md"
-        target.write_text(
-            "\n".join(
-                line for line in target.read_text(encoding="utf-8").splitlines()
-                if "| unresolved source owner |" not in line
-            ) + "\n",
-            encoding="utf-8",
-        )
+        text = "\n".join(
+            line
+            for line in target.read_text(encoding="utf-8").splitlines()
+            if "| unresolved source owner |" not in line
+        ) + "\n"
+        target.write_text(text, encoding="utf-8")
         self.assertIn("owner-map", self._rules(root))
 
     def test_full_source_owner_map_is_not_automatically_loaded(self) -> None:
@@ -138,12 +135,67 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         target = root / checker.MARKER_MANIFEST_PATH
         target.write_text(
             target.read_text(encoding="utf-8")
-            + "\n[[contracts]]\nid = \"regression\"\n"
-            + "[[contracts.surfaces]]\npath = \"AGENTS.md\"\n"
-            + "markers = [\"operational detail\"]\n",
+            + '\n[[contracts]]\nid = "regression"\n'
+            + '[[contracts.surfaces]]\npath = "AGENTS.md"\n'
+            + 'markers = ["operational detail"]\n',
             encoding="utf-8",
         )
         self.assertIn("delegated-marker-surface", self._rules(root))
+
+    def test_rejects_missing_common_base_directive(self) -> None:
+        root = self._fixture()
+        target = root / "AGENTS.md"
+        text = target.read_text(encoding="utf-8").replace("@ROOT_AGENTS.md\n", "", 1)
+        target.write_text(text, encoding="utf-8")
+        self.assertIn("common-base", self._rules(root))
+
+    def test_rejects_nonleading_common_base_directive(self) -> None:
+        root = self._fixture()
+        target = root / "AGENTS.md"
+        target.write_text(
+            "<!-- heading before common base -->\n"
+            + target.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        self.assertIn("common-base", self._rules(root))
+
+    def test_rejects_correct_label_with_wrong_destination(self) -> None:
+        root = self._fixture()
+        target = root / "AGENTS.md"
+        text = target.read_text(encoding="utf-8").replace(
+            "[source map](agents/canonical/SOURCE_ROUTING.md)",
+            "[agents/canonical/SOURCE_ROUTING.md](ROOT_AGENTS.md)",
+        )
+        target.write_text(text, encoding="utf-8")
+        self.assertNotIn("owner-map", self._rules(root))
+        self.assertIn("owner-link", self._rules(root))
+
+    def test_rejects_unlinked_owner_path(self) -> None:
+        root = self._fixture()
+        target = root / "AGENTS.md"
+        text = target.read_text(encoding="utf-8").replace(
+            "[source map](agents/canonical/SOURCE_ROUTING.md)",
+            "`agents/canonical/SOURCE_ROUTING.md`",
+        )
+        target.write_text(text, encoding="utf-8")
+        self.assertIn("owner-link", self._rules(root))
+
+    def test_rejects_missing_required_document(self) -> None:
+        root = self._fixture()
+        (root / "agents/skills/agent-canon-update.md").unlink()
+        self.assertIn("owner-target", self._rules(root))
+
+    def test_accepts_equivalent_relative_destination(self) -> None:
+        root = self._fixture()
+        target = root / "agents/canonical/SOURCE_ROUTING.md"
+        text = target.read_text(encoding="utf-8")
+        original = "](../skills/agent-canon-update.md)"
+        self.assertIn(original, text)
+        target.write_text(
+            text.replace(original, "](../../agents/skills/agent-canon-update.md)"),
+            encoding="utf-8",
+        )
+        self.assertEqual(checker.run_checks(root), [])
 
 
 if __name__ == "__main__":

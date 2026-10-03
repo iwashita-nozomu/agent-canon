@@ -2,7 +2,7 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents cpp-review for this repository.
+responsibility Reviews selected C/C++ contract, build, ownership, and performance risks with point-of-use validation.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ./catalog.yaml public skill and capability projection
 upstream design ./skill-dependencies.yaml prerequisite and reviewer order
@@ -12,25 +12,41 @@ upstream design ../../documents/design/cpp-debugging.md native debugging selecti
 @dependency-end
 -->
 
+## Reader Map
+
+Select the changed contract before reading checks. A language-review candidate is
+not a reviewer activation; the selected owner must need a concrete C/C++ claim or
+risk resolved. Reuse an active reviewer when it already owns that claim.
+
+| Current change or decision | Read next |
+| --- | --- |
+| Native source, public header, ABI, or build configuration | [Required Checks](#required-checks) and the relevant interface/ownership evidence |
+| Docstring or convention prose only | [Docstring projection route](#docstring-projection-route); no native build is added |
+| CMake clangd/LSP analysis setup | [CMake analysis environment](#cmake-analysis-environment) |
+| Crash, hang, lifetime, initialization, or race diagnosis | [Runtime debugging](#runtime-debugging) |
+| Performance claim or changed workload cost | [Performance review activation boundary](#performance-review-activation-boundary), then its selected performance section |
+| Execute any selected program/check | [Project-owned execution](#project-owned-execution) |
+
+Read later debugging, benchmark, and recovery details when their condition is true.
+A documentation-only task with no performance claim uses documentation evidence;
+seeing this Skill or a C++ path does not activate every row.
 
 ## Purpose
 
-C / C++ 差分を build 境界、header 境界、所有権、例外・error path、test 追随の観点で
-厳密に確認します。性能への影響または性能改善を主張する差分では、計測可能な workload と
-metric を固定し、algorithm / data movement / memory hierarchy / concurrency / toolchain の
-順に支配要因を確認します。小技、複雑な低レベル実装、compiler flag 自体を高速化の根拠に
-しません。
+Review C/C++ changes for build/header boundaries, ABI, ownership, lifetime,
+exceptions/error paths, and required test/documentation follow-through. For a selected
+performance change, establish workload and metric, then investigate algorithm,
+data movement, memory hierarchy, concurrency, and toolchain in that order.
+Complex low-level code or a compiler flag alone is not performance evidence.
 
 ## Use When
 
-- `cpp/src/`, `cpp/include/`, `tests/cpp/`, `cpp/experiments/` 配下を触る
-- `cpp/CMakeLists.txt` や native build 設定を触る
-- CMake project の clangd / LSP 解析環境を準備する
-- public header、ABI、FFI、CLI binary の挙動を変える
-- C++ documentation / Docstring projection を触る
-- latency、throughput、memory footprint、allocation、scaling、起動時間、binary size、
-  SIMD / vectorization、LTO / IPO / PGO、並列性能への影響または改善を主張する
-- `bootstrap_agent_run.py` の changed path 判定で `cpp_reviewer` が自動で足された
+Use when an active review requires native C/C++ evidence, including changes beneath
+`cpp/src/`, `cpp/include/`, `tests/cpp/`, `cpp/experiments/`, native build settings,
+public headers, ABI/FFI/CLI behavior, or C++ Docstring projection. CMake analysis
+setup and explicit native performance/debugging requests use their matching rows.
+A `cpp_reviewer` candidate from changed-path routing is considered under the same
+claim/risk condition rather than automatically launched.
 
 ## Project-owned execution
 
@@ -47,6 +63,8 @@ JSON、host lease、別ランナーで重ねません。上限設定の追加を
 規定経路の権限・終了コードと明示された再実行禁止を維持し、別 daemon や host 直実行へ
 迂回しません。再実行禁止は縮小 build・別 target・小規模 GPU にも適用し、既存 evidence と
 fixture-only 検証へ限定します。禁止を解く根拠に過去の別許可を使いません。
+Failed verification follows [the topic-record owner](../../documents/operations/notes-lifecycle.md#failed-verification-record)
+with the actual command, observed result, affected property, and next owner/action.
 
 ## CMake analysis environment
 
@@ -72,296 +90,225 @@ DB 生成成功と依存込み解析成功を分け、結果と未検証範囲�
 ヘッダー自体をホストで開くための複製・転送は、この workspace 内解析の終了条件にしません。
 通常の docs-only 編集へ configure / build / LSP 実行を一律に追加しません。
 
-根拠は [CMake の compilation database 生成](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html)
-と [clangd の compile command 解釈](https://clangd.llvm.org/design/compile-commands) です。
+根拠は [CMake compilation database](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html)
+と [clangd compile commands](https://clangd.llvm.org/design/compile-commands) です。
 
 ## Required Checks
 
-- project-native configure / build / test evidence
-- When native static analysis is relevant and a CMake-generated database exists, use:
-  `python3 tools/validation/code/static/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
-  `python3 tools/validation/code/static/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`;
-  and `python3 tools/validation/code/static/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`.
-  The build directory is explicit per module; the tool does not enumerate or add include paths,
-  compiler flags, or provider-specific diagnostics.
-- `ctest` があるならその結果
-- CMake project では project-owned の configure / build / test 結果を使い、既存経路が
-  まとめて実行する処理を個別 command で重ねません
-- install contract がある場合は同じ規定経路による install の結果
-- 性能変更が activation 条件を満たす場合は、repository-owned benchmark / profiler / workload
-  route による before / after evidence。特定の benchmark framework、profiler、CPU counter、
-  compiler、hardware を普遍要件にはしない
+This section applies to changed native source/header/ABI/build contracts. A Docstring
+or convention-only change goes directly to its projection section. Select the
+project-native configure/build/test evidence that covers the changed contract;
+consume combined runner results without duplicating each underlying command.
+Use configured `ctest` and installation evidence when those contracts are affected.
+
+When static analysis is relevant and a CMake-generated database exists, use the
+existing `tools/validation/code/static/cpp/static_analysis.py` operations `select-db`,
+`clangd-check`, and `clang-tidy` with explicit `--workspace-root`, module `--build-dir`,
+and the selected `--source` where required. Execute through the existing owner route.
+Do not enumerate extra include paths, compiler flags, or provider-specific diagnostics.
+
+Trace public header/implementation and call-site correspondence, linkage/ABI,
+lifetime, ownership, move/copy, resource release, bounds, null, exception/error
+behavior, and affected tests/docs. Inspect the changed mechanism and reachable
+failure paths rather than freezing private helper layout. Preserve required inputs,
+safety, numerical semantics, and existing regression contracts.
+
+Only a performance-activated change requires its comparable benchmark/profiler
+results. Do not require a universal profiler, hardware counter, compiler, benchmark
+framework, or new threshold owner.
 
 ## Runtime debugging
 
-crash、hang、寿命違反、未初期化値、data race の調査、または明示的なデバッグ要求では
-[C++ debugging](../../documents/design/cpp-debugging.md) に従い、GDB、Valgrind Memcheck、
-既存 compiler の sanitizer から必要な診断を選びます。通常編集への全ツール必須 gate
-にはせず、project-owned runner と既存の実行許可・resource limit を維持します。
-診断 command の成功と対象 program の正常終了を混同せず、stack / diagnostic と
-未検証範囲を既存 Issue / PR に残します。
+For crash, hang, lifetime violation, uninitialized values, data races, or an explicit
+debugging request, read [C++ debugging](../../documents/design/cpp-debugging.md) and
+select needed GDB, Valgrind Memcheck, or existing compiler sanitizer evidence.
+Keep the project-owned runner, permissions, resource and rerun limits. Diagnostic
+command success and program success are separate observations; preserve stacks,
+diagnostics, and the unverified scope in the existing Issue/PR.
 
 ## Core References
 
-- [documents/conventions/coding-conventions-cpp.md](../../documents/conventions/coding-conventions-cpp.md)
-- [documents/conventions/DOCSTRING_GUIDE.md](../../documents/conventions/DOCSTRING_GUIDE.md)
-- [documents/conventions/coding-conventions-testing.md](../../documents/conventions/coding-conventions-testing.md)
-- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
+- [C++ conventions](../../documents/conventions/coding-conventions-cpp.md)
+- [Docstring contract](../../documents/conventions/DOCSTRING_GUIDE.md)
+- [Testing conventions](../../documents/conventions/coding-conventions-testing.md)
+- [Review process](../../documents/conventions/REVIEW_PROCESS.md)
 
-性能レビューの工学的参考資料として次の一次資料を使えます。これらは AgentCanon の第二
-policy owner ではなく、この Skill の evidence contract を解釈するための reference です。
+Performance references support the selected engineering judgment; they are not
+additional policy owners or a startup reading list:
 
-- [C++ Core Guidelines: Per — Performance](https://isocpp.org/guidelines)
-- [Google Benchmark User Guide](https://google.github.io/benchmark/user_guide.html)
-- [LLVM Auto-Vectorization diagnostics](https://llvm.org/docs/Vectorizers.html)
-- [GCC Optimize Options](https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html)
-- [CMake CheckIPOSupported](https://cmake.org/cmake/help/latest/module/CheckIPOSupported.html)
+- [C++ Core Guidelines](https://isocpp.org/guidelines)
+- [Google Benchmark](https://google.github.io/benchmark/user_guide.html)
+- [LLVM vectorization diagnostics](https://llvm.org/docs/Vectorizers.html)
+- [GCC optimization options](https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html)
+- [CMake IPO support](https://cmake.org/cmake/help/latest/module/CheckIPOSupported.html)
 
 ## Target graph readback
 
-- `cpp/CMakeLists.txt` が単一の native project entry として `cpp/src`、`cpp/include`、
-  `${ROOT}/tests/cpp`、`cpp/experiments` を同じ configure graph に接続します。tests/cpp
-  は source/binary directory を明示した out-of-tree `add_subdirectory` で登録します。
-- `cpp-test-<name>` と `cpp-experiment-<name>` は `cpp-core` を consume し、
-  `cpp-tests` と `cpp-experiments` は build grouping を提供します。
-- root anchor、build tree、install prefix は `$ROOT/cpp`、`$ROOT/build/cpp/<profile>`、
-  `$ROOT/.state/cpp-install/<profile>` に read back します。run/result publication は
-  experiment lifecycle owner に残します。
+For the selected `cpp/CMakeLists.txt` project graph, read back its existing contract:
+`cpp/src`, `cpp/include`, `${ROOT}/tests/cpp`, and `cpp/experiments` share the configure
+graph; tests use explicit out-of-tree source/binary directories. `cpp-test-<name>` and
+`cpp-experiment-<name>` consume `cpp-core`, with `cpp-tests` / `cpp-experiments` grouping.
+The anchors are `$ROOT/cpp`, `$ROOT/build/cpp/<profile>`, and
+`$ROOT/.state/cpp-install/<profile>`. Run/result publication stays with experiment
+lifecycle. These project-specific paths do not replace another consumer's graph.
 
 ## Docstring projection route
 
-`agent_team.language_review_candidates` が native C/C++ implementation or test path（native suffix、
-`cpp/CMakeLists.txt`、`cpp/src/`、`cpp/include/`、`tests/cpp/`、`cpp/experiments/`、
-`cpp/cmake/` marker）を含む
-changed surface に `cpp_reviewer` を候補として返した場合に、reviewer を起動します。
-convention/template documentation は同じ
-path inventory から `docs_workflow_steward` が担当し、catalog capability は OOP/type design
-owner の選択に限ります。semantic clause の owner は [documents/conventions/DOCSTRING_GUIDE.md](../../documents/conventions/DOCSTRING_GUIDE.md)
-へ戻します。レビューは Doxygen syntax / format、header/source anchor、native ownership
-evidence と、target responsibility region に選択した semantic delta が対応するかを確認
-します。signature、namespace、field、型事実を comment に複製せず、`@param`、`@return`、
-`@throws` の全 tag を意味契約の gate にしません。
+For a selected C/C++ semantic-documentation review, use
+[DOCSTRING_GUIDE](../../documents/conventions/DOCSTRING_GUIDE.md) as clause owner.
+A native suffix or `cpp_reviewer` candidate alone does not require a new reviewer;
+activate only a needed native claim/risk. Convention/template prose belongs to the
+selected documentation owner. OOP/type-design capability selection stays separate.
 
-Docstring または規約だけの差分では native build を追加せず、design/header/static evidence
-で完了します。native source、header、ABI、または build configuration が変わった場合だけ
-project-native configure / build / test route を起動します。
+Review Doxygen syntax/format, header/source anchors, native ownership evidence, and
+correspondence to the selected semantic delta. Do not copy signatures, namespace,
+fields, or type facts into comments or require every `@param`/`@return`/`@throws` tag.
+Docstring or convention-only changes close with design/header/static evidence.
+Changed source/header/ABI/build behavior uses the Required Checks route above.
 
 ## Performance review activation boundary
 
-性能 evidence を要求するのは、次のいずれかが今回の差分に存在するときです。
+Activate performance review when the change claims improved or preserved performance;
+changes a known critical path, hot loop, allocation/layout, I/O/transfer,
+threading/synchronization or compiler optimization; changes the workload cost model
+(complexity, working set, copies, transfers, synchronization); or falls under an
+existing performance regression contract.
 
-- PR、Issue、comment、API contract、test 名が性能改善または性能維持を主張する
-- known critical path、hot loop、allocator / layout、I/O / transfer、threading / synchronization、
-  compiler optimization setting を変える
-- complexity、working-set size、copy / allocation count、host-device transfer、同期回数など、
- 対象 workload の cost model を変える
-- 既存の performance regression gate または benchmark contract が変更対象を覆う
-
-単なる docs / comment、性能契約を持たない名前変更、非実行 metadata、または性能中立である
-ことが構造的に明らかな差分へ benchmark を一律に追加しません。activation した場合も、
-既存 repository-owned route を優先し、第二 benchmark framework、第二 profiler wrapper、
-第二性能 score / threshold owner を追加しません。
-
-実機または対象 runtime が利用できず性能主張を検証できない場合は、correctness evidence と
-analytical cost change を性能実測の代用として合格扱いにしません。未検証の hardware、
-workload、compiler、thread / device 条件を明記して handoff します。
+A performance-neutral rename, non-executable metadata, or ordinary comment/docs
+change without a performance claim does not require benchmarking. When active,
+use the repository-owned workload, profiler and benchmark. Keep correctness and
+analytical cost evidence distinct from empirical performance. If the required
+runtime is unavailable, report exact hardware/workload/compiler/thread/device gaps;
+do not mark an unmeasured improvement verified.
 
 ## Performance review order
 
+Select the relevant subsections only after the activation decision above.
+
 ### Numerical solver handoff boundary
 
-対象が C / C++ の数値 solver または反復 algorithm である場合、性能差の
-最初の判定は `computational-optimization` の convergence-first numerical
-performance diagnosis に委譲します。cpp review はその post-run record を
-受け取り、数学 / algorithm の観測と native implementation evidence を混ぜません。
-record は `python3 tools/analysis/numerical/numeric_performance.py --input
-<post-run-observations.json> --format json` の分類結果を使います。
+For C/C++ numerical solvers or iterative algorithms, first read
+[computational-optimization](computational-optimization.md) for convergence-first
+numerical performance diagnosis. Its post-run classification uses
+`tools/analysis/numerical/numeric_performance.py --input <post-run-observations.json>
+--format json` through the existing route. The dependency dictionary exposes a
+conditional candidate, not a mandatory prerequisite for all C++ reviews.
 
-- iteration count、residual / objective / KKT trajectory、KKT / finite state、step
-  acceptance / size、termination、conditioning、inner-solver work、または objective /
-  gradient / eval / linear-solve / matvec work counter が変わった場合は、math /
-  algorithm owner へ返します。JIT、backend、
-  compiler、architecture の編集を cpp review の第一手段にしません。
-- 数値 trajectory、work counters、termination、conditioning、inner-solver work、
-  mathematical problem、initial state、stopping policy、dtype、workload、run mode、
-  cache、backend、device、compiler が同じで、compile/JIT、per-iteration、eval /
-  linear-solve、transfer / synchronization、または total cost の after 側に正の
-  回帰がある場合に限り、該当 systems / JIT sibling handoff を受けます。
-- 比較 context が違う、finite / non-finite event が欠ける、または work counter が
-  変わる場合は `evidence_missing` または math route とし、systems attribution を
-  行いません。
-- total time しかない場合、または total だけが増えて decomposed component が増えて
-  いない場合は `evidence_missing`（`unattributed_total`）として追加 metrics を要求し、
-  JIT 境界の変更を提案しません。
-- 数値 solver ではない C++ performance は、既存のこの文書の workload、data
-  movement、native benchmark の順序をそのまま使います。数値 solver 用の
-  convergence record や compile/JIT 分解を一律に要求しません。
+Changed iterations, residual/objective/KKT trajectory, finite state, accepted steps,
+termination, conditioning, inner-solver work, or objective/gradient/evaluation/
+linear-solve/matvec counts return to the mathematical/algorithm owner. Systems/JIT
+handoff requires unchanged numerical trajectory, work counters, problem, initial
+state, stopping policy, dtype, workload, run mode, cache, backend, device and compiler,
+with a positive regression in the relevant compile/JIT, iteration, evaluation,
+linear-solve, transfer/synchronization or total component.
+
+Different comparison context or missing finite/non-finite events is
+`evidence_missing`, not systems attribution. Total-only or unattributed total growth
+is `evidence_missing` / `unattributed_total`; obtain relevant component evidence
+before proposing a JIT-boundary change. Non-solver performance uses the native
+workload/data-movement route without a convergence-record requirement.
 
 ### 1. Contract、workload、metric
 
-- latency、throughput、peak / steady-state memory、allocation count、startup、binary size、
-  scalability のどれを改善または維持するのかを一つ以上明示します。
-- representative input size、distribution、state、thread / process / device 数、warm / cold 条件、
-  setup、I/O、transfer、synchronization を metric の対象に含めるかを固定します。
-- profile、trace、call frequency、complexity、working-set estimate、既存 regression evidence の
-  いずれかで critical path と仮説を支えます。測定なしの「一般に速い」は根拠になりません。
-- 実装差分の semantic contract、ABI、numeric tolerance、determinism、resource limit を先に
-  固定し、性能結果を得るために事後的に意味を変更しません。
+Fix latency, throughput, memory, allocation, startup, binary size or scaling metrics
+and representative input size/distribution/state, concurrency/device counts,
+warm/cold conditions, and setup/I/O/transfer/synchronization measurement boundaries.
+Support a critical-path hypothesis with profile, trace, call frequency, complexity,
+working-set estimate or existing regression evidence. Preserve semantic/ABI/numeric
+and resource guarantees instead of changing them after seeing results.
 
 ### 2. Algorithm と不要処理
 
-低レベルの命令置換より先に、workload 全体の支配項を確認します。
-
-- asymptotic time / space complexity、iteration / pass 数、探索範囲、data structure、
-  batching、I/O / syscall / transfer / synchronization 回数が適切か
-- loop invariant、重複変換、重複 lookup、不要な format / parse、再計算、materialization を
-  semantic contract の範囲で除けるか
-- early exit、memoization、precomputation、fusion、parallelization が入力分布、memory 増加、
-  invalidation、ordering、failure semantics と整合するか
-- 局所 hotspot の高速化が end-to-end metric に寄与する割合を説明できるか
-
-単純な高水準コードを、複雑な branchless trick、手動 unroll、custom allocator、intrinsic、
-inline assembly へ置き換えるだけでは改善と判断しません。compiler、profile、benchmark の
-根拠があり、保守コストと portability cost を上回る場合だけ採用候補にします。
+Start with total asymptotic work/space, iterations/passes, search, data structures,
+batching and I/O/syscall/transfer/synchronization counts. Check redundant conversions,
+lookups, format/parse, recalculation and materialization against loop invariants.
+Early exit, caching, precomputation, fusion and parallelization must preserve input,
+memory, invalidation, order and failure contracts. Explain the hotspot's contribution
+to the end-to-end metric. Branchless tricks, unrolling, allocators, intrinsics and
+assembly require compiler/profile/benchmark evidence and justified maintenance and
+portability cost, not speculative speed claims.
 
 ### 3. Data movement、layout、allocation
 
-- access pattern に対して contiguous / predictable traversal、working-set size、cache reuse、
-  pointer chasing、strided / random access がどう変わるか
-- AoS / SoA、index / pointer、compact representation、padding / alignment の選択が実際の
-  field access と target architecture に対応するか。形だけで一律に優劣を決めない
-- allocation / deallocation、container growth、temporary、deep copy、reference counting、
-  serialization、host-device transfer の回数と byte 数を減らしているか
-- `reserve`、buffer reuse、move、view、arena / pool 等が lifetime、invalidation、peak memory、
-  exception safety、ownership を壊していないか
-- object size や alignment の変更が ABI、cache footprint、vectorization、false sharing に
-  与える影響を確認したか
-
-copy を move に変える、reference を増やす、small object を heap 化する等を一般則として
-適用しません。value category、lifetime、alias、escape、call frequency、object size の evidence
-から判断します。
+Relate access patterns, contiguous traversal, working sets, cache reuse, pointer
+chasing, strides and randomness to actual fields and architecture. Check AoS/SoA,
+indices/pointers, compact representation, padding/alignment, allocation/growth,
+temporaries, deep copies, refcounts, serialization and host-device byte/count changes.
+`reserve`, buffer reuse, moves, views and arenas must preserve lifetime, invalidation,
+peak memory, exceptions and ownership. Evaluate ABI/cache/vectorization/false-sharing
+impacts. Neither moves nor references nor heap allocation is a universal improvement;
+use value category, alias/escape, frequency, lifetime and size evidence.
 
 ### 4. Branch、alias、vectorization、generated code
 
-- branch predictability、dependency chain、alias、alignment、trip count、reduction、call boundary
-  が compiler optimization を阻害または改善するという仮説を確認します。
-- vectorization / inlining / unrolling の主張は、対象 compiler の optimization remarks、
-  generated assembly、profile、performance counter のうち利用可能で最も直接的な evidence
-  へ read back します。
-- compiler が既に行う変換を手書きで複製せず、まず明確な loop/data dependency と型契約を
-  提供します。
-- code size、instruction cache、compile time、register pressure を無視した「より多く inline / 
-  unroll / template 化」を推奨しません。
+Check branch prediction, dependency chains, aliases, alignment, trip counts,
+reductions and call boundaries. Support vectorization/inlining/unrolling claims with
+compiler remarks, assembly, profiles or relevant counters. Expose clear data and type
+dependencies rather than copying compiler transformations. Include code size,
+instruction cache, compile time and register-pressure costs.
 
 ### 5. Concurrency と heterogeneous runtime
 
-対象 runtime に並列性がある場合だけ次を確認します。
-
-- lock contention、critical section、atomic traffic、cache-line ping-pong、false sharing、
-  barrier / synchronization、queueing、task granularity、load balance、oversubscription
-- thread 数、affinity、NUMA placement、process topology、device 数と対象 workload の対応
-- CPU と accelerator 間の materialization、transfer、kernel launch、implicit synchronization、
-  asynchronous lifetime の境界
-- parallel speedup と同時に total work、memory footprint、tail latency、determinism、failure
-  propagation が悪化していないか
-
-memory order、locking、lifetime、stream / event dependency を速さのために暗黙に弱めません。
-競合や順序を保証できない実装は、benchmark が速くても不合格です。
+When parallel execution is involved, inspect contention, atomics/cache-line traffic,
+false sharing, barriers, queueing, task size, load balance and oversubscription.
+Relate affinity/NUMA/process/device topology to workload, and trace materialization,
+transfers, launches, implicit synchronization and asynchronous lifetime. Compare
+total work, memory, tail latency, determinism and failure propagation as well as
+speedup. Preserve memory order, locking, lifetimes, stream/event dependencies and
+race freedom even when a weaker implementation benchmarks faster.
 
 ### 6. Toolchain optimization と numerical semantics
 
-- optimized configuration で測定し、compiler / version、target architecture、標準 library、
-  optimization flags、link mode を before / after で揃えます。
-- LTO / IPO は target と toolchain の support を確認し、compile と link の双方を一貫させ、
-  binary size、link time、debug / sanitizer / packaging への影響を含めて実測します。
-- PGO は production を代表する profile workload、profile identity、generate / merge / use route、
-  stale profile failure semantics を確認します。
-- `-O3`、`-march=native`、fast-math、loop unroll、prefetch、SIMD intrinsic 等を無条件の tips として
- 追加しません。target portability と実測効果を確認します。
-- floating-point reassociation、NaN / Inf、signed zero、rounding、overflow、alias、alignment、
-  object lifetime、undefined behavior に関する前提を暗黙に変更しません。精度、再現性、
-  exception / error semantics の変更は独立した明示契約と test を必要とします。
+Compare optimized builds with matched compiler/version, architecture, standard
+library, flags and link mode. LTO/IPO needs compile/link support and evidence about
+size, link time, debugging, sanitizers and packaging. PGO needs representative training
+workload, profile identity and generation/merge/use/staleness semantics. Flags such as
+`-O3`, `-march=native`, fast-math, prefetch and SIMD need portability and measured
+benefit. Preserve floating-point reassociation, NaN/Inf, signed zero, rounding,
+overflow, alias/alignment, lifetime and defined-behavior assumptions. Numerical
+accuracy/reproducibility/exception changes require their own explicit contract/tests.
 
 ## Benchmark evidence contract
 
-性能を数値で主張するとき、review evidence は少なくとも次を read back します。
+For empirical performance claims, retain what (metric/workload/input/path), where
+(hardware/OS/compiler/library/flags/topology), how (timing/clock/counter/warm-up/
+repetitions/setup/synchronization/noise), validity (observable output, no dead-code
+or constant-folded result, same semantic result), result (before/after raw or owned
+summary, sample count, selected statistics, dispersion, meaningful effect and
+regression-threshold rationale), and scope (regressions, untested conditions,
+memory/tail-latency trade-offs).
 
-- **what**: metric、workload、input size / distribution、対象 path
-- **where**: hardware / device、OS、compiler / version、standard library、build type / flags、
-  thread / process / device topology
-- **how**: timing scope、clock / counter、warm-up、iteration / repetition、setup / teardown、
-  synchronization、CPU frequency / system load など支配的 noise の扱い
-- **validity**: result が消去または constant-fold されていないこと、必要な output / state が
-  observable なこと、correctness test と同じ semantic result を保つこと
-- **result**: before / after の raw または repository-owned summary、sample count、median / mean 等の
-  selected statistic、dispersion、実用上の差、regression threshold の根拠
-- **scope**: 改善した条件、退化した条件、未検証の input / architecture / compiler、memory や
-  tail latency 等の trade-off
-
-benchmark setup を timing から外すことも含めることも一般則では決めません。対象 metric の
-system boundary と一致させます。microbenchmark の改善を end-to-end 改善として外挿せず、
-必要なら両方を分離して示します。noise より小さい差や単発の最良値を改善と断定しません。
-固定の万能な改善率や統計手法は追加せず、既存 regression owner と観測ばらつきから判定します。
+Timing boundaries follow the metric. Do not extrapolate a microbenchmark to
+end-to-end behavior, use a single best timing as proof, or call a below-noise effect
+an improvement. Use existing regression ownership and observed variation rather
+than adding a universal improvement percentage or statistical method.
 
 ## Expected Outcome
 
-- public header、ABI、linkage、ownership、error path のリスクが明示されている
-- 実行した build / test evidence と未実行の check が分かれている
-- native 実装に追随すべき docs / build instructions / tests が確認されている
-- 性能変更では、critical path、cost hypothesis、before / after 条件、ばらつき、semantic risk、
-  未検証範囲が分離されている
-- speculative micro-optimization ではなく、測定された支配要因に対応する最小の
-  contract-complete change が選ばれている
+Report selected interface/ownership/error/correctness/build/docs findings and actual
+validation with its unrun scope. Performance findings retain the cost hypothesis,
+comparison conditions, variability, semantic risks and unverified conditions. Choose
+the smallest contract-complete correction supported by the observed dominant cause.
 
 ## Mandatory Checklist
 
-- public header と implementation の整合を見ている
-- lifetime、ownership、resource release、move/copy semantics の破綻を見ている
-- bounds、null、error code、exception、failure path の扱いを見ている
-- configure / build / test evidence が今回の差分に対して妥当か確認している
-- build script、CMake、linkage、include path の影響を見ている
-- native 実装に追随すべき docs や commands があれば確認している
-- 性能 activation の有無を changed contract と主張から判定している
-- activation した場合、metric / workload / critical path / cost hypothesis を固定している
-- algorithm と data movement を低レベル instruction / flag より先に確認している
-- memory access、allocation / copy、layout、並列 contention / synchronization の該当項目を
-  evidence に基づいて確認している
-- before / after の build、hardware、input、timing scope と統計が比較可能で、benchmark 自体が
-  optimized away されていない
-- performance change が correctness、defined behavior、ABI、numeric semantics、determinism、
-  portability を暗黙に弱めていない
-- benchmark / profiler / threshold / compiler policy の第二 owner を追加していない
+Apply the current Reader Map row and shared safety/semantic constraints. Native
+review uses Required Checks, documentation review its projection, and performance
+review its activation and selected evidence sections. This heading does not create
+a second unconditional build or benchmark checklist.
 
 ## Default Sequence
 
-1. changed native files、header、build files、関連 test files を固定します。
-1. public header、ABI boundary、ownership boundary、semantic / numerical contract を先に確認します。
-1. 性能 activation を判定し、activation した場合は workload、metric、critical path、cost hypothesis
-   を固定します。
-1. algorithm / total work、data movement / allocation、memory layout、concurrency、compiler-generated
-   code の順で支配要因と差分機構を対応付けます。
-1. configure / build / correctness test evidence を確認します。
-1. activation した場合は comparable before / after benchmark / profile evidence と未検証条件を
-   確認します。
-1. findings を ABI and interface、memory and ownership、error path、correctness coverage、
-   performance evidence、docs drift に分けて返します。
+Select the changed contract and required risk, read its current section, obtain
+owner-defined evidence, and report findings with limits. Resolve additional runtime,
+performance or numerical questions at the conditional routes above, then return to
+the same review. Reuse valid existing results rather than rerunning a whole sequence.
 
 ## Common Failure Modes
 
-- header だけ変わって call site や docs が追随していない
-- ownership、move/copy、resource cleanup の仮定が暗黙のまま壊れている
-- `CMakeLists.txt` や link setting が変わったのに build evidence が薄い
-- error path や malformed input の regression test が不足している
-- profile や representative workload なしに局所コードを「高速」と断定する
-- Debug と Release、異なる compiler flags / hardware / input を before / after として比較する
-- warm-up、反復、ばらつき、setup / transfer / synchronization、dead-code elimination を扱わず
-  単一 timing を採用する
-- complexity、不要処理、data movement、allocation を残したまま branchless trick、manual unroll、
-  intrinsic、custom allocator、LTO / PGO / fast-math を先に追加する
-- microbenchmark の改善を end-to-end throughput / latency の改善として外挿する
-- cache locality、working set、copy / temporary、false sharing、contention、oversubscription を
-  説明せず並列化または layout 変更を行う
-- performance のために memory order、bounds、lifetime、overflow、alias、floating-point、
-  NaN / Inf、determinism の契約を暗黙に弱める
-- repository-owned benchmark / validation route があるのに第二 framework、wrapper、threshold、
-  score、CI gate を追加する
+Watch for unmigrated callers/docs after a header change, implicit lifetime/ownership
+assumptions, build changes without selected build evidence, and untested reachable
+error paths. Under performance activation, reject unmatched build/hardware/input
+comparisons, missing warm-up/repetition/noise or dead-code controls, low-level tricks
+before algorithm/data-movement analysis, unexplained concurrency/layout changes,
+weakened numerical or memory semantics, and duplicate benchmark/profiler frameworks.

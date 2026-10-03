@@ -48,4 +48,4 @@ Do not create a line/order checker or exact-layout test.
 
 ## Review outcome
 
-Report findings first, distinguish blocking from advisory items, and tie each blocking item to the API/type/runtime contract or a concrete maintenance failure. Reuse `change-review` for durable follow-up escalation; ordinary resolved Python findings do not require issue publication.
+Report findings first, distinguish blocking from advisory items, and tie each blocking item to the API/type/runtime contract or a concrete maintenance failure. When a finding needs durable follow-up escalation, read [change-review](change-review.md); ordinary resolved Python findings do not require issue publication. The dependency dictionary exposes this as a conditional candidate, not a prerequisite or automatic review activation.
