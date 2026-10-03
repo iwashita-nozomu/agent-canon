@@ -158,6 +158,19 @@ while that cadence is active; do not delegate through existing children or
 parallel read-only work. Only an explicit user change of cadence returns to
 autonomous routing.
 
+All reader-facing writing, not only Issues or verification results, must let the
+intended reader reproduce the relevant actions or reconstruct the stated reasoning
+from the output and identified, accessible references, without private chat history
+or the author's environment. Before writeout, walk through the reader's task:
+provide applicable scope, prerequisites, exact inputs and ordered steps, expected
+outcomes or decision method, and precise evidence locations. For designs and
+explanations, expose definitions, premises, and the link from evidence to conclusion.
+Resolve placeholders and necessary context; brevity or links alone do not excuse
+missing information. Distinguish proposed, observed, unrun, and unknown conditions.
+State unavailable or withheld evidence and its limits without inventing facts or
+exposing secrets. Reuse existing owners and records; this writing obligation adds
+no fixed template, environment discovery, rerun, or publication gate.
+
 Continue safe, authorized implementation through delivery; report concrete blockers
 and the next owner when stopped. Separate commit/push authority and preserve mixed
 work; never force-push, mutate main, or publish outside scope. Report the result,
