@@ -70,6 +70,15 @@ pin; otherwise use the consumer's declared resolution.
 Establish reachability and existing guarantees before extra error handling;
 unknown is neither impossible nor a defect. Keep authorization and boundary safety.
 
+Compose cohesive parts through explicit contracts; keep use-case policy and
+presentation outside reusable mechanisms. For machine-facing commands, separate
+result data from diagnostics and define non-interactive input, framing, exit
+status, and partial-result semantics. Make resource ownership, cancellation,
+and cleanup explicit. Check actual caller workflows, not signatures alone,
+while preserving the authorized API migration boundary above. Do not equate
+simplicity with one-line code, one process per function, text-only data, silent
+errors, or additional preflight gates.
+
 Run the repository owner's fixed execution route with configured defaults first;
 success needs no route probes. After an actual failure, inspect only facts that
 can change the next authorized action. Stop incidental environment diagnosis when
