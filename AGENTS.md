@@ -3,7 +3,7 @@
 <!--
 @dependency-start
 contract agent-runtime
-responsibility Provides the minimal source entrypoint and conditional owner route.
+responsibility Provides the AgentCanon source-editing scope and conditional owner route.
 upstream design documents/design/entrypoint-owner-map.md reading boundary
 upstream design ROOT_AGENTS.md portable common constraints
 downstream design agents/canonical/SOURCE_ROUTING.md optional source owner index
@@ -12,25 +12,9 @@ downstream design agents/canonical/SOURCE_ROUTING.md optional source owner index
 
 ## Repository Role
 
-This source-only entrypoint is not a consumer composition input. Its leading
-`@ROOT_AGENTS.md` explicitly requests the common base once, not a native include.
-Source owner routes replace consumer routes, never the shared constraints.
-
-## Reader Map
-
-Use the known task owner directly. Consult the optional map below only to resolve
-an unknown owner or request modality; read its matching row. Mandatory routing
-means applying the selected owner's policy, not reopening a resolved selection
-or rereading an unchanged Skill on every action.
-
-When invoking a Skill and its adapter or command context is unresolved, start at
-[Skill Paths](agents/canonical/skills.md#skill-paths). When formatting edited files,
-use [formatter settings](documents/design/formatting.md#ownership-and-purpose).
-
-## Always-On Boundary
-
-Keep automatically loaded instructions minimal. Read only applicable detail
-sections; links and dependency metadata support selection, not recursive reading.
+These instructions apply when editing the AgentCanon repository itself. The
+leading `@ROOT_AGENTS.md` requests the common base; consumer composition uses
+that base rather than this source-only entrypoint.
 
 ## Runtime Owner Map
 
@@ -38,12 +22,6 @@ sections; links and dependency metadata support selection, not recursive reading
 | --- | --- | --- |
 | unresolved source owner | [source map](agents/canonical/SOURCE_ROUTING.md) | selected row only |
 
-## Task Entry
-
-Read the selected owner after the common base. Reuse unchanged context;
-shared constraints belong to ROOT and procedures to their selected owners.
-
-## Validation Routing
-
-Use the changed owner's existing formatter and validation route. Detailed
-procedures belong in optional files, not another auto-loaded AGENTS.
+When a selected Skill's adapter or command context is unresolved, use
+[Skill Paths](agents/canonical/skills.md#skill-paths). For formatting AgentCanon
+files, use [formatter settings](documents/design/formatting.md#ownership-and-purpose).

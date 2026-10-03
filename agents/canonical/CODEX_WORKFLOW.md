@@ -15,9 +15,8 @@ downstream design ./CODEX_COMPLETION.md validation and delivery
 
 ## Reader Map
 
-Read the starting section for the current unresolved decision or active operation.
-The selected owner chooses further detail; a row does not activate every phase.
-Reuse applicable intake, owners, and decisions through retries and handoffs.
+This map selects Codex task phases and their active auxiliary routes. Phase
+owners contain the procedures; ROOT owns the shared reading constraints.
 
 | When | Start with |
 | --- | --- |
@@ -29,20 +28,9 @@ Reuse applicable intake, owners, and decisions through retries and handoffs.
 | The selected route requires run state | [run bootstrap](CODEX_BOOTSTRAP.md#4-run-bootstrap) |
 | Design or implementation is active | [implementation reader map](CODEX_IMPLEMENTATION.md#reader-map) |
 | Validation or closeout is due | [completion reader map](CODEX_COMPLETION.md#reader-map) |
-
-Required means applicable to the selected action. Additional context follows
-[its read conditions](CODEX_INTAKE.md#optional-context) and the active Skill's
-conditional links, including during implementation and validation. When a
-condition becomes true, read the linked section before the dependent action,
-then return to the interrupted phase. Reuse valid reads rather than preloading
-related Skills or treating the initial selection as permanently fixed.
-
-An already resolved owner, route, and validation need no new routing pass.
-After an actual execution failure, use
-[bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis).
-For failed verification, also update its
-[topic record](../../documents/operations/notes-lifecycle.md#failed-verification-record)
-when the result is observed. Preserve the selected execution route.
+| Additional context becomes necessary during the active phase | [context read conditions](CODEX_INTAKE.md#optional-context) and the active Skill's matching conditional link, then return to the interrupted phase |
+| Execution fails | [bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis) |
+| Verification fails | [failure record](../../documents/operations/notes-lifecycle.md#failed-verification-record) when the result is observed |
 
 ## Completion Readiness
 
