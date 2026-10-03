@@ -77,14 +77,22 @@ separate approval merely for changing a contract. Preserve explicit guarantees,
 compatibility, and authority; expose concrete conflicts rather than silently
 weakening requirements or inventing compatibility.
 
+An explicit implementation-replacement request fixes retirement of the named old
+mechanism as part of the target. Plan implementation, necessary migration, and
+deletion together; carry that disposition into handoff and review. General reuse
+and repair guidance operates inside that target rather than reopening retirement.
+Inspect old code only for required retained guarantees, shared parts, migration
+connections, and user/data safety. Active callers, existing tests, or speculative
+rollback value do not create retention requirements.
+
 Before implementation, including private helpers and in-file additions, inspect
 relevant abstractions, callers, APIs, configuration, extension points, standard
 facilities, and adopted dependencies against that target. For new functionality,
 start with their direct use, configuration, and composition; implement only an
-evidenced gap. For fixes, changes, or cleanup of existing functionality, reconsider
-whether the affected structure should remain: consider removing or replacing
-unnecessary or defective mechanisms before adding layers to preserve them.
-Reuse sound parts; a fix does not require deletion or wholesale rewriting.
+evidenced gap. When a repair method is delegated, reconsider whether the affected
+structure should remain: consider removing or replacing unnecessary or defective
+mechanisms before adding layers to preserve them. Reuse sound parts; an unspecified
+repair does not require deletion or wholesale rewriting.
 Apply these choices per responsibility in mixed tasks, not by file age or a
 single label for the whole task. Search existing topic notes and authorized
 AgentCanon logs for applicable failed attempts; compare their inputs, revisions,
@@ -109,16 +117,20 @@ independent states, special cases, coupled invariants, and proof obligations,
 including required caller conversions and support. Justify the governing laws
 and representation correspondence; do not merely compress or relocate code,
 force deletion quotas, or weaken required behavior, safety, or performance.
-Establish semantics and migration before deleting; replacement removes obsolete code
-and support while migrating necessary consumers in the same change. Recover
-committed source from Git history and keep the maintained tree for the current
-required implementation. Remove superseded code, commented-out implementations,
-backup copies, and speculative rollback paths with their unnecessary support.
-Preserve uncommitted/untracked work and user/runtime data through their owners.
-Retain wrappers or dual paths only for a required compatibility contract. Keep
-caller orchestration separate from reusable-library responsibility. Add mechanisms,
-dependencies, exact pins, or guards only for an evidenced current need; preserve
-native resolution and required integrity checks.
+Establish required semantics and migration boundaries from the agreed target;
+replacement removes obsolete code and support while migrating necessary consumers
+in the same change. Recover committed source from Git history and keep the
+maintained tree for the current required implementation. Remove superseded code,
+commented-out implementations, backup copies, and speculative rollback paths with
+their unnecessary support. Preserve uncommitted/untracked work and user/runtime
+data through their owners. Preserve explicitly required compatibility through an
+entrypoint to the new canonical implementation. Keeping an old execution path
+requires an explicit coexistence requirement with its scope and retirement condition.
+Verify new behavior, necessary migration, and absence of retired code and exclusive
+support before reporting replacement complete. Keep caller orchestration separate
+from reusable-library responsibility. Add mechanisms, dependencies, exact pins, or
+guards only for an evidenced current need; preserve native resolution and required
+integrity checks.
 When an existing dependency contract requires an exact pin, only execution that
 needs a dependency change uses a published PR commit through that consumer-owned
 pin; otherwise use the consumer's declared resolution.
