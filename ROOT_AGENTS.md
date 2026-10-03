@@ -44,14 +44,15 @@ or input contract. State material constraints once with their user, contract,
 safety, or authority source. Use affirmative action and result statements rather
 than repeated denials or invented exclusions to define the task.
 
-Investigate and verify every material adoption, rejection, or scope decision.
-Form a concrete candidate use and a checkable requirement, read its specification
-and actual callers/control flow, and execute the focused check needed to settle
-it through the owner's route. State the input or source, required property,
-observed result, and definite conclusion within the verified scope. A rejection
-requires a demonstrated unmet requirement after relevant configuration and
-composition have been checked. Resolve open questions through the next relevant
-investigation or verification in the same task; uncertainty is work to complete.
+Investigate and verify material adoption, rejection, or scope decisions that remain
+open. Form a concrete candidate use and a checkable requirement; inspect its
+specification and only the callers/control flow needed to settle that decision.
+Execute the focused check through the owner's route and state the input or source,
+required property, observed result, and conclusion within the verified scope.
+A rejection requires a demonstrated unmet requirement after relevant configuration
+and composition have been checked. Reuse explicit user decisions as inputs rather
+than reopening them through a mandatory comparison with the discarded implementation.
+Resolve remaining questions through the next relevant investigation or verification.
 
 Stay within the authorized task and preserve unknown user/Git state. Inspect Git
 inconsistencies and repair within task authority, or hand off preserved state with
@@ -68,29 +69,43 @@ Unrelated or speculative API additions still require explicit authorization.
 
 Start from the latest explicit user agreement, including the preceding chat;
 update the owning design to that target, not the target to existing code.
-Existing code, tests, or older design are evidence of meaning and migration impact,
-not a veto or a requirement to keep their shape. Separate required outcomes from
-changeable API, representation, state, and responsibility contracts; compare
-contract-and-implementation alternatives for mathematical simplicity before fixing
-the design. Necessary contract changes include affected consumer migration, not a
-separate approval merely for changing a contract. Preserve explicit guarantees,
-compatibility, and authority; expose concrete conflicts rather than silently
-weakening requirements or inventing compatibility.
+Before choosing investigation or implementation Skills, separate decisions already
+specified by the user from decisions delegated to the agent, per responsibility.
+A request to fix something may delegate the method; a specified contract, mechanism,
+or replacement plan is an execution input. Mixed tasks retain that distinction.
 
-Before implementation, including private helpers and in-file additions, inspect
-relevant abstractions, callers, APIs, configuration, extension points, standard
-facilities, and adopted dependencies against that target. For new functionality,
-start with their direct use, configuration, and composition; implement only an
-evidenced gap. For fixes, changes, or cleanup of existing functionality, reconsider
-whether the affected structure should remain: consider removing or replacing
-unnecessary or defective mechanisms before adding layers to preserve them.
-Reuse sound parts; a fix does not require deletion or wholesale rewriting.
-Apply these choices per responsibility in mixed tasks, not by file age or a
-single label for the whole task. Search existing topic notes and authorized
-AgentCanon logs for applicable failed attempts; compare their inputs, revisions,
-configuration, and guarantees with this task. Keep necessity, source evidence,
-engineering grounds, and verified simpler-alternative decisions in the owning
-design. Investigate changed or missing decision premises to resolution.
+For explicitly directed work, implement the specified contract and approach.
+For a requested rewrite, derive design and validation from the new contract and
+replace the designated implementation without first studying its discarded internals,
+reproducing obsolete behavior, or proving the old approach unsuitable. Read only
+what the specified operation actually needs: the edit boundary, public interfaces
+of reused parts, affected connections, and required data/safety migration, at the
+point of use. An explicit diagnosis or behavior-preserving transformation still
+reads the current behavior needed for that requested operation.
+
+For autonomous design, investigate only the choices left open. New functionality
+starts with existing public APIs, standard facilities, adopted dependencies,
+configuration, and composition; implement an evidenced gap. Repairs investigate
+the relevant failure flow and reconsider retaining the defective structure before
+adding layers. Behavior-preserving refactors establish the required semantics and
+inspect the affected unit. Compare contract-and-implementation alternatives for
+mathematical simplicity, reusing sound parts. File/helper age does not select a route.
+
+Apply context, reuse, and implementation surveys in selected workflows within this
+decision boundary. Carry the specified choices and unresolved decisions in the
+existing task/handoff, without a new classifier, packet, or approval. Resolve
+unspecified details inside the agreed contract. Revisit a specified choice only
+for a user update or an evidenced conflict with required guarantees, safety, or
+authority; name the affected condition rather than inventing compatibility.
+Old code, tests, and design may inform a needed migration, but do not redefine the
+target. Verify the new implementation and migrated consumers against the agreed
+contract; update or retire obsolete tests instead of using them to restore old behavior.
+
+Search existing topic notes and authorized AgentCanon logs for failed attempts
+relevant to an open decision or required verification. Compare their inputs,
+revisions, configuration, and guarantees with this task. Keep the agreement,
+necessity, engineering grounds, and decisions on open alternatives in the owning
+design; reuse established premises and investigate only material gaps or changes.
 
 Record failed verification promptly in the owning topic memo (such as the
 repository's documents/memo area or existing notes equivalent) or authorized

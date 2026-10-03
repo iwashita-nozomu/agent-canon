@@ -4,6 +4,7 @@
 contract skill
 responsibility Selects one canonical skill route plus evidence-backed deferred candidates without duplicate routing state sets.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../ROOT_AGENTS.md directed execution and delegated design boundary
 upstream design ../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
 upstream design ../../documents/design/responsibility-rationale.md routing-state rationale
 upstream design ./agent-orchestration.md owns later Decision Sufficiency and write-safety policy
@@ -35,6 +36,16 @@ LCPの `DEFERRED_SKILLS` 境界は [`agent-orchestration.md#Local Capability Pri
 Historical names such as `SKILLS`, `ACTIVE_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILLS`, or `RELATED_SKILL_CANDIDATES` may be accepted as compatibility reads while callers migrate, but they are not independent state owners. New consumers read only the canonical selected/candidate state. If compatibility projections are emitted, they must be derived from the canonical state and may not carry extra routing meaning.
 
 ## Operation
+
+Before selecting investigation or implementation Skills, apply the
+[directed/delegated decision boundary](../../ROOT_AGENTS.md#always-on-boundary)
+to the latest user agreement. Route specified implementation choices to execution
+and only delegated choices to investigation and method selection. A generic fix
+request can delegate the method; file age and new/fix/refactor labels do not
+replace this decision. Keep specified choices, open questions, and the necessary
+read scope in the existing task/handoff; no new mode, classifier, or packet is needed.
+Selected owners apply their context/reuse surveys within that scope. Verify the
+specified implementation and its required migration through the normal owner route.
 
 Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
 
