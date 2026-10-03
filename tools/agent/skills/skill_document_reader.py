@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Reads compact discovered Skills and task-relevant canonical Skill sections in bounded UTF-8 chunks.
+# responsibility Reads only selected Skill section bodies in bounded UTF-8 chunks, leaving branches deferred.
 # upstream design ../../../agents/skills/agent-orchestration.md owner-first Skill read and implementation admission
 # upstream design ../../../agents/canonical/CODEX_WORKFLOW.md bounded Skill read admission
 # downstream implementation ../../../tests/agent_tools/test_skill_document_reader.py validates heading indexing, chunk boundaries, and admission state
 # @dependency-end
-"""Read Skill documents in bounded chunks without requiring full canonical files."""
+"""Read selected Skill sections without expanding child branches or requiring file EOF."""
 
 from __future__ import annotations
 
@@ -70,16 +70,12 @@ class DocumentChunk:
 class SkillReadAdmission:
     """Transient implementation-read state; no receipt is written."""
 
-    compact_path: str
-    compact_file_eof: bool
     owner_sections: tuple[DocumentChunk, ...]
     implementation_read: str
 
     def as_json(self) -> dict[str, object]:
         """Return read positions and EOF state, not previously read section text."""
         return {
-            "compact_path": self.compact_path,
-            "compact_file_eof": self.compact_file_eof,
             "owner_sections": [
                 {key: value for key, value in chunk.as_json().items() if key != "text"}
                 for chunk in self.owner_sections
@@ -163,11 +159,11 @@ class SkillDocumentReader:
         indexed: list[Heading] = []
         file_end = len(self.data)
         for index, (heading, title, level, line, start, end) in enumerate(headings):
-            section_end = file_end
-            for next_heading in headings[index + 1 :]:
-                if next_heading[2] <= level:
-                    section_end = next_heading[4]
-                    break
+            # A heading owns only its direct body. Child branches are selected
+            # separately, rather than preloaded by reading their parent.
+            section_end = (
+                headings[index + 1][4] if index + 1 < len(headings) else file_end
+            )
             indexed.append(
                 Heading(heading, title, level, line, start, end, section_end)
             )
@@ -199,7 +195,10 @@ class SkillDocumentReader:
         offset: int = 0,
         max_bytes: int = DEFAULT_MAX_BYTES,
     ) -> DocumentChunk:
-        """Return one UTF-8-safe chunk from a file or named section.
+        """Return one UTF-8-safe chunk from a file or a heading's direct body.
+
+        A named section stops before the next heading, including child headings.
+        Its ``section_eof`` does not mean that descendants have been read.
 
         ``byte_start``, ``byte_end``, and ``next_offset`` use zero-based
         half-open file byte offsets. ``line_start`` and ``line_end`` are
@@ -250,22 +249,10 @@ class SkillDocumentReader:
             text=text,
         )
 
-    def read_file(self, *, max_bytes: int = DEFAULT_MAX_BYTES) -> tuple[DocumentChunk, ...]:
-        """Read the complete file as bounded chunks."""
-        chunks: list[DocumentChunk] = []
-        offset = 0
-        if not self.data:
-            return ()
-        while offset < len(self.data):
-            current = self.chunk(offset=offset, max_bytes=max_bytes)
-            chunks.append(current)
-            offset = current.next_offset
-        return tuple(chunks)
-
     def read_section(
         self, heading: str, *, max_bytes: int = DEFAULT_MAX_BYTES
     ) -> tuple[DocumentChunk, ...]:
-        """Read one named section as bounded chunks."""
+        """Read one heading and its direct body, never its child sections."""
         selected = self.find_heading(heading)
         chunks: list[DocumentChunk] = []
         offset = selected.byte_start
@@ -287,56 +274,33 @@ def _read_owner_spec(value: str) -> tuple[Path, str]:
 
 
 def admit_implementation_read(
-    compact_path: Path | str,
     owner_sections: Sequence[tuple[Path | str, str]] = (),
     *,
     max_bytes: int = DEFAULT_MAX_BYTES,
 ) -> SkillReadAdmission:
-    """Return ready only after compact EOF and each requested section EOF."""
-    compact_reader = SkillDocumentReader(compact_path)
-    compact_chunks = compact_reader.read_file(max_bytes=max_bytes)
-    compact_eof = bool(compact_chunks) and compact_chunks[-1].file_eof
+    """Check only the supplied current sections; this is not proof of model reading.
+
+    Callers select common constraints and active branch sections from the owner
+    route. This metadata check does not discover branches or establish that the
+    selection is sufficient. Actual content is obtained through ``chunk``.
+    """
     owner_chunks: list[DocumentChunk] = []
     for owner_path, owner_heading in owner_sections:
         reader = SkillDocumentReader(owner_path)
         chunks = reader.read_section(owner_heading, max_bytes=max_bytes)
-        if chunks:
-            owner_chunks.append(chunks[-1])
-        else:
-            owner_chunks.append(
-                DocumentChunk(
-                    path=Path(owner_path).as_posix(),
-                    heading=owner_heading,
-                    line_start=None,
-                    line_end=None,
-                    byte_start=0,
-                    byte_end=0,
-                    next_offset=0,
-                    section_eof=False,
-                    file_eof=False,
-                    text="",
-                )
-            )
-    ready = implementation_read_state(
-        compact_eof, (chunk.section_eof for chunk in owner_chunks)
-    ) == "ready"
+        owner_chunks.append(chunks[-1])
     return SkillReadAdmission(
-        compact_path=Path(compact_path).as_posix(),
-        compact_file_eof=compact_eof,
         owner_sections=tuple(owner_chunks),
-        implementation_read="ready" if ready else "locked",
+        implementation_read=implementation_read_state(
+            chunk.section_eof for chunk in owner_chunks
+        ),
     )
 
 
-def implementation_read_state(
-    compact_file_eof: bool, owner_section_eofs: Iterable[bool]
-) -> str:
-    """Return transient admission state from observed EOF flags."""
-    return (
-        "ready"
-        if compact_file_eof and all(owner_section_eofs)
-        else "locked"
-    )
+def implementation_read_state(owner_section_eofs: Iterable[bool]) -> str:
+    """Require a nonempty selection with every observed direct-section EOF true."""
+    eofs = tuple(owner_section_eofs)
+    return "ready" if eofs and all(eofs) else "locked"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -350,13 +314,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--heading", help="Exact heading or unique heading title.")
     parser.add_argument("--offset", type=int, default=0, help="Zero-based file byte offset.")
     parser.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
-    parser.add_argument("--compact", type=Path, help="Generated compact SKILL.md path.")
     parser.add_argument(
         "--owner",
         action="append",
         default=[],
         metavar="PATH#HEADING",
-        help="Canonical owner section; repeat for each delegated section.",
+        help="Current common or active branch section; repeat only for needed sections.",
     )
     parser.add_argument("--format", choices=("json", "text"), default="json")
     return parser
@@ -389,10 +352,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 max_bytes=args.max_bytes,
             )
         else:
-            if args.compact is None:
-                raise SkillDocumentError("compact_required")
             owners = tuple(_read_owner_spec(value) for value in args.owner)
-            result = admit_implementation_read(args.compact, owners, max_bytes=args.max_bytes)
+            result = admit_implementation_read(owners, max_bytes=args.max_bytes)
         if args.format == "json":
             if isinstance(result, tuple):
                 payload: object = [item.as_json() for item in result]

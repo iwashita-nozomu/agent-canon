@@ -19,8 +19,9 @@ These are lookup routes, not a startup checklist. Read a named section only
 when its fact can change the current decision; stop once that fact is resolved.
 Reuse already loaded instructions and selected owners. Inactive rows require
 neither reading nor a `not_applicable` inventory unless an active contract asks.
-Selected Skills retain their existing full-body/EOF admission; delegated
-canonical documents require only the selected section, not every linked file.
+Selected Skills follow the same point-of-use rule through
+[Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace):
+read common constraints and current branches, not the full body or every linked file.
 
 | Missing decision or active operation | Read only the matching owner/slice |
 | --- | --- |
@@ -129,15 +130,15 @@ test paths は既存 `reuse_survey` に advisory context として載せ、選�
 と test context から slice を導きます。同一 asset に触れる slice を merge してから
 child handoff に同じ known context を渡します。context の不在は dispatch または
 writing を block しません。
-bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。#335 の既存 tool 先行実行は維持しますが、結果の解釈や修正に入る前に、生成された compact `SKILL.md` を `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` で `file_eof=true` まで読みます。Skill が委譲する場合だけ、canonical owner document の必要な見出しを `section_eof=true` まで読みます。canonical ファイル全体の EOF は要求しません。`implementation_read=ready` はこの条件を満たしたときだけ使い、可視 prefix や既知 path だけでは unlock しません。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。#335 の既存 tool 先行実行を維持し、結果の解釈や修正の直前に、Owner-First Read Trace が選んだ共通制約と現在必要な分岐・委譲先の節だけを `section_eof=true` まで読みます。compact/canonical の全文 EOF や未到達分岐の読了は要求しません。`implementation_read=ready` は必要節の読了後だけ使い、可視 prefix や既知 path だけでは unlock しません。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ## Skill read admission
 
 The canonical [`agent-orchestration` Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace)
-owns compact `SKILL.md` EOF/section-EOF/readback requirements and the
+owns point-of-use branch selection, required-section EOF, and the
 no-duplicate-receipt/body rule. This workflow preserves its existing-tool-before-read
-exception and sets `implementation_read=ready` only after that owner trace and
-any delegated sections reach their required EOF.
+exception. Readiness applies only to the current action; inactive branches and
+whole-file EOF are not admission requirements.
 
 ```bash
 git grep -l "topic keywords" -- <responsibility-scoped dirs> \
