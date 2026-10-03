@@ -2,155 +2,124 @@
 <!--
 @dependency-start
 contract agent-runtime
-responsibility Documents Artifact Placement for this repository.
+responsibility Owns placement of task artifacts and routes durable document creation to its structure owner.
 upstream design README.md canonical workflow index
+upstream design ../../documents/rule/directory-structure.md document placement, responsibility split, and reader reachability
 @dependency-end
 -->
-
 
 この文書は、task 実行中に増える文書や補助出力の置き場の正本です。
 run ごとの一時 artifact と、repo に長く残す文書を分けて扱います。
 
 ## この文書の読み方
 
-この文書は、run-local artifact、repo-wide 正本文書、cross-run に残す
-agent report の置き場を決めます。まず `置き場ルール` と `Task 中の拡張文書`
-で判断軸を確認し、具体的な保存先は `どこへ置くか` の
-`reports/agents/<run-id>/`、`documents/`、`agents/`、`documents/notes/` を読み分けます。
-`Subagent と補助文書` と `禁止事項` は、task 固有メモを repo 正本へ
-昇格させる前の境界確認に使います。
+作成・移動する成果物の責務を決めてから、該当する保存先だけを読みます。
+既存の in-scope file の編集だけでは、配置の再調査を要求しません。
+
+| 現在の操作 | 次に読む箇所 |
+| --- | --- |
+| run-local artifact の作成 | [reports](#reportsagentsrun-id) と選択済み run の write policy |
+| 恒久文書の追加・分割・移動・削除 | [配置と分割](../../documents/rule/directory-structure.md#配置と分割の判断軸)、[参照と到達性](../../documents/rule/directory-structure.md#参照と到達性) |
+| file・symbol・artifact の命名 | [命名規約](../../documents/rule/naming.md) の該当する責務 |
+| 公開可能な失敗検証の保存 | [Failed Verification Record](../../documents/operations/notes-lifecycle.md#failed-verification-record) |
+| cross-run knowledge の配置・昇格 | [documents/notes](#documentsnotes) と [Notes Lifecycle](../../documents/operations/notes-lifecycle.md) |
+
+追加・移動・分割では、新しい場所へ置くことと、実際の consumer から必要な場面に
+読めることを同じ変更で確認します。索引への登録だけで適用経路の接続済みとは扱いません。
+直接の参照元を更新し、path / anchor の実在を既存 docs 検証で確認します。
 
 ## 置き場ルール
 
-- repo-wide の正本:
-  - agent 運用は `agents/`
-  - 一般ルールや workflow は `documents/`
-  - 再利用する知見や cross-run 要約は `documents/notes/`
-  - 開発環境は `docker/`
-- run-local の artifact:
-  - `reports/agents/<run-id>/`
-- cross-run に蓄積する agent report:
-  - `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/`
-  - branch and stable-source identity are owned by the `agent-canon-log`
-    repository policy; this document only owns placement.
-  - 具体値は `python3 tools/runtime/archive/runtime_log_archive_git.py status` の
-    `RUNTIME_LOG_ARCHIVE_REPORTS_*` 行を見る
-- 一時的な runtime output:
-  - current checkout の run-local handoff、`team_manifest.yaml` write policy、または `task_authority.yaml` `allowed_paths` に明示された場所
-  - `WORKTREE_SCOPE.md` は legacy cleanup evidence であり、新しい runtime output や write scope の authority ではありません
+恒久文書を追加・分割・移動・削除するときは、
+[配置と分割](../../documents/rule/directory-structure.md#配置と分割の判断軸) と
+[参照と到達性](../../documents/rule/directory-structure.md#参照と到達性) を適用します。
+名前を決める場合は [命名規約](../../documents/rule/naming.md) の該当する責務を読みます。
+
+- repo-wide の正本: agent 運用は `agents/`、一般規約と恒久手順は `documents/`、
+  再利用知見は `documents/notes/`。開発環境はその repository の既存環境 owner。
+- run-local artifact: 選択された coordination / resumption run の `reports/agents/<run-id>/`。
+  bounded route は既存 task/Issue evidence を使い、配置のために bundle を作りません。
+- cross-run agent report: `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/`。
+  branch と stable-source identity は `agent-canon-log` の repository policy が所有します。
+- temporary runtime output: current handoff、`team_manifest.yaml`、または
+  `task_authority.yaml` の許可された path。`WORKTREE_SCOPE.md` は legacy cleanup evidence
+  であり、新しい write authority ではありません。
 
 ## Task 中の拡張文書
 
-- その run だけで意味を持つメモは、新しい repo-wide 文書にしません。
-- run 固有の判断、review、handoff は既存 artifact に追記します。
-- 追加の reader-facing 説明が必要なら、まず file / document responsibility から次のどれに属するか判断します。
+その run だけの判断・review・handoff・メモは既存 artifact へ追記します。
+repo-wide 文書へ増殖させず、追加の reader-facing 説明は file/document responsibility
+から保存先を選びます。writer は選択された artifact と許可 path だけを更新します。
 
 ## どこへ置くか
 
 ### `reports/agents/<run-id>/`
 
-対象:
-- intake
-- design
-- review
-- verification
-- retrospective
-- research / experiment の run 単位メモ
+Selected run artifacts include `intent_brief.md`, `decision_log.md`, `design_brief.md`,
+`design_review.md`, `change_review.md`, `final_review.md`, `verification.txt`, and
+only the selected experiment/environment/specialist outputs. Artifact names are
+available placements, not instructions to materialize every template.
 
-使うファイル:
-- `intent_brief.md`
-- `decision_log.md`
-- `design_brief.md`
-- `design_review.md`
-- `semantic_responsibility_contract.toml` (the run-local semantic delta
-  allocation instance referenced by the active design packet)
-- `change_review.md`
-- `final_review.md`
-- `experiment_change_loop.md`
-- `environment_change_proposal.md`
-- `verification.txt`
-- `predecessor_integration.<unit_id>.json`（approved source unit の merge 後に
-  canonical producer が生成する場合だけ）
-- specialist 用 artifact
+`semantic_responsibility_contract.toml` is the populated run-local instance referenced
+by the active design packet. Policy and empty template stay with `documents/design/`
+and `templates/documents/`; a populated instance is not copied back into canon.
+Roles and artifact write policy remain in `agents/agents_config.json` and the selected
+run's authority. Add run-specific sections to existing artifacts rather than new
+parallel reports.
 
-補足:
-- role write policy は `agents/agents_config.json` に従います。
-- artifact-only role は許可された artifact だけを更新します。
-- run 固有の追補は既存 artifact の節追加で吸収します。
-- cross-run で残す必要がある agent report は、agent が手で別 report を作らず
-  `python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report
-  --report-dir reports/agents/<run-id>` で immutable snapshot にします。snapshot
-  の append-only index と push/readback は同じ helper が担当します。広い
-  `sync` は hook JSONL や Codex runtime summary など、明示的に選んだ累積
-  runtime family の checkpoint に限ります。
-- closeout 前に、`task_close.py` が report artifact placement を確認します。
-  tracked durable report は repo canon として許可します。untracked または
-  ignored な report file は current run の `reports/agents/<run-id>/` の下だけを
-  許可します。古い run bundle は archive / closeout の対象であり、current run
-  へ手でコピーして残しません。
-- `semantic_responsibility_contract.toml` は template から作る空の task
-  instance shape を run-local に populated したものだけを許可します。
-  policy と empty template はそれぞれ `documents/design/` と
-  `templates/documents/` に置き、populated instance を repo-wide canon や
-  template に戻しません。
-- 機械的に再生成できる report root は残しません。
-  `reports/agent-eval-runs/`、`reports/dependency-review/`,
-  `reports/agent-runtime-dashboard/`, `reports/agent-improvement-guide/`,
-  `reports/hooks/`, `reports/.cache/`, `reports/*.json`, `reports/*.patch`,
-  `reports/*.txt` は `generated_artifact_guard.py` の対象です。必要なら
-  producer を再実行します。知見を残す場合は report file ではなく、
-  `documents/` / `agents/` / `documents/notes/` へ責務と dependency manifest 付きで
-  昇格します。
-- predecessor record の filename は unit ID から一意に導出し、通常の run-local
-  memo 名として再利用しません。`knowledge_graph` と
-  `active_design_packet_materialization` は同じ complete run bundle を一度だけ
-  immutable snapshot へ archive し、successor は archive locator、各
-  `artifact_sha256`、manifest complete-file SHA-256、共通 integrated source OID を
- 参照します。merge 前の placeholder、手書き record、aggregate set file は置きません。
+Archive a selected durable agent report through the existing
+`tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir
+reports/agents/<run-id>` operation, using the owned execution route. It owns the
+immutable snapshot, append-only index, push and remote readback. Broad `sync` is for
+explicitly selected cumulative runtime families, not a replacement report publisher.
+Read actual placement/identity from that owner's status output rather than guessing.
+
+When coordinated closeout is selected, `task_close.py` checks artifact placement.
+Tracked durable reports are allowed by canon; untracked/ignored reports belong only
+to the current run directory. Old run bundles follow archive/closeout rather than
+being copied into a new run.
+
+Mechanically regenerable report roots remain governed by `generated_artifact_guard.py`:
+`reports/agent-eval-runs/`, `reports/dependency-review/`,
+`reports/agent-runtime-dashboard/`, `reports/agent-improvement-guide/`, `reports/hooks/`,
+`reports/.cache/`, and generated `reports/*.json`, `*.patch`, `*.txt`.
+Promote reusable findings to their document/notes owner with responsibility and
+reference evidence, not by retaining disposable output as a second canon.
+
+A canonical producer alone creates `predecessor_integration.<unit_id>.json` after the
+approved source unit is merged. `knowledge_graph` and
+`active_design_packet_materialization` archive the same complete bundle once; the
+successor uses its archive locator, artifact digests, complete-file manifest digest,
+and common integrated source OID. Do not handwrite placeholder predecessor records,
+reuse the reserved filename for a memo, or add an aggregate set file.
 
 ### `documents/`
 
-対象:
-- repo 全体の標準 workflow
-- 開発環境運用
-- review / experiment / research の恒久手順
-
-判断基準:
-- 同種 task で繰り返し参照される
-- 特定 run に閉じない
-- agent 以外の人間にも読む価値がある
+Place reusable repository-wide rules, development-environment operations, and durable
+review/research/experiment procedures here when they have value beyond a single run.
+Use the structure/reader-route owner before adding or splitting these documents.
 
 ### `agents/`
 
-対象:
-- cross-agent の正本
-- workflow family
-- handoff / review / escalation
-- agent 間で共有する CLI / skill / subagent の運用
-
-判断基準:
-- Codex で再利用したい
-- runtime entrypoint には重複させたくない
+Place cross-agent workflow, handoff, review, escalation, Skill and subagent operating
+canon here. Runtime entrypoints remain thin references rather than copied policy.
 
 ### `documents/notes/`
 
-対象:
-- cross-run の知見
-- 実験や調査の要約
-- 将来の意思決定に再利用する補助メモ
-
-判断基準:
-- 正式ルールではない
-- ただし捨てるには惜しい
-- 次回の探索開始点として残す
+Place cross-run observations, experiment/research summaries, and reusable decision
+support here. These are supporting records, not another permanent rule owner.
+Use existing topic records and Notes Lifecycle for retrieval, retention and promotion.
+Private knowledge follows its authorized private-log owner instead of public notes.
 
 ## Subagent と補助文書
 
-- subagent 自体の利用方針は `agents/` に置きます。
-- 特定エージェント専用の prompt 断片を repo-wide 正本に昇格させないでください。
+Subagent policy belongs to `agents/`; a particular run's prompt fragment is not
+repo-wide canon. New artifacts require the selected operation and existing write
+scope, not merely a possible future stage or candidate reviewer.
 
 ## 禁止事項
 
-- 一時的な run メモを `documents/` に混ぜない
-- agent ごとの CLI 実験ログを repo 正本にしない
-- 古い例示コマンドを runtime truth として残さない
+Keep transient run notes and command experiments out of permanent canon. Retired
+example commands are not runtime truth. Preserve unknown/user-owned data, successful
+or shared evidence, and current authority while applying the existing archive and
+cleanup owners; placing an artifact does not authorize deleting another owner's data.

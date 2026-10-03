@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Verifies that root agent instruction entrypoints remain thin owner maps instead of procedural policy stores.
+# responsibility Verifies that root agent instruction entrypoints remain thin owner maps with usable required owner links.
 # upstream design ../../../../documents/design/entrypoint-owner-map.md structural grammar and owner-map contract
 # upstream implementation ../convention/convention_compliance_contracts.toml operational marker ownership manifest
 # downstream implementation ../../../../tests/agent_tools/test_check_entrypoint_owner_map.py focused regression
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import posixpath
 import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -66,11 +67,7 @@ CONTRACTS = (
             "## Validation Routing",
         ),
         owner_rows=(
-            (
-                "root runtime entrypoint",
-                "bootstrap.sh",
-                "bash bootstrap.sh --help",
-            ),
+            ("root runtime entrypoint", "bootstrap.sh", "bash bootstrap.sh --help"),
             (
                 "workflow family, spawn budget, role topology",
                 "agents/task_catalog.yaml",
@@ -105,31 +102,18 @@ CONTRACTS = (
             "## Validation Routing",
         ),
         owner_rows=(
-            (
-                "product implementation and behavior",
-                "consumer source and design owners",
-            ),
-            (
-                "build, tests, and runtime environment",
-                "consumer build and test owners",
-            ),
-            (
-                "repository structure and file placement",
-                "consumer structure owner",
-            ),
-            (
-                "root instruction extension",
-                "consumer-specific section in this file",
-            ),
-            (
-                "AgentCanon source maintenance",
-                "selected AgentCanon development checkout",
-            ),
+            ("product implementation and behavior", "consumer source and design owners"),
+            ("build, tests, and runtime environment", "consumer build and test owners"),
+            ("repository structure and file placement", "consumer structure owner"),
+            ("root instruction extension", "consumer-specific section in this file"),
+            ("AgentCanon source maintenance", "selected AgentCanon development checkout"),
         ),
     ),
 )
 
-MARKER_MANIFEST_PATH = "tools/validation/semantic/convention/convention_compliance_contracts.toml"
+MARKER_MANIFEST_PATH = (
+    "tools/validation/semantic/convention/convention_compliance_contracts.toml"
+)
 ROOT_ENTRYPOINT_PATHS = frozenset({"AGENTS.md", "ROOT_AGENTS.md"})
 
 H1_RE = re.compile(r"^#(?!#)\s+\S")
@@ -149,6 +133,9 @@ BULLET_COMMAND_RE = re.compile(
     r"tools/[A-Za-z0-9_./-]+|PYTHONPATH=\S+|AGENT_CANON_[A-Z0-9_]+=\S+"
     r")(?:`|\s|$)"
 )
+# Only the finite required owner rows use this inline-link grammar. General
+# Markdown syntax, anchors, and repository reachability stay with the docs owner.
+OWNER_LINK_RE = re.compile(r"\]\(([^\s)]+)\)")
 
 
 @dataclass(frozen=True)
@@ -194,6 +181,30 @@ def _table_rows(lines: Sequence[str]) -> tuple[str, ...]:
     return tuple(rows)
 
 
+def _check_owner_links(
+    root: Path, contract: EntrypointContract, rows: Sequence[str], markers: Sequence[str]
+) -> list[Finding]:
+    """Verify required document destinations, not just their displayed names."""
+    destinations = {
+        posixpath.normpath(
+            posixpath.join(posixpath.dirname(contract.path), href.split("#", 1)[0])
+        )
+        for row in rows
+        for href in OWNER_LINK_RE.findall(row)
+    }
+    findings: list[Finding] = []
+    for target in (marker for marker in markers if marker.endswith(".md")):
+        if target not in destinations:
+            findings.append(
+                Finding(contract.path, "owner-link", f"missing-destination={target}")
+            )
+        if not (root / target).is_file():
+            findings.append(
+                Finding(contract.path, "owner-target", f"missing-file={target}")
+            )
+    return findings
+
+
 def check_entrypoint(root: Path, contract: EntrypointContract) -> list[Finding]:
     """Validate one entrypoint against its structural contract."""
     target = root / contract.path
@@ -203,6 +214,10 @@ def check_entrypoint(root: Path, contract: EntrypointContract) -> list[Finding]:
     text = target.read_text(encoding="utf-8")
     lines = text.splitlines()
     findings: list[Finding] = []
+    if contract.path == "AGENTS.md" and (not lines or lines[0] != "@ROOT_AGENTS.md"):
+        findings.append(
+            Finding(contract.path, "common-base", "expected-leading=@ROOT_AGENTS.md", 1)
+        )
 
     h1 = [(index + 1, line.strip()) for index, line in enumerate(lines) if H1_RE.match(line)]
     if len(h1) != 1:
@@ -228,7 +243,9 @@ def check_entrypoint(root: Path, contract: EntrypointContract) -> list[Finding]:
                 Finding(contract.path, "nested-heading", line.strip(), line_number)
             )
         if FENCE_RE.match(line):
-            findings.append(Finding(contract.path, "fenced-recipe", line.strip(), line_number))
+            findings.append(
+                Finding(contract.path, "fenced-recipe", line.strip(), line_number)
+            )
         if ORDERED_PROCEDURE_RE.match(line):
             findings.append(
                 Finding(contract.path, "ordered-procedure", line.strip(), line_number)
@@ -244,11 +261,15 @@ def check_entrypoint(root: Path, contract: EntrypointContract) -> list[Finding]:
     else:
         rows = _table_rows(owner_section)
         for markers in contract.owner_rows:
-            if not any(all(marker in row for marker in markers) for row in rows):
+            matching = tuple(
+                row for row in rows if all(marker in row for marker in markers)
+            )
+            if not matching:
                 findings.append(
                     Finding(contract.path, "owner-map", f"missing-row={markers[0]}")
                 )
-
+            else:
+                findings.extend(_check_owner_links(root, contract, matching, markers))
     return findings
 
 
