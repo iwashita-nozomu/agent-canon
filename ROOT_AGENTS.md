@@ -26,6 +26,13 @@ file focused on a responsibility and its activation condition; route independent
 needed details to their owner at the point of use, not a startup reading list.
 Keep auto-loaded instructions short and shared constraints self-contained.
 
+Order actions by the inputs they actually require, not by link direction or
+document order. Never require an observation, generated result, or later approval
+before the authorized action that produces it. Bounded observation may obtain
+new evidence without a revised task; this does not authorize repeating a failed
+mutation without changed premises. Preserve safety checks and stop only actions
+whose actual prerequisites are unresolved.
+
 ## Always-On Boundary
 
 Start with the required outcome, valid inputs, guarantees, and completion evidence.
@@ -59,15 +66,31 @@ concrete conflicts with their owners while continuing independent authorized wor
 API preservation or active use is not a veto or a separate-approval requirement.
 Unrelated or speculative API additions still require explicit authorization.
 
-Before implementation, including private helpers and in-file additions, locate
-existing abstractions, callers, dependencies, APIs, configuration, extension points,
-standard facilities, and adopted dependencies on the premise they suffice. Search
-existing topic notes and authorized AgentCanon logs for applicable failed attempts;
-compare their inputs, versions, configuration, and guarantees with this task.
-Verify direct use, composition, or extension, then implement the demonstrated gap
-at its owner. Keep the candidate, check, observed result, necessity, and mathematical
-or engineering grounds in the existing design before code/API changes. Reuse
-current evidence and investigate changed or missing decision premises to resolution.
+Start from the latest explicit user agreement, including the preceding chat;
+update the owning design to that target, not the target to existing code.
+Existing code, tests, or older design are evidence of meaning and migration impact,
+not a veto or a requirement to keep their shape. Separate required outcomes from
+changeable API, representation, state, and responsibility contracts; compare
+contract-and-implementation alternatives for mathematical simplicity before fixing
+the design. Necessary contract changes include affected consumer migration, not a
+separate approval merely for changing a contract. Preserve explicit guarantees,
+compatibility, and authority; expose concrete conflicts rather than silently
+weakening requirements or inventing compatibility.
+
+Before implementation, including private helpers and in-file additions, inspect
+relevant abstractions, callers, APIs, configuration, extension points, standard
+facilities, and adopted dependencies against that target. For new functionality,
+start with their direct use, configuration, and composition; implement only an
+evidenced gap. For fixes, changes, or cleanup of existing functionality, reconsider
+whether the affected structure should remain: consider removing or replacing
+unnecessary or defective mechanisms before adding layers to preserve them.
+Reuse sound parts; a fix does not require deletion or wholesale rewriting.
+Apply these choices per responsibility in mixed tasks, not by file age or a
+single label for the whole task. Search existing topic notes and authorized
+AgentCanon logs for applicable failed attempts; compare their inputs, revisions,
+configuration, and guarantees with this task. Keep necessity, source evidence,
+engineering grounds, and verified simpler-alternative decisions in the owning
+design. Investigate changed or missing decision premises to resolution.
 
 Record failed verification promptly in the owning topic memo (such as the
 repository's documents/memo area or existing notes equivalent) or authorized
@@ -78,13 +101,20 @@ and established cause distinct; investigate any cause needed for the decision.
 Update an existing topic and read back the saved record. Retain concise reusable
 findings when retiring failed code or artifacts; keep private data with its owner.
 
-Minimize maintained code space, not the diff. Prefer the simplest complete use
-of existing APIs; replacement includes deleting superseded code and obsolete
-support in the same owning unit, not later cleanup. Retain wrappers or dual paths
-only for a required compatibility contract. Keep caller orchestration separate
-from reusable-library responsibility. Add mechanisms, dependencies, exact pins,
-or guards only for an evidenced current need; preserve native resolution and
-required integrity checks.
+Actively shrink maintained code space within the affected responsibility, not just
+limit additions or minimize the diff. With the task-specific starting point above,
+seek and apply evidenced deletion, consolidation, and simplification opportunities
+in the same change; do not wait for a separate cleanup request. Prefer fewer
+independent states, special cases, coupled invariants, and proof obligations,
+including required caller conversions and support. Justify the governing laws
+and representation correspondence; do not merely compress or relocate code,
+force deletion quotas, or weaken required behavior, safety, or performance.
+Establish semantics and migration before deleting; replacement removes obsolete code
+and support while migrating necessary consumers in the same change.
+Retain wrappers or dual paths only for a required compatibility contract. Keep
+caller orchestration separate from reusable-library responsibility. Add mechanisms,
+dependencies, exact pins, or guards only for an evidenced current need; preserve
+native resolution and required integrity checks.
 When an existing dependency contract requires an exact pin, only execution that
 needs a dependency change uses a published PR commit through that consumer-owned
 pin; otherwise use the consumer's declared resolution.
@@ -171,6 +201,19 @@ while that cadence is active; do not delegate through existing children or
 parallel read-only work. Only an explicit user change of cadence returns to
 autonomous routing.
 
+All reader-facing writing, not only Issues or verification results, must let the
+intended reader reproduce the relevant actions or reconstruct the stated reasoning
+from the output and identified, accessible references, without private chat history
+or the author's environment. Before writeout, walk through the reader's task:
+provide applicable scope, prerequisites, exact inputs and ordered steps, expected
+outcomes or decision method, and precise evidence locations. For designs and
+explanations, expose definitions, premises, and the link from evidence to conclusion.
+Resolve placeholders and necessary context; brevity or links alone do not excuse
+missing information. Distinguish proposed, observed, unrun, and unknown conditions.
+State unavailable or withheld evidence and its limits without inventing facts or
+exposing secrets. Reuse existing owners and records; this writing obligation adds
+no fixed template, environment discovery, rerun, or publication gate.
+
 Continue safe, authorized implementation through delivery; report concrete blockers
 and the next owner when stopped. Separate commit/push authority and preserve mixed
 work; never force-push, mutate main, or publish outside scope. Report the result,
@@ -203,6 +246,12 @@ or task record. If no formatter is configured,
 record that fact without choosing one. If it fails or cannot run, record the
 failure and affected scope and hand off as unverified, not formatting-complete.
 
-Validate the changed contract and its failure semantics, then use that owner's
-closeout route when required. A generated consumer root file does not authorize
-unrelated AgentCanon checks, product checks, or runtime changes.
+Base verification on deduction: derive obligations from requirements and explicit
+assumptions before implementation; show invariant establishment and preservation,
+composition, required termination, and outcomes against the actual code. Check
+assumptions and model-to-runtime gaps; never assume the conclusion or narrow valid
+inputs to make a proof pass. Tests target derived properties, counterexamples,
+and integration gaps, not proof by examples. Retain required execution checks;
+distinguish reasoned arguments, machine-checked proofs, observations, and unresolved
+claims. Use existing validation and closeout owners without new universal gates.
+A generated consumer root does not authorize unrelated checks or runtime changes.

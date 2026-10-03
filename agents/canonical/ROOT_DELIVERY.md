@@ -7,7 +7,7 @@ responsibility Owns detailed source-side Issue evidence, task continuation, repo
 upstream design ../../AGENTS.md conditional source reader map
 upstream design ../../ROOT_AGENTS.md portable common boundaries
 upstream design ../../documents/design/entrypoint-owner-map.md source and consumer split contract
-upstream design ../internal-routines/verification-result-structuring.md mandatory pre-write result structuring
+upstream design ../internal-routines/verification-result-structuring.md reader reconstruction and pre-write result structuring
 @dependency-end
 -->
 
@@ -71,11 +71,21 @@ report the concrete authority or external blocker with
 its evidence and next owner/action. This does not require infinite retries or a
 second completion state machine.
 
+## Reader-facing writing
+
+Before any reader-facing draft or revision, use
+[reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction).
+This includes documentation, instructions, designs, plans, reviews, chat, and
+handoffs without verification results, not just Issues or final reports. Apply
+the common root's self-contained writing boundary through this existing owner;
+keep the reader's necessary context even when choosing a compact presentation.
+
 ## Result reporting
 
-Before any verification-result output, including chat progress and interrupted
-handoffs, invoke [verification result structuring](../internal-routines/verification-result-structuring.md).
-Use its retained findings and coverage check for the following report.
+For verification results, including chat progress and interrupted handoffs, also
+use [verification result structuring](../internal-routines/verification-result-structuring.md#structure-before-writeout).
+Use its retained findings and coverage check for the following report; this
+specialization does not limit the writing boundary above.
 
 A result report leads with the answer to the user's request, not an inventory
 of work. Explain whether the goal was met or what the investigation establishes,
