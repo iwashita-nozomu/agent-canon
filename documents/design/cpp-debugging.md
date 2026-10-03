@@ -5,7 +5,6 @@
 contract design
 responsibility Defines native C++ debugging tool choice, image provisioning, and evidence boundaries.
 upstream design ../../CONTAINER_OPERATIONS.md shared image and project execution boundary
-upstream design ../experiments/host-build-admission.md existing compiler execution safety
 upstream design ../conventions/coding-conventions-cpp.md C++ implementation conventions
 downstream implementation ../../bootstrap/container/image/Dockerfile installs native diagnostic utilities
 downstream design ../../agents/skills/cpp-review.md selects debugging evidence when relevant
