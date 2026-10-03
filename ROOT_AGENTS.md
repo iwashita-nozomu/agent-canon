@@ -35,7 +35,13 @@ whose actual prerequisites are unresolved.
 
 ## Always-On Boundary
 
-Start with the required outcome, valid inputs, guarantees, and completion evidence.
+Before choosing a mechanism, reconstruct the user's problem and intended outcome
+from the current agreement, relevant context, and reported attempts. Match that
+understanding to a concrete input/expected outcome or failure and the owning
+source; distinguish observed facts, established causes, and hypotheses. Resolve
+material mismatches before editing; reuse settled context without a fresh full
+survey or mandatory reconfirmation. State valid inputs, guarantees, constraints,
+and completion evidence from that understanding.
 Derive the complete change unit from the root mechanism and its affected contracts,
 consumers, tests, and documentation. Carry that same outcome through planning,
 handoff, implementation, review, and reporting. Choose a shared owner-level
@@ -44,14 +50,22 @@ or input contract. State material constraints once with their user, contract,
 safety, or authority source. Use affirmative action and result statements rather
 than repeated denials or invented exclusions to define the task.
 
-Investigate and verify every material adoption, rejection, or scope decision.
-Form a concrete candidate use and a checkable requirement, read its specification
-and actual callers/control flow, and execute the focused check needed to settle
-it through the owner's route. State the input or source, required property,
-observed result, and definite conclusion within the verified scope. A rejection
-requires a demonstrated unmet requirement after relevant configuration and
-composition have been checked. Resolve open questions through the next relevant
-investigation or verification in the same task; uncertainty is work to complete.
+Use existing evidence to settle each material adoption, rejection, or scope
+decision. Match the candidate's actual prerequisites to the known constraints and
+failure conditions before adding configuration, composition, or implementation.
+A demonstrated unmet necessary condition also rejects alternatives that require
+that same condition; wrappers, different routes, and reimplementation do not
+change it. Reuse that conclusion while its premises hold. Proceed with a different
+candidate only with evidence that it changes the blocking premise within scope
+and authority or meets the requirement without depending on it.
+
+For unresolved decision-relevant facts, inspect the governing specification and
+actual callers/control flow, then use the owner's focused check when needed.
+State the source/input, required property, result, and conclusion within the
+verified scope. A single failed method or an unperformed check does not establish
+universal impossibility. Pursue actions that can resolve the missing fact; when
+an established limit blocks the affected action, record the needed premise change
+and next owner, and continue independent authorized work.
 
 Stay within the authorized task and preserve unknown user/Git state. Inspect Git
 inconsistencies and repair within task authority, or hand off preserved state with
@@ -80,17 +94,18 @@ weakening requirements or inventing compatibility.
 Before implementation, including private helpers and in-file additions, inspect
 relevant abstractions, callers, APIs, configuration, extension points, standard
 facilities, and adopted dependencies against that target. For new functionality,
-start with their direct use, configuration, and composition; implement only an
-evidenced gap. For fixes, changes, or cleanup of existing functionality, reconsider
-whether the affected structure should remain: consider removing or replacing
-unnecessary or defective mechanisms before adding layers to preserve them.
+start with their direct use, configuration, and composition; implement only a gap
+shown to be remediable at its authorized owner. For fixes, changes, or cleanup of
+existing functionality, reconsider whether the affected structure should remain:
+consider removing or replacing unnecessary or defective mechanisms before adding
+layers to preserve them.
 Reuse sound parts; a fix does not require deletion or wholesale rewriting.
 Apply these choices per responsibility in mixed tasks, not by file age or a
 single label for the whole task. Search existing topic notes and authorized
 AgentCanon logs for applicable failed attempts; compare their inputs, revisions,
 configuration, and guarantees with this task. Keep necessity, source evidence,
 engineering grounds, and verified simpler-alternative decisions in the owning
-design. Investigate changed or missing decision premises to resolution.
+design. Revisit only decision-relevant premises that are changed or still unknown.
 
 Record failed verification promptly in the owning topic memo (such as the
 repository's documents/memo area or existing notes equivalent) or authorized
