@@ -80,15 +80,23 @@ simplicity with one-line code, one process per function, text-only data, silent
 errors, or additional preflight gates.
 
 Run the repository owner's fixed execution route with configured defaults first;
-only after failure diagnose the relevant route, stopping when resolved. Success
-needs no route probes; explicit diagnosis/setup requests remain separate. Keep
-that route through retries, validation, and handoff. Do not preflight, manually
-switch environments, bypass the entrypoint, or invent scripts, workflows,
+success needs no route probes. After an actual failure, inspect only facts that
+can change the next authorized action. Stop incidental environment diagnosis when
+that decision is settled, scope/access prevents a remedy, or further inspection
+offers no actionable evidence. Reuse unchanged failure evidence; a retry needs a
+concrete changed premise and existing rerun allowance. Environment repair and
+exhaustive cause proof are not prerequisites for independent authorized work.
+Record blocked required verification and continue that work; warnings, optional
+settings, and unavailable diagnostics do not create new gates.
+
+Keep the fixed route through retries, validation, and handoff. Do not preflight,
+manually switch environments, bypass the entrypoint, or invent scripts, workflows,
 wrappers, or fallbacks. Fixed means the owned procedure, not hard-coded paths,
 versions, or SHAs. Preserve the entrypoint's safety checks, permissions, resource
 and rerun limits, and failure semantics. Route changes and repair require scope
 and authority at that owner. Stop only affected actions; do not rebuild for
-ordinary work or replace a required backend to claim validation.
+ordinary work or replace a required backend to claim validation. Explicit
+diagnosis/setup requests retain their own scope.
 
 Bound audits, reviews, and validation by the requested task; audit another backend
 only when explicitly named or required by a cross-backend guarantee. Leave its
