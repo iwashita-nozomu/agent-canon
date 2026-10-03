@@ -180,7 +180,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - parent は owner-critical な requirements / planning / design / review / implementation stage だけを選択して切り替えます。固定 plan-review-edit sequence はありません
 - delegated stage owner が child subagents を起動する場合も、active spawn budget、max write budget、fresh lifecycle policy、current-checkout write-scope policy を継承します
 - activated review role 数が budget を超える場合だけ batch に分け、前段の output を parent が束ねて次 batch へ渡します。candidate pack は materialize しません
-- running 中の write-capable subagent の write scope が parent の次作業または後続 writer と重なる場合、parent は同期を優先します。同期では `wait_agent`、workspace 上の成果物確認、または `interrupt=false` の status request で、完了済み変更、未完了点、判断理由を回収します。timeout、empty status、final response 未着は `resolution_decision=await_new_state|continue_disjoint_parent_work` と `termination_action=preserve_running_instance` に写像します。parent は status と回収済み evidence を記録して control を戻します。同種の wait を続けるには new state evidence または explicit revised packet を必須にします。scope 変更後も非終端 subagent の write scope は保持し、`overlapping_writer=blocked` とします。`close_agent` の authority は runtime status `completed|errored|shutdown` または user の明示取消です。
+- running 中の write-capable subagent の write scope が parent の次作業または後続 writer と重なる場合、parent は同期を優先します。同期では `wait_agent`、workspace 上の成果物確認、または `interrupt=false` の status request で、完了済み変更、未完了点、判断理由を回収します。timeout、empty status、final response 未着は `resolution_decision=await_new_state|continue_disjoint_parent_work` と `termination_action=preserve_running_instance` に写像します。parent は status と回収済み evidence を記録して control を戻します。次の bounded 観測は [Subagent Return Investigation](../skills/subagent-bootstrap.md#subagent-return-investigation) に従い、新着通知や packet 改訂を前提にしません。scope 変更後も非終端 subagent の write scope は保持し、`overlapping_writer=blocked` とします。`close_agent` の authority は runtime status `completed|errored|shutdown` または user の明示取消です。
 - parent は stage gate を通過したら完了した instance を閉じます
 - 各 user input は `same_active_task_delta`、`scope_or_contract_change`、または
   `new_task` として分類しますが、新しい turn、名前を変えた packet、または scope の
@@ -309,8 +309,8 @@ typed role-to-agent evidence through `--select-agent-type`, stdout records
 `parent_packet_ref`, and `status=blocked`; changing candidates requires a
 revised parent packet and wave.
 For T12 (`agent workflow tooling, AgentCanon submodule flow, or canon
-rearchitecture`), `scheduler`, `schedule_reviewer`, `project_reviewer`,
-`docs_workflow_steward`, and `prompt_config_reviewer` are candidate specialists;
+rearchitecture`), `scheduler`、`schedule_reviewer`、`project_reviewer`、
+`docs_workflow_steward`、`prompt_config_reviewer` are candidate specialists;
 activate only the owner-critical roles selected by the route. `researcher`, `research_reviewer`, `infra_steward`,
 `infra_reviewer` and `python_reviewer` require explicit parent-packet evidence,
 changed-path evidence, or an explicitly selected review pack. `test_designer`
@@ -444,18 +444,19 @@ claim/risk が選択されるまで quality-check stage や artifact を materia
 `wait_agent` timeout, empty wait status, or an absent final response at a wave
 decision point is a subagent lifecycle signal. The parent records
 `subagent_no_return_investigation`, returns control to the parent decision
-point, and gates another wait on new state evidence or an explicit revised
-packet. These signals map to `termination_action=preserve_running_instance` and
+point, and follows the existing
+[observation boundary](../skills/subagent-bootstrap.md#subagent-return-investigation)
+for the next bounded wait. These signals map to `termination_action=preserve_running_instance` and
 `resolution_decision=await_new_state|continue_disjoint_parent_work`.
 
 The investigation record includes `agent_id`, `wave_id`, wait command and
 timeout, last known status, last workflow-monitor event, runtime / tool error,
 log or dashboard pointers, cause hypothesis, and the owner action taken after
-control returns. Another wait or probe is valid only after new state evidence
-arrives or the parent records an explicit revised packet. Scope, owner,
-allowed-path, or review-gate changes move through the fresh follow-up wave path
-already defined by the wave contract and lifecycle policy, but the prior
-nonterminal agent keeps its write scope with `overlapping_writer=blocked`.
+control returns. Bounded observation obtains new evidence; it does not require
+a new-state notification or revised packet first. Failed mutation retries still
+require changed premises. Scope, owner, allowed-path, or review-gate changes
+use a revised packet and the existing context-reuse/fresh-agent decision. The
+prior nonterminal agent keeps its write scope with `overlapping_writer=blocked`.
 `close_agent` authority is runtime status `completed|errored|shutdown` or an
 explicit user cancellation. Timeout and absent-response inference preserve the
 nonterminal status.

@@ -26,6 +26,13 @@ file focused on a responsibility and its activation condition; route independent
 needed details to their owner at the point of use, not a startup reading list.
 Keep auto-loaded instructions short and shared constraints self-contained.
 
+Order actions by the inputs they actually require, not by link direction or
+document order. Never require an observation, generated result, or later approval
+before the authorized action that produces it. Bounded observation may obtain
+new evidence without a revised task; this does not authorize repeating a failed
+mutation without changed premises. Preserve safety checks and stop only actions
+whose actual prerequisites are unresolved.
+
 ## Always-On Boundary
 
 Stay within the authorized task and preserve unknown user/Git state. Preservation
@@ -170,6 +177,19 @@ This boundary overrides orchestrator-only and mandatory child-handoff rules
 while that cadence is active; do not delegate through existing children or
 parallel read-only work. Only an explicit user change of cadence returns to
 autonomous routing.
+
+All reader-facing writing, not only Issues or verification results, must let the
+intended reader reproduce the relevant actions or reconstruct the stated reasoning
+from the output and identified, accessible references, without private chat history
+or the author's environment. Before writeout, walk through the reader's task:
+provide applicable scope, prerequisites, exact inputs and ordered steps, expected
+outcomes or decision method, and precise evidence locations. For designs and
+explanations, expose definitions, premises, and the link from evidence to conclusion.
+Resolve placeholders and necessary context; brevity or links alone do not excuse
+missing information. Distinguish proposed, observed, unrun, and unknown conditions.
+State unavailable or withheld evidence and its limits without inventing facts or
+exposing secrets. Reuse existing owners and records; this writing obligation adds
+no fixed template, environment discovery, rerun, or publication gate.
 
 Continue safe, authorized implementation through delivery; report concrete blockers
 and the next owner when stopped. Separate commit/push authority and preserve mixed
