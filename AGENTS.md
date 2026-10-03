@@ -21,6 +21,11 @@ Source owner routes replace consumer routes, never the shared constraints.
 Use the known task owner directly. Consult the optional map below only to resolve
 an unknown owner or request modality; read its matching row, not the whole index.
 
+When a check fails or a related adoption/rejection decision begins,
+resolve an unknown recording/reuse owner through the `failed verification and reuse`
+row of the [source map](agents/canonical/SOURCE_ROUTING.md#reader-map).
+Read the capture or retrieval section selected for the current action.
+
 When that responsibility is active, formatter settings and direct commands are
 owned by [documents/design/formatting.md](documents/design/formatting.md).
 

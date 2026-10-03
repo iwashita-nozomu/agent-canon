@@ -2,6 +2,7 @@
 # contract test
 # responsibility Verifies the root entrypoint owner-map grammar and regression failures.
 # upstream design ../../documents/design/entrypoint-owner-map.md structural contract
+# upstream design ../../documents/operations/notes-lifecycle.md failed verification reader route
 # upstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py verifier under test
 # @dependency-end
 """Tests for the root entrypoint owner-map checker."""
@@ -132,6 +133,67 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         self.assertNotIn("public skill registry", entry)
         self.assertNotIn(optional, checker.ROOT_ENTRYPOINT_PATHS)
         self.assertTrue((REPOSITORY_ROOT / optional).is_file())
+
+    def test_failed_verification_reader_route_reaches_storage_owners(self) -> None:
+        routes = (
+            ("ROOT_AGENTS.md", "AGENTS.md#reader-map", "## Reader Map"),
+            (
+                "AGENTS.md",
+                "agents/canonical/SOURCE_ROUTING.md#reader-map",
+                "## Reader Map",
+            ),
+            (
+                "agents/canonical/SOURCE_ROUTING.md",
+                "../../documents/operations/notes-lifecycle.md#failed-verification-record",
+                "### Failed Verification Record",
+            ),
+            (
+                "agents/canonical/SOURCE_ROUTING.md",
+                "../../documents/operations/notes-lifecycle.md#retrieve-before-deciding",
+                "### Retrieve Before Deciding",
+            ),
+            (
+                "agents/canonical/ROOT_IMPLEMENTATION.md",
+                "../../documents/operations/notes-lifecycle.md#retrieve-before-deciding",
+                "### Retrieve Before Deciding",
+            ),
+            (
+                "documents/operations/notes-lifecycle.md",
+                "../notes/failures/FAILURE_NOTE_TEMPLATE.md",
+                "",
+            ),
+            (
+                "documents/operations/notes-lifecycle.md",
+                "../../agents/skills/agent-learning.md#operating-route",
+                "## Operating Route",
+            ),
+            (
+                "agents/skills/agent-learning.md",
+                "../../documents/runtime/private-feedback-knowledge.md",
+                "",
+            ),
+        )
+        for source, link, heading in routes:
+            with self.subTest(source=source, link=link):
+                source_path = REPOSITORY_ROOT / source
+                self.assertIn(f"]({link})", source_path.read_text(encoding="utf-8"))
+                relative_path, _, anchor = link.partition("#")
+                target = (source_path.parent / relative_path).resolve()
+                self.assertTrue(target.is_file(), str(target))
+                if anchor:
+                    self.assertEqual(
+                        anchor, heading.lstrip("# ").lower().replace(" ", "-")
+                    )
+                    self.assertEqual(
+                        target.read_text(encoding="utf-8").splitlines().count(heading),
+                        1,
+                    )
+        for path in ("ROOT_AGENTS.md", "agents/canonical/SOURCE_ROUTING.md"):
+            with self.subTest(owner_map=path):
+                self.assertIn(
+                    "| failed verification and reuse |",
+                    (REPOSITORY_ROOT / path).read_text(encoding="utf-8"),
+                )
 
     def test_rejects_operational_marker_surface(self) -> None:
         root = self._fixture()
