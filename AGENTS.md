@@ -19,15 +19,18 @@ Source owner routes replace consumer routes, never the shared constraints.
 ## Reader Map
 
 Use the known task owner directly. Consult the optional map below only to resolve
-an unknown owner or request modality; read its matching row, not the whole index.
+an unknown owner or request modality; read its matching row. Mandatory routing
+means applying the selected owner's policy, not reopening a resolved selection
+or rereading an unchanged Skill on every action.
 
-When that responsibility is active, formatter settings and direct commands are
-owned by [documents/design/formatting.md](documents/design/formatting.md).
+When invoking a Skill and its adapter or command context is unresolved, start at
+[Skill Paths](agents/canonical/skills.md#skill-paths). When formatting edited files,
+use [formatter settings](documents/design/formatting.md#ownership-and-purpose).
 
 ## Always-On Boundary
 
 Keep automatically loaded instructions minimal. Read only applicable detail
-sections; links and dependency metadata never require recursive or full reading.
+sections; links and dependency metadata support selection, not recursive reading.
 
 ## Runtime Owner Map
 
@@ -42,5 +45,5 @@ shared constraints belong to ROOT and procedures to their selected owners.
 
 ## Validation Routing
 
-Use the changed owner's existing formatter and validation route, not every linked
-check. Detailed procedures belong in optional files, not another auto-loaded AGENTS.
+Use the changed owner's existing formatter and validation route. Detailed
+procedures belong in optional files, not another auto-loaded AGENTS.

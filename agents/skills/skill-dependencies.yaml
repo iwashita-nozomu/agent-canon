@@ -8,6 +8,7 @@ version: 1
 # downstream design ../../agents/skills/agent-orchestration.md consumes canonical invocation order
 # downstream design ../../agents/skills/task-routing.md consumes canonical routing order
 # downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py validates cycle, reference, order, and graph contracts
+# downstream implementation ../../tests/agent_tools/test_point_of_use_skill_routes.py verifies conditional handoffs without prerequisite activation
 # @dependency-end
 skill_dependencies:
   agent-orchestration:
@@ -68,6 +69,7 @@ skill_dependencies:
     - task-routing
     - result-artifact-writeout
     - change-review
+    - integration
     successors: []
     order_constraints: []
     parallel_independent:
@@ -117,7 +119,8 @@ skill_dependencies:
   python-review:
     responsibility_group: review
     required_prerequisites: []
-    routing_candidates: []
+    routing_candidates:
+    - change-review
     successors: []
     order_constraints: []
     parallel_independent:
@@ -125,7 +128,8 @@ skill_dependencies:
   cpp-review:
     responsibility_group: review
     required_prerequisites: []
-    routing_candidates: []
+    routing_candidates:
+    - computational-optimization
     successors: []
     order_constraints: []
     parallel_independent:

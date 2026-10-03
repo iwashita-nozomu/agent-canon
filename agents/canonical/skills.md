@@ -7,6 +7,7 @@ responsibility Points readers to the public skill registry and internal routine 
 upstream design README.md canonical workflow index
 upstream design ../skills/README.md public skill surface contract
 upstream design ../internal-routines/README.md internal routine registry
+upstream design ./CLI_ENTRYPOINTS.md logical command execution boundary
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates official system skill delegation
 @dependency-end
 -->
@@ -48,6 +49,15 @@ read failure inspect that entry's link target and generated state through the
 existing bootstrap owner; do not substitute a same-named file from another
 checkout. Explicit source maintenance edits the canonical owner in the selected
 development checkout.
+
+An adapter's “Read the canonical owner” instruction uses that same point-of-use
+boundary: open the owner's Reader Map or short common conditions, then the selected
+section. The thin adapter is a pointer, not a second copy of branch policy.
+Its advertised Python command is a logical command packet, not a new Host entrypoint.
+Before executing it, use [Tool commands](CLI_ENTRYPOINTS.md#tool-commands) through
+[the Host entrypoint](CLI_ENTRYPOINTS.md#host-entrypoint), retaining the current
+registered target and existing source-root resolution. A resolved execution route
+is reused; this reference does not request installation, setup, or a status probe.
 
 Naming carries the visibility boundary:
 
