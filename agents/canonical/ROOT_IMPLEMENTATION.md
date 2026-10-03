@@ -11,6 +11,7 @@ upstream design ../../documents/design/api-surface-traversal-policy.md traversal
 upstream design ../../documents/conventions/software-engineering-principles.md maintained code-space objective, abstraction admission, and reuse feasibility decision owner
 upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 upstream design ../../documents/operations/notes-lifecycle.md failed verification recording and reuse
+downstream design ../skills/dependency-analysis.md pre-edit LSP context procedure
 @dependency-end
 -->
 
@@ -42,6 +43,12 @@ Use [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-
 to align the owning design with the latest explicit agreement before choosing a
 mechanism. State the required outcome, valid inputs, guarantees, and completion
 evidence first. Carry source-backed constraints with the affected operation.
+
+Before any code edit, including a direct cause fix, activate
+[LSP-first recursive context](../skills/dependency-analysis.md#lsp-first-recursive-context).
+Use its inspected code and contract excerpts to select the complete owning unit.
+Carry snapshot-valid context into implementation and review handoffs, and refresh
+affected relations after edits through that same owner.
 
 Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
 per responsibility: compose existing capabilities for new functionality; reconsider
@@ -97,11 +104,12 @@ State the checked input/source, actual result, and conclusion; investigate a mis
 guarantee until the material decision is settled. Record candidates, verified unmet
 contracts, and necessary owner/API changes in the existing design.
 
-Fix the root, then trace references and callers through the existing dependency
-or LSP owner and migrate affected implementations, tests, and documentation in
-the same change. Stop tracing at unchanged contracts, not at the originally
-named files. Validate required semantics and the corrected public contract;
-do not freeze defective behavior in tests or move the defect into caller
+Use [pre-edit LSP context](../skills/dependency-analysis.md#lsp-first-recursive-context)
+to trace references and callers before correcting the root. Migrate affected
+implementations, tests, and documentation in the same change, then refresh the
+affected relations. Bound traversal at inspected unchanged contracts rather than
+the originally named files. Validate required semantics and the corrected public
+contract; do not freeze defective behavior in tests or move the defect into caller
 workarounds. Remove obsolete implementation paths and dedicated support code;
 retain a compatibility entrypoint only for an actual required contract and
 connect it to the canonical implementation, not a second implementation.

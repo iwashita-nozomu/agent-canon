@@ -59,8 +59,9 @@ a concrete owner/action. Preserve the required problem class, valid inputs,
 guarantees, and failure semantics. Follow the selected owner and reuse its policy.
 
 A requested root fix includes necessary public API replacement, removal, or
-unavoidable addition and affected consumers, tests, and documentation. Fix the
-root, then trace and repair affected uses through the changed contracts. Honor
+unavoidable addition and affected consumers, tests, and documentation. Establish
+affected uses through the pre-edit LSP context below, then correct the root and
+migrate those uses through the changed contracts. Honor
 explicit compatibility requirements and actual authority/access limits. Resolve
 concrete conflicts with their owners while continuing independent authorized work.
 API preservation or active use is not a veto or a separate-approval requirement.
@@ -76,6 +77,18 @@ the design. Necessary contract changes include affected consumer migration, not 
 separate approval merely for changing a contract. Preserve explicit guarantees,
 compatibility, and authority; expose concrete conflicts rather than silently
 weakening requirements or inventing compatibility.
+
+Before the first code edit, invoke the repository's configured LSP route on the
+target symbols. Recursively follow relevant definitions/types, implementations,
+references, and callers/callees, reading reached code, governing contracts, and
+tests into working context. Include decisive excerpts with revision, path, symbol,
+line range, and relation evidence. Deduplicate inspected symbols; expand until
+relevant relations are covered or an inspected unchanged contract explains the
+boundary. Reuse current evidence and refresh affected relations after edits.
+Preserve failed, unsupported, or truncated results as explicit gaps and pursue the
+next authorized verification; only successful queries establish their scoped empty
+result. Load instruction documents at their activation points while expanding
+this code context.
 
 Before implementation, including private helpers and in-file additions, inspect
 relevant abstractions, callers, APIs, configuration, extension points, standard
