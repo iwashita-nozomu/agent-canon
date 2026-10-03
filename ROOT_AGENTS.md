@@ -46,14 +46,23 @@ state material constraints once with their user, contract, safety, or authority
 source. Specialize behavior only for a verified difference in requirements or
 input contract.
 
+An explicit implementation-replacement request fixes retirement of the named old
+mechanism as part of the target. Plan implementation, necessary migration, and
+deletion together; carry that disposition into handoff and review. General reuse
+and repair guidance operates inside that target rather than reopening retirement.
+Inspect old code only for required retained guarantees, shared parts, migration
+connections, and user/data safety. Active callers, existing tests, or speculative
+rollback value do not create retention requirements.
+
 Before implementing any code or API, including private helpers, inspect relevant
 abstractions, actual callers, configuration, extension points, standard facilities,
 and adopted dependencies. New functionality starts with direct use, configuration,
-and composition; implement an evidenced gap. For repairs, reconsider the defective
-structure and compare removal or replacement before adding preservation layers.
-Reuse sound parts and apply these choices per responsibility in mixed tasks.
-Existing code, tests, and older design explain migration impact; align the owning
-design to the agreement rather than treating existing shape as a veto.
+and composition; implement an evidenced gap. When a repair method is delegated,
+reconsider the defective structure and compare removal or replacement before
+adding preservation layers. Reuse sound parts and apply these choices per
+responsibility in mixed tasks. Existing code, tests, and older design explain
+migration impact; align the owning design to the agreement rather than treating
+existing shape as a veto.
 
 Settle each material adoption, rejection, or scope decision by investigating a
 concrete candidate use and checkable requirement, reading its specification and
@@ -72,11 +81,18 @@ states, special cases, coupled invariants, and proof obligations, including call
 conversions and support. Actively delete, consolidate, and simplify within that
 responsibility. Justify the governing laws and representation correspondence;
 line compression, relocation, deletion quotas, and weakened behavior are not
-simplification evidence. Establish semantics and migration before deleting.
-Replacement retires obsolete code and support and migrates necessary consumers
-in the same change. Retain dual paths or wrappers only for an actual required
-compatibility contract. Use-case orchestration stays with callers and reusable
-semantics with the library.
+simplification evidence. Establish required semantics and migration boundaries
+from the agreed target. Replacement retires obsolete code and support and migrates
+necessary consumers in the same change. Recover committed source from Git history
+and keep the maintained tree for the current required implementation. Remove
+superseded code, commented-out implementations, backup copies, and speculative
+rollback paths with their unnecessary support. Preserve uncommitted/untracked work
+and user/runtime data through their owners. Preserve explicitly required
+compatibility through an entrypoint to the new canonical implementation. Keeping
+an old execution path requires an explicit coexistence requirement with its scope
+and retirement condition. Verify new behavior, necessary migration, and absence
+of retired code and exclusive support before reporting replacement complete.
+Use-case orchestration stays with callers and reusable semantics with the library.
 
 A root fix includes necessary API replacement, removal, signature changes,
 unavoidable additions, and affected consumers, tests, and documentation. Trace
@@ -173,14 +189,26 @@ distinguish proposed, observed, unrun, and unknown conditions. State unavailable
 withheld evidence and its limits while protecting secrets. Use existing owners
 and records without a fixed template, extra environment discovery, rerun, or gate.
 
-Continue safe authorized work through delivery. Decide commit and push separately,
-preserve mixed work, and avoid force-push, main mutation, or out-of-scope publication.
-Report the result, material findings, evidence, and limits, distinguishing
-implemented, verified, published, and applied states. Before any verification
-writeout, including progress and interrupted handoff, structure established facts,
-evidence, scope, limits, distinct findings, and counterevidence. Use the same result
-across chat, Issue/PR comments, and reports through their owners. Keep comparable
-reasoning and results on the Issue and link reusable topic records.
+Before a terminal response, compare the current result with the whole agreed
+deliverable. Continue the same task through the next required implementation,
+migration, retirement, verification, or authorized delivery action whenever it
+can proceed. Partial success, a checkpoint, draft publication, and a remaining-work
+list are progress, not permission to return. A child returns its assigned unit;
+the parent verifies and integrates it and retains overall completion ownership.
+Honor an explicit user step boundary or pause/handoff request. Otherwise, an
+incomplete handoff requires evidenced authority, safety, or execution blockers
+for the remaining operations and completion of independent actionable required
+work. Record the failed operation or restriction, blocked property, and next
+owner/action; keep this status distinct from completion and preserve rerun limits.
+
+Decide commit and push separately, preserve mixed work, and avoid force-push,
+main mutation, or out-of-scope publication. Report the result, material findings,
+evidence, and limits, distinguishing implemented, verified, published, and applied
+states. Before any verification writeout, including progress and interrupted
+handoff, structure established facts, evidence, scope, limits, distinct findings,
+and counterevidence. Use the same result across chat, Issue/PR comments, and reports
+through their owners. Keep comparable reasoning and results on the Issue and link
+reusable topic records.
 
 ## Validation Routing
 
