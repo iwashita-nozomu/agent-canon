@@ -84,18 +84,24 @@ refactor-loop は親 packet または変更後 responsibility graph が明示し
 topology を構成する refactor は、次の順序を正本とします。
 RC-09 の置換・廃止でも、変更によって影響する利用側はこの手順に含めます。
 
-1. user-facing consumer / parent で完成形を先に確定する。責務、パス、所有境界を
-   明示する。
-2. shared module / canonical source/tool を、完成形を生成・維持するように一括実装する。
-3. 依存を辿り、影響する consumer / parent / projection を完成形へ移行・materialize する。
-4. checker / CI を完成形の観測可能な意味的性質へ更新し、旧 topology の固定を削除する。
-5. consumer、canonical tool、projection、checker / CI を含む最終 topology をまとめて検証する。
+1. user-facing consumer / parent が必要とする完成形を**設計**し、責務、API、
+   パス、所有境界を固定する。利用側コードを依存先より先に完成させる指示ではない。
+2. shared module / canonical source/tool と、その同時変更が必要な利用側を
+   一つの修正単位で更新する。生成元より先に projection を手書きしない。
+3. 別 repository の実行入力に source の公開 revision が必要なら、source 側の
+   単位を検証・公開してから、既存の pin / 解決規約で dependent を更新する。
+   具体的な順序は [cross-module resolution](dependency-analysis.md#conditional-cross-module-resolution) に従う。
+4. 影響する consumer / parent / projection と checker / CI を新契約へ移行し、
+   旧 topology の固定を削除する。
+5. 変更した source と、実際にその revision を使う利用側の検証を対応付け、
+   全体の完成を判定する。source の公開だけで利用側の移行済みとはしない。
 
-設計文書、CI、source module を先に完成扱いにして consumer 実装を後回しに
-する経路は禁止します。consumer が完成形を materialize できない間は、共有
-module の追従、projection 移行、checker の更新を完了扱いにしません。中間状態を
-通す別経路は追加せず、各段階に過剰な操作検証を要求せず、最後の return gate
-で完成した全体を検証します。
+source 単位の検証・公開と、全体移行の完了は別です。未公開 source を必要とする
+利用側の実行成功を、その source の公開条件に戻してはいけません。同一 repository
+で互換性なく同時変更する組は一つの検証可能な commit に閉じます。変更依存が
+循環する組を別 wave にして相互の完了を待たず、既存の
+[commit 境界](../../documents/operations/BRANCH_SCOPE.md#commit-correctness-contract) で単位をまとめます。
+各編集段階に checker を追加せず、依存が揃った単位と最後の全体で必要な検証を行います。
 この実行順の所有者は `refactor-loop` であり、`structure-refactor` は構造
 surface / runtime boundary の分類を、`agent-canon-update` は AgentCanon 固有の
 source / pin routing を参照として担当します。
@@ -184,8 +190,9 @@ or writing.
    wrapper、config route、generated surface の移動または削除をまとめて行います。
    置換で不要になった旧コード・専用補助コードは RC-09 により移動ではなく削除します。
    stage 2 は `usage-surface repair` で、caller、docs、workflow、skill、hook、
-   config、report consumer を新しい surface に合わせます。test、smoke、
-   behavior execution は二段完了後の return-gate validation に集約します。
+   config、report consumer を新しい surface に合わせます。同一修正単位の test、
+   smoke、behavior execution は二段完了後に行います。別 repository へ公開する
+   source 単位の検証と全体完了の区別は [共有構造 refactor の実行順](#共有構造-refactor-の実行順) に従います。
    RC-09 でも必要な利用側修正を stage 2 に含め、残存参照のエラーだけで完了としません。
 1. 実装前に `Targets To Change:` として、変更する target trace を列挙します。
    実在する関数、method、class は `path:start-end:qualname`、cohesive な
@@ -265,7 +272,7 @@ trace、behavior contract、latest diff を渡します。OOP の数値や findi
 ## Canonicalization-First Refactors
 
 Stopping、logging、runtime tolerance、preconditioner など、複数 algorithm
-から参照される policy / base abstraction を一本化する refactor では、依存先を
+から参照される policy / base abstraction を一本化する refactor では、利用側を
 先に個別修正しません。最初の slice は正本 surface の確定に使います。
 RC-09 でも、以下の必要な利用側更新は正本化と同じ修正責務に含めます。
 
@@ -285,7 +292,7 @@ RC-09 でも、以下の必要な利用側更新は正本化と同じ修正責�
    refactor pass ではなく design / algorithm pass に分離します。
 1. canonical surface を直したら、親 packet または変更後 responsibility graph が
    明示した exact validation command だけを実行し、利用側の `repair_slice` を作ります。
-1. 利用側は、最も依存の深い algorithm から順に、primitive helper 直接呼び出しを
+1. 利用側は、前提が揃った単位から依存順に、primitive helper 直接呼び出しを
    canonical object 呼び出しへ置き換えます。専用 wrapper を caller ごとに増やす
    ことを既定解にしてはいけません。
 1. 利用側 wave を直したら、前記 `Validation route` が選択した exact command を実行し、
@@ -455,8 +462,10 @@ validation を使います。
    finding 1 件に縮める理由ではなく、task order で解く対象です。衝突する target は
    同一 wave に置かず、dependency order に従って先行 / 後続 wave に分け、先行 wave
    の validation と tool rerun 後に後続 writer へ渡します。
-1. root slice の validation、tool rerun、`diff_linked_findings` が通ったあとだけ、
-   write scope が交差しない downstream slice を wave に分けて並列化します。
+1. root 単位が必要とする validation、tool rerun、`diff_linked_findings` を閉じてから、
+   独立した downstream 単位を並列化します。未修正の downstream を直さないと
+   root の検証が成立しない組は、[共有構造 refactor の実行順](#共有構造-refactor-の実行順)
+   に従って同一単位へまとめ、先行 wave の成功待ちにしません。
 1. 各 slice には少なくとも次を記録します。
    - `slice_id`
    - `target_traces`: `path:start-end:qualname` または `path:start-end:region-id`
@@ -616,8 +625,10 @@ zero callers. Stop propagation at unchanged contracts, not at initially named fi
    config route, and generated surface as one structural migration. Under RC-09,
    remove superseded code and its exclusive support rather than relocating it. The second
    stage updates every caller, document, workflow, skill, hook, config, and
-   report consumer that uses the moved surface. Put test, smoke, and behavior
-   execution in return-gate validation after both stages are complete.
+   report consumer that uses the moved surface. Validate both stages together
+   within each inseparable repair unit. Follow [shared-structure order](#共有構造-refactor-の実行順)
+   for source-unit validation/publication before a dependent repository can
+   execute; do not make that execution a prerequisite for publishing its input.
    RC-09 also requires the affected consumer repairs; remaining-reference errors
    do not complete the second stage.
 1. Explicitly list every target trace being changed before editing. Use

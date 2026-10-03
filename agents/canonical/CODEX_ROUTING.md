@@ -16,9 +16,10 @@ load inactive phases or restart completed intake merely by following a link.
 ## Runtime Profile And Risk Selection
 
 Establish structure, owner, and touched-surface evidence before selecting a
-runtime profile. Use
-[documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md) only after that evidence fixes
-the applicable validation and checker obligations.
+runtime profile. Use that evidence with
+[documents/runtime/runtime-profiles-and-check-matrix.md](../../documents/runtime/runtime-profiles-and-check-matrix.md) to select
+the applicable validation and checker obligations. Those obligations are the
+selection result, not a prerequisite for consulting their owner.
 
 - A runtime profile selects validation and checker obligations only. It does
   not limit context size, work scope, team mode, or task size.

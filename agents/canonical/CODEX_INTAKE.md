@@ -93,10 +93,11 @@ AgentCanon の更新・再構築を要求しません。
 
 実装、設計変更、文書改訂、実験計画の前に、repo evidence を根拠にします。
 context sweep は `requested_scope` を保存したうえで work packet を作る手順です。
-先に user request から要求された file、workflow、check、doc、PR state を
-`requested_scope` として固定し、task topic、runtime profile、implementation
-surface router、semantic-index / context-pack、dependency review の structured
-output で `work_scope` を段階化します。選ばれなかった profile / document bucket
+先に user request から要求された file、workflow、check、doc、PR state と
+acceptance criteria を `requested_scope` として固定します。その範囲から必要な
+context と owner を調べ、変更面が分かった時点で [runtime profile](CODEX_ROUTING.md#runtime-profile-and-risk-selection)
+と検証を選びます。選択された router、context-pack、dependency review の根拠で
+`work_scope` を具体化し、未選択の出力を調査開始の前提にしません。選ばれなかった profile / document bucket
 は、request に無関係である evidence がある場合だけ `not_applicable` にします。
 Large delivery / Shared canon でも、bounded responsibility route は作業順序を
 決める artifact です。対象範囲の正本は `requested_scope` に残します。読む
@@ -192,8 +193,9 @@ repo-changing run では `team_manifest.yaml` の
 
 ## 1. Intake
 
-- context sweep と library sweep を先に行う
-- 変更対象と acceptance criteria を短く固定する
+- ユーザー要求から変更対象と acceptance criteria を短く固定する
+- その範囲で必要な context sweep と library sweep を行い、owner・変更面から
+  route と検証を選ぶ。調査結果による具体化を、要求範囲の無断拡張と混同しない
 - `user_request_contract.md` に must-do、must-not-do、completion-evidence の clause ID を書く
 - coordination、resumption、または selected workflow が要求する場合だけ `schedule.md` を TODO 正本として materialize し、stage plan / clause coverage / planned work units を concrete にする。bounded one-writer task は owner/path/validation note で閉じる
 - 各 clause に source bucket を付け、`current_request`、`durable_user_preference`、`repo_or_code_precedent`、`domain_or_external_constraint`、`unknown_or_open_question` を混ぜずに扱う
