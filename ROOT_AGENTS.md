@@ -35,23 +35,36 @@ whose actual prerequisites are unresolved.
 
 ## Always-On Boundary
 
-Stay within the authorized task and preserve unknown user/Git state. Preservation
-is not abandonment: inspect Git inconsistencies, repair within task authority,
-or hand off preserved state with a concrete owner/action. Unfamiliar diffs or
-absent separate instructions do not waive this duty; dirty is not itself
-inconsistent. Preserve the required problem class, valid inputs, guarantees, and
-failure semantics; neither small diffs nor completeness justify shortcuts or
-unrelated work. Follow the selected owner rather than inventing a fallback,
-wrapper, or policy copy.
+Start with the required outcome, valid inputs, guarantees, and completion evidence.
+Derive the complete change unit from the root mechanism and its affected contracts,
+consumers, tests, and documentation. Carry that same outcome through planning,
+handoff, implementation, review, and reporting. Choose a shared owner-level
+correction; specialize a branch only for a verified difference in required behavior
+or input contract. State material constraints once with their user, contract,
+safety, or authority source. Use affirmative action and result statements rather
+than repeated denials or invented exclusions to define the task.
+
+Investigate and verify every material adoption, rejection, or scope decision.
+Form a concrete candidate use and a checkable requirement, read its specification
+and actual callers/control flow, and execute the focused check needed to settle
+it through the owner's route. State the input or source, required property,
+observed result, and definite conclusion within the verified scope. A rejection
+requires a demonstrated unmet requirement after relevant configuration and
+composition have been checked. Resolve open questions through the next relevant
+investigation or verification in the same task; uncertainty is work to complete.
+
+Stay within the authorized task and preserve unknown user/Git state. Inspect Git
+inconsistencies and repair within task authority, or hand off preserved state with
+a concrete owner/action. Preserve the required problem class, valid inputs,
+guarantees, and failure semantics. Follow the selected owner and reuse its policy.
 
 A requested root fix includes necessary public API replacement, removal, or
 unavoidable addition and affected consumers, tests, and documentation. Fix the
-root, then trace and repair affected uses; bound work by changed contracts, not
-the initially named files. API preservation or active use is not a veto or a
-separate-approval requirement. Respect explicit compatibility constraints and
-actual authority/access limits; report concrete conflicts and unfinished migration
-while continuing independent authorized work. Unrelated or speculative API
-additions still require explicit authorization.
+root, then trace and repair affected uses through the changed contracts. Honor
+explicit compatibility requirements and actual authority/access limits. Resolve
+concrete conflicts with their owners while continuing independent authorized work.
+API preservation or active use is not a veto or a separate-approval requirement.
+Unrelated or speculative API additions still require explicit authorization.
 
 Start from the latest explicit user agreement, including the preceding chat;
 update the owning design to that target, not the target to existing code.
@@ -73,9 +86,20 @@ whether the affected structure should remain: consider removing or replacing
 unnecessary or defective mechanisms before adding layers to preserve them.
 Reuse sound parts; a fix does not require deletion or wholesale rewriting.
 Apply these choices per responsibility in mixed tasks, not by file age or a
-single label for the whole task. Keep necessity, source evidence, engineering
-grounds, and rejected simpler alternatives in the owning design.
-A failed name search is not absence; unknown defers only the affected decision.
+single label for the whole task. Search existing topic notes and authorized
+AgentCanon logs for applicable failed attempts; compare their inputs, revisions,
+configuration, and guarantees with this task. Keep necessity, source evidence,
+engineering grounds, and verified simpler-alternative decisions in the owning
+design. Investigate changed or missing decision premises to resolution.
+
+Record failed verification promptly in the owning topic memo (such as the
+repository's documents/memo area or existing notes equivalent) or authorized
+AgentCanon log. Include the goal/candidate, source revision and relevant conditions,
+reproducible command or inspection, expected and actual result, evidence locator,
+verified conclusion, and conditions for reuse or rechecking. Keep observed failure
+and established cause distinct; investigate any cause needed for the decision.
+Update an existing topic and read back the saved record. Retain concise reusable
+findings when retiring failed code or artifacts; keep private data with its owner.
 
 Actively shrink maintained code space within the affected responsibility, not just
 limit additions or minimize the diff. With the task-specific starting point above,
@@ -95,7 +119,7 @@ When an existing dependency contract requires an exact pin, only execution that
 needs a dependency change uses a published PR commit through that consumer-owned
 pin; otherwise use the consumer's declared resolution.
 Establish reachability and existing guarantees before extra error handling;
-unknown is neither impossible nor a defect. Keep authorization and boundary safety.
+investigate uncertain premises and preserve authorization and boundary safety.
 
 Run the repository owner's fixed execution route with configured defaults first;
 success needs no route probes. After an actual failure, inspect only facts that
@@ -116,16 +140,13 @@ and authority at that owner. Stop only affected actions; do not rebuild for
 ordinary work or replace a required backend to claim validation. Explicit
 diagnosis/setup requests retain their own scope.
 
-Bound audits, reviews, and validation by the requested task; audit another backend
-only when explicitly named or required by a cross-backend guarantee. Leave its
-implementation, configuration, runtime, and logs untouched; do not run or repair
-it for parity or completeness. Backend differences alone are not defects. For
-shared changes, validate the changed shared contract without auditing unrelated
-backend internals. Briefly record exclusions in the existing Issue/PR when
-relevant; do not make them failures, verification debt, required follow-ups, or
-completion conditions. Do not add probes, adapters, settings, or measurements
-solely to audit an excluded backend. If a required in-scope backend is unavailable,
-report it as unverified; do not substitute another backend.
+Select audits, reviews, and validation from the required outcome and affected
+contracts. For shared changes, verify the shared guarantee and the consumers it
+reaches. Select backend-specific investigation when the request or a changed
+guarantee requires that backend. Preserve independent backend internals and apply
+explicit scope constraints with their source. If a required in-scope backend is
+unavailable, record the failed attempt and exact blocked property honestly and
+pursue the next authorized verification action at its owner.
 
 Environment rebuilds include deleting the superseded environment and its exclusive
 resources in the same task. Stopping, renaming, relocating, or keeping it for
@@ -141,9 +162,10 @@ For protocol-confirmed failed experiments, immediately delete experiment-only
 code, configuration, and artifacts unless evidence establishes a physical cause.
 Unknown cause, debugging value, numerical trouble, or future reuse do not justify
 retention or waiting for closeout. Use existing experiment/storage owners with
-safe stopping and scoped authority; keep only a concise Issue/task disposition,
-not a relocated bundle. Preserve successful/shared/other-owned data and Git
-history. Do not add discard classifiers, archives, or reruns as cleanup gates.
+safe stopping and scoped authority; retain the concise finding in its topic record
+and link the disposition from the Issue/task. Preserve successful/shared/other-owned
+data and Git history. Do not add discard classifiers, archives, or reruns as
+cleanup gates.
 
 Establish the actual in-scope checkout and dependency identities; recheck only
 changed premises. Keep required pin evidence distinct from execution inputs.
@@ -151,9 +173,10 @@ Read Git/storage/team owners before those operations. Clean only unneeded,
 task-owned temporary checkouts; preserve unknown state and shared resources.
 
 Record observed AgentCanon-owned failures promptly through the Issue owner;
-qualify uncertain attribution. Demand measurements only when relevant and
-obtainable by an authorized route. Explicit but unavailable requirements remain
-unverified; do not add setup, gates, or unrelated completion criteria.
+qualify uncertain attribution. Obtain the measurements and checks needed to settle
+the current decision through authorized routes. Report a genuine access or runtime
+blocker with its failed operation and next owner/action; preserve truthful status
+and continue independent work toward the required outcome.
 
 ## Runtime Owner Map
 
@@ -167,8 +190,8 @@ unverified; do not add setup, gates, or unrelated completion criteria.
 
 ## Task Entry
 
-Resolve the task owner and validation route. Keep bounded work bounded; broader
-design, orchestration, research, or delegation activates only under its owner's
+Resolve the required outcome, complete responsibility unit, and validation route.
+Select design, orchestration, research, or delegation under the relevant owner's
 conditions. AgentCanon maintenance does not authorize consumer generated-file edits.
 
 User-guided debugging is parent-executed: keep investigation, edits, and any
@@ -199,7 +222,7 @@ published, and applied. Before writing any verification result, including progre
 or interrupted work, structure established facts, evidence, scope, and limits;
 preserve distinct findings and counterevidence. Use that same result across chat,
 Issue/PR comments, and reports through the applicable reporting owner. Keep
-comparable reasoning and results on the Issue.
+comparable reasoning and results on the Issue and link reusable topic records.
 
 ## Validation Routing
 
