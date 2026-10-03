@@ -33,6 +33,8 @@ downstream implementation ../../tools/validation/semantic/documents/check_design
   - 型パラメータ化の方針
 - [cpp-build-layout.md](cpp-build-layout.md)
   - C++ build の配置と構成
+- [runtime-debugging.md](runtime-debugging.md)
+  - 標準 system / Python 診断の選択、規定実行境界、既存 C++ 診断への導線
 - [agent-canon-bootstrap-tool-runtime.md](agent-canon-bootstrap-tool-runtime.md)
   - standalone bootstrap と共有 tool runtime の設計
 - [devcontainer/parent-devcontainer-policy.md](devcontainer/parent-devcontainer-policy.md)

@@ -12,6 +12,7 @@
 name: AgentCanon Static Gates
 
 on:
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -19,7 +20,6 @@ permissions:
 
 env:
   AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
-  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
 
 concurrency:
   group: agent-canon-static-gates-${{ github.event.pull_request.head.sha || github.sha }}
@@ -27,10 +27,10 @@ concurrency:
 
 jobs:
   select-static-units:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       units: ${{ steps.select.outputs.units }}
+      docs_paths: ${{ steps.select.outputs.docs_paths }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,49 +41,103 @@ jobs:
         id: select
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
-          python3 tools/validation/semantic/path/classify_path_risk.py \
-            --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" \
-            --format github-output | tee -a "${GITHUB_OUTPUT}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            git -c core.quotePath=false diff --name-only --no-renames "${BASE_SHA}" HEAD > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
+            python3 tools/validation/semantic/path/classify_path_risk.py \
+              --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" \
+              --format github-output | tee -a "${GITHUB_OUTPUT}"
+          else
+            python3 tools/validation/semantic/path/classify_path_risk.py \
+              --full-confidence --format github-output | tee -a "${GITHUB_OUTPUT}"
+          fi
 
   static-gates:
     needs: select-static-units
-    if: >-
-      always() &&
-      (github.event_name == 'workflow_dispatch' ||
-       needs.select-static-units.result == 'success')
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Require successful unit selection
+        env:
+          SELECTION_RESULT: ${{ needs.select-static-units.result }}
+          SELECTED_UNITS: ${{ needs.select-static-units.outputs.units }}
+        run: |
+          [[ "${SELECTION_RESULT}" == "success" ]] || exit 1
+          printf 'selected_units=%s\n' "${SELECTED_UNITS:-none}"
+
       - name: Checkout repository
+        if: needs.select-static-units.outputs.units != ''
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Start one shared tool runtime
+      - name: Prepare candidate source for bootstrap main synchronization
+        if: needs.select-static-units.outputs.units != ''
         run: |
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+          candidate_source="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-canon-static-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          candidate_bare="${candidate_source}.git"
+          printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\n' "${candidate_source}" >> "${GITHUB_ENV}"
+          printf 'AGENT_CANON_CANDIDATE_BARE=%s\n' "${candidate_bare}" >> "${GITHUB_ENV}"
+          git init --bare "${candidate_bare}"
+          git push "${candidate_bare}" HEAD:refs/heads/main
+          git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main
+          git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"
+
+      - name: Start one shared tool runtime
+        if: needs.select-static-units.outputs.units != ''
+        run: |
+          key="$(bash "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap/container/image/digest.sh" "${AGENT_CANON_CANDIDATE_SOURCE}")"
+          image="ghcr.io/${GITHUB_REPOSITORY}:env-${key}"
+          if docker buildx imagetools inspect "${image}" >/dev/null 2>&1; then
+            "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" install
+          else
+            "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" update --local-build
+          fi
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" start
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
       - name: Run selected units in the shared runtime
+        if: needs.select-static-units.outputs.units != ''
         env:
-          SELECTED_UNITS: ${{ github.event_name == 'workflow_dispatch' && 'rust,contracts,eval,workflow-container' || needs.select-static-units.outputs.units }}
+          SELECTED_UNITS: ${{ needs.select-static-units.outputs.units }}
+          DOCS_PATHS: ${{ needs.select-static-units.outputs.docs_paths }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if [ -z "${SELECTED_UNITS}" ]; then
-            echo "selected_units=none"
-            exit 0
-          fi
+          python3 - <<'PY' > "${RUNNER_TEMP}/agent-canon-docs-paths"
+          import json
+          import os
+          import sys
+          for path in json.loads(os.environ["DOCS_PATHS"]):
+              sys.stdout.buffer.write(path.encode("utf-8") + b"\0")
+          PY
+          mapfile -d '' -t docs_paths < "${RUNNER_TEMP}/agent-canon-docs-paths"
           IFS=',' read -r -a units <<< "${SELECTED_UNITS}"
-          printf 'selected_units=%s\n' "${SELECTED_UNITS}"
+          status=0
           for unit in "${units[@]}"; do
-            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            args=()
+            case "${unit}" in
+              docs) args=("${docs_paths[@]}") ;;
+              contracts) args=("${BASE_SHA:-origin/main}") ;;
+            esac
+            if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
               exec --root "${GITHUB_WORKSPACE}" -- bash \
-              /usr/local/share/agent-canon/runtime/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}"
+              /opt/agent-canon/source/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}" "${args[@]}"; then
+              printf 'unit=%s status=pass\n' "${unit}" >> "${GITHUB_STEP_SUMMARY}"
+            else
+              result=$?
+              printf 'unit=%s status=fail exit=%s\n' "${unit}" "${result}" >> "${GITHUB_STEP_SUMMARY}"
+              status=1
+            fi
           done
+          exit "${status}"
 
       - name: Release shared tool runtime
         if: always()
-        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
+        run: |
+          if [[ -n "${AGENT_CANON_CANDIDATE_SOURCE:-}" ]]; then
+            if [[ -d "${AGENT_CANON_CANDIDATE_SOURCE}/.runtime" ]]; then
+              "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" uninstall
+            fi
+            rm -rf -- "${AGENT_CANON_CANDIDATE_SOURCE}" "${AGENT_CANON_CANDIDATE_BARE}"
+          fi

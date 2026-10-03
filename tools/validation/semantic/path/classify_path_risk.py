@@ -28,7 +28,12 @@ class PathRisk:
     checks: tuple[str, ...]
 
 
-DOC_SUFFIXES = {".md", ".rst", ".txt"}
+DOC_SUFFIXES = {".md"}
+DOC_CHECK_INPUTS = {
+    "tools/runtime/dispatch/agent-canon/src/docs.rs",
+    "documents/runtime/runtime-profiles-and-check-matrix.json",
+    "tests/tools/test_fix_mermaid.py",
+}
 PYTHON_SUFFIXES = {".py", ".pyi"}
 CONTAINER_PREFIXES = ("docker/", "bootstrap/")
 GITHUB_PREFIXES = (".github/",)
@@ -46,7 +51,7 @@ SELECTOR_BOUNDARY_PATHS = {
     "tools/validation/ci/checks/check_agent_canon_pr.sh",
     ".github/workflows/agent-canon-static-gates.yml",
 }
-STATIC_GATE_UNITS = ("rust", "contracts", "eval", "workflow-container")
+STATIC_GATE_UNITS = ("docs", "rust", "contracts", "eval", "workflow-container")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -75,10 +80,9 @@ def normalize_paths(paths: list[str], paths_file: str | None) -> tuple[str, ...]
 def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
     """Classify paths into active profile checks without selecting a second route."""
     active: list[PathRisk] = []
-    if any(Path(path).suffix in DOC_SUFFIXES for path in paths):
-        active.append(PathRisk("docs-only-or-docs-impact", "markdown_or_text_changed", (
+    if any(Path(path).suffix in DOC_SUFFIXES or path in DOC_CHECK_INPUTS for path in paths):
+        active.append(PathRisk("docs-only-or-docs-impact", "markdown_or_docs_checker_changed", (
             "tools/bin/agent-canon docs check",
-            "bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header",
         )))
     if any(Path(path).suffix in PYTHON_SUFFIXES for path in paths):
         active.append(PathRisk("python-tooling", "python_path_changed", (
@@ -111,21 +115,23 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
 
 
 def select_static_gate_units(paths: tuple[str, ...], *, full_confidence: bool = False) -> tuple[str, ...]:
-    """Map canonical path classification to the four execution units."""
+    """Select the union of required units without losing unclassified paths."""
     if full_confidence or any(path in SELECTOR_BOUNDARY_PATHS for path in paths):
         return STATIC_GATE_UNITS
     profiles = {risk.profile for risk in classify(paths)}
     selected: list[str] = []
+    if "docs-only-or-docs-impact" in profiles:
+        selected.append("docs")
     if "rust" in profiles:
         selected.append("rust")
-    if profiles & {"docs-only-or-docs-impact", "python-tooling", "dependency"}:
+    if profiles & {"python-tooling", "dependency"} or any(
+        not classify((path,)) for path in paths
+    ):
         selected.append("contracts")
     if "agent-eval" in profiles:
         selected.append("eval")
     if profiles & {"github-automation", "container-runtime"}:
         selected.append("workflow-container")
-    if paths and not selected:
-        selected.append("contracts")
     return tuple(selected)
 
 
@@ -146,7 +152,14 @@ def render_text(paths: tuple[str, ...], risks: tuple[PathRisk, ...], units: tupl
 def render_github_output(paths: tuple[str, ...], units: tuple[str, ...]) -> str:
     """Render stable GitHub Actions outputs from canonical unit selection."""
     selected = set(units)
-    lines = ["units=" + ",".join(units), f"input_count={len(paths)}"]
+    docs_paths = [] if any(path in DOC_CHECK_INPUTS for path in paths) else [
+        path for path in paths if Path(path).suffix in DOC_SUFFIXES
+    ]
+    lines = [
+        "units=" + ",".join(units),
+        f"input_count={len(paths)}",
+        "docs_paths=" + json.dumps(docs_paths),
+    ]
     for unit in STATIC_GATE_UNITS:
         key = unit.replace("-", "_")
         lines.append(f"{key}={'true' if unit in selected else 'false'}")

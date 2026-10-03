@@ -5,6 +5,7 @@ contract skill
 responsibility Documents user-guided-debugging for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../ROOT_AGENTS.md shared parent-executed debugging boundary
+upstream design ../../documents/design/runtime-debugging.md conditional standard diagnostic selection
 downstream implementation ../../.codex/personal/skills/user-guided-debugging/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -25,6 +26,13 @@ downstream implementation ../../.codex/personal/skills/user-guided-debugging/SKI
 read-only の探索やレビューも含め、新規起動・既存 child の再利用・並行する別調査へ委譲しません。
 ユーザーの判断と観測が次の操作を決める直列ループなので、対話 context と規定の実行経路を分断しません。
 [共通境界](../../ROOT_AGENTS.md#task-entry) が一般の orchestrator-only / child-handoff 規定に優先します。
+
+## Diagnostic selection
+
+実行時の観測が必要になった時点で、[標準診断の選択表](../../documents/design/runtime-debugging.md#tool-selection)
+から症状に対応する節だけ読みます。source / 既存ログで足りるなら追加ツールを起動しません。
+診断でも規定 runner と下記 cadence を維持し、ツールの提供を追加実行・再実行や
+修正後検証の許可として扱いません。
 
 ## Core Loop
 

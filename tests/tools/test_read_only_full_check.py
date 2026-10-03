@@ -42,7 +42,7 @@ def test_full_unit_is_guarded_by_read_only_mount_proof() -> None:
 def test_full_unit_reuses_existing_body_and_forwards_options() -> None:
     """The adapter adds only an effect boundary; it does not duplicate checks."""
     text = runner_text()
-    body = text.split("run_full() {", 1)[1].split("\n}\n\nrun_rust()", 1)[0]
+    body = text.split("run_full() {", 1)[1].split("\n}\n\nrun_docs()", 1)[0]
 
     assert 'bash "${ROOT}/tools/validation/ci/runners/run_all_checks.sh" "${UNIT_ARGS[@]}"' in body
     assert (
@@ -50,9 +50,9 @@ def test_full_unit_reuses_existing_body_and_forwards_options() -> None:
     )
     assert "AGENT_CANON_CONTROL_PARENT_ROOT:?AGENT_CANON_CONTROL_PARENT_ROOT is required" in body
     assert 'AGENT_CANON_CHILD_PURPOSE="standalone-static-gate-unit"' in body
-    assert 'AGENT_CANON_CLI_CMD="/usr/local/bin/agent-canon"' in body
-    assert 'CARGO_HOME="${CARGO_HOME}"' in body
-    assert 'RUSTUP_HOME="${RUSTUP_HOME}"' in body
+    assert 'AGENT_CANON_CLI_CMD="${AGENT_CANON_CACHE_ROOT}/bin/agent-canon"' in body
+    assert "CARGO_HOME=" not in body
+    assert "RUSTUP_HOME=" not in body
     assert 'AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}"' in body
     assert "full) run_full" in text
     assert '"${UNIT}" != "full"' in text
@@ -159,6 +159,9 @@ def test_full_unit_preserves_body_status_without_target_mutation(
             "AGENT_CANON_TARGET_ROOT": str(target),
             "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+            "AGENT_CANON_CACHE_ROOT": str(control / "cache"),
+            "CARGO_HOME": str(control / "cache" / "cargo"),
+            "RUSTUP_HOME": str(control / "image" / "rustup"),
             "AGENT_CANON_CHILD_HANDOFF": "authenticated-handoff",
             "AGENT_CANON_HANDOFF_AUDIENCE": "standalone-static-gate-unit",
             "FAKE_CAPTURE": str(capture),
@@ -176,9 +179,9 @@ def test_full_unit_preserves_body_status_without_target_mutation(
         "runtime": str(runtime),
         "purpose": "standalone-static-gate-unit",
         "handoff": "authenticated-handoff",
-        "cli": "/usr/local/bin/agent-canon",
-        "cargo": str(runtime / "cargo-home"),
-        "rustup": str(runtime / "rustup-home"),
+        "cli": str(control / "cache" / "bin" / "agent-canon"),
+        "cargo": str(control / "cache" / "cargo"),
+        "rustup": str(control / "image" / "rustup"),
         "args": "--quick --skip-docs",
     }
     after_tree = subprocess.run(

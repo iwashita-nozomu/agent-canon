@@ -9,6 +9,7 @@ upstream design ./skill-dependencies.yaml prerequisite and reviewer order
 upstream design ./agent-orchestration.md canonical validation trust boundary owner
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract and sparse Python projection
 upstream design ../../documents/design/responsibility-rationale.md Python readability and OOP-review activation rationale
+upstream design ../../documents/design/runtime-debugging.md conditional standard diagnostic selection
 @dependency-end
 -->
 
@@ -19,6 +20,15 @@ Review Python diffs against the owning API/type/runtime contract and the exact v
 ## Validation selection
 
 Run the exact parent-selected commands and any additional static/read-only confirmation needed by the changed mechanism. Pyright, Ruff/quality checks, convention checks, targeted tests, or docstring review are selected when their contracts are reachable. `pytest tests/` is not automatically added by this reviewer.
+
+## Runtime debugging
+
+When a failure needs live frame inspection or fatal-signal tracebacks, read only
+[Python debugging](../../documents/design/runtime-debugging.md#python-debugging)
+and its execution boundary. Use the existing interpreter and runner; do not add
+packages for standard `pdb` or `faulthandler`. Select system observation only for
+process, file-descriptor, or syscall evidence that the current diagnosis needs.
+This is not a debugging gate for every Python diff or permission for extra reruns.
 
 ## OOP/SOLID sensitivity
 
