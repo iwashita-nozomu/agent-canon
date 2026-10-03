@@ -40,9 +40,12 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 をこのrouteの走査・更新順として使います。通常の局所修正に全走査を追加しません。
 同じ `reuse_survey` と依存根拠を使い、検証・レビュー・commitの正本を置き換えません。
 
-1. file/worker slice より先に、今回の責務を担う current module/helper/type/test/docs と、
-   標準ライブラリ、採用済み framework/dependency、既存 CLI の公開機能を一つの
-   shared asset universe で比較する。provider の比較は
+1. [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
+   で最新の明示的合意を完成形に固定し、[SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
+   の既存機能の修正・整理として、対象構造の維持も見直す。不要・原因となる構造の削除・置換を
+   継ぎ足しより先に検討し、正しい既存部品は再利用する。current module/helper/type/test/docs、
+   標準ライブラリ、採用済み dependency、既存 CLI を同じ shared asset universe で比較する。
+   file/worker slice はその後に導く。provider の比較は
    [SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
    を使い、既存の呼出元・公開 API から最小の利用案と要求・保証の対応を作る。
    disposition の根拠はその対応から導き、名前やシグネチャの一致だけで決めない。
@@ -71,18 +74,19 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    根幹の修正で契約・接続が変わる利用側も修正対象に含める。RC-09 の残存参照は
    移行漏れとして追い、影響情報を記録しただけで修正を終えない。
    responsibility slices と `allowed_paths` はこの asset universe と disposition から導き、
-   同じ asset に触れる slices を一つへ merge する。既存 provider の利用案が要求 contract を
-   満たすなら、その直接利用・設定・合成へ置換し、第三の helper へ再実装しない。
+   同じ asset に触れる slices を一つへ merge する。既存 provider の利用案が合意した完成形を
+   最も単純に満たすなら、直接利用・設定・合成へ置換し、第三の helper へ再実装しない。
    candidate がない場合も、ローカル検索ゼロだけで新 surface を admission しない。
    SEP-08 の capability 比較で残った具体的な不足責務だけを新設理由にする。実在する
-   candidate の `reject` はその不足を満たせない根拠で判断し、既に満たす部分まで
-   捨てない。実在しない candidate や synthetic な `reject` は作らない。
+   candidate の `reject` は能力不足と、旧構造の維持で増える複雑さを区別し、SEP-06/08 の
+   根拠を使う。必要な部品まで再実装せず、実在しない candidate や synthetic な `reject` は作らない。
 6. approved mechanism を `refactor-loop` へ渡し、同じ serialized `reuse_survey` と
    tests を各 write-capable child と read-only reviewer に伝播する。置換・廃止とも RC-09 の
    削除と必要な usage-surface repair を含め、子 prompt 側で disposition を再構築しない。
 7. `change-review` で current snapshot、reachable path、contract、witness と
    worker packet と同一の asset/disposition/test-path evidence を readback し、置換後の tree に
-   不要な旧コードが残っていないか確認する。targeted validation は各行ではなく
+   合意からの逸脱、旧構造を守るための追加層、不要な旧コードの残存を確認する。
+   targeted validation は各行ではなく
    owning-unit boundary で一度だけ実行する。
 
 再利用先の比較は今回の責務に限り、contract を満たす選択が決まれば終える。全 library の
@@ -99,6 +103,8 @@ bash tools/analysis/dependencies/run_repo_dependency_review.sh
 
 ## Boundary
 
+このcleanup routeを新規実装の一律前提にしません。新規部分はSEP-06の既存機能の組合せから始め、
+修正部分だけを本routeで扱います。挙動保存のrefactorは必要な挙動を保ち、構造の保存とは区別します。
 削除、rename、移動の oracle は analyzer ではなく public/module contract、到達性、validation、
 rollback の owner evidence です。`dependency-analysis`、`refactor-loop`、`change-review` の
 policy をこの skill に複製しません。search tool、asset registry、reuse database、
