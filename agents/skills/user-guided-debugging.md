@@ -50,8 +50,8 @@ read-only の探索やレビューも含め、新規起動・既存 child の再
 
 ## Boundary
 
-- この skill はユーザー明示時だけ使います。
-- `agent-orchestration` の既定 routing には入れません。
+- オーケストレーションの子エージェントも適用条件と実行責任を読みます。読込と cadence の適用を分け、ユーザー主導 cadence はユーザー明示時だけ有効にします。
+- 通常のオーケストレーションは、選択済み workflow とその検証権限で進めます。
 - validation 実行はこの cadence の既定動作ではありません。必要な validation route は提示できますが、実行はユーザーの明示指示後に限ります。
 - 難易度・複数ファイル・検証失敗を理由に自律 wave へ切り替えません。ユーザーが自律作業への切替を明示した場合だけ通常の routing に戻し、大規模 repair は [refactor-loop](refactor-loop.md) の責務とします。
 - report や artifact 作成が必要なら `tool-finding-report` / `report-writing` を併用します。
