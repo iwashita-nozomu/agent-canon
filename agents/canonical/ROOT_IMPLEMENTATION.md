@@ -19,59 +19,59 @@ additional startup packet or a dependency of generated consumer instructions.
 
 ## Contract and valid domain
 
-Preserve the problem class, valid input domain, and output guarantees required
-by the explicit user request and applicable canonical contract. A bounded
-change scope is not permission to narrow that problem. Do not add fixed
-dimensions, shapes, distributions, or other preconditions merely to fit a
-chosen algorithm, library, test fixture, implementation convenience, or
-performance target. Distinguish restrictions inherent in the governing problem
-from limitations of the chosen method; choose or derive a suitable method
-instead of promoting the latter into the specification. Do not reject or skip
-valid cases, or silently truncate or project them into a different problem,
-and call the result complete. Unresolved coverage remains an implementation
-gap, not invalid input or authorization to shrink the contract. Narrowing
-requires explicit user direction. Validate through the applicable implementation
-and test owners, including valid cases beyond the motivating example and cases
-a shortcut would exclude.
+Use [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
+to distinguish required problem semantics from changeable design contracts.
+API shape, representation, internal preconditions, state transitions, and ownership
+are candidates for redesign, not immutable constraints merely because code, tests,
+or documentation already prescribe them. Compare contract-and-implementation pairs
+before choosing the simplest design, with preserved requirements, intended semantic
+changes, and necessary consumer migration explicit. Do not require equivalence to
+obsolete behavior that the authorized change is meant to correct.
+
+Keep the required input domain, output, safety, performance, and failure guarantees.
+Do not turn a method's limitations into stronger user preconditions, silently skip
+valid cases, or weaken guarantees to make implementation or proof easier. A changed
+internal precondition needs a derivation showing how every required input reaches
+it legally. A real conflict with explicit compatibility or authority needs the
+exact affected requirement and decision, not a blanket contract-preservation veto.
 
 ## Simplest complete implementation
 
- Before implementation, use the existing
- [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
- to locate abstractions that already own the required behavior. Trace actual
- callers, usage examples, provider dependencies, contracts, configuration, and
- extension points. A failed name search or unfamiliar location does not establish
- absence. Settle direct use, composition, extension at the existing owner, or an
- evidenced responsibility gap before writing code, including private helpers and
- additions inside existing files. Unknown keeps only the affected implementation
- pending; it does not require a repository-wide audit or justify inventing a
- foundation.
+Use [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
+to align the owning design with the latest explicit agreement before choosing a
+mechanism. Old code, tests, or design do not reopen it; report concrete conflicts
+with still-required contracts, safety, or authority rather than invent compatibility.
 
- Design for the smallest maintained code space after the change, not the smallest
-diff. Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
-to the final implementation, including retained code and support mechanisms.
-Start with direct use or composition of existing APIs; admit new abstractions,
-configuration, routes, or state only for an evidenced unmet current requirement.
-Hypothetical reuse, pattern uniformity, or test-double convenience is not a gap.
-Preserve the required domain, correctness, safety, performance, and failure semantics;
-code compression or omitted behavior is not simplification.
-For replacements, include the retained owner, superseded code, and necessary
-consumer migration in the existing design before implementation, then close
-[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-in the same change. Do not defer deletion to a later cleanup or keep the old path
-to reduce the diff. Keep unrelated changes out; add no checker, report, or approval
-gate to enforce this objective.
- Make the simplest complete implementation the default, not a later refactor.
- Introduce abstractions, configuration, execution paths, or state only when a
- concrete current requirement cannot be met more simply; justify that necessity
- with mathematical or engineering grounds. Hypothetical reuse, design-pattern
- uniformity, or test-double convenience alone is not such a reason. Minimize
- concepts, state, branches, and dependencies while preserving the required domain,
- correctness, safety, and failure semantics. Neither fewer lines nor a smaller diff
- justifies omitted behavior, and completeness does not authorize speculative
- generalization or unrelated library or consumer changes. Keep the decision with
- existing implementation and review owners, without adding a checker, report, or
- approval gate to enforce simplicity.
+Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
+per responsibility: compose existing capabilities for new functionality; reconsider
+structure preservation for repairs. Use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+to inspect abstractions, actual callers, APIs, configuration, dependencies, and
+extension points before implementation. A failed name search is not absence;
+unknown defers only the affected decision, not independent work.
+
+Within that starting point, apply SEP-06's mathematical simplicity comparison,
+including contract redesign, independent state, exceptional cases, coupled
+invariants, and proof obligations across the affected unit and its consumers.
+Remove redundant representations and mechanisms when the derivation permits;
+do not wait for replacement or a separate cleanup request. Consolidate shared
+responsibility, not similar syntax; reuse sound parts and keep local fixes local.
+
+For replacement or retirement, close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+in the same change: remove obsolete paths and support, migrate affected uses, and
+validate agreed behavior rather than freezing superseded implementation in tests.
+Review the completed unit, including retained code, not just the diff. Record
+material reductions and necessary growth in the existing design/PR rationale;
+line compression, relocation, and deletion quotas are not evidence of improvement.
+Preserve required domain, correctness, safety, performance, failure semantics, and
+behavior-preserving refactor contracts. Add no unrelated cleanup, checker, report,
+or approval gate.
+
+Before implementing, derive the selected contract's obligations through
+[SEP-11](../../documents/conventions/software-engineering-principles.md#sep-11-testability-and-validation-selection).
+Connect assumptions, invariants, transitions, and required termination to actual
+paths/symbols; derive tests from those properties and remaining execution risks.
+Do not treat a proof of an ideal model or passing examples as proof of the code.
+Keep unproved obligations and empirical limits explicit in the same design/review.
 
 ## Public API additions
 
@@ -86,8 +86,10 @@ Before implementation, use [API surface traversal](../../documents/design/api-su
 to inspect current abstractions, real callers, APIs, configuration, extension
 points, standard facilities, and adopted dependencies. Reuse sufficient current
 findings; not finding a name or preferring another signature is not a capability
-gap. If direct use or composition suffices, use it without a new API. Otherwise,
-record the candidates, source evidence, unmet contract, and necessary owner/API
+gap. New functionality starts with direct use or composition before a new API.
+For a repair, existing capability does not require preserving the affected owner;
+choose the simplest complete correction, including replacement when justified.
+Record candidates, source evidence, any unmet contract, and necessary owner/API
 change in the existing design, then implement it within the requested scope.
 Unknown capability remains unknown; it neither justifies speculative additions
 nor blocks independent authorized work.
@@ -125,9 +127,11 @@ change in the same PR. Connect its design section to the relevant implementation
 paths/symbols at responsibility-unit granularity. Reuse an adequate, still-current
 design explanation by reference instead of copying it for each function or edit;
 add or update a concise section under existing design conventions when needed.
-Chat, Issue/PR discussion, and code comments may support or link to that section
-but never replace its explanation. If necessity cannot be justified, reconsider
-the implementation rather than inventing a reason. Use the existing design and
+Record the latest explicit agreement in that section before editing; its older
+text must not override the agreement. Chat, Issue/PR discussion, and code comments
+may support or link to the rationale but do not replace the durable explanation.
+If necessity cannot be justified, reconsider the implementation rather than inventing
+a reason. Use the existing design and
 review owners; do not add a checker, schema, approval gate, or unrelated
 retrospective documentation task.
 
