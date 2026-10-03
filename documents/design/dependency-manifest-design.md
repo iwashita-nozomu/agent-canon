@@ -4,7 +4,7 @@
 @dependency-start
 contract design
 responsibility Defines the repository-wide dependency manifest DSL and validation model.
-upstream design source-owned-dependency-validation.md source authority, PR receipt, and source/runtime boundary
+downstream design source-owned-dependency-validation.md applies the DSL to source-owned validation
 downstream design dependency-contract-kinds.toml registered dependency header contract kinds
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates changed-file manifests
 downstream implementation ../../tools/analysis/dependencies/scan_dependency_headers.sh scans manifest marker coverage
@@ -224,9 +224,10 @@ responsibility <role statement...>
 依存がない direction は行を置きません。
 空の placeholder 行や `none` 行は不要です。
 
-ただし、manifest block 全体が空の file は graph 上の孤立 node になりやすいため、default graph gate では fail とします。
-少なくとも、編集前に読むべき nearest canonical context を `upstream` に置くか、変更後に確認すべき consumer / index / generated mirror を `downstream` に置きます。
-shared canon の file は、実依存がない場合でも [AGENTS.md](../../AGENTS.md)、`README.md`、directory-level README、canonical workflow doc、tool index、skill implementation guide のような canon 内 anchor に接続します。
+孤立判定は全 source topology の outgoing / incoming edge を使います。
+自分から宣言がない manifest も、他の file から実依存が宣言されていれば孤立ではありません。
+`upstream` は実際の前提、`downstream` はその前提を使う consumer に限ります。
+単なる索引、相互参照、生成 mirror という理由で前提へ昇格させず、孤立診断を消すための架空の anchor は追加しません。
 Dockerfile や repo-local environment file は universal anchor にしません。
 shared canon は派生 repo に配布されるため、environment edge はその file が本当に Docker / CI / requirements / runtime assumption に依存する場合だけ使います。
 
@@ -309,15 +310,18 @@ Commentless formats such as strict JSON are classified separately by the scan to
 
 ## Upstream And Downstream Graphs
 
-`upstream` and `downstream` are separate graphs.
-They are not mixed into one dependency graph.
+The declaration views serve different context queries: upstream identifies a
+file's prerequisites; downstream identifies its consumers. Read-time closure may
+keep those views separate, but cycle validation uses one prerequisite ordering:
 
-The upstream graph answers: before editing this file, what context must be read?
+```text
+A downstream B  =>  A -> B
+B upstream A    =>  A -> B
+```
 
-The downstream graph answers: after editing this file, what affected files must be checked?
-
-This separation exists for human and agent context management.
-An agent can load upstream closure before editing, then load downstream closure after the diff exists.
+The two declarations coalesce to one edge, not a two-node cycle. Kind and source
+provenance remain in the existing declaration/TSV output; they do not partition
+cycle detection. A cycle may cross direction spellings and dependency kinds.
 
 ## Explicit Graph Analysis Artifact
 
@@ -576,32 +580,37 @@ It should report missing reverse edges and kind mismatches with file-relative di
 ## Isolated Manifests
 
 A file with a dependency manifest must appear in the graph as either a source or a target.
-If it appears in neither position, the manifest does not help an agent choose context and should fail the default graph gate.
-
-Valid ways to avoid isolation:
-
-- add an `upstream design` edge to the nearest canonical contract
-- add an `upstream implementation` edge to the helper, generator, or runtime it uses
-- add a `downstream implementation` edge to tests, mirrors, generated views, or consumers that must be checked after edits
-- add an `environment` edge only when the file truly depends on Docker, CI, requirements, or runtime configuration
-
-Do not add synthetic Dockerfile dependencies just to make a node non-isolated.
-For `agent-canon`, generic files should connect to canon-owned anchors such as [AGENTS.md](../../AGENTS.md), `README.md`, `agents/canonical/*.md`, `documents/*.md`, or [tools/README.md](../../tools/README.md).
+If it appears in neither position in the full source topology, the explicit
+graph review reports an isolated manifest. Selected review must not discard
+incoming edges declared by unselected files before this check. Repair an actual
+missing prerequisite or consumer declaration when supported by source evidence;
+do not invent a canon, index, or environment dependency just to silence a finding.
 
 ## Self Reference And Cycles
 
-Self reference is a graph-level error.
-It belongs in `check_dependency_graph.sh`, not in the format checker, because the graph checker resolves paths and normalizes edges across the repository.
+Self reference remains a graph-level error, including in `--cycle-report-only`.
+Canonicalizing a generated view can expose a self edge; investigation must
+separate that declaration from a genuine source self-dependency rather than
+silently dropping either one.
 
-Cycle detection is also graph-level.
-The checker should analyze upstream and downstream separately.
+`check_dependency_graph.sh` computes all strongly connected components (SCCs)
+over the full, normalized source topology. A component is cyclic if it contains
+more than one node or a self edge. Full review reports every cyclic component
+once, in deterministic order. Explicit selected paths or `--changed` restrict
+only the reported components to those containing a selected node, not the edges
+used to compute SCCs. An empty changed set reports no cycles; a reachable but
+unselected component is not a selected finding. Explicit paths take precedence
+over changed scope. Declaration output remains scoped to its declaring files.
 
-- upstream cycles are fail by default because upstream represents prerequisite context
-- downstream cycles are fail by default during initial rollout unless a documented allowlist is introduced
-- bidirectional consistency itself is not treated as a cycle because upstream and downstream are separate graphs
+Cycles fail by default. `--cycle-report-only` emits
+`DEPENDENCY_GRAPH_CYCLES=report_only` without making cycle findings blocking;
+parse, projection, isolation, and self-reference failures retain their existing
+failure semantics. No additional always-on gate is introduced, and retiring
+mandatory headers/gates under Issue #1228 remains independent of this correction.
 
-Example: A `downstream` B plus B `upstream` A is expected and valid.
-Example: A `upstream` B plus B `upstream` A is an upstream cycle and should fail.
+Example: A `downstream` B plus B `upstream` A is one valid ordering edge.
+Example: A `downstream` B, C `upstream` B, and C `downstream` A form one cycle,
+even when only A is selected and B/C are unchanged.
 
 ## Tool Split
 
@@ -669,7 +678,7 @@ Responsibilities:
 - filter explicit dependency facts and project their typed detail
 - fail manifest files that are isolated from the edge graph
 - validate self reference
-- detect cycles separately in upstream and downstream graphs
+- detect all cyclic SCCs in the normalized full source topology, then apply review scope
 - list every manifest edge declared by, or pointing at, focused changed files
 - print upstream and downstream related surfaces for changed files
 - emit a deterministic review-only TSV projection with `--graph-tsv`
@@ -748,6 +757,6 @@ Phase 5: remove legacy `Dependency Files:` wording from remaining docs after all
 ## Open Design Questions
 
 - Whether strict JSON files should require a sidecar manifest or remain classified as commentless unsupported files
-- Whether downstream cycles should eventually support an explicit allowlist
+- Whether explicitly reviewed cycle debt needs any policy beyond report-only review
 - Whether generated files should point to generators via sidecar metadata or stay outside the checkable set
 - Whether closure output should be ordered by graph distance, kind, or stable path sort
