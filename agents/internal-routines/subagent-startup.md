@@ -6,6 +6,7 @@ contract agent-runtime
 responsibility Documents the canonical private subagent startup route and internal startup handoff routing.
 upstream design README.md internal routine registry
 upstream design ../COMMUNICATION_PROTOCOL.md owns Fresh Subagent Context Capsule fields
+upstream design ../skills/user-guided-debugging.md owns guided cadence activation and execution ownership
 downstream design ../skills/subagent-bootstrap.md consumes the canonical private subagent startup route
 downstream implementation ../../tools/agent/orchestration/agent_team.py emits run.subagent_prompt_packet.subagent_startup_route
 downstream implementation ../../tools/agent/orchestration/route.py strips private startup labels from prompt skill activation
@@ -19,10 +20,11 @@ downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py ch
 - Purpose: defines the private startup route used inside subagent handoff
   packets and generated run artifacts.
 - Use When: a parent, stage owner, or `$subagent-bootstrap` prepares a fresh
-  subagent handoff and needs to name the internal startup owner without creating
-  a public skill.
+  or reused subagent handoff and needs to name the internal startup owner
+  without creating a public skill.
 - Section path: Contract defines route identity and non-goals; Handoff Use
-  explains what to carry into generated artifacts and prompts.
+  explains what to carry into generated artifacts and prompts; Guided Debugging
+  Reader defines the child read required at launch or reuse.
 - Boundary: this file is an internal routine. It is not a public Codex skill,
   not a catalog entry, and not a `.codex/config.toml` activation surface.
 
@@ -50,7 +52,7 @@ or public prompt-routing skill lists.
 
 `$subagent-bootstrap` cites this routine when preparing startup handoffs. The
 schema for the handoff stays in [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md); this
-routine only names the internal startup route owner.
+routine owns the internal startup route and its child reader instructions.
 
 Generated run artifacts carry the route structurally under:
 
@@ -61,3 +63,19 @@ run.subagent_prompt_packet.subagent_startup_route
 Subagent prompts carry the field when it is present and keep it structural. Do
 not convert the route path or historical startup labels into prompt keywords,
 public skill activation, accepted route aliases, or a second capsule schema.
+
+## Guided Debugging Reader
+
+At every orchestrated child launch or reuse, the parent includes the latest
+user cadence instruction and these canonical `user-guided-debugging` sections
+in the existing capsule's selected canon context:
+[Use When](../skills/user-guided-debugging.md#use-when),
+[Execution Ownership](../skills/user-guided-debugging.md#execution-ownership), and
+[Boundary](../skills/user-guided-debugging.md#boundary). The child reads them
+before its first delegated action, reusing unchanged reads. This applies with
+or without a durable run bundle; handoff fields remain protocol-owned.
+
+Apply the Skill's activation condition to the latest user instruction. When
+guided cadence is active, return the assignment and existing evidence to the
+parent under Execution Ownership. Otherwise, continue the selected workflow
+and its validation authority. Read further sections only at their own trigger.
