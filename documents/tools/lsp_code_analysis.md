@@ -31,6 +31,30 @@ python3 tools/analysis/code/lsp_code_analysis.py scan-legacy \
 ときだけ同じ report を atomic に保存します。`--lexical-only` は server を起動せず、
 既存 scanner と同じ lexical evidence だけを返します。
 
+## Recursive Context Collection
+
+コード編集前は、repository の既定実行経路で `analyze` に現在の対象 file を
+`--files` で明示します。変更前の seed は依頼対象の symbol、既存 owner / extension
+point、caller、test から選びます。`--changed` による編集後の差分収集と分けます。
+
+`analyze` の一回の report はその呼び出しの解析結果です。関連先の本文を自動で
+読み込んだ再帰的コンテキストとして扱うには、呼び出し側で次を行います。
+
+1. report の capability / status と relation の source / target location を確認し、
+   関連する定義・参照・呼び出し先の実コード、型・実装の契約、tests を読みます。
+2. 新たに関連した未確認 file / symbol を次の seed にし、同じ既定経路で明示した
+   `--files` を解析します。同一 snapshot の解析済み情報を再利用し、関係を再帰的に
+   たどります。各 batch の上限と探索完了を区別し、未確認の関連 frontier を引き継ぎます。
+3. 判断に必要な本文・契約の抜粋と revision / path / symbol / line range、関連理由を
+   現在の作業コンテキストへ取り込みます。report の保存先は詳細 evidence の locator
+   として残し、編集後は変化した symbol と影響する relation を再取得します。
+
+capability matrix に含まれない関係は、その report で解析済みとは判断せず、
+既存 owner の対応する LSP 操作または実コード・test の確認で補います。
+unsupported / failed / partial / truncated の範囲と次の検証を記録し、補完した
+source evidence と LSP evidence を区別します。root 外の対象はその repository の
+owner と実行経路で扱い、既存の path / authority boundary を維持します。
+
 ## Contract
 
 サーバーは devcontainer dependency manifest の exact command から選び、公開
