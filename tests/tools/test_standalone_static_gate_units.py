@@ -334,19 +334,33 @@ def test_output_is_uploaded_before_cleanup_even_when_unit_execution_fails() -> N
 
 
 @pytest.mark.parametrize(
-    ("container", "status_exit", "copy_exit", "copied"),
+    ("overrides", "status_exit", "copy_exit", "copied"),
     [
-        ({"owned": True, "id": "a" * 64}, 0, 0, True),
-        ({"owned": True, "id": "a" * 64}, 0, 17, True),
-        ({"owned": True, "id": "a" * 64}, 9, 0, False),
-        ({"owned": False, "id": "a" * 64}, 0, 0, False),
-        ({"owned": True, "id": "guessed-name"}, 0, 0, False),
-        ({}, 0, 0, False),
+        ({}, 0, 0, True),
+        ({}, 0, 17, True),
+        ({}, 9, 0, False),
+        ({"drift": True}, 0, 0, False),
+        ({"health": "absent", "running": False}, 0, 0, False),
+        ({"health": "unknown", "running": False}, 0, 0, True),
+        ({"name": ""}, 0, 0, False),
+        ({"health": None}, 0, 0, False),
     ],
 )
-def test_capture_exports_only_the_bootstrap_owned_container(
-    tmp_path: Path, container, status_exit: int, copy_exit: int, copied: bool,
+def test_capture_exports_only_the_bootstrap_validated_container(
+    tmp_path: Path, overrides, status_exit: int, copy_exit: int, copied: bool,
 ) -> None:
+    # Native status shape observed in run 37202683378; operation receipts use a
+    # different resource_ids shape and must not define this fixture.
+    container_name = "agent-canon-tools-0123456789abcdef"
+    container = {
+        "name": container_name, "running": True, "health": "healthy", "drift": False,
+        **overrides,
+    }
+    native_status = {
+        "schema": "agent-canon.bootstrap-receipt.v2", "status": "ok",
+        "operation": "status", "container": container,
+        "runtime_root": "/fixture/.runtime", "source_sync": None,
+    }
     source = tmp_path / "candidate"
     source.mkdir()
     bootstrap = source / "bootstrap.sh"
@@ -373,16 +387,16 @@ def test_capture_exports_only_the_bootstrap_owned_container(
         AGENT_CANON_CANDIDATE_SOURCE=str(source),
         AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path), RUNNER_TEMP=str(tmp_path),
         PATH=f"{bin_dir}:{os.environ['PATH']}", CALLS=str(calls),
-        STATUS_JSON=json.dumps({"resource_ids": {"container": container}}),
+        STATUS_JSON=json.dumps(native_status),
         STATUS_EXIT=str(status_exit), COPY_EXIT=str(copy_exit),
     )
     assert calls.exists() == copied
     evidence = tmp_path / "agent-canon-static-evidence"
-    assert (evidence / "runtime-status.json").is_file()
+    assert json.loads((evidence / "runtime-status.json").read_text()) == native_status
     archive = evidence / "runtime-task-output.tar"
     if copied:
         assert calls.read_text().splitlines() == [
-            "cp", f"{'a' * 64}:/var/lib/agent-canon/runtime/tasks", "-",
+            "cp", "--", f"{container_name}:/var/lib/agent-canon/runtime/tasks", "-",
         ]
         assert result.returncode == copy_exit
         assert archive.exists() == (copy_exit == 0)
