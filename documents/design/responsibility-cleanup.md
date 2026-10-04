@@ -24,8 +24,12 @@ downstream implementation ../../tools/validation/semantic/skills/check_skill_too
 
 ## Reader Map
 
+実装の置換・廃止を計画、実装、review するときは、その時点で
+[RC-09](#duplicate-implementation-retirement) を読み、既読の不変な判断を再利用します。
+通常の置換には同節を使い、repository cleanup 全体の schema や dispatch を起動しません。
+
 この文書（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）は、repository cleanup を近接 path や analyzer の finding ではなく、意味のある
-責務単位として閉じるための共通設計です（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。最初に境界と unit schema を読み、次に各
+責務単位として閉じるための共通設計です（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。repository cleanup 全体を扱う場合は境界と unit schema を読み、次に各
 cleanup skill の既存 owner route（[agents/skills/responsibility-cleanup.md](../../agents/skills/responsibility-cleanup.md)）、外部 tool の証拠、validation/rollback、統合と再レビュー
 の順に読みます（`agents/skills/catalog.yaml`）。公開 skill の discovery metadata と生成 shim の schema は既存の
 catalog/materializer owner（`agents/skills/catalog.yaml`、`tools/agent/skills/skill_shim_materializer.py`）を参照し、この文書へ複製しません。
@@ -96,16 +100,26 @@ RC-09 は、置換・統合で不要になる旧実装・旧入口の削除と�
 後続 cleanup を待ちません。最終コードスペースの比較は
 [SEP-06](../conventions/software-engineering-principles.md#sep-06-kiss) に従います。
 
-設計時に、残す正本が担う意味、domain、invariant、state、side effect、I/O、failure semantics
-と、不要になる旧コードを既存の設計・変更対応へ結び付けます。名称や構文の類似だけで
-重複とせず、独自責務や未確認の意味は不足として残します。未使用コードは到達性と副作用で
-別に判断し、file 全体を削除する場合は全寄与の不要性を確認します。
+明示的に置換を依頼された機構は廃止対象として確定し、新実装、必要な利用側移行、専用
+support の削除を一緒に設計・handoff・review へ渡します。残す要素には要求上必要な責務を
+示します。一般的な再利用・修正方針はこの到達状態の内側で適用し、旧実装の不適合証明や
+削除の再承認を着手条件にしません。方式選択を委ねられた部分だけ採否を調査します。
 
-旧実装専用の helper、type、import、設定・flag、build target、dependency、fixture、docs も
-不要になれば同じ修正で削除・更新します。必要な契約を検証する test は新しい境界へ移し、
-検証を消して成功にしません。移動・改名・wrapper 化、無効化、コメントアウト、復旧用コピーは
-削除の代替ではありません。公開互換契約が必要な入口は廃止対象と区別して内部を正本へ接続し、
-利用中や小さい diff だけを旧実装維持の契約へ昇格させません。
+設計時に、合意した新契約から正本の意味、domain、invariant、state、side effect、I/O、
+failure semantics と移行対象を定めます。旧コードは、保持する保証、共有部品、移行する
+接続点、未知の Git 状態やユーザーデータの保護に必要な範囲で確認します。
+判断に必要な不足はその操作の調査で解消し、未確認というだけで廃止対象全体を温存しません。
+置換範囲外の独自責務・共有部品は保存し、file 全体を削除するときはそれらを巻き込まない
+ことを確認します。自律的な重複・未使用判定は意味、到達性、副作用を根拠とします。
+
+コミット済みの旧実装は必要時に Git 履歴から復元できるため、作業ツリーには
+現在必要な実装を残します。不要な旧コードと専用の helper、type、import、設定・flag、
+build target、dependency、fixture、docs は同じ修正で削除・更新します。
+必要な保証の test と利用側は正本へ移行します。移動・改名・wrapper 化、無効化、
+コメントアウト、復旧用コピーや予防的な rollback 分岐を旧コードの保存先にしません。
+明示された公開互換契約は新しい正本へ接続する入口で満たします。
+旧経路の併存そのものが明示要件の場合だけ、対象・必要理由・撤去条件を既存設計へ残します。
+利用中、旧 test の存在、小さい diff、将来の復旧可能性だけを併存要件へ昇格させません。
 
 まず正本側を修正し、既存 LSP / dependency-analysis で実際の参照を辿って、契約・接続が
 変わる caller、import、設定、生成元、tests、docs を更新します。利用側の契約変更がさらに
@@ -124,9 +138,18 @@ alias、互換実装、旧実装の再作成、エラーの握りつぶしで成
 実施できない移行は、対象、理由、次の担当を Issue / PR に残し、移行完了とは報告しません。
 無関係な改善、契約が変わらない利用側の変更、別 Issue 全体の完了は終了条件に追加しません。
 
-検証は正本の保証、不要になった旧コードの除去、必要な利用側の接続・動作を対象にします。
+完了判定は、新契約の保証、旧実装と不要な専用 support の不在、必要な利用側の接続・動作を
+合わせて確認します。既存の差分・参照調査と対象検証で削除 path / symbol、残る入口の接続先、
+移行した利用側を確認し、既存 Issue / PR に証拠を残します。新実装の test が通っても、
+明示要件のない旧コードや切替経路が残れば、同じ task で撤去・移行へ戻り、影響する保証を
+再検証します。未完了という注記、残件一覧、commit や PR 公開でこの復帰を終端応答へ
+置き換えません。新契約・必要な移行・撤去・必須検証の同時成立が完了条件であり、一部の
+成功だけでは終了できないためです。終了と実際の阻害時の扱いは既存の
+[Completion Readiness](../../agents/canonical/CODEX_COMPLETION.md#completion-readiness) に従います。
+認可された併存期間中も、その段階の達成と全面撤去の完了を区別します。
+test の期待値は合意した契約から定めます。
 廃止済み入口を意図的に呼ぶ負例の期待エラーと、維持する利用側の移行漏れ、正本の回帰、
-無関係な失敗を区別します。削除だけで完了とせず、未実行の検証も成功扱いにしません。
+無関係な失敗を区別します。未実行の検証は未実行として記録します。
 新 checker、互換 wrapper、台帳、全 consumer 監査や全面検証 gate は追加しません。
 
 参照の存在は実装の独自性を示さず、旧実装を残せばその保守対象と互換関係も残ります。
@@ -179,10 +202,12 @@ RC-09 の置換・廃止では、正本、不要な旧コードの除去、必�
 出力ではなく、`.codex/config.toml` の catalog skill id に対する entry set、source order、
 path、enabled の readback input とします。
 
-rollback は `rollback` field に対象 tree/commit、保持する source identity、復元する
-generated projection、再検証 command を記録します（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。統合前に candidate の source identity
-と tree を保存し、readback 前の削除や別 owner の状態変更を行わないことで復元可能性を
-保ちます（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。
+rollback は既存の `rollback` field に復元元の Git tree/commit と対象 path、再生成する
+projection、再検証 command を記録します。コミット済み source の保持先は Git 履歴です。
+別コピー、退避 branch/worktree、復元リハーサルを通常の削除の前提にしません。
+Git に未収録の変更・untracked の作業とユーザー/runtime データは、既存 Git/storage owner
+の手順で保護します。実際に復元が必要になった時点で対象 revision/path を選び、後続変更と
+無関係な状態を保存して適用し、変更契約を再検証します。
 
 ## Design-To-Implementation Trace
 
