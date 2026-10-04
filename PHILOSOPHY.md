@@ -10,47 +10,182 @@ downstream design agents/README.md workflow, skill, and runtime hub.
 downstream design documents/README.md documentation ownership and policy index.
 downstream design documents/conventions/software-engineering-principles.md language- and paradigm-neutral engineering principles and decision precedence.
 downstream design documents/runtime/private-feedback-knowledge.md private knowledge and feedback contract.
+downstream design documents/design/responsibility-rationale.md skill-specific decision and procedure derivation.
 @dependency-end
 -->
 
-この文書は、AgentCanon の top-level philosophy です。
-ユーザー、repo owner、maintainer、agent が同じ設計思想を共有するために置きます。
-設計・実装・refactor・review で原則が競合する場合の詳細な判断順序は
-[documents/conventions/software-engineering-principles.md](documents/conventions/software-engineering-principles.md) が所有し、この文書では複製しません。
+AgentCanon は、**合意した成果を、根拠のある最小の仕組みで、再現可能に完結する**
+ための判断基準を共有する。この文書は、ユーザー、保守者、設計・レビューを担う
+エージェントが、スキルやワークフローを作るときの大方針の正本である。
+過去の指摘を個別の禁止事項として積み増すのではなく、手順を選ぶ基準とその理由へ整理する。
+
+## 読む契機と設計階層
+
+スキルの作成・意味のある改訂・設計レビューでは、今回の判断に関係する原則を読む。
+実行役は、選択されたスキルの入力・条件・操作・終了判定を使う。
+設計の全履歴や上位文書の全読込みを、通常実行の前提にしない。
+
+| 層 | 所有する内容 |
+| --- | --- |
+| この大方針 | 何を優先して手順を設計するか、その理由 |
+| 個別責務の設計 | 原則を具体的な目的・前提に適用した判断、比較・検証根拠、見直し条件 |
+| スキル・内部手順 | 実行に必要な入力、適用条件、操作、出力、終了条件 |
+| ツール・設定 | 決まった処理と実行環境の保証、その実装 |
+
+原則が競合する場合の詳細な優先順位は
+[ソフトウェア工学原則](documents/conventions/software-engineering-principles.md) に従う。
+以下は全作業へ検査を追加するチェックリストではなく、該当する設計判断の基準である。
 
 ## 原則
 
-- まず責務を明確にする。
-- 明示された contract、correctness、safety、semantic invariant を、差分サイズ、短さ、style より先に守る。
-- 設計は、最初に実装対象 file や最小 patch へ閉じない。
-- 先に抽象責務、概念モデル、非対象、拡張余地、評価軸を固定し、その後で実装 slice に落とす。
-- code、directory、document、tool、skill、workflow、DB、report の責務を同じように扱う。
-- 責務が曖昧な surface を作らない。
-- 同じ policy、invariant、state、identity、lifecycle を複数の正本へ置かない。
-- directory は単なる置き場ではなく、配下の code / document / artifact を束ねる責務を持つ。
-- document は説明の有無ではなく、担うべき責務を満たしているかで評価する。
-- 最も推論能力の低い agent でも同じ出力を得られる skill を設計する。
-- agent の賢さに依存せず、入力、出力、判断範囲、終了条件を surface 側で固定する。
-- 決定論的な規定動作は agent task ではなく tool task にする。
-- agent は判断、統合、例外処理を担い、再現可能な定型処理は tool が担う。
-- 人間の意図を上位に置く。
-- 会話ではなく正本に判断を残す。
-- 文章、コード、tool、DB、report の対応を見失わない。
-- 構造化してから agent に渡す。
-- 診断は作業に接続する。
-- runtime agent には単純な contract を渡す。
-- tool design 文書は実行時 agent ではなく maintainer / reviewer / 設計 agent が読む。
-- 新しい surface は convenience ではなく責務 gap から作る。
-- KISS、YAGNI、DRY、SOLID は一律 checklist にせず、到達する contract と failure evidence がある場合だけ専門 owner から選ぶ。
-- private `agent-canon-log` は同じ問題に再遭遇したときに検索して使う knowledge / feedback の置き場にし、安定した契約は正本へ昇格する。
+### 1. 合意した成果を判断の起点にする
+
+ユーザーが問題としている事象と、達成したい結果を具体例・根拠に照合して理解する。
+最新の明示的な合意から、目的、有効入力、保証、変更範囲、完了証拠を受け取り、
+開始・再開・委譲・実装・レビュー・報告まで同じ意味で引き継ぐ。
+要求を満たすことが目的であり、既存実装や途中の調査結果は、そのための情報である。
+
+合意済みの契約・方式・置換方針は実行入力とし、自律的な候補比較は委ねられた判断に限る。
+新規実装では既存能力の組合せ、原因診断では現行の原因フロー、
+指定された置換では新契約と移行する接続点というように、読む対象を判断の目的から選ぶ。
+必要な安全・権限・要求の衝突は根拠を示して解決し、指定済みの判断の再選定と区別する。
+
+### 2. 責務を単位に、必要な変更を完結する
+
+コード、ディレクトリ、文書、スキル、ツール、データ、報告を、担う責務から設計する。
+ディレクトリは配下の責務を束ね、文書は読者が必要な判断・行動を行える役割を持つ。
+先に概念モデル、保証、対象・非対象、必要な拡張境界と評価軸を明らかにし、
+それを実装単位へ落とす。最初のファイルや最小パッチを設計の上限にしない。
+
+変更範囲は、合意した成果に必要な根本機構と、その変更で影響する利用側・テスト・文書の
+対応から導く。原因だけを直して必要な移行を残すことも、無関係な改善を完了条件へ
+吸収することも避ける。各変更の必要性を成果に対応付け、独立した別責務は分離する。
+これにより、根本修正の完全性とIssue間の低い結合を両立する。
+
+### 3. 完成後に維持する仕組みを最小にする
+
+要求された意味、正しさ、安全性、必要な互換性を満たす候補の中で、
+維持する実装・入口・分岐・状態・依存・整合条件が最も単純になる構成を選ぶ。
+差分行数や文章の短さは、その代用指標にしない。
+複数の独立した状態や経路を残すほど、それらの対応を継続して確認する責務が増えるからである。
+
+再利用は、採用済みの標準機能・依存・抽象基盤の直接利用、設定、合成から考える。
+新しい仕組みは確認できた責務の不足を埋めるために作り、不要になった実装と専用の
+補助物は利用側の移行と一緒に撤去する。履歴はGitに残し、作業ツリーは現在必要な実装を保つ。
+未知の未コミット変更、利用者データ、明示された併存契約は、それぞれの所有者の境界を守る。
+KISS、YAGNI、DRY、SOLIDは、実際の契約と問題に応じて専門規約から適用する。
+
+### 4. 正本と判断の所有者を一つにする
+
+同じ規則、状態、識別情報、ライフサイクルを定義する場所は一つにする。
+呼び出し側は、その定義を複写する代わりに、適用条件と該当箇所への参照を持つ。
+正本が複数になると、変更ごとに同期が必要になり、片方だけの更新で判断が分かれる。
+
+大方針は基準、個別設計はその適用理由、スキルは実行契約、ツールは実装を所有する。
+索引と生成された配布用ファイルは、正本を発見・利用するための表現とする。
+階層化はこの責務の分離のために行い、同じ内容を各層へ書き直すために行わない。
+製品・環境・データの規約は利用先のリポジトリが所有し、AgentCanonは第二の所有者にならない。
+
+### 5. 必要な文脈を、必要になる時点で渡す
+
+判断・操作に必要な情報を構造化して渡す。実行に必要な共通制約と短い分岐条件を先に示し、
+詳細は条件が成立した時点で、依存する操作の前に読む。
+途中で新しい事実が得られた場合も、呼び出し元から関連スキルの該当節へ進み、元の作業へ戻る。
+有効な既読情報と解決済みの選択は再利用する。
+
+読取範囲は、判断に必要な依存関係から決める。関連コードの確認が必要な場面では
+LSP等の既存の定義・参照追跡を使い、必要な利用箇所まで辿る。
+これは文書リンクの無差別な再帰読込みや、破棄する旧実装の精読を全作業に課すこととは異なる。
+初回に全て読むことと、途中で必要な情報を読み落とすことを、同じ条件付き参照で解消する。
+
+### 6. 判断はエージェントに、定型処理はツールに任せる
+
+エージェントは要求の解釈、設計判断、例外の扱い、統合を担う。
+再現可能な定型処理は既存ツールとその設定に任せ、同じ処理を独自の言語・帳票・
+ラッパーで再定義しない。想定する実行役の推論能力に頼らず、同じ入力から同じ判断基準で
+要求を満たせるよう、スキルの入力・出力・判断範囲・終了条件を具体化する。
+
+操作順は必要な入力を生む順序から導く。ユーザー主導デバッグのように直前の判断と観測へ
+逐次依存する作業は親が直接担い、読取りを含めてその対話ループを維持する。
+自律作業の委譲は、独立性、検証上の価値、並列化の効果がある範囲で選ぶ。
+親は合意・範囲・根拠を渡し、返された成果を統合して、全体の完了責任を持つ。
+
+### 7. 実行経路と成立条件を、その所有者に任せる
+
+スキルは、対象リポジトリが定めた実行入口へツールと対象を渡す。
+パス解決、コンテナ、認証、資源制限は、その入口と設定の所有者が必要な保証を提供する。
+整形のために別の開発環境を選ぶ、入口が保証する条件を毎回手作業で検査するといった
+責務の重複を、スキルの手順として増やさない。
+
+診断は、実際の失敗後に次の認可済み操作を決めるために行う。
+同じ必要条件が成立しないことが分かっているなら、その条件に依存する別実装も解決にならない。
+代替案は、阻害条件を実際に変えるか、その条件に依存せず要求を満たせる根拠で選ぶ。
+一つの経路の失敗を全体の不可能へ広げず、親子の実行環境差も観測した境界に帰属させる。
+再試行は変わった前提と既存の権限に基づき、独立して進められる作業を続ける。
+
+### 8. 要求と証拠から、検証と完了を決める
+
+必要な保証と前提から検証項目を導く。数学的な性質は支配方程式・不変条件・
+成立仮定との対応で説明し、テストは反例と実装・接続上の不足を確かめる。
+採用・却下・範囲の結論には、調べた対象、要求する性質、観測と判断を対応付ける。
+数値の不一致は算法・実装・誤差の根拠を調べ、任意の補正で隠さない。
+
+実施する操作と到達結果を肯定形で示す。制約は出所と適用範囲を明記し、
+要件や入力条件に確認された違いがある場合にだけ分岐を設ける。
+論理的な説明、静的確認、実行結果、独立した行動評価を区別し、
+不足する証拠は必要な調査・検証へ接続する。
+文章の追加、リンクの存在、ログ件数だけでは動作改善を実証したことにならない。
+
+終了条件は合意した成果から導き、必要な実装・移行・撤去・検証・公開まで追跡する。
+実行可能な必須作業が残る間は続け、明示された段階・中断指示はその範囲を守る。
+実際の権限・安全・実行上の阻害は証拠と次の所有者・操作を残して、完了と区別する。
+実装済み・検証済み・公開済み・適用済みを分け、読者が再現・判断できる情報を
+チャットとIssue/PRの双方に残す。Git・公開・状態ラベルの詳細手順は既存の担当規約に従う。
+
+### 9. 指摘を、再利用できる設計判断へ変える
+
+指摘を受けたら、具体的な発生箇所と、誤った行動を選ばせた判断・適用条件を調べる。
+必要な修正はその所有者へ反映し、個別事例の禁止や例外を各スキルへ散らさない。
+一つの観測から一般則へ広げる範囲は、契約と検証された根拠で決める。
+
+現在有効な設計判断は正本へ、過去の試行・失敗と詳細証拠は担当メモや認可済みログへ残す。
+再利用時は入力、リビジョン、設定、保証の対応を確かめ、変わった前提だけを再検討する。
+記録・保存・公開・読戻しは実際の結果として区別し、privateな本文は所有者の境界に保つ。
+安定した知見は正本へ昇格し、手順を変える同じ変更で、その根拠と検証条件も更新する。
 
 ## 境界
 
-- 一般的なソフトウェア工学原則と競合時の優先順位は [documents/conventions/software-engineering-principles.md](documents/conventions/software-engineering-principles.md) に置く。
-- OOP、class、state、inheritance、`Protocol`、SOLID の専門判断は [documents/conventions/object-oriented-design.md](documents/conventions/object-oriented-design.md) に置く。
-- 個別 tool の使い方は `tools/` と tool document に置く。
-- skill の実行契約は `agents/skills/` と `.codex/personal/skills/` に置く。
-- task の手順は `agents/skills/` に置き、`agents/workflows/` には reader index と bibliography だけを置く。
-- validation matrix と policy は `documents/` に置く。
-- 対話から得た raw observation は runtime logs/evidence/Issue/failures の owner に置き、
-  独立した再発防止知識や修正 feedback は private `agent-canon-log` に置く。source treeへ本文を複製しない。
+個別スキルでは、上の原則の名前を列挙するだけでなく、
+「この目的と前提では、なぜこの順序・分岐・終了条件になるか」を説明する。
+その記録とレビューの方法は
+[手順の設計根拠](documents/design/responsibility-rationale.md#skill-procedure-derivation)
+が所有する。一つの判断で複数の操作を説明してよく、スキルごとの新規文書や固定帳票は要求しない。
+参照した過去Issueの全件解決や、変更しないスキルの一括改訂も、この方針の適用条件にしない。
+
+| 内容 | 正本・担当範囲 |
+| --- | --- |
+| 一般工学原則と競合時の優先順位 | [ソフトウェア工学原則](documents/conventions/software-engineering-principles.md) |
+| OOP・状態・継承・Protocol・SOLIDの専門判断 | [オブジェクト指向設計](documents/conventions/object-oriented-design.md) |
+| スキルの実行契約と配布用表現 | `agents/skills/` の正本と、そこから生成する `.codex/personal/skills/` |
+| 作業の手順と索引 | 手順は `agents/skills/`、`agents/workflows/` は読者向け索引・参考文献 |
+| 個別ツールの使い方と実装 | `tools/` と、その担当ツール文書 |
+| 検証方針・対応表 | `documents/` の担当設計・運用文書 |
+| 観測と再利用する知見 | raw observationはruntime logs/evidence/Issue/failuresの所有者、独立した知見・feedbackはprivate `agent-canon-log` |
+
+## 履歴からの導出
+
+以下は設計基準を明確にした指摘の対応であり、全履歴の監査結果や個別runの原因証明ではない。
+リンク先は当時の要求・判断・証拠として読み、古い実装案や状態を現在の手順へそのまま取り込まない。
+公開範囲を限定した過去の会話上の指摘と今回の編集判断は
+[Issue #1345の追加依頼記録](https://github.com/iwashita-nozomu/agent-canon/issues/1345#issuecomment-5978000099)
+に残している。
+
+| 指摘・要求 | 導いた判断基準 |
+| --- | --- |
+| [合意が工程間で失われる #1334](https://github.com/iwashita-nozomu/agent-canon/issues/1334)、[明示方針と自律判断 #1341](https://github.com/iwashita-nozomu/agent-canon/issues/1341) | 原則1・2: 合意を入力として保持し、未決の判断と必要な変更だけを展開する。 |
+| [最小差分への偏り #1284](https://github.com/iwashita-nozomu/agent-canon/issues/1284)、[旧実装の撤去と完結 #1332](https://github.com/iwashita-nozomu/agent-canon/issues/1332) | 原則2・3・8: 完成後の保守対象を小さくし、移行・撤去まで含む成果で終了を決める。 |
+| [規約の三重定義 #1129](https://github.com/iwashita-nozomu/agent-canon/issues/1129)、[独自の実行記述 #1233](https://github.com/iwashita-nozomu/agent-canon/issues/1233) | 原則4・6: 定義の所有者を一つにし、標準の実行機構を直接利用する。 |
+| [途中の条件付き読込み #1294](https://github.com/iwashita-nozomu/agent-canon/issues/1294)、[ROOT起点の適用経路 #1331](https://github.com/iwashita-nozomu/agent-canon/issues/1331) | 原則5: 発見可能性と適用条件を結び付け、必要な時点で必要な文脈を渡す。 |
+| [ユーザー主導デバッグの委譲 #1299](https://github.com/iwashita-nozomu/agent-canon/issues/1299) | 原則6: 直列の判断・観測ループは親が保ち、委譲は作業の依存関係から選ぶ。 |
+| [規定経路外の実行 #1314](https://github.com/iwashita-nozomu/agent-canon/issues/1314)、[初期理解と既知制約 #1339](https://github.com/iwashita-nozomu/agent-canon/issues/1339) | 原則1・7: 対象と成立条件を理解し、保証を持つ入口へ実行責務を集約する。 |
+| [読み手による再現と判断 #1324](https://github.com/iwashita-nozomu/agent-canon/issues/1324)、[手順の根拠保存 #1345](https://github.com/iwashita-nozomu/agent-canon/issues/1345) | 原則8・9: 主張と証拠、基準と手順を対応させ、後から見直せる正本へ残す。 |
