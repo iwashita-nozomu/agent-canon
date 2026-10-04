@@ -124,11 +124,16 @@ the repair.
 For numerical, randomized, tolerance, solver, convergence, residual, benchmark,
 or experiment-style tests, apply the conditional Numerical Test Admission Gate
 only when `activation=required`: consult
-[documents/conventions/coding-conventions-testing.md](../../documents/conventions/coding-conventions-testing.md), record the `数値 trigger`,
-numerical trigger,
-non-numerical alternative, oracle, GPU target, and budget, and omit the numerical
-test with an omission reason when the target behavior is not numerical. Do not
-use a CPU computational test as a fallback for numerical validation.
+[documents/conventions/coding-conventions-testing.md](../../documents/conventions/coding-conventions-testing.md), record the numerical trigger,
+non-numerical alternative, oracle, project-configured backend/device target, and
+budget. Omit a numerical test when the target behavior is not numerical, with
+the omission reason. Use the project's prescribed execution route and supported
+configured backend; a CPU/OpenMP backend selected by that contract is not a
+handwritten host fallback. Require a GPU target only for a GPU-specific request,
+contract, runtime profile, or validation claim. Keep CPU/OpenMP evidence distinct
+from CUDA/GPU evidence, and record required GPU validation as blocked when that
+target is unavailable. Do not substitute host arithmetic, an alternate runner,
+weakened oracle, or CPU results for required GPU evidence.
 
 ## Rejection rules
 

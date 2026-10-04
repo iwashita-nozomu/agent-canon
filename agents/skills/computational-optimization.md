@@ -209,15 +209,18 @@ surfaces when the route packet makes them part of the product contract.
    check, and device / dtype case when relevant.
 1. Implement the responsibility-preserving change that matches the contract and
    validation plan.
-1. Validate with targeted tests and one protocol-consistent GPU run; record
-   skipped GPU, benchmark, or formal run evidence as a blocker with reason
-   instead of replacing it with CPU computation.
+1. Validate with targeted tests through the project's prescribed route on its
+   supported configured backend. Run GPU, benchmark, or formal validation when
+   the request, contract, runtime profile, or claim requires it. Record unavailable
+   required evidence as a blocker; do not replace a required GPU run with CPU
+   computation or introduce an alternate runner.
 1. Review numerical claims separately from code style: convergence evidence, stopping status, failure mode, tolerance rationale, and documentation alignment.
 
 ## Validation Rules
 
-- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route、CPU smoke、CPU-only regression をしません。
-- solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、benchmark、experiment validation などの計算テストは CPU で実行しません。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence を残します。
+- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、手書きの host 計算や別 runner による代用をしません。
+- 検証 backend は project が所有する契約・configure/compile-time 設定と規定の実行経路に従います。対応する CPU/OpenMP backend の正規実行を CPU fallback とみなさず、数値処理というだけで GPU 専用に再分類しません。
+- GPU 固有の要求・契約・runtime profile・検証主張には GPU の証拠が必要です。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence を残し、CPU smoke / CPU-only regression をその代用にしません。CPU/OpenMP の結果と CUDA/GPU の結果を明確に分け、未実行の backend へ成功を拡張しません。build 失敗で assertion に到達しなかった場合も数値検証成功にしません。
 - `converged=false`、`max_iter`、non-finite intermediate、constraint violation は pass evidence ではありません。
   ただし原結果と実際の status は保持・報告し、数値判定による削除、置換、隠蔽、
   保存・返却拒否はしません。生成済み artifact は `$result-artifact-writeout` に渡し、
@@ -369,12 +372,13 @@ The runtime discovery adapter delegates these required operating clauses to this
    not emit a test plan. When activated, include exact small cases,
    ill-conditioned cases, constraint-boundary cases, derivative checks,
    non-finite guards, and not-converged status handling only when relevant.
-1. Do not green numerical tests by relaxing tolerances, deleting assertions,
-   skipping cases, changing expected values to match current output, or running
-   computational tests on CPU; using CPU as substitute evidence is a validation
-   blocker, not pass evidence. Solver, optimizer, JAX/XLA/IREE lowering,
-   convergence, residual, benchmark, and experiment validation must run on the
-   GPU target or be recorded as `gpu_validation_blocker=<reason>`.
+1. Apply [Validation Rules](#validation-rules) to the project-owned configured
+   backend and prescribed runner. Supported CPU/OpenMP execution is valid only
+   for the contract and backend actually exercised; it is not GPU evidence.
+   Keep tolerances, assertions, cases, and independently justified expected
+   values intact. For required GPU validation, CPU substitutes are not pass
+   evidence; record `gpu_validation_blocker=<reason>` when the GPU target is
+   unavailable. Numerical subject matter alone does not require a GPU run.
 1. Diagnose failed runs by first bad iteration, finite state before failure, residual components, reference norm, tolerance, status flag, and unconfirmed hypotheses; do not infer cause only from the final NaN, Inf, or residual.
 1. Keep correctness evidence separate from performance evidence; benchmark claims need reproducibility and confounder review.
 1. Route review by risk: `scientific_computing_reviewer` for math/numerical risk, `benchmark_reviewer` for performance claims, `$python-review` or `$cpp-review` for implementation diffs, and `$report-writing` for reader-facing claims.
