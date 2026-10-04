@@ -127,7 +127,11 @@ def test_selector_failure_cannot_become_a_successful_required_check(result) -> N
 
 def test_empty_selection_does_not_start_a_runtime() -> None:
     for item in workflow()["jobs"]["static-gates"]["steps"]:
-        if item["name"] not in {"Require successful unit selection", "Release shared tool runtime"}:
+        if item["name"] in {"Require successful unit selection", "Release shared tool runtime"}:
+            continue
+        if item["name"] in {"Capture shared runtime validation output", "Upload static validation evidence"}:
+            assert item["if"] == "always() && steps.start_runtime.outcome == 'success'"
+        else:
             assert item["if"] == "needs.select-static-units.outputs.units != ''"
 
 
@@ -172,6 +176,8 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(tmp_path: Pat
     bootstrap.write_text(
         '#!/usr/bin/env bash\n'
         'printf "%s\\n" "$*" >> "$CALLS"\n'
+        'printf "receipt for %s\\n" "$*"\n'
+        'printf "native stderr\\n" >&2\n'
         '[[ "$*" != *".sh docs "* ]] || exit 7\n'
     )
     bootstrap.chmod(0o755)
@@ -187,6 +193,12 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(tmp_path: Pat
     assert ".sh contracts fixed-base" in calls.read_text()
     assert summary.read_text().splitlines() == [
         "unit=docs status=fail exit=7", "unit=contracts status=pass", "unit=eval status=pass"]
+    evidence = tmp_path / "agent-canon-static-evidence"
+    receipts = sorted(evidence.glob("unit-*.log"))
+    assert len(receipts) == 3
+    assert all("native stderr" in path.read_text() for path in receipts)
+    assert "receipt for" in result.stdout
+    assert "base=fixed-base" in (evidence / "source-identity.txt").read_text()
 
 
 @pytest.mark.parametrize("paths", [[], ["has space.md"], ["deleted.md"]])
@@ -300,3 +312,84 @@ def test_unpublished_environment_uses_native_local_build(tmp_path: Path, remote_
     commands = calls.read_text().splitlines()
     assert commands[0].endswith("install" if remote_status == 0 else "update --local-build")
     assert len(commands) == (3 if bootstrap_status == 0 else 1)
+
+
+def test_output_is_uploaded_before_cleanup_even_when_unit_execution_fails() -> None:
+    steps = workflow()["jobs"]["static-gates"]["steps"]
+    names = [item["name"] for item in steps]
+    execute = names.index("Run selected units in the shared runtime")
+    capture = names.index("Capture shared runtime validation output")
+    upload = names.index("Upload static validation evidence")
+    cleanup = names.index("Release shared tool runtime")
+    assert execute < capture < upload < cleanup
+    assert step("Start one shared tool runtime")["id"] == "start_runtime"
+    for index in (capture, upload):
+        assert steps[index]["if"] == "always() && steps.start_runtime.outcome == 'success'"
+        assert "continue-on-error" not in steps[index]
+    assert steps[cleanup]["if"] == "always()"
+    assert steps[upload]["uses"] == "actions/upload-artifact@v4"
+    assert steps[upload]["with"]["retention-days"] == "7"
+    assert steps[upload]["with"]["if-no-files-found"] == "error"
+    assert "github.run_attempt" in steps[upload]["with"]["name"]
+
+
+@pytest.mark.parametrize(
+    ("container", "status_exit", "copy_exit", "copied"),
+    [
+        ({"owned": True, "id": "a" * 64}, 0, 0, True),
+        ({"owned": True, "id": "a" * 64}, 0, 17, True),
+        ({"owned": True, "id": "a" * 64}, 9, 0, False),
+        ({"owned": False, "id": "a" * 64}, 0, 0, False),
+        ({"owned": True, "id": "guessed-name"}, 0, 0, False),
+        ({}, 0, 0, False),
+    ],
+)
+def test_capture_exports_only_the_bootstrap_owned_container(
+    tmp_path: Path, container, status_exit: int, copy_exit: int, copied: bool,
+) -> None:
+    source = tmp_path / "candidate"
+    source.mkdir()
+    bootstrap = source / "bootstrap.sh"
+    bootstrap.write_text(
+        '#!/usr/bin/env bash\n'
+        '[[ "${@: -1}" == status ]] || exit 99\n'
+        'printf "%s\\n" "$STATUS_JSON"\n'
+        'exit "$STATUS_EXIT"\n'
+    )
+    bootstrap.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    docker = bin_dir / "docker"
+    docker.write_text(
+        '#!/usr/bin/env bash\n'
+        'printf "%s\\n" "$@" > "$CALLS"\n'
+        'printf "archive-stream"\n'
+        'exit "$COPY_EXIT"\n'
+    )
+    docker.chmod(0o755)
+    calls = tmp_path / "calls"
+    result = run_shell(
+        step("Capture shared runtime validation output")["run"], root=ROOT,
+        AGENT_CANON_CANDIDATE_SOURCE=str(source),
+        AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path), RUNNER_TEMP=str(tmp_path),
+        PATH=f"{bin_dir}:{os.environ['PATH']}", CALLS=str(calls),
+        STATUS_JSON=json.dumps({"resource_ids": {"container": container}}),
+        STATUS_EXIT=str(status_exit), COPY_EXIT=str(copy_exit),
+    )
+    assert calls.exists() == copied
+    evidence = tmp_path / "agent-canon-static-evidence"
+    assert (evidence / "runtime-status.json").is_file()
+    archive = evidence / "runtime-task-output.tar"
+    if copied:
+        assert calls.read_text().splitlines() == [
+            "cp", f"{'a' * 64}:/var/lib/agent-canon/runtime/tasks", "-",
+        ]
+        assert result.returncode == copy_exit
+        assert archive.exists() == (copy_exit == 0)
+        if copy_exit == 0:
+            assert archive.read_bytes() == b"archive-stream"
+        else:
+            assert (evidence / "runtime-task-output.tar.part").read_bytes() == b"archive-stream"
+    else:
+        assert result.returncode != 0
+        assert not archive.exists()
