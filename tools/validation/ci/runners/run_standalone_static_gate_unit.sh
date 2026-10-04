@@ -38,45 +38,38 @@ TOOLS_ROOT="${RUNTIME_ROOT}/tools"
 
 assert_read_only_target() {
   python3 - "${ROOT}" <<'PY'
+import json
 from pathlib import Path
+import subprocess
 import sys
 
 
-def decode_mount_path(value: str) -> str:
-    for encoded, decoded in (
-        ("\\040", " "),
-        ("\\011", "\t"),
-        ("\\012", "\n"),
-        ("\\134", "\\"),
-    ):
-        value = value.replace(encoded, decoded)
-    return value
+# libmount owns path decoding, nested mounts and visible overmount selection.
+# Query this process's namespace; only VFS flags authorize the read-only body.
+try:
+    target = Path(sys.argv[1]).resolve(strict=True)
+    result = subprocess.run(
+        [
+            "findmnt", "--kernel", "--target", str(target), "--json",
+            "--output", "TARGET,VFS-OPTIONS",
+        ],
+        check=True, capture_output=True, text=True,
+    )
+    payload = json.loads(result.stdout)
+except (OSError, subprocess.CalledProcessError, ValueError) as error:
+    raise SystemExit(
+        f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_query_failed error={type(error).__name__}"
+    ) from error
 
-
-target = Path(sys.argv[1]).resolve(strict=True)
-mountinfo = Path("/proc/self/mountinfo")
-if not mountinfo.is_file():
-    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=mountinfo_unavailable")
-
-best: tuple[int, Path, set[str]] | None = None
-for line in mountinfo.read_text(encoding="utf-8").splitlines():
-    left, separator, _right = line.partition(" - ")
-    fields = left.split()
-    if not separator or len(fields) < 6:
-        continue
-    mount_point = Path(decode_mount_path(fields[4])).resolve(strict=False)
-    try:
-        target.relative_to(mount_point)
-    except ValueError:
-        continue
-    candidate = (len(mount_point.parts), mount_point, set(fields[5].split(",")))
-    if best is None or candidate[0] > best[0]:
-        best = candidate
-
-if best is None:
+mounts = payload.get("filesystems") if isinstance(payload, dict) else None
+if not isinstance(mounts, list) or len(mounts) != 1 or not isinstance(mounts[0], dict):
     raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_missing")
-_depth, mount_point, options = best
-if "ro" not in options:
+mount_point = mounts[0].get("target")
+vfs_options = mounts[0].get("vfs-options")
+if not isinstance(mount_point, str) or not mount_point or not isinstance(vfs_options, str):
+    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_columns_missing")
+options = set(vfs_options.split(","))
+if "ro" not in options or "rw" in options:
     raise SystemExit(
         f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_not_read_only mount={mount_point}"
     )

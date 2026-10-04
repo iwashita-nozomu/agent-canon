@@ -10,8 +10,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -26,17 +28,107 @@ def runner_text() -> str:
 
 
 def test_full_unit_is_guarded_by_read_only_mount_proof() -> None:
-    """The full body cannot run before the deepest source mount proves `ro`."""
+    """The full body cannot run before the visible source mount proves `ro`."""
+    text = runner_text()
+    assert "\nassert_read_only_target\n" in text
+    assert text.index("\nassert_read_only_target\n") < text.index('cd "${ROOT}"')
+    assert text.index("\nassert_read_only_target\n") < text.index("run_full()")
+
+
+@pytest.mark.parametrize(
+    ("reply", "status", "admitted"),
+    [
+        ('{"filesystems":[{"target":"/source","vfs-options":"ro,relatime"}]}', 0, True),
+        ('{"filesystems":[{"target":"/source","vfs-options":"rw,relatime","options":"ro"}]}', 0, False),
+        ('{"filesystems":[{"target":"/source","vfs-options":"errors=remount-ro"}]}', 0, False),
+        ('{"filesystems":[{"target":"/source","vfs-options":"ro,rw"}]}', 0, False),
+        ('{"filesystems":[{"target":"/source","options":"ro"}]}', 0, False),
+        ('{"filesystems":[{"target":"/source","vfs-options":null}]}', 0, False),
+        ('{"filesystems":[]}', 0, False),
+        ('{"filesystems":[{},{}]}', 0, False),
+        ('{"filesystems":[null]}', 0, False),
+        ('[]', 0, False),
+        ('not JSON', 0, False),
+        ('{"filesystems":[{"target":"/source","vfs-options":"ro"}]}', 1, False),
+    ],
+)
+def test_mount_admission_consumes_native_result_before_body(
+    tmp_path: Path, reply: str, status: int, admitted: bool,
+) -> None:
+    """Run the production guard; only the external findmnt observation is faked."""
+    target = tmp_path / "source with space\\backslash"
+    target.mkdir()
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_findmnt = fake_bin / "findmnt"
+    capture = tmp_path / "argv.json"
+    fake_findmnt.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, pathlib, sys\n"
+        "pathlib.Path(os.environ['FINDMNT_CAPTURE']).write_text(json.dumps(sys.argv[1:]))\n"
+        "print(os.environ['FINDMNT_REPLY'])\n"
+        "sys.exit(int(os.environ['FINDMNT_STATUS']))\n",
+        encoding="utf-8",
+    )
+    fake_findmnt.chmod(0o755)
     text = runner_text()
     guard = text.split("assert_read_only_target() {", 1)[1].split(
         "\n}\n\nassert_read_only_target", 1
     )[0]
+    result = subprocess.run(
+        ["bash", "-c", "set -euo pipefail\nassert_read_only_target() {" + guard
+         + "\n}\nassert_read_only_target\nprintf 'CHECK_BODY_STARTED\\n'\n"],
+        check=False, capture_output=True, text=True,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "ROOT": str(target),
+            "FINDMNT_CAPTURE": str(capture),
+            "FINDMNT_REPLY": reply,
+            "FINDMNT_STATUS": str(status),
+        },
+    )
+    assert (result.returncode == 0) is admitted, result.stderr
+    assert ("CHECK_BODY_STARTED" in result.stdout) is admitted
+    assert json.loads(capture.read_text(encoding="utf-8")) == [
+        "--kernel", "--target", str(target.resolve()), "--json",
+        "--output", "TARGET,VFS-OPTIONS",
+    ]
 
-    assert "/proc/self/mountinfo" in guard
-    assert 'if "ro" not in options' in guard
-    assert "target_mount_not_read_only" in guard
-    assert "\nassert_read_only_target\n" in text
-    assert text.index("\nassert_read_only_target\n") < text.index("run_full()")
+
+@pytest.mark.parametrize("visible_options", ("ro", "rw"))
+@pytest.mark.parametrize("layout", ("ordinary", "nested", "overmount"))
+def test_native_findmnt_resolves_visible_mount_fixture(
+    tmp_path: Path, visible_options: str, layout: str,
+) -> None:
+    """Exercise libmount fixtures, not real mounts or a duplicate mount parser."""
+    target = tmp_path / "source with space\\backslash"
+    target.mkdir()
+    nested = target / "nested"
+    nested.mkdir()
+    selected = target if layout == "ordinary" else nested
+    encoded_target = str(target.resolve()).replace("\\", "\\134").replace(" ", "\\040")
+    encoded_selected = str(selected.resolve()).replace("\\", "\\134").replace(" ", "\\040")
+    rows = ["1 0 0:1 / / rw - tmpfs tmpfs rw"]
+    parent_options = visible_options if layout == "ordinary" else "rw"
+    rows.append(f"2 1 0:2 / {encoded_target} {parent_options} - tmpfs tmpfs rw")
+    if layout != "ordinary":
+        hidden_options = "rw" if visible_options == "ro" else "ro"
+        options = hidden_options if layout == "overmount" else visible_options
+        rows.append(f"3 2 0:3 / {encoded_selected} {options} - tmpfs tmpfs rw")
+    if layout == "overmount":
+        rows.append(f"4 3 0:4 / {encoded_selected} {visible_options} - tmpfs tmpfs rw")
+    table = tmp_path / "mountinfo.fixture"
+    table.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    result = subprocess.run(
+        ["findmnt", "--kernel", "--tab-file", str(table), "--target", str(selected),
+         "--json", "--output", "TARGET,VFS-OPTIONS"],
+        check=True, capture_output=True, text=True,
+    )
+    mounts = json.loads(result.stdout)["filesystems"]
+    assert len(mounts) == 1
+    assert mounts[0]["target"] == str(selected.resolve())
+    assert mounts[0]["vfs-options"].split(",")[0] == visible_options
 
 
 def test_full_unit_reuses_existing_body_and_forwards_options() -> None:
