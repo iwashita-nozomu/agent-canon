@@ -41,11 +41,7 @@ CONTRACTS = (
         title="# AgentCanon Repository Instructions",
         headings=(
             "## Repository Role",
-            "## Reader Map",
-            "## Always-On Boundary",
             "## Runtime Owner Map",
-            "## Task Entry",
-            "## Validation Routing",
         ),
         owner_rows=(
             (
