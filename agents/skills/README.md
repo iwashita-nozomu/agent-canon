@@ -4,6 +4,7 @@
 @dependency-start
 contract skill
 responsibility Documents Shared Skill Canon for this repository.
+upstream design ../../documents/design/responsibility-rationale.md skill procedure derivation contract
 upstream design ./catalog.yaml enumerates public skill families
 upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
@@ -117,7 +118,7 @@ in the Codex host runtime.
 | Official System Skill | AgentCanon Route |
 | --- | --- |
 | `$openai-docs` | Current OpenAI / Codex product docs, model guidance, API reference, and Codex manual source route. |
-| `$skill-creator` | Skill creation, skill refactor, and skill instruction quality work after AgentCanon fixes the local owner surface. |
+| `$skill-creator` | Skill creation, refactor, and instruction quality work after selecting the local owner and [authoring contract](#updating-skills). |
 | `$skill-installer` | External skill installation and curated skill listing. |
 | `$imagegen` | Bitmap visual asset generation for HTML, reports, dashboards, or visual mockups. |
 | `$plugin-creator` | Codex plugin scaffold, manifest defaults, marketplace entries, and plugin reinstall flow. |
@@ -188,7 +189,13 @@ in the Codex host runtime.
 
 ## Updating Skills
 
-1. `agents/skills/<family>.md` を更新する
-1. `agents/skills/catalog.yaml` を更新する
-1. 既存の [保守者用 materializer](../../README.md#source-and-artifact-boundary) で adapter を更新し、正本と一緒に commit する。利用時には生成しない
-1. 必要なら [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) と [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) の routing を更新する
+スキル手順の作成・修正・レビューでは、先に
+[設計基準から手順への導出](../../documents/design/responsibility-rationale.md#skill-procedure-derivation)
+と、そのスキルの担当設計の該当節を読みます。共通方針を各スキルへ複写せず、
+どの基準・前提からその手順を選んだかを担当設計へ残し、手順の該当節と対応させます。
+`$skill-creator` へ委譲する場合も、この設計ownerと対象判断を渡します。
+
+実変更は [skill-cleanup の保守経路](skill-cleanup.md#route) で、根拠・canonical本文と
+影響するcatalog/DAG/routingを揃え、既存materializerのadapterを同じcommitへ含めます。
+利用時には生成しません。レビューは
+[同じ根拠との対応確認](skill-cleanup.md#procedure-rationale) へ進み、レビューだけで編集を開始しません。

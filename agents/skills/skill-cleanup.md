@@ -5,6 +5,7 @@ contract skill
 responsibility Routes canonical skill and generated runtime cleanup as one source-to-readback unit.
 upstream design ./README.md shared public skill canon
 upstream design ../../documents/design/responsibility-cleanup.md responsibility-unit cleanup contract
+upstream design ../../documents/design/responsibility-rationale.md skill procedure derivation and maintenance rationale
 upstream design ../../documents/design/skill-runtime-shim-materialization.md generated shim materialization owner
 upstream design ../../documents/design/skill-tool-invocation-graph.md generated skill/tool graph owner
 upstream design ./agent-orchestration.md routing owner
@@ -41,13 +42,27 @@ graph/readback を一つの source-to-generated cleanup unit として既存 own
 ## Route
 
 1. canonical skill doc と catalog/dependency/route/tool command の source owner を固定する。
+   手順を作成・改訂するときは、[Procedure rationale](#procedure-rationale) から該当する設計根拠を読む。
    挙動を改訂する場合は、最初の変更前に [Behavioral Tuning](#behavioral-tuning) を適用する。
    関連スキルへの導線を追加・変更する場合は、[Caller-side wiring](#caller-side-wiring) に従う。
+   変更する判断の根拠と手順を同じ変更で更新してから、生成・readbackへ進む。
 2. `.codex/config.toml` を host-wiring の source/input として読み、catalog skill id に対する
    entry set、source order、path、enabled を readback する。
 3. 既存 materializer は保守時に `.codex/personal/skills/<skill>/SKILL.md` を生成し、正本と同じ commit に含める。利用時には呼ばない。
 4. `skill_dependency_map.py graph` は通常、明示した外部 runtime root に graph JSON/Mermaid を生成し、既存 checker で source/readback equality を確認する。tracked reader pair を更新する場合だけ、固定2ファイルの mutation capability と外部 before/after evidence を明示する。
 5. validation command の実行範囲は [Write-Capable Handoff Validation Trust Boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary) を参照し、skill-cleanup 側で別の test/full-scan policy を作らない。作業途中の関連読込は、[Conditional maintenance reads](#conditional-maintenance-reads) の成立した条件だけを使う。
+
+## Procedure rationale
+
+手順の作成・改訂・レビューでは、判断に先立って
+[設計基準から手順への導出](../../documents/design/responsibility-rationale.md#skill-procedure-derivation)
+と対象スキルの担当設計の該当節を読みます。この保守手順自体の根拠は
+[Skill maintenance derivation](../../documents/design/responsibility-rationale.md#skill-maintenance-derivation)
+です。既読で有効な根拠は再利用し、対象の設計判断またはレビューへ戻ります。
+
+変更のレビューでも同じ根拠を使い、前提・採用基準から変更した順序・分岐・終了条件と
+検証条件への対応を確認します。レビューだけの依頼から編集・生成を開始しません。
+通常実行・誤字修正・整形だけの場合の読取境界も、上記の設計契約に従います。
 
 ## Caller-side wiring
 
