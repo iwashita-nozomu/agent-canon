@@ -193,12 +193,25 @@ style debt stays separate. A failed check immediately routes to its
 
 ## Coordination handoff
 
-For selected delegation, read [Codex Subagents](CODEX_SUBAGENTS.md) and the selected
-role's current TOML. They own model/profile, authority, context capsule, and write
-scope; this file does not duplicate the role inventory. The existing typed route
-selects `worker` by default and permits `spark_worker` only with explicit
-`implementer=spark_worker:<evidence>` for a design-derived mechanical slice with
-no unresolved specification, public-interface, or dependency decision.
+For selected delegation, consume the current verdict from
+[Decision Sufficiency](../skills/agent-orchestration.md#decision-sufficiency-packet)
+and its role/profile mapping in [Codex Subagents](CODEX_SUBAGENTS.md#principles).
+The model/profile registry is authoritative; role TOML files are generated
+readback, not a second selection policy. This phase has no independent worker
+default or additional implementer token admission.
+
+Before the verdict is established, unresolved specification, public-interface,
+algorithm, dependency, or owner decisions return to their existing design owner.
+A small diff or available capacity does not imply `execute_spark`. Once that
+verdict is established for the fixed packet, preserve its selected `spark_worker`
+and post-completion owning gate. Do not return to a default reasoning worker
+because a handoff lacks the legacy `implementer=spark_worker:<evidence>` spelling.
+When the existing dispatch API requires selection arguments, project them from
+the established verdict; they are transport inputs, not another user approval.
+Reuse a compatible active child without changing the selected role/profile.
+An incompatible context or unavailable launch follows the existing continuation
+or blocked route, not parent implementation, candidate substitution, or an
+invented successful runtime acknowledgement.
 
 Handoff includes the selected design path/section and request clauses, established
 reuse assets and relevant tests, dependency-expanded write scope, validation route,
