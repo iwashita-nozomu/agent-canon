@@ -16,6 +16,41 @@ ADAPTER = ROOT / "bootstrap/host/lifecycle/entrypoint.sh"
 
 
 @pytest.mark.parametrize(
+    "arguments",
+    [["--mode", "explicit-target-write"], ["--mutation-capability-json", "{}"]],
+)
+def test_controller_parser_does_not_advertise_unsupported_write(
+    arguments: list[str],
+) -> None:
+    from tools.runtime.container.bootstrap_runtime import build_parser
+
+    with pytest.raises(SystemExit) as result:
+        build_parser().parse_args(["target", "add", "--root", ".", *arguments])
+    assert result.value.code == 2
+
+
+def test_git_metadata_failure_is_not_a_successful_empty_plan(tmp_path: Path) -> None:
+    (tmp_path / ".git").write_text("gitdir: /does-not-exist\n")
+    manifest = tmp_path / "mounts.tsv"
+    manifest.write_text("")
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; AGENT_CANON_REPOSITORY_ROOT=$2; _agent_canon_git_mounts "$3"',
+            "test",
+            str(ADAPTER),
+            str(tmp_path),
+            str(manifest),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
     "arguments", ["--mode explicit-target-write", "--mutation-capability-json {}"]
 )
 def test_target_rejects_unsupported_write_before_docker(
