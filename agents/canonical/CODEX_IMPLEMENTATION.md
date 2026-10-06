@@ -49,10 +49,8 @@ The selected `workflow_activation_policy` owns child activation and authority.
 A blocked selected child preserves that boundary; it does not create a parent
 write fallback. User-guided debugging uses the common ROOT exception.
 
-A bounded owner/path/targeted-validation route uses its existing task or handoff
-for these decisions. Its selected execution owner performs the edit and selected
-verification directly; this section does not manufacture a child handoff. When
-the selected route requires full staging, read
+A bounded route's selected execution owner performs its edit and verification
+without a child handoff. When the selected route requires full staging, read
 [Coordination design packet](#coordination-design-packet) before that handoff.
 Only an activated design-correspondence route reads
 [DIC](../internal-routines/design-implementation-correspondence.md) and carries
