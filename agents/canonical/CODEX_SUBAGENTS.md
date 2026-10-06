@@ -88,11 +88,11 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   `workflow_monitoring.md` に残します。
 - repo-changing task では、owner、責務、context、write authority、validation
   route が揃った launchable wave だけを立てる
-- repo-changing implementation / patch / doc-edit work は、catalog の typed route が
-  要求する場合だけ write-capable implementer handoff first です。bounded owner/path/
-  targeted-validation route は、typed route が要求しない限り child を必要としません。
-  spawn authorization、tool gate、または他の launch blocker がある場合は typed
-  blocked/retry/user-report packet を残し、親の直接編集へ切り替えません。
+- selected delegation / coordination route だけが write-capable implementer
+  handoff を作ります。そのrouteでspawn authorization、tool gate、または他の
+  launch blockerがある場合はtyped blocked/retry/user-report packetを残し、
+  childに割り当てたunitを親が代替実装しません。bounded single-owner executionは
+  このsubagent lifecycleの対象外です。
 - 調査、レビュー、文書整備は分ける
 - fan-out は active spawn budget と stage wave plan の範囲で管理する
 - subagents may spawn bounded child subagents when their handoff packet includes `delegated_spawn_policy` with owner, input packet, expected output, dependency-expanded handoff scope, validation route, review gate, and remaining spawn budget
@@ -100,7 +100,9 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
 - 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
-- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は [agents/canonical/CODEX_INTAKE.md](CODEX_INTAKE.md) の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
+- 同じ checkout root の write-capable agent は同時起動しません。先行writerの
+  lifecycle終了とowner release/readback後だけ同じcheckoutを直列再利用します。
+  並列writerはcheckout ownerが選択したdistinct checkout rootを使います。
 - subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
 - fresh subagent は必要な launch ごとに [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
@@ -118,7 +120,11 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - Codex の role ごとの model / reasoning 設定は `agents/model_profiles.toml` を正本にし、`.codex/agents/*.toml` は registry-generated view とする
 - `implementer.codex_agents` は canonical model/profile registry の generated view です。implementation-executable fixed packet は Decision Sufficiency の `execute_spark` から `spark_worker` 一体を直接 materialize し、同じ packet の post-completion owning gate だけを続けます。Luna は ambiguous design、causal repair、graph-owned cross-owner integration、review を所有します。
 - repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch / doc-edit work が scope にある task では、`agents/task_catalog.yaml#workflow_activation_policy` が child handoff を要求する typed route の場合に限り、write-capable handoff を既定 route として説明する。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、選択済み write-capable implementer の handoff を schedule し、parent は packet relay、依存順、status、最終 readback に集中する
-- user が coding / implementation / patch / doc-edit work を求めた task では、read-only wave は setup evidence です。selected typed route が child を要求する場合に限り、requirements、surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作って write-capable implementer を起動または schedule します。prompt-only bounded route は semantic handoff と targeted validation のまま child を必要としません。spawn authorization、tool gate、または他の launch blocker がある場合は typed blocked/retry/user-report packet を残し、親の直接編集へ切り替えません。親は packet relay、依存順、status、最終 readback だけを担当します。
+- selected typed route が child を要求する場合、必要なrequirements、scope、
+  dependency、validation evidenceからhandoff scopeを作ってwrite-capable
+  implementerを起動またはscheduleします。childを要求しないbounded routeの
+  executorやvalidation cadenceはそのworkflow ownerが所有し、この文書は
+  subagent規則を投影しません。
 - 分割境界は差し替え可能性で判断します。別実装、別証明、別 validation oracle、別 review decision に置き換えられる単位なら worker scope にできます。数理的に差し替えが起きない境界、記法だけの境界、固定 context、同じ oracle を共有する連続導出は、過剰な subagent 分割を避けて同じ input packet に残します。
 - 固定 packet の candidate replacement は行いません。capacity/model failure は typed event として同じ immutable packet を queue し、exact target contradiction だけを一度の `StructuralDesignGap` として修復後、同じ Spark を再開します。
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution は
