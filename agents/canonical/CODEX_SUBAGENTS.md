@@ -75,11 +75,11 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   reviewer または ship reviewer が current snapshot、reachable path、contract、
   witness/static proof を確認して adjudicate し、distinct unresolved risk の
   ときだけ specialist を追加します
-- parent agent は orchestrator only です。repo-changing implementation /
-  patch / doc-edit work では、親は handoff packet の選択、agent 起動、packet
-  relay、依存順、status、最終外部 readback だけを担当し、調査、設計、実装、
-  テスト、diff review、Issue/PR、評価、merge/conflict、validation/finding の
-  判定を行いません
+- selected coordination/delegation route では parent agent は orchestrator /
+  integrator です。親は handoff packet の選択、agent 起動、packet relay、依存順、
+  status、選択済み integration と最終 readback を担当し、child に割り当てた
+  implementation unit を代替実装しません。bounded single-owner route や
+  user-guided debugging の executor は各 workflow owner が定めます
 - routing と owner-critical な review を決めてから、必要な subagent wave
   だけを起動する
 - Agent Wave の `計画 -> レビュー -> 編集` は候補 stage です。各 wave は
