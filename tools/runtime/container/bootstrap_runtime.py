@@ -5659,12 +5659,28 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             try:
                 request = json.loads(args.request_json)
             except json.JSONDecodeError as exc:
-                raise BootstrapError("invalid_exec_request", "request is not JSON") from exc
+                raise BootstrapError(
+                    "invalid_exec_request", "request is not JSON"
+                ) from exc
             allowed = {
-                "schema", "tool_id", "runtime", "argv", "child_args",
-                "source_root", "cwd", "cwd_policy", "target_root", "environment",
-                "stdin", "stdout", "stderr", "exit", "signal", "side_effect",
-                "output_root", "written_paths",
+                "schema",
+                "tool_id",
+                "runtime",
+                "argv",
+                "child_args",
+                "source_root",
+                "cwd",
+                "cwd_policy",
+                "target_root",
+                "environment",
+                "stdin",
+                "stdout",
+                "stderr",
+                "exit",
+                "signal",
+                "side_effect",
+                "output_root",
+                "written_paths",
             }
             if not isinstance(request, dict) or set(request) - allowed:
                 raise BootstrapError("invalid_exec_request", "request fields are invalid")

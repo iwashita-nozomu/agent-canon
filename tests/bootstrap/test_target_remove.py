@@ -15,17 +15,28 @@ ROOT = Path(__file__).resolve().parents[2]
 ADAPTER = ROOT / "bootstrap/host/lifecycle/entrypoint.sh"
 
 
-@pytest.mark.parametrize("arguments", ["--mode explicit-target-write", "--mutation-capability-json {}"])
-def test_target_rejects_unsupported_write_before_docker(tmp_path: Path, arguments: str) -> None:
+@pytest.mark.parametrize(
+    "arguments", ["--mode explicit-target-write", "--mutation-capability-json {}"]
+)
+def test_target_rejects_unsupported_write_before_docker(
+    tmp_path: Path, arguments: str
+) -> None:
     """Unsupported public write arguments cannot be silently admitted as read-only."""
-    script = r'''
+    script = (
+        r"""
 source "$1"
 _agent_canon_validate_roots() { :; }
 _agent_canon_prepare_host_runtime() { :; }
 docker_fixture() { printf 'unexpected Docker call\n' >&2; return 91; }
 AGENT_CANON_DOCKER=docker_fixture
-bootstrap_host_entrypoint "$2" --control-parent-root "$2" target add --root "$2" ''' + arguments
-    result = subprocess.run(["bash", "-c", script, "test", str(ADAPTER), str(tmp_path)], capture_output=True, text=True)
+bootstrap_host_entrypoint "$2" --control-parent-root "$2" target add --root "$2" """
+        + arguments
+    )
+    result = subprocess.run(
+        ["bash", "-c", script, "test", str(ADAPTER), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 2
     assert "unexpected Docker call" not in result.stderr
     assert '"status":"ok"' not in result.stdout
@@ -36,13 +47,49 @@ def test_linked_targets_share_native_read_only_git_mount(tmp_path: Path) -> None
     repository = tmp_path / "source"
     repository.mkdir()
     subprocess.run(["git", "init", str(repository)], check=True, capture_output=True)
-    subprocess.run(["git", "-C", str(repository), "-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "seed"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "seed",
+        ],
+        check=True,
+        capture_output=True,
+    )
     first, second = tmp_path / "first", tmp_path / "second"
     for path in (first, second):
-        subprocess.run(["git", "-C", str(repository), "worktree", "add", "--detach", str(path)], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "-C", str(repository), "worktree", "add", "--detach", str(path)],
+            check=True,
+            capture_output=True,
+        )
     manifest = tmp_path / "mounts.tsv"
-    manifest.write_text(f"target\tfirst\t{first}\t/targets/first\tread-only\n", encoding="utf-8")
-    result = subprocess.run(["bash", "-c", 'source "$1"; AGENT_CANON_REPOSITORY_ROOT=$2; AGENT_CANON_TARGET_PENDING_SOURCE=$3; _agent_canon_git_mounts "$4"', "test", str(ADAPTER), str(repository), str(second), str(manifest)], check=True, capture_output=True, text=True)
+    manifest.write_text(
+        f"target\tfirst\t{first}\t/targets/first\tread-only\n", encoding="utf-8"
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; AGENT_CANON_REPOSITORY_ROOT=$2; AGENT_CANON_TARGET_PENDING_SOURCE=$3; _agent_canon_git_mounts "$4"',
+            "test",
+            str(ADAPTER),
+            str(repository),
+            str(second),
+            str(manifest),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     common = repository / ".git"
     assert result.stdout == f"{common}\t{common}\tfalse\n"
 
@@ -51,11 +98,32 @@ def test_rollback_metadata_allows_retired_checkout(tmp_path: Path) -> None:
     """Reading a GC plan needs identities, not a still-existing checkout mount."""
     missing = tmp_path / "deleted"
     plan = tmp_path / "rollback-plan.tsv"
-    plan.write_text("schema\tagent-canon.rollback-plan.v1\nimage-id\t" + "sha256:" + "a" * 64 + "\nimage-ref\tagent-canon-tools:rollback\n" + f"mount\tmount\t{missing}\t/targets/old\ttrue\n", encoding="utf-8")
-    result = subprocess.run(["bash", "-c", 'source "$1"; AGENT_CANON_STATE_ROOT=$2; _agent_canon_read_rollback_plan "$3"', "test", str(ADAPTER), str(tmp_path), str(tmp_path / "projection.tsv")], capture_output=True, text=True)
+    plan.write_text(
+        "schema\tagent-canon.rollback-plan.v1\nimage-id\t"
+        + "sha256:"
+        + "a" * 64
+        + "\nimage-ref\tagent-canon-tools:rollback\n"
+        + f"mount\tmount\t{missing}\t/targets/old\ttrue\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; AGENT_CANON_STATE_ROOT=$2; _agent_canon_read_rollback_plan "$3"',
+            "test",
+            str(ADAPTER),
+            str(tmp_path),
+            str(tmp_path / "projection.tsv"),
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 0, result.stderr
     assert not missing.exists()
-    assert (tmp_path / "projection.tsv").read_text() == f"target\told\t{missing}\t/targets/old\tread-only\n"
+    assert (
+        tmp_path / "projection.tsv"
+    ).read_text() == f"target\told\t{missing}\t/targets/old\tread-only\n"
 
 
 @pytest.mark.parametrize("failure", ["", "stop", "rm", "ensure", "start", "validate"])
@@ -72,7 +140,7 @@ def test_remove_recreates_before_final_readback(tmp_path: Path, failure: str) ->
     manifest = f"target\t{digest}\t{removed}\t/targets/{digest}\tread-only\n" + keep
     (state / "mounts.tsv").write_text(manifest, encoding="utf-8")
     (tmp_path / "observed").write_text(manifest, encoding="utf-8")
-    script = r'''
+    script = r"""
 source "$1"
 fixture=$2
 failure=$3
@@ -123,7 +191,7 @@ _agent_canon_validate_existing_container() {
 _agent_canon_restore_candidate_failure() { record restore; }
 bootstrap_host_entrypoint "$fixture" --control-parent-root "$fixture" \
   target remove --root "$fixture/removed" --mode read-only
-'''
+"""
     result = subprocess.run(
         ["bash", "-c", script, "test", str(ADAPTER), str(tmp_path), failure],
         check=False,
