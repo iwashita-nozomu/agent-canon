@@ -22,10 +22,10 @@ downstream design ./direct-luna-communication.md owns bounded direct-Luna packet
 
 ## Reader Map
 
-設計を伴う repository-changing route では、owner selection の後に
-[../internal-routines/design-implementation-correspondence.md](../internal-routines/design-implementation-correspondence.md) を stage route
-として参照します。universal policy は同 routine にあり、この skill は route
-selection の owner だけを持ちます。
+Design-implementation correspondence is read only after the selected route
+activates that owner. A design file, design edit, or repository-changing task does
+not activate it by itself. This skill selects the route; the selected workflow
+owns its procedure.
 
 - Purpose: mandatory repository-task routing that selects workflow family,
   active skills, roles, reviews, run bundle, and implementation route.
@@ -391,7 +391,7 @@ mode の意味:
   - full kickoff や repo-changing-only skill を勝手に足さない
   - 普通の相談、壁打ち、説明だけの turn を含む
   - repo state 確認、shell / GitHub check を走らせず、会話だけで応答する
-  - user が repo inspection、file edit、validation、PR / issue 処理、CI 確認、または実装作業を求めた時点で `repo-changing execution` へ切り替え、切り替えをユーザー向け update で明示してから preflight へ進む
+  - repository inspection and other read-only evidence gathering stay on the advisory/read route. File edits, validation execution that mutates task state, PR/Issue mutation, or implementation select the corresponding write/execution route before that operation
 
 ## Execution-Time-Aware Work-Conservation Contract
 
