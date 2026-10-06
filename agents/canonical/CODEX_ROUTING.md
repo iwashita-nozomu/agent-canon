@@ -44,11 +44,10 @@ contract is actually in scope. Existing-environment execution or an unavailable
 test does not initiate environment maintenance. The selected environment owner
 keeps product validation separate from AgentCanon runtime validation.
 
-Use `execution_route_policy` from the same catalog to distinguish
-`bounded_fast_path` and `coordination`. A bounded route carries owner, complete
-responsibility unit, implementation mechanism, selected verification, and
-publication evidence in the existing task/Issue or handoff. Coordination uses
-its declared run bundle. Family names and links alone do not create artifacts.
+Use `execution_route_policy` to distinguish `bounded_fast_path` and
+`coordination`. Bounded work has one execution owner for edit and selected
+verification, without a child or run bundle. Coordination assigns its units and
+uses its declared run bundle.
 
 ## Contract-Required Skill Set
 
@@ -60,9 +59,9 @@ related candidates belong to [the dependency dictionary](../skills/skill-depende
 Read [Skill Paths](skills.md#skill-paths) only for an unresolved adapter or
 command context, and read the selected Skill's active sections before use.
 
-For a selected routing action, the existing `route` command uses
-`--mode repo-changing` for repository changes and `--mode routing-only` for
-advisory routing. Its active/candidate distinction is preserved through handoff.
+The existing `route` command uses `--mode routing-only` for read-only work
+and `--mode repo-changing` for a selected repository/remote mutation. Reading
+source for an answer or diagnosis does not widen the mode.
 `codex-task-workflow` becomes active for execution transport; `subagent-bootstrap`
 becomes active only when the selected typed route requires child handoff.
 User invocation uses `$skill-name`.

@@ -39,7 +39,7 @@ read-only の探索やレビューも含め、新規起動・既存 child の再
 1. 次に直す対象を 1 件選ぶ。
 1. 編集前に、チャットで対象 object、問題点、根拠、修復面を短く提示してから、その問題を親が修正する。
 1. 根本原因が別 object に移ったら、編集前に新しい問題点を提示する。
-1. この cadence では、修正後に test、smoke run、lint、docs check、benchmark、その他 validation command を実行しない。patch 後にユーザーが明示した場合だけ実行する。
+1. 修正後は、このtaskで既に合意されたvalidationだけを親が続ける。ユーザーが「今回は修正だけ」「テストせず待つ」などの停止境界を明示した場合はそこで止め、後続の指示がその境界を更新したら同じtaskのvalidationへ戻る。
 1. patch 後にユーザーが validation 実行を明示し、その validation が fail した場合は、次の edit 方針を示す前に
    `failing_contract`、`observation_level`、`cause_classification`、
    `intent_preservation`、`evidence` を提示する。`intent_preservation` は
@@ -52,6 +52,6 @@ read-only の探索やレビューも含め、新規起動・既存 child の再
 
 - オーケストレーションの子エージェントも適用条件と実行責任を読みます。読込と cadence の適用を分け、ユーザー主導 cadence はユーザー明示時だけ有効にします。
 - 通常のオーケストレーションは、選択済み workflow とその検証権限で進めます。
-- validation 実行はこの cadence の既定動作ではありません。必要な validation route は提示できますが、実行はユーザーの明示指示後に限ります。
+- validationの種類と範囲はこのcadenceから追加しません。現在のtaskで合意済みのvalidationを保持し、明示された停止境界だけがその実行を止めます。
 - 難易度・複数ファイル・検証失敗を理由に自律 wave へ切り替えません。ユーザーが自律作業への切替を明示した場合だけ通常の routing に戻し、大規模 repair は [refactor-loop](refactor-loop.md) の責務とします。
 - report や artifact 作成が必要なら `tool-finding-report` / `report-writing` を併用します。

@@ -283,6 +283,12 @@ per-skill farms are not read. Uninstall removes only the AgentCanon-owned
 
 ## Tool routes and compatibility
 
+AgentCanon source maintenance, including topic checkouts, uses native formatter
+and test commands through the shared resident. Source-root resolution identifies
+that responsibility independently of the installation path. Product targets keep
+their project-owned execution route; target admission and mount permissions apply
+to both cases.
+
 Rust first-class commands keep their existing public shape, for example
 `agent-canon docs check` and `agent-canon semantic-index`. Python tools do not
 gain flat global executables. A catalog entry is runnable through
