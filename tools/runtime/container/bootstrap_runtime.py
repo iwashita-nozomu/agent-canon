@@ -2,9 +2,10 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Owns container-side TOML/JSON/state/tool/check/eval logic for the shared AgentCanon tool container without implicit source writes.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
-# downstream implementation ../../bootstrap.sh fixed host entrypoint
-# downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
+# upstream implementation ../source/agent_canon_source_root.py standalone source identity
+# downstream implementation ../../../bootstrap.sh fixed host entrypoint
+# downstream implementation ../../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 # @dependency-end
 """Container control plane for the AgentCanon tool runtime.
 
@@ -243,15 +244,18 @@ def _validate_tool_plane_argv(
         if script.startswith(image_tool_root):
             return
     if root.resolve() == repository_root.resolve():
-        if executable == "python3" and len(argv) > 2 and argv[1:3] == ["-m", "pytest"]:
-            return
-        if executable == "cargo" and len(argv) > 1 and argv[1] in {
-            "build",
-            "clippy",
-            "fmt",
-            "test",
-        }:
-            return
+        return
+    from tools.runtime.source.agent_canon_source_root import (
+        SourceRootFailure,
+        resolve_agent_canon_source_root,
+    )
+
+    try:
+        resolve_agent_canon_source_root(root, source_root=root, canon_root=root)
+    except SourceRootFailure:
+        pass
+    else:
+        return
     raise BootstrapError(
         "tool_plane_command_rejected",
         "exec accepts AgentCanon tools only; project commands use the project execution environment",

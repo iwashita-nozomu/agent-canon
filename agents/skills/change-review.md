@@ -15,10 +15,6 @@ upstream design ../internal-routines/design-implementation-correspondence.md for
 @dependency-end
 -->
 
-## Related Document Closure
-
-The review packet consumes the active DIC-010 path+section+clause/ref closure receipt. DIC owns closure traversal; this skill records the changed-path reverse trace, design fingerprint, owner mapping, implementation target, and validation-route readback. Missing or drifting DIC-010 coverage blocks acceptance rather than creating a second correspondence policy.
-
 ## Purpose
 
 Review the actual diff, resulting in-scope code, and selected validation evidence findings-first.
@@ -101,15 +97,9 @@ clone scan, a fixed rule-of-three threshold, a new checker, or a dedicated recei
 identifies the repeated sites, the shared responsibility dimensions, the synchronization/authority/
 drift risk, and the selected SEP-03 or SEP-08 clause that supports the decision.
 
-When a new or modified helper, module, script, parser, state, or publisher surrounds an existing CLI, library, or
-toolchain, consume the existing `reuse_survey` provider comparison, exact provider input/output boundary,
-selected command/options, and exact gap. Phase labels alone are insufficient. Block manual reimplementation
-of provider-owned phases, and return `design_issue_blocker` when the comparison or gap is absent. Apply the
-prospective compound-responsibility-name stop in [命名規約](../../documents/rule/naming.md).
-For deletion or refactor review, require the `$code-cleanup` line/block mapping content itself; a claim-only
-handoff without mapping rows/content is insufficient. Names, symbols, search hits, and diff size are not deletion proof; numerical meaning must be
-reconstructed before architecture or JIT changes. Follow the streaming cleanup route and RC-09 for
-replacement and retirement; a remaining caller does not justify reimplementation or per-line validation.
+Review actual provider reuse, changed semantics, consumer migration, and retirement
+against the requested outcome and existing evidence. Investigate missing facts only
+when they can change a finding. A numerical change follows its mathematical owner.
 
 ## Code Comment Review
 
