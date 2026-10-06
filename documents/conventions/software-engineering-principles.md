@@ -65,7 +65,7 @@ downstream design ../../documents/notes/knowledge/coding_decision_methods.md ext
 弱める根拠になりません。
 
 1. 最新の明示的なユーザー合意と user / domain contract、safety、correctness
-2. semantic invariant、state / lifecycle owner、要求上必要な public compatibility
+2. semantic invariant、state / lifecycle owner
 3. root-cause closure、reachable failure handling、cleanup / recovery
 4. responsibility / dependency boundary、information hiding、authority boundary
 5. testability、reproducibility、operational observability
@@ -105,7 +105,7 @@ downstream design ../../documents/notes/knowledge/coding_decision_methods.md ext
 ### SEP-01 Contract first
 
 直前のチャットを含む最新の明示的なユーザー要求と、実装のために選んだ契約を区別します。
-目的、有効入力、必要な結果・安全性・性能・失敗条件と明示的互換要求は守る条件です。
+目的、有効入力、必要な結果・安全性・性能・失敗条件は守る条件です。
 一方、既存の API、データ表現、状態遷移、責務分割、内部の前提・不変条件は設計変数です。
 旧契約を固定してからコードだけを短くせず、要求を満たす契約と実装の組を比較し、
 数理的に単純になる契約変更も通常の候補に含めます。既存コード・テスト・文書は
@@ -115,7 +115,7 @@ downstream design ../../documents/notes/knowledge/coding_decision_methods.md ext
 影響する利用側と移行を簡潔に示します。表現変更なら意味の対応を、挙動変更なら保存する
 性質と認可された差を示し、意図して直す旧挙動との完全同値を要求しません。
 必要な契約変更・利用側移行は認可された修正に含め、契約変更というだけで別承認待ちに
-しません。ただし明示された保証・互換制約の撤回、目的変更、権限外の変更は別です。
+しません。ただし目的変更、権限外の変更は別です。
 具体的な衝突と必要な判断を示し、未承認の提案を合意扱いせず独立した作業を続けます。
 
 実装を成立させるための入力領域縮小、前提強化、保証弱化、失敗の成功化を、契約整理と
@@ -202,7 +202,7 @@ KISS は、合意した完成形を満たす候補の中で、変更後に保守
 | 既存機能の修正・変更・整理 | 合意した結果から、対象の既存構造を残す必要も見直す。不要・原因となる構造の削除・置換を継ぎ足しより先に検討し、正しい部品は再利用する。根本原因と影響する契約から変更単位を決める。 |
 
 混在する作業は責務別に選び、file・helper の新旧やIssue全体の名称で一括分類しません。
-必要な挙動・有効入力・安全性・明示的互換契約の保存と、現在の実装構造の保存は別です。
+必要な挙動・有効入力・安全性の保存と、現在の実装構造の保存は別です。
 挙動保存のrefactorは合意した意味を維持し、修正でも無条件削除・全書換え・範囲外の掃除をしません。
 新規での組合せは不要な重複を避け、修正での維持見直しは欠陥や不要な構造を支える層の増殖を避けます。
 「最短の code」や「最小の diff」ではなく、完成形に残る次の実体と相互依存を比較します。
@@ -395,7 +395,7 @@ validation を変更単位にします。共通の原因を所有する箇所か
 
 実装開始前に、implementation が導かれる complete target state を固定します。この target state は
 少なくとも `contract`、`responsibility/state/lifecycle`、`failure/recovery`、
-`compatibility/migration`、`cleanup`、`validation` を含みます。implementation sequencing や
+`migration`、`cleanup`、`validation` を含みます。implementation sequencing や
 waves は、すでに定義された work の順序だけを決める仕組みであり、target state を後から完成させるための
 段階実装には使いません。したがって「最初の実装」や `initial implementation`、temporary API、
 placeholder route、required behavior の stub / no-op / hard-coded replacement、deferred-later completion
@@ -414,9 +414,7 @@ public surface、schema、path、identity、runtime route を変更する場合�
 不要になった旧実装・alias・wrapper・selector・generated projection の削除、必要な consumer migration
 を一つの完成条件として [RC-09](../design/responsibility-cleanup.md#duplicate-implementation-retirement) で閉じます。
 
-互換経路を残すには、明示された現行の公開契約を満たす必要性を先に示します。supported period、
-owner、read / write direction、removal condition はその必要性に従い、移行の手間や diff の小ささを
-温存理由にしません。必要な入口も正本へ接続し、旧実装を第二の source of truth として残しません。
+複数経路がある場合は直近に反映された実装を基準に利用側を移行し、旧経路と専用supportを削除します。
 
 ## 5. Verification、再現性、運用
 

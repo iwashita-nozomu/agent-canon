@@ -85,8 +85,8 @@ or confirmed duplicate retirement, apply
 without requiring a separate retirement request or zero callers. Review the resulting retained
 implementation and exclusive support, not just changed lines. A missing-deletion finding identifies
 the obsolete contribution, the retained owner that satisfies its contract, and the unnecessary
-maintenance or compatibility surface. Follow RC-09 for required public compatibility and consumer
-repairs; do not demand unrelated consumer changes or preserve the old implementation for a smaller diff.
+maintenance surface. Follow RC-09 for consumer repairs; do not demand unrelated consumer changes
+or preserve the old implementation for a smaller diff.
 Extract a shared abstraction only at a stable responsibility boundary that passes abstraction admission.
 Retain separate implementations only for evidenced differences in
 domain meaning, lifecycle, failure semantics, caller contracts, or change reasons. Caller-specific

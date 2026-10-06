@@ -48,7 +48,7 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
    に従い、通常の置換でも不要になる旧実装・入口・専用補助コードを同じ pass で削除する。
    別の廃止依頼、active caller ゼロ、後続 cleanup を待たない。独自責務、未確認の意味、
-   公開互換契約の判断と必要な利用側移行は同じ RC-09 を使い、ここへ規則を複製しない。
+   必要な利用側移行は同じ RC-09 を使い、ここへ規則を複製しない。
 4. 数値コードを削除・置換する前に equations、units、state、stopping rule、convergence contract、
    failure semantics を復元する。未解決の数学的意味は既存の semantic math owner に戻し、architecture、
    compiler、JIT の変更で吸収しない。
