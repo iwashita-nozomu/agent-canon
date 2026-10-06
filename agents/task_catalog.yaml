@@ -140,9 +140,9 @@ role_topology_defaults: &standard_role_topology
     identity_key: role_id+instance_id+agent_type
     read_only: allowed_when_input_packets_or_review_focus_are_distinct
     write_capable: allowed_only_for_worker_spark_worker_integration_executor
-    current_checkout_parallel_requirements: disjoint_paths+no_shared_git_index_or_head+no_generated_or_formatter_effects
+    same_checkout_writers: sequential_reuse_after_owner_release_only
     collision_policy: reject_same_checkout_root_before_spawn
-    isolated_worktree_policy: lifecycle_selected_linked_worktree_or_independent_clone
+    parallel_writer_checkout_policy: lifecycle_selected_distinct_checkout_root
     runtime_threads_are_cardinality_source: false
   stage_waves:
     - id: intake
