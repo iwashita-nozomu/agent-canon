@@ -30,6 +30,11 @@ without understanding their contents.
   and documentation together; migrate necessary consumers to the retained owner.
   [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
   owns retirement details, not an additional compatibility layer or approval gate.
+- Remove intermediate concepts as well as their code: packets, wrappers, types,
+  and names that merely relay existing data or rename an operation need no separate
+  owner. Connect callers directly to the existing responsibility; renaming or moving
+  an unnecessary layer is not cleanup. Keep abstractions for actual domain meaning,
+  independent behavior, or a demonstrated shared responsibility, not naming alone.
 - For numerical code, establish equations and convergence semantics before
   deletion; do not substitute an architecture or JIT change for a mathematical fix.
 - Use [refactor-loop](refactor-loop.md) for an actual structural migration and

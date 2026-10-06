@@ -82,6 +82,11 @@ unverified property, and next owner/action, and finish independent required work
 Consider commit and push separately, preserving mixed work and publication scope.
 Report implemented, verified, published, and applied states accurately; include
 material limits and accessible evidence without exposing secrets.
+Before asserting feasibility, cause, or completion, establish the claim from
+relevant source, a checked derivation, or the owner's actual execution path.
+A proposal, a name, a written rule, or an unverified worker declaration is not
+proof that it works. Resolve the necessary in-scope facts; if uncertainty remains,
+state it rather than giving an untested confirmation. This adds no blanket test gate.
 
 ## Validation Routing
 

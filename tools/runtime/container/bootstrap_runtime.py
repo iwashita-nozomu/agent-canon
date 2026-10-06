@@ -5584,15 +5584,10 @@ def build_parser() -> argparse.ArgumentParser:
     target_sub = target.add_subparsers(dest="target_operation", required=True)
     add = target_sub.add_parser("add")
     add.add_argument("--root", required=True)
-    add.add_argument(
-        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
-    )
-    add.add_argument("--mutation-capability-json")
+    add.add_argument("--mode", choices=("read-only",), default="read-only")
     remove = target_sub.add_parser("remove")
     remove.add_argument("--root", required=True)
-    remove.add_argument(
-        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
-    )
+    remove.add_argument("--mode", choices=("read-only",), default="read-only")
     execute = sub.add_parser("exec")
     execute_group = execute.add_mutually_exclusive_group(required=True)
     execute_group.add_argument("--root")
@@ -5658,26 +5653,34 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "gc":
         return runtime.gc(dry_run=args.dry_run)
     if operation == "target" and args.target_operation == "add":
-        capability = None
-        if args.mutation_capability_json:
-            try:
-                capability = json.loads(args.mutation_capability_json)
-            except json.JSONDecodeError as exc:
-                raise BootstrapError("mutation_capability_invalid", "capability is not JSON") from exc
-        return runtime.target_add(
-            Path(args.root), args.mode, mutation_capability=capability
-        )
+        return runtime.target_add(Path(args.root), args.mode)
     if operation == "exec":
         if args.request_json:
             try:
                 request = json.loads(args.request_json)
             except json.JSONDecodeError as exc:
-                raise BootstrapError("invalid_exec_request", "request is not JSON") from exc
+                raise BootstrapError(
+                    "invalid_exec_request", "request is not JSON"
+                ) from exc
             allowed = {
-                "schema", "tool_id", "runtime", "argv", "child_args",
-                "source_root", "cwd", "cwd_policy", "target_root", "environment",
-                "stdin", "stdout", "stderr", "exit", "signal", "side_effect",
-                "output_root", "written_paths",
+                "schema",
+                "tool_id",
+                "runtime",
+                "argv",
+                "child_args",
+                "source_root",
+                "cwd",
+                "cwd_policy",
+                "target_root",
+                "environment",
+                "stdin",
+                "stdout",
+                "stderr",
+                "exit",
+                "signal",
+                "side_effect",
+                "output_root",
+                "written_paths",
             }
             if not isinstance(request, dict) or set(request) - allowed:
                 raise BootstrapError("invalid_exec_request", "request fields are invalid")
