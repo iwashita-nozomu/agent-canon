@@ -40,29 +40,11 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 をこのrouteの走査・更新順として使います。通常の局所修正に全走査を追加しません。
 同じ `reuse_survey` と依存根拠を使い、検証・レビュー・commitの正本を置き換えません。
 
-1. [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
-   で最新の明示的合意を完成形に固定し、[SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
-   の既存機能の修正・整理として、対象構造の維持も見直す。不要・原因となる構造の削除・置換を
-   継ぎ足しより先に検討し、正しい既存部品は再利用する。current module/helper/type/test/docs、
-   標準ライブラリ、採用済み dependency、既存 CLI を同じ shared asset universe で比較する。
-   file/worker slice はその後に導く。provider の比較は
-   [SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-   を使い、既存の呼出元・公開 API から最小の利用案と要求・保証の対応を作る。
-   disposition の根拠はその対応から導き、名前やシグネチャの一致だけで決めない。
-   同名のローカル実装がないことを、再利用先がない根拠にしない。split / extraction
-   または suspected predecessor の現行欠落では、同じ universe を `git log`、`-S`、
-   deleted paths、prior PR / Issue、predecessor tests、関連 design docs まで必要範囲で
-   拡張する。bounded non-split edit では historical scan を必須にしない。
-2. 各 candidate の `asset_path`、`asset_origin`、`capability`、`disposition`
-   (`reuse|extend|restore|consolidate|replace|delete|reject`)、`reason`、非空の
-   `test_paths` を既存 `reuse_survey` に一度だけ記録する。調査 dimension が
-   非適用なら categorized `bounded_omission` と根拠を残す。候補の重複、未分類、
-   根拠/test path 欠落を含む survey は write handoff へ進めない。bounded
-   non-split edit で reuse choice 自体がない場合だけ、明示理由付き
-   `scope=not_applicable` を使う。
-3. 削除、置換、移動の候補は filename、symbol、search hit、行数では決めない。候補を行または
-   block ごとに読み、各寄与を数学的・domain 上の意味、invariant、state transition、side effect、I/O、
-   reachable caller / consumer として既存 handoff または review context に対応付ける。
+1. 合意した完成形から、対象ownerと実際の利用側を特定する。既存の意味・能力・判断を再利用し、
+   失われた既存機能が疑われる場合は、その判断に必要なGit履歴や過去の設計を確認する。
+2. 既知のowner、利用案、意味、検証結果を再利用し、今回の判断を変える未確認点だけを調べる。
+   必要な根拠は既存Issue、設計、またはhandoffに残す。
+3. 候補の意味、invariant、state transition、side effect、I/Oと実際のcallerを確認する。
    [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
    に従い、通常の置換でも不要になる旧実装・入口・専用補助コードを同じ pass で削除する。
    別の廃止依頼、active caller ゼロ、後続 cleanup を待たない。独自責務、未確認の意味、
@@ -80,14 +62,9 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
    SEP-08 の capability 比較で残った具体的な不足責務だけを新設理由にする。実在する
    candidate の `reject` は能力不足と、旧構造の維持で増える複雑さを区別し、SEP-06/08 の
    根拠を使う。必要な部品まで再実装せず、実在しない candidate や synthetic な `reject` は作らない。
-6. approved mechanism を `refactor-loop` へ渡し、同じ serialized `reuse_survey` と
-   tests を各 write-capable child と read-only reviewer に伝播する。置換・廃止とも RC-09 の
-   削除と必要な usage-surface repair を含め、子 prompt 側で disposition を再構築しない。
-7. `change-review` で current snapshot、reachable path、contract、witness と
-   worker packet と同一の asset/disposition/test-path evidence を readback し、置換後の tree に
-   合意からの逸脱、旧構造を守るための追加層、不要な旧コードの残存を確認する。
-   targeted validation は各行ではなく
-   owning-unit boundary で一度だけ実行する。
+6. 選択した変更を実装し、必要な移行と旧実装・専用supportの撤去を同じ単位で閉じる。
+   委譲する場合だけ、受け手の判断に必要な既存根拠と検証範囲を渡す。
+7. 変更した意味、利用側の接続、旧コードの撤去を既存reviewと対象検証で確認する。
 
 再利用先の比較は今回の責務に限り、contract を満たす選択が決まれば終える。全 library の
 網羅調査、provider 内部の再監査、調査用の依存導入を追加しない。置換時の検証は既存の
