@@ -86,8 +86,6 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   選択した stage の plan artifact、review gate decision、edit handoff
   evidence だけを `team_manifest.yaml`、`schedule.md`、
   `workflow_monitoring.md` に残します。
-- repo-changing task では、owner、責務、context、write authority、validation
-  route が揃った launchable wave だけを立てる
 - selected delegation / coordination route だけが write-capable implementer
   handoff を作ります。そのrouteでspawn authorization、tool gate、または他の
   launch blockerがある場合はtyped blocked/retry/user-report packetを残し、
@@ -120,11 +118,6 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - Codex の role ごとの model / reasoning 設定は `agents/model_profiles.toml` を正本にし、`.codex/agents/*.toml` は registry-generated view とする
 - `implementer.codex_agents` は canonical model/profile registry の generated view です。implementation-executable fixed packet は Decision Sufficiency の `execute_spark` から `spark_worker` 一体を直接 materialize し、同じ packet の post-completion owning gate だけを続けます。Luna は ambiguous design、causal repair、graph-owned cross-owner integration、review を所有します。
 - repo inventory、tool drift survey、static validation planning、diff-local review、機械 report の要約は、implementation の critical path を塞がない独立検証としてだけ read-only role に切る。coding / implementation / patch / doc-edit work が scope にある task では、`agents/task_catalog.yaml#workflow_activation_policy` が child handoff を要求する typed route の場合に限り、write-capable handoff を既定 route として説明する。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff packet が揃い次第、選択済み write-capable implementer の handoff を schedule し、parent は packet relay、依存順、status、最終 readback に集中する
-- selected typed route が child を要求する場合、必要なrequirements、scope、
-  dependency、validation evidenceからhandoff scopeを作ってwrite-capable
-  implementerを起動またはscheduleします。childを要求しないbounded routeの
-  executorやvalidation cadenceはそのworkflow ownerが所有し、この文書は
-  subagent規則を投影しません。
 - 分割境界は差し替え可能性で判断します。別実装、別証明、別 validation oracle、別 review decision に置き換えられる単位なら worker scope にできます。数理的に差し替えが起きない境界、記法だけの境界、固定 context、同じ oracle を共有する連続導出は、過剰な subagent 分割を避けて同じ input packet に残します。
 - 固定 packet の candidate replacement は行いません。capacity/model failure は typed event として同じ immutable packet を queue し、exact target contradiction だけを一度の `StructuralDesignGap` として修復後、同じ Spark を再開します。
 - 設計・scope 判断、曖昧な実装判断、multi-surface conflict resolution は
