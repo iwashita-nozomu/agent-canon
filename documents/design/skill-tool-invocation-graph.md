@@ -184,34 +184,12 @@ equality/readback は四段で行う。(1) source→materialized IR は catalog 
 
 ## Current Catalog Inventory (readback evidence)
 
-これは第二の identity source ではなく、現在 snapshot の generated readback である。`catalog.yaml` の skill id 集合と一致することを確認し、名称は source の実値である。順序は catalog の source order、変更時は checker が再生成する。
-
-| # | catalog skill id | # | catalog skill id | # | catalog skill id |
-| ---: | --- | ---: | --- | ---: | --- |
-| 1 | agent-orchestration | 24 | pr-processing | 47 | gpu-execution |
-| 2 | repo-onboarding | 25 | agent-update-branch | 48 | computational-optimization |
-| 3 | task-routing | 26 | report-writing | 49 | adaptive-improvement-loop |
-| 4 | start-repository | 27 | prose-reasoning-graph | 50 | literature-survey |
-| 5 | codex-task-workflow | 28 | structure-planning | 51 | formal-proof-workflow |
-| 6 | subagent-bootstrap | 29 | code-visualization | 52 | lean-algorithm-design |
-| 7 | direct-luna-communication | 30 | html-output | 53 | algorithm-proof-exploration |
-| 8 | change-review | 31 | test-design | 54 | algorithm-flowchart |
-| 9 | python-review | 32 | refactor-loop | 55 | research-workflow |
-| 10 | cpp-review | 33 | structure-refactor | 56 | comprehensive-development |
-| 11 | oop-readability-check | 34 | user-guided-debugging | 57 | dependency-design |
-| 12 | oop-type-design | 35 | grilling | 58 | devcontainer-exec |
-| 13 | result-artifact-writeout | 36 | long-form-writing | 59 | environment-maintenance |
-| 14 | result-visualize | 37 | academic-writing | 60 | agent-learning |
-| 15 | tool-finding-report | 38 | paper-writing | 61 | wiki-publication |
-| 16 | issue-finding-report | 39 | md-style-check | 62 | responsibility-cleanup |
-| 17 | agent-log-analysis | 40 | mvp-skeleton | 63 | environment-cleanup |
-| 18 | runtime-log-repair | 41 | document-canon-cleanup | 64 | code-cleanup |
-| 19 | agent-eval-accumulation | 42 | parent-repository-audit | 65 | skill-cleanup |
-| 20 | agent-canon-update | 43 | dependency-analysis | 66 | empirical-prompt-tuning |
-| 21 | agent-canon-bootstrap | 44 | worktree-health | 67 | slides |
-| 22 | repository-topic-clone | 45 | experiment-lifecycle | 68 | tokens |
-| 23 | dependency-module-change | 46 | experiment-review | 69 | integration |
-| source order | catalog が定める skill id の順序（`agents/skills/catalog.yaml`） | readback | `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` が同じ source order を検証 |
+現行の skill 集合・source order は `agents/skills/catalog.yaml`、関係は
+`agents/skills/skill-dependencies.yaml` から読みます。件数と生成 projection の一致は
+上記 [Checker Contract](#checker-contract-inputs--outputs--equality) の実際の出力で確認します。
+この設計文書へ全件一覧の snapshot を複写せず、追加・廃止に追従する別の一覧を保守しません。
+生成・readback の証拠は対象 source snapshot とともに既存 artifact owner へ保存し、
+[Artifact side-effect boundary](#artifact-side-effect-boundary) の外部出力と tracked pair の境界を保持します。
 
 ## Complete Mermaid Projection Contract
 
