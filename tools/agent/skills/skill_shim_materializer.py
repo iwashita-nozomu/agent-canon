@@ -387,7 +387,9 @@ def build_context(
     if set(routes) != set(skill_ids) or set(dependencies) != set(skill_ids):
         raise MaterializerError("owner_skill_set_mismatch")
     try:
-        resolution = resolve_agent_canon_source_root(root)
+        resolution = resolve_agent_canon_source_root(
+            root, source_root=root, canon_root=root
+        )
         packets = {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
     except (OSError, ValueError) as exc:
         raise MaterializerError("command_packet_invalid", str(exc)) from exc
