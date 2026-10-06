@@ -175,10 +175,10 @@ Select design, orchestration, research, or delegation when the relevant owner's
 condition is active; reuse a resolved selection through retries and handoffs.
 AgentCanon maintenance does not authorize consumer generated-file edits.
 
-User-guided debugging stays in the parent session for investigation, edits, and
-requested validation, including read-only work. This overrides orchestrator-only
-and mandatory child-handoff rules for that cadence; only an explicit user change
-returns to autonomous routing.
+Workflow-specific execution ownership, cadence, delegation, and validation
+conditions belong to the selected workflow owner. ROOT supplies shared authority,
+safety, scope, and completion invariants; it does not add a second executor or
+stage policy.
 
 Before any reader-facing writing, let the intended reader reconstruct the actions
 or reasoning from the output and accessible references. Provide applicable scope,
