@@ -2119,25 +2119,6 @@ skill_families:
     routing:
       stage_policy: active
       reason: public/module responsibility, reachability, or behavior-preserving code cleanup is in scope
-  - id: skill-cleanup
-    purpose: Route canonical skill and generated runtime cleanup as one source-to-readback unit.
-    canonical_doc: agents/skills/skill-cleanup.md
-    shim: .codex/personal/skills/skill-cleanup/SKILL.md
-    discovery:
-      name: skill-cleanup
-      description: "Use when canonical skill docs, catalog, dependency DAG, routes, tool commands, generated shims, host config, graph, or readback must be cleaned as one unit."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "check-agent-runtime-alignment", "operation_id": "default"}
-      - {"executable": "python3", "argv": ["tools/agent/skills/skill_shim_materializer.py", "materialize", "--root", ".", "--all"]}
-      - {"executable": "python3", "argv": ["tools/agent/skills/skill_shim_materializer.py", "readback", "--root", ".", "--all"]}
-      - {"executable": "python3", "argv": ["tools/agent/skills/skill_dependency_map.py", "graph", "--root", ".", "--runtime-root", "<external-runtime-root>"]}
-      - {"executable": "python3", "argv": ["tools/agent/skills/skill_dependency_map.py", "graph", "--root", ".", "--output", "documents/runtime/skill-dependency-graph.md", "--runtime-root", "<external-runtime-root>", "--source-mutation-capability-json", "<exact-two-path-capability.json>"]}
-      - {"executable": "python3", "argv": ["tools/validation/semantic/skills/check_skill_tool_invocation_graph.py", "--root", "."]}
-    routing:
-      stage_policy: active
-      reason: canonical skill, catalog, route, generated shim, host config, graph, or readback cleanup is in scope
   - id: empirical-prompt-tuning
     purpose: Improve reusable agent instructions through fresh evaluation on frozen baseline and hold-out scenarios until qualitative and quantitative evidence converges.
     canonical_doc: agents/skills/empirical-prompt-tuning.md

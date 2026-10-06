@@ -3,9 +3,10 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents Shared Skill Canon for this repository.
+responsibility Indexes public skills and owns AgentCanon-specific skill maintenance.
 upstream design ./catalog.yaml enumerates public skill families
 upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
+upstream design ../../documents/design/responsibility-cleanup.md skill maintenance delegation rationale
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public and official skill boundaries
 upstream design code-visualization.md sole public visualization owner and typed projection contract
@@ -117,7 +118,7 @@ in the Codex host runtime.
 | Official System Skill | AgentCanon Route |
 | --- | --- |
 | `$openai-docs` | Current OpenAI / Codex product docs, model guidance, API reference, and Codex manual source route. |
-| `$skill-creator` | Skill creation, skill refactor, and skill instruction quality work after AgentCanon fixes the local owner surface. |
+| `$skill-creator` | Direct owner for general skill creation, refactoring, and instruction quality; AgentCanon source changes also use [Updating Skills](#updating-skills). |
 | `$skill-installer` | External skill installation and curated skill listing. |
 | `$imagegen` | Bitmap visual asset generation for HTML, reports, dashboards, or visual mockups. |
 | `$plugin-creator` | Codex plugin scaffold, manifest defaults, marketplace entries, and plugin reinstall flow. |
@@ -188,7 +189,43 @@ in the Codex host runtime.
 
 ## Updating Skills
 
-1. `agents/skills/<family>.md` を更新する
-1. `agents/skills/catalog.yaml` を更新する
-1. 既存の [保守者用 materializer](../../README.md#source-and-artifact-boundary) で adapter を更新し、正本と一緒に commit する。利用時には生成しない
-1. 必要なら [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) と [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) の routing を更新する
+一般的な skill の作成・改訂は、ホスト提供の `$skill-creator` に直接渡します。
+以下は AgentCanon source の登録・配布を変更する場合の追加手順です。repository-owned
+skill の通常保守には持ち込まず、read-only review は編集・生成の権限を増やしません。
+この分担を設計・見直しするときは
+[Skill Maintenance Delegation](../../documents/design/responsibility-cleanup.md#skill-maintenance-delegation)
+を読み、通常の保守では既に解決した担当と判断を再利用します。
+
+1. 変更する canonical doc、catalog entry、依存関係、直接 caller と配布対象を特定します。
+   設計する場合は [PHILOSOPHY](../../PHILOSOPHY.md) と当該設計を基準に、目的・前提、
+   比較した案と証拠、順序・分岐・終了条件の理由、見直し条件を既存の担当設計へ残します。
+   根拠・手順・検証条件を同じ変更で揃え、全 Skill の棚卸しを着手条件にしません。
+2. 新しい再利用指示、大幅な挙動改訂、曖昧な指示による失敗修正、明示的な挙動評価では、
+   最初の挙動変更前に [empirical-prompt-tuning](empirical-prompt-tuning.md#workflow) の
+   Iteration 0 と Scenario Packet の凍結を行い、既存の独立評価経路へ渡します。
+   formatter-only、path-only、生成 view の stale 修正、one-off prompt だけでは起動しません。
+3. canonical doc と `catalog.yaml`、`skill-dependencies.yaml`、実際に影響する caller・
+   route・tool command を揃えます。廃止する公開入口は本体・catalog・依存関係・配布adapterを
+   同じ変更で取り除き、必要な caller を残る担当へ接続します。公式本文のコピーや
+   標準を呼ぶだけの代替 Skill は作りません。
+4. [md-style-check](md-style-check.md) の規定経路で変更文書を整形します。
+   [保守者用 materializer](../../README.md#source-and-artifact-boundary) で対象adapterを
+   生成・readbackし、必要な生成差分を正本と同じcommitへ含めます。利用時には生成しません。
+   `.codex/config.toml` はhost-wiringのsource/inputとして確認し、生成先や第二のinventoryにしません。
+5. 公開surface変更は [Public Skill Surface](#public-skill-surface) のruntime alignment・
+   dependency checkと、既存の `check_skill_tool_invocation_graph.py` で配布と参照を確認します。
+   graphは同節の既存materializerから生成し、通常の外部出力と明示的なtracked pair更新を区別します。
+   検証範囲は [既存のvalidation境界](agent-orchestration.md#write-capable-handoff-validation-trust-boundary)
+   に従い、構造整合の成功と独立した挙動評価の成功を区別します。
+
+関連手順を配線する変更では、callerの判断・操作の直前に成立条件、具体的なMarkdownリンク、
+復帰先を置き、[条件付き読込](task-routing.md#in-flight-skill-reads) に従います。
+変更したcallerで条件成立時の到達・復帰と、未成立時の非起動を確認します。
+正本整理は [document-canon-cleanup](document-canon-cleanup.md)、checkoutの不整合は
+[worktree-health](worktree-health.md)、ログからの判断は [agent-log-analysis](agent-log-analysis.md)、
+認可済みのログ修復は [runtime-log-repair](runtime-log-repair.md)、結果保存は
+[result-artifact-writeout](result-artifact-writeout.md) を必要になった時点で読み、元の保守へ戻ります。
+
+必要な実行環境・evaluatorが利用不能なら、未実施の検証と凍結packetをIssueに残し、
+可能なsource変更と [pr-processing](pr-processing.md) による公開を続けます。
+自己採点、別runtime、手書き生成物で成功を代用せず、既存ownerの次操作を引き継ぎます。

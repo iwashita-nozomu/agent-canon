@@ -2,7 +2,7 @@
 name: agent-learning
 description: "Use when private knowledge/feedback curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"98f49f80dac8e0911c3222d8b9854dd367055b58eb9ad7d5c5cf23b4abda4385"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"ab8357750a8f36b2ec471fe1e4f77dbdf5aab44d05face0eb4153f77df274aaf"} -->
 
 <!--
 @dependency-start
