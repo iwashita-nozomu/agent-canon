@@ -39,8 +39,8 @@ class SkillShimMaterializerTest(unittest.TestCase):
         with patch.dict(
             "os.environ",
             {
-                "AGENT_CANON_SOURCE_ROOT": "/absent-installed-source",
-                "AGENT_CANON_CANON_ROOT": "/absent-installed-source",
+                "AGENT_CANON_SOURCE_ROOT": "/opt/agent-canon/source",
+                "AGENT_CANON_CANON_ROOT": "/opt/agent-canon/source",
             },
         ):
             actual = render_shim(
