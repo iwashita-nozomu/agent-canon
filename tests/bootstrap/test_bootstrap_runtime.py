@@ -724,6 +724,29 @@ def test_container_control_keeps_active_task_on_same_resident(
     assert state["tasks"]["old-exec"]["pinned"] is True
 
 
+def test_container_control_rejects_closed_admission_before_identity_reconcile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A closed runtime rejects admission without mutating cached identity."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    control.mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "container-new")
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
+    state = manager._new_state()
+    state["resources"] = manager._resource_records()
+    state["resources"]["container"].update({"id": "container-old", "state": "running"})
+    manager._ensure_layout()
+    manager._write_state(state)
+
+    with pytest.raises(BootstrapError, match="task_admission_closed"):
+        manager.admit_task("next-exec")
+
+    after = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert after["resources"]["container"]["id"] == "container-old"
+
+
 def test_target_add_prunes_missing_target_and_is_idempotent(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:

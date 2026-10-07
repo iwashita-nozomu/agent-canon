@@ -3497,11 +3497,29 @@ class BootstrapRuntime:
         self, state: dict[str, Any], task_id: str, *, target_root: Path | None = None
     ) -> dict[str, Any]:
         task_id = _slug(task_id)
-        self._reconcile_container_identity_locked(state)
         if state.get("state") not in ADMISSION_STATES:
             raise BootstrapError(
                 "task_admission_closed", f"runtime state is {state.get('state')}"
             )
+        if self._container_control():
+            observed_id = os.environ.get("AGENT_CANON_CONTAINER_ID", "").strip()
+            if observed_id:
+                resources = state.setdefault("resources", self._resource_records())
+                container = resources.setdefault(
+                    "container", self._resource_records()["container"]
+                )
+                cached_id = container.get("id")
+                if cached_id and cached_id != observed_id:
+                    for orphan_id, task in list(state.get("tasks", {}).items()):
+                        if isinstance(task, dict) and task.get("state") == "active":
+                            self._release_task_locked(
+                                state, orphan_id, outcome="cancelled"
+                            )
+                if cached_id != observed_id:
+                    container.update(
+                        {"id": observed_id, "state": "running", "owned": True}
+                    )
+                    self._write_state(state)
         if task_id in state.get("tasks", {}):
             raise BootstrapError(
                 "task_already_exists", f"task already exists: {task_id}"
@@ -3547,26 +3565,6 @@ class BootstrapRuntime:
         state["state"] = "running"
         self._write_state(state)
         return record
-
-    def _reconcile_container_identity_locked(self, state: dict[str, Any]) -> None:
-        """Release leases that belong to a resident replaced before exec resumed."""
-        if not self._container_control():
-            return
-        observed_id = os.environ.get("AGENT_CANON_CONTAINER_ID", "").strip()
-        if not observed_id:
-            return
-        resources = state.setdefault("resources", self._resource_records())
-        container = resources.setdefault(
-            "container", self._resource_records()["container"]
-        )
-        cached_id = container.get("id")
-        if cached_id and cached_id != observed_id:
-            for task_id, task in list(state.get("tasks", {}).items()):
-                if isinstance(task, dict) and task.get("state") == "active":
-                    self._release_task_locked(state, task_id, outcome="cancelled")
-        if cached_id != observed_id:
-            container.update({"id": observed_id, "state": "running", "owned": True})
-            self._write_state(state)
 
     def admit_task(
         self, task_id: str, *, target_root: Path | None = None
