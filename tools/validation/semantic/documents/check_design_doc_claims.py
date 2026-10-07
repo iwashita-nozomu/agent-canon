@@ -783,8 +783,6 @@ def token_path_candidates(token: str) -> tuple[str, ...]:
     normalized: list[str] = []
     for part in parts:
         candidate = part.strip("'\";,")
-        if candidate.startswith("./"):
-            candidate = candidate[2:]
         normalized.append(candidate)
     return tuple(dict.fromkeys(normalized))
 
