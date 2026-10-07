@@ -35,9 +35,9 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter 
    the reported formatting, link, heading, math, or Mermaid property; route
    semantic or cross-document issues to the document owner.
 4. Use the selected formatter/fixer for math or Mermaid when available. Keep
-   display math on standalone `$$` lines, inline math in `$...$`, and literal
-   commands/paths in code spans; do not add formatter-specific conventions beyond
-   the repository's existing docs rules.
+   display-math delimiters on standalone lines, inline-math delimiters in prose,
+   and literal commands/paths in code spans; do not add formatter-specific
+   conventions beyond the repository's existing docs rules.
 5. Rerun the same owner's required check after a formatter/fixer edit, reusing an
    adjacent result already produced by that command. Do not repeat a check or
    widen to full review when it cannot change the selected property.
