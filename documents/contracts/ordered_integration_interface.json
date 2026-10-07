@@ -63,7 +63,6 @@
   "changed_paths": [
     ".codex/hooks/oop_readability_guard.py",
     ".codex/hooks/skill_usage_logger.py",
-    "documents/runtime/log-surface-inventory.json",
     "documents/conventions/REVIEW_PROCESS.md",
     "notes/knowledge/coding_decision_methods.md",
     "documents/tools/agent-canon.md",
@@ -135,13 +134,6 @@
       "operation": "delete-reference",
       "selector": "dependency header downstream implementation ../../../tools/ci/run_docs_checks.sh",
       "desired_result": "remove the reverse dependency pair for the deleted forwarder"
-    },
-    {
-      "path": "documents/runtime/log-surface-inventory.json",
-      "owner": "W2 writer-owned",
-      "operation": "regenerate",
-      "selector": "all entries whose path is tools/ci/run_docs_checks.sh",
-      "desired_result": "regenerate the inventory so no deleted forwarder path or forwarder log field remains"
     },
     {
       "path": ".codex/hooks/skill_usage_logger.py",

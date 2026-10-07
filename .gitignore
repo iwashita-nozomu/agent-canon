@@ -35,7 +35,7 @@ reports/*.patch
 # Local environments
 .venv/
 venv/
-workspace/
+/workspace/
 .runtime/
 
 # Personal settings stay local; distributed skill adapters travel with Git.

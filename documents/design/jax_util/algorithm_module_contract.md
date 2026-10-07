@@ -393,7 +393,7 @@ artifact は空 arrays を含み、下流が text の exit status だけに依�
 | CI route | `tools/validation/ci/runners/run_all_checks.sh` の Python nested invocation と header | `${CANON_BIN} python-algorithm-contract-check --root "$WORKSPACE_ROOT" python` に置換 |
 | catalog | `check-algorithm-module-public-surface` entry | 削除。Rust entry に capability を統合 |
 | catalog | `check-algorithm-module-nested-contract` entry | 削除。Rust entry の `default_wiring.ci` を `true` に変更 |
-| runtime inventory | `documents/runtime/log-surface-inventory.json` | Rust owner fix 後に canonical inventory tool で再生成し、stale-path diff を閉じる。logs/log archive は保持 |
+| runtime inventory | `tools/runtime/archive/log_surface_inventory.py` | 必要時にcurrent sourceの項目一覧を取得する。logs/log archive は保持 |
 | tool docs | [documents/tools/README.md](../../tools/README.md) の二つの Python bullet | canonical Rust bullet 一つへ統合 |
 | tool docs | [tools/README.md](../../../tools/README.md) の nested checker bullet | 削除し Rust CLI entry を唯一の案内にする |
 | provenance | [documents/tools/repo-local-tool-imports.md](../../tools/repo-local-tool-imports.md) の nested checker rows | 現行 capability から削除または retired record に明示更新 |
@@ -425,27 +425,9 @@ finding schema を持つためである。
 4. **Docs/catalog/mirror:** tool docs、repo-local provenance、runtime surface mirror、
    dependency headers を single owner へ更新する。Rust entry の docs/tests は design
    owner、tool docs、Rust source/test、fixture path を指す。
-5. **PR #471 clean-baseline gate:** PR #471 の log-surface owner fix が統合された後、
-   clean baseline から `python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json`
-   を先に実行する。この時点で既に存在する added/removed/stale record は、algorithm
-   checker consolidation の差分に混ぜず、PR #471 の owner または inventory owner に
-   `pre-existing log-surface drift` の別 owner blocker として識別する。baseline の再生成、
-   stale record の削除、runtime logs、hook JSONL、eval report、log archive の削除・truncate・
-   retention 変更は、この pre-existing drift の解決策として行わない。
 6. **Retire:** parity fixture と static grep readback が pass した同じ change set で、
    二つの Python implementation/test、catalog id、Python CI call を削除する。旧
    command が見つかることを pass condition にしない。
-7. **Final inventory regeneration/check:** PR #471 の clean-baseline gate が pass（または
-   pre-existing drift を別 owner blocker として明示）した後、かつ Rust route cutover と
-   Python implementation/test retirement が完了した後に、初めて
-   `python3 tools/runtime/archive/log_surface_inventory.py --root . --output /tmp/python-algorithm-contract-log-surface.current.json`
-   で current inventory を生成する。algorithm route retirement の意図した差分だけを
-   canonical baseline に反映するため、`python3 tools/runtime/archive/log_surface_inventory.py --root . --output documents/runtime/log-surface-inventory.json`
-   で再生成し、`python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json`
-   を再実行して stale-path closure を pass にする。この final inventory 操作も inventory
-   projection だけを更新し、runtime logs、hook JSONL、eval report、log archive branch の
-   file は削除・truncate・retention変更しない。pre-existing drift blocker が未解決なら、
-   baseline を上書きせず別 owner blocker のまま停止する。
 8. **Closeout:** `cargo fmt --check`、`cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml`,
    CLI fixture matrix、`tools/bin/agent-canon python-algorithm-contract-check --format json`,
    catalog/dependency checks、final log-surface regeneration/check、
@@ -475,11 +457,6 @@ finding schema を持つためである。
   `generated/a.py` が残る。
 - `git grep` による static closure で retired Python path、old catalog id、old CI invocation、
   old output prefix が production/docs/catalog/runtime mirror に残らないことを確認する。
-- PR #471 owner fix 統合後の clean baseline check を先に通し、pre-existing drift は別
-  owner blocker として識別する。その後、Python implementation/test retirement 後に
-  `documents/runtime/log-surface-inventory.json` を final regeneration し、
-  `log_surface_inventory.py --check --baseline ...` が pass する。stale inventory record
-  は owner route で閉じるが、runtime logs/log archive/eval logs は一切削除しない。
 - Rust formatter/test、catalog validation、dependency-header/graph validation、docs check
   の failure は downscope せず、該当 owner surface に修復を戻す。
 

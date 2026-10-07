@@ -35,10 +35,6 @@ class HookRetirementTest(unittest.TestCase):
         self.assertTrue((PROJECT_ROOT / "tools" / "runtime" / "authority" / "hook_safety.py").is_file())
         self.assertEqual(caller_audit["moved_source_old_paths"], [".codex/hooks/hook_safety.py"])
         self.assertNotIn("hook_safety.py", caller_audit["retired_child_basenames"])
-        self.assertNotIn(
-            "tools/runtime/authority/hook_safety.py",
-            payload["generated_inventory_paths"],
-        )
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 name: repo-onboarding
 description: "Use when entering an unfamiliar repository or subdirectory and you need the fastest safe path to the repo overview, commands, conventions, and agent canon."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"63bfa38238d631363d6979f72d0cf1c4461dde6b87fa88a047052bb7d5294fce"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"df0837292edc525d5141a4f107dce80fca1a844c05012053c117a3c3d077b4b7"} -->
 
 <!--
 @dependency-start

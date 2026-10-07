@@ -49,7 +49,11 @@ repository の変更は `independent-clone` を使います。どちらも同じ
 hash や group 階層を path に追加しません。
 
 linked worktree は native Git の shared refs/config と per-worktree index を使います。
+新規worktreeの公開rootはanchorのアクセスmodeを引き継ぎます。準備中のscratchの
+private modeを公開checkoutへ固定し、設定済みtool residentの読取を妨げません。
 writer packet と task marker は各 worktree に属し、別 worktree の状態を共有・上書きしません。
+同じcheckoutを再prepareする明示的なallowed pathsは、その親packetの更新として反映します。
+省略時は既存のscopeを保持し、branch・remote・rootのidentity確認は継続します。
 independent clone も同じ path、marker、writer packet、branch identity の検証を通ります。
 
 mode の選択・作成は lifecycle command が行い、manual clone や手動 worktree 作成へ迂回しません。

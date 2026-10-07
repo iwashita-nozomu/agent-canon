@@ -2,7 +2,7 @@
 name: empirical-prompt-tuning
 description: "Use when a reusable skill, prompt, or instruction surface needs fresh empirical evaluation against frozen baseline and hold-out scenarios, followed by evidence-based iteration to convergence."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1da2ba2d9c986cc28d42af4e8de3bc48a1e3626e2bf90ff4358f140712badf55"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f457ed8fb8c9eeebc04e388fa2e0ba4d652d73b8009915666f3807f1c7d71bc7"} -->
 
 <!--
 @dependency-start
