@@ -4,7 +4,6 @@
 # contract test
 # responsibility Tests structured AgentCanon tool catalog validation.
 # upstream implementation ../../tools/runtime/manifest/tool_catalog.py validates tool catalog
-# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns the canonical visualization contract tool.
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
@@ -37,56 +36,6 @@ class CheckToolCatalogTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
-        )
-
-    def test_catalog_renderer_and_visualization_entries(self) -> None:
-        """Canonical renderer and visualization entries retain their contracts."""
-        catalog = yaml.safe_load(
-            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
-        )
-        renderer = next(
-            entry
-            for entry in catalog["entries"]
-            if entry["path"]
-            == "tools/analysis/dependencies/render_dependency_manifest_graph.py"
-        )
-        self.assertEqual(
-            renderer["command"],
-            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py "
-            "--root . --scope full --bundle-dir reports/dependency-graph --format json",
-        )
-        visualization_entries = [
-            entry
-            for entry in catalog["entries"]
-            if entry["id"] == "visualization-contract"
-            or entry["path"] == "tools/validation/semantic/tools/visualization_contract.py"
-        ]
-        self.assertEqual(len(visualization_entries), 1)
-        visualization = visualization_entries[0]
-        self.assertEqual(visualization["status"], "canonical")
-        self.assertEqual(visualization["audience"], "skill")
-        self.assertIn(
-            visualization["placement"],
-            {"support_library", "validation_checker"},
-        )
-        self.assertEqual(
-            visualization["docs"],
-            [
-                "tools/README.md",
-                "documents/tools/README.md",
-                "documents/tools/visualization_contract.md",
-            ],
-        )
-        tool_docs = (
-            PROJECT_ROOT / "documents" / "tools" / "tool-docs.toml"
-        ).read_text(encoding="utf-8")
-        self.assertEqual(
-            tool_docs.count('tool = "tools/validation/semantic/tools/visualization_contract.py"'),
-            1,
-        )
-        self.assertEqual(
-            tool_docs.count('doc = "documents/tools/visualization_contract.md"'),
-            1,
         )
 
     def test_workflow_command_rows_use_existing_catalog_schema(self) -> None:

@@ -3,8 +3,7 @@
 contract reference
 responsibility Documents route tool usage.
 upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
-upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns the exact typed visualization ToolCall contract
-upstream design ../../agents/skills/code-visualization.md owns sole-public-owner and coverage/readback policy
+upstream design ../../agents/skills/code-visualization.md owns visualization selection and native renderer delegation
 upstream design ../design/tool-skill-routing-refactor.md defines short naming policy
 upstream design ../../agents/skills/structure-refactor.md defines repo-refactor and personal runtime routing boundary
 downstream implementation ../../tests/agent_tools/test_route.py validates route behavior
@@ -49,46 +48,13 @@ skill selection and pass `--mode repo-changing` only when an edit is explicitly
 authorized. If `--mode` is omitted, routing remains in the non-write
 `routing-only` state; prompt vocabulary never widens that authority.
 
-Prompt routing keeps schema `agent_canon.route.skill_route.v1` and adds exactly
-three singular visualization fields:
+Prompt routing keeps schema `agent_canon.route.skill_route.v1` and returns the
+selected skills, stage, related candidates, and native route evidence. Visualization
+selection is handled by `code-visualization` when explicitly requested; routing
+does not construct a private visualization ToolCall or adapter packet.
 
-- `visualization_owner_skill`: `code-visualization` or null;
-- `visualization_tool_call`: one canonical `ToolCall` or null;
-- `visualization_rejection`: `missing_owner`, `invalid_tool_call`,
-  `schema_mismatch`, `prose_only`, or null.
-
-There is no parallel route ToolCall type and no plural ToolCall collection.
-`visualization_tool_call`, when present, is exactly the canonical owner call:
-
-- `schema = agent_canon.visualization_tool_call.v1`;
-- `tool_id = agent_canon.visualization.coverage`;
-- `argument_schema = agent_canon.visualization.arguments.coverage.v1`;
-- `arguments` contains every field required by the canonical typed contract.
-
-The route activates visualization ownership only from an explicit
-`code-visualization` skill ID, explicit visualization capability ID, exact
-canonical ToolID, or valid schema-bearing ToolCall. Explicit renderer-skill
-aliases and adapter ToolIDs normalize to `code-visualization`; they never
-become public visualization owners. Visualization prose without one of those
-explicit identities does not route by keyword and returns `prose_only`.
-Malformed calls reject deterministically: absent owner is `missing_owner`, an
-unknown ToolID or field/type/format defect is `invalid_tool_call`, and a
-ToolCall or argument-schema mismatch is `schema_mismatch`.
-
-The six accepted ToolID/schema pairs are:
-
-| Role | ToolID | Argument schema |
-| ---- | ------ | --------------- |
-| Owner | `agent_canon.visualization.coverage` | `agent_canon.visualization.arguments.coverage.v1` |
-| Dependency adapter | `agent_canon.visualization.adapter.dependency_manifest` | `agent_canon.visualization.arguments.dependency_manifest.v1` |
-| Algorithm adapter | `agent_canon.visualization.adapter.algorithm_flowchart` | `agent_canon.visualization.arguments.algorithm_flowchart.v1` |
-| Document adapter | `agent_canon.visualization.adapter.document_mermaid` | `agent_canon.visualization.arguments.document_mermaid.v1` |
-| Repository adapter | `agent_canon.visualization.adapter.repository_graph` | `agent_canon.visualization.arguments.repository_graph.v1` |
-| Knowledge adapter | `agent_canon.visualization.adapter.knowledge_graph` | `agent_canon.visualization.arguments.knowledge_graph.v1` |
-
-An executable renderer path is a command, never a ToolID. Runtime ordering is
-owner ToolCall first and one task-matching adapter ToolCall second. The adapter
-owns syntax/layout only and remains downstream of the canonical owner.
+Executable renderer paths remain commands owned by their existing CLI/API
+entrypoints. Prompt vocabulary does not widen write authority.
 
 ## Execution closeout routing
 
