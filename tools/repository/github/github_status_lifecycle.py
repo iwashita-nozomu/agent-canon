@@ -113,9 +113,7 @@ class LabelMapping:
 
     @property
     def managed(self) -> frozenset[str]:
-        return frozenset(self.canonical.values()).union(
-            *self.legacy_aliases.values()
-        )
+        return frozenset(self.canonical.values()).union(*self.legacy_aliases.values())
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -144,7 +142,7 @@ def mapping_from_data(data: Mapping[str, object]) -> LabelMapping:
     """Read the existing taxonomy without a second label vocabulary."""
     table = data.get("status_lifecycle")
     keys = {"active", "ready_for_review", "needs_verification"}
-    if not isinstance(table, Mapping) or set(table) - { *keys, "legacy_aliases" }:
+    if not isinstance(table, Mapping) or set(table) - {*keys, "legacy_aliases"}:
         raise _failure("taxonomy_invalid", "invalid status_lifecycle table")
     canonical: dict[str, str] = {}
     for key in sorted(keys):
@@ -190,7 +188,11 @@ def validate_remote_catalog(
     names = frozenset(remote)
     missing = set(mapping.canonical.values()) - names
     if missing:
-        raise _failure("label_mapping_missing", "canonical labels are absent", missing=sorted(missing))
+        raise _failure(
+            "label_mapping_missing",
+            "canonical labels are absent",
+            missing=sorted(missing),
+        )
     return names
 
 
@@ -202,7 +204,12 @@ class IssueSnapshot:
     labels: tuple[str, ...]
 
     def as_dict(self) -> dict[str, object]:
-        return {"number": self.number, "url": self.url, "state": self.state, "labels": list(self.labels)}
+        return {
+            "number": self.number,
+            "url": self.url,
+            "state": self.state,
+            "labels": list(self.labels),
+        }
 
 
 @dataclass(frozen=True)
@@ -224,7 +231,9 @@ def _positive_id(value: object, name: str) -> int:
 class GhStatusAdapter:
     """Use native gh API arguments; every write is attempted once."""
 
-    def __init__(self, repo: str, issue: int | str, *, runner: Runner = subprocess_runner) -> None:
+    def __init__(
+        self, repo: str, issue: int | str, *, runner: Runner = subprocess_runner
+    ) -> None:
         if not REPO_RE.fullmatch(repo) or "?" in repo or "#" in repo:
             raise _failure("identity_invalid", "repository must be owner/name")
         if isinstance(issue, str) and issue.isascii() and issue.isdecimal():
@@ -236,7 +245,11 @@ class GhStatusAdapter:
 
     def _api_json(self, args: Sequence[str], *, mutation: bool = False) -> object:
         try:
-            result = run_command(["gh", "api", *args], runner=self.runner)
+            result = run_command(
+                self.runner,
+                ["gh", "api", *args],
+                next_action="fresh-reconcile-after-owner-review",
+            )
             return json.loads(result.stdout)
         except Exception as exc:
             raise _failure(
@@ -248,45 +261,94 @@ class GhStatusAdapter:
 
     def issue(self) -> IssueSnapshot:
         raw = self._api_json([self.issue_path])
-        if not isinstance(raw, dict) or type(raw.get("number")) is not int or raw["number"] != self.issue_number:
-            raise _failure("readback_invalid", "Issue identity does not match", scope=TRANSPORT_SCOPE)
+        if (
+            not isinstance(raw, dict)
+            or type(raw.get("number")) is not int
+            or raw["number"] != self.issue_number
+        ):
+            raise _failure(
+                "readback_invalid",
+                "Issue identity does not match",
+                scope=TRANSPORT_SCOPE,
+            )
         labels = raw.get("labels")
         if not isinstance(labels, list) or any(
-            not isinstance(row, dict) or not isinstance(row.get("name"), str)
-            or not row["name"] for row in labels
+            not isinstance(row, dict)
+            or not isinstance(row.get("name"), str)
+            or not row["name"]
+            for row in labels
         ):
-            raise _failure("readback_invalid", "invalid Issue labels", scope=TRANSPORT_SCOPE)
+            raise _failure(
+                "readback_invalid", "invalid Issue labels", scope=TRANSPORT_SCOPE
+            )
         names = tuple(sorted(row["name"] for row in labels))
         url, state = raw.get("html_url"), raw.get("state")
-        if len(set(names)) != len(names) or not isinstance(url, str) or not url or state not in {"open", "closed"}:
-            raise _failure("readback_invalid", "invalid Issue snapshot", scope=TRANSPORT_SCOPE)
+        if (
+            len(set(names)) != len(names)
+            or not isinstance(url, str)
+            or not url
+            or state not in {"open", "closed"}
+        ):
+            raise _failure(
+                "readback_invalid", "invalid Issue snapshot", scope=TRANSPORT_SCOPE
+            )
         return IssueSnapshot(self.issue_number, url, state, names)
 
     def label_catalog(self) -> tuple[str, ...]:
-        pages = self._api_json([
-            "--paginate", "--slurp", f"repos/{self.repo}/labels?per_page=100"
-        ])
-        if not isinstance(pages, list) or any(not isinstance(page, list) for page in pages):
-            raise _failure("readback_invalid", "invalid label catalog pages", scope=TRANSPORT_SCOPE)
+        pages = self._api_json(
+            ["--paginate", "--slurp", f"repos/{self.repo}/labels?per_page=100"]
+        )
+        if not isinstance(pages, list) or any(
+            not isinstance(page, list) for page in pages
+        ):
+            raise _failure(
+                "readback_invalid", "invalid label catalog pages", scope=TRANSPORT_SCOPE
+            )
         names: list[str] = []
         for page in pages:
             for row in page:
-                if not isinstance(row, dict) or not isinstance(row.get("name"), str) or not row["name"]:
-                    raise _failure("readback_invalid", "invalid catalog label", scope=TRANSPORT_SCOPE)
+                if (
+                    not isinstance(row, dict)
+                    or not isinstance(row.get("name"), str)
+                    or not row["name"]
+                ):
+                    raise _failure(
+                        "readback_invalid",
+                        "invalid catalog label",
+                        scope=TRANSPORT_SCOPE,
+                    )
                 names.append(row["name"])
         return tuple(names)
 
-    def _comment_snapshot(self, raw: object, expected_id: int | None = None) -> CommentSnapshot:
+    def _comment_snapshot(
+        self, raw: object, expected_id: int | None = None
+    ) -> CommentSnapshot:
         if not isinstance(raw, dict):
-            raise _failure("evidence_readback_unavailable", "invalid comment response", scope=TRANSPORT_SCOPE)
+            raise _failure(
+                "evidence_readback_unavailable",
+                "invalid comment response",
+                scope=TRANSPORT_SCOPE,
+            )
         identity = _positive_id(raw.get("id"), "comment id")
-        body, url, issue_url = raw.get("body"), raw.get("html_url"), raw.get("issue_url")
+        body, url, issue_url = (
+            raw.get("body"),
+            raw.get("html_url"),
+            raw.get("issue_url"),
+        )
         if expected_id is not None and identity != expected_id:
             raise _failure("evidence_readback_mismatch", "comment id changed")
-        if not all(isinstance(value, str) and value.strip() for value in (body, url, issue_url)):
-            raise _failure("evidence_readback_unavailable", "comment fields are missing", scope=TRANSPORT_SCOPE)
+        if not all(
+            isinstance(value, str) and value.strip() for value in (body, url, issue_url)
+        ):
+            raise _failure(
+                "evidence_readback_unavailable",
+                "comment fields are missing",
+                scope=TRANSPORT_SCOPE,
+            )
         if urlsplit(issue_url).path.casefold() != f"/{self.issue_path}".casefold():
-            raise _failure("evidence_readback_mismatch", "comment belongs to a different Issue")
+            raise _failure(
+                "evidence_readback_mismatch", "comment belongs to a different Issue"
+            )
         return CommentSnapshot(identity, body, url)
 
     def comment(self, comment_id: int) -> CommentSnapshot:
@@ -295,29 +357,52 @@ class GhStatusAdapter:
         return self._comment_snapshot(raw, identity)
 
     def create_comment(self, body: str) -> CommentSnapshot:
-        raw = self._api_json([
-            "--method", "POST", f"{self.issue_path}/comments", "-f", f"body={body}"
-        ], mutation=True)
+        raw = self._api_json(
+            ["--method", "POST", f"{self.issue_path}/comments", "-f", f"body={body}"],
+            mutation=True,
+        )
         created = self._comment_snapshot(raw)
         observed = self.comment(created.comment_id)
         if created != observed or observed.body != body:
-            raise _failure("evidence_readback_mismatch", "created comment could not be read back unchanged", comment_id=created.comment_id)
+            raise _failure(
+                "evidence_readback_mismatch",
+                "created comment could not be read back unchanged",
+                comment_id=created.comment_id,
+            )
         return observed
 
     def add_label(self, label: str) -> None:
-        self._api_json([
-            "--method", "POST", f"{self.issue_path}/labels", "-f", f"labels[]={label}"
-        ], mutation=True)
+        self._api_json(
+            [
+                "--method",
+                "POST",
+                f"{self.issue_path}/labels",
+                "-f",
+                f"labels[]={label}",
+            ],
+            mutation=True,
+        )
 
     def remove_label(self, label: str) -> None:
         # DELETE returns an empty body, so successful transport needs no JSON parse.
         try:
-            run_command([
-                "gh", "api", "--method", "DELETE",
-                f"{self.issue_path}/labels/{quote(label, safe='')}",
-            ], runner=self.runner)
+            run_command(
+                self.runner,
+                [
+                    "gh",
+                    "api",
+                    "--method",
+                    "DELETE",
+                    f"{self.issue_path}/labels/{quote(label, safe='')}",
+                ],
+                next_action="fresh-reconcile-after-owner-review",
+            )
         except Exception as exc:
-            raise _failure("mutation_partial", "label removal response unavailable", scope=TRANSPORT_SCOPE) from exc
+            raise _failure(
+                "mutation_partial",
+                "label removal response unavailable",
+                scope=TRANSPORT_SCOPE,
+            ) from exc
 
 
 def classify_lifecycle(facts: Mapping[str, object]) -> str:
@@ -328,13 +413,23 @@ def classify_lifecycle(facts: Mapping[str, object]) -> str:
         if facts.get(field, False) is True:
             return "active"
         if type(facts.get(field, False)) is not bool:
-            raise _failure("lifecycle_facts_incomplete", "invalid lifecycle fact", field=field)
+            raise _failure(
+                "lifecycle_facts_incomplete", "invalid lifecycle fact", field=field
+            )
     for field in ("handoff_ready", "validation_complete", "verification_unavailable"):
         if type(facts.get(field, False)) is not bool:
-            raise _failure("lifecycle_facts_incomplete", "invalid lifecycle fact", field=field)
-    if not facts.get("handoff_ready", False) or not facts.get("validation_complete", False):
+            raise _failure(
+                "lifecycle_facts_incomplete", "invalid lifecycle fact", field=field
+            )
+    if not facts.get("handoff_ready", False) or not facts.get(
+        "validation_complete", False
+    ):
         return "active"
-    return "review-ready-unverified" if facts.get("verification_unavailable", False) else "review-ready"
+    return (
+        "review-ready-unverified"
+        if facts.get("verification_unavailable", False)
+        else "review-ready"
+    )
 
 
 def desired_labels(lifecycle: str, mapping: LabelMapping) -> frozenset[str]:
@@ -345,16 +440,26 @@ def plan_operations(
     before: Sequence[str], desired: frozenset[str], mapping: LabelMapping
 ) -> tuple[tuple[str, str], ...]:
     labels = set(before)
-    removals = tuple(("remove", name) for name in sorted((labels & mapping.managed) - desired))
-    additions = tuple(("add", name) for name in mapping.canonical.values() if name in desired - labels)
+    removals = tuple(
+        ("remove", name) for name in sorted((labels & mapping.managed) - desired)
+    )
+    additions = tuple(
+        ("add", name) for name in mapping.canonical.values() if name in desired - labels
+    )
     return removals + additions
 
 
 def evaluate_final(
-    observed: Sequence[str], desired: frozenset[str], initial: Sequence[str], mapping: LabelMapping
+    observed: Sequence[str],
+    desired: frozenset[str],
+    initial: Sequence[str],
+    mapping: LabelMapping,
 ) -> bool:
     labels = set(observed)
-    return labels & mapping.managed == desired and labels - mapping.managed == set(initial) - mapping.managed
+    return (
+        labels & mapping.managed == desired
+        and labels - mapping.managed == set(initial) - mapping.managed
+    )
 
 
 def reconcile_status(
@@ -372,8 +477,12 @@ def reconcile_status(
     Markdown. This adapter neither requires a PR nor infers authority from prose.
     """
     if (comment_body is None) == (comment_id is None):
-        raise _failure("evidence_missing", "supply either comment_body or an existing comment_id")
-    if comment_body is not None and (not isinstance(comment_body, str) or not comment_body.strip()):
+        raise _failure(
+            "evidence_missing", "supply either comment_body or an existing comment_id"
+        )
+    if comment_body is not None and (
+        not isinstance(comment_body, str) or not comment_body.strip()
+    ):
         raise _failure("evidence_missing", "comment_body must be non-empty")
     if comment_id is not None:
         _positive_id(comment_id, "comment id")
@@ -381,14 +490,24 @@ def reconcile_status(
     desired = mapping.desired(lifecycle)
     validate_remote_catalog(mapping, adapter.label_catalog())
     before = adapter.issue()
-    evidence = adapter.comment(comment_id) if comment_id is not None else adapter.create_comment(comment_body)
+    evidence = (
+        adapter.comment(comment_id)
+        if comment_id is not None
+        else adapter.create_comment(comment_body)
+    )
     expected = set(before.labels)
     operations = plan_operations(before.labels, desired, mapping)
     completed: list[dict[str, str]] = []
     for action, label in operations:
         observed = adapter.issue()
         if set(observed.labels) != expected:
-            raise _failure("fresh_state_changed", "labels changed before mutation", completed_prefix=completed, observed_labels=list(observed.labels), comment_id=evidence.comment_id)
+            raise _failure(
+                "fresh_state_changed",
+                "labels changed before mutation",
+                completed_prefix=completed,
+                observed_labels=list(observed.labels),
+                comment_id=evidence.comment_id,
+            )
         try:
             if action == "remove":
                 adapter.remove_label(label)
@@ -400,10 +519,15 @@ def reconcile_status(
             except LifecycleFailure:
                 observed_labels = None
             raise _failure(
-                "mutation_partial", "mutation result requires fresh owner review",
-                completed_prefix=completed, failed_operation={"action": action, "label": label},
-                observed_labels=observed_labels, desired_labels=sorted(desired),
-                comment_id=evidence.comment_id, cause=exc.as_dict(), rollback="not-attempted",
+                "mutation_partial",
+                "mutation result requires fresh owner review",
+                completed_prefix=completed,
+                failed_operation={"action": action, "label": label},
+                observed_labels=observed_labels,
+                desired_labels=sorted(desired),
+                comment_id=evidence.comment_id,
+                cause=exc.as_dict(),
+                rollback="not-attempted",
             ) from exc
         if action == "remove":
             expected.remove(label)
@@ -411,21 +535,45 @@ def reconcile_status(
             expected.add(label)
         observed = adapter.issue()
         if set(observed.labels) != expected:
-            raise _failure("readback_mismatch", "labels differ after mutation", completed_prefix=completed, last_operation={"action": action, "label": label}, observed_labels=list(observed.labels), comment_id=evidence.comment_id)
+            raise _failure(
+                "readback_mismatch",
+                "labels differ after mutation",
+                completed_prefix=completed,
+                last_operation={"action": action, "label": label},
+                observed_labels=list(observed.labels),
+                comment_id=evidence.comment_id,
+            )
         completed.append({"action": action, "label": label})
     final = adapter.issue()
     selected = adapter.comment(evidence.comment_id)
     if selected != evidence:
-        raise _failure("evidence_readback_mismatch", "selected evidence changed", comment_id=evidence.comment_id, completed_prefix=completed)
+        raise _failure(
+            "evidence_readback_mismatch",
+            "selected evidence changed",
+            comment_id=evidence.comment_id,
+            completed_prefix=completed,
+        )
     if not evaluate_final(final.labels, desired, before.labels, mapping):
-        raise _failure("readback_mismatch", "final labels differ from intended state", observed_labels=list(final.labels), completed_prefix=completed)
+        raise _failure(
+            "readback_mismatch",
+            "final labels differ from intended state",
+            observed_labels=list(final.labels),
+            completed_prefix=completed,
+        )
     return {
-        "kind": "success", "lifecycle": lifecycle,
+        "kind": "success",
+        "lifecycle": lifecycle,
         "before_managed": sorted(set(before.labels) & mapping.managed),
         "after_managed": sorted(set(final.labels) & mapping.managed),
-        "labels_added": [item["label"] for item in completed if item["action"] == "add"],
-        "labels_removed": [item["label"] for item in completed if item["action"] == "remove"],
-        "completed_operations": completed, "evidence": evidence.as_dict(),
-        "readback": final.as_dict(), "code_owner": MODULE_OWNER,
+        "labels_added": [
+            item["label"] for item in completed if item["action"] == "add"
+        ],
+        "labels_removed": [
+            item["label"] for item in completed if item["action"] == "remove"
+        ],
+        "completed_operations": completed,
+        "evidence": evidence.as_dict(),
+        "readback": final.as_dict(),
+        "code_owner": MODULE_OWNER,
         "responsibility_scope": LIFECYCLE_SCOPE,
     }
