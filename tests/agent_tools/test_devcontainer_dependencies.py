@@ -2998,13 +2998,15 @@ class DependencyModelTests(unittest.TestCase):
                 "pipx",
                 "check-jsonschema",
                 "yamllint",
+                "ruff",
+                "basedpyright",
                 "pyright-language-server",
                 "bash-language-server",
                 "jq",
                 "tree",
                 "clangd-language-server",
                 "rust-toolchain",
-                "agent-canon-cli",
+                "python3-pytest",
             },
         )
         for removed in (
