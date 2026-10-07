@@ -218,7 +218,7 @@ def resolve_claim_token_path(root: Path, claim_path: str, token_path: str) -> Pa
     candidate = Path(token_path)
     if candidate.is_absolute():
         return candidate
-    if token_path.startswith("../"):
+    if token_path.startswith(("./", "../")):
         claim_file = resolve_repo_path(root, claim_path)
         return Path(os.path.normpath((claim_file.parent / candidate).as_posix()))
     return resolve_repo_path(root, candidate)

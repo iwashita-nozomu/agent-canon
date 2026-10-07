@@ -410,6 +410,36 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
 
+    def test_relative_current_path_link_resolves_from_claim_file(self) -> None:
+        """A ./ Markdown link keeps ordinary document-relative semantics."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents" / "tools" / "guide.md",
+                """
+                # Tool Guide
+                <!--
+                @dependency-start
+                contract reference
+                responsibility Documents a reference guide fixture.
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: [source](./source.py).
+                - Assumptions: current-directory links are document-relative.
+
+                The guide must read [the source](./source.py).
+                """,
+            )
+            write(root / "documents" / "tools" / "source.py", "VALUE = 1\n")
+
+            result = run_checker("documents/tools/guide.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
+
     def test_fail_parent_relative_path_token_does_not_collapse_to_repo_root(
         self,
     ) -> None:
