@@ -27,17 +27,14 @@ from typing import cast
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    import yaml
-except ModuleNotFoundError:  # pragma: no cover - clean host fallback
-    from tools.runtime.container import stdlib_yaml as yaml
+import yaml
 
+from tools.agent.orchestration.route import load_skill_related_map
 from tools.runtime.source.agent_canon_source_root import (
     RootResolution,
     SourceRootFailure,
     resolve_agent_canon_source_root,
 )
-from tools.agent.orchestration.route import load_skill_related_map
 
 DEFAULT_ROOT = Path.cwd()
 RUNTIME_SKILL_ROOT = Path(".codex/personal/skills")

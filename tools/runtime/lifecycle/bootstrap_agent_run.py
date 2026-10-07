@@ -311,8 +311,8 @@ def build_parser(
         default=[],
         metavar="ROLE_ID=AGENT_TYPE:EVIDENCE",
         help=(
-            "Explicit parent-packet role-to-agent selection with evidence. "
-            "Required for non-default codex_agents candidates."
+            "Optional native pre-route role-to-agent selection with evidence; "
+            "preserved in the selected route readback."
         ),
     )
     parser.add_argument(
