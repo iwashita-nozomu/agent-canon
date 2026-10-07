@@ -508,7 +508,8 @@ def test_capture_exports_only_the_bootstrap_validated_container(
         "runtime_root": "/fixture/.runtime",
         "source_sync": None,
     }
-    source = tmp_path / "candidate"
+    fixture_root = executable_fixture_root(tmp_path)
+    source = fixture_root / "candidate"
     source.mkdir()
     bootstrap = source / "bootstrap.sh"
     bootstrap.write_text(
@@ -518,8 +519,8 @@ def test_capture_exports_only_the_bootstrap_validated_container(
         'exit "$STATUS_EXIT"\n'
     )
     bootstrap.chmod(0o755)
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
+    bin_dir = fixture_root / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
     docker = bin_dir / "docker"
     docker.write_text(
         "#!/usr/bin/env bash\n"
