@@ -14,16 +14,11 @@ downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_
 downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency evidence separately
 downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design claims against manifest evidence
 downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
-downstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
-downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh executes selected source review and writes the source/skipped receipt
-downstream implementation ../../tools/validation/ci/receipts/pr_gate_receipt.py owns the owner/root/PID/status-bound receipt schema
-downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh consumes the validated source/skipped receipt
+downstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects trusted scope for explicit dependency analysis
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
-downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies the source/runtime boundary and receipt owner
-downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection
-downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py verifies writer/parser/consumer execution
+downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies the source/runtime boundary and PR-route separation
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs owns canonical graph materialization and queries
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
@@ -137,22 +132,17 @@ context remains a separate persisted analysis capability. The claim checker
 does not parse dependency headers or open evidence files as a second fact
 authority.
 
-## Parent PR Gate Selection Contract
+## Explicit Dependency Analysis Route
 
-Dependency-manifest correctness is source-owned and does not require a
-persisted graph runtime. The authority, receipt meaning, and source/graph
-boundary are defined by
-[`source-owned-dependency-validation.md`](source-owned-dependency-validation.md).
-This document owns only the manifest DSL, relation semantics, contract kinds,
-changed-scope selection, and source-derived projections.
+Dependency-manifest analysis is source-owned and does not require a persisted
+graph runtime. This document owns the manifest DSL, relation semantics,
+contract kinds, changed-scope selection, and source-derived projections.
 
-The PR selector still selects trusted base/head evidence and the changed-path
-packet. `run_pr_dependency_source_gate.sh` then runs source scan, format,
-relation/cycle, and source-derived TSV/DOT projections. It records a receipt
-with exactly `source` or `skipped`; it never creates or reads persisted graph
-state. `tools/validation/ci/receipts/pr_gate_receipt.py` is the sole receipt schema/parser owner,
-and `run_all_checks.sh` consumes its single validated status output. The
-retired `prepared` and `scoped` graph states are not compatibility values.
+When explicitly selected, `run_pr_dependency_source_gate.sh` may use trusted
+base/head evidence to run source scan, format, relation/cycle, and TSV/DOT
+projection checks. The normal PR and CI routes do not invoke that command or
+require a dependency receipt. Persisted graph commands remain explicit
+analysis capabilities rather than ordinary edit or PR prerequisites.
 
 The normal repository review route remains independent of graph executables and
 databases. `--ensure-graph` and `tools/bin/agent-canon graph

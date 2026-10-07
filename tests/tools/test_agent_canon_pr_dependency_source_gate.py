@@ -1,11 +1,10 @@
-"""Integration tests for the PR dependency source gate."""
+"""Integration tests for the explicitly selected dependency source route."""
 
 # @dependency-start
 # contract test
-# responsibility Verifies PR dependency validation runs without graph runtime state.
+# responsibility Verifies explicit dependency validation runs without graph runtime state.
 # upstream implementation ../../tools/validation/ci/checks/run_pr_dependency_source_gate.sh owns source review routing
 # upstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh owns source validation
-# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh consumes the gate status
 # @dependency-end
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
-    """Exercise required and skipped source-review routes."""
+    """Exercise required and skipped explicit source-review routes."""
 
     def fixture(self, root: Path) -> tuple[Path, Path, Path]:
         """Create source-review stubs without a graph executable."""
@@ -86,7 +85,7 @@ class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
         required: int,
         base: str = "a" * 40,
     ) -> subprocess.CompletedProcess[str]:
-        """Run the production source-gate shell against fixture tools."""
+        """Run the explicit source-analysis shell against fixture tools."""
         environment = dict(os.environ)
         environment.pop("AGENT_CANON_PARENT_ROOT", None)
         return subprocess.run(
@@ -114,7 +113,7 @@ class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
         )
 
     def test_required_standalone_route_runs_source_checks_without_graph(self) -> None:
-        """Required review runs drift, source graph, and rendering without runtime."""
+        """Selected review runs drift, source graph, and rendering without runtime."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             tools, report, packet = self.fixture(root)
@@ -137,7 +136,7 @@ class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
             self.assertFalse((root / ".agent-canon").exists())
 
     def test_skipped_parent_route_runs_only_trusted_header_scan(self) -> None:
-        """Out-of-surface changes retain trusted header scan without full review."""
+        """Selected scoped changes retain trusted header scan without full review."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             tools, report, packet = self.fixture(root)

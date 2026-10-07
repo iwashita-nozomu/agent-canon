@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Runs PR dependency completeness from trusted changed paths and tracked source manifests.
+# responsibility Runs explicitly selected dependency analysis from trusted changed paths and tracked source manifests.
 # upstream design ../../../../documents/design/source-owned-dependency-validation.md source-owned dependency validation contract
 # upstream design ../../../../documents/design/dependency-manifest-design.md manifest DSL and source projection semantics
-# upstream implementation ../receipts/pr_gate_receipt.py owns the producer/consumer receipt schema
 # upstream implementation ../../../analysis/dependencies/run_repo_dependency_review.sh validates source headers, relations, and cycles
 # upstream implementation ../../semantic/tools/tool_drift.py validates standalone tool links from source facts
 # upstream implementation ../../../analysis/dependencies/render_dependency_manifest_graph.py renders optional source projections
-# downstream implementation ./check_agent_canon_pr.sh records the source dependency gate receipt
 # downstream implementation ../../../../tests/tools/test_agent_canon_pr_dependency_source_gate.py verifies the no-runtime route
 # @dependency-end
 set -euo pipefail
@@ -31,8 +29,9 @@ Usage:
     --trusted-base-sha SHA \
     --source-review-required 0|1
 
-Runs the PR dependency gate from tracked source. It never builds, queries, or
-reads persisted graph runtime state.
+Runs dependency analysis from tracked source when explicitly selected. It is
+not part of the default PR or CI route and never builds, queries, or reads
+persisted graph runtime state.
 EOF
 }
 

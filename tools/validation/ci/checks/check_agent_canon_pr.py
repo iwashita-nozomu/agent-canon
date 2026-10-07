@@ -44,7 +44,6 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
 
 GENERATED_COMPLETENESS_CHECK_IDS = (
     "standalone_static_gate_ci",
-    "strict_dependency_review",
     "documentation_checks",
     "repository_quick_ci",
     "generated_artifact_guard",
