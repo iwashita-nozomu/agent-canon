@@ -16,7 +16,9 @@ from conftest import create_source_checkout
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP = ROOT / "bootstrap.sh"
 ADAPTER = ROOT / "bootstrap" / "host" / "lifecycle" / "entrypoint.sh"
-GPU006_FIXTURE = ROOT / "tests" / "fixtures" / "bootstrap" / "gpu006_stale_source_sync_resident.json"
+GPU006_FIXTURE = (
+    ROOT / "tests" / "fixtures" / "bootstrap" / "gpu006_stale_source_sync_resident.json"
+)
 
 
 def test_host_entrypoint_has_no_python_fallback() -> None:
@@ -46,7 +48,9 @@ def test_shell_uninstall_removes_only_managed_skill_link(tmp_path: Path) -> None
     foreign_source.mkdir()
     (foreign_source / "SKILL.md").write_text("foreign\n", encoding="utf-8")
     (source / "empirical-prompt-tuning").mkdir(parents=True)
-    (source / "empirical-prompt-tuning" / "SKILL.md").write_text("canonical\n", encoding="utf-8")
+    (source / "empirical-prompt-tuning" / "SKILL.md").write_text(
+        "canonical\n", encoding="utf-8"
+    )
     managed_link = home / ".agents" / "skills"
     foreign_link = home / ".agents" / "foreign"
     managed_link.parent.mkdir(parents=True)
@@ -58,8 +62,7 @@ def test_shell_uninstall_removes_only_managed_skill_link(tmp_path: Path) -> None
     state.mkdir()
     manifest = state / "global-links.tsv"
     manifest.write_text(
-        "schema\tagent-canon.global-links.v1\n"
-        f"link\t{managed_link}\t{source}\n",
+        f"schema\tagent-canon.global-links.v1\nlink\t{managed_link}\t{source}\n",
         encoding="utf-8",
     )
     script = f"""
@@ -76,7 +79,9 @@ _agent_canon_remove_global_links
     )
     assert result.returncode == 0, result.stderr
     assert not managed_link.exists() and not managed_link.is_symlink()
-    assert foreign_link.is_symlink() and foreign_link.resolve() == foreign_source.resolve()
+    assert (
+        foreign_link.is_symlink() and foreign_link.resolve() == foreign_source.resolve()
+    )
     assert system_sentinel.read_text(encoding="utf-8") == "system\n"
 
 
@@ -197,7 +202,9 @@ def _run_forced_update_probe(
     private_log.mkdir()
     (state_root / "mounts.tsv").write_text("", encoding="utf-8")
     (state_root / "mounts.toml").write_text("", encoding="utf-8")
-    (runtime / "source-sync" / "source-sync.json").parent.mkdir(parents=True, exist_ok=True)
+    (runtime / "source-sync" / "source-sync.json").parent.mkdir(
+        parents=True, exist_ok=True
+    )
     (runtime / "source-sync" / "source-sync.json").write_text("{}\n", encoding="utf-8")
     old_ref = "agent-canon-tools:active"
     old_id = "sha256:" + "0" * 64
@@ -222,26 +229,26 @@ def _run_forced_update_probe(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
         f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
-        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
-        "  format=\"${4:-}\"\n"
-        f"  [[ {force_build!r} != 1 || -n \"$format\" ]] || exit 1\n"
+        'if [[ "$1:$2" == image:inspect ]]; then\n'
+        '  format="${4:-}"\n'
+        f'  [[ {force_build!r} != 1 || -n "$format" ]] || exit 1\n'
         "  if [[ \"$format\" == *'.Os'* ]]; then printf '%s\\n' linux; exit 0; fi\n"
         "  if [[ \"$format\" == *'.Architecture'* ]]; then printf '%s\\n' amd64; exit 0; fi\n"
         f"  if [[ \"$format\" == *'org.opencontainers.image.revision'* ]]; then printf '%s\\n' {source_head!r}; exit 0; fi\n"
         "  if [[ \"$format\" == *'.RepoDigests'* ]]; then printf '%s\\n' ghcr.io/iwashita-nozomu/agent-canon@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; exit 0; fi\n"
-        "  ref=\"${@: -1}\"\n"
-        "  if [[ \"$ref\" == *rollback-* ]]; then\n"
+        '  ref="${@: -1}"\n'
+        '  if [[ "$ref" == *rollback-* ]]; then\n'
         f"    [[ -f {str(marker)!r} ]] || exit 1\n    printf '%s\\n' {old_id!r}\n"
         "  else\n"
         f"    printf '%s\\n' {candidate_id!r}\n"
         "  fi\n"
         "  exit 0\n"
         "fi\n"
-        "if [[ \"$1\" == tag ]]; then\n"
+        'if [[ "$1" == tag ]]; then\n'
         f"  touch {str(marker)!r}\n  exit {tag_result}\n"
         "fi\n"
-        "if [[ \"$1\" == pull ]]; then\n  exit 0\nfi\n"
-        "if [[ \"$1\" == build ]]; then\n"
+        'if [[ "$1" == pull ]]; then\n  exit 0\nfi\n'
+        'if [[ "$1" == build ]]; then\n'
         f"  [[ -f {str(marker)!r} ]] || exit 91\n"
         f"  exit {build_result}\n"
         "fi\n"
@@ -249,7 +256,7 @@ def _run_forced_update_probe(
         encoding="utf-8",
     )
     docker.chmod(0o755)
-    script = f'''
+    script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
@@ -259,11 +266,11 @@ AGENT_CANON_STATE_ROOT={str(state_root)!r}
 AGENT_CANON_PRIVATE_LOG_ROOT={str(private_log)!r}
 AGENT_CANON_DOCKER_CMD={str(docker)!r}
 AGENT_CANON_ALLOW_BUILD=1
-{f'AGENT_CANON_LOCAL_BUILD={force_build}' if force_build is not None else ''}
+{f"AGENT_CANON_LOCAL_BUILD={force_build}" if force_build is not None else ""}
 export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
 export AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
 export AGENT_CANON_DOCKER_CMD AGENT_CANON_ALLOW_BUILD
-{f'export AGENT_CANON_LOCAL_BUILD' if force_build is not None else ''}
+{f"export AGENT_CANON_LOCAL_BUILD" if force_build is not None else ""}
 _agent_canon_replace_resident_locked() {{
   printf '%s\\n' replaced > {str(replaced)!r}
   _agent_canon_commit_pending_rollback_plan
@@ -272,7 +279,7 @@ _agent_canon_update_locked '' ignored
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
-'''
+"""
     completed = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
@@ -297,10 +304,13 @@ def test_explicit_local_build_rebuilds_same_source_image(tmp_path: Path) -> None
         tmp_path, build_result="0", force_build="1"
     )
     assert completed.returncode == 0, completed.stderr
-    assert sum(
-        operation.startswith("build ")
-        for operation in calls.read_text(encoding="utf-8").splitlines()
-    ) == 1
+    assert (
+        sum(
+            operation.startswith("build ")
+            for operation in calls.read_text(encoding="utf-8").splitlines()
+        )
+        == 1
+    )
     assert not any(
         operation.startswith("pull ")
         for operation in calls.read_text(encoding="utf-8").splitlines()
@@ -314,9 +324,13 @@ def test_local_build_retains_same_reference_before_build(tmp_path: Path) -> None
     )
     assert completed.returncode == 0, completed.stderr
     operations = calls.read_text(encoding="utf-8").splitlines()
-    assert next(index for index, operation in enumerate(operations) if operation.startswith("tag " + old_id)) < operations.index(next(
-        operation for operation in operations if operation.startswith("build ")
-    ))
+    assert next(
+        index
+        for index, operation in enumerate(operations)
+        if operation.startswith("tag " + old_id)
+    ) < operations.index(
+        next(operation for operation in operations if operation.startswith("build "))
+    )
     assert marker.is_file()
     assert (tmp_path / "runtime" / "container-state" / "rollback-plan.tsv").is_file()
     assert "rollback_plan_invalid" not in completed.stderr
@@ -333,14 +347,21 @@ def test_local_build_failure_preserves_previous_plan_and_active_image(
     assert completed.returncode == 2
     assert '"code":"candidate_image_build_failed"' in completed.stderr
     assert not (tmp_path / "replaced").exists()
-    assert (tmp_path / "runtime" / "host-state" / "active-image.tsv").read_text(
-        encoding="utf-8"
-    ).endswith(f"image-id\t{old_id}\n")
+    assert (
+        (tmp_path / "runtime" / "host-state" / "active-image.tsv")
+        .read_text(encoding="utf-8")
+        .endswith(f"image-id\t{old_id}\n")
+    )
     assert (tmp_path / "runtime" / "container-state" / "rollback-plan.tsv").read_text(
         encoding="utf-8"
     ) == previous_plan
-    assert not (tmp_path / "runtime" / "container-state" / ".pending-rollback-plan.tsv").exists()
-    assert any(operation.startswith("build ") for operation in calls.read_text(encoding="utf-8").splitlines())
+    assert not (
+        tmp_path / "runtime" / "container-state" / ".pending-rollback-plan.tsv"
+    ).exists()
+    assert any(
+        operation.startswith("build ")
+        for operation in calls.read_text(encoding="utf-8").splitlines()
+    )
 
 
 def test_forced_retention_failure_stops_before_build(tmp_path: Path) -> None:
@@ -354,7 +375,9 @@ def test_forced_retention_failure_stops_before_build(tmp_path: Path) -> None:
         operation.startswith("build ")
         for operation in calls.read_text(encoding="utf-8").splitlines()
     )
-    assert not (tmp_path / "runtime" / "container-state" / ".pending-rollback-plan.tsv").exists()
+    assert not (
+        tmp_path / "runtime" / "container-state" / ".pending-rollback-plan.tsv"
+    ).exists()
 
 
 @pytest.mark.parametrize(
@@ -385,19 +408,18 @@ def test_replacement_failure_hooks_abort_before_teardown_or_state_callbacks(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
         f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
-        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
+        'if [[ "$1:$2" == image:inspect ]]; then\n'
         f"  printf '%s\\n' {candidate_id!r}\n"
         "  exit 0\n"
         "fi\n"
-        "if [[ \"$1:$2\" == container:inspect ]]; then exit 0; fi\n"
+        'if [[ "$1:$2" == container:inspect ]]; then exit 0; fi\n'
         "exit 0\n",
         encoding="utf-8",
     )
     docker.chmod(0o755)
     active = runtime / "host-state" / "active-image.tsv"
     active.write_text(
-        f"schema\tagent-canon.active-image.v1\n"
-        f"image-ref\tactive\nimage-id\t{old_id}\n",
+        f"schema\tagent-canon.active-image.v1\nimage-ref\tactive\nimage-id\t{old_id}\n",
         encoding="utf-8",
     )
     hooks = {
@@ -438,7 +460,7 @@ def test_replacement_failure_hooks_abort_before_teardown_or_state_callbacks(
             f"printf '%s\\n' require >> {str(callbacks)!r}; return {failure_rc}; }}"
         ),
     }
-    script = f'''
+    script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_CONTROL_ROOT={str(control)!r}
@@ -458,7 +480,7 @@ _agent_canon_replace_resident candidate {candidate_id}
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
-'''
+"""
     completed = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
@@ -487,7 +509,9 @@ def test_public_update_locked_propagates_gate_failure(
     private_log.mkdir()
     (state_root / "mounts.tsv").write_text("", encoding="utf-8")
     (state_root / "mounts.toml").write_text("", encoding="utf-8")
-    (runtime / "source-sync" / "source-sync.json").parent.mkdir(parents=True, exist_ok=True)
+    (runtime / "source-sync" / "source-sync.json").parent.mkdir(
+        parents=True, exist_ok=True
+    )
     (runtime / "source-sync" / "source-sync.json").write_text("{}\n", encoding="utf-8")
     old_id = "sha256:" + "0" * 64
     candidate_id = "sha256:" + "1" * 64
@@ -507,18 +531,18 @@ def test_public_update_locked_propagates_gate_failure(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
         f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
-        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
-        "  ref=\"${@: -1}\"\n"
+        'if [[ "$1:$2" == image:inspect ]]; then\n'
+        '  ref="${@: -1}"\n'
         f"  if [[ \"$ref\" == *rollback-* ]]; then [[ -f {str(retained)!r} ]] || exit 1; printf '%s\\n' {old_id!r}; "
         f"  else printf '%s\\n' {candidate_id!r}; fi\n"
         "  exit 0\n"
         "fi\n"
-        "if [[ \"$1\" == tag ]]; then\n"
+        'if [[ "$1" == tag ]]; then\n'
         f"  touch {str(retained)!r}\n  exit 0\n"
         "fi\n"
-        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
-        "  format=\"${4:-}\"\n"
-        "  case \"$format\" in\n"
+        'if [[ "$1:$2" == container:inspect ]]; then\n'
+        '  format="${4:-}"\n'
+        '  case "$format" in\n'
         "    *Config.Image*) printf 'active\\n' ;;\n"
         "    *'{{.Id}}'*) printf 'old-container\\n' ;;\n"
         "    *io.agent-canon.runtime*) printf 'shared-v1\\n' ;;\n"
@@ -536,7 +560,7 @@ def test_public_update_locked_propagates_gate_failure(
         "validate": "_agent_canon_validate_target_manifest() { return 19; }",
         "require": "_agent_canon_require_existing_container_identity() { return 20; }",
     }
-    script = f'''
+    script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
@@ -569,11 +593,13 @@ _agent_canon_update_locked '' candidate
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
-'''
+"""
     completed = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
-    expected_rc = {"classify": 17, "prune": 18, "validate": 19, "require": 20}[failure_hook]
+    expected_rc = {"classify": 17, "prune": 18, "validate": 19, "require": 20}[
+        failure_hook
+    ]
     assert completed.returncode == expected_rc
     docker_calls = calls.read_text(encoding="utf-8").splitlines()
     assert not any(
@@ -616,7 +642,6 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
         "AGENT_CANON_DOCKER": str(fake_docker),
         "FAKE_DOCKER_STATE": str(state_path),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
-        "AGENT_CANON_FORCE_BUILD": "1",
     }
     common = [
         str(BOOTSTRAP),
@@ -735,11 +760,34 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     )
     assert smoke.returncode == 0, smoke.stderr
     active_ref, image_a = active_image()
+    # ``--local-build`` reuses an existing image reference by design. Advance
+    # the fixture's actual image input between updates so the digest owner
+    # selects a new environment image; the image-ID rollback oracle remains
+    # meaningful without a FORCE_BUILD test-only escape hatch.
+    bootstrap_link = repository / "bootstrap"
+    if bootstrap_link.is_symlink():
+        bootstrap_link.unlink()
+    else:
+        shutil.rmtree(bootstrap_link)
+    shutil.copytree(ROOT / "bootstrap", bootstrap_link, symlinks=True)
+    dockerfile = bootstrap_link / "container" / "image" / "Dockerfile"
+    dockerfile.write_text(
+        dockerfile.read_text(encoding="utf-8") + "\nENV AGENT_CANON_FIXTURE_ENV=B\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "add", "bootstrap/container/image/Dockerfile"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-qm", "fixture environment B"],
+        check=True,
+    )
     first = run("update", "--local-build")
     assert first.returncode == 0, first.stderr
     assert not first.stderr
-    updated_ref, image_b = active_image()
-    assert updated_ref == active_ref
+    ref_b, image_b = active_image()
+    assert ref_b != active_ref
     assert image_b != image_a
     assert_volume_registry()
     rollback_ref_a, rollback_id_a = rollback_plan()
@@ -747,11 +795,23 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     assert rollback_id_a == image_a
     assert docker_state["images"][rollback_ref_a]["Id"] == image_a
 
+    dockerfile.write_text(
+        dockerfile.read_text(encoding="utf-8") + "\nENV AGENT_CANON_FIXTURE_ENV=C\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "add", "bootstrap/container/image/Dockerfile"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-qm", "fixture environment C"],
+        check=True,
+    )
     second = run("update", "--local-build")
     assert second.returncode == 0, second.stderr
     assert not second.stderr
-    updated_ref, image_c = active_image()
-    assert updated_ref == active_ref
+    ref_c, image_c = active_image()
+    assert ref_c not in {active_ref, ref_b}
     assert image_c not in {image_a, image_b}
     assert_volume_registry()
     rollback_ref_b, rollback_id_b = rollback_plan()
@@ -765,9 +825,10 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     rollback_active_ref, rollback_active_id = active_image()
     assert rollback_active_id == image_b
     assert rollback_active_ref == image_b
-    container_name = "agent-canon-tools-" + hashlib.sha256(
-        str(control.resolve()).encode("utf-8")
-    ).hexdigest()[:16]
+    container_name = (
+        "agent-canon-tools-"
+        + hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()[:16]
+    )
     docker_state = json.loads(state_path.read_text(encoding="utf-8"))
     assert docker_state["containers"][container_name]["Config"]["Image"] == image_b
     assert any(
@@ -835,7 +896,9 @@ def test_existing_controller_volume_requires_state_label(tmp_path: Path) -> None
     assert json.loads(result.stderr)["code"] == "state_volume_ownership_mismatch"
 
 
-def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(tmp_path: Path) -> None:
+def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(
+    tmp_path: Path,
+) -> None:
     """A fresh volume copy-up leaves an unmarked runtime and fails closed."""
     legacy = tmp_path / "legacy-state"
     legacy.mkdir()
@@ -893,7 +956,9 @@ def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(tmp_path: 
     assert not (volume_root / ".agent-canon-controller-volume-v1").exists()
 
 
-def test_fake_volume_initializer_preserves_readonly_legacy_source(tmp_path: Path) -> None:
+def test_fake_volume_initializer_preserves_readonly_legacy_source(
+    tmp_path: Path,
+) -> None:
     """Fake volume initialization copies legacy input without mutating it."""
     legacy = tmp_path / "legacy-state"
     legacy.mkdir()
@@ -1160,11 +1225,11 @@ def test_state_volume_init_reports_native_docker_exit(tmp_path: Path) -> None:
     docker = tmp_path / "docker"
     docker.write_text(
         "#!/usr/bin/env bash\n"
-        "if [[ \"$1\" == run ]]; then\n"
+        'if [[ "$1" == run ]]; then\n'
         "  printf 'native state-volume failure\\n' >&2\n"
         "  exit 17\n"
         "fi\n"
-        f"exec {str(ROOT / 'tests/bootstrap/fake_docker.py')!r} \"$@\"\n",
+        f'exec {str(ROOT / "tests/bootstrap/fake_docker.py")!r} "$@"\n',
         encoding="utf-8",
     )
     docker.chmod(0o755)
@@ -1195,7 +1260,9 @@ def test_state_volume_init_reports_native_docker_exit(tmp_path: Path) -> None:
     assert "Docker exit 17" in receipt["detail"]
 
 
-def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path) -> None:
+def test_target_add_init_failure_restores_previous_fake_resident(
+    tmp_path: Path,
+) -> None:
     """Initializer failure aborts target replacement and restores the prior resident."""
     home = tmp_path / "home"
     control = tmp_path / "control"
@@ -1203,7 +1270,10 @@ def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path)
     home.mkdir()
     control.mkdir()
     create_source_checkout(repository)
-    subprocess.run(["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
+        check=True,
+    )
     subprocess.run(
         ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
         check=True,
@@ -1225,7 +1295,11 @@ def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path)
         str(control),
     ]
     installed = subprocess.run(
-        [*common, "install"], check=False, capture_output=True, text=True, env=environment
+        [*common, "install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
     )
     assert installed.returncode == 0, installed.stderr
     state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -1271,9 +1345,9 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     guide_stage.mkdir()
     (fake_install / ".codex" / "personal" / "skills" / "managed").mkdir(parents=True)
     (fake_install / ".codex" / "config.toml").write_text("config\n", encoding="utf-8")
-    (fake_install / ".codex" / "personal" / "skills" / "managed" / "SKILL.md").write_text(
-        "skill\n", encoding="utf-8"
-    )
+    (
+        fake_install / ".codex" / "personal" / "skills" / "managed" / "SKILL.md"
+    ).write_text("skill\n", encoding="utf-8")
     (volume_root / "exchange").mkdir(parents=True)
     (volume_root / "codex-home").mkdir(parents=True)
     (volume_root / "codex-home" / "config.toml").symlink_to(
@@ -1292,15 +1366,15 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     volume_name = "agent-canon-runtime-real-shell"
     docker = tmp_path / "docker-real-shell"
     docker.write_text(
-        "#!/bin/sh\n"
+        "#!/usr/bin/env bash\n"
         "set -eu\n"
         "script= input= volume=\n"
-        "while [ \"$#\" -gt 0 ]; do\n"
-        "  case \"$1\" in\n"
+        'while [ "$#" -gt 0 ]; do\n'
+        '  case "$1" in\n'
         "    --mount)\n"
         "      shift\n"
         "      spec=$1\n"
-        "      case \"$spec\" in\n"
+        '      case "$spec" in\n'
         "        type=volume,src=*,dst=/var/lib/agent-canon)\n"
         "          volume=${spec#type=volume,src=}; volume=${volume%,dst=/var/lib/agent-canon} ;;\n"
         "        type=volume,src=*,dst=/var/lib/agent-canon,readonly)\n"
@@ -1310,15 +1384,15 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
         "        type=bind,src=*,dst=/agent-canon-copy-output)\n"
         "          exit 91 ;;\n"
         "      esac ;;\n"
-        "    --env) shift; export \"$1\" ;;\n"
+        '    --env) shift; export "$1" ;;\n'
         "    -c) shift; script=$1 ;;\n"
         "  esac\n"
         "  shift\n"
         "done\n"
-        "[ \"$volume\" = \"$FAKE_VOLUME_NAME\" ]\n"
-        "[ -n \"$script\" ]\n"
-        "script=$(printf \"%s\" \"$script\" | sed -e \"s|/var/lib/agent-canon|$FAKE_VOLUME_ROOT|g\" -e \"s|/agent-canon-copy-input|$input|g\")\n"
-        "exec /bin/sh -c \"$script\"\n",
+        '[ "$volume" = "$FAKE_VOLUME_NAME" ]\n'
+        '[ -n "$script" ]\n'
+        'script=$(printf "%s" "$script" | sed -e "s|/var/lib/agent-canon|$FAKE_VOLUME_ROOT|g" -e "s|/agent-canon-copy-input|$input|g")\n'
+        'exec /bin/sh -c "$script"\n',
         encoding="utf-8",
     )
     docker.chmod(0o755)
@@ -1349,8 +1423,10 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     )
     assert result.returncode == 0, result.stderr
     assert (stage / "mounts.tsv").read_text(encoding="utf-8") == "target\n"
-    assert (stage / "mounts.toml").read_text(encoding="utf-8").startswith(
-        'schema = "agent-canon.mount-registry.v2"'
+    assert (
+        (stage / "mounts.toml")
+        .read_text(encoding="utf-8")
+        .startswith('schema = "agent-canon.mount-registry.v2"')
     )
     guide_source = volume_root / "runtime" / "reports" / "agent-improvement-guide"
     guide_source.mkdir(parents=True)
@@ -1388,6 +1464,8 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
             " ".join(
                 (
                     f"source {str(ADAPTER)!r};",
+                    f"AGENT_CANON_DOCKER={str(docker)!r};",
+                    f"AGENT_CANON_DOCKER_CMD={str(docker)!r};",
                     "_agent_canon_prepare_host_runtime() {",
                     f"AGENT_CANON_STATE_ROOT={str(runtime)!r};",
                     f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r};",
@@ -1411,7 +1489,11 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert json.loads(rejected.stderr)["code"] == "volume_copy_destination_invalid"
     assert sentinel.read_text(encoding="utf-8") == "untouched\n"
     codex_export = subprocess.run(
-        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
+        [
+            "bash",
+            "-c",
+            common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -1424,7 +1506,9 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert codex_export.returncode == 0, codex_export.stderr
     assert codex_stage.is_dir()
     assert (codex_stage / "config.toml").is_symlink()
-    assert (codex_stage / "config.toml").resolve() == (fake_install / ".codex" / "config.toml").resolve()
+    assert (codex_stage / "config.toml").resolve() == (
+        fake_install / ".codex" / "config.toml"
+    ).resolve()
     assert (codex_stage / "skills" / "managed" / "SKILL.md").is_symlink()
     assert (codex_stage / "skills" / "managed" / "SKILL.md").resolve() == (
         fake_install / ".codex" / "personal" / "skills" / "managed" / "SKILL.md"
@@ -1438,7 +1522,11 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     (codex_stage / "agents").mkdir()
     (codex_stage / "agents" / "old.toml").write_text("old\n", encoding="utf-8")
     codex_failed = subprocess.run(
-        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
+        [
+            "bash",
+            "-c",
+            common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -1457,7 +1545,11 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     (volume_root / "codex-home" / "config.toml").unlink()
     (volume_root / "codex-home" / "config.toml").symlink_to("relative-config.toml")
     relative_rejected = subprocess.run(
-        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
+        [
+            "bash",
+            "-c",
+            common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -1475,7 +1567,11 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     )
     (volume_root / "codex-home" / "unexpected").symlink_to(tmp_path / "outside")
     rejected = subprocess.run(
-        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
+        [
+            "bash",
+            "-c",
+            common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -1613,7 +1709,9 @@ def test_volume_export_rejects_fifo_before_publish(tmp_path: Path) -> None:
     assert (stage / "old.txt").read_text(encoding="utf-8") == "keep\n"
 
 
-def test_volume_export_list_failure_is_typed_and_preserves_destination(tmp_path: Path) -> None:
+def test_volume_export_list_failure_is_typed_and_preserves_destination(
+    tmp_path: Path,
+) -> None:
     """A malformed tar stream fails before touching the existing projection."""
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
@@ -1675,7 +1773,9 @@ def test_volume_export_list_failure_is_typed_and_preserves_destination(tmp_path:
     assert (stage / "old.txt").read_text(encoding="utf-8") == "keep\n"
 
 
-def test_projection_later_move_failure_restores_exact_previous_state(tmp_path: Path) -> None:
+def test_projection_later_move_failure_restores_exact_previous_state(
+    tmp_path: Path,
+) -> None:
     """A later fixed-file move failure restores all prior files and absences."""
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
@@ -1834,8 +1934,9 @@ def test_private_feedback_volume_copy_uses_canonical_subtree(tmp_path: Path) -> 
     assert not (stage / "stale.txt").exists()
     assert (stage / "feedback.json").read_text(encoding="utf-8") == "feedback\n"
     assert not (stage / "other.txt").exists()
-    assert '_agent_canon_volume_copy export private-feedback "$spool" private-feedback' in ADAPTER.read_text(
-        encoding="utf-8"
+    assert (
+        '_agent_canon_volume_copy export private-feedback "$spool" private-feedback'
+        in ADAPTER.read_text(encoding="utf-8")
     )
     invalid = subprocess.run(
         [
@@ -1958,7 +2059,11 @@ def test_codex_volume_copy_roundtrips_managed_symlink(tmp_path: Path) -> None:
         "AGENT_CANON_IMAGE_REF=image; "
     )
     exported = subprocess.run(
-        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(stage)!r}"],
+        [
+            "bash",
+            "-c",
+            common + f"_agent_canon_volume_copy export codex-home {str(stage)!r}",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -1966,9 +2071,15 @@ def test_codex_volume_copy_roundtrips_managed_symlink(tmp_path: Path) -> None:
     )
     assert exported.returncode == 0, exported.stderr
     assert (stage / "config.toml").is_symlink()
-    assert (stage / "config.toml").resolve() == (fake_install / ".codex" / "config.toml").resolve()
+    assert (stage / "config.toml").resolve() == (
+        fake_install / ".codex" / "config.toml"
+    ).resolve()
     imported = subprocess.run(
-        ["bash", "-c", common + f"_agent_canon_volume_copy import codex-home {str(stage)!r}"],
+        [
+            "bash",
+            "-c",
+            common + f"_agent_canon_volume_copy import codex-home {str(stage)!r}",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -1976,7 +2087,9 @@ def test_codex_volume_copy_roundtrips_managed_symlink(tmp_path: Path) -> None:
     )
     assert imported.returncode == 0, imported.stderr
     assert (codex_home / "config.toml").is_symlink()
-    assert (codex_home / "config.toml").resolve() == (fake_install / ".codex" / "config.toml").resolve()
+    assert (codex_home / "config.toml").resolve() == (
+        fake_install / ".codex" / "config.toml"
+    ).resolve()
 
 
 @pytest.mark.skipif(
@@ -2089,11 +2202,13 @@ def test_real_docker_forced_updates_retain_previous_images(tmp_path: Path) -> No
 def test_source_sync_state_is_mounted_read_only_into_the_resident() -> None:
     """The host mounts one source-sync directory into the resident."""
     text = ADAPTER.read_text(encoding="utf-8")
-    assert "AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync" in text
+    assert (
+        "AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync" in text
+    )
     assert "_agent_canon_volume_copy import source-sync" not in text
     assert "_agent_canon_volume_copy import mount-registry" in text
     assert 'mount-registry) destination="$root/mount-registry.toml"' in text
-    assert 'dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly' in text
+    assert "dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly" in text
     assert "_agent_canon_ensure_source_sync_state" in text
     assert "container-state/source-sync.json" not in text
 
@@ -2220,7 +2335,7 @@ GIT_LOG={str(git_log)!r}
 export AGENT_CANON_DOCKER PATH GIT_LOG
 _agent_canon_validate_roots() {{
   AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
-  AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / 'private-log')!r}
+  AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / "private-log")!r}
   export AGENT_CANON_RUNTIME_ROOT
   export AGENT_CANON_PRIVATE_LOG_ROOT
 }}
@@ -2251,9 +2366,14 @@ bootstrap_host_entrypoint {str(repository)!r} --control-parent-root {str(tmp_pat
 def test_source_sync_state_is_a_read_only_directory_mount() -> None:
     """The source-sync directory remains visible after atomic nested-file replace."""
     text = ADAPTER.read_text(encoding="utf-8")
-    assert "AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync" in text
-    assert 'AGENT_CANON_RUNTIME_ROOT/source-sync/source-sync.json' in text
-    assert 'type=bind,src=$AGENT_CANON_RUNTIME_ROOT/source-sync,dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly' in text
+    assert (
+        "AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync" in text
+    )
+    assert "AGENT_CANON_RUNTIME_ROOT/source-sync/source-sync.json" in text
+    assert (
+        "type=bind,src=$AGENT_CANON_RUNTIME_ROOT/source-sync,dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly"
+        in text
+    )
     assert "_agent_canon_volume_copy import source-sync" not in text
 
 
@@ -2277,7 +2397,9 @@ interrupted_rc=$?
 test "$interrupted_rc" -eq 99
 test "$before" = "$(< {str(runtime / "source-sync/source-sync.json")!r})"
 """
-    completed = subprocess.run(["bash", "-c", script], check=False, capture_output=True, text=True)
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
     assert completed.returncode == 0, completed.stderr
     source_sync = runtime / "source-sync"
     assert source_sync.stat().st_mode & 0o777 == 0o755
@@ -2345,27 +2467,37 @@ def test_target_mount_manifest_is_strict_and_reused_on_create() -> None:
     """Target mounts are emitted as allowlisted TSV and applied by host Docker."""
     text = ADAPTER.read_text(encoding="utf-8")
     assert "mounts.tsv" in text
-    assert 'target_mount_args+=(--mount "type=bind,src=$target_source,dst=$target_destination,readonly")' in text
-    assert 'target mount destination or mode is invalid' in text
+    assert (
+        'target_mount_args+=(--mount "type=bind,src=$target_source,dst=$target_destination,readonly")'
+        in text
+    )
+    assert "target mount destination or mode is invalid" in text
 
 
-def test_structured_exec_target_digest_is_shell_validated_before_container_handoff() -> None:
+def test_structured_exec_target_digest_is_shell_validated_before_container_handoff() -> (
+    None
+):
     """Structured requests carry a typed digest; the shell never parses JSON."""
     text = ADAPTER.read_text(encoding="utf-8")
     assert "_agent_canon_extract_exec_target_digest" in text
     assert "--target-digest" in text
-    assert 'AGENT_CANON_STATE_ROOT/mounts.tsv' in text
-    assert 'AGENT_CANON_TARGET_DIGEST=$digest' in text
-    assert 'install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)' in text
+    assert "AGENT_CANON_STATE_ROOT/mounts.tsv" in text
+    assert "AGENT_CANON_TARGET_DIGEST=$digest" in text
+    assert (
+        "install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)"
+        in text
+    )
     assert '" ${command_args[*]} " == *" --request-json "*' not in text
 
 
-def test_exec_child_request_json_does_not_switch_to_structured_mode(tmp_path: Path) -> None:
+def test_exec_child_request_json_does_not_switch_to_structured_mode(
+    tmp_path: Path,
+) -> None:
     """A child argv token after ``--`` remains a generic exec command."""
     script = (
         f'source "{ADAPTER}"\n'
-        'command_args=(exec --root /tmp/target -- tool --request-json value)\n'
-        '_agent_canon_exec_is_structured_request\n'
+        "command_args=(exec --root /tmp/target -- tool --request-json value)\n"
+        "_agent_canon_exec_is_structured_request\n"
     )
     result = subprocess.run(
         ["bash", "-c", script],
@@ -2390,10 +2522,10 @@ def test_exec_request_json_before_separator_uses_typed_digest(tmp_path: Path) ->
     script = (
         f'source "{ADAPTER}"\n'
         f'AGENT_CANON_STATE_ROOT="{state_root}"\n'
-        'AGENT_CANON_DOCKER_CMD=true\n'
+        "AGENT_CANON_DOCKER_CMD=true\n"
         f'command_args=(exec --request-json "quoted value" --target-digest={digest})\n'
-        '_agent_canon_exec_is_structured_request\n'
-        '_agent_canon_extract_exec_target_digest\n'
+        "_agent_canon_exec_is_structured_request\n"
+        "_agent_canon_extract_exec_target_digest\n"
         'printf "%s\\n" "$AGENT_CANON_TARGET_DIGEST" "${command_args[*]}"\n'
     )
     result = subprocess.run(
@@ -2403,7 +2535,10 @@ def test_exec_request_json_before_separator_uses_typed_digest(tmp_path: Path) ->
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines() == [digest, f'exec --request-json quoted value --target-digest {digest}']
+    assert result.stdout.splitlines() == [
+        digest,
+        f"exec --request-json quoted value --target-digest {digest}",
+    ]
 
 
 def test_private_log_source_is_read_back_from_the_owned_mount() -> None:
@@ -2454,7 +2589,7 @@ def test_host_configuration_is_fixed_and_not_a_toml_parser() -> None:
     text = ADAPTER.read_text(encoding="utf-8")
     assert "AGENT_CANON_CONTAINER_CPUS=2" in text
     assert "AGENT_CANON_RUNTIME_DESTINATION=" in text
-    assert "source \"$AGENT_CANON_REPOSITORY_ROOT/bootstrap/" not in text
+    assert 'source "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/' not in text
 
 
 def test_container_create_maps_caller_without_fixed_user_policy() -> None:
@@ -2470,8 +2605,12 @@ def test_container_create_maps_caller_without_fixed_user_policy() -> None:
     assert '--user "$caller_user"' in create
     assert "AGENT_CANON_FIXED_UID" not in text
     assert "AGENT_CANON_USER" not in text
-    dockerfile = (ROOT / "bootstrap/container/image/Dockerfile").read_text(encoding="utf-8")
-    assert not any(line.lstrip().startswith("USER ") for line in dockerfile.splitlines())
+    dockerfile = (ROOT / "bootstrap/container/image/Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    assert not any(
+        line.lstrip().startswith("USER ") for line in dockerfile.splitlines()
+    )
 
 
 def test_help_does_not_require_python_or_docker(tmp_path: Path) -> None:
@@ -2608,6 +2747,18 @@ def _gc_fixture(
         "foreign-resident": container("container-foreign", foreign_ref, foreign),
     }
     containers[container_name]["Name"] = "/" + container_name
+    # The host entrypoint now discovers an existing resident's authoritative
+    # runtime through the bind-mounted mount registry before GC/update work.
+    # Model that protocol boundary instead of relying on the old empty mount list.
+    containers[container_name]["Mounts"] = [
+        {
+            "Type": "bind",
+            "Source": str(runtime_root / "container-state" / "mounts.toml"),
+            "Destination": "/var/lib/agent-canon/mount-registry.toml",
+            "RW": False,
+            "Mode": "ro",
+        }
+    ]
     containers["agent-canon-tools-stale"]["Name"] = "/agent-canon-tools-stale"
     containers["foreign-resident"]["Name"] = "/foreign-resident"
     state = {"images": images, "containers": containers, "next": 1}
@@ -2685,9 +2836,9 @@ source {str(ADAPTER)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_CONTROL_ROOT={str(control)!r}
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
-AGENT_CANON_STATE_ROOT={str(runtime / 'container-state')!r}
-AGENT_CANON_PRIVATE_LOG_ROOT={str(control / 'agent-canon-log')!r}
-AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
+AGENT_CANON_PRIVATE_LOG_ROOT={str(control / "agent-canon-log")!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / "tests/bootstrap/fake_docker.py")!r}
 AGENT_CANON_IMAGE_REF=agent-canon-tools:live
 export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
 export AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT AGENT_CANON_DOCKER_CMD
@@ -2937,7 +3088,7 @@ def test_resident_replacement_lock_serializes_only_the_replacement(
     runtime = tmp_path / "runtime"
     (runtime / "host-state").mkdir(parents=True)
     events = tmp_path / "events"
-    script = f'''
+    script = f"""
 set -eu
 source {str(ADAPTER)!r}
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
@@ -2947,7 +3098,7 @@ _agent_canon_replace_resident_locked() {{
   printf '%s end\\n' "$AGENT_CANON_TEST_LABEL" >> {str(events)!r}
 }}
 _agent_canon_replace_resident candidate sha256:candidate
-'''
+"""
     environment = {**os.environ, "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
     first = subprocess.Popen(
         ["bash", "-c", script],
@@ -2989,7 +3140,7 @@ def test_replacement_candidate_inspect_failure_stops_before_transaction_callback
         encoding="utf-8",
     )
     docker.chmod(0o755)
-    script = f'''
+    script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
@@ -3001,7 +3152,7 @@ _agent_canon_replace_resident candidate sha256:candidate
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
-'''
+"""
     completed = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
@@ -3022,13 +3173,13 @@ def test_replacement_ensure_failure_does_not_publish_active_state(
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; exit 0; fi\n"
-        "if [[ \"$1:$2\" == container:inspect ]]; then exit 1; fi\n"
-        "if [[ \"$1:$2\" == image:rm ]]; then exit 0; fi\n"
+        'if [[ "$1:$2" == container:inspect ]]; then exit 1; fi\n'
+        'if [[ "$1:$2" == image:rm ]]; then exit 0; fi\n'
         "exit 0\n",
         encoding="utf-8",
     )
     docker.chmod(0o755)
-    script = f'''
+    script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
@@ -3041,7 +3192,7 @@ _agent_canon_replace_resident candidate requested
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
-'''
+"""
     completed = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
@@ -3065,13 +3216,13 @@ def test_replacement_rollback_failure_is_reported_after_controller_failure(
         "#!/usr/bin/env bash\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; fi\n"
         "if [[ \"$1:$2\" == container:inspect && \"$4\" == '{{.Id}}' ]]; then printf 'container-old\\n'; fi\n"
-        "if [[ \"$1:$2\" == container:inspect && \"$4\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
-        f"if [[ \"$1:$2\" == container:inspect && \"$4\" == *io.agent-canon.control-root-digest* ]]; then printf '{control_digest}\\n'; fi\n"
+        'if [[ "$1:$2" == container:inspect && "$4" == *io.agent-canon.runtime* ]]; then printf \'shared-v1\\n\'; fi\n'
+        f'if [[ "$1:$2" == container:inspect && "$4" == *io.agent-canon.control-root-digest* ]]; then printf \'{control_digest}\\n\'; fi\n'
         "exit 0\n",
         encoding="utf-8",
     )
     docker.chmod(0o755)
-    script = f'''
+    script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
@@ -3095,7 +3246,7 @@ _agent_canon_replace_resident candidate requested
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
-'''
+"""
     completed = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
@@ -3149,7 +3300,7 @@ def test_owned_resident_replacement_classifies_before_drift_and_teardown(
         "set -eu\n"
         f"printf '%s\\n' \"$*\" >> {str(marker)!r}\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; exit 0; fi\n"
-        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        'if [[ "$1:$2" == container:inspect ]]; then\n'
         "  if [[ \"${4:-}\" == '{{.Id}}' ]]; then printf 'container-old\\n'; fi\n"
         "  if [[ \"${4:-}\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
         f"  if [[ \"${{4:-}}\" == *io.agent-canon.control-root-digest* ]]; then printf '{owner_label}\\n'; fi\n"
@@ -3159,7 +3310,7 @@ def test_owned_resident_replacement_classifies_before_drift_and_teardown(
         encoding="utf-8",
     )
     docker.chmod(0o755)
-    script = f'''
+    script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
@@ -3183,7 +3334,7 @@ _agent_canon_ensure_container() {{ printf 'candidate\\n'; }}
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
-'''
+"""
     completed = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
@@ -3216,7 +3367,7 @@ def test_replacement_preserves_resident_when_identity_changes_before_teardown(
         "set -eu\n"
         f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; exit 0; fi\n"
-        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        'if [[ "$1:$2" == container:inspect ]]; then\n'
         f"  if [[ \"${{4:-}}\" == *Id* ]]; then n=$(< {str(id_reads)!r}); n=$((n + 1)); printf '%s\\n' \"$n\" > {str(id_reads)!r}; if ((n == 1)); then printf 'container-old\\n'; else printf 'container-new\\n'; fi; fi\n"
         "  if [[ \"${4:-}\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
         f"  if [[ \"${{4:-}}\" == *io.agent-canon.control-root-digest* ]]; then printf '{control_digest}\\n'; fi\n"
@@ -3226,7 +3377,7 @@ def test_replacement_preserves_resident_when_identity_changes_before_teardown(
         encoding="utf-8",
     )
     docker.chmod(0o755)
-    script = f'''
+    script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
@@ -3244,7 +3395,7 @@ _agent_canon_replace_resident candidate requested
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
-'''
+"""
     completed = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
     )
@@ -3270,12 +3421,13 @@ def test_install_update_reject_foreign_before_build_or_state_mutation(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
         f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
-        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        'if [[ "$1:$2" == container:inspect ]]; then\n'
+        "  if [[ \"${4:-}\" == *Id* ]]; then printf 'container-foreign\\n'; fi\n"
         "  if [[ \"${4:-}\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
         "  if [[ \"${4:-}\" == *io.agent-canon.control-root-digest* ]]; then printf 'foreign-control-root\\n'; fi\n"
         "  exit 0\n"
         "fi\n"
-        "if [[ \"$1\" == build ]]; then exit 99; fi\n"
+        'if [[ "$1" == build ]]; then exit 99; fi\n'
         "exit 0\n",
         encoding="utf-8",
     )
@@ -3307,9 +3459,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     """GPU006 fixture: old owned resident converges through install/update."""
     fixture = json.loads(GPU006_FIXTURE.read_text(encoding="utf-8"))
     assert fixture["fixture"] == "GPU006 stale source-sync mount"
-    assert fixture["resident"]["missing_mounts"] == [
-        "/var/lib/agent-canon/source-sync"
-    ]
+    assert fixture["resident"]["missing_mounts"] == ["/var/lib/agent-canon/source-sync"]
     repository = tmp_path / "agent-canon"
     # Both routes use a local origin.  Install deliberately exercises a
     # detached checkout; SourceSync must leave it on local main.
@@ -3357,12 +3507,26 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         encoding="utf-8",
     )
     old_mount_sources = {
-        "container-state": (runtime / "container-state", "/var/lib/agent-canon/runtime", True),
+        "container-state": (
+            runtime / "container-state",
+            "/var/lib/agent-canon/runtime",
+            True,
+        ),
         "private-log": (private_log, "/var/lib/agent-canon/private-log", False),
-        "mount-registry": (runtime / "container-state" / "mounts.toml", "/var/lib/agent-canon/mount-registry.toml", False),
+        "mount-registry": (
+            runtime / "container-state" / "mounts.toml",
+            "/var/lib/agent-canon/mount-registry.toml",
+            False,
+        ),
     }
     old_mounts = [
-        {"Type": "bind", "Source": str(source), "Destination": destination, "RW": rw, "Mode": "rw" if rw else "ro"}
+        {
+            "Type": "bind",
+            "Source": str(source),
+            "Destination": destination,
+            "RW": rw,
+            "Mode": "rw" if rw else "ro",
+        }
         for source, destination, rw in old_mount_sources.values()
     ]
     assert fixture["expected"]["source_sync_mount"] not in {
@@ -3415,13 +3579,13 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     git_wrapper = tool_bin / "git"
     git_wrapper.write_text(
         "#!/usr/bin/env bash\n"
-        "for argument in \"$@\"; do\n"
-        "  case \"$argument\" in\n"
+        'for argument in "$@"; do\n'
+        '  case "$argument" in\n'
         f"    fetch) printf '%s\\n' git-fetch >> {str(events)!r} ;;\n"
         f"    checkout) printf '%s\\n' git-checkout >> {str(events)!r} ;;\n"
         "  esac\n"
         "done\n"
-        "exec /usr/bin/git \"$@\"\n",
+        'exec /usr/bin/git "$@"\n',
         encoding="utf-8",
     )
     git_wrapper.chmod(0o755)
@@ -3452,15 +3616,17 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     )
     assert completed.returncode == 0, completed.stderr
     assert "container_ownership_mismatch" not in completed.stderr
-    receipts = [json.loads(line) for line in completed.stdout.splitlines() if line.startswith("{")]
+    receipts = [
+        json.loads(line)
+        for line in completed.stdout.splitlines()
+        if line.startswith("{")
+    ]
     assert receipts[-1]["status"] == "ok"
     assert receipts[-1]["operation"] == operation
     if operation == "install":
-        assert events.read_text(encoding="utf-8").splitlines()[:3] == [
-            "git-fetch",
-            "git-checkout",
-            "docker",
-        ]
+        # Existing-resident ownership is read before the install transaction;
+        # source-sync provenance is asserted below after the transition.
+        assert events.read_text(encoding="utf-8").splitlines()[0] == "docker"
     result = json.loads(state_path.read_text(encoding="utf-8"))
     assert resident["id"] not in {
         record["Id"] for record in result["containers"].values()
@@ -3504,8 +3670,12 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     assert replacement["HostConfig"]["CapDrop"] == security["cap_drop"]
     assert replacement["HostConfig"]["SecurityOpt"] == security["security_opt"]
     calls = calls_path.read_text(encoding="utf-8").splitlines()
-    pull_index = next(index for index, call in enumerate(calls) if call.startswith("pull\t"))
-    stop_index = next(index for index, call in enumerate(calls) if call.startswith("stop\t"))
+    pull_index = next(
+        index for index, call in enumerate(calls) if call.startswith("pull\t")
+    )
+    stop_index = next(
+        index for index, call in enumerate(calls) if call.startswith("stop\t")
+    )
     if operation == "install":
         assert stop_index < pull_index
     else:
@@ -3513,23 +3683,37 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     assert resident["id"] in calls[stop_index]
     assert any(old_image_id in call for call in calls if call.startswith("tag\t"))
     if operation == "install":
-        assert subprocess.run(
-            ["git", "-C", str(repository), "symbolic-ref", "--quiet", "--short", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip() == "main"
-        assert subprocess.run(
-            ["git", "-C", str(repository), "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip() == subprocess.run(
-            ["git", "-C", str(repository), "rev-parse", "origin/main"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
+        assert (
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repository),
+                    "symbolic-ref",
+                    "--quiet",
+                    "--short",
+                    "HEAD",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            == "main"
+        )
+        assert (
+            subprocess.run(
+                ["git", "-C", str(repository), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            == subprocess.run(
+                ["git", "-C", str(repository), "rev-parse", "origin/main"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
 
 
 def test_public_clean_install_uses_tracked_skills_and_first_target(
@@ -3541,7 +3725,9 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     origin = tmp_path / "origin.git"
     publisher = tmp_path / "publisher"
     subprocess.run(
-        ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
+        ["git", "init", "--bare", "--initial-branch=main", str(origin)],
+        check=True,
+        capture_output=True,
     )
     create_source_checkout(publisher)
     subprocess.run(
@@ -3584,30 +3770,40 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     assert list(personal_skills.glob("*/SKILL.md"))
 
     installed = subprocess.run(
-        [*common, "install"], check=False, capture_output=True, text=True, env=environment
+        [*common, "install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
     )
     assert installed.returncode == 0, installed.stderr
     assert (repository / ".runtime").is_dir()
     assert personal_skills.is_dir()
     assert list(personal_skills.glob("*/SKILL.md"))
     assert not legacy_runtime.exists()
-    assert subprocess.run(
-        ["git", "-C", str(repository), "branch", "--show-current"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip() == "main"
-    assert subprocess.run(
-        ["git", "-C", str(repository), "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip() == subprocess.run(
-        ["git", "-C", str(repository), "rev-parse", "origin/main"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    assert (
+        subprocess.run(
+            ["git", "-C", str(repository), "branch", "--show-current"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == "main"
+    )
+    assert (
+        subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "origin/main"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
 
     started = subprocess.run(
         [*common, "start"], check=False, capture_output=True, text=True, env=environment
@@ -3629,9 +3825,11 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         env=environment,
     )
     assert added.returncode == 0, added.stderr
-    mounts = (repository / ".runtime" / "container-state" / "mounts.tsv").read_text(
-        encoding="utf-8"
-    ).splitlines()
+    mounts = (
+        (repository / ".runtime" / "container-state" / "mounts.tsv")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
     assert len(mounts) == 1
     assert mounts[0].split("\t")[2] == str(repository.resolve())
 
@@ -3672,7 +3870,9 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     )
     stale_target = home / "removed-agent-canon"
     stale_digest = hashlib.sha256(str(stale_target).encode("utf-8")).hexdigest()
-    stale_state = json.loads((volume_root / "runtime" / "state.json").read_text(encoding="utf-8"))
+    stale_state = json.loads(
+        (volume_root / "runtime" / "state.json").read_text(encoding="utf-8")
+    )
     stale_state["targets"] = {
         stale_digest: {
             "root": str(stale_target),
@@ -3700,7 +3900,11 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         preserved_surfaces[name] = preserved
 
     repeated_install = subprocess.run(
-        [*common, "install"], check=False, capture_output=True, text=True, env=environment
+        [*common, "install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
     )
     assert repeated_install.returncode == 0, repeated_install.stderr
     assert not (state_root / "rollback-plan.tsv").exists()
@@ -3715,9 +3919,10 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         .read_text(encoding="utf-8")
         .splitlines()
     )
-    assert docker_state["images"][active_values["image-ref"]]["Id"] == active_values[
-        "image-id"
-    ]
+    assert (
+        docker_state["images"][active_values["image-ref"]]["Id"]
+        == active_values["image-id"]
+    )
     assert docker_state["images"][foreign_ref]["Id"] == foreign_id
     assert not any("-rollback-" in key for key in docker_state["images"])
 
@@ -3738,11 +3943,14 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     )
     assert repeated_add.returncode == 0, repeated_add.stderr
     assert '"code": "target_registered"' in repeated_add.stdout
-    assert len(
-        (repository / ".runtime" / "container-state" / "mounts.tsv").read_text(
-            encoding="utf-8"
-        ).splitlines()
-    ) == 1
+    assert (
+        len(
+            (repository / ".runtime" / "container-state" / "mounts.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        == 1
+    )
 
 
 def test_clean_install_failure_restores_resident_and_lifecycle_state(
@@ -3754,7 +3962,9 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
     origin = tmp_path / "origin.git"
     publisher = tmp_path / "publisher"
     subprocess.run(
-        ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
+        ["git", "init", "--bare", "--initial-branch=main", str(origin)],
+        check=True,
+        capture_output=True,
     )
     create_source_checkout(publisher)
     subprocess.run(
@@ -3797,7 +4007,11 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
     ]
 
     installed = subprocess.run(
-        [*common, "install"], check=False, capture_output=True, text=True, env=environment
+        [*common, "install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
     )
     assert installed.returncode == 0, installed.stderr
 
@@ -3808,9 +4022,10 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
         line.split("\t", 1)
         for line in active_image.read_text(encoding="utf-8").splitlines()
     )
-    container_name = "agent-canon-tools-" + hashlib.sha256(
-        str(home.resolve()).encode("utf-8")
-    ).hexdigest()[:16]
+    container_name = (
+        "agent-canon-tools-"
+        + hashlib.sha256(str(home.resolve()).encode("utf-8")).hexdigest()[:16]
+    )
     before = json.loads(fake_state.read_text(encoding="utf-8"))
     old_resident = before["containers"][container_name]
     old_image_ref = active_values["image-ref"]
@@ -3834,7 +4049,9 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
         active_image,
     ]
     lifecycle_before = {
-        path.relative_to(runtime).as_posix(): path.read_bytes() if path.exists() else None
+        path.relative_to(runtime).as_posix(): path.read_bytes()
+        if path.exists()
+        else None
         for path in lifecycle_paths
     }
 
@@ -3871,8 +4088,7 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
     rollback_refs = [
         fields[2]
         for fields in (
-            line.split("\t")
-            for line in calls.read_text(encoding="utf-8").splitlines()
+            line.split("\t") for line in calls.read_text(encoding="utf-8").splitlines()
         )
         if len(fields) == 3 and fields[0] == "tag" and "-rollback-" in fields[2]
     ]
@@ -3904,7 +4120,9 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
     origin = tmp_path / "origin.git"
     publisher = tmp_path / "publisher"
     subprocess.run(
-        ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
+        ["git", "init", "--bare", "--initial-branch=main", str(origin)],
+        check=True,
+        capture_output=True,
     )
     create_source_checkout(publisher)
     subprocess.run(
@@ -3926,9 +4144,10 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
     legacy_runtime = home / "workspace" / "agent-canon-runtime" / "host"
     personal_skills = repository / ".codex" / "personal" / "skills"
     runtime = repository / ".runtime"
-    container_name = "agent-canon-tools-" + hashlib.sha256(
-        str(home.resolve()).encode("utf-8")
-    ).hexdigest()[:16]
+    container_name = (
+        "agent-canon-tools-"
+        + hashlib.sha256(str(home.resolve()).encode("utf-8")).hexdigest()[:16]
+    )
     common = [
         str(BOOTSTRAP),
         "--repository-root",
@@ -3947,11 +4166,14 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
     }
     assert not runtime.exists()
     assert list(personal_skills.glob("*/SKILL.md"))
-    assert subprocess.run(
-        [docker, "container", "inspect", container_name],
-        check=False,
-        capture_output=True,
-    ).returncode != 0
+    assert (
+        subprocess.run(
+            [docker, "container", "inspect", container_name],
+            check=False,
+            capture_output=True,
+        ).returncode
+        != 0
+    )
 
     try:
         installed = subprocess.run(
@@ -3994,9 +4216,11 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
             timeout=120,
         )
         assert added.returncode == 0, added.stderr
-        mounts = (runtime / "container-state" / "mounts.tsv").read_text(
-            encoding="utf-8"
-        ).splitlines()
+        mounts = (
+            (runtime / "container-state" / "mounts.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
         assert len(mounts) == 1
         assert mounts[0].split("\t")[2] == str(repository.resolve())
 
@@ -4042,11 +4266,14 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         )
         assert repeated_add.returncode == 0, repeated_add.stderr
         assert '"code":"target_unchanged"' in repeated_add.stdout
-        assert len(
-            (runtime / "container-state" / "mounts.tsv").read_text(
-                encoding="utf-8"
-            ).splitlines()
-        ) == 1
+        assert (
+            len(
+                (runtime / "container-state" / "mounts.tsv")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            )
+            == 1
+        )
     finally:
         subprocess.run(
             [*common, "uninstall"],
@@ -4151,11 +4378,13 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     fake_docker = tmp_path / "docker"
     fake_docker.write_text(
-        "#!/bin/sh\n"
+        "#!/usr/bin/env bash\n"
         "set -eu\n"
-        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
-        "  format=\"${4:-}\"\n"
-        "  case \"$format\" in\n"
+        'if [[ "$1:$2" == container:inspect ]]; then\n'
+        '  format="${4:-}"\n'
+        "  if [[ \"$format\" == *Id* ]]; then printf '%s\\n' container-live; fi\n"
+        '  case "$format" in\n'
+        "    '{{.Id}}') printf '%s\\n' container-live ;;\n"
         "    *io.agent-canon.runtime*) printf '%s\\n' shared-v1 ;;\n"
         f"    *io.agent-canon.control-root-digest*) printf '%s\\n' {control_digest!r} ;;\n"
         f"    *Mounts*) printf '%s\\t%s\\n' {str(control_runtime / 'container-state/mounts.toml')!r} /var/lib/agent-canon/mount-registry.toml ;;\n"
@@ -4282,8 +4511,8 @@ def test_symlinked_private_log_is_rejected_before_runtime_creation(
 def test_runtime_root_argument_is_parse_only() -> None:
     """The shell always resolves runtime state below the install source."""
     text = ADAPTER.read_text(encoding="utf-8")
-    assert 'AGENT_CANON_RUNTIME_ROOT=$default_runtime' in text
-    assert 'runtime_root_escape' not in text
+    assert "AGENT_CANON_RUNTIME_ROOT=$default_runtime" in text
+    assert "runtime_root_escape" not in text
 
 
 def test_malicious_docker_environment_is_not_sourced(tmp_path: Path) -> None:
@@ -4316,6 +4545,7 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
     """Container control state operations do not reach Docker lifecycle code."""
     control = tmp_path / "control"
     control.mkdir()
+    (control / "runtime").mkdir()
     completed = subprocess.run(
         [
             "python3",
@@ -4336,6 +4566,7 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
             **os.environ,
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "AGENT_CANON_DOCKER": "missing-docker",
+            "AGENT_CANON_CONTAINER_CONTROL": "1",
         },
     )
     assert completed.returncode == 0, completed.stderr
@@ -4344,9 +4575,9 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
 
 def test_scheduler_template_invokes_shell_bootstrap() -> None:
     """Generated systemd units keep the shell boundary as their entrypoint."""
-    text = (ROOT / "bootstrap/host/scheduler/systemd/user/agent-canon-sync.service.in").read_text(
-        encoding="utf-8"
-    )
+    text = (
+        ROOT / "bootstrap/host/scheduler/systemd/user/agent-canon-sync.service.in"
+    ).read_text(encoding="utf-8")
     assert "ExecStart=@BOOTSTRAP@" in text
     assert "sync --install-root @INSTALL_ROOT@" in text
     assert "--runtime-root" not in text
@@ -4357,68 +4588,85 @@ def test_scheduler_template_invokes_shell_bootstrap() -> None:
 def test_rollback_validates_current_mounts_before_previous_plan() -> None:
     """Current resident readback is bound to the live manifest before swap."""
     text = ADAPTER.read_text(encoding="utf-8")
-    rollback = text.split('    rollback)\n', 1)[1].split('    target)\n', 1)[0]
-    assert '_agent_canon_validate_existing_container "$rollback_container" \\' in rollback
+    rollback = text.split("_agent_canon_rollback_locked() {", 1)[1].split(
+        "\nbootstrap_host_entrypoint() {", 1
+    )[0]
+    assert (
+        '_agent_canon_validate_existing_container "$rollback_container" \\' in rollback
+    )
     assert '"$AGENT_CANON_STATE_ROOT/mounts.tsv"' in rollback
     assert rollback.index('"$AGENT_CANON_STATE_ROOT/mounts.tsv"') < rollback.index(
         '"$AGENT_CANON_DOCKER_CMD" stop --time 10 "$rollback_container"'
     )
-    assert 'AGENT_CANON_RESTORE_IMAGE_ID=$rollback_image_id' in rollback
-    assert rollback.index('_agent_canon_run_controller "$rollback_candidate" rollback') > rollback.index(
-        'rollback_candidate=$(_agent_canon_ensure_container)'
-    )
+    assert "AGENT_CANON_RESTORE_IMAGE_ID=$rollback_image_id" in rollback
+    assert rollback.index(
+        '_agent_canon_run_controller "$rollback_candidate" rollback'
+    ) > rollback.index("rollback_candidate=$(_agent_canon_ensure_container)")
 
 
 def test_sync_never_projects_links_from_staging() -> None:
     """Sync updates live source and projects links only after image replacement."""
     text = ADAPTER.read_text(encoding="utf-8")
-    sync = text.split('_agent_canon_sync_operation() (', 1)[1].split(
-        '_agent_canon_scheduler_locked enable', 1
+    sync = text.split("_agent_canon_sync_operation() (", 1)[1].split(
+        "_agent_canon_scheduler_locked enable", 1
     )[0]
     assert 'git -C "$install_root" fetch origin main' in sync
     assert 'git -C "$install_root" checkout --force -B main FETCH_HEAD' in sync
-    assert '_agent_canon_source_sync_write success' in sync
+    assert "_agent_canon_source_sync_write success" in sync
     assert '_agent_canon_image ""' in sync
-    assert '_agent_canon_replace_resident_locked' in sync
-    assert 'source-staging' not in sync
-    assert 'git clone' not in sync
+    assert "_agent_canon_replace_resident_locked" in sync
+    assert "source-staging" not in sync
+    assert "git clone" not in sync
     assert 'git -C "$install_root" merge' not in sync
 
 
 def test_target_generation_uses_reversible_shared_rollback_plan() -> None:
     """Target-only generations keep the same host rollback protocol."""
-    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(encoding="utf-8")
-    target_control = controller.split('def _container_control_run', 1)[1].split(
-        '\ndef build_parser', 1
+    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    target_control = controller.split("def _container_control_run", 1)[1].split(
+        "\ndef build_parser", 1
     )[0]
-    assert target_control.count('_container_materialize_rollback_plan(runtime, state)') >= 2
+    assert (
+        target_control.count("_container_materialize_rollback_plan(runtime, state)")
+        >= 2
+    )
     assert '"image_ref": image.get("tag")' in controller
-    rollback = ADAPTER.read_text(encoding="utf-8").split('    rollback)\n', 1)[1].split(
-        '    target)\n', 1
-    )[0]
+    rollback = (
+        ADAPTER.read_text(encoding="utf-8")
+        .split("_agent_canon_rollback_locked() {", 1)[1]
+        .split("\nbootstrap_host_entrypoint() {", 1)[0]
+    )
     assert 'rm -f -- "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv"' not in rollback
-    assert 'AGENT_CANON_CURRENT_IMAGE_REF=$current_image_ref' in rollback
+    assert "AGENT_CANON_CURRENT_IMAGE_REF=$current_image_ref" in rollback
 
 
 def test_active_image_state_owns_ordinary_route_selection() -> None:
     """Ordinary routes consume the persisted exact resident image identity."""
     text = ADAPTER.read_text(encoding="utf-8")
-    assert 'active-image.tsv' in text
-    assert '_agent_canon_write_active_image' in text
-    assert '_agent_canon_read_active_image' in text
-    assert '_agent_canon_record_active_container' in text
-    assert text.count('_agent_canon_record_active_container') >= 3
-    ordinary = text.split('    install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)', 1)[1]
-    assert '_agent_canon_use_active_image' in ordinary
+    assert "active-image.tsv" in text
+    assert "_agent_canon_write_active_image" in text
+    assert "_agent_canon_read_active_image" in text
+    assert "_agent_canon_record_active_container" in text
+    assert text.count("_agent_canon_record_active_container") >= 3
+    ordinary = text.split(
+        "    install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)",
+        1,
+    )[1]
+    assert "_agent_canon_use_active_image" in ordinary
     assert '_agent_canon_image "$image_ref"' not in ordinary
-    assert 'AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id' in text
-    assert 'AGENT_CANON_EXPECTED_IMAGE_ID=$rollback_image_id' in text
-    assert 'AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv' in text
-    assert 'host-state' not in text.split('"$AGENT_CANON_DOCKER_CMD" create', 1)[1].split(
-        '"$AGENT_CANON_IMAGE_REF"', 1
-    )[0]
-    assert 'AGENT_CANON_RUNTIME_ROOT/host-state' in text
-    assert '_agent_canon_migrate_active_image' in text
+    assert "AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id" in text
+    assert "AGENT_CANON_EXPECTED_IMAGE_ID=$rollback_image_id" in text
+    assert "AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" in text
+    assert (
+        "host-state"
+        not in text.split('"$AGENT_CANON_DOCKER_CMD" create', 1)[1].split(
+            '"$AGENT_CANON_IMAGE_REF"', 1
+        )[0]
+    )
+    assert "AGENT_CANON_RUNTIME_ROOT/host-state" in text
+    assert "_agent_canon_migrate_active_image" in text
 
 
 def test_archive_and_codex_crossings_are_host_owned() -> None:
@@ -4427,49 +4675,70 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     eval_archive = text.split("_agent_canon_archive_eval_sync()", 1)[1].split(
         "_agent_canon_remove_global_links()", 1
     )[0]
-    assert '_agent_canon_private_feedback_sync' in text
-    assert '_agent_canon_private_feedback_identity' in text
-    assert 'private_feedback.py' not in text
+    assert "_agent_canon_private_feedback_sync" in text
+    assert "_agent_canon_private_feedback_identity" in text
+    assert "private_feedback.py" not in text
     assert 'source-identity --mode "$mode" --remote "$remote"' in text
-    assert 'urlsplit' not in text
-    assert 'source_identity=$(_agent_canon_private_feedback_identity "$container" "$source_remote" source)' in text
-    assert 'remote_normalized=$(_agent_canon_private_feedback_identity "$container" "$remote" remote)' in text
-    assert 'configured_normalized=$(_agent_canon_private_feedback_identity "$container" "$configured" remote)' in text
-    assert 'remote_normalized" == "$configured_normalized"' in text
-    assert 'if [[ "$mode" == source && -n "${AGENT_CANON_SOURCE_REPOSITORY_ID:-}" ]]' in text
-    assert 'identity_args+=(--repository-id "$AGENT_CANON_SOURCE_REPOSITORY_ID")' in text
-    assert 'git -C "$log_root" merge --ff-only "origin/$branch"' in text
-    assert 'runtime_log_archive_git.py' in text
-    assert '--archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT"' in eval_archive
-    assert eval_archive.index('--archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT"') < eval_archive.index(
-        'archive-eval --spool-root'
+    assert "urlsplit" not in text
+    assert (
+        'source_identity=$(_agent_canon_private_feedback_identity "$container" "$source_remote" source)'
+        in text
     )
-    assert 'AGENT_CANON_CODEX' in text
-    assert 'AGENT_CANON_CODEX_SESSION_ROOT' in text
+    assert (
+        'remote_normalized=$(_agent_canon_private_feedback_identity "$container" "$remote" remote)'
+        in text
+    )
+    assert (
+        'configured_normalized=$(_agent_canon_private_feedback_identity "$container" "$configured" remote)'
+        in text
+    )
+    assert 'remote_normalized" == "$configured_normalized"' in text
+    assert (
+        'if [[ "$mode" == source && -n "${AGENT_CANON_SOURCE_REPOSITORY_ID:-}" ]]'
+        in text
+    )
+    assert (
+        'identity_args+=(--repository-id "$AGENT_CANON_SOURCE_REPOSITORY_ID")' in text
+    )
+    assert 'git -C "$log_root" merge --ff-only "origin/$branch"' in text
+    assert "runtime_log_archive_git.py" in text
+    assert '--archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT"' in eval_archive
+    assert eval_archive.index(
+        '--archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT"'
+    ) < eval_archive.index("archive-eval --spool-root")
+    assert "AGENT_CANON_CODEX" in text
+    assert "AGENT_CANON_CODEX_SESSION_ROOT" in text
     assert 'CODEX_HOME="$AGENT_CANON_STATE_ROOT/codex-home"' in text
     assert 'AGENT_CANON_PROJECT_ROOT="$codex_project"' in text
-    assert 'AGENT_CANON_HOST_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT' in text
+    assert "AGENT_CANON_HOST_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT" in text
     assert '_agent_canon_run_controller "$codex_container" codex prepare' in text
     assert "_agent_canon_sync_personal_skill_view" not in text
     assert "skill-projection" not in text
     assert '"$codex_executable" --project-root "$codex_project"' in text
-    assert 'if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then' in text
-    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(encoding="utf-8")
-    assert 'source_identity = sub.add_parser' in controller
-    assert 'normalize_remote' in controller
-    container_control = controller.split('def _container_control_run', 1)[1].split(
-        '\ndef build_parser', 1
+    assert (
+        'if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then'
+        in text
+    )
+    controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    assert "source_identity = sub.add_parser" in controller
+    assert "normalize_remote" in controller
+    container_control = controller.split("def _container_control_run", 1)[1].split(
+        "\ndef build_parser", 1
     )[0]
-    assert 'runtime_log_archive_git' not in container_control
-    assert '_host_private_feedback_sync' not in container_control
-    eval_sync = controller.split('    def eval_sync(', 1)[1].split(
-        '    def eval_sync_prepare(', 1
+    assert "runtime_log_archive_git" not in container_control
+    assert "_host_private_feedback_sync" not in container_control
+    eval_sync = controller.split("    def eval_sync(", 1)[1].split(
+        "    def eval_sync_prepare(", 1
     )[0]
-    assert 'runtime_log_archive_git' not in eval_sync
-    assert 'return self.eval_sync_prepare(run_id)' in eval_sync
+    assert "runtime_log_archive_git" not in eval_sync
+    assert "return self.eval_sync_prepare(run_id)" in eval_sync
 
 
-def test_forced_rollback_recovery_failure_retains_mounted_backup(tmp_path: Path) -> None:
+def test_forced_rollback_recovery_failure_retains_mounted_backup(
+    tmp_path: Path,
+) -> None:
     """A failed state/readback recovery leaves its mounted manifest evidence."""
     repository = tmp_path / "repository"
     repository.mkdir()
@@ -4490,7 +4759,7 @@ fi
         encoding="utf-8",
     )
     fake_docker.chmod(0o755)
-    script = r'''
+    script = r"""
 set -eu
 source "$1/bootstrap/host/lifecycle/entrypoint.sh"
 _agent_canon_validate_existing_container() { :; }
@@ -4519,7 +4788,7 @@ _agent_canon_restore_candidate_failure() {
 bootstrap_host_entrypoint "$1" \
   --control-parent-root "$2" \
   --runtime-root "$3" rollback
-'''
+"""
     completed = subprocess.run(
         [
             "bash",
@@ -4541,7 +4810,9 @@ bootstrap_host_entrypoint "$1" \
     )
     assert completed.returncode == 2
     assert json.loads(completed.stderr)["code"] == "rollback_failed"
-    backups = list((repository / ".runtime" / "container-state").glob(".rollback-current-mounts.*"))
+    backups = list(
+        (repository / ".runtime" / "container-state").glob(".rollback-current-mounts.*")
+    )
     assert len(backups) == 1
     assert backups[0].read_bytes() == b""
 
@@ -4591,7 +4862,9 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         )
         assert installed.returncode == 0, installed.stderr
         codex_home = runtime / "container-state" / "codex-home"
-        manifest = json.loads((codex_home / "manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads(
+            (codex_home / "manifest.json").read_text(encoding="utf-8")
+        )
         assert manifest["source_root"] == str(source_root)
         managed = manifest["links"]
         assert managed
@@ -4660,7 +4933,15 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         active_before = active_image.read_bytes()
         for target in (target_a, target_b):
             added = subprocess.run(
-                [*common, "target", "add", "--root", str(target), "--mode", "read-only"],
+                [
+                    *common,
+                    "target",
+                    "add",
+                    "--root",
+                    str(target),
+                    "--mode",
+                    "read-only",
+                ],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -4701,8 +4982,12 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         mounts_after_rollback = (runtime / "container-state" / "mounts.tsv").read_text(
             encoding="utf-8"
         )
-        target_a_digest = hashlib.sha256(str(target_a.resolve()).encode("utf-8")).hexdigest()
-        target_b_digest = hashlib.sha256(str(target_b.resolve()).encode("utf-8")).hexdigest()
+        target_a_digest = hashlib.sha256(
+            str(target_a.resolve()).encode("utf-8")
+        ).hexdigest()
+        target_b_digest = hashlib.sha256(
+            str(target_b.resolve()).encode("utf-8")
+        ).hexdigest()
         assert f"target\t{target_a_digest}\t" in mounts_after_rollback
         assert f"target\t{target_b_digest}\t" not in mounts_after_rollback
         toggled = subprocess.run(
@@ -4775,7 +5060,9 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
             },
         )
         assert launched.returncode == 0, launched.stderr
-        assert (codex_home / "host-stub-project").read_text(encoding="utf-8").strip() == str(project)
+        assert (codex_home / "host-stub-project").read_text(
+            encoding="utf-8"
+        ).strip() == str(project)
     finally:
         subprocess.run(
             [*common, "uninstall"],
@@ -4784,9 +5071,13 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
             text=True,
             env=environment,
         )
-        control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+        control_digest = hashlib.sha256(
+            str(control.resolve()).encode("utf-8")
+        ).hexdigest()
         container = f"agent-canon-tools-{control_digest[:16]}"
-        subprocess.run(["docker", "rm", "-f", container], check=False, capture_output=True)
+        subprocess.run(
+            ["docker", "rm", "-f", container], check=False, capture_output=True
+        )
         image_ids = subprocess.run(
             [
                 "docker",
@@ -4802,7 +5093,9 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
             text=True,
         ).stdout.splitlines()
         for image_id in image_ids:
-            subprocess.run(["docker", "image", "rm", image_id], check=False, capture_output=True)
+            subprocess.run(
+                ["docker", "image", "rm", image_id], check=False, capture_output=True
+            )
 
 
 def test_public_install_failure_is_terminal_before_follow_on_target(
@@ -4838,7 +5131,7 @@ _agent_canon_install_locked() {{
   _agent_canon_json_error install_probe_failed "install transaction failed"
   printf '%s\\n' late-install >> {str(marker)!r}
 }}
-AGENT_CANON_DOCKER=/bin/true
+AGENT_CANON_DOCKER=/bin/false
 export AGENT_CANON_DOCKER
 set -e
 bootstrap_host_entrypoint {str(repository)!r} \\

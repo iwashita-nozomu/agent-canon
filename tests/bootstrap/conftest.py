@@ -28,15 +28,22 @@ def create_source_checkout(source: Path) -> Path:
     repository = Path(__file__).resolve().parents[2]
     source.mkdir()
     for entry in repository.iterdir():
-        if entry.name in {".git", ".runtime"}:
+        if entry.name in {
+            ".git",
+            ".runtime",
+            ".ruff_cache",
+            ".pytest_cache",
+            "target",
+            "__pycache__",
+        }:
             continue
         destination = source / entry.name
         if entry.name == ".codex":
             shutil.copytree(entry, destination, symlinks=True)
         elif entry.is_dir():
-            destination.symlink_to(entry, target_is_directory=True)
+            shutil.copytree(entry, destination, symlinks=True)
         else:
-            destination.symlink_to(entry)
+            shutil.copy2(entry, destination)
     subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
     for key, value in (
         ("user.name", "AgentCanon Bootstrap Fixture"),
@@ -44,9 +51,7 @@ def create_source_checkout(source: Path) -> Path:
     ):
         subprocess.run(["git", "-C", str(source), "config", key, value], check=True)
     subprocess.run(["git", "-C", str(source), "add", "-A"], check=True)
-    subprocess.run(
-        ["git", "-C", str(source), "commit", "-qm", "fixture"], check=True
-    )
+    subprocess.run(["git", "-C", str(source), "commit", "-qm", "fixture"], check=True)
     subprocess.run(
         [
             "git",
@@ -91,23 +96,23 @@ def bootstrap_test_isolation(
     fake_systemctl.write_text(
         "#!/bin/sh\n"
         "set -eu\n"
-        "case \"$0\" in\n"
-        "  \"$AGENT_CANON_TEST_ROOT\"/*) ;;\n"
+        'case "$0" in\n'
+        '  "$AGENT_CANON_TEST_ROOT"/*) ;;\n'
         "  *) exit 125 ;;\n"
         "esac\n"
-        "case \"${XDG_CONFIG_HOME:-}\" in\n"
-        "  \"$AGENT_CANON_TEST_ROOT\"/*) ;;\n"
+        'case "${XDG_CONFIG_HOME:-}" in\n'
+        '  "$AGENT_CANON_TEST_ROOT"/*) ;;\n'
         "  *) exit 126 ;;\n"
         "esac\n"
-        "printf 'binary\\t%s\\n' \"$0\" >> \"$AGENT_CANON_TEST_SYSTEMCTL_LOG\"\n"
-        "printf 'xdg\\t%s\\n' \"$XDG_CONFIG_HOME\" >> \"$AGENT_CANON_TEST_SYSTEMCTL_LOG\"\n"
-        "printf 'argv\\t%s\\n' \"$*\" >> \"$AGENT_CANON_TEST_SYSTEMCTL_LOG\"\n"
-        "case \"$*\" in\n"
-        "  \"--user show-environment\") ;;\n"
-        "  \"--user daemon-reload\") ;;\n"
-        "  \"--user enable --now agent-canon-sync.timer\") ;;\n"
-        "  \"--user disable --now agent-canon-sync.timer\") ;;\n"
-        "  \"--user show agent-canon-sync.timer --property=ActiveState,UnitFileState\")\n"
+        'printf \'binary\\t%s\\n\' "$0" >> "$AGENT_CANON_TEST_SYSTEMCTL_LOG"\n'
+        'printf \'xdg\\t%s\\n\' "$XDG_CONFIG_HOME" >> "$AGENT_CANON_TEST_SYSTEMCTL_LOG"\n'
+        'printf \'argv\\t%s\\n\' "$*" >> "$AGENT_CANON_TEST_SYSTEMCTL_LOG"\n'
+        'case "$*" in\n'
+        '  "--user show-environment") ;;\n'
+        '  "--user daemon-reload") ;;\n'
+        '  "--user enable --now agent-canon-sync.timer") ;;\n'
+        '  "--user disable --now agent-canon-sync.timer") ;;\n'
+        '  "--user show agent-canon-sync.timer --property=ActiveState,UnitFileState")\n'
         "    printf '%s\\n' 'ActiveState=inactive' 'UnitFileState=disabled'\n"
         "    ;;\n"
         "  *) exit 127 ;;\n"
