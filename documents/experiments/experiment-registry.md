@@ -170,7 +170,7 @@ make experiment-check
 この checker は、path の存在、必須 field、command の placeholder、branch / worktree metadata の妥当性を確認します。
 registered command から `{config_path}` が欠ける場合も fail します。
 
-実験実行面の検証は [experiment-lifecycle](../../agents/skills/experiment-lifecycle.md#boundary)
+実験実行面の検証は [experiment-lifecycle](../../agents/skills/experiment-lifecycle.md#topic-boundary)
 の変更契約に従います。`tool_rejection_preflight.py` の
 `experiment_execution_surface_guard` は
 [Optional Rejection Prediction](../../agents/COMMUNICATION_PROTOCOL.md#optional-rejection-prediction)
