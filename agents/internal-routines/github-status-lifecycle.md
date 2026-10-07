@@ -3,155 +3,111 @@
 <!--
 @dependency-start
 contract agent-runtime
-responsibility Defines deterministic GitHub Issue status-label lifecycle reconciliation, evidence, concurrency, and readback requirements.
-upstream design ../../documents/conventions/software-engineering-principles.md shared correctness, ownership, failure, and traceability precedence
-upstream design ../../documents/operations/issue-label-taxonomy.toml machine-readable repository label mapping
-upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet convention
-downstream design ../skills/pr-processing.md invokes this routine inside the GitHub publication boundary
-downstream implementation ../../.codex/personal/skills/_github-status-lifecycle/SKILL.md exposes this routine as a private runtime skill
-downstream implementation ../../tools/repository/github/github_status_lifecycle.py projects the transport and reconciliation contract
+responsibility Defines Issue status-label reconciliation using ordinary evidence comments and native GitHub identities.
+upstream design ../../documents/conventions/software-engineering-principles.md correctness, ownership, failure, and traceability
+upstream design ../../documents/operations/issue-label-taxonomy.toml repository label mapping
+downstream design ../skills/pr-processing.md invokes this routine inside the publication boundary
+downstream implementation ../../.codex/personal/skills/_github-status-lifecycle/SKILL.md private runtime adapter
+downstream implementation ../../tools/repository/github/github_status_lifecycle.py transport and reconciliation
 @dependency-end
 -->
 
 ## Reader Map
 
-この文書は GitHub Issue status-label reconciliation の意味論の正本です。
-`pr-processing` が対象 Issue、fresh remote state、write authority、PR/Issue
-publication を所有し、この routine は lifecycle classification、evidence admission、
-ordered transition、observable concurrency stop、final predicate を所有します。
-実装は `tools/repository/github/github_status_lifecycle.py` の機械的投影であり、第二の
-state machine や別の label taxonomy を定義しません。
+`pr-processing` が対象 Issue、公開する内容、現在の事実、書込権限、公開結果を所有します。
+この routine は、その事実に対応する status、選択されたコメントの確認、単一ラベルの
+変更順序と読戻しを所有します。別の taxonomy、publisher、承認段階を作りません。
 
 ## Activation Gate
 
-次をすべて満たす場合だけ active です。
-
-1. repository-changing work に対応する Issue が確定している。
-2. user request または repository policy が status label mutation を要求している。
-3. `pr-processing` が対象、fresh state、write authority を確認している。
-
-Read-only inspection、通常の review、Issue triage、taxonomy 設計だけでは active に
-しません。Issue や label を推測・新規作成しません。
+repository-changing work に対応する Issue が確定し、ユーザー依頼または repository
+policy が status 更新を要求し、呼出元が対象と書込権限を確認した場合だけ使います。
+通常の読取・レビュー・triage・taxonomy 設計だけでは起動しません。
+Issue や label の推測・新規作成、PR merge、Issue close はこの操作に含めません。
 
 ## Responsibility Boundary
 
-| Surface | Owner | This routine owns | This routine does not own |
-| --- | --- | --- | --- |
-| Issue / PR fresh state | `pr-processing` | status 計算に必要な入力条件 | Issue/PR discovery、queue planning、mergeability |
-| Write authority | `pr-processing` | authority がない場合の停止条件 | permission、approval、merge |
-| Status lifecycle | this routine | lifecycle、managed set、transition、final predicate | repository label taxonomy の定義 |
-| Evidence comment | this routine | required fields、retry identity、duplicate/conflict stop | implementation/validation result の生成 |
-| GitHub transport | `GhStatusAdapter` | snapshot、comment、single-label API、readback | lifecycle の意味論、full-label replacement |
-| Label mutation publication | `pr-processing` | caller authority and publication readback | second transition table or predicate |
-| Durable Issue authority | repository-qualified GitHub URL/number | comment、PR、packetから対象へ辿れる要求 | host GitHub adapter |
+| 対象 | 所有者 |
+| --- | --- |
+| 対象 Issue/PR、現在の実装・検証事実、公開権限 | `pr-processing` と変更・検証の各 owner |
+| ラベル名と明示された旧ラベル | `documents/operations/issue-label-taxonomy.toml` |
+| 作業状態の分類、変更順、結果判定 | この routine |
+| native comment/Issue ID、単一 API 操作と読戻し | `GhStatusAdapter` と既存 `github_publish.py` transport |
+| 説明の十分性、根拠・検証・残件、最終公開報告 | 呼出元の既存 writing/publication owner |
 
-`pr-processing` は target resolution、fresh initial read、authority、adapter invocation、
-publication closeout のみを行います。mutation order、retry identity、success predicate
-を再掲しません。
+コメントの文面・リンク・モデルから書込権限を推論しません。呼出元は routine の結果を
+利用し、同じ状態遷移や成功判定を二重実装しません。
 
 ## Canonical label mapping
 
-`documents/operations/issue-label-taxonomy.toml` が repository taxonomy の唯一の機械可読
-owner です。`[status_lifecycle]` は `active`、`ready_for_review`、
-`needs_verification` の3つの non-empty な canonical name と、
-`[status_lifecycle.legacy_aliases]` の3つの optional string arrays を持ちます。
-Parser は `tomllib`（Python 3.10 では repository precedent の `tomli` fallback）を使い、
-unknown key、empty/duplicate name、canonical name と一致する alias を拒否します。
-
-Tool は canonical name が remote label catalog に存在することを mutation 前に確認します。
-不足は `label_mapping_invalid` とし、label の作成・rename・color 変更・推測をしません。
-明示された legacy alias だけを managed set に含め、alias が remote catalog にないことは
-勝手な必須 label として扱いません。unrelated labels は常に保存します。
+既存 TOML の `[status_lifecycle]` が `active`、`ready_for_review`、
+`needs_verification` の名前を所有します。`legacy_aliases` に宣言された旧ラベルだけを
+管理対象へ加えます。標準 `tomllib`（既存 Python 3.10 経路では `tomli`）を使います。
+空・重複・衝突・未知キーは拒否し、canonical labels の remote catalog での存在を確認します。
+不足するラベルを勝手に作成・rename しません。旧ラベルの不存在は問題にせず、他のラベルは保存します。
 
 ## Lifecycle Model
 
-| state | admission | desired canonical set `D` |
+| 状態 | 現在の事実 | 付ける canonical labels |
 | --- | --- | --- |
-| `active` | work started、handoff not ready または validation failure | `{active}` |
-| `review-ready` | handoff ready、selected validation complete、gap なし | `{ready_for_review}` |
-| `review-ready-unverified` | handoff ready、実装可、外部 unavailable gap が完全 | `{ready_for_review, needs_verification}` |
+| `active` | 実装・必要な修正を作業中、引継ぎ未準備、または対象検証が失敗 | `active` |
+| `review-ready` | 変更と選択した検証が完了し、引継ぎ可能 | `ready_for_review` |
+| `review-ready-unverified` | 引継ぎ可能な変更と実行可能な検証を終え、外部制約で必要な検証を実行できない | `ready_for_review` と `needs_verification` |
 
-`needs_verification` は単独では使いません。implementation failure、failing/unknown
-validation、未修正 finding は unavailable gap ではなく `active` または blocked work です。
-desired set は現在の label toggle から推測しません。
+未修正の実装不良・対象テストの失敗を、外部の検証不能へ言い換えません。
+`needs_verification` は単独で使わず、未実施の性質、実際の試行・観測、必要な外部条件、
+次の担当・正規経路を通常の説明に残します。専用の必須フィールドや対象外 token は要求しません。
+記録が非空であることだけでは内容の正しさを保証できないため、内容は owner が確認します。
 
 ## Evidence Comment Contract
 
-final transition の前に、Issue comment は次を含みます: lifecycle、baseline、branch、exact
-head、PR identity（repository、number、URL、base SHA、head SHA）、changed scope と
-non-goals、validation command/result、remaining verification の
-property/reason/attempt/observed result/environment/owner/next command、mutation 後の
-readback expectation。これらの evidence fields と PR identity fields は comment create
-前に型と non-empty を fail-closed 検証します。
+結果は通常の Markdown で残します。変更範囲と理由、実在する branch/commit/PR、
+実施した検証と未実施事項、残件と次の担当が、私的な会話なしで追える説明にします。
+PR がない段階では PR identity を作らず、存在する source・Issue・作業結果だけを記録します。
+書式を満たすための marker、hash、canonical serialization、全履歴の同一 payload 件数は不要です。
 
-Body の marker は次の形式です。
+`reconcile_status` へは、投稿する `comment_body` または再利用する `comment_id` の
+どちらか一つを渡します。既存コメントを使う際は、呼出元が内容と対象の適合を確認して
+その native ID を明示します。同文の別コメントが存在してもそれだけでは拒否せず、
+逆に同文検索から操作の完了・排他・再投稿権限を推論しません。
 
-```text
-<!-- agent-canon:github-status-lifecycle:v1 key=sha256:<attempt-key> -->
-```
-
-Canonical payload は required evidence、exact PR identity、taxonomy mapping digest、fresh
-preflight source snapshot digest を含みます。stable `operation_identity_digest` は
-`{repo, issue, full evidence payload, PR identity, taxonomy}` から計算し、mutable な source
-snapshot を除外します。`attempt_key` はこの operation identity と current source snapshot
-digest の canonical JSON の SHA-256 です。read timestamps と pagination cursor は digest に
-含めません。
-
-GitHub comment API には create-if-absent/CAS がありません。従って、全履歴から同じ
-operation identity の exact payload 1件を再利用し、現在の labels/source snapshot が変わって
-いても新しい comment を作りません。同一 identity の異なる payload は
-`evidence_conflict`、複数件は `evidence_duplicate` として停止します。未作成なら POST を
-1回だけ行い、fresh comment readback が exactly one になるまで進みません。POST 応答を失った
-場合に blind retry しません。過去のコメントを自動編集・削除しません。
+新規投稿は一回だけです。GitHub の応答から comment ID を取得し、その ID を再取得して
+`issue_url`、本文、公開 URL を確認します。既存 ID も同じ対象 Issue への所属を確認します。
+応答不明・ID 不明・取得失敗では停止し、POST を盲目的に繰り返しません。受付後に応答を
+失った場合は、呼出元が既存 remote 状態を確認し、特定できたコメントを明示して再開します。
+過去のコメントを自動編集・削除しません。
 
 ## Reconciliation Algorithm
 
-1. `pr-processing` が対象/authority/初期事実を確定し、adapter が Issue snapshot、comments、
-   repository label catalog を fresh read する。
-2. taxonomy を parse し canonical labels の catalog presence を確認する。
-3. facts から state と `D` を純粋に計算し、evidence/PR fields を fail-closed 検証する。
-   全履歴の operation identity に一致する evidence comment を reuse または1回だけ create
-   して readback する。
-4. evidence 前の全 labels と直後の全 labels を比較する。不一致は
-   `concurrent_status_drift` で、label mutation を開始しない。
-5. `M = canonical labels ∪ declared aliases`、`O = observed ∩ M` とし、
-   `remove = O - D`、`add = D - O` を順に計画する。full-label replacement は使いません。
-6. 各 operation の直前に全 labels を read して前の expected state と比較し、single-label
-   POST/DELETE を1回行い、直後に全 labels を read して次の expected state と比較します。
-   mismatch、API error、unknown response は exact state と completed prefix を返して停止します。
-7. 最後に Issue labels と comments を fresh read し、次の predicate が全て true の場合だけ成功します。
+1. 呼出元が対象・権限・作業事実・説明を確定します。taxonomy と native repository label
+   catalog を照合し、変更前の Issue labels を取得します。
+2. 事実から必要なラベル集合 `D` を決め、通常コメントを一度投稿して読戻すか、指定 ID を
+   読みます。証拠の保存とラベル更新を一つの GitHub transaction と称しません。
+3. `M = canonical labels ∪ declared aliases` とし、現在の `M` 内で不要なラベルを削除し、
+   不足する canonical labels だけを追加します。full-label replacement は使いません。
+4. 各操作の直前に全 labels が直前の期待状態と同じか確認し、単一 POST/DELETE を一度
+   実行して、その直後の全 labels を読み戻します。観測した変更・応答不明・不一致では
+   完了済み操作と既知の結果を残して停止します。
+5. 最後に Issue と選択した comment ID を読み、管理対象が `D` と一致すること、旧ラベルが
+   残らないこと、他のラベルが保存されたこと、選択コメントの所属と内容が変わっていないことを確認します。
 
-```text
-observed_canonical_managed_labels == D
-declared_legacy_aliases_absent
-observed_unrelated_labels == initial_unrelated_labels
-exact_evidence_payload_count == 1
-```
-
-GitHub に version/CAS token がないため、read-to-write gap と ABA (`A -> B -> A`) は観測
-不能です。Tool はそれを exclusive ownership や CAS success と主張しません。final readback
-でも同じ marker の conflicting payload、複数の historical payload、または evidence 消失を
-成功扱いにしません。
+確認するのは選択した一件の native identity であり、全コメント履歴の一意性ではありません。
+GitHub の読取と書込の間の競合や、観測されなかった `A -> B -> A` は排除できません。
+コメントの private hash は CAS を提供しないため、独自 digest を増やしてその保証を装いません。
 
 ## Failure Semantics
 
-全 typed failure は `code_owner` と `responsibility_scope` を含みます。主な code は
-`issue_unresolved`、`authority_missing`、`label_mapping_invalid`、
-`lifecycle_facts_incomplete`、`verification_gap_incomplete`、`evidence_conflict`、
-`evidence_duplicate`、`evidence_readback_unavailable`、`concurrent_status_drift`、
-`mutation_partial`、`readback_mismatch` です。transport error は
-`github-api-transport`、lifecycle error は `status-label-lifecycle` として報告し、
-環境失敗を policy failure に混ぜません。
+実装は失敗に `code_owner` と `responsibility_scope` を付け、API transport の失敗と
+lifecycle の入力・状態不整合を区別します。コメント所属/内容の不一致、取得不能、label
+catalog の不足、観測した label drift、部分的な変更を成功や警告だけに変換しません。
 
-`mutation_partial` は completed operations、failed/ambiguous operation、exact observed
-labels、desired labels、unrelated before/after、`rollback=not-attempted`、
-`next_action=fresh-reconcile-after-owner-review` を返します。rollback は同じ absent-CAS
-問題を持つため自動実行しません。failure を warning-only success に格下げせず、Issue close、
-PR approval、PR merge もこの routine の副作用にしません。
+部分失敗では完了した操作、失敗/応答不明の操作、取得できた現在 labels、意図した labels、
+選択した comment ID を残します。追加読取にも失敗した場合は現在値を不明と明示します。
+自動 rollback は別の競合を起こし得るため行わず、同じ API write を盲目的に再試行しません。
+次の owner が fresh remote 状態から必要な操作だけを選びます。
 
 ## Completion Output
 
-成功結果は Issue、target lifecycle、before/after managed labels、added/removed labels、
-evidence comment id/url、completed operations、fresh readback、`code_owner`、
-`responsibility_scope` を返します。caller はこの result を既存 publication closeout に
-投影し、第二の queue、approval、merge、close workflow を作りません。
+成功結果は lifecycle、変更前後の managed labels、追加・削除した labels、完了操作、
+native comment ID/URL、最終 Issue readback を返します。コメント本文と結果の意味は
+チャットと Issue の両方へ引き継ぎます。ラベル更新成功は実装・検証・merge の成功証拠ではありません。
