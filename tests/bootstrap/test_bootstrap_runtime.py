@@ -636,6 +636,94 @@ def test_multi_target_registry_and_admission_race_guard(
     manager.release_task("task-a")
 
 
+def _write_container_control_task_state(
+    manager: BootstrapRuntime,
+    target: Path,
+    *,
+    cached_container_id: str,
+    active_task_id: str = "old-exec",
+) -> dict[str, Any]:
+    """Seed one active target lease with the resident identity it observed."""
+    target_record = manager._target_record(target, "read-only")
+    state = manager._new_state()
+    state.update(
+        {
+            "state": "running",
+            "active_task_count": 1,
+            "targets": {target_record["digest"]: target_record},
+            "tasks": {
+                active_task_id: {
+                    "id": active_task_id,
+                    "state": "active",
+                    "generation": "generation-0001",
+                    "target": target_record,
+                    "pinned": True,
+                }
+            },
+            "resources": manager._resource_records(),
+        }
+    )
+    state["resources"]["container"].update(
+        {"id": cached_container_id, "state": "running"}
+    )
+    manager._ensure_layout()
+    manager._write_state(state)
+    return target_record
+
+
+def test_container_control_releases_task_from_replaced_resident(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A new resident identity cancels only leases left by the dead resident."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    target = tmp_path / "target"
+    control.mkdir()
+    target.mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "container-new")
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
+    target_record = _write_container_control_task_state(
+        manager, target, cached_container_id="container-old"
+    )
+
+    result = manager.admit_task("next-exec", target_root=target)
+
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert result["code"] == "task_reserved"
+    assert state["resources"]["container"]["id"] == "container-new"
+    assert state["tasks"]["old-exec"]["state"] == "cancelled"
+    assert state["tasks"]["old-exec"]["pinned"] is False
+    assert state["tasks"]["next-exec"]["state"] == "active"
+    assert state["tasks"]["next-exec"]["target"] == target_record
+    manager.release_task("next-exec")
+
+
+def test_container_control_keeps_active_task_on_same_resident(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A task remains protected when the resident identity has not changed."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    target = tmp_path / "target"
+    control.mkdir()
+    target.mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "container-same")
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
+    _write_container_control_task_state(
+        manager, target, cached_container_id="container-same"
+    )
+
+    with pytest.raises(BootstrapError, match="target_busy"):
+        manager.admit_task("next-exec", target_root=target)
+
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert state["resources"]["container"]["id"] == "container-same"
+    assert state["tasks"]["old-exec"]["state"] == "active"
+    assert state["tasks"]["old-exec"]["pinned"] is True
+
+
 def test_target_add_prunes_missing_target_and_is_idempotent(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:
