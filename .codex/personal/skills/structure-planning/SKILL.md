@@ -2,7 +2,7 @@
 name: structure-planning
 description: "Use when a report, experiment plan, Eval output, presentation storyboard, PPT/deck plan, document, paper, HTML view, or refactor needs a structure contract before prose, rendering, interpretation, follow-up runs, or edits."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"68215e4ff0bee862247192d6197044ca51e6061224776f31f49ee9332d4f38af"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"bea94ba0bfc3fa4bd7c3e30812469c93405767365fafc312611519b4b2a029e1"} -->
 
 <!--
 @dependency-start

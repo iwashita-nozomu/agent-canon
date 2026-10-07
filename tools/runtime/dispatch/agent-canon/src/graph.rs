@@ -3571,10 +3571,6 @@ mod tests {
                 include_bytes!("../../../../../tools/agent/skills/skill_projection_registry.py"),
             ),
             (
-                "tools/runtime/container/stdlib_yaml.py",
-                include_bytes!("../../../../../tools/runtime/container/stdlib_yaml.py"),
-            ),
-            (
                 "documents/runtime/shared-runtime-surfaces.toml",
                 include_bytes!("../../../../../documents/runtime/shared-runtime-surfaces.toml"),
             ),

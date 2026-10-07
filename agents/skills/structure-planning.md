@@ -16,25 +16,20 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 
 ## Purpose
 
-Use `structure-planning` only when the task contains a real structural decision: a responsibility owner, canonical source, reader entry, document split/merge, section topology, presentation/storyboard topology, or validation route has more than one plausible target. A bounded claim, wording, link, paragraph, or already-owned section edit does not activate this skill merely because it is substantive.
-
-The long-lived reason and activation boundary are owned by [structure rationale](../../documents/design/responsibility-rationale.md#structure-planning-and-visualization). This skill owns the selected structural decision; it does not create evidence that an unselected responsibility was skipped.
-
-## Activation
-
-Activate when at least one of these changes:
-
-- owner or canonical source of truth;
-- reader entry, reading activation condition, or downstream consumer;
-- document split/merge/rename or section responsibility boundary;
-- validation topology or update cadence;
-- artifact/storyboard ordering where competing structures affect the reader decision.
-
-Do not activate for typo/link/format fixes, bounded claim/support edits inside an existing owner, ordinary paragraph edits with an already-obvious order, or because an artifact is long or `nontrivial`. Do not emit a `structure_contract=skipped` receipt for those cases.
+owner、canonical source、reader entry、split/merge、section topology、presentation topology、または validation route に複数の候補があるときだけ構造を決めます。
+bounded な wording/link/paragraph edit、既に順序が明らかな section、長いだけの文書には起動しません。
 
 ## Minimal structure decision
 
-Record only facts needed to make the unresolved decision:
+1. 既存 owner と caller の条件を読み、`structure_kind`、`audience`、`decision_context`、`owner_and_source` を決める。
+2. `selected_topology`、`source_map`、material な `invalid_interpretations`、`validation_route` だけを既存の structure record に記録する。
+   split/merge/rename/inline/keep が関わるときも、サイズ・token 数・一時都合を根拠にしない。
+3. state/ownership/dependency/routing が図で明瞭になる場合だけ `code-visualization` に rendering/readback を委譲する。単純な prose/table で足りるなら図を作らない。
+4. experiment plan では hypothesis/input/method/environment/metric/output/reproducibility の owner を固定し、stateful object や factory boundary が実際のリスクのときだけ OOP map を追加する。
+5. 直接 review で解けない ordering/bridge 問題だけ semantic-index または prose-reasoning-graph を advisory に使う。
+6. closeout では選択した owner/source、topology、source map、invalid interpretation、validation route を読み返す。通常の bounded edit はこの packet を作らず owner skill の check で閉じる。
+
+## Minimal record
 
 ```text
 structure_kind=<document|report|experiment|presentation|html|refactor|other>
@@ -47,29 +42,4 @@ invalid_interpretations=<material forbidden readings>
 validation_route=<owner/check>
 ```
 
-When a document split/merge is in scope, read only
-[Document Split Decision](../../documents/conventions/common/05_docs.md#document-split-decision).
-Identify the task/operation that needs each responsibility, the existing owner,
-and the caller's conditional route in the selected topology. Independent reading
-conditions can separate responsibilities even under one owner; size alone cannot.
-Keep the decision in the existing structure record, not a new receipt or registry.
-
-## Visualization selection
-
-Choose the first representation by information gain, not by category words. Mermaid is appropriate when state, ownership, dependency, routing, or many-to-many relations are materially clearer as a diagram. Use text or a table without a negative receipt when those forms are already unambiguous. If a diagram is selected, delegate rendering/readback/coverage to `code-visualization`.
-
-## Experiment boundary
-
-An experiment plan always needs hypothesis/input/method/environment/metric/output/reproducibility ownership. Add an OOP responsibility map only when stateful objects, plugin/factory boundaries, mutation ownership, or dependency direction are an actual risk. Pure functions, numerical scripts, and simple benchmarks do not need an invented object model or `not_required` token.
-
-## Prose diagnostics
-
-Semantic-index and prose-reasoning-graph tools are optional diagnostics. Use one only when direct review leaves a concrete ordering or bridge hypothesis unresolved. Do not run both by default, do not make their finding count an acceptance oracle, and do not record a negative token when they are not selected.
-
-## Closeout
-
-For an activated structural decision, read back the selected owner/source, topology, source map, material invalid interpretations, and validation route. Record only fields that participated in the decision. Ordinary bounded edits complete through their owning skill and targeted docs/review checks without a structure packet.
-
-## Relationships
-
-`report-writing`, `html-output`, experiment, slide, and refactor owners may invoke this skill when they encounter a genuine structural choice. They do not invoke it solely because their output class is a report, experiment, HTML artifact, presentation, or refactor.
+`report-writing`、experiment、slide、HTML、refactor owner は、実際の structural choice がある場合だけこの skill を呼びます。

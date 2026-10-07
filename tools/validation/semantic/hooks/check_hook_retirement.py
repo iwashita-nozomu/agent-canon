@@ -120,18 +120,6 @@ def contract_payload(root: Path) -> dict[str, object]:
                 executable_references.append(match)
     present_files = [f".codex/hooks/{name.filename}" for name in RETIRED_CHILD_TOMBSTONES if (root / ".codex" / "hooks" / name.filename).exists()]
     present_files.extend([old_path for old_path in moved_source_old_paths if (root / old_path).exists()])
-    inventory_paths: list[str] = []
-    inventory = root / "documents/runtime/log-surface-inventory.json"
-    if inventory.exists():
-        try:
-            text = inventory.read_text(encoding="utf-8")
-            inventory_paths = [
-                token
-                for token in child_basenames + moved_source_old_paths
-                if token in text
-            ]
-        except OSError:
-            inventory_paths = ["inventory_unreadable"]
     artifacts = [
         {"name": "skill_usage.jsonl", "mode": "historical_read_only", "producer": "none", "parser": "tools/runtime/archive/historical_skill_usage_reader.py", "consumers": ["tools/runtime/archive/historical_skill_usage_reader.py", "eval/producers/generate_agent_improvement_guide.py", "eval/producers/generate_agent_runtime_dashboard.py"]},
         {"name": "behavior_events.jsonl", "mode": "active_canonical", "producer": "tools/runtime/archive/behavior_event_assembly.py", "parser": "tools/runtime/archive/behavior_event_assembly.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py"]},
@@ -149,7 +137,6 @@ def contract_payload(root: Path) -> dict[str, object]:
         "source_digest": source_digest(),
         "missing_files": sorted(present_files),
         "executable_references": sorted(executable_references, key=lambda item: (str(item["path"]), int(item["line"]), str(item["token"]))),
-        "generated_inventory_paths": sorted(inventory_paths),
         "caller_audit": {
             "schema": CALLER_AUDIT_SCHEMA,
             "retired_child_basenames": child_basenames,
@@ -174,8 +161,6 @@ def check_payload(payload: dict[str, object]) -> list[str]:
         errors.append("missing_files")
     if payload.get("executable_references"):
         errors.append("executable_references")
-    if payload.get("generated_inventory_paths"):
-        errors.append("generated_inventory_paths")
     children = payload.get("retired_child_tombstones", [])
     if any(not isinstance(row, dict) or not isinstance(row.get("command_or_skill"), str) or not _COMMAND_RE.fullmatch(row["command_or_skill"]) or any(bad in row["command_or_skill"] for bad in (".codex/hooks/", "compat", "wrapper", "shim", "fallback")) for row in children):
         errors.append("command_or_skill_grammar")

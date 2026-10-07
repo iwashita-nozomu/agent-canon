@@ -32,6 +32,22 @@ from tools.agent.skills.skill_shim_materializer import (  # noqa: E402
 class SkillShimMaterializerTest(unittest.TestCase):
     """Verify materialization converges without a second writer."""
 
+    def test_explicit_authoring_root_is_independent_of_runtime_alias(self) -> None:
+        expected = render_shim(
+            build_record(build_context(PROJECT_ROOT), "code-cleanup")
+        )
+        with patch.dict(
+            "os.environ",
+            {
+                "AGENT_CANON_SOURCE_ROOT": "/opt/agent-canon/source",
+                "AGENT_CANON_CANON_ROOT": "/opt/agent-canon/source",
+            },
+        ):
+            actual = render_shim(
+                build_record(build_context(PROJECT_ROOT), "code-cleanup")
+            )
+        self.assertEqual(actual, expected)
+
     def test_build_context_does_not_launch_catalog_validators(self) -> None:
         """Ordinary materialization resolves real inputs without authoring tools."""
         with patch.object(subprocess, "run", wraps=subprocess.run) as commands:

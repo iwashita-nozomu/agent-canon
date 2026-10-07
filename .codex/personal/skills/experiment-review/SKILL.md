@@ -2,7 +2,7 @@
 name: experiment-review
 description: "Use when reviewing experiment topics, run.py files, experiment registries, GPU/JAX environment ownership, visualization.py artifacts, or experiment README/report readiness."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f078b0a0d735cf6c6da578b8248f1e6165ef3cf2265bc8d2d8455211aa15a227"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"c8ef85218a25207a660e44b982a1c515e0eb3124c9c3a24552e78ee895568a94"} -->
 
 <!--
 @dependency-start
