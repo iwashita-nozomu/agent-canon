@@ -211,7 +211,7 @@ tools/
 `ReportBundleArtifactPathError`, `active_design_packet_mapping`,
 `normalize_active_design_packet_config`, `resolve_report_bundle_artifact_path`,
 `resolve_report_root` です。`SINGLE_SET` は `resolve_report_root`、
-`TOOL_CALL_SET` は `materialize_skill_tool_call_token`、`MONITOR_SET` は
+`TOOL_CALL_SET` は `materialize_tool_call_token`, `materialize_dynamic_route_tool_call_token`、`MONITOR_SET` は
 `resolve_report_root`, `schedule_wave_row` です。
 
 test caller は `tests/agent_tools/test_agent_team_templates.py` の次の exact set も確認します。
@@ -267,7 +267,7 @@ module を top-level import します。`route`, `task_authority`,
 | --- | --- | --- | --- |
 | `tools/agent/orchestration/team_config.py` | config/catalog/base types | `WritePolicy`, `Role`, `SubagentWaveSlot`, `AgentTypeSelection`, `StageWave`, `TeamConfig`, `TaskCatalog`, `RunBundleSpec`, `CapacityHandshakeConsumerBinding`, `load_team_config`, `load_task_catalog`, role/task/workflow/stage selection | `WritePolicy` と config/catalog の dataclass、loader、resolver、型検証だけ。scope result type、template rendering、write は持たない |
 | `tools/agent/orchestration/packets.py` | document/active-design packets | `DocumentSectionLocator`, `DocumentPacketEntry`, `RoleDocumentPacket`, `ActiveDesignClause`, `ActiveDesignPacketEntry`, `ActiveDesignPacketConfig`、active packet normalization/mapping/reference projection、document packet resolution | packet schema、identity、reference、section locator だけ。manifest line rendering は持たない |
-| `tools/agent/orchestration/tool_calls.py` | ToolCall materialization | `materialize_tool_call_token`, `materialize_skill_tool_call_token`, `materialize_dynamic_route_tool_call_token`, `CloseAgentLifecycleEvidence`, `materialize_close_agent_tool_call` | ToolCall と close receipt の typed output だけ。capacity reservation は持たない |
+| `tools/agent/orchestration/tool_calls.py` | ToolCall materialization | `materialize_tool_call_token`, `materialize_dynamic_route_tool_call_token`, `CloseAgentLifecycleEvidence`, `materialize_close_agent_tool_call` | ToolCall と close receipt の typed output だけ。capacity reservation は持たない |
 | `tools/agent/orchestration/implementation_dispatch.py` | capacity + fixed implementation dispatch | `ImplementationDispatch`、capacity derivation/runtime/projection、agent type selection、spawn budget、`dispatch_fixed_implementation` | capacity reservation、eligibility、dispatch の state transition。prompt/manifest text は持たない |
 | `tools/runtime/manifest/manifest_rendering.py` | manifest/prompt/topology rendering | policy output lines、wave formatting、`build_manifest`、manifest sections、`render_role_topology`、`render_subagent_prompt_packet`、template helper | deterministic text projection と template expansion。config load、git snapshot、capacity mutation は持たない |
 | `tools/repository/workspace/workspace_scope.py` | report paths/write scope/snapshots | `RoleWriteScope`, `resolve_workspace_document_path`, `resolve_report_root`, `ReportBundleArtifactPathError`, report artifact path、role scope、changed-path/snapshot helpers、`slugify`, `make_run_id` | `RoleWriteScope`、path validation、scope read、snapshot read/write。manifest schema は持たない |
@@ -325,8 +325,8 @@ allowlist に追加しません。
   `parse_agent_type_selections`, `format_agent_type_selections`,
   `validate_agent_type_selections`, `agent_type_selection_map`,
   `capacity_start_output_lines`
-- ToolCall/lifecycle: `materialize_skill_tool_call_token`,
-  `materialize_close_agent_tool_call`, `CloseAgentLifecycleEvidence`
+- ToolCall/lifecycle: `materialize_tool_call_token`,
+  `materialize_dynamic_route_tool_call_token`, `materialize_close_agent_tool_call`, `CloseAgentLifecycleEvidence`
 - rendering/orchestration: `create_run_bundle`, `run_active_design_packet`,
   `run_workflow_family`, `format_subagent_wave`, `format_subagent_wave_chunks`,
   `format_subagent_role_instance_wave_chunks`,

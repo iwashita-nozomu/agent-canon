@@ -152,9 +152,9 @@ not raw chat, full logs, dashboards, or a repo-wide reading list.
 
 Where the selected run emits `REPO_TOOL_ROUTING_SEQUENCE`,
 `REPO_TOOL_ROUTING_NEXT_COMMAND`, and `REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES`, carry
-those values without activating every candidate. A newly selected related Skill gets
-its own current command packet before handoff. Execute advertised logical commands
-through [CLI Entrypoints](../canonical/CLI_ENTRYPOINTS.md#tool-commands).
+those values without activating every candidate. A newly selected related Skill is
+read from its current owner and executed through the existing native CLI/API/script
+entrypoint with argv and process-result semantics preserved.
 
 A selected writer's failure retains its authority boundary and concrete blocker;
 parent execution is not a fallback. After a nonterminal timeout, use

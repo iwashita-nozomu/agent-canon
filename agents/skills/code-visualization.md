@@ -258,8 +258,9 @@ call relations, `$structure-refactor` for architecture and responsibility
 maps, `$algorithm-flowchart` for algorithm/proof overlays,
 `$prose-reasoning-graph` for prose graphs, `$html-output` for browser-readable
 large-graph views, and `$md-style-check` for embedded Markdown diagrams.
-Follow each related skill's current command packet; this selector describes the
-ownership route without reproducing those commands.
+Follow each related skill's current owner and native entrypoint; this selector
+describes the ownership route without reproducing or regenerating private command
+definitions.
 
 ## Renderer Choice
 
@@ -387,7 +388,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    `$md-style-check` for Mermaid / Markdown checks.
    Treat this as `Document Embedded Diagrams`: the section claim, reader path,
    and embedding context are part of the visualization selection.
-1. Route source ownership and delegation through owning skills and packets only.
+1. Route source ownership and delegation through owning skills and their native
+   entrypoints only.
 1. Keep pass/fail authority with the source producer. The diagram is a
    projection of extracted facts; code, dependency, proof, or runtime checkers
    own correctness claims.

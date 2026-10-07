@@ -68,10 +68,10 @@ User invocation uses `$skill-name`.
 
 A later operation, finding, or changed premise can activate a related Skill.
 Select it under the caller's stated condition, read its current sections, and
-regenerate its command packet before a selected handoff. Required commands,
-task-matching conditional commands, and selected validation retain their order.
-Catalog command argv are logical tool routes, interpreted through the existing
-[CLI owner](CLI_ENTRYPOINTS.md#tool-commands), not Host execution recipes.
+use its existing native CLI/API/script entrypoint at handoff. Selected validation
+retains its owner-defined order and process-result semantics. Native argv remains
+owned by the existing [CLI owner](CLI_ENTRYPOINTS.md#host-entrypoint), not by a
+second AgentCanon command schema.
 
 Before claiming a capability gap in an API, dependency, configuration, or
 extension point, use [API surface traversal](../../documents/design/api-surface-traversal-policy.md).

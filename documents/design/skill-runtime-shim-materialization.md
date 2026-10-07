@@ -352,8 +352,7 @@ python3 tools/agent/skills/skill_shim_materializer.py readback --root . --all
 です。directory swap と journal は採用せず、per-file replace と全件 readback だけを
 runtime recovery contract とします。
 
-1. catalog の全 public entry、canonical doc、dependency row、command
-   packet を load する。catalog の skill id 集合との不一致、重複、欠落、unknown id は停止する。
+1. catalog の全 public entry、canonical doc、dependency row、route owner を load する。catalog の skill id 集合との不一致、重複、欠落、unknown id は停止する。
 2. SkillRuntimeShimRecord を固定 serializer で作り、catalog の既存 route identity、
    確定する。prose、keyword、近接 path から route を決めない。
 3. legacy shim の全 catalog id を分類し、LegacyResolutionRecord を作る。unresolved block が
@@ -363,8 +362,7 @@ runtime recovery contract とします。
 5. 検査済みの各 target を deterministic path order で temp file に書き、同じ filesystem
    上で `os.replace` する。これは per-file atomic replace であり、全件 transaction
    ではない。
-6. 実体の全 catalog target を再読込し、byte digest、frontmatter、owner refs、
-   packet/ToolCall refs を検査する。途中停止や一部 replace failure
+6. 実体の全 catalog target を再読込し、byte digest、frontmatter、owner refs を検査する。途中停止や一部 replace failure
    は `partial_stop` として記録し、別の recovery writer を作らず、同じ
    materializer を再実行して canonical source から全 target を収束させる。materialize
    は同じ input record に対して同じ bytes を出す idempotent operation とする。
@@ -896,7 +894,7 @@ python3 eval/producers/skill_shim_evaluation.py tokens \
 | SHIM-002 catalog-owned discovery metadata | catalog reader | agents/skills/catalog.yaml / skill_families[].discovery | catalog-sized frontmatter pairs equal generated records |
 | SHIM-003 canonical prose stays out of runtime adapter | human skill canon | agents/skills/<skill>.md and generated template | adapter contains link/digest only; duplicate-policy scan=0 |
 | SHIM-004 owner/dependency/route identity | route/dependency readers | `agents/skills/catalog.yaml`、`tools/agent/skills/skill_route_catalog.py`、`tools/agent/orchestration/route.py`、`documents/runtime/skill-dependency-graph.json`、`tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` | catalog-derived route/dependency digests and semantic edge golden |
-| SHIM-005b typed ToolID/ToolCall preservation | graph/tool-packet owner | agent_team.py, [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md) | ToolID/ToolCall/argument-schema Ref and digest equal; no payload in shim |
+| SHIM-005b native owner preservation | graph/native-route owner | native CLI/API/script owner and [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md) | native route and process guarantees remain owner-owned; no private command schema in shim |
 | SHIM-006 host discovery preservation | runtime alignment | `.codex/personal/skills/*/SKILL.md`, check_agent_runtime_alignment.py | catalog-sized shim paths、frontmatter pass、project config skill registry absent |
 | SHIM-008 all-catalog migration/readback | migration route | `tools/agent/skills/skill_shim_materializer.py` migrate/readback and tests | catalog-sized row receipt, unresolved=0 |
 | SHIM-009 graph/route golden | graph and route checkers | skill_dependency_map.py, check_skill_tool_invocation_graph.py, frozen route cases | typed identity/edge/order/route equality |
