@@ -1,111 +1,45 @@
 # code-cleanup
+
 <!--
 @dependency-start
 contract skill
-responsibility Routes public/module code cleanup by responsibility and reachability through dependency analysis, refactor loop, and change review.
-upstream design ./README.md shared public skill canon
-upstream design ../../documents/design/responsibility-cleanup.md responsibility-unit cleanup contract
-upstream design ../../documents/conventions/software-engineering-principles.md existing provider reuse and abstraction admission owner
-upstream design ./dependency-analysis.md dependency and reachability owner
-upstream design ./refactor-loop.md behavior-preserving refactor owner
-upstream design ../internal-routines/incremental-code-change.md opt-in coverage traversal and incremental update sequence
-upstream design ./change-review.md findings-first review owner
-upstream design ./responsibility-cleanup.md responsibility-unit dispatch owner
+responsibility Removes obsolete code and support by owning responsibility and reachability.
+upstream design ../../documents/design/responsibility-cleanup.md retirement and consumer migration
+upstream design ./dependency-analysis.md unresolved dependency and cause investigation
+upstream design ./refactor-loop.md structural migration
+upstream design ./change-review.md changed contract review
 downstream implementation ../../.codex/personal/skills/code-cleanup/SKILL.md runtime discovery shim
 downstream implementation ./catalog.yaml public skill registry
 downstream implementation ./skill-dependencies.yaml public skill dependency DAG
-downstream implementation ../../.codex/config.toml host skill configuration
 @dependency-end
 -->
 
 ## Purpose
 
-public/module responsibility と到達性を一つの cleanup unit として閉じ、既存の
-`dependency-analysis -> refactor-loop -> change-review` route に渡します。unit schema、
-analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup`](../../documents/design/responsibility-cleanup.md)
-の RC-02、RC-04、RC-07、RC-08 を参照します。通常の置換・統合と重複旧実装の廃止は
-[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-に従い、旧コードの削除と必要な利用側移行を同じ修正で閉じます。
-
-## Use When
-
-- public API、module responsibility、consumer reachability、dependency closure を整理する
-- analyzer finding を候補として調査し、実装 owner と refactor boundary を確定する
-- 実装の置換・統合・廃止を、不要な旧コードの削除と findings-first review まで閉じる
+Clean the complete owning responsibility, including affected consumers and
+obsolete support, rather than choosing a minimum diff or deleting whole files
+without understanding their contents.
 
 ## Route
 
-全対象の走査と逐次修正、またはタスク内の重複読取・引継ぎ・再レビューの修正を
-依頼された場合は、[依存順走査による逐次コード変更](../internal-routines/incremental-code-change.md)
-をこのrouteの走査・更新順として使います。通常の局所修正に全走査を追加しません。
-同じ `reuse_survey` と依存根拠を使い、検証・レビュー・commitの正本を置き換えません。
+- Start from the agreed final behavior and the most recently incorporated path.
+  Read the actual control flow; compare existing capabilities before adding code.
+- Follow callers and effects through [dependency-analysis](dependency-analysis.md)
+  where the cause or migration boundary remains unresolved. Reuse settled evidence.
+- Remove superseded entrypoints, implementation, exclusive dependencies, fixtures,
+  and documentation together; migrate necessary consumers to the retained owner.
+  [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+  owns retirement details, not an additional compatibility layer or approval gate.
+- Remove intermediate concepts as well as their code: packets, wrappers, types,
+  and names that merely relay existing data or rename an operation need no separate
+  owner. Connect callers directly to the existing responsibility; renaming or moving
+  an unnecessary layer is not cleanup. Keep abstractions for actual domain meaning,
+  independent behavior, or a demonstrated shared responsibility, not naming alone.
+- For numerical code, establish equations and convergence semantics before
+  deletion; do not substitute an architecture or JIT change for a mathematical fix.
+- Use [refactor-loop](refactor-loop.md) for an actual structural migration and
+  [change-review](change-review.md) for the resulting contract and missed deletions.
+  Validate changed guarantees and connections, not the retired implementation.
 
-1. [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
-   で最新の明示的合意を完成形に固定し、[SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
-   の既存機能の修正・整理として、対象構造の維持も見直す。不要・原因となる構造の削除・置換を
-   継ぎ足しより先に検討し、正しい既存部品は再利用する。current module/helper/type/test/docs、
-   標準ライブラリ、採用済み dependency、既存 CLI を同じ shared asset universe で比較する。
-   file/worker slice はその後に導く。provider の比較は
-   [SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-   を使い、既存の呼出元・公開 API から最小の利用案と要求・保証の対応を作る。
-   disposition の根拠はその対応から導き、名前やシグネチャの一致だけで決めない。
-   同名のローカル実装がないことを、再利用先がない根拠にしない。split / extraction
-   または suspected predecessor の現行欠落では、同じ universe を `git log`、`-S`、
-   deleted paths、prior PR / Issue、predecessor tests、関連 design docs まで必要範囲で
-   拡張する。bounded non-split edit では historical scan を必須にしない。
-2. 各 candidate の `asset_path`、`asset_origin`、`capability`、`disposition`
-   (`reuse|extend|restore|consolidate|replace|delete|reject`)、`reason`、非空の
-   `test_paths` を既存 `reuse_survey` に一度だけ記録する。調査 dimension が
-   非適用なら categorized `bounded_omission` と根拠を残す。候補の重複、未分類、
-   根拠/test path 欠落を含む survey は write handoff へ進めない。bounded
-   non-split edit で reuse choice 自体がない場合だけ、明示理由付き
-   `scope=not_applicable` を使う。
-3. 削除、置換、移動の候補は filename、symbol、search hit、行数では決めない。候補を行または
-   block ごとに読み、各寄与を数学的・domain 上の意味、invariant、state transition、side effect、I/O、
-   reachable caller / consumer として既存 handoff または review context に対応付ける。
-   [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-   に従い、通常の置換でも不要になる旧実装・入口・専用補助コードを同じ pass で削除する。
-   別の廃止依頼、active caller ゼロ、後続 cleanup を待たない。独自責務、未確認の意味、
-   公開互換契約の判断と必要な利用側移行は同じ RC-09 を使い、ここへ規則を複製しない。
-4. 数値コードを削除・置換する前に equations、units、state、stopping rule、convergence contract、
-   failure semantics を復元する。未解決の数学的意味は既存の semantic math owner に戻し、architecture、
-   compiler、JIT の変更で吸収しない。
-5. `dependency-analysis` で public/module responsibility、到達性、consumer、impact を閉じる。
-   根幹の修正で契約・接続が変わる利用側も修正対象に含める。RC-09 の残存参照は
-   移行漏れとして追い、影響情報を記録しただけで修正を終えない。
-   responsibility slices と `allowed_paths` はこの asset universe と disposition から導き、
-   同じ asset に触れる slices を一つへ merge する。既存 provider の利用案が合意した完成形を
-   最も単純に満たすなら、直接利用・設定・合成へ置換し、第三の helper へ再実装しない。
-   candidate がない場合も、ローカル検索ゼロだけで新 surface を admission しない。
-   SEP-08 の capability 比較で残った具体的な不足責務だけを新設理由にする。実在する
-   candidate の `reject` は能力不足と、旧構造の維持で増える複雑さを区別し、SEP-06/08 の
-   根拠を使う。必要な部品まで再実装せず、実在しない candidate や synthetic な `reject` は作らない。
-6. approved mechanism を `refactor-loop` へ渡し、同じ serialized `reuse_survey` と
-   tests を各 write-capable child と read-only reviewer に伝播する。置換・廃止とも RC-09 の
-   削除と必要な usage-surface repair を含め、子 prompt 側で disposition を再構築しない。
-7. `change-review` で current snapshot、reachable path、contract、witness と
-   worker packet と同一の asset/disposition/test-path evidence を readback し、置換後の tree に
-   合意からの逸脱、旧構造を守るための追加層、不要な旧コードの残存を確認する。
-   targeted validation は各行ではなく
-   owning-unit boundary で一度だけ実行する。
-
-再利用先の比較は今回の責務に限り、contract を満たす選択が決まれば終える。全 library の
-網羅調査、provider 内部の再監査、調査用の依存導入を追加しない。置換時の検証は既存の
-consumer boundary と変更した意味・接続に向け、provider の実装や test suite を複製しない。
-
-## Tool Commands
-
-```bash
-python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
-bash tools/analysis/dependencies/scan_code_dependencies.sh --changed
-bash tools/analysis/dependencies/run_repo_dependency_review.sh
-```
-
-## Boundary
-
-このcleanup routeを新規実装の一律前提にしません。新規部分はSEP-06の既存機能の組合せから始め、
-修正部分だけを本routeで扱います。挙動保存のrefactorは必要な挙動を保ち、構造の保存とは区別します。
-削除、rename、移動の oracle は analyzer ではなく public/module contract、到達性、validation、
-rollback の owner evidence です。`dependency-analysis`、`refactor-loop`、`change-review` の
-policy をこの skill に複製しません。search tool、asset registry、reuse database、
-public code-splitting Skill は追加せず、既存 `reuse_survey` と write handoff の単一路線を使います。
+Use existing dependency and reference tools only for unresolved questions.
+No new inventory, handoff schema, or full-repository scan is required by cleanup.

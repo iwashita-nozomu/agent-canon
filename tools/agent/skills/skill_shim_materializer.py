@@ -30,14 +30,7 @@ from typing import Any, Protocol, cast
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    import yaml
-except ModuleNotFoundError:  # clean host before the shared tool image exists
-    try:
-        from tools.runtime.container import stdlib_yaml as yaml
-    except ImportError:
-        import tools.runtime.container.stdlib_yaml as yaml  # type: ignore[no-redef]
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+import yaml
 
 from tools.agent.orchestration.tool_calls import materialize_skill_tool_call_token
 from tools.agent.skills.skill_dependency_map import build_graph
@@ -49,6 +42,7 @@ from tools.agent.skills.skill_route_catalog import (
     load_skill_route_rules,
 )
 from tools.agent.skills.skill_tool_commands import SkillCommandPacket, packet_for_skill
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (
@@ -387,7 +381,9 @@ def build_context(
     if set(routes) != set(skill_ids) or set(dependencies) != set(skill_ids):
         raise MaterializerError("owner_skill_set_mismatch")
     try:
-        resolution = resolve_agent_canon_source_root(root)
+        resolution = resolve_agent_canon_source_root(
+            root, source_root=root, canon_root=root
+        )
         packets = {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
     except (OSError, ValueError) as exc:
         raise MaterializerError("command_packet_invalid", str(exc)) from exc
