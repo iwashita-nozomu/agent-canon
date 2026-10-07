@@ -2415,7 +2415,6 @@ _agent_canon_container_name() {
 }
 
 _agent_canon_select_existing_runtime() {
-  local source_runtime="$AGENT_CANON_RUNTIME_ROOT"
   local container mount_rows registry_source authority
   local registry_destination="$AGENT_CANON_MOUNT_REGISTRY_DESTINATION"
   local container_name
