@@ -795,7 +795,6 @@ skill_dependencies:
     - structure-refactor
     - environment-cleanup
     - code-cleanup
-    - skill-cleanup
     - document-canon-cleanup
     - worktree-health
     - agent-log-analysis
@@ -816,7 +815,6 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - code-cleanup
-    - skill-cleanup
   code-cleanup:
     responsibility_group: cleanup
     required_prerequisites:
@@ -831,26 +829,6 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - environment-cleanup
-    - skill-cleanup
-  skill-cleanup:
-    responsibility_group: cleanup
-    required_prerequisites:
-    - responsibility-cleanup
-    - agent-orchestration
-    routing_candidates:
-    - agent-orchestration
-    - task-routing
-    - document-canon-cleanup
-    - worktree-health
-    - agent-log-analysis
-    - runtime-log-repair
-    - result-artifact-writeout
-    - empirical-prompt-tuning
-    successors: []
-    order_constraints: []
-    parallel_independent:
-    - environment-cleanup
-    - code-cleanup
   empirical-prompt-tuning:
     responsibility_group: workflow
     required_prerequisites: []

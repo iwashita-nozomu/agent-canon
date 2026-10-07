@@ -61,7 +61,7 @@ refactor は、[ソフトウェア工学原則](../../documents/conventions/soft
 
 refactor 固有の実行契約は、挙動保存を次の順で閉じます。
 
-1. `Behavior Contract`、semantic invariant、state / lifecycle owner、public compatibility、
+1. `Behavior Contract`、semantic invariant、state / lifecycle owner、
    root mechanism を実装前に固定します。
 2. dependency-expanded scope から、root mechanism と evidence-linked consumer、failure handling、
    cleanup、migration、docs、tests、validation を含む replaceable unit を選びます。

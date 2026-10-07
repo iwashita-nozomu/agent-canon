@@ -2,9 +2,10 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Owns container-side TOML/JSON/state/tool/check/eval logic for the shared AgentCanon tool container without implicit source writes.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
-# downstream implementation ../../bootstrap.sh fixed host entrypoint
-# downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
+# upstream implementation ../source/agent_canon_source_root.py standalone source identity
+# downstream implementation ../../../bootstrap.sh fixed host entrypoint
+# downstream implementation ../../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 # @dependency-end
 """Container control plane for the AgentCanon tool runtime.
 
@@ -243,15 +244,18 @@ def _validate_tool_plane_argv(
         if script.startswith(image_tool_root):
             return
     if root.resolve() == repository_root.resolve():
-        if executable == "python3" and len(argv) > 2 and argv[1:3] == ["-m", "pytest"]:
-            return
-        if executable == "cargo" and len(argv) > 1 and argv[1] in {
-            "build",
-            "clippy",
-            "fmt",
-            "test",
-        }:
-            return
+        return
+    from tools.runtime.source.agent_canon_source_root import (
+        SourceRootFailure,
+        resolve_agent_canon_source_root,
+    )
+
+    try:
+        resolve_agent_canon_source_root(root, source_root=root, canon_root=root)
+    except SourceRootFailure:
+        pass
+    else:
+        return
     raise BootstrapError(
         "tool_plane_command_rejected",
         "exec accepts AgentCanon tools only; project commands use the project execution environment",
@@ -5580,15 +5584,10 @@ def build_parser() -> argparse.ArgumentParser:
     target_sub = target.add_subparsers(dest="target_operation", required=True)
     add = target_sub.add_parser("add")
     add.add_argument("--root", required=True)
-    add.add_argument(
-        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
-    )
-    add.add_argument("--mutation-capability-json")
+    add.add_argument("--mode", choices=("read-only",), default="read-only")
     remove = target_sub.add_parser("remove")
     remove.add_argument("--root", required=True)
-    remove.add_argument(
-        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
-    )
+    remove.add_argument("--mode", choices=("read-only",), default="read-only")
     execute = sub.add_parser("exec")
     execute_group = execute.add_mutually_exclusive_group(required=True)
     execute_group.add_argument("--root")
@@ -5654,26 +5653,34 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "gc":
         return runtime.gc(dry_run=args.dry_run)
     if operation == "target" and args.target_operation == "add":
-        capability = None
-        if args.mutation_capability_json:
-            try:
-                capability = json.loads(args.mutation_capability_json)
-            except json.JSONDecodeError as exc:
-                raise BootstrapError("mutation_capability_invalid", "capability is not JSON") from exc
-        return runtime.target_add(
-            Path(args.root), args.mode, mutation_capability=capability
-        )
+        return runtime.target_add(Path(args.root), args.mode)
     if operation == "exec":
         if args.request_json:
             try:
                 request = json.loads(args.request_json)
             except json.JSONDecodeError as exc:
-                raise BootstrapError("invalid_exec_request", "request is not JSON") from exc
+                raise BootstrapError(
+                    "invalid_exec_request", "request is not JSON"
+                ) from exc
             allowed = {
-                "schema", "tool_id", "runtime", "argv", "child_args",
-                "source_root", "cwd", "cwd_policy", "target_root", "environment",
-                "stdin", "stdout", "stderr", "exit", "signal", "side_effect",
-                "output_root", "written_paths",
+                "schema",
+                "tool_id",
+                "runtime",
+                "argv",
+                "child_args",
+                "source_root",
+                "cwd",
+                "cwd_policy",
+                "target_root",
+                "environment",
+                "stdin",
+                "stdout",
+                "stderr",
+                "exit",
+                "signal",
+                "side_effect",
+                "output_root",
+                "written_paths",
             }
             if not isinstance(request, dict) or set(request) - allowed:
                 raise BootstrapError("invalid_exec_request", "request fields are invalid")

@@ -2827,7 +2827,10 @@ def test_gc_invokes_container_state_gc_and_combines_receipt(tmp_path: Path) -> N
     assert "exec" in calls and "gc" in calls
 
 
-def test_gc_dry_run_keeps_resident_rollback_preview_read_only(tmp_path: Path) -> None:
+@pytest.mark.parametrize("expired_target", [False, True])
+def test_gc_dry_run_keeps_resident_rollback_preview_read_only(
+    tmp_path: Path, expired_target: bool
+) -> None:
     """A resident rollback preview does not copy or clear host mounts."""
     state, owned, repository, control, runtime, state_path, name, environment = (
         _gc_fixture(
@@ -2860,6 +2863,12 @@ def test_gc_dry_run_keeps_resident_rollback_preview_read_only(tmp_path: Path) ->
         }
     ]
     state_path.write_text(json.dumps(state), encoding="utf-8")
+    if expired_target:
+        plan = runtime / "container-state" / "rollback-plan.tsv"
+        plan.write_text(
+            plan.read_text()
+            + f"mount\tmount\t{tmp_path / 'deleted-target'}\t/targets/deleted\ttrue\n"
+        )
     runtime_before = {
         path.relative_to(runtime): path.read_bytes()
         for path in runtime.rglob("*")
@@ -2902,8 +2911,8 @@ set +e
 AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
 AGENT_CANON_CONTROL_ROOT={str(control)!r}
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
-AGENT_CANON_STATE_ROOT={str(runtime / 'container-state')!r}
-AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}
+AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
+AGENT_CANON_DOCKER_CMD={str(ROOT / "tests/bootstrap/fake_docker.py")!r}
 AGENT_CANON_IMAGE_REF=agent-canon-tools:live
 AGENT_CANON_STATE_VOLUME_NAME=
 AGENT_CANON_ROLLBACK_MOUNTS_FILE={str(rollback_mounts)!r}

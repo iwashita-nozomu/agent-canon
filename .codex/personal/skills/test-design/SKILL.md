@@ -2,7 +2,7 @@
 name: test-design
 description: "Use after the owning implementation mechanism exists to proactively design a logically minimal test set; classify unresolved oracle, specification, regression, and failure-mode risk before adding cases."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"bb77bb1f49db651fcc7df24eca7907640f73966a2412a2f0302a1beb27653368"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"4080174a5a238f289e0ab0900236db634c71b48b75113a2c1812524fd119ce80"} -->
 
 <!--
 @dependency-start
