@@ -28,16 +28,22 @@ def native_results(monkeypatch: pytest.MonkeyPatch, *, fail_at: int = -1):
     def run(parts, **kwargs):
         calls.append(tuple(parts))
         return subprocess.CompletedProcess(
-            parts, 17 if len(calls) == fail_at else 0,
-            stdout="Found a counter-example!\n", stderr="native diagnostic\n",
+            parts,
+            17 if len(calls) == fail_at else 0,
+            stdout="Found a counter-example!\n",
+            stderr="native diagnostic\n",
         )
 
     monkeypatch.setattr(proof_env.subprocess, "run", run)
     return calls
 
 
-@pytest.mark.parametrize("action", ("init", "smoke", "agent-smoke", "counterexample-smoke", "all-smoke"))
-def test_dry_run_neither_initializes_nor_writes_probes(tmp_path: Path, monkeypatch, action: str):
+@pytest.mark.parametrize(
+    "action", ("init", "smoke", "agent-smoke", "counterexample-smoke", "all-smoke")
+)
+def test_dry_run_neither_initializes_nor_writes_probes(
+    tmp_path: Path, monkeypatch, action: str
+):
     root = tmp_path / "absent"
     calls = native_results(monkeypatch)
     result = proof_env.build_result(arguments(root, action, execute=False))
@@ -68,7 +74,9 @@ def test_empty_package_is_created_by_native_lake_only(tmp_path: Path, monkeypatc
 
 
 @pytest.mark.parametrize("config_name", ("lakefile.lean", "lakefile.toml"))
-def test_existing_package_configuration_is_not_rewritten(tmp_path: Path, monkeypatch, config_name: str):
+def test_existing_package_configuration_is_not_rewritten(
+    tmp_path: Path, monkeypatch, config_name: str
+):
     files = {
         config_name: b"project-owned dependency declaration\n",
         "lean-toolchain": b"project-selected-toolchain\n",
@@ -86,7 +94,9 @@ def test_existing_package_configuration_is_not_rewritten(tmp_path: Path, monkeyp
 
 
 @pytest.mark.parametrize("fail_at", (1, 2, 3, 4, 5, 6, 7))
-def test_native_failure_stops_subsequent_commands(tmp_path: Path, monkeypatch, fail_at: int):
+def test_native_failure_stops_subsequent_commands(
+    tmp_path: Path, monkeypatch, fail_at: int
+):
     calls = native_results(monkeypatch, fail_at=fail_at)
     result = proof_env.build_result(arguments(tmp_path))
     assert result.status == "failed"
@@ -97,11 +107,15 @@ def test_native_failure_stops_subsequent_commands(tmp_path: Path, monkeypatch, f
 
 
 @pytest.mark.parametrize("returncode", (0, 1, 17, -9))
-def test_counterexample_text_cannot_change_native_status(tmp_path: Path, monkeypatch, returncode: int):
+def test_counterexample_text_cannot_change_native_status(
+    tmp_path: Path, monkeypatch, returncode: int
+):
     def run(parts, **kwargs):
         return subprocess.CompletedProcess(
-            parts, returncode,
-            stdout="Found a counter-example!\n", stderr="unrelated type error\n",
+            parts,
+            returncode,
+            stdout="Found a counter-example!\n",
+            stderr="unrelated type error\n",
         )
 
     monkeypatch.setattr(proof_env.subprocess, "run", run)
@@ -158,9 +172,16 @@ def test_external_file_path_is_a_single_native_argument(tmp_path: Path, monkeypa
     (tmp_path / "lakefile.toml").write_text("project-owned\n", encoding="utf-8")
     target = tmp_path / "proof with spaces.lean"
     target.write_text("example : True := by trivial\n", encoding="utf-8")
-    args = proof_env.build_parser().parse_args([
-        "check-file", "--env-dir", str(tmp_path), "--lean-file", str(target), "--execute",
-    ])
+    args = proof_env.build_parser().parse_args(
+        [
+            "check-file",
+            "--env-dir",
+            str(tmp_path),
+            "--lean-file",
+            str(target),
+            "--execute",
+        ]
+    )
     calls = native_results(monkeypatch)
     result = proof_env.build_result(args)
     assert calls[-1] == ("lake", "--keep-toolchain", "env", "lean", str(target))

@@ -54,15 +54,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "action",
         choices=(
-            "init", "smoke", "agent-smoke", "counterexample-smoke",
-            "all-smoke", "check-file",
+            "init",
+            "smoke",
+            "agent-smoke",
+            "counterexample-smoke",
+            "all-smoke",
+            "check-file",
         ),
     )
-    parser.add_argument("--env-dir", required=True, help="Selected Lake package directory.")
+    parser.add_argument(
+        "--env-dir", required=True, help="Selected Lake package directory."
+    )
     parser.add_argument("--package-name", default=DEFAULT_PACKAGE_NAME)
     parser.add_argument("--lean-file", help="File to check for the check-file action.")
     parser.add_argument(
-        "--execute", action="store_true",
+        "--execute",
+        action="store_true",
         help="Execute the printed native commands; otherwise make no changes.",
     )
     parser.add_argument("--format", choices=("text", "json"), default="text")
@@ -151,20 +158,30 @@ def write_generated(path: Path, text: str) -> bool:
 def run_command(parts: Sequence[str], cwd: Path) -> CommandResult:
     """Return native output and status without counterexample-text heuristics."""
     completed = subprocess.run(
-        tuple(parts), cwd=cwd, check=False, capture_output=True, text=True,
+        tuple(parts),
+        cwd=cwd,
+        check=False,
+        capture_output=True,
+        text=True,
     )
     return CommandResult(
-        command=shlex.join(parts), returncode=completed.returncode,
-        stdout=completed.stdout, stderr=completed.stderr,
+        command=shlex.join(parts),
+        returncode=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
     )
 
 
 def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
     """Initialize with Lake when needed, then run the selected native checks."""
     env_dir = Path(args.env_dir).resolve()
-    configured = any((env_dir / name).is_file() for name in ("lakefile.lean", "lakefile.toml"))
+    configured = any(
+        (env_dir / name).is_file() for name in ("lakefile.lean", "lakefile.toml")
+    )
     if not configured and env_dir.exists() and any(env_dir.iterdir()):
-        raise ValueError(f"Choose an empty directory or an existing Lake package: {env_dir}")
+        raise ValueError(
+            f"Choose an empty directory or an existing Lake package: {env_dir}"
+        )
 
     probes: dict[Path, str] = {}
     if args.action in {"smoke", "all-smoke"}:
@@ -172,7 +189,9 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
     if args.action in {"agent-smoke", "all-smoke"}:
         probes[env_dir / "AgentCanonLeanProofEnvAgent.lean"] = agent_smoke_text()
     if args.action in {"counterexample-smoke", "all-smoke"}:
-        probes[env_dir / "AgentCanonLeanProofEnvCounterexample.lean"] = counterexample_text()
+        probes[env_dir / "AgentCanonLeanProofEnvCounterexample.lean"] = (
+            counterexample_text()
+        )
     lean_files = list(probes)
     if args.action == "check-file":
         if not args.lean_file:
@@ -213,12 +232,17 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
     toolchain = env_dir / "lean-toolchain"
     manifest = env_dir / "lake-manifest.json"
     return LeanProofEnvResult(
-        action=str(args.action), status=status, env_dir=str(env_dir),
+        action=str(args.action),
+        status=status,
+        env_dir=str(env_dir),
         created_or_updated_files=tuple(created_files),
         commands=tuple(shlex.join(command) for command in commands),
-        executed=bool(args.execute), command_results=tuple(results),
+        executed=bool(args.execute),
+        command_results=tuple(results),
         lean_file=str(lean_files[-1]) if lean_files else None,
-        lean_toolchain=toolchain.read_text(encoding="utf-8").strip() if toolchain.is_file() else None,
+        lean_toolchain=toolchain.read_text(encoding="utf-8").strip()
+        if toolchain.is_file()
+        else None,
         lake_manifest=str(manifest) if manifest.is_file() else None,
     )
 
@@ -233,7 +257,9 @@ def render_text(result: LeanProofEnvResult) -> str:
     ]
     lines.extend(f"  {command}" for command in result.commands)
     for command in result.command_results:
-        lines.append(f"LEAN_PROOF_ENV_COMMAND_RESULT={command.returncode} {command.command}")
+        lines.append(
+            f"LEAN_PROOF_ENV_COMMAND_RESULT={command.returncode} {command.command}"
+        )
         lines.extend((command.stdout, command.stderr))
     return "\n".join(lines)
 
@@ -250,7 +276,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(asdict(result), ensure_ascii=False, indent=2))
     else:
         print(render_text(result))
-    return next((item.returncode for item in result.command_results if item.returncode), 0)
+    return next(
+        (item.returncode for item in result.command_results if item.returncode), 0
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover
