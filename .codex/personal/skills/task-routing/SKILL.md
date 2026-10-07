@@ -2,7 +2,7 @@
 name: task-routing
 description: "Use when choosing short AgentCanon tool, skill, profile, check, runtime, closeout, or evidence routes from long candidate names, broad workflow text, routing misses, over-constrained related-skill candidates, public/system skill delegation, skill splitting, or skill/tool routing refactors."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"27c45e03e991f8dac7372db074115a443b05f9e5490effb474d38be585cee48b"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"55d943a65d4ba42ce77861ba735beb43e1260936639e9c9fdde26719c0b2c951"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/task-routing.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [task-routing](../../../../agents/skills/task-routing.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill task-routing --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

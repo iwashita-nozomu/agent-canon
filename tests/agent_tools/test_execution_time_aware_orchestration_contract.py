@@ -9,8 +9,7 @@
 # upstream design ../../agents/task_catalog.yaml task routing projection
 # upstream design ../../templates/agents/schedule.md schedule projection
 # upstream implementation ../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py production contract checker
-# upstream implementation ../../tools/agent/skills/skill_tool_commands.py selected-skill command packet
-# upstream design ../../agents/skills/catalog.yaml runtime shim registration and maintenance phase
+# upstream design ../../agents/skills/catalog.yaml runtime shim registration
 # @dependency-end
 
 from __future__ import annotations
@@ -234,23 +233,17 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
             self.assertIsInstance(marker, str)
             self.assertIn(" ".join(marker.lower().split()), text, marker)
 
-    def test_rejects_universal_or_missing_checker_and_runtime_registration(self) -> None:
-        for mutation in ("required", "missing", "runtime"):
-            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
-                root = self.fixture_root(directory)
-                path = root / "agents/skills/catalog.yaml"
-                data = yaml.safe_load(path.read_text())
-                owner = next(item for item in data["skill_families"] if item["id"] == "agent-orchestration")
-                if mutation == "runtime":
-                    owner["canonical_doc"] = "agents/skills/pr-processing.md"
-                else:
-                    command = {"tool_id": "check-execution-time-aware-orchestration", "operation_id": "default"}
-                    owner["tool_commands"]["maintenance"].remove(command)
-                    if mutation == "required":
-                        owner["tool_commands"]["required"].append(command)
-                path.write_text(yaml.safe_dump(data, sort_keys=False))
-                category = "consumer_reference_mismatch" if mutation == "runtime" else "required_command_route"
-                self.assert_rejected(root, category)
+    def test_rejects_runtime_registration_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.fixture_root(directory)
+            path = root / "agents/skills/catalog.yaml"
+            data = yaml.safe_load(path.read_text())
+            owner = next(
+                item for item in data["skill_families"] if item["id"] == "agent-orchestration"
+            )
+            owner["canonical_doc"] = "agents/skills/pr-processing.md"
+            path.write_text(yaml.safe_dump(data, sort_keys=False))
+            self.assert_rejected(root, "consumer_reference_mismatch")
 
     def test_rejects_unconditional_schedule_projection(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

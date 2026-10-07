@@ -186,7 +186,6 @@ run_contracts() {
     python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \
     --root "${ROOT}" --format json
-  python3 "${TOOLS_ROOT}/agent/skills/skill_tool_commands.py" check
 }
 
 run_eval() (

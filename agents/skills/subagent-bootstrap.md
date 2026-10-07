@@ -397,7 +397,8 @@ The runtime discovery adapter delegates these required operating clauses to this
 - Use When: a task needs a fresh subagent, explicit handoff packet, wave ledger
   update, or write-capable implementation routing. Compatible active agents may
   be reused for revised scope.
-- Tool Commands: run this skill's command packet, then read the canonical
-  [agents/skills/subagent-bootstrap.md](subagent-bootstrap.md) route before spawning or recording waves.
+- Tool route: use the selected native CLI/API/script entrypoint, then read the
+  canonical [agents/skills/subagent-bootstrap.md](subagent-bootstrap.md) route
+  before spawning or recording waves.
 - Boundary: do not spawn or reuse agents without bounded scope, validation
   route, review gate, and lifecycle evidence.

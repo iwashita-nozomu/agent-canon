@@ -782,7 +782,6 @@ Run the focused resident-container receipt route and skill wiring checks after c
   tool run --root <registered-target-root> issue-sync -- --receipt-preflight \
   --checkout-head <target-commit> --checkout-repository <owner/repository>
 python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-python3 tools/agent/skills/skill_tool_commands.py check
 python3 tools/agent/skills/skill_shim_materializer.py check --root .
 python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
 bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing

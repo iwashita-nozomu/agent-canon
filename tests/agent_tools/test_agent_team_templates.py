@@ -73,7 +73,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             {"subagent_prompt": {"purpose": "fixture"}}, "",
         )))["subagent_prompt_packet"]
         self.assertNotIn("tool_rejection_prediction", packet["required_tool_fields"])
-        for field in ("tool_route", "tool_call_tokens", "tool_evidence"):
+        for field in ("tool_route", "native_argv", "tool_evidence"):
             self.assertIn(field, packet["required_tool_fields"])
 
     def test_manifest_keeps_prediction_available_without_a_pending_gate(self) -> None:

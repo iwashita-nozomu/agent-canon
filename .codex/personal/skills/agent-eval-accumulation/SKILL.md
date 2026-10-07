@@ -2,7 +2,7 @@
 name: agent-eval-accumulation
 description: "Use when AgentCanon eval collection or repair is selected to establish required evidence; runs registered producers, validates family accumulation, and archives reports. Read-only observation of missing, stale, or failing evidence alone does not activate this repair loop."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"4e5d285e9c891b8e14b16f8e2cd9b74a58c40b494354b8c5911e28a5e878f468"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1a6c5731413cc4bb5a72055fe362ff7a0aeca571f04017845e53dd09299fbd19"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/agent-eval-accumulation.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [agent-eval-accumulation](../../../../agents/skills/agent-eval-accumulation.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill agent-eval-accumulation --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

@@ -2,7 +2,7 @@
 name: retention
 description: "Use when planning whether existing experiment results should be retained, archived, externalized, or deleted before mutation."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f3e8991365d74d1867ccbf5b51b68ab826059ddef766957b8f786b7efe47c9da"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"d8845e9d3f7e9e938750c7119d2437a685432504d5bb99d3f8a77ed0b08cdf4a"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/retention.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [retention](../../../../agents/skills/retention.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill retention --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

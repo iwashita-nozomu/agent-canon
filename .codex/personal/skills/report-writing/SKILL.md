@@ -2,7 +2,7 @@
 name: report-writing
 description: "Use when drafting or revising reader-facing reports, decision briefs, experiment summaries, presentation narratives, PPT/storyboard plans, or slide-ready visual asset plans from tool, hook, eval, experiment, review, audit, or operational evidence; separates raw-result writeout from report narrative and applies the report quality checklist."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"2af64885497dde8db8377201250858d86df151689de4c3168cb7c93509a3dfd6"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"818a9bd797cdf63fb2dbfb6e468cf3307981348babd51a038880436596a57e2c"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/report-writing.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [report-writing](../../../../agents/skills/report-writing.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill report-writing --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

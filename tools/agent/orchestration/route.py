@@ -66,12 +66,6 @@ from tools.agent.skills.skill_route_catalog import (
 from tools.agent.skills.skill_route_catalog import (
     load_skill_related_map as _load_skill_related_map,
 )
-from tools.agent.skills.skill_route_catalog import (
-    load_skill_required_tool_commands as _load_skill_required_tool_commands,
-)
-from tools.agent.skills.skill_route_catalog import (
-    load_skill_tool_commands as _load_skill_tool_commands,
-)
 from tools.runtime.source.agent_canon_source_root import (
     SourceRootFailure,
     resolve_agent_canon_source_root,
@@ -86,8 +80,6 @@ from tools.validation.semantic.tools.visualization_contract import (
 )
 
 load_skill_related_map = _load_skill_related_map
-load_skill_required_tool_commands = _load_skill_required_tool_commands
-load_skill_tool_commands = _load_skill_tool_commands
 
 
 ROUTE_NAME = "task-routing"

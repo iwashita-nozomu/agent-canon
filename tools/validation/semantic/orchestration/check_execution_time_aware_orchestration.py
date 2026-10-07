@@ -4,7 +4,6 @@
 # responsibility Enforces the machine-readable execution-time-aware orchestration contract and its exact consumer projections.
 # upstream design ../../../../agents/skills/agent-orchestration.execution-contract.toml canonical machine contract
 # upstream design ../../../../agents/skills/agent-orchestration.md sole execution-time-aware policy owner
-# upstream implementation ../../../agent/skills/skill_tool_commands.py selected-skill maintenance-command packet owner
 # downstream implementation ../../../../tests/agent_tools/test_execution_time_aware_orchestration_contract.py negative contract tests
 # downstream implementation ../../../catalog.yaml production tool registry
 # @dependency-end
@@ -262,10 +261,9 @@ def _check_exact_contract(
     )
     checker = contract.get("checker")
     checker_command = contract.get("checker_command")
-    phase = contract.get("skill_command_phase")
     if checker != "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py":
         add(findings, "contract_schema", contract_label, "checker-path-mismatch")
-    if checker_command != expected_command or phase != "maintenance":
+    if checker_command != expected_command:
         add(
             findings,
             "required_command_route",
@@ -550,7 +548,6 @@ def _check_checker_command(
     consumer_texts: dict[str, str],
 ) -> None:
     entry = catalog_skill(root, EXPECTED_OWNER_SKILL)
-    expected_command = str(contract.get("checker_command"))
     if entry is None:
         add(
             findings,
@@ -559,36 +556,10 @@ def _check_checker_command(
             "agent-orchestration-entry-missing",
         )
         return
-    expected = {"tool_id": "check-execution-time-aware-orchestration", "operation_id": "default"}
-    tool_commands = entry.get("tool_commands")
-    if not isinstance(tool_commands, dict) or any(
-        not isinstance(tool_commands.get(phase), list)
-        or tool_commands[phase].count(expected) != (1 if phase == "maintenance" else 0)
-        for phase in ("required", "conditional", "maintenance")
-    ):
-        add(
-            findings,
-            "required_command_route",
-            "agents/skills/catalog.yaml",
-            "maintenance-checker-command-mismatch",
-        )
     if entry.get("canonical_doc") != OWNER_REF.split("#", 1)[0] or entry.get("shim") != (
         ".codex/personal/skills/agent-orchestration/SKILL.md"
     ):
         add(findings, "consumer_reference_mismatch", "agents/skills/catalog.yaml", "runtime-registration-mismatch")
-    owner_text = read_text(root, "agents/skills/agent-orchestration.md")
-    runtime_text = consumer_texts.get("runtime-shim", "")
-    for path, text in (
-        ("agents/skills/agent-orchestration.md", owner_text),
-        ("agents/skills/catalog.yaml", runtime_text),
-    ):
-        if expected_command in text:
-            add(
-                findings,
-                "required_command_route",
-                path,
-                "checker-command-copied-from-catalog",
-            )
 
 
 def check_contract(root: Path, contract_path: Path) -> list[Finding]:

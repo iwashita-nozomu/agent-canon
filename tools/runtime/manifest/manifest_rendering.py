@@ -34,15 +34,7 @@ from tools.repository.workspace.parent_root_side_effects import (
 
 from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
-
 from tools.agent.orchestration.route import decide_skills, load_skill_route_rules
-from tools.agent.skills.skill_tool_commands import (
-    CommandPlan,
-    SkillCommandPacket,
-    packet_for_skill,
-    project_public_command_for_layout,
-)
 from tools.runtime.lifecycle.update_lifecycle_contract import (
     import_decision_sufficiency_verdict,
 )
@@ -93,7 +85,6 @@ from tools.agent.orchestration.team_config import (
 from tools.agent.orchestration.tool_calls import (
     TOOL_CALL_SCHEMA,
     materialize_dynamic_route_tool_call_token,
-    materialize_skill_tool_call_token,
 )
 
 from tools.agent.orchestration.implementation_dispatch import (
@@ -318,29 +309,33 @@ PARENT_BLOCKED_ROUTE = "typed_blocked_retry_or_user_report"
 
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 
-REPO_TOOL_ROUTING_OWNER = "tools/agent/skills/skill_tool_commands.py"
+REPO_TOOL_ROUTING_OWNER = "tools/runtime/dispatch/tool_dispatch.py"
 
-REPO_TOOL_ROUTING_STATUS = "selected_skill_tool_call_tokens"
+REPO_TOOL_ROUTING_STATUS = "selected_native_argv"
 
 REPO_TOOL_ROUTING_ROUTE_BASIS = "selected_public_skills"
 
 REPO_TOOL_ROUTING_EXECUTION_MODE = "sequential_by_skill_and_stage"
 
 REPO_TOOL_ROUTING_SEQUENCE = (
-    "materialize_tool_call_token",
-    "execute_canonical_tool_id",
-    "record_typed_result",
+    "select_existing_entrypoint",
+    "execute_native_argv",
+    "record_process_result",
 )
 
 REPO_TOOL_ROUTING_STAGE_FIELDS = (
-    "tool_call_token",
-    "intent",
-    "typed_failure_semantics",
+    "tool_route",
+    "argv",
+    "cwd",
+    "env",
+    "exit",
+    "stdout",
+    "stderr",
 )
 
 REPO_DYNAMIC_SKILL_ROUTING_STATUS = "related_skill_candidates"
 
-REPO_DYNAMIC_SKILL_ROUTING_NEXT = "add_skill_then_regenerate_repo_tool_routes"
+REPO_DYNAMIC_SKILL_ROUTING_NEXT = "add_skill_then_select_existing_entrypoint"
 
 # DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"
 DECISION_SUFFICIENCY_OWNER = (
@@ -698,18 +693,6 @@ def selected_skill_names(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
     )
 
 
-def selected_skill_command_packets(
-    selected_skills: tuple[str, ...],
-    source_root: Path | None = None,
-) -> tuple[SkillCommandPacket, ...]:
-    """Build repo tool command packets for selected public skills."""
-    root_resolution = resolve_agent_canon_source_root(source_root or ROOT)
-    return tuple(
-        packet_for_skill(root_resolution, skill)
-        for skill in selected_skill_names(selected_skills)
-    )
-
-
 def dynamic_skill_candidate_names(
     selected_skills: tuple[str, ...],
     source_root: Path | None = None,
@@ -717,8 +700,9 @@ def dynamic_skill_candidate_names(
     """Return related public skills that can activate in later waves."""
     selected = set(selected_skill_names(selected_skills))
     candidates: list[str] = []
-    for packet in selected_skill_command_packets(selected_skills, source_root):
-        for candidate in packet.related_skills:
+    rules = {rule.skill: rule for rule in load_skill_route_rules(source_root or ROOT)}
+    for skill in selected_skill_names(selected_skills):
+        for candidate in rules[skill].related_skills:
             if candidate in selected or candidate in candidates:
                 continue
             candidates.append(candidate)
@@ -752,7 +736,6 @@ def repo_tool_routing_policy_output_lines(
         f"REPO_TOOL_ROUTING_EXECUTION_MODE={REPO_TOOL_ROUTING_EXECUTION_MODE}",
         f"REPO_TOOL_ROUTING_SEQUENCE={','.join(REPO_TOOL_ROUTING_SEQUENCE)}",
         f"REPO_TOOL_ROUTING_STAGE_FIELDS={','.join(REPO_TOOL_ROUTING_STAGE_FIELDS)}",
-        "REPO_TOOL_ROUTING_CHECK_TOOL_ID=skill-tool-commands",
         f"REPO_DYNAMIC_SKILL_ROUTING_POLICY={REPO_DYNAMIC_SKILL_ROUTING_STATUS}",
         "REPO_DYNAMIC_SKILL_ROUTING_TOOL_CALL="
         + json.dumps(
@@ -864,20 +847,17 @@ def subagent_wave_record_command(
         "allowed_paths=<paths> do_not_read=<paths> write_scope=<scope> "
         "validation_route=<route> review_gate=<gate> handoff_artifacts=<artifacts> status=<status>",
     )
-    plan = CommandPlan(json.dumps(list(argv)), ".", ".", (), argv)
-    projection = project_public_command_for_layout(plan, layout=layout)
-    return shlex.join(list(projection.public_argv))
+    del layout
+    return shlex.join(list(argv))
 
 
 def public_command_for_layout(
-    command: Sequence[str] | CommandPlan | str,
+    command: Sequence[str] | str,
     layout: str,
 ) -> str:
     """Render structured argv with shell quoting for display only."""
     del layout
-    if isinstance(command, CommandPlan):
-        argv = command.execution_argv
-    elif isinstance(command, str):
+    if isinstance(command, str):
         # Compatibility callers still provide documentation-only constants;
         # they are returned verbatim and never parsed or executed.
         return command
@@ -890,7 +870,7 @@ def public_command_for_layout(
 
 def public_command_for_spec(
     spec: RunBundleSpec,
-    command: Sequence[str] | CommandPlan | str,
+    command: Sequence[str] | str,
 ) -> str:
     """Render one command through the selected source/public layout owner."""
     roots = spec.repository_roots
@@ -1869,9 +1849,8 @@ def manifest_pre_handoff_gate_status_lines(
         "--gate",
         "design",
     )
-    design_plan = CommandPlan(json.dumps(list(design_argv)), ".", ".", (), design_argv)
-    design_projection = project_public_command_for_layout(design_plan, layout=layout)
-    design_command = shlex.join(list(design_projection.public_argv))
+    del layout
+    design_command = shlex.join(list(design_argv))
     lines = [
         "  pre_handoff_gate_status:",
         "    enabled: true",
@@ -1935,29 +1914,6 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
             lines.append(f"        - ${candidate}")
     else:
         lines.append("        - none")
-    lines.append("    sequential_tool_routes:")
-    for packet in selected_skill_command_packets(selected_skills, source_root):
-        lines.extend(manifest_one_skill_tool_route_lines(packet))
-    return lines
-
-
-def manifest_one_skill_tool_route_lines(packet: SkillCommandPacket) -> list[str]:
-    """Render one selected skill's sequential tool route."""
-    lines = [
-        f"      - skill: {packet.skill}",
-        f"        runtime_skill: {packet.runtime_skill!r}",
-        f"        canonical_doc: {packet.canonical_doc!r}",
-        "        tool_call_token:",
-        *_yaml_mapping_lines(
-            materialize_skill_tool_call_token(packet.skill), indent=10
-        ),
-        "        related_skills:",
-    ]
-    if packet.related_skills:
-        for skill in packet.related_skills:
-            lines.append(f"          - ${skill}")
-    else:
-        lines.append("          - none")
     return lines
 
 
@@ -2412,7 +2368,7 @@ def render_subagent_prompt_packet(
     )
     lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
     lines.append(
-        f"{indent}  tool_call_tokens: 'run.repo_tool_routing_policy.sequential_tool_routes[].tool_call_token'"
+        f"{indent}  native_argv: 'run.repo_tool_routing_policy'"
     )
     lines.append(
         f"{indent}  tool_evidence: 'run.repo_tool_routing_policy.dynamic_skill_routing'"
@@ -2427,7 +2383,7 @@ def render_subagent_prompt_packet(
             lines.append(f"{indent}  {key}: {value!r}")
     lines.append(f"{indent}  required_tool_fields:")
     lines.append(f"{indent}    - tool_route")
-    lines.append(f"{indent}    - tool_call_tokens")
+    lines.append(f"{indent}    - native_argv")
     lines.append(f"{indent}    - tool_evidence")
     lines.append(f"{indent}  checkout_identity:")
     lines.append(f"{indent}    command: {CHECKOUT_IDENTITY_COMMAND!r}")
@@ -2483,7 +2439,7 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
         "Carry the owner-produced DecisionSufficiencyPacket reference and "
-        "run.repo_tool_routing_policy tool_route, machine-readable ToolCall tokens, and tool_evidence into "
+        "run.repo_tool_routing_policy tool_route, native argv, process result, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, "
         "and normalized remote owner/repository at the bounded transition points; do not "

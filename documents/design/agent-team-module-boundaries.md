@@ -228,7 +228,7 @@ test caller は `tests/agent_tools/test_agent_team_templates.py` の次の exact
 
 `tools/agent/orchestration/agent_team.py` は `__package__` が truthy の
 package import では相対 import を使い、falsey の direct-script import では同じ
-module を top-level import します。`route`, `skill_tool_commands`, `task_authority`,
+module を top-level import します。`route`, `task_authority`,
 `update_lifecycle_contract` は両 mode で top-level import のままです。この inventory
 は mode 差が既存の caller contract であることを示し、target では次を固定します。
 

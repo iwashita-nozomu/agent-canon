@@ -270,7 +270,6 @@ required_regex = [
   "\\$structure-planning",
   "\\$md-style-check",
   "\\$algorithm-flowchart",
-  "skill_tool_commands\\.py show --skill code-visualization",
   "render_dependency_manifest_graph\\.py --root \\. --scope full --bundle-dir reports/dependency-graph --format json",
   "canonical graph owns dependency status and facts",
   "typed dependency query",
@@ -874,8 +873,8 @@ required_regex = ["machine-readable ToolCall tokens", "typed failure semantics",
 [[evals.checklist]]
 id = "ORCH-SHIM-DISCOVERY-1"
 critical = true
-description = "Keeps the generated skill-tool command block as discovery while route execution stays token-owned."
-required_regex = ["## Tool Commands", "skill-tool-commands:start", "skill_tool_commands\\.py show --skill agent-orchestration"]
+description = "Keeps the generated skill adapter as an owner pointer while route execution stays native-entrypoint-owned."
+required_regex = ["## Canonical Skill", "Read the canonical owner", "does not materialize a private command packet"]
 
 [[evals.checklist]]
 id = "ORCH-DOCS-FIRST-BOUNDED-1"

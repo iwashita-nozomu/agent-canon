@@ -106,35 +106,12 @@ class SkillShimMaterializerTest(unittest.TestCase):
         self.assertEqual(result["status"], "fail")
         self.assertIn(runtime_path.relative_to(PROJECT_ROOT).as_posix(), result["content_delta_paths"])
 
-    def test_legacy_classification_blocks_tool_commands_only(self) -> None:
-        """Generated section-only bodies must keep all unmatched blocks and remain blocked."""
+    def test_render_shim_has_no_private_command_section(self) -> None:
+        """Generated adapters point to owners without a private command DSL."""
         context = build_context(PROJECT_ROOT)
-        skill = "agent-orchestration"
-        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
-        expected = render_shim(build_record(context, skill))
-        original = runtime_path.read_text(encoding="utf-8")
-        runtime_path.write_text(
-            "<!-- generated: agent_canon.skill_runtime_shim.v1 -->\n"
-            "## Tool Commands\n"
-            "python3 tools/agent/skills/skill_tool_commands.py show --skill agent-orchestration --format text\n",
-            encoding="utf-8",
-        )
-        try:
-            receipt = classify_legacy(context, skill, expected)
-        finally:
-            runtime_path.write_text(original, encoding="utf-8")
-        self.assertEqual(receipt["resolution"], "blocked")
-        self.assertEqual(receipt["classification"], "legacy_schema_mismatch")
-        self.assertEqual(len(receipt["unmatched_blocks"]), 2)
-        locators = [entry["locator"] for entry in receipt["unmatched_blocks"]]
-        self.assertIn(
-            f"{runtime_path.relative_to(PROJECT_ROOT).as_posix()}#preamble",
-            locators,
-        )
-        self.assertIn(
-            f"{runtime_path.relative_to(PROJECT_ROOT).as_posix()}#L2-L3",
-            locators,
-        )
+        rendered = render_shim(build_record(context, "agent-orchestration"))
+        self.assertNotIn("Tool Commands", rendered)
+        self.assertNotIn("skill_tool_commands.py", rendered)
 
     def test_legacy_receipt_lists_every_unmatched_block(self) -> None:
         """Legacy prose is rejected without a canonical-heading fallback."""
@@ -163,10 +140,8 @@ class SkillShimMaterializerTest(unittest.TestCase):
         context = build_context(PROJECT_ROOT)
         skill = "agent-orchestration"
         expected = render_shim(build_record(context, skill))
-        legacy = expected
-        canonical_start = legacy.index("## Canonical Skill")
-        commands_start = legacy.index("## Tool Commands")
-        subset = legacy[:canonical_start] + legacy[commands_start:]
+        canonical_start = expected.index("## Canonical Skill")
+        subset = expected[:canonical_start]
         runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
         original = runtime_path.read_text(encoding="utf-8")
         runtime_path.write_text(subset, encoding="utf-8")
