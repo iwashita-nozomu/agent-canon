@@ -2,7 +2,7 @@
 name: issue-finding-report
 description: "Use when creating, splitting, merging, re-parenting, reopening, or superseding Issues by owner, decision, mechanism, validation, and completion responsibility; investigates cause hypotheses without overclaiming, preserves unique clauses, and can also convert accumulated runtime evidence into durable AgentCanon Issues through the shared dashboard tool."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"14b45ddf52a0ed4bbc646225bf039f4eea64240e4b8dc7e4a9907ebba01dd2a5"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"d8b839a8989fef210264364dc4213398cb7bbc02941537626737e6c91c05ad03"} -->
 
 <!--
 @dependency-start

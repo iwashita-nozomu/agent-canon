@@ -2249,10 +2249,8 @@ _agent_canon_read_rollback_plan() {
           _agent_canon_json_error rollback_plan_invalid "rollback plan image reference is invalid"
         AGENT_CANON_ROLLBACK_IMAGE_REF=$value; ref_seen=$((ref_seen + 1)) ;;
       mount)
-        [[ "$value" == mount && -n "$source" && "$source" = /* && ! -L "$source" &&
-           ( -d "$source" ||
-             ("$destination" == "$AGENT_CANON_SOURCE_SYNC_DESTINATION" && -d "$source") ||
-             ("$destination" == "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION" && -f "$source") ) &&
+        # GC reads the saved identity; mount availability belongs to activation.
+        [[ "$value" == mount && -n "$source" && "$source" = /* &&
            -n "$destination" && ("$ro" == true || "$ro" == false) ]] ||
           _agent_canon_json_error rollback_plan_invalid "rollback plan mount is invalid"
         case "$destination" in
@@ -2262,7 +2260,10 @@ _agent_canon_read_rollback_plan() {
               _agent_canon_json_error rollback_plan_invalid "rollback target destination is invalid"
             printf 'target\t%s\t%s\t%s\tread-only\n' "$digest" "$source" "$destination" >> "$previous_mounts" ;;
           /var/lib/agent-canon/*|/opt/agent-canon/source) ;;
-          *) _agent_canon_json_error rollback_plan_invalid "rollback destination is invalid" ;;
+          *)
+            # Git metadata binds are derived again from the target roots, not replayed.
+            [[ "$source" == "$destination" && "$ro" == true ]] ||
+              _agent_canon_json_error rollback_plan_invalid "rollback destination is invalid" ;;
         esac ;;
       *) _agent_canon_json_error rollback_plan_invalid "rollback plan contains an unknown key: $key" ;;
     esac
@@ -2383,6 +2384,7 @@ _agent_canon_validate_existing_container() {
     printf '%s\t%s\tfalse\n' "$AGENT_CANON_TARGET_PENDING_SOURCE" \
       "/targets/$AGENT_CANON_TARGET_PENDING_DIGEST" >> "$expected_mounts"
   fi
+  _agent_canon_git_mounts "$mount_manifest" "$include_pending" >> "$expected_mounts" || return $?
   "$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{range .Mounts}}{{if eq .Type "volume"}}{{printf "volume:%s\t%s\t%t\n" .Name .Destination .RW}}{{else}}{{printf "%s\t%s\t%t\n" .Source .Destination .RW}}{{end}}{{end}}' \
   "$container" | sed '/^$/d' | sort > "$observed_mounts"
@@ -2410,6 +2412,28 @@ _agent_canon_container_name() {
   local control_digest
   control_digest=$(printf '%s' "$AGENT_CANON_CONTROL_ROOT" | sha256sum | awk '{print $1}')
   printf 'agent-canon-tools-%s\n' "${control_digest:0:16}"
+}
+
+_agent_canon_git_mounts() {
+  local manifest=$1 include_pending=${2:-1} source common sources
+  local -a common_dirs=()
+  sources=$({
+    printf '%s\n' "$AGENT_CANON_REPOSITORY_ROOT"
+    if [[ -f "$manifest" ]]; then
+      awk -F '\t' '$1 == "target" {print $3}' "$manifest"
+    fi
+    if [[ "$include_pending" == 1 && -n "${AGENT_CANON_TARGET_PENDING_SOURCE:-}" ]]; then
+      printf '%s\n' "$AGENT_CANON_TARGET_PENDING_SOURCE"
+    fi
+  }) || return $?
+  while IFS= read -r source; do
+    [[ -f "$source/.git" ]] || continue
+    common=$(git -C "$source" rev-parse --path-format=absolute --git-common-dir) || return $?
+    common_dirs+=("$common")
+  done <<< "$sources"
+  for common in "${common_dirs[@]}"; do
+    printf '%s\t%s\tfalse\n' "$common" "$common"
+  done | sort -u
 }
 
 _agent_canon_ensure_container() {
@@ -2447,6 +2471,12 @@ _agent_canon_ensure_container() {
       --mount "type=bind,src=$AGENT_CANON_TARGET_PENDING_SOURCE,dst=/targets/$AGENT_CANON_TARGET_PENDING_DIGEST,readonly"
     )
   fi
+  local git_mounts git_source git_destination git_rw
+  git_mounts=$(_agent_canon_git_mounts "$target_manifest") || return $?
+  while IFS=$'\t' read -r git_source git_destination git_rw; do
+    [[ -n "$git_source" ]] || continue
+    target_mount_args+=(--mount "type=bind,src=$git_source,dst=$git_destination,readonly")
+  done <<< "$git_mounts"
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
     if "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
       _agent_canon_import_host_inputs
@@ -4268,13 +4298,20 @@ bootstrap_host_entrypoint() {
       if [[ "$target_action" != add && "$target_action" != remove ]]; then
         _agent_canon_json_error unsupported_operation "unsupported target operation: $target_action"
       fi
-      local target_arg_index=0
+      local target_arg_index=2
       while ((target_arg_index < ${#command_args[@]})); do
-        if [[ "${command_args[target_arg_index]}" == --root && $((target_arg_index + 1)) -lt ${#command_args[@]} ]]; then
-          target_host_root=${command_args[target_arg_index+1]}
-          break
-        fi
-        target_arg_index=$((target_arg_index + 1))
+        case "${command_args[target_arg_index]}" in
+          --root) target_host_root=${command_args[target_arg_index+1]:-} ;;
+          --mode)
+            [[ "${command_args[target_arg_index+1]:-}" == read-only ]] || {
+              _agent_canon_json_error invalid_target_mode "shared tool targets are read-only"
+              return 2
+            } ;;
+          *)
+            _agent_canon_json_error argument_invalid "unsupported target argument: ${command_args[target_arg_index]}"
+            return 2 ;;
+        esac
+        target_arg_index=$((target_arg_index + 2))
       done
       target_host_root=$(realpath -e -- "$target_host_root")
       [[ -d "$target_host_root" && ! -L "$target_host_root" ]] ||

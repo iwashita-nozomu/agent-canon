@@ -113,9 +113,11 @@ same identity and ownership reads without preparing or changing `.runtime/`;
 includes the resident controller's state/cache/lease GC receipt.
 
 `target add` is explicit because the shared runtime never scans a workspace
-or mounts a whole home directory. `read-only` is the default and is required
-for analysis. `explicit-target-write` is available only for an operation whose
-documented mutation capability names its target and allowed paths. Outputs and
+or mounts a whole home directory. Shared tool targets are `read-only`; the
+unsupported target-write mode and capability CLI have been retired rather than
+silently downgraded. Authoring uses the tool's native diff/output and host Git
+publication. Linked worktrees retain native Git access through a read-only bind
+of their common Git directory at its original path. Outputs and
 build directories remain checkout-local or use an explicitly named run-specific
 external mount. Shared data/cache writes require parent-owned scope and
 concurrency coordination; product resource limits are not inferred from this
@@ -282,6 +284,12 @@ per-skill farms are not read. Uninstall removes only the AgentCanon-owned
 `~/.agents/skills` directory link.
 
 ## Tool routes and compatibility
+
+AgentCanon source maintenance, including topic checkouts, uses native formatter
+and test commands through the shared resident. Source-root resolution identifies
+that responsibility independently of the installation path. Product targets keep
+their project-owned execution route; target admission and mount permissions apply
+to both cases.
 
 Rust first-class commands keep their existing public shape, for example
 `agent-canon docs check` and `agent-canon semantic-index`. Python tools do not
