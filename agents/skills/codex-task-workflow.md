@@ -166,9 +166,8 @@ for the next bounded observation; keep failed mutation retries distinct.
 Only coordination consumes `agent-canon.completion-coverage.v1` from the existing
 logical ledger. COMMUNICATION_PROTOCOL owns its schema, CODEX_COMPLETION its
 applicability, and `report_artifact_checks` / `task_close` its check and consumption.
-Preserve the five mapping error sets, typed owner/state/API/dependency evidence,
-W1 references, and independent `all_planned_chunks_complete` and
-`overall_delivery_complete` predicates. A checkpoint is progress, not delivery.
+This transport reuses those owners and does not enumerate their fields, create a
+second ledger, or turn a checkpoint into delivery.
 
 ## Required Output
 
@@ -192,30 +191,7 @@ Private knowledge/behavior feedback alone selects [agent-learning](agent-learnin
 
 ## Runtime Contract Clauses
 
-Apply the current route and referenced owners above; this section adds no second
-phase checklist. Existing semantic and safety requirements remain effective in both
-execution routes, while artifacts are created only under their owner's conditions.
-
-For optional `tool_rejection_preflight`, consult
-[Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction).
-実装ディレクトリ follows the `responsibility_scope` owner scope and protecting tools;
-prediction is diagnostic, not implementation admission.
-
-When class / `Protocol` changes activate an OOP/SOLID risk under the selected language
-review, route [$oop-readability-check](oop-readability-check.md). Its evidence owns
-SOLID principle signal, OOP dimension, finding kind, and
-`tools/validation/code/oop/shared/readability_core.py` mapping. For a selected
-SOLID-sensitive Python change, `check_solid_evidence.py` checks that report
-`scanned_paths` cover the changed responsibility; annotation-only and ordinary helper
-changes do not activate that review by category alone.
-
-Tool, checker, hook, or reviewer findings use the Stages judgment before
-[tool-finding-report](tool-finding-report.md). A confirmed `handoff_prompt_gap` or
-`shared_skill_or_workflow_gap` is corrected before the next dependent handoff.
-Existing MCP configuration is owned by `.codex/config.toml` and its selected docs;
-the removed root `mcp/` directory is not an alternative source.
-
-Continue required in-scope work through
-[Completion Readiness](../canonical/CODEX_COMPLETION.md#completion-readiness), using
-the selected bounded or coordination route. Distinguish implemented, verified,
-published, and applied states, and preserve concrete blockers and next owner/action.
+Apply the selected route and referenced owners. Create artifacts only under their
+conditions; do not add a second phase checklist, schema, evidence ledger, or
+approval gate. Route failed checks to the existing failure owner, and continue
+required in-scope work through the selected Completion Readiness route.

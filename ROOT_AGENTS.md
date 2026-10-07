@@ -32,6 +32,18 @@ unrelated changes or publication.
 Investigate the cause before choosing a repair. Follow actual callers, state,
 effects, and affected consumers far enough to close the owning mechanism, rather
 than minimizing the diff or expanding into unrelated architecture.
+Choose the mechanism from the established cause, applicable constraints, and
+guarantee that must hold after the change. A procedure, role, artifact, or stage
+used by an earlier task is not a reason to repeat it; reuse it only when the
+current cause and guarantee require it.
+Before editing, state the existing responsibility and non-goals briefly, then
+inspect the changed implementation and actual caller. After a failure, separate
+source cause, oracle/specification, fixture, and transport/environment causes;
+repair the owning source first, and change test inputs or wiring only for an
+established API/layout/specification migration or demonstrably incorrect test.
+Test changes include include/imports, configuration, fixtures, and skips: do not
+alter them for pass-only purposes. Record an authorized test correction's reason,
+commit, and result in the existing delivery record.
 For numerical problems, establish the equations, assumptions, and convergence
 behavior before changing implementation structure or tolerances.
 
@@ -46,6 +58,10 @@ product verification have separate environments. Successful execution needs no
 extra preflight. After failure, inspect facts that determine the next action;
 retry only with a changed premise and existing authority. Unavailable required
 verification remains unverified; it does not justify a manual backend switch.
+Use configured Git/GitHub and connected transport routes first. Do not discover,
+generate, copy, link, or agent-configure SSH keys/agents/auth files. On an
+authentication failure, return the observed error to its source, transport, or
+environment owner instead of creating a private recovery path.
 
 Capture reusable findings in their owning topic or authorized log, with the
 revision, command, observed result, and evidence location. Report AgentCanon
