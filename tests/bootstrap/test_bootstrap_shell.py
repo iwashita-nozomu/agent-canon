@@ -4375,6 +4375,21 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
     (control_runtime / "container-state" / "mounts.tsv").write_text(
         "", encoding="utf-8"
     )
+    # A topic checkout may retain stale local state; the named resident's
+    # registry bind remains the sole authority for this invocation.
+    topic_runtime = topic / ".runtime"
+    (topic_runtime / "host-state").mkdir(parents=True)
+    (topic_runtime / "container-state").mkdir()
+    (topic_runtime / "host-state" / "active-image.tsv").write_text(
+        "schema\tagent-canon.active-image.v1\n"
+        "image-ref\tstale-topic-image\n"
+        "image-id\tsha256:" + "b" * 64 + "\n",
+        encoding="utf-8",
+    )
+    (topic_runtime / "container-state" / "mounts.tsv").write_text(
+        "target\tstale\t/stale\t/targets/stale\tread-only\n",
+        encoding="utf-8",
+    )
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     fake_docker = tmp_path / "docker"
     fake_docker.write_text(
@@ -4419,7 +4434,10 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
     assert completed.returncode == 0, completed.stderr
     receipt = json.loads(completed.stdout)
     assert receipt["runtime_root"] == str(control_runtime)
-    assert not (topic / ".runtime").exists()
+    assert (topic_runtime / "host-state" / "active-image.tsv").is_file()
+    assert (topic_runtime / "container-state" / "mounts.tsv").read_text(
+        encoding="utf-8"
+    ).startswith("target\tstale\t")
 
 
 def test_symlinked_source_runtime_is_rejected_before_legacy_argument_mapping(

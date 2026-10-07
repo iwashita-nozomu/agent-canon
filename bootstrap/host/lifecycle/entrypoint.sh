@@ -2420,12 +2420,6 @@ _agent_canon_select_existing_runtime() {
   local registry_destination="$AGENT_CANON_MOUNT_REGISTRY_DESTINATION"
   local container_name
 
-  if [[ -f "$source_runtime/host-state/active-image.tsv" &&
-        ! -L "$source_runtime/host-state/active-image.tsv" &&
-        -f "$source_runtime/container-state/mounts.tsv" &&
-        ! -L "$source_runtime/container-state/mounts.tsv" ]]; then
-    return 0
-  fi
   container_name=$(_agent_canon_container_name)
   if ! "$AGENT_CANON_DOCKER_CMD" container inspect "$container_name" >/dev/null 2>&1; then
     return 0
