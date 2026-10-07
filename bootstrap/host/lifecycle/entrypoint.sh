@@ -372,13 +372,10 @@ _agent_canon_validate_roots() {
     _agent_canon_json_error control_root_invalid "control parent root must be an existing directory"
   }
   AGENT_CANON_CONTROL_ROOT=$control
-  default_runtime="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
+  default_runtime="$AGENT_CANON_CONTROL_ROOT/.runtime"
   AGENT_CANON_PRIVATE_LOG_ROOT="$(dirname -- "$AGENT_CANON_REPOSITORY_ROOT")/agent-canon-log"
-  _agent_canon_validate_new_path "$default_runtime" "default runtime root"
+  _agent_canon_validate_new_path "$default_runtime" "control runtime root"
   _agent_canon_validate_new_path "$AGENT_CANON_PRIVATE_LOG_ROOT" "private log root"
-  # --runtime-root is retained only so older launchers continue to parse.  A
-  # source checkout owns its runtime, and no caller can redirect state into a
-  # workspace or another checkout.
   AGENT_CANON_RUNTIME_ROOT=$default_runtime
   export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
 }
@@ -4159,14 +4156,11 @@ bootstrap_host_entrypoint() {
      [[ ! -x "$AGENT_CANON_DOCKER_CMD" ]]; then
     _agent_canon_json_error runtime_unavailable "Docker executable is unavailable"
   fi
-  if [[ "$operation" == update ]]; then
-    # Ownership is resolved before image build or runtime-state preparation.
-    # A foreign collision therefore cannot trigger any candidate build or
-    # host-state mutation.
-    local preflight_container=$(_agent_canon_container_name)
-    if "$AGENT_CANON_DOCKER_CMD" container inspect "$preflight_container" >/dev/null 2>&1; then
-      _agent_canon_classify_existing_container "$preflight_container"
-    fi
+  # Claim an existing named resident before source/image work. Later lifecycle
+  # owners perform the full configuration readback for their operation.
+  local existing_container=$(_agent_canon_container_name)
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$existing_container" >/dev/null 2>&1; then
+    _agent_canon_classify_existing_container "$existing_container" || return $?
   fi
   if [[ "$operation" == gc && "${command_args[1]:-}" == --dry-run ]]; then
     # A preview is read-only: dispatch before host-runtime preparation, which
