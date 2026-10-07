@@ -50,6 +50,10 @@ product verification have separate environments. Successful execution needs no
 extra preflight. After failure, inspect facts that determine the next action;
 retry only with a changed premise and existing authority. Unavailable required
 verification remains unverified; it does not justify a manual backend switch.
+Use configured Git/GitHub and connected transport routes first. Do not discover,
+generate, copy, link, or agent-configure SSH keys/agents/auth files. On an
+authentication failure, return the observed error to its source, transport, or
+environment owner instead of creating a private recovery path.
 
 Capture reusable findings in their owning topic or authorized log, with the
 revision, command, observed result, and evidence location. Report AgentCanon
