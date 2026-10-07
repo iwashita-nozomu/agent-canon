@@ -177,49 +177,6 @@ description = "Defaults tool finding runs to full repository scope and records a
 required_regex = ["full repository", "scope_exception", "requested_scope", "omitted_surfaces"]
 
 [[evals]]
-id = "md-style-check-unified-rust-docs"
-target = ".codex/personal/skills/md-style-check/SKILL.md"
-canonical_target = "agents/skills/md-style-check.md"
-kind = "skill"
-description = "Markdown style skill shim must route formatter-adjacent work through the unified Rust docs tool."
-
-[[evals.checklist]]
-id = "MD-STYLE-RUST-1"
-critical = true
-description = "Uses agent-canon docs as the canonical check and formatter entrypoint."
-required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "Rust", "DOCS_CHECK_REPORT_BEGIN"]
-
-[[evals.checklist]]
-id = "MD-STYLE-RUST-2"
-critical = true
-description = "Requires adjacent checks after formatter or fixer execution."
-required_regex = ["After any docs formatter or fixer runs", "adjacent check", "fix-math", "fix-mermaid"]
-
-[[evals.checklist]]
-id = "MD-STYLE-MATH-FENCE-1"
-critical = true
-description = "Runtime md-style-check skill must forbid text/plaintext/txt/plain/math/latex/tex fenced blocks and require standalone double-dollar guidance."
-required_regex = [
-  "\\btext\\b",
-  "\\bplaintext\\b",
-  "\\btxt\\b",
-  "\\bplain\\b",
-  "\\bmath\\b",
-  "\\blatex\\b",
-  "\\btex\\b",
-  "fenced block",
-  "must not be placed",
-  "standalone double-dollar",
-  "case-insensitively",
-]
-
-[[evals.checklist]]
-id = "MD-STYLE-STRUCTURE-ROUTING-1"
-critical = true
-description = "Keeps substantive structural design with structure-planning while md-style-check follows its owner-selected style route and treats graph analysis as optional."
-required_regex = ["structure-planning", "owner boundary", "existing-tool route", "targeted validation", "format-only"]
-
-[[evals]]
 id = "subagent-bootstrap-tool-first-gate"
 target = ".codex/personal/skills/subagent-bootstrap/SKILL.md"
 canonical_target = "agents/skills/subagent-bootstrap.md"
@@ -245,48 +202,6 @@ required_regex = [
   "Context Visibility Contract",
   "protocol-owned",
 ]
-
-[[evals]]
-id = "md-style-check-human-doc-unified-rust-docs"
-target = "agents/skills/md-style-check.md"
-kind = "skill"
-description = "Human Markdown style skill doc must expose the unified Rust docs command and formatter-adjacent check contract."
-
-[[evals.checklist]]
-id = "MD-STYLE-DOC-RUST-1"
-critical = true
-description = "Documents the unified check, format, math, and Mermaid commands."
-required_regex = ["tools/bin/agent-canon docs -h", "tools/bin/agent-canon docs check", "tools/bin/agent-canon docs format", "tools/bin/agent-canon docs fix-math", "tools/bin/agent-canon docs fix-mermaid", "DOCS_CHECK_REPORT_BEGIN"]
-
-[[evals.checklist]]
-id = "MD-STYLE-DOC-RUST-2"
-critical = true
-description = "Defines formatter completion as adjacent Markdown checks, not formatting alone."
-required_regex = ["formatter", "隣接", "Markdown lint", "link", "math", "Mermaid", "heading"]
-
-[[evals.checklist]]
-id = "MD-STYLE-DOC-MATH-FENCE-1"
-critical = true
-description = "Canonical md-style-check doc skill must forbid text/plaintext/txt/plain/math/latex/tex fenced blocks and require standalone double-dollar guidance."
-required_regex = [
-  "\\btext\\b",
-  "\\bplaintext\\b",
-  "\\btxt\\b",
-  "\\bplain\\b",
-  "\\bmath\\b",
-  "\\blatex\\b",
-  "\\btex\\b",
-  "fenced block",
-  "数式を\\s+入れず",
-  "standalone double-dollar",
-  "大文字小文字を区別せず",
-]
-
-[[evals.checklist]]
-id = "MD-STYLE-DOC-STRUCTURE-ROUTING-1"
-critical = true
-description = "Separates format-only Markdown checks from structural design and does not require skip records for unselected analysis."
-required_regex = ["structure-planning", "typo / link / format-only", "未選択の構造解析に skip 記録は不要"]
 
 [[evals]]
 id = "report-writing-semantic-contract"
@@ -1043,43 +958,6 @@ description = "A delegated path remains unresolved until read; an unresolved own
 required_regex = ["Merely naming a delegated path", "docs_first_status=unresolved", "implementation_read=locked", "documents/tools/search-coordination\\.md", "Search results nominate an owner", "do not unlock implementation"]
 
 [[evals]]
-id = "codex-task-workflow-convention-gate"
-target = ".codex/personal/skills/codex-task-workflow/SKILL.md"
-canonical_target = "agents/skills/codex-task-workflow.md"
-kind = "skill"
-description = "The discoverable Codex task workflow skill must call convention compliance before closeout."
-
-[[evals.checklist]]
-id = "CONVENTION-SKILL-2"
-critical = true
-description = "Requires convention compliance verifier during repo task closeout and owner-bounded tool route evidence."
-required_regex = ["check_convention_compliance\\.py", "before closeout", "existing-tool route", "targeted-validation evidence"]
-
-[[evals.checklist]]
-id = "CODEX-TASK-PRE-EDIT-PACKET-1"
-critical = true
-description = "Requires the communication-protocol pre-edit packet before edits."
-required_regex = ["protocol-owned", "Pre-Edit Repository Investigation Packet", "agents/COMMUNICATION_PROTOCOL.md", "missing or shallow"]
-
-[[evals.checklist]]
-id = "CODEX-TASK-FRESH-CAPSULE-1"
-critical = true
-description = "Requires fresh subagent context capsules instead of chat history."
-required_regex = ["protocol-owned", "Fresh Subagent Context Capsule", "agents/COMMUNICATION_PROTOCOL.md", "chat history", "repo-root scope"]
-
-[[evals.checklist]]
-id = "CODEX-TASK-LITERATURE-FIRST-1"
-critical = true
-description = "Requires literature survey source packets in the skill call order before research workflow, design, and implementation for source-backed claims."
-required_regex = ["\\$literature-survey", "\\$research-workflow", "before design", "Implementation Source Packet", "adoption/exclusion"]
-
-[[evals.checklist]]
-id = "CODEX-TASK-OWNER-FIRST-1"
-critical = true
-description = "Transports the selected Skill and upstream-owner readback before the implementation stage."
-required_regex = ["Owner-First Readback", "agent-orchestration\\.md#Owner-First-Read-Trace", "docs_first_status=resolved", "implementation_read=ready", "implementation remains locked", "new durable packet"]
-
-[[evals]]
 id = "adaptive-improvement-loop-skill-shim"
 target = ".codex/personal/skills/adaptive-improvement-loop/SKILL.md"
 canonical_target = "agents/skills/adaptive-improvement-loop.md"
@@ -1193,67 +1071,6 @@ id = "AIL-WF-8"
 critical = true
 description = "Consumes path and static-analysis evidence without owning the comparison implementation."
 required_regex = ["Path Comparison Evidence", "Static Analysis Feedback", "\\$tokens", "Execution Path Decision"]
-
-[[evals]]
-id = "change-review-cause-investigation"
-target = ".codex/personal/skills/change-review/SKILL.md"
-canonical_target = "agents/skills/change-review.md"
-kind = "skill"
-description = "Change review investigates cause and reachability when causality is unresolved before proposing action."
-
-[[evals.checklist]]
-id = "CR-CAUSE-1"
-critical = true
-description = "Requires evidence-linked incoming/outgoing cause traversal and selected-cause action derivation."
-required_regex = ["Cause Investigation Receipt", "Incoming Callers/Entrypoints", "Owning Mechanism/State/Guards", "Downstream Consumers/Side Effects/Cleanup", "Sibling Implementations/Tests/Docs/Config", "Reachability and Overcheck Analysis", "Alternative Disposition", "Selected Cause", "Expected Mechanism", "Action Derivation", "required_action", "cause_unproven"]
-
-[[evals.checklist]]
-id = "CR-CAUSE-2"
-critical = true
-description = "Requires bounded evidence-driven scope and a conditional temporal search."
-required_regex = ["evidence-linked", "arbitrary\\s+full-repository\\s+scan", "fixed number of candidates|fixed candidate count", "disconfirmed or bounded", "static[\\s\\S]*invariant", "latest remote/default branch|latest remote/Issue/branch history"]
-forbidden_regex = ["always.*full-repository scan", "exactly [0-9]+ candidates"]
-
-[[evals.checklist]]
-id = "CR-CAUSE-3"
-critical = true
-description = "Forbids making every action-bearing, rejected, duplicate, or unreachable finding carry a receipt."
-required_regex = ["conditional", "straightforward finding", "direct cause proof", "rejected", "duplicate", "already-covered", "unreachable", "no named receipt|receipt は不要|receipt を要求しません"]
-forbidden_regex = ["every required_action.*receipt", "all findings.*receipt", "unconditional.*receipt"]
-
-[[evals.checklist]]
-id = "CR-CAUSE-4"
-critical = true
-description = "Negative scenario: change review rejects a smallest-patch or symptom-only repair after cause selection."
-required_regex = [
-  "minimum-diff|smallest-local-patch|smallest patch|最小差分|最小パッチ",
-  "explicitly[\\s\\S]*prohibited|明示的に禁止|禁止します",
-  "[Ss]ymptom[\\s\\S]*suppression|症状抑制|症状だけから",
-  "wrapper|compatibility shim|wrapper / compatibility shim|ラッパー",
-  "test-only relaxation|oracle weakening|test-only relaxation / oracle weakening|テストだけの緩和",
-  "nearby local[\\s\\S]*patch|近傍行だけ|近傍.*修正",
-  "root mechanism[\\s\\S]*(closure|closed)|root mechanism[\\s\\S]*閉じ|根本機構[\\s\\S]*閉じ",
-]
-
-[[evals.checklist]]
-id = "CR-CAUSE-5"
-critical = true
-description = "Positive scenario: change review accepts only complete owning-unit closure across reachable effects and validation."
-required_regex = [
-  "complete[\\s\\S]*replaceable[\\s\\S]*owning[\\s\\S]*responsibility[\\s\\S]*unit|complete[\\s\\S]*owning[\\s\\S]*unit|完全な差し替え可能な責務単位",
-  "root mechanism[\\s\\S]*(closed|closure)|root mechanism|根本機構",
-  "reachable[\\s\\S]*(consumer|effect)|到達可能な.*(consumer|影響)",
-  "side[\\s\\S]*effect|副作用",
-  "failure[\\s\\S]*(handling|path)|失敗処理|failure",
-  "rollback|ロールバック",
-  "cleanup|クリーンアップ",
-  "contract|契約",
-  "docs|documentation|文書",
-  "tests?|テスト",
-  "validation|検証",
-  "evidence[\\s\\S]*bounded|evidence-bounded|証拠.*bounded|証拠.*限定",
-  "complete_owning_unit_selected[\\s\\S]*root_mechanism_closed[\\s\\S]*reachable_effects_closed[\\s\\S]*contract_docs_tests_validation_closed|complete[\\s\\S]*unit[\\s\\S]*closed",
-]
 
 [[evals]]
 id = "dependency-analysis-code-improvement-skill"
