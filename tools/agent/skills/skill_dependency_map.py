@@ -24,26 +24,19 @@ import hashlib
 import json
 import os
 import re
-import tempfile
 import sys
+import tempfile
 import unicodedata
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from pathlib import Path
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    import yaml
-except ModuleNotFoundError:  # clean host before the shared tool image exists
-    try:
-        from tools.runtime.container import stdlib_yaml as yaml
-    except ImportError:
-        import tools.runtime.container.stdlib_yaml as yaml  # type: ignore[no-redef]
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+import yaml
+
 from tools.agent.skills.skill_route_catalog import (
     SKILL_DEPENDENCY_MAP_PATH,
     VISUALIZATION_ADAPTER_TOOL_IDS,
@@ -66,6 +59,7 @@ from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeRootRequired,
     runtime_artifact_boundary,
 )
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 from tools.validation.semantic.tools.visualization_contract import (
     TOOL_ARGUMENT_SCHEMAS,
     VisualizationSourceItem,
