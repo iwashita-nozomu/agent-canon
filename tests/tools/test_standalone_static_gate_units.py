@@ -34,43 +34,63 @@ def workflow() -> dict:
 
 def step(name: str) -> dict:
     return next(
-        item for item in workflow()["jobs"]["static-gates"]["steps"]
+        item
+        for item in workflow()["jobs"]["static-gates"]["steps"]
         if item["name"] == name
     )
 
 
-def run_shell(script: str, *, root: Path, **environment: str) -> subprocess.CompletedProcess:
+def run_shell(
+    script: str, *, root: Path, **environment: str
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["bash", "-euo", "pipefail", "-c", script],
-        cwd=root, env={**os.environ, **environment}, capture_output=True,
-        text=True, check=False,
+        cwd=root,
+        env={**os.environ, **environment},
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
 
 def selected_units(*paths: str) -> tuple[str, ...]:
     result = subprocess.run(
-        ["python3", str(SELECTOR), "--format", "json",
-         *(arg for path in paths for arg in ("--path", path))],
-        cwd=ROOT, check=True, capture_output=True, text=True,
+        [
+            "python3",
+            str(SELECTOR),
+            "--format",
+            "json",
+            *(arg for path in paths for arg in ("--path", path)),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     return tuple(json.loads(result.stdout)["units"])
 
 
-@pytest.mark.parametrize(("paths", "units"), [
-    (("documents/design/example.md",), ("docs",)),
-    (("tools/analysis/example.py",), ("contracts",)),
-    (("tools/runtime/dispatch/agent-canon/src/main.rs",), ("rust",)),
-    (("eval/definitions/example.toml",), ("eval",)),
-    ((".github/PULL_REQUEST_TEMPLATE.md",), ("docs", "workflow-container")),
-    (("bootstrap/container/image/Dockerfile",), ("workflow-container",)),
-    (("documents/notes/example.yaml",), ("contracts",)),
-    (("documents/example.rst",), ("contracts",)),
-    (("documents/example.md", "tools/runtime/dispatch/agent-canon/src/main.rs"), ("docs", "rust")),
-    (("documents/example.md", "tools/unknown.sh"), ("docs", "contracts")),
-    (("tools/runtime/dispatch/agent-canon/src/docs.rs",), ("docs", "rust")),
-    (("documents/runtime/runtime-profiles-and-check-matrix.json",), ("docs",)),
-    ((), ()),
-])
+@pytest.mark.parametrize(
+    ("paths", "units"),
+    [
+        (("documents/design/example.md",), ("docs",)),
+        (("tools/analysis/example.py",), ("contracts",)),
+        (("tools/runtime/dispatch/agent-canon/src/main.rs",), ("rust",)),
+        (("eval/definitions/example.toml",), ("eval",)),
+        ((".github/PULL_REQUEST_TEMPLATE.md",), ("docs", "workflow-container")),
+        (("bootstrap/container/image/Dockerfile",), ("workflow-container",)),
+        (("documents/notes/example.yaml",), ("contracts",)),
+        (("documents/example.rst",), ("contracts",)),
+        (
+            ("documents/example.md", "tools/runtime/dispatch/agent-canon/src/main.rs"),
+            ("docs", "rust"),
+        ),
+        (("documents/example.md", "tools/unknown.sh"), ("docs", "contracts")),
+        (("tools/runtime/dispatch/agent-canon/src/docs.rs",), ("docs", "rust")),
+        (("documents/runtime/runtime-profiles-and-check-matrix.json",), ("docs",)),
+        ((), ()),
+    ],
+)
 def test_selector_routes_each_surface_and_mixed_unknowns(paths, units) -> None:
     assert selected_units(*paths) == units
 
@@ -80,7 +100,10 @@ def test_selector_boundary_and_manual_dispatch_select_all_units() -> None:
         assert selected_units(path) == STATIC_GATE_UNITS
     result = subprocess.run(
         ["python3", str(SELECTOR), "--full-confidence", "--format", "github-output"],
-        cwd=ROOT, check=True, capture_output=True, text=True,
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     outputs = dict(line.split("=", 1) for line in result.stdout.splitlines())
     assert outputs["units"].split(",") == list(STATIC_GATE_UNITS)
@@ -89,12 +112,19 @@ def test_selector_boundary_and_manual_dispatch_select_all_units() -> None:
 
 def test_selector_preserves_document_arguments_and_full_docs_inputs() -> None:
     from tools.validation.semantic.path.classify_path_risk import render_github_output
+
     paths = ("documents/has space.md", "documents/日本語.md", "documents/$data.md")
-    outputs = dict(line.split("=", 1) for line in render_github_output(paths, ("docs",)).splitlines())
+    outputs = dict(
+        line.split("=", 1)
+        for line in render_github_output(paths, ("docs",)).splitlines()
+    )
     assert json.loads(outputs["docs_paths"]) == list(paths)
-    outputs = dict(line.split("=", 1) for line in render_github_output(
-        (*paths, "tools/runtime/dispatch/agent-canon/src/docs.rs"), ("docs", "rust")
-    ).splitlines())
+    outputs = dict(
+        line.split("=", 1)
+        for line in render_github_output(
+            (*paths, "tools/runtime/dispatch/agent-canon/src/docs.rs"), ("docs", "rust")
+        ).splitlines()
+    )
     assert json.loads(outputs["docs_paths"]) == []
 
 
@@ -116,10 +146,16 @@ def test_workflow_triggers_and_one_authoritative_selector() -> None:
                 assert item["with"]["persist-credentials"] == "false"
 
 
-@pytest.mark.parametrize("result", ["failure", "cancelled", "skipped", "unknown", "success"])
+@pytest.mark.parametrize(
+    "result", ["failure", "cancelled", "skipped", "unknown", "success"]
+)
 def test_selector_failure_cannot_become_a_successful_required_check(result) -> None:
-    actual = run_shell(step("Require successful unit selection")["run"], root=ROOT,
-                       SELECTION_RESULT=result, SELECTED_UNITS="")
+    actual = run_shell(
+        step("Require successful unit selection")["run"],
+        root=ROOT,
+        SELECTION_RESULT=result,
+        SELECTED_UNITS="",
+    )
     assert (actual.returncode == 0) == (result == "success")
     if result == "success":
         assert "selected_units=none" in actual.stdout
@@ -127,9 +163,15 @@ def test_selector_failure_cannot_become_a_successful_required_check(result) -> N
 
 def test_empty_selection_does_not_start_a_runtime() -> None:
     for item in workflow()["jobs"]["static-gates"]["steps"]:
-        if item["name"] in {"Require successful unit selection", "Release shared tool runtime"}:
+        if item["name"] in {
+            "Require successful unit selection",
+            "Release shared tool runtime",
+        }:
             continue
-        if item["name"] in {"Capture shared runtime validation output", "Upload static validation evidence"}:
+        if item["name"] in {
+            "Capture shared runtime validation output",
+            "Upload static validation evidence",
+        }:
             assert item["if"] == "always() && steps.start_runtime.outcome == 'success'"
         else:
             assert item["if"] == "needs.select-static-units.outputs.units != ''"
@@ -138,8 +180,12 @@ def test_empty_selection_does_not_start_a_runtime() -> None:
 def test_candidate_preparation_preserves_head_and_target_base(tmp_path: Path) -> None:
     target = tmp_path / "target"
     target.mkdir()
+
     def git(*args: str) -> str:
-        return subprocess.check_output(["git", "-C", str(target), *args], text=True).strip()
+        return subprocess.check_output(
+            ["git", "-C", str(target), *args], text=True
+        ).strip()
+
     git("init", "-b", "main")
     git("config", "user.name", "CI fixture")
     git("config", "user.email", "ci@example.invalid")
@@ -152,29 +198,48 @@ def test_candidate_preparation_preserves_head_and_target_base(tmp_path: Path) ->
     git("commit", "-am", "candidate")
     head = git("rev-parse", "HEAD")
     env_file = tmp_path / "env"
-    result = run_shell(step("Prepare candidate source for bootstrap main synchronization")["run"],
-                       root=target, AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
-                       GITHUB_RUN_ID="1", GITHUB_RUN_ATTEMPT="1", GITHUB_ENV=str(env_file))
+    result = run_shell(
+        step("Prepare candidate source for bootstrap main synchronization")["run"],
+        root=target,
+        AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
+        GITHUB_RUN_ID="1",
+        GITHUB_RUN_ATTEMPT="1",
+        GITHUB_ENV=str(env_file),
+    )
     assert result.returncode == 0, result.stderr
     environment = dict(line.split("=", 1) for line in env_file.read_text().splitlines())
     source = Path(environment["AGENT_CANON_CANDIDATE_SOURCE"])
     assert source.parent == target.parent and source != target
-    assert subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip() == head
-    assert subprocess.check_output(["git", "-C", str(source), "branch", "--show-current"], text=True).strip() == "main"
+    assert (
+        subprocess.check_output(
+            ["git", "-C", str(source), "rev-parse", "HEAD"], text=True
+        ).strip()
+        == head
+    )
+    assert (
+        subprocess.check_output(
+            ["git", "-C", str(source), "branch", "--show-current"], text=True
+        ).strip()
+        == "main"
+    )
     assert git("rev-parse", "origin/main") == base
     assert git("status", "--porcelain") == ""
-    cleanup = run_shell(step("Release shared tool runtime")["run"], root=target, **environment)
+    cleanup = run_shell(
+        step("Release shared tool runtime")["run"], root=target, **environment
+    )
     assert cleanup.returncode == 0, cleanup.stderr
     assert not source.exists()
     assert not Path(environment["AGENT_CANON_CANDIDATE_BARE"]).exists()
 
 
-def test_unit_failures_are_aggregated_without_skipping_later_units(tmp_path: Path) -> None:
+def test_unit_failures_are_aggregated_without_skipping_later_units(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "candidate"
     source.mkdir()
     bootstrap = source / "bootstrap.sh"
     bootstrap.write_text(
-        '#!/usr/bin/env bash\n'
+        "#!/usr/bin/env bash\n"
         'printf "%s\\n" "$*" >> "$CALLS"\n'
         'printf "receipt for %s\\n" "$*"\n'
         'printf "native stderr\\n" >&2\n'
@@ -182,17 +247,27 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(tmp_path: Pat
     )
     bootstrap.chmod(0o755)
     calls, summary = tmp_path / "calls", tmp_path / "summary"
-    result = run_shell(step("Run selected units in the shared runtime")["run"], root=ROOT,
-                       AGENT_CANON_CANDIDATE_SOURCE=str(source),
-                       AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path), GITHUB_WORKSPACE=str(ROOT),
-                       RUNNER_TEMP=str(tmp_path), SELECTED_UNITS="docs,contracts,eval",
-                       DOCS_PATHS='["documents/has space.md", "documents/$data.md"]',
-                       BASE_SHA="fixed-base", GITHUB_STEP_SUMMARY=str(summary), CALLS=str(calls))
+    result = run_shell(
+        step("Run selected units in the shared runtime")["run"],
+        root=ROOT,
+        AGENT_CANON_CANDIDATE_SOURCE=str(source),
+        AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
+        GITHUB_WORKSPACE=str(ROOT),
+        RUNNER_TEMP=str(tmp_path),
+        SELECTED_UNITS="docs,contracts,eval",
+        DOCS_PATHS='["documents/has space.md", "documents/$data.md"]',
+        BASE_SHA="fixed-base",
+        GITHUB_STEP_SUMMARY=str(summary),
+        CALLS=str(calls),
+    )
     assert result.returncode == 1, result.stderr
     assert len(calls.read_text().splitlines()) == 3
     assert ".sh contracts fixed-base" in calls.read_text()
     assert summary.read_text().splitlines() == [
-        "unit=docs status=fail exit=7", "unit=contracts status=pass", "unit=eval status=pass"]
+        "unit=docs status=fail exit=7",
+        "unit=contracts status=pass",
+        "unit=eval status=pass",
+    ]
     evidence = tmp_path / "agent-canon-static-evidence"
     receipts = sorted(evidence.glob("unit-*.log"))
     assert len(receipts) == 3
@@ -202,7 +277,9 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(tmp_path: Pat
 
 
 @pytest.mark.parametrize("paths", [[], ["has space.md"], ["deleted.md"]])
-def test_docs_unit_executes_native_checker_and_propagates_failure(tmp_path: Path, paths) -> None:
+def test_docs_unit_executes_native_checker_and_propagates_failure(
+    tmp_path: Path, paths
+) -> None:
     root, cache = tmp_path / "target", tmp_path / "cache"
     root.mkdir()
     (cache / "bin").mkdir(parents=True)
@@ -212,9 +289,18 @@ def test_docs_unit_executes_native_checker_and_propagates_failure(tmp_path: Path
     cli.chmod(0o755)
     calls = tmp_path / "args"
     text = RUNNER.read_text()
-    body = "run_docs() {" + text.split("run_docs() {", 1)[1].split("\n}\n\nrun_rust()", 1)[0] + "\n}\n"
-    result = run_shell(body + "UNIT_ARGS=(" + shlex.join(paths) + "); run_docs",
-                       root=root, ROOT=str(root), AGENT_CANON_CACHE_ROOT=str(cache), CALLS=str(calls))
+    body = (
+        "run_docs() {"
+        + text.split("run_docs() {", 1)[1].split("\n}\n\nrun_rust()", 1)[0]
+        + "\n}\n"
+    )
+    result = run_shell(
+        body + "UNIT_ARGS=(" + shlex.join(paths) + "); run_docs",
+        root=root,
+        ROOT=str(root),
+        AGENT_CANON_CACHE_ROOT=str(cache),
+        CALLS=str(calls),
+    )
     assert result.returncode == 9
     expected = ["docs", "check", "--root", str(root)]
     if paths == ["has space.md"]:
@@ -233,14 +319,21 @@ def test_contract_collection_and_source_toolchain_owners() -> None:
     assert "RUNTIME_ROOT=/usr/local/share/agent-canon/runtime" not in text
     assert "export RUSTUP_HOME=" not in text
     assert "export CARGO_HOME=" not in text
-    assert "/opt/agent-canon/source/tools/validation/ci/runners/" in WORKFLOW.read_text()
+    assert (
+        "/opt/agent-canon/source/tools/validation/ci/runners/" in WORKFLOW.read_text()
+    )
 
 
 def test_runner_rejects_host_before_executing_units() -> None:
     if Path("/usr/local/share/agent-canon/.agent-canon-tool-container").is_file():
         pytest.skip("Host rejection does not apply inside the shared runtime")
-    result = subprocess.run(["bash", str(RUNNER), "eval"], cwd=ROOT,
-                            capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        ["bash", str(RUNNER), "eval"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert result.returncode == 2
     assert "shared_tool_runtime_required" in result.stderr
 
@@ -250,8 +343,9 @@ def test_shell_syntax_and_single_runtime_install() -> None:
     for job in workflow()["jobs"].values():
         scripts.extend(item["run"] for item in job["steps"] if "run" in item)
     for script in scripts:
-        result = subprocess.run(["bash", "-n"], input=script, text=True,
-                                capture_output=True, check=False)
+        result = subprocess.run(
+            ["bash", "-n"], input=script, text=True, capture_output=True, check=False
+        )
         assert result.returncode == 0, result.stderr
     assert WORKFLOW.read_text().count(" install\n") == 1
 
@@ -259,7 +353,9 @@ def test_shell_syntax_and_single_runtime_install() -> None:
 def test_pytest_is_provisioned_for_the_system_interpreter() -> None:
     import tomllib
 
-    manifest = tomllib.loads((ROOT / "bootstrap/container/image/dependencies.toml").read_text())
+    manifest = tomllib.loads(
+        (ROOT / "bootstrap/container/image/dependencies.toml").read_text()
+    )
     record = next(row for row in manifest["records"] if row["id"] == "python3-pytest")
     assert record["method"] == "apt-package"
     assert record["package"] == "python3-pytest"
@@ -274,24 +370,42 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
     assert "unknown standalone static-gate unit" in text
     rust = text.split("run_rust() {", 1)[1].split("\n}\n\nrun_contracts()", 1)[0]
     remainder = text.replace(rust, "", 1)
-    for command in ("cargo build --manifest-path", "cargo fmt --manifest-path", "cargo clippy --manifest-path", "cargo test --manifest-path"):
+    for command in (
+        "cargo build --manifest-path",
+        "cargo fmt --manifest-path",
+        "cargo clippy --manifest-path",
+        "cargo test --manifest-path",
+    ):
         assert command in rust
         assert command not in remainder
-    wrapper = FULL_WRAPPER.read_text().split("run_standalone_static_gate_ci() {", 1)[1].split("\n}\n\ngithub_repo_security_status()", 1)[0]
+    wrapper = (
+        FULL_WRAPPER.read_text()
+        .split("run_standalone_static_gate_ci() {", 1)[1]
+        .split("\n}\n\ngithub_repo_security_status()", 1)[0]
+    )
     assert "owned_by_bootstrap_container_workflow" in wrapper
-    for command in ("cargo build", "tool_catalog.py", "run_accumulated_agent_evals.py", "check_github_workflows.py"):
+    for command in (
+        "cargo build",
+        "tool_catalog.py",
+        "run_accumulated_agent_evals.py",
+        "check_github_workflows.py",
+    ):
         assert command not in wrapper
 
 
-@pytest.mark.parametrize(("remote_status", "bootstrap_status"), [(0, 0), (1, 0), (1, 17)])
-def test_unpublished_environment_uses_native_local_build(tmp_path: Path, remote_status, bootstrap_status) -> None:
+@pytest.mark.parametrize(
+    ("remote_status", "bootstrap_status"), [(0, 0), (1, 0), (1, 17)]
+)
+def test_unpublished_environment_uses_native_local_build(
+    tmp_path: Path, remote_status, bootstrap_status
+) -> None:
     source = tmp_path / "candidate"
     image = source / "bootstrap/container/image"
     image.mkdir(parents=True)
     (image / "digest.sh").write_text("printf 'fixture-key\\n'\n")
     bootstrap = source / "bootstrap.sh"
     bootstrap.write_text(
-        '#!/usr/bin/env bash\n'
+        "#!/usr/bin/env bash\n"
         'printf "%s\\n" "$*" >> "$CALLS"\n'
         'exit "$BOOTSTRAP_STATUS"\n'
     )
@@ -302,15 +416,23 @@ def test_unpublished_environment_uses_native_local_build(tmp_path: Path, remote_
     docker.write_text('#!/usr/bin/env bash\nexit "$REMOTE_STATUS"\n')
     docker.chmod(0o755)
     calls = tmp_path / "calls"
-    result = run_shell(step("Start one shared tool runtime")["run"], root=ROOT,
-                       AGENT_CANON_CANDIDATE_SOURCE=str(source),
-                       AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
-                       GITHUB_WORKSPACE=str(ROOT), GITHUB_REPOSITORY="iwashita-nozomu/agent-canon",
-                       PATH=f"{bin_dir}:{os.environ['PATH']}", CALLS=str(calls),
-                       REMOTE_STATUS=str(remote_status), BOOTSTRAP_STATUS=str(bootstrap_status))
+    result = run_shell(
+        step("Start one shared tool runtime")["run"],
+        root=ROOT,
+        AGENT_CANON_CANDIDATE_SOURCE=str(source),
+        AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
+        GITHUB_WORKSPACE=str(ROOT),
+        GITHUB_REPOSITORY="iwashita-nozomu/agent-canon",
+        PATH=f"{bin_dir}:{os.environ['PATH']}",
+        CALLS=str(calls),
+        REMOTE_STATUS=str(remote_status),
+        BOOTSTRAP_STATUS=str(bootstrap_status),
+    )
     assert result.returncode == bootstrap_status
     commands = calls.read_text().splitlines()
-    assert commands[0].endswith("install" if remote_status == 0 else "update --local-build")
+    assert commands[0].endswith(
+        "install" if remote_status == 0 else "update --local-build"
+    )
     assert len(commands) == (3 if bootstrap_status == 0 else 1)
 
 
@@ -324,7 +446,9 @@ def test_output_is_uploaded_before_cleanup_even_when_unit_execution_fails() -> N
     assert execute < capture < upload < cleanup
     assert step("Start one shared tool runtime")["id"] == "start_runtime"
     for index in (capture, upload):
-        assert steps[index]["if"] == "always() && steps.start_runtime.outcome == 'success'"
+        assert (
+            steps[index]["if"] == "always() && steps.start_runtime.outcome == 'success'"
+        )
         assert "continue-on-error" not in steps[index]
     assert steps[cleanup]["if"] == "always()"
     assert steps[upload]["uses"] == "actions/upload-artifact@v4"
@@ -347,25 +471,35 @@ def test_output_is_uploaded_before_cleanup_even_when_unit_execution_fails() -> N
     ],
 )
 def test_capture_exports_only_the_bootstrap_validated_container(
-    tmp_path: Path, overrides, status_exit: int, copy_exit: int, copied: bool,
+    tmp_path: Path,
+    overrides,
+    status_exit: int,
+    copy_exit: int,
+    copied: bool,
 ) -> None:
     # Native status shape observed in run 37202683378; operation receipts use a
     # different resource_ids shape and must not define this fixture.
     container_name = "agent-canon-tools-0123456789abcdef"
     container = {
-        "name": container_name, "running": True, "health": "healthy", "drift": False,
+        "name": container_name,
+        "running": True,
+        "health": "healthy",
+        "drift": False,
         **overrides,
     }
     native_status = {
-        "schema": "agent-canon.bootstrap-receipt.v2", "status": "ok",
-        "operation": "status", "container": container,
-        "runtime_root": "/fixture/.runtime", "source_sync": None,
+        "schema": "agent-canon.bootstrap-receipt.v2",
+        "status": "ok",
+        "operation": "status",
+        "container": container,
+        "runtime_root": "/fixture/.runtime",
+        "source_sync": None,
     }
     source = tmp_path / "candidate"
     source.mkdir()
     bootstrap = source / "bootstrap.sh"
     bootstrap.write_text(
-        '#!/usr/bin/env bash\n'
+        "#!/usr/bin/env bash\n"
         '[[ "${@: -1}" == status ]] || exit 99\n'
         'printf "%s\\n" "$STATUS_JSON"\n'
         'exit "$STATUS_EXIT"\n'
@@ -375,7 +509,7 @@ def test_capture_exports_only_the_bootstrap_validated_container(
     bin_dir.mkdir()
     docker = bin_dir / "docker"
     docker.write_text(
-        '#!/usr/bin/env bash\n'
+        "#!/usr/bin/env bash\n"
         'printf "%s\\n" "$@" > "$CALLS"\n'
         'printf "archive-stream"\n'
         'exit "$COPY_EXIT"\n'
@@ -383,12 +517,16 @@ def test_capture_exports_only_the_bootstrap_validated_container(
     docker.chmod(0o755)
     calls = tmp_path / "calls"
     result = run_shell(
-        step("Capture shared runtime validation output")["run"], root=ROOT,
+        step("Capture shared runtime validation output")["run"],
+        root=ROOT,
         AGENT_CANON_CANDIDATE_SOURCE=str(source),
-        AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path), RUNNER_TEMP=str(tmp_path),
-        PATH=f"{bin_dir}:{os.environ['PATH']}", CALLS=str(calls),
+        AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
+        RUNNER_TEMP=str(tmp_path),
+        PATH=f"{bin_dir}:{os.environ['PATH']}",
+        CALLS=str(calls),
         STATUS_JSON=json.dumps(native_status),
-        STATUS_EXIT=str(status_exit), COPY_EXIT=str(copy_exit),
+        STATUS_EXIT=str(status_exit),
+        COPY_EXIT=str(copy_exit),
     )
     assert calls.exists() == copied
     evidence = tmp_path / "agent-canon-static-evidence"
@@ -396,14 +534,19 @@ def test_capture_exports_only_the_bootstrap_validated_container(
     archive = evidence / "runtime-task-output.tar"
     if copied:
         assert calls.read_text().splitlines() == [
-            "cp", "--", f"{container_name}:/var/lib/agent-canon/runtime/tasks", "-",
+            "cp",
+            "--",
+            f"{container_name}:/var/lib/agent-canon/runtime/tasks",
+            "-",
         ]
         assert result.returncode == copy_exit
         assert archive.exists() == (copy_exit == 0)
         if copy_exit == 0:
             assert archive.read_bytes() == b"archive-stream"
         else:
-            assert (evidence / "runtime-task-output.tar.part").read_bytes() == b"archive-stream"
+            assert (
+                evidence / "runtime-task-output.tar.part"
+            ).read_bytes() == b"archive-stream"
     else:
         assert result.returncode != 0
         assert not archive.exists()
