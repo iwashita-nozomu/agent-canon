@@ -286,7 +286,6 @@ Read that owner before applying the skill. This file is only the Codex discovery
 adapter; it does not restate the canonical skill prose.
 
 
-
 ~~~
 
 dependency headerの具体的な field は source record の owner links から生成し、

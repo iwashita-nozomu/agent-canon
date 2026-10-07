@@ -89,7 +89,6 @@ ExecutionContext {root_abs, resolved_locators, expires_at=invocation_end}
 ```
 
 
-
 `ManifestEnvelope`、`CoverageEnvelope`、`ReadbackEnvelope` は ordered `Ref`、digest、counts だけを保持する。status、failure reason、unresolved detail は `CheckResult` の `failure_refs`/`unresolved_refs` から参照し、envelope に payload として重複しない。durable artifact の locator は `/` 区切りの logical repository-relative locator とし、絶対 path、`..`、`.`、empty segment、NUL を拒否する。absolute runtime path は execution context でだけ解決し、終了時に破棄する。
 
 ### Lifecycle state
