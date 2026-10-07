@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 
-<!-- graph_digest=9750b3a7d844e499bda421655b3f56309c03a813c85cc737dd18ac66a9636073 coverage_digest=63ea20898f920436af7cad3f7815d2f46501b53a20f64899981017c640836e83 -->
+<!-- graph_digest=02d3bc314ba701e8cf805c81fc56266ef103dbb1a6a77412ffdf4e9bd7fdeefc coverage_digest=63ea20898f920436af7cad3f7815d2f46501b53a20f64899981017c640836e83 -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -1264,4 +1264,4 @@ graph LR
 - `routing` and `parallel`: dashed directed edges.
 
 Coverage digest: `63ea20898f920436af7cad3f7815d2f46501b53a20f64899981017c640836e83`.
-Graph digest: `9750b3a7d844e499bda421655b3f56309c03a813c85cc737dd18ac66a9636073`.
+Graph digest: `02d3bc314ba701e8cf805c81fc56266ef103dbb1a6a77412ffdf4e9bd7fdeefc`.
