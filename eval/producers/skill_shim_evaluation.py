@@ -185,10 +185,6 @@ def _empty_route(mode: str) -> dict[str, object]:
         "related_skill_candidates": [],
         "related_skills": {},
         "reasons": [],
-        "visualization_owner_skill": None,
-        "visualization_tool_call": None,
-        "visualization_adapter_tool_call": None,
-        "visualization_rejection": None,
         "evidence": "",
     }
 

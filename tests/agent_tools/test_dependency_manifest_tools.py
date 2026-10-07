@@ -8,7 +8,6 @@
 # upstream implementation ../../tools/analysis/dependencies/scan_dependency_headers.sh scans
 # upstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh graph checks
-# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns complete projection/readback coverage after graph extraction
 # upstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps
 # upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh scans code
 # @dependency-end

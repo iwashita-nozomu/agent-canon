@@ -294,7 +294,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_default_manifest_uses_stable_code_visualization_omission_oracle_contract(
         self,
     ) -> None:
-        """The manifest requires canonical typed omission/readback semantics."""
+        """The manifest requires native source/output visualization checks."""
         manifest = PROJECT_ROOT / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
         data = load_toml_document(manifest)
         evals = cast(list[dict[str, object]], data["evals"])
@@ -306,19 +306,12 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         required = set(cast(list[str], omission["required_regex"]))
         expected_semantics = {
             "literal user scope",
-            "source-owner and dependency\\s+closure",
-            "VisualizationSourceUniverse",
-            "ProjectionCoverageManifest",
-            "canonical owner ToolCall",
-            "agent_canon\\.visualization\\.coverage",
-            "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
-            "mandatory format",
-            "final-artifact readback|post-format readback",
-            "source_counts",
-            "rendered_counts",
-            "readback_counts",
-            "coverage_digest",
-            "final_token_readback",
+            "source evidence|source fact",
+            "required labels|labels",
+            "relations|relation",
+            "formatter|format",
+            "final artifact|final-output",
+            "final-artifact readback|output check",
             "clustering",
             "zoom",
             "filtering",

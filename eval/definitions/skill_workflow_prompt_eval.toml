@@ -270,36 +270,27 @@ required_regex = [
   "\\$structure-planning",
   "\\$md-style-check",
   "\\$algorithm-flowchart",
-  "skill_tool_commands\\.py show --skill code-visualization",
   "render_dependency_manifest_graph\\.py --root \\. --scope full --bundle-dir reports/dependency-graph --format json",
   "canonical graph owns dependency status and facts",
   "typed dependency query",
   "supplied-input",
   "raw-checker",
   "Mermaid fallback",
-  "agent_canon\\.visualization\\.coverage",
-  "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
+  "required labels|source evidence|final artifact",
 ]
 
 [[evals.checklist]]
 id = "CODE-VISUALIZATION-4"
 critical = true
-description = "Requires canonical typed omission prevention and post-format coverage/readback oracle evidence."
+description = "Requires source correspondence, requested labels/relations, formatter, and final artifact checks."
 required_regex = [
   "literal user scope",
-  "source-owner and dependency\\s+closure",
-  "VisualizationSourceUniverse",
-  "ProjectionCoverageManifest",
-  "canonical owner ToolCall",
-  "agent_canon\\.visualization\\.coverage",
-  "agent_canon\\.visualization\\.arguments\\.coverage\\.v1",
-  "mandatory format",
-  "final-artifact readback|post-format readback",
-  "source_counts",
-  "rendered_counts",
-  "readback_counts",
-  "coverage_digest",
-  "final_token_readback",
+  "source evidence|source fact",
+  "required labels|labels",
+  "relations|relation",
+  "formatter|format",
+  "final artifact|final-output",
+  "final-artifact readback|output check",
   "clustering",
   "zoom",
   "filtering",

@@ -238,10 +238,6 @@ def _route_payload(rule: SkillRoutingRule) -> dict[str, object]:
         "triggers": [list(group) for group in rule.triggers],
         "capabilities": [asdict(capability) for capability in rule.capabilities],
         "related_skills": list(rule.related_skills),
-        "visualization_owner_skill": rule.visualization_owner_skill or "none",
-        "visualization_role": rule.visualization_role,
-        "tool_id": rule.tool_id,
-        "argument_schema": rule.argument_schema,
         "responsibility_group": rule.responsibility_group,
     }
 

@@ -6,7 +6,6 @@
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
 # upstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py changed-file checks
-# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py canonical visualization contract dependency target
 # downstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh runs this source regression
 # @dependency-end
 
@@ -153,9 +152,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
                 self.assertIn("@dependency-end", header)
                 if header_checker.matches_declared_surface(relative_path, patterns):
                     self.assertTrue(
-                        "code-visualization.md" in header
-                        or "visualization_contract.py" in header
-                        or "visualization_contract.md" in header,
+                        "code-visualization.md" in header,
                         relative_path,
                     )
 

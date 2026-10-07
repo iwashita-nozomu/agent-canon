@@ -163,7 +163,6 @@ run_rust() {
 run_contracts() {
   node --version
   python3 -m pytest -p no:cacheprovider --pyargs \
-    tests.agent_tools.test_visualization_contract \
     tests.agent_tools.test_render_dependency_manifest_graph \
     tests.agent_tools.test_graph_client_source_projection \
     tests.tools.test_agent_canon_pr_dependency_source_gate \

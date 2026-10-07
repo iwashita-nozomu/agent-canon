@@ -117,28 +117,14 @@ JSON uses schema `agent_canon.route.capability_route.v1` and preserves this key
 order: `schema`, `route`, `mode`, `status`, `error_code`, `capability_ids`,
 `matches`, `skills`, `active_skills`, `deferred_skills`,
 `related_skill_candidates`, `related_skills`, `reasons`,
-`visualization_owner_skill`, `visualization_tool_call`,
-`visualization_rejection`.
+and `evidence`.
 
 `status=pass` with exit 0 is success. `status=fail` with a stable `error_code`,
 empty non-applicable fields, and exit 2 is fail-closed. Related-skill
 candidates are evidence for a later owner route, not automatic activation.
 Text and Markdown use the same fields and ordering as the capability schema.
-An explicit visualization capability emits only the same canonical owner
-ToolCall. Renderer selection and adapter emission remain downstream work.
-
-## Visualization completion boundary
-
-Routing does not authorize omission. `code-visualization` constructs the
-immutable literal scope plus owner/dependency closure before renderer
-selection. Renderer family, clustering, zoom, and filtering are view-only and
-cannot remove serialized identities. After the downstream adapter runs, the
-owning formatter is mandatory, followed by readback from the final formatted
-artifact. Completion carries exact eight-kind (`identity`, `edge`, `field`,
-`phase`, `branch`, `module`, `evidence`, `time`) source, rendered, and readback
-count maps, the deterministic coverage digest, and final-token evidence. If a
-renderer cannot retain complete coverage, return the typed renderer-capacity
-blocker instead of pruning or emitting a partial fallback.
+Visualization selection and renderer execution remain downstream of routing;
+native CLI/API input and final-output checks stay with the selected renderer.
 
 `$test-design` is selected only by an explicit Skill ID or capability route.
 The selected Skill owner evaluates the concrete unresolved oracle,

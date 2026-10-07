@@ -290,7 +290,7 @@ Legend: `consumer -->|depends_on| provider` means the left target consumes the
 right target; aggregate arrows use the same dependency semantics and point to
 their individual targets.
 
-Visualization selection: `context_question=exact consumer/provider ownership of one C++ configure graph`; `literal_user_scope=cpp-core, individual test/experiment executables, cpp-tests, cpp-experiments`; `visualization_kind=dependency graph`; `time_axis=static relation`; `precision_need=exact branch graph`; `source_evidence=D-TARGET-TYPE,D-TEST-GRAPH,D-EXPERIMENT-GRAPH`; `owner_skill_or_tool=code-visualization`; `adapter=agent_canon.visualization.adapter.document_mermaid`; `renderer=Mermaid`; `output_path=documents/design/cpp-build-layout.md`.
+Visualization selection: `context_question=exact consumer/provider ownership of one C++ configure graph`; `literal_user_scope=cpp-core, individual test/experiment executables, cpp-tests, cpp-experiments`; `visualization_kind=dependency graph`; `time_axis=static relation`; `precision_need=exact branch graph`; `source_evidence=D-TARGET-TYPE,D-TEST-GRAPH,D-EXPERIMENT-GRAPH`; `owner_skill_or_tool=code-visualization`; `renderer_input=native Mermaid`; `renderer=Mermaid`; `output_path=documents/design/cpp-build-layout.md`.
 
 ### Exact CMake inventory and positive ownership gate
 
