@@ -11,6 +11,8 @@ from typing import Any
 
 import pytest
 
+from conftest import materialize_source_fixture
+
 from tools.runtime.container.bootstrap_runtime import (
     BootstrapError,
     BootstrapRuntime,
@@ -29,7 +31,8 @@ def _runtime(tmp_path: Path) -> tuple[BootstrapRuntime, DockerAdapter]:
     docker = DockerAdapter(str(ROOT / "tests/bootstrap/fake_docker.py"))
     control = tmp_path / "control"
     control.mkdir()
-    return BootstrapRuntime(control, control / "runtime", repository_root=ROOT, docker=docker), docker
+    source = materialize_source_fixture(tmp_path)
+    return BootstrapRuntime(control, control / "runtime", repository_root=source, docker=docker), docker
 
 
 def _fast_manifest(tmp_path: Path) -> Path:
@@ -157,10 +160,11 @@ def test_health_failure_restores_old_runtime_and_image(tmp_path: Path, monkeypat
     manager.install()
     manager.start()
     old = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    source = materialize_source_fixture(tmp_path)
     changed = BootstrapRuntime(
         manager.paths.control_parent_root,
         manager.paths.runtime_root,
-        repository_root=ROOT,
+        repository_root=source,
         manifest_path=_fast_manifest(tmp_path),
         docker=docker,
     )
@@ -205,11 +209,12 @@ def test_owned_image_filter_argv_and_failure_are_typed(
 
 def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path) -> None:
     manager, _docker = _runtime(tmp_path)
+    source = manager.repository_root
     manager.install()
     manager.update()
     result = manager.codex_prepare()
     manifest = json.loads((manager.paths.codex_home / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["source_root"] == str(ROOT)
+    assert manifest["source_root"] == str(source)
     assert manifest["manifest_digest"] == manager.manifest_digest
     assert {entry["surface"] for entry in manifest["links"]} == {
         "skills", "agents", "hooks", "config"
@@ -220,17 +225,18 @@ def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path
     skill_links = [entry for entry in result["details"]["links"] if entry["surface"] == "skills"]
     assert skill_links
     assert len(skill_links) == 1
-    assert skill_links[0]["source"] == str(ROOT / ".codex/personal/skills")
+    assert skill_links[0]["source"] == str(source / ".codex/personal/skills")
     assert all(Path(entry["target"]).is_symlink() for entry in skill_links)
 
 
 def test_codex_prepare_keeps_one_directory_link(tmp_path: Path) -> None:
     """Git-owned skills are referenced, never regenerated or indexed per file."""
     manager, _docker = _runtime(tmp_path)
+    source = manager.repository_root
     manager.install()
     target = manager.paths.codex_home / "skills/agent-canon"
     assert target.is_symlink()
-    assert target.resolve() == ROOT / ".codex/personal/skills"
+    assert target.resolve() == source / ".codex/personal/skills"
     before = target.lstat()
     manager.codex_prepare()
     assert target.lstat().st_ino == before.st_ino
