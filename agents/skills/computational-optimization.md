@@ -248,10 +248,10 @@ before / after は、同じ mathematical problem、initial state、stopping poli
 dtype / device contract、workload で比較します。少なくとも次の decomposition を
 同じ record に残します。
 
-\[
+$$
 T_{total} = T_{compile/JIT} + N_{iter} \times
 (T_{iter\_eval} + T_{linear\_solve} + T_{communication}) + T_{other}.
-\]
+$$
 
 `T_iter_eval`、`T_linear_solve`、`T_communication` を可能な範囲で分離し、cold
 compile/JIT、warm execution、transfer / synchronization、algorithmic iteration
