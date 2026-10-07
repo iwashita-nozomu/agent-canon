@@ -41,13 +41,9 @@ read-only の探索やレビューも含め、新規起動・既存 child の再
 1. 編集前に、チャットで対象 object、問題点、根拠、修復面を短く提示してから、その問題を親が修正する。
 1. 根本原因が別 object に移ったら、編集前に新しい問題点を提示する。
 1. 修正後は、合意した修正の完了に必要な test、lint、docs check 等を規定経路で実行する。patch 前に成立した同じ作業の検証合意も有効であり、patch 後の再指示を着手条件にしない。ユーザーが「修正だけ、テストは待つ」等を明示している間は、その限定された操作を保留する。
-1. validation が fail した場合は、次の edit 方針を示す前に
-   `failing_contract`、`observation_level`、`cause_classification`、
-   `intent_preservation`、`evidence` を提示する。`intent_preservation` は
-   same-intent repair / escalation route を示す。合意した意図を維持する原因修正と、
-   その修正で前提が変わった検証を続ける。pass 目的の単純化、revert、
-   intended behavior / test 削除、oracle weakening、validation downscope を
-   失敗解消の代用にしない。
+1. validation が fail した場合は、観測結果、原因、責務を調査し、合意した意図を保つ
+   原因修正と前提の変わった検証へ進む。pass 目的の単純化、revert、意図した挙動や
+   test の削除、oracle weakening、validation downscope を修正の代用にしない。
 1. 実際の修正・検証結果を報告し、合意した成果に残る対象へ進む。必須検証が進行中なら同じ実行の結果を確認し、重複起動しない。局所検証の成功だけで、まだ必要な owner-selected 検証を完了扱いにしない。実行不能な検証は理由・観測・次の操作とともに未実施とし、独立して進められる範囲は続ける。
 
 ## Boundary
