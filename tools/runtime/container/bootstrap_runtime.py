@@ -3511,7 +3511,7 @@ class BootstrapRuntime:
                 cached_id = container.get("id")
                 if cached_id and cached_id != observed_id:
                     for orphan_id, task in list(state.get("tasks", {}).items()):
-                        if isinstance(task, dict) and task.get("state") == "active":
+                        if task.get("state") == "active":
                             self._release_task_locked(
                                 state, orphan_id, outcome="cancelled"
                             )

@@ -94,6 +94,11 @@ evidence.
 1. Resolve the task and project owner first. Use the project repository's
    normal Docker/test runner for project execution; select this skill only for
    AgentCanon tools or their lifecycle.
+   The installer entrypoint comes from the installed runtime source root; the
+   observed project/worktree is a separate read-only `--root <topic>` target.
+   Use the latest installed/bootstrap absolute entrypoint for that runtime; a
+   topic checkout's `./bootstrap.sh` is only for validating lifecycle-source
+   changes and may be stale.
 2. Reuse the source install root and authorized control root, then invoke the
    catalog-qualified `tool run --root <project> <catalog-id> -- ...` directly.
    Preserve argv, cwd, input/output, exit/signal, written paths, execution plane,
