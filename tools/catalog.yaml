@@ -1300,7 +1300,7 @@ entries:
 
   - id: check-design-doc-claims
     public: true
-    summary: Checks design-document claims against dependency-header, implementation, and parent-document evidence.
+    summary: Checks design-document claims against source and parent-document evidence.
     path: tools/validation/semantic/documents/check_design_doc_claims.py
     family: agent_tools
     role: checker

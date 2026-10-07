@@ -17,26 +17,16 @@ import json
 import os
 import re
 import subprocess
-import sys
 from collections import deque
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from itertools import groupby
 from pathlib import Path
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-
-try:
-    from tools.analysis.dependencies.graph_client import GraphClient, GraphClientError
-except ImportError:  # pragma: no cover - direct CLI execution
-    from tools.analysis.dependencies.graph_client import GraphClient, GraphClientError
-
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
 MANIFEST_REASON_MAX_SPLIT = MANIFEST_FIELD_COUNT - 1
 DEFAULT_RECURSIVE_DEPTH = 0
-CHECKABLE_TOKEN_MAX_CHARS = 120
 TEXT_SUFFIXES = {
     ".bash",
     ".c",
@@ -71,8 +61,6 @@ CLAIM_CUE_RE = re.compile(
     r"|必須|責務|契約|検証|確認|使う|接続|比較|生成|出力|入力|読む|書く",
     re.IGNORECASE,
 )
-RC_ID_RE = re.compile(r"^RC-\d{2}$")
-TARGET_STATE_SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 POSITIVE_CUE_RE = re.compile(
     r"\b(must|shall|requires?|uses?|validates?|runs?|routes?|maps?|owns?)\b"
     r"|必須|使う|使用|実行|接続|検証",
@@ -83,14 +71,8 @@ NEGATIVE_CUE_RE = re.compile(
     r"|禁止|使わない|使用しない|不要|しない",
     re.IGNORECASE,
 )
-ASSUMPTION_TERM_RE = re.compile(
-    r"\bDSL\b|problem standard form|standard form|canonical form|normalization"
-    r"|問題標準形|標準形|正規化|正準形",
-    re.IGNORECASE,
-)
 HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*$")
-TOKEN_RE = re.compile(r"`([^`]+)`")
-GITHUB_REFERENCE_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#\d+$")
+MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\((?P<target>[^)]+)\)")
 DIFF_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(?P<start>\d+)(?:,(?P<count>\d+))? @@")
 
 
@@ -171,46 +153,6 @@ class ClosureAccumulator:
     queue: deque[tuple[str, int]]
 
 
-@dataclass(frozen=True)
-class GraphClaimContext:
-    """Graph-owned context used by the claim checker."""
-
-    evidence_paths: tuple[str, ...]
-    parent_paths: tuple[str, ...]
-    evidence: dict[str, str]
-
-
-class GraphClaimConsumer:
-    """Consume one source-derived graph-compatible context projection."""
-
-    def __init__(self, root: Path) -> None:
-        """Bind the repository root and its typed graph adapter."""
-        self.root = root
-        self.client = GraphClient(root)
-
-    def context(self, path: str) -> GraphClaimContext:
-        """Return graph-certified evidence paths for one design document."""
-        response = self.client.context(path)
-        if response.status != "fresh" or response.exit_code != 0:
-            raise GraphClientError("graph snapshot is not fresh")
-        if response.source_identity is None:
-            raise GraphClientError(f"graph context did not resolve {path}")
-        payload = response.payload
-        raw_evidence = payload.get("evidence_paths")
-        raw_parents = payload.get("parent_paths")
-        if not isinstance(raw_evidence, list) or not isinstance(raw_parents, list):
-            raise GraphClientError(f"graph context for {path} omitted canonical path sets")
-        evidence_paths = tuple(sorted({value for value in raw_evidence if isinstance(value, str)}))
-        parent_paths = tuple(sorted({value for value in raw_parents if isinstance(value, str)}))
-        if path not in evidence_paths:
-            evidence_paths = tuple(sorted({path, *evidence_paths}))
-        return GraphClaimContext(
-            evidence_paths=evidence_paths,
-            parent_paths=parent_paths,
-            evidence=evidence_texts(self.root, evidence_paths),
-        )
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -246,8 +188,10 @@ def strip_manifest_line(line: str) -> str:
 def repo_relative(root: Path, path: Path) -> str:
     """Return a normalized path relative to root when possible."""
     absolute_root = Path(os.path.normpath(root.absolute().as_posix()))
-    absolute_path = Path(os.path.normpath((root / path).absolute().as_posix())) if not path.is_absolute() else Path(
-        os.path.normpath(path.absolute().as_posix())
+    absolute_path = (
+        Path(os.path.normpath((root / path).absolute().as_posix()))
+        if not path.is_absolute()
+        else Path(os.path.normpath(path.absolute().as_posix()))
     )
     try:
         return absolute_path.relative_to(absolute_root).as_posix()
@@ -360,9 +304,7 @@ def run_git_files(root: Path, prefix: str) -> list[str]:
     if result.returncode != 0:
         return []
     return [
-        f"{prefix}{line.strip()}"
-        for line in result.stdout.splitlines()
-        if line.strip()
+        f"{prefix}{line.strip()}" for line in result.stdout.splitlines() if line.strip()
     ]
 
 
@@ -390,7 +332,12 @@ def all_manifest_edges(root: Path) -> tuple[ManifestEdge, ...]:
     for path in files:
         if is_checkable_path(path):
             edges.extend(parse_manifest_edges(root, path))
-    return tuple(sorted(set(edges), key=lambda item: (item.source, item.direction, item.kind, item.target)))
+    return tuple(
+        sorted(
+            set(edges),
+            key=lambda item: (item.source, item.direction, item.kind, item.target),
+        )
+    )
 
 
 def changed_design_paths(root: Path) -> tuple[str, ...]:
@@ -434,7 +381,9 @@ def has_non_manifest_change(root: Path, path: str) -> bool:
     )
     if baseline.returncode != 0:
         return True
-    return _without_dependency_manifest(current_path.read_text(encoding="utf-8")) != _without_dependency_manifest(baseline.stdout)
+    return _without_dependency_manifest(
+        current_path.read_text(encoding="utf-8")
+    ) != _without_dependency_manifest(baseline.stdout)
 
 
 def _added_diff_lines(root: Path, path: str) -> tuple[tuple[int, str], ...]:
@@ -528,7 +477,16 @@ def has_changed_implementation_claim(root: Path, path: str) -> bool:
 def run_git_changed_path_names(root: Path) -> tuple[str, ...]:
     """Return git changed path names from the current checkout."""
     result = subprocess.run(
-        ["git", "-C", str(root), "diff", "--name-only", "--diff-filter=ACMRT", "HEAD", "--"],
+        [
+            "git",
+            "-C",
+            str(root),
+            "diff",
+            "--name-only",
+            "--diff-filter=ACMRT",
+            "HEAD",
+            "--",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -540,11 +498,7 @@ def run_git_changed_path_names(root: Path) -> tuple[str, ...]:
 
 def design_paths_from_candidates(paths: Iterable[str]) -> tuple[str, ...]:
     """Return design-document paths from candidate path names."""
-    return tuple(
-        path
-        for path in paths
-        if is_design_doc_path(path)
-    )
+    return tuple(path for path in paths if is_design_doc_path(path))
 
 
 def is_design_doc_path(path: str) -> bool:
@@ -560,12 +514,16 @@ def is_design_doc_path(path: str) -> bool:
     )
 
 
-def dependency_indexes(edges: Sequence[ManifestEdge]) -> tuple[dict[str, list[ManifestEdge]], dict[str, list[ManifestEdge]]]:
+def dependency_indexes(
+    edges: Sequence[ManifestEdge],
+) -> tuple[dict[str, list[ManifestEdge]], dict[str, list[ManifestEdge]]]:
     """Return outgoing and incoming manifest-edge indexes."""
     return edge_index_by_source(edges), edge_index_by_target(edges)
 
 
-def edge_index_by_source(edges: Sequence[ManifestEdge]) -> dict[str, list[ManifestEdge]]:
+def edge_index_by_source(
+    edges: Sequence[ManifestEdge],
+) -> dict[str, list[ManifestEdge]]:
     """Return manifest edges grouped by source path."""
     return {
         source: list(group)
@@ -576,7 +534,9 @@ def edge_index_by_source(edges: Sequence[ManifestEdge]) -> dict[str, list[Manife
     }
 
 
-def edge_index_by_target(edges: Sequence[ManifestEdge]) -> dict[str, list[ManifestEdge]]:
+def edge_index_by_target(
+    edges: Sequence[ManifestEdge],
+) -> dict[str, list[ManifestEdge]]:
     """Return manifest edges grouped by target path."""
     return {
         target: list(group)
@@ -603,7 +563,9 @@ def dependency_closure(
             continue
         visited.add(current)
         for edge in related_dependency_edges(outgoing, incoming, current):
-            record_dependency_closure_edge(target, current, depth, recursive_depth, edge, accumulator)
+            record_dependency_closure_edge(
+                target, current, depth, recursive_depth, edge, accumulator
+            )
     return accumulator.evidence, accumulator.parents, findings
 
 
@@ -657,7 +619,9 @@ def dependency_next_path(edge: ManifestEdge, current: str) -> str:
     return edge.source
 
 
-def dependency_edge_is_traversable(edge: ManifestEdge, next_path: str, target: str) -> bool:
+def dependency_edge_is_traversable(
+    edge: ManifestEdge, next_path: str, target: str
+) -> bool:
     """Return whether one dependency edge participates in claim evidence closure."""
     return (
         edge.kind in {"design", "implementation"}
@@ -668,7 +632,9 @@ def dependency_edge_is_traversable(edge: ManifestEdge, next_path: str, target: s
 
 def dependency_edge_is_parent(target: str, edge: ManifestEdge) -> bool:
     """Return whether one edge identifies an upstream parent design document."""
-    return edge.source == target and edge.direction == "upstream" and edge.kind == "design"
+    return (
+        edge.source == target and edge.direction == "upstream" and edge.kind == "design"
+    )
 
 
 def read_text(root: Path, relative_path: str) -> str:
@@ -696,11 +662,7 @@ def resolve_existing_text_path(root: Path, relative_path: str) -> Path | None:
 
 def evidence_texts(root: Path, paths: Iterable[str]) -> dict[str, str]:
     """Return readable evidence texts."""
-    return {
-        path: text
-        for path in sorted(paths)
-        if (text := read_text(root, path))
-    }
+    return {path: text for path in sorted(paths) if (text := read_text(root, path))}
 
 
 def iter_body_lines(text: str) -> Iterable[tuple[int, str]]:
@@ -724,7 +686,10 @@ def iter_body_lines(text: str) -> Iterable[tuple[int, str]]:
             continue
         if not stripped or stripped.startswith("<!--") or stripped.startswith("-->"):
             continue
-        if stripped.startswith("|") and set(stripped.replace("|", "").strip()) <= {"-", ":"}:
+        if stripped.startswith("|") and set(stripped.replace("|", "").strip()) <= {
+            "-",
+            ":",
+        }:
             continue
         yield index, raw_line.rstrip()
 
@@ -755,64 +720,33 @@ def section_text(text: str, section_keywords: Sequence[str]) -> str:
 
 
 def checkable_tokens(line: str) -> tuple[str, ...]:
-    """Return checkable backtick tokens from one line."""
+    """Return local Markdown link targets used as explicit evidence references.
+
+    Inline code and ``key=value`` examples are ordinary prose.  Only an
+    explicit Markdown link enters the source-evidence check, so formatting a
+    value as a code span cannot silently become a private claim language.
+    """
     tokens: list[str] = []
-    for raw_token in TOKEN_RE.findall(line):
-        if token := normalized_checkable_token(raw_token):
-            tokens.append(token)
+    for match in MARKDOWN_LINK_RE.finditer(line):
+        target = markdown_link_target(match.group("target"))
+        if target:
+            tokens.append(target)
     return tuple(dict.fromkeys(tokens))
 
 
-def normalized_checkable_token(raw_token: str) -> str | None:
-    """Return a normalized token when one Markdown code span is checkable."""
-    token = raw_token.strip()
-    if not token or len(token) > CHECKABLE_TOKEN_MAX_CHARS:
-        return None
-    if "..." in token:
-        return None
-    if "<" in token and ">" in token:
-        return None
-    if token.startswith(("http://", "https://")):
-        return None
-    if GITHUB_REFERENCE_RE.fullmatch(token):
-        return None
-    if token.lower() in {"yes", "no", "pass", "fail", "active", "pending"}:
-        return None
-    if token.startswith("<") and token.endswith(">"):
-        return None
-    if not is_checkable_token(token):
-        return None
-    return token
-
-
-def is_checkable_token(token: str) -> bool:
-    """Return whether a Markdown code span is a checkable code/path token."""
-    if TARGET_STATE_SHA_RE.fullmatch(token):
-        return True
-    if any(sep in token for sep in ("/", "\\", "::", ".", "_", "-")):
-        return True
-    if token.startswith("--"):
-        return True
-    if " " in token and any(part.endswith((".py", ".sh", ".rs", ".md")) for part in token.split()):
-        return True
-    return token.isupper() and len(token) > 2
-
-
-def strict_claim_prose_required(path: str, text: str) -> bool:
-    """Return whether cue-only prose lines are design claims for this document."""
-    if "/design/" in path or path.endswith("-design.md"):
-        return True
-    for raw_line in text.splitlines()[:HEADER_SCAN_LINES]:
-        line = strip_manifest_line(raw_line)
-        if line == "contract design":
-            return True
-    return False
+def markdown_link_target(raw_target: str) -> str:
+    """Return a local Markdown link target, excluding optional title/anchor data."""
+    target = raw_target.strip().split(maxsplit=1)[0]
+    if not target or target.startswith(("http://", "https://", "mailto:", "#")):
+        return ""
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    return target.split("#", 1)[0].split("?", 1)[0].strip()
 
 
 def extract_claims(path: str, text: str) -> tuple[Claim, ...]:
-    """Extract checkable design claim lines."""
+    """Extract design claim lines with explicit Markdown evidence links."""
     claims: list[Claim] = []
-    strict_prose = strict_claim_prose_required(path, text)
     for line_number, line in iter_body_lines(text):
         stripped = line.strip()
         if stripped.startswith("#"):
@@ -820,7 +754,7 @@ def extract_claims(path: str, text: str) -> tuple[Claim, ...]:
         if is_non_claim_control_line(stripped):
             continue
         tokens = checkable_tokens(stripped)
-        if tokens or (strict_prose and CLAIM_CUE_RE.search(stripped)):
+        if tokens and CLAIM_CUE_RE.search(stripped):
             claims.append(Claim(path, line_number, stripped, tokens))
     return tuple(claims)
 
@@ -859,7 +793,11 @@ def token_is_path_in_repo(root: Path, claim_path: str, token: str) -> bool:
     """Return whether one token points to an existing repo path."""
     for candidate in token_path_candidates(token):
         if "*" in candidate:
-            base = resolve_repo_path(root, claim_path).parent if candidate.startswith("../") else root
+            base = (
+                resolve_repo_path(root, claim_path).parent
+                if candidate.startswith("../")
+                else root
+            )
             if any(path_is_under_root(root, path) for path in base.glob(candidate)):
                 return True
             continue
@@ -875,102 +813,38 @@ def token_is_path_in_repo(root: Path, claim_path: str, token: str) -> bool:
     return False
 
 
-def key_value_token_in_evidence(token: str, texts: dict[str, str]) -> bool:
-    """Return whether a key/value token has same-record evidence."""
-    for separator in (":", "="):
-        if separator not in token:
-            continue
-        key, value = (part.strip() for part in token.split(separator, 1))
-        if not key or not value:
-            return False
-        pattern = re.compile(
-            rf"(?<![\w.-]){re.escape(key)}[ \t]*[:=][ \t]*[\"'{{]?"
-            rf"{re.escape(value)}[\"'}}]?(?![\w.-])",
-            re.IGNORECASE,
-        )
-        return any(pattern.search(text) for text in texts.values())
-    return False
-
-
 def token_in_evidence(token: str, texts: dict[str, str]) -> bool:
-    """Return whether one token appears in any evidence text."""
+    """Return whether one explicit link target appears in evidence text."""
     token_lower = token.lower()
     candidates = [token_lower]
     candidates.extend(candidate.lower() for candidate in token_path_candidates(token))
-    if any(candidate and candidate in text.lower() for text in texts.values() for candidate in candidates):
+    if any(
+        candidate and candidate in text.lower()
+        for text in texts.values()
+        for candidate in candidates
+    ):
         return True
     if "*" in token:
         pattern = re.compile(re.escape(token_lower).replace(r"\*", r"[^\s`'\"|,]+"))
         return any(pattern.search(text.lower()) for text in texts.values())
-    if key_value_token_in_evidence(token, texts):
-        return True
     return False
 
 
 def has_evidence_ledger(text: str) -> bool:
     """Return whether the design carries an evidence / assumption section."""
-    return bool(section_text(text, ("evidence and assumption", "assumption ledger", "evidence ledger")))
-
-
-def assumption_terms(text: str) -> tuple[str, ...]:
-    """Return implicit-assumption vocabulary terms present in text."""
-    return tuple(dict.fromkeys(match.group(0) for match in ASSUMPTION_TERM_RE.finditer(text)))
+    return bool(
+        section_text(
+            text, ("evidence and assumption", "assumption ledger", "evidence ledger")
+        )
+    )
 
 
 def claim_evidence_record_v1(
     claim: Claim,
     all_evidence_text: dict[str, str],
-    assumption_terms_in_claim_text: tuple[str, ...],
 ) -> ClaimEvidenceRecord:
     """Return one fixed-shape claim evidence record."""
     claim_hash = hashlib.sha256(claim.text.encode("utf-8")).hexdigest()
-    claim_tokens = tuple(token.lower() for token in claim.tokens)
-    if any(RC_ID_RE.fullmatch(token.upper()) for token in claim_tokens):
-        rc_ids = tuple(
-            token.upper() for token in claim_tokens if RC_ID_RE.fullmatch(token.upper())
-        )
-        return ClaimEvidenceRecord(
-            record_version=1,
-            claim_id=f"{claim.path}:{claim.line}",
-            claim_text_sha256=claim_hash,
-            evidence_class="request_contract",
-            input_identity=claim.path,
-            owner_id="check_design_doc_claims",
-            evidence_ids=(),
-            request_clause_ids=rc_ids,
-            target_state_contract_sha256=None,
-            final_readback_action_id=None,
-            status="verified",
-        )
-    for token in claim_tokens:
-        if TARGET_STATE_SHA_RE.fullmatch(token):
-            return ClaimEvidenceRecord(
-                record_version=1,
-                claim_id=f"{claim.path}:{claim.line}",
-                claim_text_sha256=claim_hash,
-                evidence_class="target_state",
-                input_identity=claim.path,
-                owner_id="check_design_doc_claims",
-                evidence_ids=tuple(sorted(all_evidence_text)),
-                request_clause_ids=(),
-                target_state_contract_sha256=token,
-                final_readback_action_id=None,
-                status="approved_pending_implementation",
-            )
-        if any(term.lower() in token for term in assumption_terms_in_claim_text):
-            return ClaimEvidenceRecord(
-                record_version=1,
-                claim_id=f"{claim.path}:{claim.line}",
-                claim_text_sha256=claim_hash,
-                evidence_class="assumption",
-                input_identity=claim.path,
-                owner_id="check_design_doc_claims",
-                evidence_ids=(),
-                request_clause_ids=(),
-                target_state_contract_sha256=None,
-                final_readback_action_id=None,
-                status="blocked",
-            )
     return ClaimEvidenceRecord(
         record_version=1,
         claim_id=f"{claim.path}:{claim.line}",
@@ -1001,31 +875,6 @@ def claim_evidence_class_counts(
     return counts
 
 
-def check_assumption_ledger(path: str, text: str) -> list[Finding]:
-    """Check implicit assumption terms against the design ledger."""
-    terms = assumption_terms(text)
-    if not terms:
-        return []
-    ledger = section_text(text, ("evidence and assumption", "assumption ledger", "assumptions"))
-    if not ledger:
-        return [
-            Finding(
-                "implicit-assumption-without-ledger",
-                path,
-                0,
-                f"terms={','.join(sorted(terms, key=str.lower))}",
-            )
-        ]
-    ledger_lower = ledger.lower()
-    findings: list[Finding] = []
-    for term in terms:
-        if term.lower() not in ledger_lower:
-            findings.append(
-                Finding("implicit-assumption-term-untracked", path, 0, f"term={term}")
-            )
-    return findings
-
-
 def polarity_for_line(line: str) -> str:
     """Return positive, negative, or neutral polarity for a line."""
     if NEGATIVE_CUE_RE.search(line):
@@ -1049,11 +898,11 @@ def token_polarities(text: str) -> dict[str, set[str]]:
 
 
 def token_polarity_entries(line: str) -> tuple[tuple[str, str], ...]:
-    """Return polarity entries for checkable tokens in one prose line."""
+    """Return polarity entries for explicit Markdown evidence links."""
     return tuple(
         (token.lower(), polarity)
-        for match in TOKEN_RE.finditer(line)
-        if (token := normalized_checkable_token(match.group(1)))
+        for match in MARKDOWN_LINK_RE.finditer(line)
+        if (token := markdown_link_target(match.group("target")))
         if (polarity := polarity_for_line(line[: match.start()])) != "neutral"
     )
 
@@ -1064,7 +913,7 @@ def check_parent_contradictions(
     text: str,
     parent_paths: Sequence[str],
 ) -> list[Finding]:
-    """Find deterministic parent/child modal contradictions over code tokens."""
+    """Find deterministic parent/child modal contradictions over evidence links."""
     child_polarities = token_polarities(text)
     findings: list[Finding] = []
     for parent_path in parent_paths:
@@ -1073,11 +922,21 @@ def check_parent_contradictions(
             parent_values = parent_polarities.get(token, set())
             if "positive" in child_values and "negative" in parent_values:
                 findings.append(
-                    Finding("parent-document-contradiction", path, 0, f"token={token} parent={parent_path}")
+                    Finding(
+                        "parent-document-contradiction",
+                        path,
+                        0,
+                        f"token={token} parent={parent_path}",
+                    )
                 )
             if "negative" in child_values and "positive" in parent_values:
                 findings.append(
-                    Finding("parent-document-contradiction", path, 0, f"token={token} parent={parent_path}")
+                    Finding(
+                        "parent-document-contradiction",
+                        path,
+                        0,
+                        f"token={token} parent={parent_path}",
+                    )
                 )
     return findings
 
@@ -1087,50 +946,18 @@ def check_claim_support(
     claims: Sequence[Claim],
     evidence: dict[str, str],
 ) -> tuple[int, list[Finding], tuple[ClaimEvidenceRecord, ...]]:
-    """Check claim tokens against repo paths and evidence text."""
+    """Check explicit Markdown evidence links against source paths and text."""
     supported = 0
     findings: list[Finding] = []
     records: list[ClaimEvidenceRecord] = []
-    assumption_terms_in_text = assumption_terms("\n".join(claim.text for claim in claims))
     for claim in claims:
-        if not claim.tokens:
-            findings.append(
-                Finding(
-                    "claim-without-checkable-token",
-                    claim.path,
-                    claim.line,
-                    "add code/path/command evidence token or move statement to non-claim prose",
-                )
-            )
-            records.append(
-                ClaimEvidenceRecord(
-                    record_version=1,
-                    claim_id=f"{claim.path}:{claim.line}",
-                    claim_text_sha256=hashlib.sha256(claim.text.encode("utf-8")).hexdigest(),
-                    evidence_class="assumption",
-                    input_identity=claim.path,
-                    owner_id="check_design_doc_claims",
-                    evidence_ids=(),
-                    request_clause_ids=(),
-                    target_state_contract_sha256=None,
-                    final_readback_action_id=None,
-                    status="blocked",
-                )
-            )
-            continue
-        record = claim_evidence_record_v1(claim, evidence, assumption_terms_in_text)
+        record = claim_evidence_record_v1(claim, evidence)
         records.append(record)
         token_findings = []
         for token in claim.tokens:
-            if token_is_path_in_repo(root, claim.path, token) or token_in_evidence(token, evidence):
-                continue
-            if record.evidence_class == "request_contract" and RC_ID_RE.fullmatch(token.upper()):
-                continue
-            if record.evidence_class == "target_state" and TARGET_STATE_SHA_RE.fullmatch(token.lower()):
-                continue
-            if record.evidence_class == "assumption" and token.lower() in {
-                term.lower() for term in assumption_terms_in_text
-            }:
+            if token_is_path_in_repo(root, claim.path, token) or token_in_evidence(
+                token, evidence
+            ):
                 continue
             token_findings.append(
                 Finding(
@@ -1147,13 +974,17 @@ def check_claim_support(
     return supported, findings, tuple(records)
 
 
-def missing_dependency_target_findings(root: Path, path: str, evidence_paths: Sequence[str]) -> list[Finding]:
+def missing_dependency_target_findings(
+    root: Path, path: str, evidence_paths: Sequence[str]
+) -> list[Finding]:
     """Return findings for dependency targets that do not resolve."""
     findings: list[Finding] = []
     for evidence_path in evidence_paths:
         if not resolve_repo_path(root, evidence_path).exists():
             findings.append(
-                Finding("dependency-target-unresolved", path, 0, f"path={evidence_path}")
+                Finding(
+                    "dependency-target-unresolved", path, 0, f"path={evidence_path}"
+                )
             )
     return findings
 
@@ -1177,8 +1008,14 @@ def _check_one_from_manifest(
             findings=(Finding("design-document-unresolved", path, 0, f"path={path}"),),
         )
     text = read_text(root, path)
-    claims = changed_implementation_claims(root, path) if changed_only else extract_claims(path, text)
-    evidence_paths, parent_paths, traversal_findings = dependency_closure(path, edges, recursive_depth)
+    claims = (
+        changed_implementation_claims(root, path)
+        if changed_only
+        else extract_claims(path, text)
+    )
+    evidence_paths, parent_paths, traversal_findings = dependency_closure(
+        path, edges, recursive_depth
+    )
     readable_evidence = evidence_texts(root, evidence_paths)
     supported, claim_findings, claim_evidence_records = check_claim_support(
         root,
@@ -1187,12 +1024,22 @@ def _check_one_from_manifest(
     )
     findings: list[Finding] = []
     if claims and not has_evidence_ledger(text):
-        findings.append(Finding("missing-evidence-assumption-ledger", path, 0, "section=Evidence And Assumption Ledger"))
+        findings.append(
+            Finding(
+                "missing-evidence-assumption-ledger",
+                path,
+                0,
+                "section=Evidence And Assumption Ledger",
+            )
+        )
     findings.extend(traversal_findings)
-    findings.extend(missing_dependency_target_findings(root, path, sorted(evidence_paths)))
+    findings.extend(
+        missing_dependency_target_findings(root, path, sorted(evidence_paths))
+    )
     analysis_text = "\n".join(claim.text for claim in claims) if changed_only else text
-    findings.extend(check_assumption_ledger(path, analysis_text))
-    findings.extend(check_parent_contradictions(root, path, analysis_text, sorted(parent_paths)))
+    findings.extend(
+        check_parent_contradictions(root, path, analysis_text, sorted(parent_paths))
+    )
     findings.extend(claim_findings)
     return CheckResult(
         path=path,
@@ -1201,41 +1048,12 @@ def _check_one_from_manifest(
         evidence_paths=tuple(sorted(evidence_paths)),
         parent_paths=tuple(sorted(parent_paths)),
         claim_evidence_records=claim_evidence_records,
-        findings=tuple(sorted(findings, key=lambda item: (item.kind, item.path, item.line, item.detail))),
-    )
-
-
-def check_one(root: Path, path: str, consumer: GraphClaimConsumer) -> CheckResult:
-    """Check one design document against graph-provided evidence context."""
-    if resolve_existing_text_path(root, path) is None:
-        return CheckResult(
-            claim_evidence_records=(),
-            path=path,
-            claims=0,
-            supported_claims=0,
-            evidence_paths=(),
-            parent_paths=(),
-            findings=(Finding("design-document-unresolved", path, 0, f"path={path}"),),
-        )
-    text = read_text(root, path)
-    claims = extract_claims(path, text)
-    context = consumer.context(path)
-    supported, claim_findings, claim_evidence_records = check_claim_support(root, claims, context.evidence)
-    findings: list[Finding] = []
-    if claims and not has_evidence_ledger(text):
-        findings.append(Finding("missing-evidence-assumption-ledger", path, 0, "section=Evidence And Assumption Ledger"))
-    findings.extend(missing_dependency_target_findings(root, path, context.evidence_paths))
-    findings.extend(check_assumption_ledger(path, text))
-    findings.extend(check_parent_contradictions(root, path, text, context.parent_paths))
-    findings.extend(claim_findings)
-    return CheckResult(
-        claim_evidence_records=claim_evidence_records,
-        path=path,
-        claims=len(claims),
-        supported_claims=supported,
-        evidence_paths=context.evidence_paths,
-        parent_paths=context.parent_paths,
-        findings=tuple(sorted(findings, key=lambda item: (item.kind, item.path, item.line, item.detail))),
+        findings=tuple(
+            sorted(
+                findings,
+                key=lambda item: (item.kind, item.path, item.line, item.detail),
+            )
+        ),
     )
 
 
@@ -1261,7 +1079,9 @@ def render_text(results: Sequence[CheckResult]) -> str:
         "assumption": 0,
     }
     for result in results:
-        for key, value in claim_evidence_class_counts(result.claim_evidence_records).items():
+        for key, value in claim_evidence_class_counts(
+            result.claim_evidence_records
+        ).items():
             aggregate_counts[key] += value
     lines.extend(
         [
@@ -1296,36 +1116,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = args.root.resolve()
     paths = selected_paths(root, args)
-    repository_scoped = (root / ".git").exists() or (root / "vendor" / "agent-canon" / ".git").exists()
-    if repository_scoped and not args.changed:
-        try:
-            consumer = GraphClaimConsumer(root)
-            results = tuple(check_one(root, path, consumer) for path in paths)
-        except GraphClientError as error:
-            results = tuple(
-                CheckResult(
-                    claim_evidence_records=(),
-                    path=path,
-                    claims=0,
-                    supported_claims=0,
-                    evidence_paths=(),
-                    parent_paths=(),
-                    findings=(Finding("graph-snapshot-unavailable", path, 0, str(error)),),
-                )
-                for path in paths
-            )
-    else:
-        edges = all_manifest_edges(root)
-        results = tuple(
-            _check_one_from_manifest(
-                root,
-                path,
-                edges,
-                args.recursive_depth,
-                changed_only=args.changed,
-            )
-            for path in paths
+    edges = all_manifest_edges(root)
+    results = tuple(
+        _check_one_from_manifest(
+            root,
+            path,
+            edges,
+            args.recursive_depth,
+            changed_only=args.changed,
         )
+        for path in paths
+    )
     if args.format == "json":
         print(render_json(results))
     else:

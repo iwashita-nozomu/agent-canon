@@ -115,7 +115,7 @@ skipped while the strict canonical header scan and format check still run.
 With --ensure-graph, the opt-in persisted graph status/build operation runs once
 and exits before source-owned dependency-header review.
 With --check-design-doc-claims, changed design documents are compared with
-dependency header evidence and implementation-backed claim tokens. Repeat
+source-derived dependency evidence and explicit Markdown links. Repeat
 --design-doc-claim-path to check explicit design documents instead of changed
 scope.
 EOF

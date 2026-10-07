@@ -5,14 +5,11 @@
 # responsibility Tests design-document claim evidence checker behavior.
 # upstream design ../../documents/design/README.md design-document evidence policy
 # upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py checks design claims
-# upstream implementation ../../tools/analysis/dependencies/graph_client.py validates persisted graph context
 # upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh provides dependency graph semantics
 # @dependency-end
 
 from __future__ import annotations
 
-import contextlib
-import io
 import json
 import subprocess
 import sys
@@ -20,14 +17,20 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
 
-from tools.validation.semantic.documents import check_design_doc_claims as graph_claim_checker
-from tools.analysis.dependencies.graph_client import GraphResponse
+from tools.validation.semantic.documents import (
+    check_design_doc_claims as graph_claim_checker,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "documents" / "check_design_doc_claims.py"
+SCRIPT = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "documents"
+    / "check_design_doc_claims.py"
+)
 
 
 def run_checker(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
@@ -49,7 +52,9 @@ def write(path: Path, text: str) -> None:
 
 def git(root: Path, *args: str) -> None:
     """Run one Git operation in a fixture repository."""
-    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True)
+    subprocess.run(
+        ["git", "-C", str(root), *args], check=True, capture_output=True, text=True
+    )
 
 
 def init_git(root: Path) -> None:
@@ -71,7 +76,9 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             (),
         )
 
-    def test_changed_scope_keeps_active_claims_and_ignores_retired_history_and_tables(self) -> None:
+    def test_changed_scope_keeps_active_claims_and_ignores_retired_history_and_tables(
+        self,
+    ) -> None:
         """Changed mode gates only new active implementation claims."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -164,13 +171,25 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             git(root, "add", ".")
             git(root, "commit", "-qm", "fixture baseline")
 
-            with (root / "documents/design/active.md").open("a", encoding="utf-8") as stream:
-                stream.write("\n- The design must route through `run_feature`.\n")
-            with (root / "documents/design/retired.md").open("a", encoding="utf-8") as stream:
+            with (root / "documents/design/active.md").open(
+                "a", encoding="utf-8"
+            ) as stream:
+                stream.write(
+                    "\n- The design must route through [runner](../../tools/runner.py).\n"
+                )
+            with (root / "documents/design/retired.md").open(
+                "a", encoding="utf-8"
+            ) as stream:
                 stream.write("\n- The retired route must use `retired_new_symbol`.\n")
-            with (root / "documents/design/historical.md").open("a", encoding="utf-8") as stream:
-                stream.write("\n- The historical route must use `historical_new_symbol`.\n")
-            with (root / "documents/design/evidence-table.md").open("a", encoding="utf-8") as stream:
+            with (root / "documents/design/historical.md").open(
+                "a", encoding="utf-8"
+            ) as stream:
+                stream.write(
+                    "\n- The historical route must use `historical_new_symbol`.\n"
+                )
+            with (root / "documents/design/evidence-table.md").open(
+                "a", encoding="utf-8"
+            ) as stream:
                 stream.write("\n| new | `unknown_generated_label` |\n")
 
             selected = graph_claim_checker.changed_design_paths(root)
@@ -204,7 +223,7 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
                 ## Claims
 
-                - The design must route work through `run_feature`.
+                - The design must route work through [runner](../../tools/feature_runner.py).
                 """,
             )
             write(
@@ -225,6 +244,40 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
             self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=1", result.stdout)
+
+    def test_explicit_path_does_not_require_graph_snapshot(self) -> None:
+        """Source evidence remains usable without graph status or identity receipts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            write(
+                root / "documents" / "design" / "feature.md",
+                """
+                # Feature Design
+                <!--
+                @dependency-start
+                responsibility Documents Feature Design fixture.
+                downstream implementation ../../tools/feature_runner.py runner implementation
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: [runner](../../tools/feature_runner.py).
+                - Assumptions: direct implementation evidence.
+
+                The design must route work through [runner](../../tools/feature_runner.py).
+                """,
+            )
+            write(
+                root / "tools" / "feature_runner.py",
+                "def run_feature() -> None:\n    pass\n",
+            )
+
+            result = run_checker("documents/design/feature.md", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
 
     def test_dependency_manifest_lines_are_not_claims(self) -> None:
         """Dependency header route lines are evidence metadata, not body claims."""
@@ -357,7 +410,9 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
 
-    def test_fail_parent_relative_path_token_does_not_collapse_to_repo_root(self) -> None:
+    def test_fail_parent_relative_path_token_does_not_collapse_to_repo_root(
+        self,
+    ) -> None:
         """Parent-relative path claims do not fall back to unrelated root files."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -378,7 +433,7 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
                 - Evidence sources: `../README.md`.
                 - Assumptions: parent-relative links are resolved from the guide.
 
-                The guide must read `../README.md`.
+                The guide must read [the README](../README.md).
                 """,
             )
             write(root / "README.md", "# Root Docs\n")
@@ -430,89 +485,8 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
 
-    def test_request_contract_claim_is_typed_as_request_contract(self) -> None:
-        """Request-contract claims are emitted as request_contract records."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                responsibility Documents Feature Design fixture.
-                downstream implementation ../../tools/feature_runner.py runner implementation
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `tools/feature_runner.py`.
-                - Assumptions: request-contract claim is test-only.
-
-                ## Claims
-
-                - The design must satisfy request-contract `RC-10`.
-                """,
-            )
-            write(
-                root / "tools" / "feature_runner.py",
-                """
-                def run_feature() -> None:
-                    pass
-                """,
-            )
-
-            result = run_checker("--format", "json", "documents/design/feature.md", root=root)
-            payload = json.loads(result.stdout)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(payload["status"], "pass")
-            records = payload["documents"][0]["claim_evidence_records"]
-            self.assertEqual(len(records), 1)
-            self.assertEqual(records[0]["evidence_class"], "request_contract")
-            self.assertEqual(records[0]["status"], "verified")
-
-    def test_target_state_claim_reports_target_state_class(self) -> None:
-        """Target-state claims are typed and accepted as approved_pending_implementation."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents" / "design" / "feature.md",
-                """
-                # Feature Design
-                <!--
-                @dependency-start
-                contract design
-                responsibility Documents Feature Design fixture.
-                upstream design ../README.md feature design
-                @dependency-end
-                -->
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence sources: `documents/README.md`.
-                - Assumptions: target-state projection is not yet implemented.
-
-                ## Claims
-
-                - The design route requires target state `e8ae83767a4c3a7edb10a59f611c9f949ac8ea0563dcf844329f2be95c9a2762`.
-                """,
-            )
-            write(root / "documents" / "README.md", "# Docs\n")
-
-            result = run_checker("--format", "json", "documents/design/feature.md", root=root)
-            payload = json.loads(result.stdout)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(payload["status"], "pass")
-            records = payload["documents"][0]["claim_evidence_records"]
-            self.assertEqual(len(records), 1)
-            self.assertEqual(records[0]["evidence_class"], "target_state")
-            self.assertEqual(records[0]["status"], "approved_pending_implementation")
-
-    def test_fail_key_value_token_requires_same_record_evidence(self) -> None:
-        """A key and value in separate evidence records do not support a pair claim."""
+    def test_key_value_code_span_is_ordinary_prose(self) -> None:
+        """A key/value example is not promoted to a private claim language."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             write(
@@ -546,9 +520,8 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
             result = run_checker("documents/design/feature.md", root=root)
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-token-without-evidence", result.stdout)
-            self.assertIn("token=goal_status: blocked", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
 
     def test_fail_claim_without_evidence_after_recursive_expansion(self) -> None:
         """A missing token remains visible after recursive header expansion."""
@@ -572,7 +545,7 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
                 ## Claims
 
-                - The design must call `missing_symbol`.
+                - The design must call [the missing symbol](../../tools/missing_symbol.py).
                 """,
             )
             write(
@@ -589,15 +562,19 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
                 Parent text mentions `other_symbol`.
                 """,
             )
+            write(
+                root / "tools" / "legacy_route.py",
+                "def legacy_route() -> None:\n    pass\n",
+            )
 
             result = run_checker("documents/design/child.md", root=root)
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("claim-token-without-evidence", result.stdout)
-            self.assertIn("token=missing_symbol", result.stdout)
+            self.assertIn("token=../../tools/missing_symbol.py", result.stdout)
 
-    def test_fail_natural_language_claim_without_checkable_token(self) -> None:
-        """A modal claim line needs a checkable evidence token."""
+    def test_natural_language_claim_without_link_is_ordinary_prose(self) -> None:
+        """A modal prose line is not a private claim grammar entry."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             write(
@@ -636,8 +613,8 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
             result = run_checker("documents/design/feature.md", root=root)
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-without-checkable-token", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
 
     def test_fail_missing_explicit_design_path(self) -> None:
         """An explicit missing design path is reported as a finding."""
@@ -671,7 +648,7 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
                 ## Claims
 
-                - The design must call `engine_step`.
+                - The design must call [the engine](../../tools/engine.py).
                 """,
             )
             write(
@@ -732,7 +709,7 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
                 ## Claims
 
-                - The design must use `legacy_route`.
+                - The design must use [the legacy route](../../tools/legacy_route.py).
                 """,
             )
             write(
@@ -746,18 +723,22 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
                 @dependency-end
                 -->
 
-                - The parent design must not use `legacy_route`.
+                - The parent design must not use [the legacy route](../../tools/legacy_route.py).
                 """,
+            )
+            write(
+                root / "tools" / "legacy_route.py",
+                "def legacy_route() -> None:\n    pass\n",
             )
 
             result = run_checker("documents/design/child.md", root=root)
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("parent-document-contradiction", result.stdout)
-            self.assertIn("token=legacy_route", result.stdout)
+            self.assertIn("token=../../tools/legacy_route.py", result.stdout)
 
-    def test_implicit_assumption_term_requires_ledger_entry(self) -> None:
-        """DSL and standard-form terms are tracked through the assumption ledger."""
+    def test_dsl_terms_are_not_implicit_ledger_requirements(self) -> None:
+        """DSL and standard-form prose does not activate a private ledger grammar."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             write(
@@ -796,12 +777,11 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
             result = run_checker("documents/design/dsl.md", root=root)
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("implicit-assumption-term-untracked", result.stdout)
-            self.assertIn("term=DSL", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
 
-    def test_reports_path_is_not_used_as_manifest_evidence(self) -> None:
-        """Generated report paths stay outside dependency evidence."""
+    def test_generated_report_example_is_ordinary_prose(self) -> None:
+        """A generated-report code span is not an implicit evidence reference."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             write(
@@ -835,8 +815,8 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
 
             result = run_checker("documents/design/feature.md", root=root)
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("claim-token-without-evidence", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=0", result.stdout)
 
     def test_json_output_is_stable(self) -> None:
         """JSON output exposes machine-readable result shape."""
@@ -854,133 +834,14 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
                 """,
             )
 
-            result = run_checker("--format", "json", "documents/design/feature.md", root=root)
+            result = run_checker(
+                "--format", "json", "documents/design/feature.md", root=root
+            )
             payload = json.loads(result.stdout)
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(payload["status"], "pass")
             self.assertEqual(payload["finding_count"], 0)
-
-
-class FakeDesignGraphClient:
-    """Provide graph-owned context without rerunning the graph producer."""
-
-    def __init__(self, _root: Path, *, status: str = "fresh") -> None:
-        self._status = status
-
-    def status(self) -> SimpleNamespace:
-        return SimpleNamespace(
-            status=self._status,
-            exit_code=0 if self._status == "fresh" else 2,
-        )
-
-    def context(self, path: str) -> GraphResponse:
-        payload = {
-            "schema": "agent-canon.graph.context.v1",
-            "command": "context",
-            "status": self._status,
-            "resolved_path": path,
-            "source_identity": {
-                "snapshot_commit": "a" * 40,
-                "source_path": path,
-                "content_sha256": "b" * 64,
-            },
-            "evidence_paths": [path, "tools/feature_runner.py"],
-            "parent_paths": [],
-        }
-        return GraphResponse(
-            "agent-canon.graph.context.v1",
-            "context",
-            self._status,
-            payload,
-            0 if self._status == "fresh" else 2,
-        )
-
-
-class DesignDocGraphConsumerTest(unittest.TestCase):
-    """Exercise consume-only graph context and freshness refusal."""
-
-    def run_main(
-        self,
-        root: Path,
-        graph: FakeDesignGraphClient,
-        *paths: str,
-    ) -> tuple[int, str]:
-        output = io.StringIO()
-        (root / ".git").mkdir(exist_ok=True)
-        argv = ["check_design_doc_claims.py", "--root", str(root), *paths]
-        with (
-            patch.object(sys, "argv", argv),
-            patch.object(graph_claim_checker, "GraphClient", lambda _root: graph),
-            contextlib.redirect_stdout(output),
-        ):
-            result = graph_claim_checker.main()
-        return result, output.getvalue()
-
-    def test_check_one_consumes_graph_context_evidence(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(
-                root / "documents/design/feature.md",
-                """
-                # Feature Design
-
-                ## Evidence And Assumption Ledger
-
-                - Evidence: `tools/feature_runner.py`.
-
-                ## Claims
-
-                - The design must route work through `run_feature`.
-                """,
-            )
-            write(
-                root / "tools/feature_runner.py",
-                """
-                def run_feature() -> None:
-                    pass
-                """,
-            )
-            result, output = self.run_main(
-                root,
-                FakeDesignGraphClient(root),
-                "documents/design/feature.md",
-            )
-            self.assertEqual(result, 0, output)
-            self.assertIn("DESIGN_DOC_CLAIMS=pass", output)
-
-    def test_stale_graph_context_is_reported(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(root / "documents/design/feature.md", "# Feature Design\n")
-            result, output = self.run_main(
-                root,
-                FakeDesignGraphClient(root, status="stale"),
-                "documents/design/feature.md",
-            )
-            self.assertNotEqual(result, 0)
-            self.assertIn("graph snapshot is not fresh", output)
-
-    def test_graph_context_without_identity_fails_closed(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            write(root / "documents/design/feature.md", "# Feature Design\n")
-            graph = FakeDesignGraphClient(root)
-            missing_identity = GraphResponse(
-                "agent-canon.graph.context.v1",
-                "context",
-                "fresh",
-                {"resolved_path": "documents/design/feature.md"},
-                0,
-            )
-            with patch.object(graph, "context", return_value=missing_identity):
-                result, output = self.run_main(
-                    root,
-                    graph,
-                    "documents/design/feature.md",
-                )
-            self.assertNotEqual(result, 0)
-            self.assertIn("graph context did not resolve", output)
 
 
 if __name__ == "__main__":
