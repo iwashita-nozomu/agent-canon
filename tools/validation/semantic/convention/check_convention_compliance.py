@@ -123,14 +123,6 @@ TOOL_GATES = {
         "tools/analysis/dependencies/scan_code_dependencies.sh",
         (TOOL_CATALOG_PATH,),
     ),
-    "hardcoded_numbers": (
-        "tools/validation/semantic/code/check_hardcoded_numbers.py",
-        (TOOL_CATALOG_PATH,),
-    ),
-    "static_any": (
-        "tools/validation/semantic/code/check_static_any.py",
-        (TOOL_CATALOG_PATH,),
-    ),
     "log_helper_names": (
         "tools/validation/semantic/logging/check_log_helper_names.py",
         (TOOL_CATALOG_PATH,),

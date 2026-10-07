@@ -15,6 +15,10 @@ WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
 cd "${WORKSPACE_ROOT}"
 
+RUFF_DOCSTRING_CONFIG="${WORKSPACE_ROOT}/tools/validation/code/config/ruff-docstrings.toml"
+RUFF_MAGIC_VALUE_CONFIG="${WORKSPACE_ROOT}/tools/validation/code/config/ruff-magic-values.toml"
+BASEDPYRIGHT_CONFIG="${WORKSPACE_ROOT}/tools/validation/code/config/basedpyright-explicit-any.json"
+
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "$PYTHON_BIN" ]; then
   if command -v python3 >/dev/null 2>&1; then
@@ -130,6 +134,15 @@ else
 fi
 echo ""
 
+echo "5️⃣  BasedPyright explicit Any checks を実行中..."
+if basedpyright --project "${BASEDPYRIGHT_CONFIG}" "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
+  echo "✅ BasedPyright explicit Any checks 成功"
+else
+  echo "❌ BasedPyright explicit Any checks 失敗"
+  EXIT_CODE=1
+fi
+echo ""
+
 if [ "$QUICK_MODE" -eq 1 ]; then
   echo "RUFF=skip reason=quick_mode"
 elif [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
@@ -142,10 +155,24 @@ else
   echo "   - D: Docstring 検証"
   echo "   - UP: Python 最新構文チェック"
   echo ""
-  if "$PYTHON_BIN" -m ruff check "${PYTHON_SOURCE_PATHS[@]}" --select D,E,F,I,UP --ignore E501 2>&1; then
+  if "$PYTHON_BIN" -m ruff check \
+    --config "${RUFF_DOCSTRING_CONFIG}" \
+    "${PYTHON_SOURCE_PATHS[@]}" \
+    --select D,E,F,I,UP \
+    --ignore E501 2>&1; then
     echo "✅ ruff 成功"
   else
     echo "❌ ruff 失敗"
+    EXIT_CODE=1
+  fi
+  echo "   - PLR2004: Python magic-value 検証"
+  if "$PYTHON_BIN" -m ruff check \
+    --config "${RUFF_MAGIC_VALUE_CONFIG}" \
+    "${PYTHON_SOURCE_PATHS[@]}" \
+    --select PLR2004 2>&1; then
+    echo "✅ ruff magic-value checks 成功"
+  else
+    echo "❌ ruff magic-value checks 失敗"
     EXIT_CODE=1
   fi
 fi

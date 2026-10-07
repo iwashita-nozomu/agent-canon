@@ -1681,25 +1681,6 @@ entries:
     tests:
       - tests/tools/test_run_all_checks_script.py
 
-  - id: pydocstyle-review
-    summary: Runs explicit AgentCanon Docstring review with source-root-bound canonical D213 configuration.
-    path: tools/validation/semantic/code/pydocstyle_review.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
-    dispatch: {argv: ["tools/bin/agent-canon", "pydocstyle-review", "--target", "<repo-relative.py>"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - documents/conventions/DOCSTRING_GUIDE.md
-      - tools/validation/ci/guides/PRE_REVIEW_GUIDE.md
-      - agents/skills/python-review.md
-    tests:
-      - tests/agent_tools/test_pydocstyle_review.py
-
   - id: agent-canon-update-todos
     summary: Routes parent readback tasks after a standalone AgentCanon source merge.
     path: tools/agent/orchestration/agent_canon_update_todos.py
@@ -1941,42 +1922,6 @@ entries:
       - documents/experiments/experiment-registry.md
     tests: []
     test_exempt_reason: Registry contract is exercised through repo-wide CI smoke checks.
-
-  - id: check-hardcoded-numbers
-    summary: Rejects unexplained numeric literals in Python and C++ sources.
-    path: tools/validation/semantic/code/check_hardcoded_numbers.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/code/check_hardcoded_numbers.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_hardcoded_numbers.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/conventions/common/01_principles.md
-    tests:
-      - tests/agent_tools/test_check_hardcoded_numbers.py
-
-  - id: check-static-any
-    summary: Rejects explicit Python Any usage outside allowed boundaries.
-    path: tools/validation/semantic/code/check_static_any.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/code/check_static_any.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_static_any.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/conventions/python/04_type_annotations.md
-    tests:
-      - tests/agent_tools/test_check_static_any.py
 
   - id: check-solid-evidence
     summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.

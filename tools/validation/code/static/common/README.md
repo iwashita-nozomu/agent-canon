@@ -6,7 +6,7 @@ responsibility Documents cross-language static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
 upstream design ../../../../../documents/design/dependency-manifest-design.md dependency manifest policy
 upstream implementation ../../../../repository/github/review_backlog_scan.sh runs integrated review scans
-upstream implementation ../../../semantic/code/check_hardcoded_numbers.py checks numeric literals
+upstream implementation ../../config/ruff-magic-values.toml configures native Python magic-value checks
 upstream implementation ../../../../analysis/dependencies/run_repo_dependency_review.sh validates dependency headers
 @dependency-end
 -->
@@ -26,7 +26,7 @@ Default commands:
 ```
 
 `review_backlog_scan.sh` writes both JSON and Markdown inventory reports, then
-runs dependency, code-dependency, readability, hardcoded-number, log-helper, and
-convention scans for the selected scope.
+runs dependency, code-dependency, readability, native Ruff/BasedPyright,
+log-helper, and convention scans for the selected scope.
 Run the scan against one explicitly selected standalone source or project
 target. Cross-repository discovery is not implicit.

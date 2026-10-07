@@ -6,7 +6,7 @@ responsibility Documents the verifier pre-review entrypoint for this repository.
 upstream design ../../../README.md shared automation index
 upstream implementation ../runners/pre_review.sh verifier entrypoint
 upstream implementation ../checks/run_python_quality_checks.sh shared Python quality gate
-downstream implementation ../../semantic/code/pydocstyle_review.py explicit AgentCanon Docstring review
+upstream implementation ../../code/config/ruff-docstrings.toml owns the native Docstring lint overlay
 @dependency-end
 -->
 
@@ -54,8 +54,8 @@ bash tools/validation/ci/checks/run_python_quality_checks.sh
 ```
 
 The PR quick chain intentionally runs pytest and pyright while skipping Ruff;
-the explicit full Python quality command adds Ruff. Neither shared path invokes
-pydocstyle.
+the explicit full Python quality command adds Ruff and BasedPyright. The shared
+path uses the checked-in native Ruff overlays for Docstrings and magic values.
 
 For `check_agent_canon_pr.sh`, standalone and derived AgentCanon gates run
 shared AgentCanon surfaces only. A derived parent emits
@@ -68,13 +68,13 @@ invoke `run_all_checks.sh`.
 
 Explicit Docstring review for selected Python targets:
 
-    tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
+    ruff check --config tools/validation/code/config/ruff-docstrings.toml \
+      --select D <repo-relative.py>
 
-This command resolves the canonical AgentCanon source root and applies its D213
-configuration. Parent-specific Docstring review remains a separate parent-owner
-command and does not substitute its authority. Missing pydocstyle or reported
-diagnostics fail this explicit review only; the shared PR correctness gate is
-unaffected.
+This command applies the native D213 configuration. Parent-specific Docstring
+review remains a separate parent-owner command and does not substitute its
+authority. Missing Ruff or reported diagnostics fail this explicit review only;
+the shared PR correctness gate is unaffected.
 
 ## Report Evidence
 

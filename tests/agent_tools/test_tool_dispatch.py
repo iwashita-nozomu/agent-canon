@@ -60,7 +60,6 @@ class ToolDispatchTest(unittest.TestCase):
         """A Python entry documented as a Rust adapter is not auto-cut over."""
         specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
         self.assertEqual(specs["graph-client"].parity, "legacy")
-        self.assertEqual(specs["pydocstyle-review"].parity, "legacy")
 
     def test_catalog_does_not_default_to_verified(self) -> None:
         """Listing a command cannot silently authorize a cutover."""

@@ -47,8 +47,6 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
 path: tools/analysis/dependencies/scan_code_dependencies.sh
-path: tools/validation/semantic/code/check_hardcoded_numbers.py
-path: tools/validation/semantic/code/check_static_any.py
 path: tools/validation/semantic/logging/check_log_helper_names.py
 path: tools/validation/notebooks/notebook_quality.py
 path: tools/validation/code/oop/python/readability.py
@@ -67,7 +65,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "tests/tools/test_bootstrap_container_contract.py": "# bootstrap_runtime\ndef test_bootstrap_container_contract(): pass\n",
     "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
     "documents/conventions/README.md": "conventions\n",
-    "documents/conventions/common/01_principles.md": "check_hardcoded_numbers.py\n",
+    "documents/conventions/common/01_principles.md": "ruff-magic-values.toml\n",
     "documents/rule/naming.md": "check_log_helper_names.py\n",
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
@@ -81,9 +79,9 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "merge_when invalid_split_boundaries task_close.py\n"
     ),
     "documents/conventions/python/01_scope.md": "scope\n",
-    "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
+    "documents/conventions/python/04_type_annotations.md": "basedpyright-explicit-any.json\n",
     "documents/conventions/python/06_comments.md": "comments\n",
-    "documents/conventions/python/07_type_checker.md": "check_static_any.py\n",
+    "documents/conventions/python/07_type_checker.md": "basedpyright-explicit-any.json\n",
     "documents/conventions/python/09_file_roles.md": (
         "roles 読者順序 依存順序 公開契約 公開入口 内部補助関数 "
         "check_convention_compliance.py\n"
@@ -491,7 +489,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "Evidence route:\n"
     ),
     "tools/validation/ci/runners/run_all_checks.sh": (
-        "check_static_any.py "
+        "run_python_quality_checks.sh "
         "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "

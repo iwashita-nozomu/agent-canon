@@ -156,10 +156,11 @@ Markdown / JSON report の SOLID principle signal counts、OOP dimension、findi
 
 ## Python ファイル修正後
 
-- `python3 tools/validation/semantic/code/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
+- `ruff check --config tools/validation/code/config/ruff-magic-values.toml --select PLR2004 python`
 - `python3 -m pyright`
+- `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json`
 - `python3 -m pytest tests/ -q --tb=short`
-- `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`
+- `python3 -m ruff check --config tools/validation/code/config/ruff-docstrings.toml python tests --select D,E,F,I,UP --ignore E501`
 
 ## Markdown ファイル修正後
 
