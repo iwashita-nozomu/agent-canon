@@ -85,6 +85,7 @@ jobs:
           git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"
 
       - name: Start one shared tool runtime
+        id: start_runtime
         if: needs.select-static-units.outputs.units != ''
         run: |
           key="$(bash "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap/container/image/digest.sh" "${AGENT_CANON_CANDIDATE_SOURCE}")"
@@ -104,6 +105,10 @@ jobs:
           DOCS_PATHS: ${{ needs.select-static-units.outputs.docs_paths }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
+          evidence="${RUNNER_TEMP}/agent-canon-static-evidence"
+          mkdir -p "${evidence}"
+          git -C "${GITHUB_WORKSPACE}" show --no-patch --format='%H%n%P' HEAD > "${evidence}/source-identity.txt"
+          printf 'base=%s\nunits=%s\n' "${BASE_SHA:-origin/main}" "${SELECTED_UNITS}" >> "${evidence}/source-identity.txt"
           python3 - <<'PY' > "${RUNNER_TEMP}/agent-canon-docs-paths"
           import json
           import os
@@ -114,7 +119,10 @@ jobs:
           mapfile -d '' -t docs_paths < "${RUNNER_TEMP}/agent-canon-docs-paths"
           IFS=',' read -r -a units <<< "${SELECTED_UNITS}"
           status=0
+          unit_index=0
           for unit in "${units[@]}"; do
+            unit_index=$((unit_index + 1))
+            receipt="${evidence}/unit-${unit_index}.log"
             args=()
             case "${unit}" in
               docs) args=("${docs_paths[@]}") ;;
@@ -122,15 +130,37 @@ jobs:
             esac
             if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
               exec --root "${GITHUB_WORKSPACE}" -- bash \
-              /opt/agent-canon/source/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}" "${args[@]}"; then
+              /opt/agent-canon/source/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}" "${args[@]}" > "${receipt}" 2>&1; then
               printf 'unit=%s status=pass\n' "${unit}" >> "${GITHUB_STEP_SUMMARY}"
             else
               result=$?
               printf 'unit=%s status=fail exit=%s\n' "${unit}" "${result}" >> "${GITHUB_STEP_SUMMARY}"
               status=1
             fi
+            cat -- "${receipt}"
           done
           exit "${status}"
+
+      - name: Capture shared runtime validation output
+        if: always() && steps.start_runtime.outcome == 'success'
+        run: |
+          evidence="${RUNNER_TEMP}/agent-canon-static-evidence"
+          mkdir -p "${evidence}"
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" status > "${evidence}/runtime-status.json"
+          container="$(jq -er 'select(.schema == "agent-canon.bootstrap-receipt.v2" and .status == "ok" and .operation == "status") | .container | select(.drift == false) | select(.health | type == "string" and length > 0 and . != "absent") | .name | select(type == "string" and length > 0)' "${evidence}/runtime-status.json")"
+          # The status owner validates this exact container name and reports
+          # drift. Export data without starting a command or extracting paths.
+          docker cp -- "${container}:/var/lib/agent-canon/runtime/tasks" - > "${evidence}/runtime-task-output.tar.part"
+          mv -- "${evidence}/runtime-task-output.tar.part" "${evidence}/runtime-task-output.tar"
+
+      - name: Upload static validation evidence
+        if: always() && steps.start_runtime.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-canon-static-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/agent-canon-static-evidence/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Release shared tool runtime
         if: always()
