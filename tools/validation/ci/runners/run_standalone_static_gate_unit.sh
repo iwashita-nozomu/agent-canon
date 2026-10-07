@@ -50,7 +50,8 @@ try:
     target = Path(sys.argv[1]).resolve(strict=True)
     result = subprocess.run(
         [
-            "findmnt", "--kernel", "--target", str(target), "--json",
+            "findmnt", "--kernel", "--first-only", "--direction", "backward",
+            "--list", "--target", str(target), "--json",
             "--output", "TARGET,VFS-OPTIONS",
         ],
         check=True, capture_output=True, text=True,
