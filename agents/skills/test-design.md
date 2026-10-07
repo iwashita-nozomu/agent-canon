@@ -25,9 +25,9 @@ Use `test-design` after the owning contract and implementation mechanism are kno
    must reach the owning logic rather than replace it.
 3. Keep the existing test oracle and wiring when they are correct. Do not change
    expected values, include/import paths, configuration, fixture data, or skips just
-   to make a test pass. Update a test only for an approved API/layout/spec change
-   or when source evidence shows the test itself is wrong; record the reason in the
-   existing Issue/PR record.
+   to make a test pass. Update a test only for an established API/layout/spec
+   migration or when source evidence shows the test itself is wrong; record the
+   reason in the existing Issue/PR record.
 4. Run the focused test through its existing owner. A reproduced failure is useful
    evidence; a pass proves only the exercised contract. If the failure is in the
    implementation, repair the owning code first rather than adding a wrapper or

@@ -39,7 +39,8 @@ current cause and guarantee require it.
 Before editing, state the existing responsibility and non-goals briefly, then
 inspect the changed implementation and actual caller. After a failure, separate
 source cause, oracle/specification, fixture, and transport/environment causes;
-repair the owning source or a demonstrably incorrect test input only.
+repair the owning source first, and change test inputs or wiring only for an
+established API/layout/specification migration or demonstrably incorrect test.
 Test changes include include/imports, configuration, fixtures, and skips: do not
 alter them for pass-only purposes. Record an authorized test correction's reason,
 commit, and result in the existing delivery record.
