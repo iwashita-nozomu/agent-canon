@@ -168,7 +168,7 @@ owners:
 - C++ target responsibility: `cpp-core` is the provider; individual test and experiment
   targets are consumers; root-anchored build/install paths and lifecycle-owned result paths
   are read back from [documents/design/cpp-build-layout.md](../../documents/design/cpp-build-layout.md).
-- Explicit `Any`: `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json`.
+- Explicit `Any`: `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json <python-paths>`.
 - OOP/SOLID signals: `$oop-readability-check`; keep its evidence with the owning review.
 - Dependency headers/graph: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.
 - Schema or algorithm checks: existing checker only when the changed implementation

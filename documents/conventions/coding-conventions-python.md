@@ -158,7 +158,7 @@ Markdown / JSON report の SOLID principle signal counts、OOP dimension、findi
 
 - `ruff check --config tools/validation/code/config/ruff-magic-values.toml --select PLR2004 python`
 - `python3 -m pyright`
-- `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json`
+- `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json python tests`
 - `python3 -m pytest tests/ -q --tb=short`
 - `python3 -m ruff check --config tools/validation/code/config/ruff-docstrings.toml python tests --select D,E,F,I,UP --ignore E501`
 
