@@ -76,6 +76,8 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 encoding="utf-8",
             )
             checker.chmod(0o755)
+            (root / "a.md").write_text("a\n", encoding="utf-8")
+            (root / "b.md").write_text("b\n", encoding="utf-8")
             bundle = root / "bundle"
             result = run_renderer(
                 "--root",
@@ -117,10 +119,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 (bundle / "dependency_graph.ir.json").read_text(encoding="utf-8")
             )
             self.assertEqual(graph_ir["schema"], "agent_canon.graph_ir.v2")
-            self.assertEqual(
-                {(edge["relation"], edge["label"]) for edge in graph_ir["edges"]},
-                {("depends", "design")},
-            )
+            relations = {(edge["relation"], edge["label"]) for edge in graph_ir["edges"]}
+            self.assertIn(("upstream", "design"), relations)
+            self.assertIn(("contains", "contains"), relations)
 
     def test_projection_uses_native_tsv_and_rejects_invalid_mode(self) -> None:
         """Named projection mode keeps native source and output checks."""

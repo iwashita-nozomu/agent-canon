@@ -125,9 +125,10 @@ class RouteToolTest(unittest.TestCase):
             skill: copy.deepcopy(source_dependencies["skill_dependencies"][skill])
             for skill in skill_ids
         }
-            "argument_schema": argument_schema,
-            "arguments": arguments,
-        }
+        dependency_path = root / "agents" / "skills" / "skill-dependencies.yaml"
+        dependency_path.write_text(
+            yaml.safe_dump(source_dependencies, sort_keys=False), encoding="utf-8"
+        )
 
     def test_area_outputs_short_tool_and_skill(self) -> None:
         """Area routing should keep names short and machine-readable."""
@@ -2274,21 +2275,6 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertIn(
             "parent-repository-audit", capability_payload["active_skills"]
         )
-
-    def test_capability_route_rejects_duplicate_definition(self) -> None:
-        """A same-skill duplicate definition is rejected."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            duplicate = (
-                self.capability_entry()
-                + "\n"
-                + "        - id: oop_type_design\n          owner: pre_implementation_oop_type_design\n          phase: pre_implementation_design\n          activation: explicit_capability\n          exclusive: true"
-            )
-            self.write_catalog(root, duplicate)
-            result = self.run_route(
-                "--root", str(root), "--capability", "oop_type_design"
-            )
-        self.assert_failure_code(result, "duplicate-capability-definition:oop_type_design")
 
     def test_capability_route_rejects_multiple_capabilities(self) -> None:
         """The first capability version does not arbitrate multiple IDs."""

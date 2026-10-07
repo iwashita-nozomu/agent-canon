@@ -68,6 +68,7 @@ CATALOG_SCHEMA_PATHS = {
 }
 PRIVATE_SKILL_PREFIX = "_"
 CAPABILITY_ID_RE = re.compile(r"^[a-z0-9_]+$")
+@dataclass(frozen=True)
 class CapabilityRoute:
     """One catalog capability route owned by a public skill."""
 
