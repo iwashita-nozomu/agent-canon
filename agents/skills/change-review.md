@@ -22,7 +22,9 @@ because this skill was selected.
 
 1. Inspect the current diff against the changed contract and the most recently
    incorporated owner. Read callers, state/guards, effects, and unchanged
-   superseded paths only while they can change the finding or validation.
+   superseded paths only while they can change the finding or validation. Before
+   accepting a review finding, identify why the current implementation exists and
+   what source evidence could refute the finding.
 2. For an overlap or missing-deletion finding, identify the retained owner,
    obsolete contribution, and required consumer migration. RC-09 owns retirement;
    an alias or wrapper is not the default repair.

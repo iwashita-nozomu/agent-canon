@@ -33,7 +33,8 @@ Use `test-design` after the owning contract and implementation mechanism are kno
    implementation, repair the owning code first rather than adding a wrapper or
    weakening the oracle.
 5. For numerical/tolerance/solver/benchmark tests, use the existing numerical test
-   owner and oracle. Do not invent a CPU fallback or a new admission packet.
+   owner and oracle, honoring the project-configured CPU/OpenMP or GPU route. Do
+   not invent a fallback route or new admission packet.
 6. Reuse an existing property/table/integration case when it already distinguishes
    the same invariant. Add one minimal regression case only when the risk remains
    uncovered, then review the final diff and record the test commit SHA and actual

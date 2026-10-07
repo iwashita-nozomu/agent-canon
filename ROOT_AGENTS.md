@@ -36,6 +36,13 @@ Choose the mechanism from the established cause, applicable constraints, and
 guarantee that must hold after the change. A procedure, role, artifact, or stage
 used by an earlier task is not a reason to repeat it; reuse it only when the
 current cause and guarantee require it.
+Before editing, state the existing responsibility and non-goals briefly, then
+inspect the changed implementation and actual caller. After a failure, separate
+source cause, oracle/specification, fixture, and transport/environment causes;
+repair the owning source or a demonstrably incorrect test input only.
+Test changes include include/imports, configuration, fixtures, and skips: do not
+alter them for pass-only purposes. Record an authorized test correction's reason,
+commit, and result in the existing delivery record.
 For numerical problems, establish the equations, assumptions, and convergence
 behavior before changing implementation structure or tolerances.
 
