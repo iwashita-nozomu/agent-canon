@@ -33,12 +33,8 @@ if __package__ in (None, ""):
     # even when the caller's cwd is a standalone source root.
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    import yaml
-except ModuleNotFoundError:
-    from tools.runtime.container import stdlib_yaml as yaml
+import yaml
 
-from tools.runtime.source.agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
 from tools.agent.orchestration.capability_route import (
     FORMAT_VALUES,
     MODE_VALUES,
@@ -75,6 +71,10 @@ from tools.agent.skills.skill_route_catalog import (
 )
 from tools.agent.skills.skill_route_catalog import (
     load_skill_tool_commands as _load_skill_tool_commands,
+)
+from tools.runtime.source.agent_canon_source_root import (
+    SourceRootFailure,
+    resolve_agent_canon_source_root,
 )
 from tools.validation.semantic.tools.visualization_contract import (
     TOOL_ARGUMENT_SCHEMAS,

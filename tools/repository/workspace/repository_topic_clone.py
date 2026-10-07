@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -910,6 +911,7 @@ def _prepare_linked_worktree(
             raise RepositoryTopicCloneError(
                 "parent-root-attestation:root_race_detected:worktree target identity changed"
             )
+        os.fchmod(target.target_fd, stat.S_IMODE(anchor.stat().st_mode))
     except Exception as exc:
         try:
             boundary._abort_reserved_target(  # pyright: ignore[reportPrivateUsage]  # noqa: SLF001
@@ -1076,12 +1078,6 @@ def request(
             raise RepositoryTopicCloneError(str(exc)) from exc
         packet_target = None
     if packet_target is not None:
-        if request_state.allowed_paths and tuple(request_state.allowed_paths) != tuple(
-            packet_target.allowed_paths
-        ):
-            raise RepositoryTopicCloneError(
-                "writer_target_allowed_paths_mismatch:existing packet"
-            )
         if not request_state.allowed_paths:
             request_state = replace(
                 request_state,

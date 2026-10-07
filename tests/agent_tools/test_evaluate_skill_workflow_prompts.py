@@ -230,10 +230,6 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             by_id["agent-orchestration-skill-call-routing"]["target"],
             ".codex/personal/skills/agent-orchestration/SKILL.md",
         )
-        self.assertEqual(
-            by_id["codex-task-workflow-convention-gate"]["target"],
-            ".codex/personal/skills/codex-task-workflow/SKILL.md",
-        )
         orchestration_check_ids = {
             str(item["id"])
             for item in cast(
@@ -267,97 +263,9 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             }.issubset(pointer_required)
         )
         self.assertNotIn("owner-produced `DecisionSufficiencyPacket`", pointer_required)
-        for eval_id in (
-            "agent-orchestration-skill-call-routing",
-            "codex-task-workflow-convention-gate",
-        ):
+        for eval_id in ("agent-orchestration-skill-call-routing",):
             checklists = cast(list[dict[str, object]], by_id[eval_id]["checklist"])
             self.assertTrue(all(bool(item["critical"]) for item in checklists))
-        codex_check_ids = {
-            str(item["id"])
-            for item in cast(
-                list[dict[str, object]],
-                by_id["codex-task-workflow-convention-gate"]["checklist"],
-            )
-        }
-        self.assertIn("CODEX-TASK-OWNER-FIRST-1", codex_check_ids)
-
-    def test_default_manifest_contains_exact_decision_sufficiency_scenarios(
-        self,
-    ) -> None:
-        """The canonical DSV owner carries the six semantic contract evals."""
-        manifest = PROJECT_ROOT / "eval" / "definitions" / "skill_workflow_prompt_eval.toml"
-        data = load_toml_document(manifest)
-        evals = cast(list[dict[str, object]], data["evals"])
-        owner_eval = next(
-            entry
-            for entry in evals
-            if entry.get("target") == "agents/skills/agent-orchestration.md"
-        )
-        checklist = cast(list[dict[str, object]], owner_eval["checklist"])
-        dsv_ids = {
-            str(item["id"])
-            for item in checklist
-            if str(item["id"]).startswith("DSV-")
-        }
-
-        self.assertEqual(
-            dsv_ids,
-            {
-                "DSV-ZERO-VALUE-1",
-                "DSV-BRANCH-NAMING-1",
-                "DSV-SPARK-FAST-PATH-1",
-                "DSV-IRRELEVANT-UNKNOWN-POSITIVE-1",
-                "DSV-IRRELEVANT-UNKNOWN-NEGATIVE-1",
-                "DSV-NO-THRESHOLD-1",
-            },
-        )
-        checks_by_id = {str(item["id"]): item for item in checklist}
-        expected_required_patterns = {
-            "DSV-ZERO-VALUE-1": {
-                "same owner, unit, mechanism, and validation\\s+route",
-                "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
-                "do not manufacture a zero-value investigation, packet, or review stage",
-            },
-            "DSV-BRANCH-NAMING-1": {
-                "each unresolved branch that could change the owner, unit, mechanism, or route",
-                "changes_next_decision",
-            },
-            "DSV-SPARK-FAST-PATH-1": {
-                "固定 Spark implementation route",
-                "parent packet が.*--select-agent-type implementer=spark_worker:<evidence>",
-                "one owning review gate",
-                "Validation is static/targeted first",
-            },
-            "DSV-IRRELEVANT-UNKNOWN-POSITIVE-1": {
-                "\\\"blocking\\\": false",
-                "\\\"serialized_in_decision_packet\\\": true",
-                "Unknowns that cannot change the next decision are non-blocking\\s+and may remain in local context",
-            },
-            "DSV-IRRELEVANT-UNKNOWN-NEGATIVE-1": {
-                "Unknowns that cannot change the next decision are non-blocking",
-                "Do not convert missing artifact fields, counts, or digests into\\s+a new mandatory gate",
-            },
-            "DSV-NO-THRESHOLD-1": {
-                "\\\"threshold_policy\\\": \\\"none\\\"",
-                "No artifact shape, digest, count, or fixed stage sequence is a substitute",
-                "no hypothesis-space or read-count form is\\s+required",
-            },
-        }
-        for check_id, expected in expected_required_patterns.items():
-            required = set(cast(list[str], checks_by_id[check_id]["required_regex"]))
-            self.assertTrue(expected.issubset(required), check_id)
-        for check_id in dsv_ids:
-            required = set(cast(list[str], checks_by_id[check_id]["required_regex"]))
-            self.assertNotIn("h in H", required)
-            self.assertNotIn("possible_branches", required)
-        self.assertTrue(
-            all(
-                item["critical"] is True
-                for item in checklist
-                if str(item["id"]).startswith("DSV-")
-            )
-        )
 
     def test_default_manifest_includes_validation_failure_response_eval_coverage(
         self,

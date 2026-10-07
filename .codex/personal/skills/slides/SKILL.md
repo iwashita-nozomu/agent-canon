@@ -2,7 +2,7 @@
 name: slides
 description: "Use when authoring or revising a presentation, slide deck, or presentation-oriented Markdown deck."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"415f6793786dc3f29784d10081b68a5dc5726a8355936fb5e51f68813cad83d5"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f57f21d3d239583b1d252949fbc8783bcb60679577cea955d9e3bf530bf71610"} -->
 
 <!--
 @dependency-start

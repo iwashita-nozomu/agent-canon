@@ -157,7 +157,6 @@ automatic_merge_ready :=
   and remote_head == validated_head
   and pr_description_is_current
 ```
-
 If any term is unproven, withhold automatic merge and the merge-ready claim,
 not independent repair, PR publication, or Issue handoff. Required branch checks
 still block merge even when their failure is unrelated to the changed contract;
@@ -305,19 +304,24 @@ identity is `owner/repository#number`.
 
 When an explicit request or repository policy requires status label mutation on a linked Issue, invoke the private `_github-status-lifecycle` runtime skill inside this publication boundary.
 
-`pr-processing` owns target Issue/PR resolution, the initial fresh remote snapshot,
-write authority, transport invocation, and final publication readback. Load the
-repository's `documents/operations/issue-label-taxonomy.toml` mapping and pass it,
-the lifecycle facts, trace evidence, and PR identity to the private routine. The
-routine owns lifecycle classification, evidence admission/retry identity, ordered
-single-label operations, observable concurrency stops, and the final predicate.
+`pr-processing` owns target Issue/PR resolution, current work and validation facts,
+write authority, the adequacy of the ordinary result explanation, and publication
+readback. Load `documents/operations/issue-label-taxonomy.toml` and pass the mapping,
+lifecycle facts, and either the ordinary Markdown `comment_body` or an explicitly
+selected existing `comment_id` to the private routine. Include an actual PR in the
+explanation when one exists; do not invent PR fields for a pre-PR handoff.
+The routine uses native comment identity and single-label operations with fresh
+readback. Private markers, payload hashes, and whole-history exact-content counts
+are not prerequisites. Explain unavailable verification with its actual evidence
+and next owner/route rather than encoding it into another required record grammar.
 
-The caller consumes the typed adapter result and does not duplicate its transition
-table, evidence protocol, or success predicate. It does not use full-label
-replacement, create labels, edit/delete historical evidence, close Issues, approve
-PRs, or merge as a status side effect. Concurrent drift, partial API failure, or
-readback mismatch leaves publication incomplete and is reported with the exact
-typed state returned by the routine.
+The caller consumes the adapter result and does not duplicate its transition
+table or success predicate. It does not use full-label replacement, create labels,
+edit/delete historical evidence, close Issues, approve PRs, or merge as a status
+side effect. An uncertain write is not blindly repeated; resolve existing remote
+state before explicitly selecting the evidence comment for a later reconciliation.
+Observed label drift, partial failure, or selected-comment mismatch remains an
+incomplete publication, with the actual completed operations and known state.
 
 Status reconciliation is conditional. Read-only inspection, ordinary review, and PR processing without an explicit Issue status requirement do not activate it.
 

@@ -48,6 +48,17 @@ provides = ["yamllint"]
 failure_policy = "fail"
 
 [[records]]
+id = "ruff"
+package = "ruff"
+method = "pipx"
+version = "0.16.10"
+source = "https://pypi.org/simple"
+verification = { kind = "pipx-package", executable = "ruff", args = ["--version"], output_contains = "0.16.10" }
+deps = ["pipx"]
+provides = ["ruff"]
+failure_policy = "fail"
+
+[[records]]
 id = "pyright-language-server"
 package = "pyright"
 method = "npm-global"

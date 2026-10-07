@@ -2,7 +2,7 @@
 name: runtime-log-repair
 description: "Use when AgentCanon runtime dashboard evidence should be turned into owner-routed repair work, including dashboard next actions, repair failing hook evidence, hook entries status=fail, missing actual wave rows, workflow attribution gaps, consulted source URLs, reference missing URLs, AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL, AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING, or AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"13a4b30d174ff4ae9f123580ac1e46d297ab8e0df97fea97fa3f129bad05631f"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"dc9a3396e5a04ea0a0b13a1060b759a7f7965bc3bb4b89b5b3e46486122409da"} -->
 
 <!--
 @dependency-start

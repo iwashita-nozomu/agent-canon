@@ -2,9 +2,10 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Owns container-side TOML/JSON/state/tool/check/eval logic for the shared AgentCanon tool container without implicit source writes.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
-# downstream implementation ../../bootstrap.sh fixed host entrypoint
-# downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
+# upstream implementation ../source/agent_canon_source_root.py standalone source identity
+# downstream implementation ../../../bootstrap.sh fixed host entrypoint
+# downstream implementation ../../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 # @dependency-end
 """Container control plane for the AgentCanon tool runtime.
 
@@ -69,6 +70,7 @@ KNOWN_SUBDIRS = (
 )
 CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
+RUFF_CACHE_DESTINATION = "/var/lib/agent-canon/cache/ruff"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
@@ -95,6 +97,7 @@ TOOL_ENVIRONMENT_KEYS = frozenset(
         "TMPDIR",
         "RUST_BACKTRACE",
         "CARGO_TERM_COLOR",
+        "RUFF_CACHE_DIR",
         "AGENT_CANON_SOURCE_ROOT",
         "AGENT_CANON_ROOT",
         "AGENT_CANON_DISPATCH_ENTRY_ID",
@@ -243,15 +246,18 @@ def _validate_tool_plane_argv(
         if script.startswith(image_tool_root):
             return
     if root.resolve() == repository_root.resolve():
-        if executable == "python3" and len(argv) > 2 and argv[1:3] == ["-m", "pytest"]:
-            return
-        if executable == "cargo" and len(argv) > 1 and argv[1] in {
-            "build",
-            "clippy",
-            "fmt",
-            "test",
-        }:
-            return
+        return
+    from tools.runtime.source.agent_canon_source_root import (
+        SourceRootFailure,
+        resolve_agent_canon_source_root,
+    )
+
+    try:
+        resolve_agent_canon_source_root(root, source_root=root, canon_root=root)
+    except SourceRootFailure:
+        pass
+    else:
+        return
     raise BootstrapError(
         "tool_plane_command_rejected",
         "exec accepts AgentCanon tools only; project commands use the project execution environment",
@@ -1299,10 +1305,8 @@ class DockerAdapter:
     ) -> None:
         """Export one exact task subtree through Docker's UID normalization."""
         source_path = Path(source)
-        if (
-            not source.startswith("/var/lib/agent-canon/exchange/tasks/")
-            or ".." in source_path.parts
-        ):
+        exchange_tasks_prefix = f"{CONTAINER_RUNTIME_DESTINATION}/exchange/tasks/"
+        if not source.startswith(exchange_tasks_prefix) or ".." in source_path.parts:
             raise BootstrapError(
                 "docker_copy_rejected", f"unsafe container export: {source}"
             )
@@ -3899,6 +3903,8 @@ class BootstrapRuntime:
                     "AGENT_CANON_HOOK_ARCHIVE_DIR": PRIVATE_LOG_DESTINATION,
                     "AGENT_CANON_LOG_ROOT": PRIVATE_LOG_DESTINATION,
                     "AGENT_CANON_RUNTIME_ROOT": CONTAINER_RUNTIME_DESTINATION,
+                    "TMPDIR": f"{CONTAINER_RUNTIME_DESTINATION}/tasks/{task_id}/tmp",
+                    "RUFF_CACHE_DIR": RUFF_CACHE_DESTINATION,
                 }
                 environment.update(extra_environment or {})
                 result = self.docker.exec_container(
@@ -4178,7 +4184,7 @@ class BootstrapRuntime:
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
                 canon_root = TOOL_SOURCE_DESTINATION
-                container_runtime = "/var/lib/agent-canon/exchange"
+                container_runtime = f"{CONTAINER_RUNTIME_DESTINATION}/exchange"
                 exchange_runtime = (
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )
@@ -5580,15 +5586,10 @@ def build_parser() -> argparse.ArgumentParser:
     target_sub = target.add_subparsers(dest="target_operation", required=True)
     add = target_sub.add_parser("add")
     add.add_argument("--root", required=True)
-    add.add_argument(
-        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
-    )
-    add.add_argument("--mutation-capability-json")
+    add.add_argument("--mode", choices=("read-only",), default="read-only")
     remove = target_sub.add_parser("remove")
     remove.add_argument("--root", required=True)
-    remove.add_argument(
-        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
-    )
+    remove.add_argument("--mode", choices=("read-only",), default="read-only")
     execute = sub.add_parser("exec")
     execute_group = execute.add_mutually_exclusive_group(required=True)
     execute_group.add_argument("--root")
@@ -5654,26 +5655,34 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "gc":
         return runtime.gc(dry_run=args.dry_run)
     if operation == "target" and args.target_operation == "add":
-        capability = None
-        if args.mutation_capability_json:
-            try:
-                capability = json.loads(args.mutation_capability_json)
-            except json.JSONDecodeError as exc:
-                raise BootstrapError("mutation_capability_invalid", "capability is not JSON") from exc
-        return runtime.target_add(
-            Path(args.root), args.mode, mutation_capability=capability
-        )
+        return runtime.target_add(Path(args.root), args.mode)
     if operation == "exec":
         if args.request_json:
             try:
                 request = json.loads(args.request_json)
             except json.JSONDecodeError as exc:
-                raise BootstrapError("invalid_exec_request", "request is not JSON") from exc
+                raise BootstrapError(
+                    "invalid_exec_request", "request is not JSON"
+                ) from exc
             allowed = {
-                "schema", "tool_id", "runtime", "argv", "child_args",
-                "source_root", "cwd", "cwd_policy", "target_root", "environment",
-                "stdin", "stdout", "stderr", "exit", "signal", "side_effect",
-                "output_root", "written_paths",
+                "schema",
+                "tool_id",
+                "runtime",
+                "argv",
+                "child_args",
+                "source_root",
+                "cwd",
+                "cwd_policy",
+                "target_root",
+                "environment",
+                "stdin",
+                "stdout",
+                "stderr",
+                "exit",
+                "signal",
+                "side_effect",
+                "output_root",
+                "written_paths",
             }
             if not isinstance(request, dict) or set(request) - allowed:
                 raise BootstrapError("invalid_exec_request", "request fields are invalid")
