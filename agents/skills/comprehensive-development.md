@@ -150,19 +150,18 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
 1. material かつ code から理由を復元できない decision は、共通コメント規約に従って最も狭い安定 owner の近傍へ残し、変更された既存コメントも同じ差分で同期します。
 1. regression / fixture / mock の追加前に [Regression Evidence Admission](#regression-evidence-admission) の判断を行います。
-1. `agents/task_catalog.yaml` の `comprehensive_development` family から `spawn_budget`、`role_topology`、`roles`、`subagent_prompt` を読みます。
-1. `agents/agents_config.json` で permanent team role ownership、required output、write policy を確認します。
-1. [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) で Codex inventory、activation、runtime surface を確認します。
-1. run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` と catalog / config 由来の route を宣言します。
-1. [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) の fresh context capsule と bounded source packet を使って、stage ごとに subagent handoff を作ります。
-1. write-capable work は approved design trace から導いた bounded slice に限定し、親が integration order と validation rerun を管理します。
-1. closeout では `project_reviewer` を integration gate として使い、canonical contract、selected principle clause、implementation basis、コメントの同期、catalog / config / inventory と実 diff の整合を確認します。
+1. 選択した catalog/config owner の route が coordination を要求するときだけ、その既存
+   run bundle と handoff owner を使います。未選択の stage、role、artifact を materialize
+   しません。
+1. write-capable work は approved design trace から導いた bounded slice に限定し、
+   選択済み owner が integration order と validation rerun を管理します。
+1. closeout は選択された owner の既存 review/closeout route で、canonical contract と
+   実 diff の整合を確認します。
 
 ## Parent-Managed Write Scope
 
-- parent は `team_manifest.yaml` に writer ごとの allowed path / directory、integration order、validation route を固定します。
-- colliding writer scope は current checkout 内の後続 wave に serialize し、同一 wave
-  の並列 writer は checkout owner が準備した distinct checkout roots に限定します。
+- parent は選択した coordination route の writer placement を
+  [Parallel Write Safety](../canonical/CODEX_SUBAGENTS.md#parallel-write-safety) に委譲します。
 - reviewer は read-only を保ち、parent-managed write-scope discipline の確認は `plan_reviewer` と `project_reviewer` が行います。
 
 ## Boundary

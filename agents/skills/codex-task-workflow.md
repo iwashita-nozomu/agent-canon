@@ -166,9 +166,8 @@ for the next bounded observation; keep failed mutation retries distinct.
 Only coordination consumes `agent-canon.completion-coverage.v1` from the existing
 logical ledger. COMMUNICATION_PROTOCOL owns its schema, CODEX_COMPLETION its
 applicability, and `report_artifact_checks` / `task_close` its check and consumption.
-Preserve the five mapping error sets, typed owner/state/API/dependency evidence,
-W1 references, and independent `all_planned_chunks_complete` and
-`overall_delivery_complete` predicates. A checkpoint is progress, not delivery.
+This transport reuses those owners and does not enumerate their fields, create a
+second ledger, or turn a checkpoint into delivery.
 
 ## Required Output
 

@@ -208,8 +208,7 @@ that decision.
 1. repo-changing task では、外形的な作業量や file 数ではなく design / OOP boundary と ownership clarity で実装経路を選ぶ。`requested_scope` と `work_scope` を分け、`work_scope` は段階化、routing、委譲してよく、要求された file、workflow、check、doc、PR state を `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` のいずれかに分類します。child handoff は選択した typed route が要求する場合だけ launch または schedule し、同じ owner、責務、context、write authority、validation route の active agent は revised scope でも再利用します。coordination route では親が handoff、launch、packet relay、依存順、status、最終 readback を持ち、child owner が割り当てられた work とその review/validation を返します。bounded route では選択済み実行 owner が編集・検証を持つため、child-only の判定を適用しません。独立 review、disjoint write authority、incompatible owner/context、または failed context integrity だけが fresh agent の根拠です。repo-wide、multi-surface、長文文書群、shared runtime surface というだけでは無制限に multi-agent を起動しない。write-capable handoff が runtime authorization や tool gate で詰まる場合は typed blocker を記録し、親が代替実行しない
 1. multi-agent にする場合でも、分割境界は `差し替え可能な単位` に限る。別実装、別証明、別文書責務、別 validation oracle、別 review decision に置き換え得る境界だけを slice / wave / worker scope にする。数理的に差し替えが発生しない境界、単なる記法・読解補助・固定 context・同じ oracle を共有する連続導出は分割せず、同じ packet と同じ owner scope に残す
 1. slice、decomposition、prototype、または worker handoff の前に、involved Git roots / modules が二つ以上か、module の consumer が dependency repository にあるかを先に判定する。条件を満たしたら、deferred / candidate の `$dependency-analysis` を ACTIVE に昇格・起動してから decomposition、prototype、worker handoff に進み、既存 packet の involved-root identities、edge kinds、topological order、dependency scope / reuse facts、common validation obligations を全 child に同じ shared context として relay する。各 child はその shared context から role / module 固有の `allowed_paths`、`do_not_read`、write scope、exact validation commands を導出し、同じ共通事実と個別 authority を handoff に持つ。単一 module で dependency-repository consumer がない場合は既存 fast pathを使い、これは新しい承認・artifact・machine gateではない
-1. subagent scheduling は `CODEX_SUBAGENTS.md` が所有する typed capacity handshake と lifecycle ledger を消費し、ready dependency-DAG frontier の stage owner ごとに `vertical dynamic wave` を組みます。requested / configured / platform-effective / workflow-demand / write-cap / nested-reserved / available を分離し、既知制約の最小値を startup で read back してから reservation 成功時だけ spawn します。capacity が足りない ready work は失敗させず queue し、durable handback、全 descendant close readback、reservation release を終えた slot から再開します。固定 active/write 数、disposable capacity probe、または generated role view は scheduling authority になりません
-1. selected coordination route では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
+1. selected coordination route は既存の capacity/lifecycle owner と readback を消費します。固定 active/write 数、追加 ledger、または generated role view を scheduling authority にしません
 1. prompt-derived skill routing が必要なら `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。編集を許可する場合だけ caller が `--mode repo-changing` を明示します。`bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
 1. [agents/skills/README.md](README.md) から current stage に必要な public skill だけを足す。依存 source clone / module lifecycle が scope の場合は `$dependency-module-change` を一般 route として先に選び、AgentCanon update はその具体例として後続に置く。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
 1. repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。
@@ -685,12 +684,8 @@ a new mandatory gate.
   decision と validation need が実際に要求する場合だけ起動する
 - 着手時の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
 - PR を作る task では、同じ routing 宣言と `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
-- coordination/resumption が必要な場合だけ run bundle command と specialist
-  activation を materialize する
-- `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` と typed parent-packet selection による implementer routing
-- `team_manifest.yaml` の `run.spawn_budget` による active/write/runtime/depth budget の階層
-- nested subagent が必要な場合は、`run.delegated_spawn_policy` に owner、child role、入力 packet、expected output、dependency-expanded handoff scope、validation route、review gate を載せます
-- parallel write が要るなら file 単位の write-scope 方針
+- coordination/resumption が必要な場合だけ、選択された workflow owner の既存 run-bundle
+  と handoff を materialize する
 
 ## Review Activation And Adjudication
 
@@ -851,7 +846,7 @@ route を止める根拠に非数理エラーだけを使いません。
 - prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
 - coding / implementation / patch / doc-edit work を求める repo-changing task は、typed route が child handoff を要求する場合に限り、read-only survey / review role だけで完了扱いにしません。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、追加の read-only wave より先に selected write-capable implementer を起動または schedule します。parent は実装者ではなく orchestrator として、handoff packet、起動、packet relay、依存順、status、最終 readback を所有します。
 - Runtime authorization や tool gate で write-capable subagent を起動できない場合は、local/tool context に blocker evidence を記録します。
-- Routine docs / Focused code でも implementation / patch / doc-edit work は、catalog の typed route が要求する場合だけ write-capable handoff を選びます。`worker` が既定で、selected typed route が `spark_worker` を返すのは Abstract Design Frame、design trace、identifier naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が必須になった場合のみ）、dependency-expanded handoff scope が揃った低リスク slice です。選択済み candidate が blocked の場合は typed blocker を記録し、親は別 candidate を再選定しません。
+- Routine docs / Focused code でも implementation / patch / doc-edit work は、catalog の typed route が要求する場合だけ write-capable handoff を選び、実装 role/profile は [Codex Subagents](../canonical/CODEX_SUBAGENTS.md) の選択結果を消費します。ここで default、Spark eligibility、blocked-candidate fields、candidate re-selection を再定義しません。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。
 

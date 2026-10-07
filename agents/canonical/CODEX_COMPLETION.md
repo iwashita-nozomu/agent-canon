@@ -209,12 +209,11 @@ Issue. Review-only/no-change work retains its result and source-backed rationale
 
 ## Coordination closeout
 
-For the selected coordination run, pass its existing verification, active request
-contract, CompletionCoverage, selected validation/static/dependency results,
-review disposition, chosen commit/push outcomes, shared-canon synchronization,
-and follow-up decisions to `task_close.py`. Keep source/config/schema/fixtures/
-documentation/tool entrypoints needed by the runnable commit together under
-[Branch Scope](../../documents/operations/BRANCH_SCOPE.md).
+For the selected coordination run, pass the existing run evidence through its
+closeout owner. `task_close.py` remains the sole coordination terminal predicate;
+this owner does not restate its artifact fields or create another checklist.
+Keep source/config/schema/fixtures/documentation/tool entrypoints needed by the
+runnable commit together under [Branch Scope](../../documents/operations/BRANCH_SCOPE.md).
 
 For selected commit/push operations, record `commit_created` and `push_completed`
 as `yes`; unselected operations use the schema's `not_applicable` with the reason.

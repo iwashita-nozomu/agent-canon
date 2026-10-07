@@ -32,6 +32,10 @@ unrelated changes or publication.
 Investigate the cause before choosing a repair. Follow actual callers, state,
 effects, and affected consumers far enough to close the owning mechanism, rather
 than minimizing the diff or expanding into unrelated architecture.
+Choose the mechanism from the established cause, applicable constraints, and
+guarantee that must hold after the change. A procedure, role, artifact, or stage
+used by an earlier task is not a reason to repeat it; reuse it only when the
+current cause and guarantee require it.
 For numerical problems, establish the equations, assumptions, and convergence
 behavior before changing implementation structure or tolerances.
 
