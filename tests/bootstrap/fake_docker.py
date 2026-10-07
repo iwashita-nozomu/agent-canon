@@ -977,7 +977,10 @@ def main(argv: list[str]) -> int:
             (
                 mount
                 for mount in found[1]["Mounts"]
-                if mount["Destination"] == "/var/lib/agent-canon"
+                if mount["Destination"] in {
+                    "/var/lib/agent-canon",
+                    "/var/lib/agent-canon/runtime",
+                }
             ),
             None,
         )
@@ -988,7 +991,10 @@ def main(argv: list[str]) -> int:
             relative = Path(clean_source).relative_to("/var/lib/agent-canon/runtime")
         except ValueError:
             return 1
-        source = Path(runtime_mount["Source"]) / "runtime" / relative
+        source = Path(runtime_mount["Source"])
+        if runtime_mount["Destination"] != "/var/lib/agent-canon/runtime":
+            source /= "runtime"
+        source /= relative
         destination = Path(argv[2])
         if not source.is_dir():
             return 1
@@ -1020,27 +1026,40 @@ def main(argv: list[str]) -> int:
             (
                 mount
                 for mount in found[1].get("Mounts", [])
-                if mount["Destination"] == "/var/lib/agent-canon"
+                if mount["Destination"] in {
+                    "/var/lib/agent-canon",
+                    "/var/lib/agent-canon/runtime",
+                }
             ),
             None,
         )
+        runtime_root = (
+            Path(runtime_mount["Source"])
+            if runtime_mount is not None
+            and runtime_mount["Destination"] == "/var/lib/agent-canon/runtime"
+            else Path(runtime_mount["Source"]) / "runtime"
+            if runtime_mount is not None
+            else None
+        )
         if runtime_mount is not None:
-            volume = state["volumes"].get(runtime_mount.get("Name", ""), {})
-            user = str(found[1].get("Config", {}).get("User", ""))
-            uid, _, gid = user.partition(":")
-            if not controller_start and (
-                volume.get("UID") != int(uid or -1)
-                or volume.get("GID") != int(gid or -1)
-                or volume.get("Mode") != "0700"
-            ):
-                return 1
+            if runtime_mount.get("Type") == "volume":
+                volume = state["volumes"].get(runtime_mount.get("Name", ""), {})
+                user = str(found[1].get("Config", {}).get("User", ""))
+                uid, _, gid = user.partition(":")
+                if not controller_start and (
+                    volume.get("UID") != int(uid or -1)
+                    or volume.get("GID") != int(gid or -1)
+                    or volume.get("Mode") != "0700"
+                ):
+                    return 1
             probe = Path(runtime_mount["Source"]) / ".fake-resident-write-read"
             probe.write_text("resident\n", encoding="utf-8")
             if probe.read_text(encoding="utf-8") != "resident\n":
                 return 1
             probe.unlink()
-            volume["ResidentWriteReadback"] = True
-            save(state)
+            if runtime_mount.get("Type") == "volume":
+                volume["ResidentWriteReadback"] = True
+                save(state)
         if command == ["cat", "/var/lib/agent-canon/source-sync/source-sync.json"]:
             source_sync_mount = next(
                 (
@@ -1086,7 +1105,10 @@ def main(argv: list[str]) -> int:
                     (
                         mount
                         for mount in found[1]["Mounts"]
-                        if mount["Destination"] == "/var/lib/agent-canon"
+                        if mount["Destination"] in {
+                            "/var/lib/agent-canon",
+                            "/var/lib/agent-canon/runtime",
+                        }
                     ),
                     None,
                 )
@@ -1094,7 +1116,10 @@ def main(argv: list[str]) -> int:
                     (
                         mount
                         for mount in found[1]["Mounts"]
-                        if mount["Destination"] == "/var/lib/agent-canon"
+                        if mount["Destination"] in {
+                            "/var/lib/agent-canon",
+                            "/var/lib/agent-canon/runtime",
+                        }
                     ),
                     None,
                 )
@@ -1105,7 +1130,6 @@ def main(argv: list[str]) -> int:
                 )
                 if runtime_mount is None or exchange_mount is None or not digest or not host_root:
                     return 1
-                runtime_root = Path(runtime_mount["Source"]) / "runtime"
                 exchange_root = Path(exchange_mount["Source"]) / "exchange"
                 state_path = runtime_root / "state.json"
                 if state_path.is_file():
@@ -1149,7 +1173,10 @@ def main(argv: list[str]) -> int:
                     (
                         mount
                         for mount in found[1]["Mounts"]
-                        if mount["Destination"] == "/var/lib/agent-canon"
+                        if mount["Destination"] in {
+                            "/var/lib/agent-canon",
+                            "/var/lib/agent-canon/runtime",
+                        }
                     ),
                     None,
                 )
@@ -1158,7 +1185,11 @@ def main(argv: list[str]) -> int:
                 if runtime_mount is None or not current_id or not current_ref:
                     return 1
                 volume_root = Path(runtime_mount["Source"])
-                runtime_root = volume_root / "runtime"
+                runtime_root = (
+                    volume_root
+                    if runtime_mount["Destination"] == "/var/lib/agent-canon/runtime"
+                    else volume_root / "runtime"
+                )
                 host_install = Path(exec_environment.get("AGENT_CANON_HOST_INSTALL_ROOT", ""))
                 private_log = host_install.parent / "agent-canon-log"
                 source_sync_source = host_install / ".runtime" / "source-sync"
@@ -1202,7 +1233,11 @@ def main(argv: list[str]) -> int:
                 save(state)
             if operation == "install" and runtime_mount is not None:
                 volume_root = Path(runtime_mount["Source"])
-                runtime_root = volume_root / "runtime"
+                runtime_root = (
+                    volume_root
+                    if runtime_mount["Destination"] == "/var/lib/agent-canon/runtime"
+                    else volume_root / "runtime"
+                )
                 for name in ("generations", "tasks"):
                     directory = runtime_root / name
                     if directory.is_dir():
@@ -1266,10 +1301,27 @@ def main(argv: list[str]) -> int:
             target = next(
                 mount
                 for mount in found[1]["Mounts"]
-                if mount["Destination"] == "/var/lib/agent-canon"
+                if mount["Destination"] in {
+                    "/var/lib/agent-canon",
+                    "/var/lib/agent-canon/runtime",
+                }
             )
-            relative = Path(runtime_arg).relative_to("/var/lib/agent-canon/exchange")
-            exchange = Path(target["Source"]) / relative
+            runtime_path = Path(runtime_arg)
+            for exchange_root in (
+                "/var/lib/agent-canon/runtime/exchange",
+                "/var/lib/agent-canon/exchange",
+            ):
+                try:
+                    relative = runtime_path.relative_to(exchange_root)
+                    break
+                except ValueError:
+                    continue
+            else:
+                return 1
+            exchange = Path(target["Source"])
+            if target["Destination"] == "/var/lib/agent-canon/runtime":
+                exchange /= "exchange"
+            exchange /= relative
             eval_failed = os.environ.get("FAKE_EVAL_FAIL") == "1"
             (exchange / "eval-results").mkdir(parents=True, exist_ok=True)
             families = {
@@ -1332,9 +1384,13 @@ def main(argv: list[str]) -> int:
             runtime_mount = next(
                 mount
                 for mount in found[1]["Mounts"]
-                if mount["Destination"] == "/var/lib/agent-canon"
+                if mount["Destination"] in {
+                    "/var/lib/agent-canon",
+                    "/var/lib/agent-canon/runtime",
+                }
             )
             runtime_root = Path(runtime_mount["Source"]) / "exchange"
+            runtime_root.mkdir(parents=True, exist_ok=True)
             for child in runtime_root.iterdir():
                 if child.is_dir() and not child.is_symlink():
                     shutil.rmtree(child)

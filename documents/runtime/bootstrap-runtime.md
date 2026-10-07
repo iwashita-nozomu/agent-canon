@@ -79,12 +79,11 @@ to the source checkout as appropriate. Eval, report, SQLite, log, and analysis o
 remains under its declared external artifact root. There is no implicit
 `$HOME`, `$HOME/.cache`, or `$HOME/.local` fallback.
 
-When a resident is already active for the same control root and its validated
-host image and target projections are present at `<control-parent-root>/.runtime`,
-another source checkout reuses that existing projection authority. This is a
-cross-checkout readback of one resident, not a new runtime selection or a
-control-root fallback; a new resident still starts from the install checkout's
-`.runtime/`.
+When a resident is already active for the same control root, another source
+checkout reuses the runtime projection named by that resident's existing host
+registry bind. This is a cross-checkout readback of one resident, not a new
+runtime selection or a control-root fallback; a new resident still starts from
+the install checkout's `.runtime/`.
 
 The command family is:
 

@@ -388,6 +388,7 @@ def test_install_tightens_preexisting_runtime_control_directories(
 ) -> None:
     """Receipts and task state never remain readable through a 0755 fixture."""
     control = tmp_path / "control"
+    control.mkdir()
     fixture_source = materialize_source_fixture(tmp_path)
     runtime_root = fixture_source / ".runtime"
     (runtime_root / "receipts").mkdir(parents=True)
@@ -789,6 +790,13 @@ def test_exec_and_tool_run_return_bounded_io_evidence_and_external_logs(
     assert output_env == "AGENT_CANON_OUTPUT_ROOT=/var/lib/agent-canon/runtime/tool-output"
     assert "AGENT_CANON_HOOK_ARCHIVE_DIR=/var/lib/agent-canon/private-log" in docker_exec
     assert "AGENT_CANON_LOG_ROOT=/var/lib/agent-canon/private-log" in docker_exec
+    assert any(
+        value.startswith("TMPDIR=/var/lib/agent-canon/runtime/tasks/")
+        and value.endswith("/tmp")
+        for index, value in enumerate(docker_exec)
+        if index > 0 and docker_exec[index - 1] == "--env"
+    )
+    assert "RUFF_CACHE_DIR=/var/lib/agent-canon/cache/ruff" in docker_exec
 
 
 def test_container_control_maps_structured_tool_request_to_registered_mounts(
@@ -1214,7 +1222,7 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     manager._write_mounts(state)
     manager._write_mount_manifest(state)
     manager._write_state(state)
-    (manager.paths.container_runtime / "rollback-mounts.tsv").write_text(
+    (runtime_root / "rollback-mounts.tsv").write_text(
         f"target\t{previous_digest}\t{previous_root}\t/targets/{previous_digest}\tread-only\n",
         encoding="utf-8",
     )
@@ -1434,7 +1442,7 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
         )
 
     def mount_backup(digest: str, root: Path) -> None:
-        (manager.paths.container_runtime / "rollback-mounts.tsv").write_text(
+        (runtime_root / "rollback-mounts.tsv").write_text(
             f"target\t{digest}\t{root}\t/targets/{digest}\tread-only\n",
             encoding="utf-8",
         )

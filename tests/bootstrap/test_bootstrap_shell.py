@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import create_source_checkout
+
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP = ROOT / "bootstrap.sh"
 ADAPTER = ROOT / "bootstrap" / "host" / "lifecycle" / "entrypoint.sh"
@@ -597,11 +599,7 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     repository = tmp_path / "agent-canon"
     home.mkdir()
     control.mkdir()
-    subprocess.run(
-        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
-        check=True,
-        capture_output=True,
-    )
+    create_source_checkout(repository)
     subprocess.run(
         ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
         check=True,
@@ -1204,11 +1202,7 @@ def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path)
     repository = tmp_path / "agent-canon"
     home.mkdir()
     control.mkdir()
-    subprocess.run(
-        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
-        check=True,
-        capture_output=True,
-    )
+    create_source_checkout(repository)
     subprocess.run(["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"], check=True)
     subprocess.run(
         ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
@@ -2004,11 +1998,7 @@ def test_real_docker_forced_updates_retain_previous_images(tmp_path: Path) -> No
     repository = tmp_path / "agent-canon"
     home.mkdir()
     control.mkdir()
-    subprocess.run(
-        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
-        check=True,
-        capture_output=True,
-    )
+    create_source_checkout(repository)
     environment = {**os.environ, "HOME": str(home), "AGENT_CANON_DOCKER": docker}
     common = [
         str(BOOTSTRAP),
@@ -3324,11 +3314,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     # Both routes use a local origin.  Install deliberately exercises a
     # detached checkout; SourceSync must leave it on local main.
     control = tmp_path
-    subprocess.run(
-        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
-        check=True,
-        capture_output=True,
-    )
+    create_source_checkout(repository)
     subprocess.run(
         ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
         check=True,
@@ -3557,11 +3543,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     subprocess.run(
         ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
     )
-    subprocess.run(
-        ["git", "clone", "--no-hardlinks", str(ROOT), str(publisher)],
-        check=True,
-        capture_output=True,
-    )
+    create_source_checkout(publisher)
     subprocess.run(
         ["git", "-C", str(publisher), "push", str(origin), "HEAD:refs/heads/main"],
         check=True,
@@ -3774,11 +3756,7 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
     subprocess.run(
         ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
     )
-    subprocess.run(
-        ["git", "clone", "--no-hardlinks", str(ROOT), str(publisher)],
-        check=True,
-        capture_output=True,
-    )
+    create_source_checkout(publisher)
     subprocess.run(
         ["git", "-C", str(publisher), "push", str(origin), "HEAD:refs/heads/main"],
         check=True,
@@ -3928,11 +3906,7 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
     subprocess.run(
         ["git", "init", "--bare", "--initial-branch=main", str(origin)], check=True, capture_output=True
     )
-    subprocess.run(
-        ["git", "clone", "--no-hardlinks", str(ROOT), str(publisher)],
-        check=True,
-        capture_output=True,
-    )
+    create_source_checkout(publisher)
     subprocess.run(
         ["git", "-C", str(publisher), "push", str(origin), "HEAD:refs/heads/main"],
         check=True,
@@ -4156,8 +4130,10 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
     tmp_path: Path,
 ) -> None:
     """A shared resident keeps one host projection when invoked from a worktree."""
-    anchor = tmp_path / "anchor"
+    control = tmp_path / "home"
+    anchor = tmp_path / "agent-canon"
     topic = tmp_path / "topic"
+    control.mkdir()
     anchor.mkdir()
     topic.mkdir()
     control_runtime = anchor / ".runtime"
@@ -4172,8 +4148,24 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
     (control_runtime / "container-state" / "mounts.tsv").write_text(
         "", encoding="utf-8"
     )
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     fake_docker = tmp_path / "docker"
-    fake_docker.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    fake_docker.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        "  format=\"${4:-}\"\n"
+        "  case \"$format\" in\n"
+        "    *io.agent-canon.runtime*) printf '%s\\n' shared-v1 ;;\n"
+        f"    *io.agent-canon.control-root-digest*) printf '%s\\n' {control_digest!r} ;;\n"
+        f"    *Mounts*) printf '%s\\t%s\\n' {str(control_runtime / 'container-state/mounts.toml')!r} /var/lib/agent-canon/mount-registry.toml ;;\n"
+        "    *State.Running*) printf '%s\\n' false ;;\n"
+        "    *State.Health*) printf '%s\\n' absent ;;\n"
+        "  esac\n"
+        "  exit 0\n"
+        "fi\n",
+        encoding="utf-8",
+    )
     fake_docker.chmod(0o755)
 
     completed = subprocess.run(
@@ -4182,7 +4174,7 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
             "--repository-root",
             str(topic),
             "--control-parent-root",
-            str(anchor),
+            str(control),
             "status",
         ],
         check=False,

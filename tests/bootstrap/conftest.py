@@ -4,10 +4,62 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Iterator
 
 import pytest
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Keep resident pytest fixtures on the task-owned executable temp mount."""
+    runtime_root = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    if not runtime_root:
+        return
+    root = Path(runtime_root) / "pytest-tmp"
+    root.mkdir(parents=True, exist_ok=True)
+    root.chmod(0o700)
+    tempfile.tempdir = str(root)
+
+
+def create_source_checkout(source: Path) -> Path:
+    """Create a writable native-Git source checkout for a test owner."""
+    repository = Path(__file__).resolve().parents[2]
+    source.mkdir()
+    for entry in repository.iterdir():
+        if entry.name in {".git", ".runtime"}:
+            continue
+        destination = source / entry.name
+        if entry.name == ".codex":
+            shutil.copytree(entry, destination, symlinks=True)
+        elif entry.is_dir():
+            destination.symlink_to(entry, target_is_directory=True)
+        else:
+            destination.symlink_to(entry)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
+    for key, value in (
+        ("user.name", "AgentCanon Bootstrap Fixture"),
+        ("user.email", "agent-canon-bootstrap@example.invalid"),
+    ):
+        subprocess.run(["git", "-C", str(source), "config", key, value], check=True)
+    subprocess.run(["git", "-C", str(source), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(source), "commit", "-qm", "fixture"], check=True
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(source),
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:iwashita-nozomu/agent-canon.git",
+        ],
+        check=True,
+    )
+    return source
 
 
 def materialize_source_fixture(tmp_path: Path) -> Path:
@@ -23,19 +75,7 @@ def materialize_source_fixture(tmp_path: Path) -> Path:
     source = tmp_path / "agent-canon-source"
     if source.exists():
         return source
-    repository = Path(__file__).resolve().parents[2]
-    source.mkdir()
-    for entry in repository.iterdir():
-        if entry.name == ".runtime":
-            continue
-        destination = source / entry.name
-        if entry.name == ".codex":
-            shutil.copytree(entry, destination, symlinks=True)
-        elif entry.is_dir():
-            destination.symlink_to(entry, target_is_directory=True)
-        else:
-            destination.symlink_to(entry)
-    return source
+    return create_source_checkout(source)
 
 
 @pytest.fixture(autouse=True)
@@ -78,6 +118,9 @@ def bootstrap_test_isolation(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config))
     monkeypatch.setenv("AGENT_CANON_TEST_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENT_CANON_TEST_SYSTEMCTL_LOG", str(systemctl_log))
+    for key in tuple(os.environ):
+        if key.startswith("AGENT_CANON_") and not key.startswith("AGENT_CANON_TEST_"):
+            monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
     yield
 

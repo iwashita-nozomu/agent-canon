@@ -30,9 +30,9 @@ evidence.
   `--control-parent-root` authorizes access but never selects runtime or log
   placement. The historical `--runtime-root` value is accepted only as a
   migration-compatible input and cannot create new state at that path.
-  When the same control root already has a validated active-image and target
-  projection, another source checkout reuses that existing projection for the
-  shared resident; it does not create a second runtime authority.
+  When the same control-root resident already exists, the host reuses the
+  runtime projection named by that resident's existing registry bind; it does
+  not infer a second control-root runtime or create another authority.
 - Host pre-container values are the fixed bootstrap constants in
   `bootstrap/host/lifecycle/entrypoint.sh` (install/runtime paths, image/container limits,
   and mount destinations). Do not add a generic TOML parser or duplicate the
