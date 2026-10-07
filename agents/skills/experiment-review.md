@@ -22,22 +22,17 @@ GPU/JAX 環境の所有境界、artifact / visualization.py renderer / README �
 - GPU preallocation、JAX platform、GPU visibility、worker 並列度の混入を確認する
 - 実験結果 artifact、visualization.py renderer、registered command の整合を確認する
 
-## Review Checklist
+## Review Procedure
 
-- `experiments/registry.toml` に topic があり、registered command は managed runner
-  が呼ぶ topic `run.py` inner command になっている
-- README の standard command は `python3 -m tools.experiments.execution.run_managed_experiment
-  --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py` と一致している
-- managed run は既定 run directory を作り、topic `run.py` は必要に応じて
-  `EXPERIMENT_RUN_DIR` を尊重して同じ artifact schema を書く
-- topic code と checked-in config は GPU visibility、JAX platform、allocator、
-  preallocation、`max_workers: 1`、単一 GPU 固定、serial throttle を持たない
-- topic が renderer 実行や worker subprocess を起動する場合、その subprocess は
-  `os.environ.copy()` または標準継承で caller environment を引き継ぐ
-- run artifact は `summary/config_snapshot.json`、`summary/summary.json`、
-  `summary/cases.jsonl`、raw case artifact を区別する
-- `visualization.py` は artifact reader/renderer であり、formal run launcher や config 正本に
-  なっていない
+1. `experiments/registry.toml` の registered command が managed runner から topic の
+   `run.py` を呼ぶことを確認する。README の標準入口は次の形です。
+   `python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py`
+2. runner が作る run directory と `EXPERIMENT_RUN_DIR`、topic config、raw/summary artifact の
+   境界を確認する。`visualization.py` は reader/renderer であり、launcher や config 正本ではない。
+3. topic code/config に GPU visibility、JAX platform、allocator、preallocation、単一 GPU 固定、
+   serial throttle がないことを確認する。child process があれば caller environment を継承することも見る。
+4. 比較対象・case set・denominator・failure pattern・baseline を揃え、correctness、stability、
+   performance、解釈、limitation を分けて結果を読む。
 
 ## Evidence Review
 
@@ -59,20 +54,19 @@ GPU/JAX 環境の所有境界、artifact / visualization.py renderer / README �
 [documents/experiments/experiment-report-style.md](../../documents/experiments/experiment-report-style.md) を参照します。ここでは reader-facing
 文章を再作成せず、結果と claim の対応だけを判定します。
 
-## Suggested Static Search
+## Static Search
 
 ```bash
 git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env=" -- \
   experiments/<topic> experiments/registry.toml tools/experiments || true
 ```
 
-## Findings Policy
+## Findings
 
 - `fix now`: managed runner の inner command が topic `run.py` を呼ばない、
   topic-side environment hard-code、child subprocess environment reset、
   missing registry command、artifact path outside run dir.
 - `follow-up`: README / visualization.py renderer explanation gap, optional artifact schema gap,
   weak visualization coverage.
-- `no findings`: state the remaining unchecked surfaces, especially whether an
-  actual formal run was intentionally skipped, and whether the claim was limited
-  to the observed population.
+- `no findings`: 残る未確認 surface と formal run を意図的に省略したか、claim が観測範囲に
+  限定されているかを記録する。
