@@ -3,10 +3,39 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 from typing import Iterator
 
 import pytest
+
+
+def materialize_source_fixture(tmp_path: Path) -> Path:
+    """Build a writable source view while leaving the checkout source untouched.
+
+    Lifecycle tests intentionally exercise source-adjacent ``.runtime`` and
+    managed Codex surfaces.  A view with symlinked source directories would
+    still route those writes into the checkout, so ``.codex`` is copied while
+    immutable source directories remain linked for speed.  The fixture root
+    itself is test-owned and its ``.runtime`` is always newly created by the
+    lifecycle owner.
+    """
+    source = tmp_path / "agent-canon-source"
+    if source.exists():
+        return source
+    repository = Path(__file__).resolve().parents[2]
+    source.mkdir()
+    for entry in repository.iterdir():
+        if entry.name == ".runtime":
+            continue
+        destination = source / entry.name
+        if entry.name == ".codex":
+            shutil.copytree(entry, destination, symlinks=True)
+        elif entry.is_dir():
+            destination.symlink_to(entry, target_is_directory=True)
+        else:
+            destination.symlink_to(entry)
+    return source
 
 
 @pytest.fixture(autouse=True)

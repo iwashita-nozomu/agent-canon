@@ -11,6 +11,8 @@ from typing import Any
 
 import pytest
 
+from conftest import materialize_source_fixture
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
@@ -216,8 +218,9 @@ def runtime(
     """Construct a runtime rooted inside the test-owned temporary directory."""
     control = tmp_path / "control"
     control.mkdir()
+    source = materialize_source_fixture(tmp_path)
     return BootstrapRuntime(
-        control, control / name, repository_root=REPOSITORY_ROOT, docker=fake_docker
+        control, control / name, repository_root=source, docker=fake_docker
     )
 
 
@@ -367,10 +370,11 @@ def test_start_accepts_daemon_canonical_mount_readback(
     nested = control / "nested"
     nested.mkdir(parents=True)
     monkeypatch.setenv("FAKE_DOCKER_CANONICALIZE_MOUNTS", "1")
+    fixture_source = materialize_source_fixture(tmp_path)
     manager = BootstrapRuntime(
         nested / "..",
         nested / ".." / "runtime",
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         docker=fake_docker,
     )
 
@@ -384,19 +388,20 @@ def test_install_tightens_preexisting_runtime_control_directories(
 ) -> None:
     """Receipts and task state never remain readable through a 0755 fixture."""
     control = tmp_path / "control"
-    runtime_root = control / "runtime"
+    fixture_source = materialize_source_fixture(tmp_path)
+    runtime_root = fixture_source / ".runtime"
     (runtime_root / "receipts").mkdir(parents=True)
     runtime_root.chmod(0o755)
     (runtime_root / "receipts").chmod(0o755)
     manager = BootstrapRuntime(
         control,
         runtime_root,
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         docker=fake_docker,
     )
     manager.install()
-    assert runtime_root.stat().st_mode & 0o777 == 0o700
-    assert (runtime_root / "receipts").stat().st_mode & 0o777 == 0o700
+    assert manager.paths.runtime_root.stat().st_mode & 0o777 == 0o700
+    assert (manager.paths.runtime_root / "receipts").stat().st_mode & 0o777 == 0o700
 
 
 def test_install_start_status_readback_and_single_container(
@@ -537,10 +542,11 @@ def test_health_timeout_quarantines_and_removes_container(
     manifest.write_text(source, encoding="utf-8")
     control = tmp_path / "control"
     control.mkdir()
+    fixture_source = materialize_source_fixture(tmp_path)
     manager = BootstrapRuntime(
         control,
         control / "runtime",
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         manifest_path=manifest,
         docker=fake_docker,
     )
@@ -558,17 +564,18 @@ def test_second_control_root_cannot_adopt_existing_runtime(
     """Refuse a state record owned by another explicit control root."""
     control = tmp_path / "control"
     control.mkdir()
+    fixture_source = materialize_source_fixture(tmp_path)
     first = BootstrapRuntime(
         control,
         control / "runtime",
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         docker=fake_docker,
     )
     first.install()
     second = BootstrapRuntime(
         tmp_path,
         control / "runtime",
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         docker=fake_docker,
     )
     with pytest.raises(BootstrapError, match="shared_runtime_owned_elsewhere"):
@@ -581,10 +588,11 @@ def test_start_refuses_foreign_named_container_without_adopting_or_cleaning(
     """Keep a same-name container owned by another control root untouched."""
     first_control = tmp_path / "first-control"
     first_control.mkdir()
+    fixture_source = materialize_source_fixture(tmp_path)
     first = BootstrapRuntime(
         first_control,
         first_control / "runtime",
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         docker=fake_docker,
     )
     first.install()
@@ -592,10 +600,11 @@ def test_start_refuses_foreign_named_container_without_adopting_or_cleaning(
 
     second_control = tmp_path / "second-control"
     second_control.mkdir()
+    second_source = materialize_source_fixture(second_control)
     second = BootstrapRuntime(
         second_control,
         second_control / "runtime",
-        repository_root=REPOSITORY_ROOT,
+        repository_root=second_source,
         docker=fake_docker,
     )
     second.install()
@@ -908,8 +917,8 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     assert captured["catalog_id"] == "generate-agent-runtime-dashboard"
     assert captured["root"] == Path(f"/targets/{digest}")
     mapped = captured["environment"]
-    assert mapped["AGENT_CANON_SOURCE_ROOT"] == "/usr/local/share/agent-canon/runtime"
-    assert mapped["AGENT_CANON_ROOT"] == "/usr/local/share/agent-canon/runtime"
+    assert mapped["AGENT_CANON_SOURCE_ROOT"] == "/opt/agent-canon/source"
+    assert mapped["AGENT_CANON_ROOT"] == "/opt/agent-canon/source"
     assert mapped["AGENT_CANON_RUNTIME_ROOT"] == "/var/lib/agent-canon/runtime"
     assert mapped["AGENT_CANON_CONTROL_PARENT_ROOT"] == "/var/lib/agent-canon"
     assert mapped["AGENT_CANON_TARGET_ROOT"] == f"/targets/{digest}"
@@ -929,6 +938,7 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
     control.mkdir()
     target.mkdir()
     (control / "private-log").mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     digest = "target-secret"
@@ -943,7 +953,6 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
     manager._write_mounts(state)
     manager._write_mount_manifest(state)
     manager._write_state(state)
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
@@ -1205,7 +1214,7 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     manager._write_mounts(state)
     manager._write_mount_manifest(state)
     manager._write_state(state)
-    (runtime_root / "rollback-mounts.tsv").write_text(
+    (manager.paths.container_runtime / "rollback-mounts.tsv").write_text(
         f"target\t{previous_digest}\t{previous_root}\t/targets/{previous_digest}\tread-only\n",
         encoding="utf-8",
     )
@@ -1233,7 +1242,7 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     assert active["targets"] == {previous_digest: previous_target}
     assert rollback["targets"] == {current_digest: current_target}
     assert f"{previous_digest}\t{previous_root}\t/targets/{previous_digest}\tread-only" in (
-        runtime_root / "mounts.tsv"
+        manager.paths.container_runtime / "mounts.tsv"
     ).read_text(encoding="utf-8")
 
 
@@ -1402,7 +1411,7 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
 
     run(target_args("add", target_a, "target-a"))
     run(target_args("add", target_b, "target-b"))
-    plan = runtime_root / "rollback-plan.tsv"
+    plan = manager.paths.container_runtime / "rollback-plan.tsv"
     assert plan.is_file()
     assert "target-a" in plan.read_text(encoding="utf-8")
 
@@ -1425,7 +1434,7 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
         )
 
     def mount_backup(digest: str, root: Path) -> None:
-        (runtime_root / "rollback-mounts.tsv").write_text(
+        (manager.paths.container_runtime / "rollback-mounts.tsv").write_text(
             f"target\t{digest}\t{root}\t/targets/{digest}\tread-only\n",
             encoding="utf-8",
         )
@@ -1653,10 +1662,11 @@ def test_gc_enforces_archive_quota_only_without_unpublished_spool(
     )
     control = tmp_path / "control"
     control.mkdir()
+    fixture_source = materialize_source_fixture(tmp_path)
     manager = BootstrapRuntime(
         control,
         control / "runtime",
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         manifest_path=manifest,
         docker=fake_docker,
     )
@@ -1706,7 +1716,7 @@ def test_uninstall_removes_only_owned_container_and_image(
         for index, command in enumerate(fake_docker.commands)
         if command[-2:] == [
             "python3",
-            "/usr/local/share/agent-canon/runtime/tools/runtime/archive/"
+            "/opt/agent-canon/source/tools/runtime/archive/"
             "runtime_exchange_cleanup.py",
         ]
     )
@@ -1778,10 +1788,11 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
         .replace("idle_stop_seconds = 3600", "idle_stop_seconds = 1800"),
         encoding="utf-8",
     )
+    fixture_source = materialize_source_fixture(tmp_path)
     changed = BootstrapRuntime(
         manager.paths.control_parent_root,
         manager.paths.runtime_root,
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         manifest_path=changed_manifest,
         docker=fake_docker,
     )
@@ -1793,7 +1804,7 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
     rebound = json.loads(changed.paths.state.read_text(encoding="utf-8"))
     assert updated["code"] == "updated"
     assert rebound["manifest_digest"] == changed.manifest_digest
-    assert rebound["repository_root"] == str(REPOSITORY_ROOT)
+    assert rebound["repository_root"] == str(fixture_source)
 
 
 def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
@@ -2073,10 +2084,11 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     )
 
     (tmp_path / "control").mkdir()
+    fixture_source = materialize_source_fixture(tmp_path)
     manager = BootstrapRuntime(
         tmp_path / "control",
         tmp_path / "control" / "runtime",
-        repository_root=REPOSITORY_ROOT,
+        repository_root=fixture_source,
         manifest_path=manifest,
         docker=fake_docker,
     )
@@ -2093,16 +2105,16 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     eval_command = next(
         command
         for command in fake_docker.commands
-        if "/usr/local/share/agent-canon/runtime/eval/producers/run_accumulated_agent_evals.py"
+        if "/opt/agent-canon/source/eval/producers/run_accumulated_agent_evals.py"
         in command
     )
     assert eval_command[eval_command.index("--root") + 1] == (
-        "/usr/local/share/agent-canon/runtime"
+        "/opt/agent-canon/source"
     )
     observed_target = eval_command[eval_command.index("--target-root") + 1]
     assert observed_target.startswith("/targets/")
     assert eval_command[eval_command.index("--prompt-eval-manifest") + 1] == (
-        "/usr/local/share/agent-canon/runtime/eval/definitions/"
+        "/opt/agent-canon/source/eval/definitions/"
         "skill_workflow_prompt_eval.toml"
     )
     spool = manager.paths.runtime_root / "spool" / "eval-e2e"

@@ -4152,6 +4152,55 @@ def test_legacy_runtime_argument_keeps_install_state_at_source_sibling_paths(
     assert (tmp_path / "agent-canon-log").is_dir()
 
 
+def test_shared_control_projection_is_reused_across_source_checkouts(
+    tmp_path: Path,
+) -> None:
+    """A shared resident keeps one host projection when invoked from a worktree."""
+    anchor = tmp_path / "anchor"
+    topic = tmp_path / "topic"
+    anchor.mkdir()
+    topic.mkdir()
+    control_runtime = anchor / ".runtime"
+    (control_runtime / "host-state").mkdir(parents=True)
+    (control_runtime / "container-state").mkdir()
+    (control_runtime / "host-state" / "active-image.tsv").write_text(
+        "schema\tagent-canon.active-image.v1\n"
+        "image-ref\tagent-canon-tools:active\n"
+        "image-id\tsha256:" + "a" * 64 + "\n",
+        encoding="utf-8",
+    )
+    (control_runtime / "container-state" / "mounts.tsv").write_text(
+        "", encoding="utf-8"
+    )
+    fake_docker = tmp_path / "docker"
+    fake_docker.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    fake_docker.chmod(0o755)
+
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(topic),
+            "--control-parent-root",
+            str(anchor),
+            "status",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "AGENT_CANON_DOCKER": str(fake_docker),
+        },
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    receipt = json.loads(completed.stdout)
+    assert receipt["runtime_root"] == str(control_runtime)
+    assert not (topic / ".runtime").exists()
+
+
 def test_symlinked_source_runtime_is_rejected_before_legacy_argument_mapping(
     tmp_path: Path,
 ) -> None:
@@ -4430,6 +4479,9 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
 
 def test_forced_rollback_recovery_failure_retains_mounted_backup(tmp_path: Path) -> None:
     """A failed state/readback recovery leaves its mounted manifest evidence."""
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "bootstrap").symlink_to(ROOT / "bootstrap", target_is_directory=True)
     control = tmp_path / "control"
     runtime = control / "runtime"
     control.mkdir()
@@ -4477,7 +4529,15 @@ bootstrap_host_entrypoint "$1" \
   --runtime-root "$3" rollback
 '''
     completed = subprocess.run(
-        ["bash", "-c", script, "bootstrap-test", str(ROOT), str(control), str(runtime)],
+        [
+            "bash",
+            "-c",
+            script,
+            "bootstrap-test",
+            str(repository),
+            str(control),
+            str(runtime),
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -4489,7 +4549,7 @@ bootstrap_host_entrypoint "$1" \
     )
     assert completed.returncode == 2
     assert json.loads(completed.stderr)["code"] == "rollback_failed"
-    backups = list((runtime / "container-state").glob(".rollback-current-mounts.*"))
+    backups = list((repository / ".runtime" / "container-state").glob(".rollback-current-mounts.*"))
     assert len(backups) == 1
     assert backups[0].read_bytes() == b""
 

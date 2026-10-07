@@ -364,7 +364,7 @@ _agent_canon_validate_new_path() {
 }
 
 _agent_canon_validate_roots() {
-  local control default_runtime
+  local control default_runtime control_runtime
   if ! control=$(realpath -e -- "$AGENT_CANON_CONTROL_ROOT" 2>/dev/null); then
     control=
   fi
@@ -376,10 +376,25 @@ _agent_canon_validate_roots() {
   AGENT_CANON_PRIVATE_LOG_ROOT="$(dirname -- "$AGENT_CANON_REPOSITORY_ROOT")/agent-canon-log"
   _agent_canon_validate_new_path "$default_runtime" "default runtime root"
   _agent_canon_validate_new_path "$AGENT_CANON_PRIVATE_LOG_ROOT" "private log root"
+  # A resident is keyed by the control root, while source checkouts may be
+  # invoked through different worktrees.  Reuse the one already-published
+  # control projection when it has both host identity and target manifest;
+  # never create or adopt a control-root runtime as a new fallback.
+  control_runtime="$AGENT_CANON_CONTROL_ROOT/.runtime"
+  if [[ "$control_runtime" != "$default_runtime" &&
+        -d "$control_runtime" && ! -L "$control_runtime" &&
+        -f "$control_runtime/host-state/active-image.tsv" &&
+        ! -L "$control_runtime/host-state/active-image.tsv" &&
+        -f "$control_runtime/container-state/mounts.tsv" &&
+        ! -L "$control_runtime/container-state/mounts.tsv" ]]; then
+    _agent_canon_validate_new_path "$control_runtime" "control runtime projection"
+    AGENT_CANON_RUNTIME_ROOT=$control_runtime
+  else
+    AGENT_CANON_RUNTIME_ROOT=$default_runtime
+  fi
   # --runtime-root is retained only so older launchers continue to parse.  A
-  # source checkout owns its runtime, and no caller can redirect state into a
-  # workspace or another checkout.
-  AGENT_CANON_RUNTIME_ROOT=$default_runtime
+  # source checkout owns a new runtime; an existing shared control projection
+  # above is the sole cross-checkout exception.
   export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
 }
 

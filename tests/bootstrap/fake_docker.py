@@ -1021,7 +1021,6 @@ def main(argv: list[str]) -> int:
                 mount
                 for mount in found[1].get("Mounts", [])
                 if mount["Destination"] == "/var/lib/agent-canon"
-                and mount.get("Type") == "volume"
             ),
             None,
         )
@@ -1260,7 +1259,7 @@ def main(argv: list[str]) -> int:
             return 0
         if command[:2] == [
             "python3",
-            "/usr/local/share/agent-canon/runtime/eval/producers/run_accumulated_agent_evals.py",
+            "/opt/agent-canon/source/eval/producers/run_accumulated_agent_evals.py",
         ]:
             runtime_arg = command[command.index("--runtime-root") + 1]
             run_id = command[command.index("--run-id") + 1]
@@ -1328,7 +1327,7 @@ def main(argv: list[str]) -> int:
             return 1 if eval_failed else 0
         if command == [
             "python3",
-            "/usr/local/share/agent-canon/runtime/tools/runtime/archive/runtime_exchange_cleanup.py",
+            "/opt/agent-canon/source/tools/runtime/archive/runtime_exchange_cleanup.py",
         ]:
             runtime_mount = next(
                 mount
