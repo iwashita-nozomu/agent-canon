@@ -13,6 +13,7 @@ import json
 import os
 import shlex
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,16 @@ WORKFLOW = ROOT / ".github/workflows/agent-canon-static-gates.yml"
 def workflow() -> dict:
     """Load strings without YAML 1.1 interpreting the Actions `on` key as true."""
     return yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+
+
+def executable_fixture_root(tmp_path: Path) -> Path:
+    """Place executable fixtures on the external runtime filesystem."""
+    runtime_root = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    if not runtime_root:
+        return tmp_path
+    task_root = Path(runtime_root) / "tasks"
+    task_root.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix="standalone-static-gate-", dir=task_root))
 
 
 def step(name: str) -> dict:
@@ -235,7 +246,7 @@ def test_candidate_preparation_preserves_head_and_target_base(tmp_path: Path) ->
 def test_unit_failures_are_aggregated_without_skipping_later_units(
     tmp_path: Path,
 ) -> None:
-    source = tmp_path / "candidate"
+    source = executable_fixture_root(tmp_path) / "candidate"
     source.mkdir()
     bootstrap = source / "bootstrap.sh"
     bootstrap.write_text(
@@ -280,7 +291,8 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(
 def test_docs_unit_executes_native_checker_and_propagates_failure(
     tmp_path: Path, paths
 ) -> None:
-    root, cache = tmp_path / "target", tmp_path / "cache"
+    fixture_root = executable_fixture_root(tmp_path)
+    root, cache = fixture_root / "target", fixture_root / "cache"
     root.mkdir()
     (cache / "bin").mkdir(parents=True)
     (root / "has space.md").write_text("# Document\n")
@@ -399,7 +411,8 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
 def test_unpublished_environment_uses_native_local_build(
     tmp_path: Path, remote_status, bootstrap_status
 ) -> None:
-    source = tmp_path / "candidate"
+    fixture_root = executable_fixture_root(tmp_path)
+    source = fixture_root / "candidate"
     image = source / "bootstrap/container/image"
     image.mkdir(parents=True)
     (image / "digest.sh").write_text("printf 'fixture-key\\n'\n")
@@ -410,7 +423,7 @@ def test_unpublished_environment_uses_native_local_build(
         'exit "$BOOTSTRAP_STATUS"\n'
     )
     bootstrap.chmod(0o755)
-    bin_dir = tmp_path / "bin"
+    bin_dir = fixture_root / "bin"
     bin_dir.mkdir()
     docker = bin_dir / "docker"
     docker.write_text('#!/usr/bin/env bash\nexit "$REMOTE_STATUS"\n')
@@ -495,7 +508,8 @@ def test_capture_exports_only_the_bootstrap_validated_container(
         "runtime_root": "/fixture/.runtime",
         "source_sync": None,
     }
-    source = tmp_path / "candidate"
+    fixture_root = executable_fixture_root(tmp_path)
+    source = fixture_root / "candidate"
     source.mkdir()
     bootstrap = source / "bootstrap.sh"
     bootstrap.write_text(
@@ -505,8 +519,8 @@ def test_capture_exports_only_the_bootstrap_validated_container(
         'exit "$STATUS_EXIT"\n'
     )
     bootstrap.chmod(0o755)
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
+    bin_dir = fixture_root / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
     docker = bin_dir / "docker"
     docker.write_text(
         "#!/usr/bin/env bash\n"
