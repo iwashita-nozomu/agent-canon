@@ -26,10 +26,14 @@ evidence.
   AgentCanon Python; it builds/adopts the image and starts exactly one resident
   container before using `docker exec` for the controller. Always pass explicit
   `--repository-root` and `--control-parent-root`; the effective runtime is
-  always the bootstrap-owned, ignored `<repository-root>/.runtime/`.
-  `--control-parent-root` authorizes access but never selects runtime or log
-  placement. The historical `--runtime-root` value is accepted only as a
+  always the bootstrap-owned, ignored `<control-parent-root>/.runtime/`.
+  `--control-parent-root` selects the shared runtime authority while the
+  private log placement remains owned by the install-root parent. The
+  historical `--runtime-root` value is accepted only as a
   migration-compatible input and cannot create new state at that path.
+  When the same control-root resident already exists, the host reuses that
+  control-root runtime and the resident's named state volume; it does not
+  infer a source-checkout runtime or create another authority.
 - Host pre-container values are the fixed bootstrap constants in
   `bootstrap/host/lifecycle/entrypoint.sh` (install/runtime paths, image/container limits,
   and mount destinations). Do not add a generic TOML parser or duplicate the
@@ -57,7 +61,7 @@ evidence.
   `test/testrunner.sh`/test list. Do not mount a project's tests into the
   AgentCanon tool container and do not make AgentCanon know project test names.
 - Bootstrap lifecycle state and cache live in the ignored, reconstructible
-  `<repository-root>/.runtime/`. The private `agent-canon-log` checkout is the
+  `<control-parent-root>/.runtime/`. The private `agent-canon-log` checkout is the
   sibling `<repository-root>/../agent-canon-log`, independent of the control
   root. General eval/report/SQLite/log/
   analysis artifacts remain outside the source checkout; the artifact output
@@ -120,8 +124,8 @@ update, and sync paths derive a new image reference.
 
 ## Command Shape
 
-The control root is a task input; the effective runtime is always the fixed
-bootstrap path `<repository-root>/.runtime`:
+The install root is the source input; the effective runtime is always the fixed
+bootstrap path `<control-parent-root>/.runtime`:
 
 ```bash
 bash bootstrap.sh \

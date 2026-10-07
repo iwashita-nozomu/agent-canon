@@ -70,6 +70,7 @@ KNOWN_SUBDIRS = (
 )
 CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
+RUFF_CACHE_DESTINATION = "/var/lib/agent-canon/cache/ruff"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
@@ -96,6 +97,7 @@ TOOL_ENVIRONMENT_KEYS = frozenset(
         "TMPDIR",
         "RUST_BACKTRACE",
         "CARGO_TERM_COLOR",
+        "RUFF_CACHE_DIR",
         "AGENT_CANON_SOURCE_ROOT",
         "AGENT_CANON_ROOT",
         "AGENT_CANON_DISPATCH_ENTRY_ID",
@@ -1303,10 +1305,8 @@ class DockerAdapter:
     ) -> None:
         """Export one exact task subtree through Docker's UID normalization."""
         source_path = Path(source)
-        if (
-            not source.startswith("/var/lib/agent-canon/exchange/tasks/")
-            or ".." in source_path.parts
-        ):
+        exchange_tasks_prefix = f"{CONTAINER_RUNTIME_DESTINATION}/exchange/tasks/"
+        if not source.startswith(exchange_tasks_prefix) or ".." in source_path.parts:
             raise BootstrapError(
                 "docker_copy_rejected", f"unsafe container export: {source}"
             )
@@ -3903,6 +3903,8 @@ class BootstrapRuntime:
                     "AGENT_CANON_HOOK_ARCHIVE_DIR": PRIVATE_LOG_DESTINATION,
                     "AGENT_CANON_LOG_ROOT": PRIVATE_LOG_DESTINATION,
                     "AGENT_CANON_RUNTIME_ROOT": CONTAINER_RUNTIME_DESTINATION,
+                    "TMPDIR": f"{CONTAINER_RUNTIME_DESTINATION}/tasks/{task_id}/tmp",
+                    "RUFF_CACHE_DIR": RUFF_CACHE_DESTINATION,
                 }
                 environment.update(extra_environment or {})
                 result = self.docker.exec_container(
@@ -4182,7 +4184,7 @@ class BootstrapRuntime:
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
                 canon_root = TOOL_SOURCE_DESTINATION
-                container_runtime = "/var/lib/agent-canon/exchange"
+                container_runtime = f"{CONTAINER_RUNTIME_DESTINATION}/exchange"
                 exchange_runtime = (
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )
