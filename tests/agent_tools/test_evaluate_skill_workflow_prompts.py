@@ -325,7 +325,6 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             },
             "DSV-SPARK-FAST-PATH-1": {
                 "固定 Spark implementation route",
-                "parent packet が.*--select-agent-type implementer=spark_worker:<evidence>",
                 "one owning review gate",
                 "Validation is static/targeted first",
             },

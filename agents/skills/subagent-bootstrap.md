@@ -322,13 +322,18 @@ The runtime discovery adapter delegates these required operating clauses to this
    `DEFAULT_QUALITY_CHECK_ROLES`, and `DEFAULT_QUALITY_CHECK_AGENT_TYPES`.
    Review and edit handoffs include `team_manifest.yaml`
    `run.default_quality_check_policy`.
-1. Require `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker`; `worker` is the default. Select `spark_worker` only when the parent packet supplies `--select-agent-type implementer=spark_worker:<evidence>`, and require the selection in `SUBAGENT_AGENT_TYPE_SELECTIONS` and `team_manifest.yaml`.
+1. Consume the generated model/profile view and the selected implementer role/profile
+   from the existing route readback. A caller may use native `--select-agent-type`
+   before route selection; validate and preserve that input, but do not require it
+   again as a Spark eligibility or approval gate after the route verdict is fixed.
 1. Resolve logical role, selected Skills, execution profile, and authority as separate fields. When the selected profile is Luna, use `$direct-luna-communication` with a direct `gpt-5.6-luna` override and do not require or select a role-specific physical alias. Read `.codex/agents/<role>.toml` only when a capability-specific or compatibility route explicitly selects that executable view.
 1. Before assigning read-only exploration, run the canonical checker, router, semantic index, or dashboard when one owns the question. Use subagents to interpret ambiguous structured tool artifacts or independently review non-tool-covered judgment, not to repeat deterministic tool checks by reading the same documents.
 1. For repo inventory, tool drift survey, machine-report summarization, and experiment/log execution, use the ordinary `gpt-5.6-luna/high` roles when they are independent verification or bounded execution that does not delay the implementation critical path. Reserve `gpt-5.4-mini/medium` for the fresh, read-only, artifact-only `skill_evaluator` in explicit T14 `skill_evaluation`; it is absent from permanent team roles.
 1. For static validation triage, diff-local Python / C++ review, bounded review, report traceability, and checklist-style review gates, select one accountable `gpt-5.6-luna/high` review role for the active decision; use `gpt-5.6-luna/xhigh` only for `ship_reviewer` findings.
 1. For coding / implementation / patch / doc-edit requests, describe the catalog-selected route first. When that typed route requires a child, route seed, responsibility search, reuse survey, stale-surface scan, dependency expansion, validation plan, and tool-rejection preflight produce a handoff packet; schedule or launch the selected write-capable implementer, while the parent owns packet selection, packet relay, dependency order, status, and final external readback.
-1. Treat a bounded implementation slice as `spark_worker` eligible only when it is derived from the Abstract Design Frame and is one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable. Eligibility does not replace the explicit typed parent-packet selection.
+1. Treat role/profile eligibility as owned by the selected implementation route. This
+   skill consumes the verdict and handoff; it does not re-derive Spark eligibility,
+   add a default worker, or request a second parent-packet selection.
 1. Keep every handoff packet owned after discovery: include dependency-expanded `allowed_paths`, relevant canon sections, explicit `do_not_read` surfaces, and expected output schema, with context artifacts referenced through the protocol-owned capsule. Use `/workspace` or the repo root only as workspace identity, then derive handoff scope from route seed, responsibility search, reuse survey, stale-surface scan, and dependency expansion. For implementation handoff, seed `allowed_paths` from implementation-surface router `PRIMARY_PATHS` and `do_not_read` from `FORBIDDEN_PATHS`; if the router is unavailable, retain deterministic router recovery output only as local provisional source-packet evidence or record `router_unavailable_blocker` before handoff. This evidence does not select a new candidate or public route; confirm the handoff paths through responsibility search and dependency scope.
 1. For a fresh launch, build the `Fresh Subagent Context Capsule` through
    [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) and its `Context Visibility Contract`.
@@ -351,7 +356,6 @@ The runtime discovery adapter delegates these required operating clauses to this
    root.
 1. Build `allowed_paths` from dependency headers when possible: expand edited paths, search hits, checker findings, or changed files through `run_repo_dependency_review.sh` and pass `dependency_edit_scope.txt` / `dependency_graph.tsv` instead of only a hand-written file list.
 1. If the selected candidate cannot launch, record local/tool evidence with `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; changing candidates requires an explicit revised parent packet and wave.
-1. Send broad implementation, design interpretation, conflict resolution, or architecture-sensitive work to `worker`.
 1. For T12, treat `scheduler`, `schedule_reviewer`, `project_reviewer`,
    `docs_workflow_steward`, and `prompt_config_reviewer` as candidates. Activate
    only owner-critical roles or roles selected by the validation route. When the
