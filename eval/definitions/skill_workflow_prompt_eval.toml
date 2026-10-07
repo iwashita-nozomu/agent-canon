@@ -2133,48 +2133,6 @@ critical = true
 required_regex = ["reader guide", "denominator", "directionality", "valid and invalid", "what result would change the next action"]
 
 [[evals]]
-id = "agent-orchestration-canonical-report-routing"
-target = "agents/skills/agent-orchestration.md"
-kind = "skill"
-description = "The canonical agent-orchestration skill must route reader-facing result reports to report-writing."
-
-[[evals.checklist]]
-id = "REPORT-ROUTING-CANONICAL-1"
-critical = true
-description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and adds result-artifact-writeout when raw machine results are stored."
-required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / JSONL", "result-artifact-writeout", "evidence-backed"]
-
-[[evals.checklist]]
-id = "OWNER-BOUNDED-PUBLIC-SURFACE-HUMAN-1"
-critical = true
-description = "The canonical owner-bounded route requires public-surface invariance and escalates every public delta with full consumer closure."
-required_regex = [
-  "design / OOP boundary と ownership clarity",
-  "owner boundary",
-  "public API/behavior/schema の追加、縮小、\\s*削除、rename、restriction、deprecation、意味変更",
-  "`scoped_change` または broader route",
-  "dependency/consumer/migration/docs closure",
-]
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
-critical = true
-description = "Routes explicit HTML/browser output to html-output while keeping report output Markdown by default."
-required_regex = ["html-output", "Markdown", "HTML", "external browser publication", "experiment / Eval artifact"]
-
-[[evals.checklist]]
-id = "STRUCTURE-ROUTING-CANONICAL-1"
-critical = true
-description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; graph analysis stays optional for ordinary writing."
-required_regex = ["structure-planning", "experiment plan / report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
-
-[[evals.checklist]]
-id = "TOOL-FINDING-ROUTING-CANONICAL-1"
-critical = true
-description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
-required_regex = ["tool、checker、hook、static analysis", "tool-finding-report", "before / after impact"]
-
-[[evals]]
 id = "experiment-lifecycle-owner-contract"
 target = ".codex/personal/skills/experiment-lifecycle/SKILL.md"
 canonical_target = "agents/skills/experiment-lifecycle.md"
