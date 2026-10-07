@@ -4358,12 +4358,10 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
 ) -> None:
     """A shared resident keeps one host projection when invoked from a worktree."""
     control = tmp_path / "home"
-    anchor = tmp_path / "agent-canon"
     topic = tmp_path / "topic"
     control.mkdir()
-    anchor.mkdir()
     topic.mkdir()
-    control_runtime = anchor / ".runtime"
+    control_runtime = control / ".runtime"
     (control_runtime / "host-state").mkdir(parents=True)
     (control_runtime / "container-state").mkdir()
     (control_runtime / "host-state" / "active-image.tsv").write_text(
@@ -4376,7 +4374,7 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
         "", encoding="utf-8"
     )
     # A topic checkout may retain stale local state; the named resident's
-    # registry bind remains the sole authority for this invocation.
+    # named-volume projection remains the sole authority for this invocation.
     topic_runtime = topic / ".runtime"
     (topic_runtime / "host-state").mkdir(parents=True)
     (topic_runtime / "container-state").mkdir()
@@ -4391,6 +4389,9 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
         encoding="utf-8",
     )
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    state_volume_source = (
+        f"/var/lib/docker/volumes/agent-canon-runtime-{control_digest}/_data"
+    )
     fake_docker = tmp_path / "docker"
     fake_docker.write_text(
         "#!/usr/bin/env bash\n"
@@ -4402,7 +4403,7 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
         "    '{{.Id}}') printf '%s\\n' container-live ;;\n"
         "    *io.agent-canon.runtime*) printf '%s\\n' shared-v1 ;;\n"
         f"    *io.agent-canon.control-root-digest*) printf '%s\\n' {control_digest!r} ;;\n"
-        f"    *Mounts*) printf '%s\\t%s\\n' {str(control_runtime / 'container-state/mounts.toml')!r} /var/lib/agent-canon/mount-registry.toml ;;\n"
+        f"    *Mounts*) printf '%s\\t%s\\n' {state_volume_source!r} /var/lib/agent-canon ;;\n"
         "    *State.Running*) printf '%s\\n' false ;;\n"
         "    *State.Health*) printf '%s\\n' absent ;;\n"
         "  esac\n"

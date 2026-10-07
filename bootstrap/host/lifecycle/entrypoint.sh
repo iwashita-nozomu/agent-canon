@@ -372,13 +372,10 @@ _agent_canon_validate_roots() {
     _agent_canon_json_error control_root_invalid "control parent root must be an existing directory"
   }
   AGENT_CANON_CONTROL_ROOT=$control
-  default_runtime="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
+  default_runtime="$AGENT_CANON_CONTROL_ROOT/.runtime"
   AGENT_CANON_PRIVATE_LOG_ROOT="$(dirname -- "$AGENT_CANON_REPOSITORY_ROOT")/agent-canon-log"
-  _agent_canon_validate_new_path "$default_runtime" "default runtime root"
+  _agent_canon_validate_new_path "$default_runtime" "control runtime root"
   _agent_canon_validate_new_path "$AGENT_CANON_PRIVATE_LOG_ROOT" "private log root"
-  # --runtime-root is retained only so older launchers continue to parse.  A
-  # source checkout owns a new runtime until an existing resident's state
-  # owner is read back by the host lifecycle below.
   AGENT_CANON_RUNTIME_ROOT=$default_runtime
   export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
 }
@@ -2414,37 +2411,6 @@ _agent_canon_container_name() {
   printf 'agent-canon-tools-%s\n' "${control_digest:0:16}"
 }
 
-_agent_canon_select_existing_runtime() {
-  local container mount_rows registry_source authority
-  local registry_destination="$AGENT_CANON_MOUNT_REGISTRY_DESTINATION"
-  local container_name
-
-  container_name=$(_agent_canon_container_name)
-  if ! "$AGENT_CANON_DOCKER_CMD" container inspect "$container_name" >/dev/null 2>&1; then
-    return 0
-  fi
-  _agent_canon_classify_existing_container "$container_name" || return $?
-  if ! mount_rows=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{range .Mounts}}{{printf "%s\t%s\n" .Source .Destination}}{{end}}' \
-    "$container_name"); then
-    _agent_canon_json_error runtime_projection_invalid \
-      "existing resident mount projection could not be read"
-    return 2
-  fi
-  registry_source=$(awk -F $'\t' -v destination="$registry_destination" \
-    '$2 == destination {print $1; exit}' <<<"$mount_rows")
-  [[ "$registry_source" == */container-state/mounts.toml &&
-     "$registry_source" != *$'\n'* && "$registry_source" != *$'\r'* ]] || {
-    _agent_canon_json_error runtime_projection_invalid \
-      "existing resident has no canonical host runtime projection"
-    return 2
-  }
-  authority=${registry_source%/container-state/mounts.toml}
-  _agent_canon_validate_new_path "$authority" "resident runtime projection"
-  AGENT_CANON_RUNTIME_ROOT=$authority
-  export AGENT_CANON_RUNTIME_ROOT
-}
-
 _agent_canon_git_mounts() {
   local manifest=$1 include_pending=${2:-1} source common sources
   local -a common_dirs=()
@@ -4190,7 +4156,12 @@ bootstrap_host_entrypoint() {
      [[ ! -x "$AGENT_CANON_DOCKER_CMD" ]]; then
     _agent_canon_json_error runtime_unavailable "Docker executable is unavailable"
   fi
-  _agent_canon_select_existing_runtime || return $?
+  # Claim an existing named resident before source/image work. Later lifecycle
+  # owners perform the full configuration readback for their operation.
+  local existing_container=$(_agent_canon_container_name)
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$existing_container" >/dev/null 2>&1; then
+    _agent_canon_classify_existing_container "$existing_container" || return $?
+  fi
   if [[ "$operation" == gc && "${command_args[1]:-}" == --dry-run ]]; then
     # A preview is read-only: dispatch before host-runtime preparation, which
     # creates directories, files, modes, and the normal replacement lock.
