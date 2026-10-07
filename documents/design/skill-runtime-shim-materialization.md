@@ -194,7 +194,6 @@ render/readback します。
 ~~~
 
 record_digest の preimage は canonical doc、route/dependency identity、shim path/discovery method、materializer/template identity を含みます。
-ToolID/ToolCall/argument-schema identity、materializer/template identity を含みます。
 comment 自体は owner payload を再掲せず、readback は comment の exact
 schema/version/digest と owner sources から再構成した record digest を照合します。
 
@@ -202,7 +201,7 @@ schema/version/digest と owner sources から再構成した record digest を�
 
 この二つを同じ性質として扱いません。
 
-- `determinism` は同じ source snapshot、command/tool packet、materializer
+- `determinism` は同じ source snapshot、native owner、materializer
   version、record input に対して、同じ canonical record bytes/digest、同じ generated
   content bytes、同じ catalog-sized projection digest map を返す純粋な render property です（`tools/agent/skills/skill_shim_materializer.py`）。
 - `idempotent fixed point` は実体 target に対する二回の materialize/readback protocol
@@ -409,21 +408,21 @@ README だけであり、上記の source/tests/eval producer diff は次の imp
 
 正確な migration 順序は以下です。
 
-1. `git diff` を変更せずに読み、catalog、canonical docs、current shims、
-2. catalog の各 `shim` が `.codex/personal/skills/<skill_id>/SKILL.md` と一致することを確認する。
-3. current frontmatter/body を分類し、全 LegacyResolutionRecord を作る。unmatched block、
-   unknown command、owner link 欠落が一つでもあれば全 locator/digest receipt を出して停止する。
-4. catalog の discovery metadata と全 records を canonicalize し、catalog-sized staged shim
+1. `git diff` を変更せずに読み、catalog、canonical docs、current shims、catalog の各
+   `shim` が `.codex/personal/skills/<skill_id>/SKILL.md` と一致することを確認する。
+2. current frontmatter/body を分類し、全 LegacyResolutionRecord を作る。unmatched block、
+   unresolved owner link が一つでもあれば全 locator/digest receipt を出して停止する。
+3. catalog の discovery metadata と全 records を canonicalize し、catalog-sized staged shim
    staging area に生成する。staging area は repository write set ではない。
-5. staged bytes を parser で readback し、全件の expected frontmatter/link/packet/
+4. staged bytes を parser で readback し、全件の expected frontmatter/link/
    numbered owner-read instruction と target manifest を比較する。
-6. 4 と 5 が pass したときだけ、catalog-derived な全 runtime target を deterministic path order で
+5. 3 と 4 が pass したときだけ、catalog-derived な全 runtime target を deterministic path order で
    per-file temp + `os.replace` する。source/tests/eval producer の通常実装 diff は
    この replace sequence に含めない。
-7. 全 runtime target を実体から再読込し、row receipt、route/graph
+6. 全 runtime target を実体から再読込し、row receipt、route/graph
    golden、writer inventory を更新する。途中停止なら `partial_stop` を記録し、同じ
    materializer の再実行で canonical source から未完了/全 target を再収束させる。
-8. 全 catalog target の readback が pass して初めて migration を accepted とする。directory
+7. 全 catalog target の readback が pass して初めて migration を accepted とする。directory
    swap、journal replay、別 recovery writer は作らない。続けて同じ materializer を
    二回目に実行し、fixed-point acceptance fixture の record/projection/readback equality
    と `content_delta_count=0` を確認する。
