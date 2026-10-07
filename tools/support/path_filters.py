@@ -7,7 +7,6 @@
 # downstream implementation ../validation/semantic/algorithm/check_algorithm_config_partition.py consumes shared path filters
 # downstream implementation ../validation/semantic/logging/check_log_helper_names.py consumes shared path filters
 # downstream implementation ../validation/semantic/logging/check_run_log_contract.py consumes shared path filters
-# downstream implementation ../validation/semantic/code/check_static_any.py consumes shared path filters
 # downstream implementation ../validation/code/oop/shared/readability_core.py consumes shared path filters
 # @dependency-end
 

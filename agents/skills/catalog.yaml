@@ -417,7 +417,7 @@ skill_families:
       required: []
       conditional:
       - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--capability", "oop_type_design"]}
-      - {"tool_id": "check-static-any", "operation_id": "default", "argv_suffix": ["--submodule-aware"]}
+      - {"tool_id": "run-python-quality-checks", "operation_id": "default"}
       - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--report-dir", "<run-dir>/dependency-review", "--fail-missing"]}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}

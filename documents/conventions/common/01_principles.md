@@ -44,9 +44,8 @@ ruff check \
 C++ では clang-tidy の `// NOLINT(readability-magic-numbers)` を使って、なぜ名前付き定数にしないかを局所的に説明します。
 許可コメントは「後で直す」逃げ道ではなく、数式・標準・プロトコル上その場に置く方が読みやすい場合だけ使います。
 
-CI では Python changed source に対して Ruff の同じ設定を走らせます。
-テスト fixture の期待値は production source と性質が違うため、既定 CI gate では `tests/` を除外します。
-ただし、テスト内でも tuning parameter、反復回数、閾値、shape などを複数箇所で使う場合は名前付き定数にします。
+CI では選択した Python source path（production と tests を含む）に対して Ruff の同じ設定を走らせます。
+テスト内でも tuning parameter、反復回数、閾値、shape などを複数箇所で使う場合は名前付き定数にします。
 
 ## 規約
 
