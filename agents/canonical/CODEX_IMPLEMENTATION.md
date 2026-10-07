@@ -49,8 +49,8 @@ The selected `workflow_activation_policy` owns child activation and authority.
 A blocked selected child preserves that boundary; it does not create a parent
 write fallback. User-guided debugging uses the common ROOT exception.
 
-A bounded owner/path/targeted-validation route uses its existing task or handoff
-for these decisions. When the selected route requires full staging, read
+A bounded route's selected execution owner performs its edit and verification
+without a child handoff. When the selected route requires full staging, read
 [Coordination design packet](#coordination-design-packet) before that handoff.
 Only an activated design-correspondence route reads
 [DIC](../internal-routines/design-implementation-correspondence.md) and carries
@@ -195,10 +195,11 @@ style debt stays separate. A failed check immediately routes to its
 
 For selected delegation, read [Codex Subagents](CODEX_SUBAGENTS.md) and the selected
 role's current TOML. They own model/profile, authority, context capsule, and write
-scope; this file does not duplicate the role inventory. The existing typed route
-selects `worker` by default and permits `spark_worker` only with explicit
-`implementer=spark_worker:<evidence>` for a design-derived mechanical slice with
-no unresolved specification, public-interface, or dependency decision.
+scope; this file does not duplicate the role inventory. The selected delegation verdict supplies the implementer role/profile. Consume
+that verdict unchanged: a fixed `execute_spark` packet dispatches to
+`spark_worker`; unresolved design or repair stays with its selected reasoning
+owner. This handoff does not apply a second worker default, magic permission
+token, or model fallback after the verdict is fixed.
 
 Handoff includes the selected design path/section and request clauses, established
 reuse assets and relevant tests, dependency-expanded write scope, validation route,

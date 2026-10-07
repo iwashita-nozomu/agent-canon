@@ -435,16 +435,25 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
     assert merged.request.allowed_paths == ("src/owned.py",)
     after, _identity = read_writer_target_packet(prepared.clone)
     assert after.allowed_paths == ("src/owned.py",)
+    revised = rtc.request(
+        remote_url, "repo-target", workspace, "topic-target", "feature/target",
+        evidence, allowed_paths=("src/owned.py", "tests/test_owned.py"),
+        checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
+    )
+    updated, _identity = read_writer_target_packet(revised.clone)
+    assert updated.allowed_paths == ("src/owned.py", "tests/test_owned.py")
 
 
+@pytest.mark.parametrize("mode", [0o700, 0o755])
 def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: int
 ) -> None:
     """Linked topics share Git objects but keep indexes, markers, and packets separate."""
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
+    workspace.chmod(mode)
     run_git(workspace, "remote", "add", "origin", remote_url)
 
     def fake_identity(path: Path) -> CheckoutIdentity:
@@ -481,6 +490,8 @@ def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
     )
 
     assert first.clone != second.clone
+    assert (first.clone.stat().st_mode & 0o777) == mode
+    assert (second.clone.stat().st_mode & 0o777) == mode
     assert run_git(first.clone, "rev-parse", "--git-common-dir") == run_git(
         second.clone, "rev-parse", "--git-common-dir"
     )

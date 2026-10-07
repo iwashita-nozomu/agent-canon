@@ -18,7 +18,7 @@ runtime surface ではありません。hooks、tools の実装は各 source dir
 - [bootstrap-runtime.md](bootstrap-runtime.md): shared tool runtime の人間向け規約。
 - `runtime-profiles-and-check-matrix.json`、`.md`: profile と validation route。選択した検査の実行境界は [static-check](../../agents/internal-routines/static-check.md) を参照します。
 - [runtime-log-archive.md](runtime-log-archive.md)、[runtime-log-archive-migration.md](runtime-log-archive-migration.md): log archive の契約。
-- `log-surface-inventory.json`: runtime surface inventory。
+- 必要なログ項目一覧は `python3 tools/runtime/archive/log_surface_inventory.py --root . --format json` で取得します。生成結果はsourceへ保存しません。
 - [task-contract-observation.md](task-contract-observation.md): run-local contract observationのschema、遷移、既存archiveへの保持。
 
 機械可読ファイルを編集した場合は、対応する runtime checker の所有範囲を確認します。

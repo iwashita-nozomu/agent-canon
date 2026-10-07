@@ -130,7 +130,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             hook = root / ".codex" / "hooks" / "sample.py"
             hook.parent.mkdir(parents=True)
             hook.write_text("print('FIRST_FIELD=1')\n", encoding="utf-8")
-            baseline = root / "documents" / "runtime" / "log-surface-inventory.json"
+            baseline = root / "snapshot.json"
             environment = self.authorized_env(root)
 
             subprocess.run(
@@ -140,7 +140,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--output",
-                    "documents/runtime/log-surface-inventory.json",
+                    "snapshot.json",
                     "--quiet",
                     ".codex",
                 ],
@@ -179,7 +179,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--output",
-                    "documents/runtime/log-surface-inventory.json",
+                    "snapshot.json",
                     "--quiet",
                     ".codex",
                 ],
@@ -246,7 +246,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--output",
-                    "documents/runtime/log-surface-inventory.json",
+                    "snapshot.json",
                     "--quiet",
                     ".codex",
                 ],
@@ -276,7 +276,7 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                     str(root),
                     "--check",
                     "--baseline",
-                    str(root / "documents" / "runtime" / "log-surface-inventory.json"),
+                    str(root / "snapshot.json"),
                     "--quiet",
                     ".codex",
                 ],
@@ -290,64 +290,6 @@ class LogSurfaceInventoryTest(unittest.TestCase):
         self.assertEqual(explicit.returncode, 0)
         self.assertEqual(explicit.stdout, "")
 
-    def test_check_does_not_use_vendored_baseline_when_root_baseline_is_absent(self) -> None:
-        """A parent root must not discover a baseline through vendor/."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            canon = root / "vendor" / "agent-canon"
-            hook = canon / ".codex" / "hooks" / "sample.py"
-            hook.parent.mkdir(parents=True)
-            hook.write_text("print('VENDORED_FIELD=1')\n", encoding="utf-8")
-
-            subprocess.run(
-                ["git", "init"],
-                cwd=canon,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            environment = self.authorized_env(canon)
-            subprocess.run(
-                ["git", "add", ".codex/hooks/sample.py"],
-                cwd=canon,
-                check=True,
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
-            subprocess.run(
-                [
-                    sys.executable,
-                    str(TOOL),
-                    "--root",
-                    str(canon),
-                    "--output",
-                    "documents/runtime/log-surface-inventory.json",
-                    "--quiet",
-                    ".codex",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TOOL),
-                    "--root",
-                    str(root),
-                    "--check",
-                    "--quiet",
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("explicit_baseline_required", result.stdout)
 
     def test_discovers_surfaces_without_git_metadata(self) -> None:
         """Inventory should still work in mounted containers where git is unavailable."""

@@ -1081,6 +1081,14 @@ def test_exec_preserves_nonzero_command_exit_and_redacts_output(
     assert "<redacted>" in receipt["details"]["stderr_preview"]
 
 
+@pytest.mark.parametrize("argv", [["python3", "-m", "pytest"], ["ruff", "format"]])
+def test_exec_accepts_native_commands_for_standalone_source(argv: list[str]) -> None:
+    """A source topic checkout uses the resident despite a different install path."""
+    bootstrap_runtime_module._validate_tool_plane_argv(
+        REPOSITORY_ROOT, REPOSITORY_ROOT.parent / "installed-source", argv
+    )
+
+
 def test_exec_rejects_project_commands_before_container_admission(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:
@@ -1088,9 +1096,7 @@ def test_exec_rejects_project_commands_before_container_admission(
     manager = runtime(tmp_path, fake_docker)
     target = tmp_path / "project"
     target.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(target)
+    # Rejection precedes lifecycle admission; an install is unrelated setup.
     exec_count = sum(command[1] == "exec" for command in fake_docker.commands)
     with pytest.raises(BootstrapError) as failure:
         manager.exec(target, ["python3", "-m", "pytest"])

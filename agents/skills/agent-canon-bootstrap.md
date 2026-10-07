@@ -98,8 +98,8 @@ evidence.
    runtime failure or target readback for a target rejection; do not scan every
    surface or infer a project-code failure from a tool-plane rejection.
 4. Install/start or `target add` only for an explicit lifecycle request or an
-   authorized repair of that failure. Default new targets to read-only; writes
-   require the existing target-write authority. Read back the changed target or
+   authorized repair of that failure. Tool targets are read-only; use the tool's
+   native diff/output and host publication for authoring. Read back the changed target or
    generation, then retry only when allowed. Preserve the one-container/image
    limit and record task-created resource IDs for cleanup.
 5. For eval work, run the registered producers, collect the run bundle, sync
