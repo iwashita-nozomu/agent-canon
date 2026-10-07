@@ -6,7 +6,6 @@
 # upstream design ../../documents/design/dependency-manifest-design.md tracked-source dependency semantics
 # upstream implementation ./source_dependency_graph.py derives dependency query and context without runtime state
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs owns opt-in persisted graph build/status and non-dependency relations
-# downstream implementation ./check_design_doc_claims.py consumes source-derived dependency context
 # downstream implementation ./tool_drift.py consumes source-derived dependency facts
 # downstream implementation ./vector_search.py consumes source-derived dependency facts
 # @dependency-end
