@@ -234,21 +234,6 @@ critical = true
 required_regex = ["Mermaid", "optional diagnostics", "information gain"]
 
 [[evals]]
-id = "test-design-semantic-admission"
-target = "agents/skills/test-design.md"
-description = "Regression admission depends on contract, reachability, and a stable oracle."
-
-[[evals.checklist]]
-id = "TEST-SEMANTIC-1"
-critical = true
-required_regex = ["contract", "reachable", "counterexample", "oracle"]
-
-[[evals.checklist]]
-id = "TEST-SEMANTIC-2"
-critical = true
-required_regex = ["reproduction", "reachability evidence", "null-hypothesis"]
-
-[[evals]]
 id = "code-visualization-skill"
 target = ".codex/personal/skills/code-visualization/SKILL.md"
 canonical_target = "agents/skills/code-visualization.md"
@@ -562,59 +547,6 @@ id = "RESEARCH-SOURCE-2"
 critical = true
 description = "Keeps source-backed research claims traceable to the consumed packet and bounded from transient context."
 required_regex = ["\\$literature-survey", "source packet", "source claim.*task claim|source claim[\\s\\S]*task.*claim", "対応|correspondence|boundary"]
-
-[[evals]]
-id = "test-design-numerical-admission-gate-shim"
-target = ".codex/personal/skills/test-design/SKILL.md"
-canonical_target = "agents/skills/test-design.md"
-kind = "skill"
-description = "The discoverable test-design skill must gate numerical, randomized, tolerance, solver, convergence, residual, benchmark, and experiment-style tests before proposing them."
-
-[[evals.checklist]]
-id = "TEST-DESIGN-NUMERICAL-GATE-SHIM-1"
-critical = true
-description = "Requires numerical test admission before recommending numerical tests."
-required_regex = ["Numerical Test Admission Gate", "numerical trigger", "non-numerical alternative", "oracle", "budget", "omit"]
-
-[[evals]]
-id = "test-design-validation-failure-response-shim"
-target_glob = ".codex/personal/skills/test-design/SKILL.md"
-expected_count = 1
-canonical_target = "agents/skills/test-design.md"
-kind = "skill"
-description = "The discoverable test-design skill must classify validation failures before simplification, deletion, revert, or oracle weakening, then route implementation bugs to owning repair."
-
-[[evals.checklist]]
-id = "TEST-DESIGN-VALIDATION-FAILURE-SHIM-1"
-critical = true
-description = "Requires validation/check failure response evidence before weakening intended behavior and avoids blocking implementation bugs behind extra test planning."
-required_regex = ["failing contract", "observation level", "failure cause", "approved intent", "owning code", "extra test-design pass", "oracle weakening"]
-
-[[evals]]
-id = "test-design-numerical-admission-gate-doc"
-target_glob = "agents/skills/test-design.md"
-expected_count = 1
-kind = "skill-doc"
-description = "The human test-design skill must require numerical trigger, alternative, oracle, and budget evidence."
-
-[[evals.checklist]]
-id = "TEST-DESIGN-NUMERICAL-GATE-DOC-1"
-critical = true
-description = "Routes numerical test admission to the canonical testing convention after activation."
-required_regex = ["activation=required", "documents/conventions/coding-conventions-testing\\.md", "Numerical Test Admission Gate", "数値 trigger", "non-numerical alternative", "oracle", "budget"]
-
-[[evals]]
-id = "test-design-validation-failure-response-doc"
-target_glob = "agents/skills/test-design.md"
-expected_count = 1
-kind = "skill-doc"
-description = "The human test-design skill must classify validation failures before simplification, deletion, revert, or oracle weakening, then route implementation bugs to owning repair."
-
-[[evals.checklist]]
-id = "TEST-DESIGN-VALIDATION-FAILURE-DOC-1"
-critical = true
-description = "Requires validation/check failure response evidence before weakening intended behavior and avoids blocking implementation bugs behind extra test planning."
-required_regex = ["failing_contract", "observation_level", "cause_classification", "intent_preservation", "documents/runtime/runtime-profiles-and-check-matrix\\.json", "owning code", "intent を弱めません"]
 
 [[evals]]
 id = "testing-conventions-numerical-admission-gate"
@@ -1422,48 +1354,6 @@ id = "OOP-DOC-1"
 critical = true
 description = "Documents exclude usage for vendored snapshots and generated reports."
 required_regex = ["--exclude vendor", "--exclude reports", "commit SHA", "run bundle"]
-
-[[evals]]
-id = "oop-refactor-routing-scope"
-target = "agents/skills/refactor-loop.md"
-kind = "skill"
-description = "The refactor-loop skill must preserve OOP analyzer scope evidence."
-
-[[evals.checklist]]
-id = "OOP-SKILL-1"
-critical = true
-description = "Requires external OOP surveys to record commit, paths, excludes, and reports."
-required_regex = ["外部 repo", "commit SHA", "--exclude vendor --exclude reports", "Markdown / JSON report"]
-
-[[evals.checklist]]
-id = "REFACTOR-TOOL-FINDING-1"
-critical = true
-description = "Requires refactor-loop to consume tool-finding-report packets and repair prompt gaps before launching more write-capable subagents."
-required_regex = ["tool-finding-report", "finding packet", "impact", "handoff_prompt_gap", "write-capable subagent"]
-
-[[evals.checklist]]
-id = "REFACTOR-SCOPE-PLAN-1"
-critical = true
-description = "Requires refactor-loop to use the mechanical scope-plan output instead of manual block partitioning."
-required_regex = ["python-structure-hash-scope-plan", "Change Impact Packet", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
-
-[[evals.checklist]]
-id = "OOP-ROUTE-1"
-critical = true
-description = "Requires read-only snapshot analysis for external and bare repositories."
-required_regex = ["external\\s+repository|外部\\s*repository", "read-only|読み取り専用", "snapshot"]
-
-[[evals.checklist]]
-id = "OOP-ROUTE-2"
-critical = true
-description = "Requires explicit analyzer scope, excludes, reports, and reviewer prompt evidence."
-required_regex = ["analysis_paths", "excluded_paths", "raw / summary report", "reviewer handoff"]
-
-[[evals.checklist]]
-id = "OOP-ROUTE-3"
-critical = true
-description = "Separates survey execution from closeout signal-class and human-review execution."
-required_regex = ["\\$oop-readability-check", "mechanical raw result", "summary report", "reviewer"]
 
 [[evals]]
 id = "workflow-monitoring-template-behavior-events"

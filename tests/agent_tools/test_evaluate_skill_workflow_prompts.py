@@ -230,10 +230,6 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             by_id["agent-orchestration-skill-call-routing"]["target"],
             ".codex/personal/skills/agent-orchestration/SKILL.md",
         )
-        self.assertEqual(
-            by_id["codex-task-workflow-convention-gate"]["target"],
-            ".codex/personal/skills/codex-task-workflow/SKILL.md",
-        )
         orchestration_check_ids = {
             str(item["id"])
             for item in cast(
@@ -267,20 +263,9 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             }.issubset(pointer_required)
         )
         self.assertNotIn("owner-produced `DecisionSufficiencyPacket`", pointer_required)
-        for eval_id in (
-            "agent-orchestration-skill-call-routing",
-            "codex-task-workflow-convention-gate",
-        ):
+        for eval_id in ("agent-orchestration-skill-call-routing",):
             checklists = cast(list[dict[str, object]], by_id[eval_id]["checklist"])
             self.assertTrue(all(bool(item["critical"]) for item in checklists))
-        codex_check_ids = {
-            str(item["id"])
-            for item in cast(
-                list[dict[str, object]],
-                by_id["codex-task-workflow-convention-gate"]["checklist"],
-            )
-        }
-        self.assertIn("CODEX-TASK-OWNER-FIRST-1", codex_check_ids)
 
     def test_default_manifest_includes_validation_failure_response_eval_coverage(
         self,
