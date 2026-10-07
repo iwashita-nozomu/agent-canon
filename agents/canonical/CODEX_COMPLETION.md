@@ -181,10 +181,11 @@ route. A partial test pass, checkpoint, commit, draft PR, status label, or writt
 remaining-work list is progress, not a reason to return control to the user.
 Recording a gap does not discharge it or require another request to continue.
 
-A child return establishes only its assigned unit and evidence. The parent verifies
-that unit, integrates it, and continues remaining required work; it does not turn
-child completion or a blocked child into overall completion. Delegate or repair
-through the already authorized route, retaining user-guided parent ownership.
+For a selected child route, a child return establishes only its assigned unit and
+evidence. The parent verifies that unit, integrates it, and continues remaining
+required work; it does not turn child completion or a blocked child into overall
+completion. Delegate or repair through the already authorized route, retaining
+user-guided parent ownership. A bounded route has no child return to interpret.
 The user's explicit step boundary defines that step's deliverable; do not expand
 it to the entire project or wait for unrelated work.
 

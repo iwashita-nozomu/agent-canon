@@ -518,12 +518,18 @@ refactor が trivial な単発編集を超える場合、parent agent は実装�
    - regression case、nasty case、behavior-preservation assertions を設計し、
      実装 agent へ渡します。
 1. Write-capable implementation agent
-   - 既定は `worker` です。低遅延で閉じる write scope でも、`spark_worker` は parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使えます。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。
-   - write-capable agent は既定 1 体ですが、parent が dependency order、
-     wave plan、disjoint write scope、integration order、review gate を明示した
-     場合は、複数 writer を同一 wave で並列化できます。衝突する target は禁止
-     でも scope 縮小理由でもなく順序制約として扱い、先行 / 後続 wave に分けます。
-     current checkout 内の wave plan で安全に分離できない場合は、separate worktree へ逃がさず後続 wave へ直列化します。
+   - 既定は `worker` です。低遅延で閉じる write scope は、selected typed route が
+     既に選んだ `spark_worker` の role/profile をそのまま使います。選択済み
+     candidate が blocked の場合は local/tool context に `selected_agent_type`、
+     `write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、
+     `status=blocked` を記録します。candidate の再選定はこの route では行わず、
+     route owner が修正した handoff から再開します。
+   - 同じ checkout root の write-capable agent は同時起動せず、先行 writer の
+     lifecycle 終了と owner release/readback 後に直列再利用します。並列 writer
+     は checkout owner が選択した distinct checkout root に置き、各 writer の
+     dependency order、disjoint write scope、integration order、review gate を
+     保持します。衝突する target は scope 縮小理由ではなく順序制約として後続
+     wave に置き、同じ checkout から worktree を増やして衝突を隠しません。
    - repair batch / slice、affected files、forbidden semantic delta、既存 dirty
      state の扱い、validation command を明示して渡します。
    - 親 agent は「どこをどう直すか」を file 単位ではなく target trace 単位で渡します。
@@ -681,9 +687,7 @@ zero callers. Stop propagation at unchanged contracts, not at initially named fi
 1. For non-trivial refactors, route implementation and review to separate
    subagents: parent fixes the contract and artifacts, one or more
    wave-scoped selected write-capable implementers implement (`worker` by
-   default; `spark_worker` only through
-   `--select-agent-type implementer=spark_worker:<evidence>` recorded in stdout /
-   manifest),
+   default; a selected typed route may supply `spark_worker` for a bounded slice),
    `test_designer` defines regression coverage only after the owning mechanism is
    established or repaired and an unresolved test-owned runtime risk remains, and a
    separate read-only reviewer
@@ -699,7 +703,8 @@ zero callers. Stop propagation at unchanged contracts, not at initially named fi
    agents. Conflict risk must be resolved by task order, not by shrinking the
    repair batch to one finding: place conflicting targets into predecessor /
    successor waves, validate and rerun tools after the predecessor, and only
-   run independent targets with disjoint write scopes in the same wave.
+   run independent targets with disjoint write scopes and distinct checkout roots
+   in the same wave.
 1. Before launching a write-capable subagent, include a token-bounded handoff:
    the `Change Impact Packet` path, every target trace in the repair batch,
    allowed files, and a target-by-target repair intent.

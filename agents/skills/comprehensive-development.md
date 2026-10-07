@@ -161,7 +161,8 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 ## Parent-Managed Write Scope
 
 - parent は `team_manifest.yaml` に writer ごとの allowed path / directory、integration order、validation route を固定します。
-- colliding writer scope は current checkout 内の後続 wave に serialize します。
+- colliding writer scope は current checkout 内の後続 wave に serialize し、同一 wave
+  の並列 writer は checkout owner が準備した distinct checkout roots に限定します。
 - reviewer は read-only を保ち、parent-managed write-scope discipline の確認は `plan_reviewer` と `project_reviewer` が行います。
 
 ## Boundary
