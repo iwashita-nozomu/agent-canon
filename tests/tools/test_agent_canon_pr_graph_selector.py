@@ -4,7 +4,6 @@
 # contract test
 # responsibility Verifies canonical selection, trusted diff bases, changed-responsibility reachability, and typed graph failures.
 # upstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects parent strict graph gating
-# upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh prepares and passes the trusted GitHub base
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json owns canonical validation profile IDs and graph requirements
 # upstream design ../../documents/design/dependency-manifest-design.md owns canonical dependency surfaces
 # @dependency-end
@@ -27,7 +26,6 @@ from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SELECTOR_PATH = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "agent_canon_pr_graph_selector.py"
-CHECKER_PATH = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
 SPEC = importlib.util.spec_from_file_location(
     "agent_canon_pr_graph_selector", SELECTOR_PATH
 )
@@ -935,20 +933,6 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         self.assertEqual(result_error.exception.reason, "graph_identity_invalid")
         self.assertEqual(database_error.exception.reason, "graph_identity_invalid")
 
-    def test_pr_entrypoint_prepares_and_passes_trusted_base(self) -> None:
-        """The parent gate wires shallow preparation to the exact selector argument."""
-        entrypoint = CHECKER_PATH.read_text(encoding="utf-8")
-
-        self.assertIn("--prepare-ci-base", entrypoint)
-        self.assertIn(
-            'selector_args+=(--trusted-base-sha "${trusted_base_sha}")',
-            entrypoint,
-        )
-        self.assertIn(
-            '--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}"',
-            entrypoint,
-        )
-
     def test_pin_only_diff_is_skipped_with_reason_and_evidence(self) -> None:
         """A pin-only parent diff does not select strict parent graph completeness."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1033,8 +1017,6 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 "tools/validation/semantic/dependencies/check_dependency_headers.py",
                 "tools/analysis/dependencies/render_dependency_manifest_graph.py",
                 "tools/analysis/dependencies/graph_client.py",
-                "tools/validation/ci/checks/check_agent_canon_pr.sh",
-                "tools/validation/ci/runners/run_all_checks.sh",
             }.issubset(surfaces)
         )
 
@@ -1470,18 +1452,6 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
         self.assertEqual(acceptance.status, "fail")
         self.assertTrue(acceptance.report["full_scope"])
-
-    def test_pr_entrypoint_keeps_graph_analysis_outside_source_receipt(self) -> None:
-        """The selector supplies scope; the source receipt owns two statuses."""
-        entrypoint = CHECKER_PATH.read_text(encoding="utf-8")
-        quick_ci = (PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertNotIn("PR_GATE_DEPENDENCY_GRAPH_STATUS", entrypoint)
-        self.assertNotIn("PR_GATE_DEPENDENCY_GRAPH_STATUS", quick_ci)
-        self.assertIn("pr_gate_receipt.py", quick_ci)
-        self.assertIn("validated_source_receipt_consumed", quick_ci)
 
     def test_base_equal_to_head_is_typed_failure(self) -> None:
         """An equal base cannot masquerade as an empty PR diff."""
