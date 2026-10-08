@@ -15,21 +15,23 @@ downstream implementation ../../.codex/personal/skills/tool-finding-report/SKILL
 
 ## Reader Map
 
-- Purpose: run tools, checkers, hooks, static analysis, or structural analyzers
-  to produce full raw, structured, prioritized finding packets.
+- Purpose: use selected tools to produce complete findings for the chosen scope,
+  ranking them when the request or repair decision needs prioritization.
 - Section path: Purpose, Use When, and Boundary define ownership; Finding Packet
-  and Procedure define artifacts and ranking; Refactor Integration explains how
-  repair workflows consume the packet.
+  and Procedure define selected artifacts and conditional ranking; Refactor
+  Integration explains how repair workflows consume the packet.
 - Use when: baseline findings, mechanical priority order, before/after impact,
   or prompt-feedback evidence is needed before or after implementation.
-- Boundary: this skill reports and ranks findings; repair choice belongs to the
-  caller workflow, `refactor-loop`, or the relevant implementation skill.
+- Boundary: this skill reports findings and ranks them when needed; repair
+  choice belongs to the caller workflow, `refactor-loop`, or the relevant
+  implementation skill.
 
 ## Purpose
 
-tool、checker、hook、static analysis、構造解析を使って問題を探し、raw result、
-structured artifact、mechanical priority order、full finding report、必要なら
-before / after impact を同じ source packet で結びます。
+tool、checker、hook、static analysis、構造解析を使って選択した scope の問題を探します。
+raw result と structured artifact は依頼や handoff が必要とするときにまとめ、mechanical
+priority order、reader-facing report、before / after impact は依頼または repair/handoff の
+判断が必要とするときに加えます。
 
 この skill は実装修正を担当しません。実装は `refactor-loop`、通常 task execution、
 または該当 workflow が担当し、この skill の finding packet を入力にします。
