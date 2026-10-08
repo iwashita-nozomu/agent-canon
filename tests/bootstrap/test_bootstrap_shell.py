@@ -111,7 +111,26 @@ AGENT_CANON_CONTROL_ROOT={str(home)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_STATE_ROOT={str(state)!r}
 export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
-_agent_canon_install_global_links
+_agent_canon_container_exec() {{
+  [[ "$1" == candidate ]] || return 90
+  shift
+  [[ "$1" == --stdin ]] || return 91
+  shift
+  [[ "$1" == /var/lib/agent-canon/cache/bin/agent-canon &&
+     "$2" == codex-config && "$3" == --source-config &&
+     "$4" == "$AGENT_CANON_SOURCE_DESTINATION/.codex/config.toml" ]] || return 92
+  local personal
+  personal=$(cat) || return 93
+  [[ "$personal" == *approval_policy* ]] || return 94
+  [[ "${{AGENT_CANON_TEST_CONFIG_FAIL:-0}}" != 1 ]] || return 2
+  printf '%s\n' \
+    'model_context_window = 1050000' \
+    'model_auto_compact_token_limit = 900000' \
+    'approval_policy = "on-request"' \
+    '[agents]' \
+    'max_threads = 8'
+}}
+_agent_canon_install_global_links candidate
 """
     result = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
@@ -157,7 +176,7 @@ _agent_canon_install_global_links
 
 
 def test_shell_install_applies_only_canonical_context_defaults(tmp_path: Path) -> None:
-    """Managed global config adopts project context defaults and keeps user TOML."""
+    """Managed global config passes its TOML through the resident writer."""
     home = tmp_path / "home"
     repository = tmp_path / "repository"
     state = tmp_path / "state"
@@ -190,7 +209,25 @@ AGENT_CANON_CONTROL_ROOT={str(home)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_STATE_ROOT={str(state)!r}
 export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
-_agent_canon_install_global_links
+_agent_canon_container_exec() {{
+  [[ "$1" == candidate ]] || return 90
+  shift
+  [[ "$1" == --stdin ]] || return 91
+  shift
+  [[ "$1" == /var/lib/agent-canon/cache/bin/agent-canon &&
+     "$2" == codex-config && "$3" == --source-config &&
+     "$4" == "$AGENT_CANON_SOURCE_DESTINATION/.codex/config.toml" ]] || return 92
+  local personal
+  personal=$(cat) || return 93
+  [[ "$personal" == *approval_policy* ]] || return 94
+  printf '%s\n' \
+    'model_context_window = 1050000' \
+    'model_auto_compact_token_limit = 900000' \
+    'approval_policy = "on-request"' \
+    '[agents]' \
+    'max_threads = 8'
+}}
+_agent_canon_install_global_links candidate
 """
     result = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
@@ -200,11 +237,33 @@ _agent_canon_install_global_links
     personal_config = repository / ".codex" / "personal" / "config.toml"
     assert global_config.resolve() == personal_config.resolve()
     assert personal_config.read_text(encoding="utf-8") == (
-        'approval_policy = "on-request"\n'
         "model_context_window = 1050000\n"
         "model_auto_compact_token_limit = 900000\n"
+        'approval_policy = "on-request"\n'
         "[agents]\nmax_threads = 8\n"
     )
+    personal_config.write_text('approval_policy = "on-request"\n', encoding="utf-8")
+    script_failure = f"""
+source {str(ADAPTER)!r}
+set +e
+HOME={str(home)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_STATE_ROOT={str(state)!r}
+AGENT_CANON_TEST_CONFIG_FAIL=1
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_TEST_CONFIG_FAIL
+_agent_canon_container_exec() {{ cat >/dev/null; return 2; }}
+_agent_canon_apply_context_defaults candidate {str(personal_config)!r}
+printf 'rc=%s\\n' "$?"
+"""
+    failure = subprocess.run(
+        ["bash", "-c", script_failure], check=False, capture_output=True, text=True
+    )
+    assert failure.returncode == 0, failure.stderr
+    assert failure.stdout.strip() == "rc=2"
+    assert personal_config.read_text(encoding="utf-8") == 'approval_policy = "on-request"\n'
+    assert not list(personal_config.parent.glob(".config.toml.context.*"))
 
 
 def test_update_transaction_has_candidate_restore_path() -> None:
@@ -3134,6 +3193,59 @@ exit "$rc"
     calls = (tmp_path / "docker.calls").read_text(encoding="utf-8")
     assert "\nrun\t" in "\n" + calls
     assert "\nexec\t" not in "\n" + calls
+
+
+def test_container_exec_forwards_only_explicit_stdin(tmp_path: Path) -> None:
+    """The one TOML call keeps stdin open without changing default execs."""
+    docker = tmp_path / "docker"
+    input_capture = tmp_path / "stdin.capture"
+    mode_log = tmp_path / "exec.modes"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        'case "$1:$2" in\n'
+        '  image:inspect) printf \'%s\\n\' sha256:image ;;\n'
+        '  container:inspect) printf \'%s\\n\' container-id ;;\n'
+        '  exec:*)\n'
+        '    shift\n'
+        '    if [[ "${1:-}" == -i ]]; then\n'
+        f"      printf '%s\\n' interactive >> {str(mode_log)!r}\n"
+        "      shift\n"
+        f"      cat > {str(input_capture)!r}\n"
+        "    else\n"
+        f"      printf '%s\\n' default >> {str(mode_log)!r}\n"
+        "    fi\n"
+        "    printf 'native-output\\n'\n"
+        "    ;;\n"
+        '  *) printf \'unexpected docker argv\\n\' >&2; exit 1 ;;\n'
+        "esac\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    control = tmp_path / "control"
+    control.mkdir()
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+AGENT_CANON_IMAGE_REF=agent-canon-tools:test
+export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+export AGENT_CANON_STATE_ROOT AGENT_CANON_DOCKER_CMD AGENT_CANON_IMAGE_REF
+printf 'personal-config-input\\n' | _agent_canon_container_exec resident --stdin /bin/cat
+_agent_canon_container_exec resident /bin/true
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == "native-output\nnative-output\n"
+    assert mode_log.read_text(encoding="utf-8").splitlines() == ["interactive", "default"]
+    assert input_capture.read_text(encoding="utf-8") == "personal-config-input\n"
 
 
 def test_resident_replacement_lock_serializes_only_the_replacement(

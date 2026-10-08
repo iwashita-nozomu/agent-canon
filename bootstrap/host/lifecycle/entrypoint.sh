@@ -1755,6 +1755,11 @@ _agent_canon_finish_clean_install() {
 _agent_canon_container_exec() {
   local container=$1
   shift
+  local -a exec_options=()
+  if [[ "${1:-}" == --stdin ]]; then
+    exec_options=(-i)
+    shift
+  fi
   local image_id container_id source_head
   if [[ -n "${AGENT_CANON_ROLLBACK_MOUNTS_FILE:-}" ]]; then
     if [[ -f "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" && ! -L "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" ]]; then
@@ -1804,7 +1809,7 @@ _agent_canon_container_exec() {
   extra_env+=(--env "AGENT_CANON_HOST_ARCHIVE_ROOT=$AGENT_CANON_ARCHIVE_DESTINATION")
   extra_env+=(--env "AGENT_CANON_HOST_CACHE_ROOT=$AGENT_CANON_CACHE_DESTINATION")
   extra_env+=(--env "AGENT_CANON_HOST_CODEX_HOME_ROOT=$AGENT_CANON_CODEX_HOME_DESTINATION")
-  "$AGENT_CANON_DOCKER_CMD" exec \
+  "$AGENT_CANON_DOCKER_CMD" exec "${exec_options[@]}" \
     --workdir "$AGENT_CANON_RUNTIME_DESTINATION" \
     --env "AGENT_CANON_CONTAINER_CONTROL=1" \
     --env "AGENT_CANON_IMAGE_REF=$AGENT_CANON_IMAGE_REF" \
@@ -3019,7 +3024,7 @@ _agent_canon_replace_resident_locked() {
     fi
   fi
   if ((rc == 0)) && [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
-    if _agent_canon_install_global_links; then
+    if _agent_canon_install_global_links "$candidate"; then
       :
     else
       rc=$?
@@ -3825,23 +3830,7 @@ _agent_canon_remove_global_links() {
 }
 
 _agent_canon_apply_context_defaults() {
-  local tracked_config="$AGENT_CANON_REPOSITORY_ROOT/.codex/config.toml"
-  local config_source=$1 context_values context_window compact_limit config_mode config_tmp
-  [[ -f "$tracked_config" && ! -L "$tracked_config" ]] || return 0
-  context_values=$(awk '
-    /^[[:space:]]*\[/ { in_table=1 }
-    !in_table && /^[[:space:]]*model_context_window[[:space:]]*=/ {
-      value=$0; sub(/^[^=]*=[[:space:]]*/, "", value); sub(/[[:space:]]*#.*/, "", value)
-      gsub(/[[:space:]]/, "", value); context_window=value
-    }
-    !in_table && /^[[:space:]]*model_auto_compact_token_limit[[:space:]]*=/ {
-      value=$0; sub(/^[^=]*=[[:space:]]*/, "", value); sub(/[[:space:]]*#.*/, "", value)
-      gsub(/[[:space:]]/, "", value); compact_limit=value
-    }
-    END { if (context_window != "" && compact_limit != "") print context_window "\t" compact_limit }
-  ' "$tracked_config")
-  IFS=$'\t' read -r context_window compact_limit <<< "$context_values"
-  [[ "$context_window" =~ ^[0-9]+$ && "$compact_limit" =~ ^[0-9]+$ ]] || return 0
+  local container=$1 config_source=$2 config_mode config_tmp
   [[ -f "$config_source" && ! -L "$config_source" ]] || {
     _agent_canon_json_error config_source_invalid \
       "personal Codex config is not a regular file: $config_source"
@@ -3849,23 +3838,16 @@ _agent_canon_apply_context_defaults() {
   }
   config_mode=$(stat -c '%a' -- "$config_source")
   config_tmp=$(mktemp "${config_source%/*}/.config.toml.context.XXXXXX") || return $?
-  if ! awk -v context_window="$context_window" -v compact_limit="$compact_limit" '
-    function insert_defaults() {
-      print "model_context_window = " context_window
-      print "model_auto_compact_token_limit = " compact_limit
-      inserted=1
-    }
-    /^[[:space:]]*\[/ {
-      if (!inserted) insert_defaults()
-      in_table=1
-      print
-      next
-    }
-    !in_table && /^[[:space:]]*model_context_window[[:space:]]*=/ { next }
-    !in_table && /^[[:space:]]*model_auto_compact_token_limit[[:space:]]*=/ { next }
-    { print }
-    END { if (!inserted) insert_defaults() }
-  ' "$config_source" > "$config_tmp" || ! chmod "$config_mode" "$config_tmp" ||
+  if ! _agent_canon_container_exec "$container" --stdin \
+    /var/lib/agent-canon/cache/bin/agent-canon codex-config \
+    --source-config "$AGENT_CANON_SOURCE_DESTINATION/.codex/config.toml" \
+    < "$config_source" > "$config_tmp"; then
+    rm -f -- "$config_tmp"
+    _agent_canon_json_error config_update_failed \
+      "managed context defaults could not be produced"
+    return 2
+  fi
+  if ! chmod "$config_mode" "$config_tmp" ||
     ! mv -f -- "$config_tmp" "$config_source"; then
     rm -f -- "$config_tmp"
     _agent_canon_json_error config_update_failed \
@@ -3875,6 +3857,7 @@ _agent_canon_apply_context_defaults() {
 }
 
 _agent_canon_install_global_links() {
+  local container=${1:-}
   local home_root
   home_root=$(realpath -e -- "$HOME")
   [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
@@ -3944,7 +3927,7 @@ _agent_canon_install_global_links() {
     mode=$(stat -c '%a' -- "$config_source")
     ln -s -- "$config_source" "$config_target"
   fi
-  _agent_canon_apply_context_defaults "$config_source" || return $?
+  _agent_canon_apply_context_defaults "$container" "$config_source" || return $?
   if [[ -L "$config_target" && "$(readlink -f -- "$config_target")" == "$config_source" ]]; then
     digest=$(_agent_canon_sha256 "$config_source")
     printf 'config\t%s\t%s\t%s\t%s\n' "$config_target" "$config_source" "$mode" "$digest" >> "$manifest"
