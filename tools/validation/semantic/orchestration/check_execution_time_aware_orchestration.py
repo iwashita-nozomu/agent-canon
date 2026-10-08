@@ -501,8 +501,8 @@ def _check_task_catalog(
         add(findings, "consumer_reference_mismatch", path, "execution-route-set-mismatch")
     else:
         bounded, coordinated = routes["bounded_fast_path"], routes["coordination"]
-        if not isinstance(bounded, dict) or bounded.get("states") != ["route", "execute", "verify_close"] or bounded.get("commands") != []:
-            add(findings, "consumer_reference_mismatch", path, "bounded-route-projection-mismatch")
+        if not isinstance(bounded, dict) or bounded.get("commands") != []:
+            add(findings, "consumer_reference_mismatch", path, "bounded-route-command-mismatch")
         if not isinstance(coordinated, dict) or coordinated.get("commands") != [
             "python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>"
         ]:

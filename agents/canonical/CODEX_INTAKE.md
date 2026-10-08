@@ -135,15 +135,18 @@ test paths は既存 `reuse_survey` に advisory context として載せ、選�
 と test context から slice を導きます。同一 asset に触れる slice を merge してから
 child handoff に同じ known context を渡します。context の不在は dispatch または
 writing を block しません。
-bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。#335 の既存 tool 先行実行を維持し、結果の解釈や修正の直前に、Owner-First Read Trace が選んだ共通制約と現在必要な分岐・委譲先の節だけを `section_eof=true` まで読みます。compact/canonical の全文 EOF や未到達分岐の読了は要求しません。`implementation_read=ready` は必要節の読了後だけ使い、可視 prefix や既知 path だけでは unlock しません。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+bounded route では、選択済みの tool action を tool-owned evidence から開始できます。結果を解釈したり修正したりする前に、selected Skill と、その判断を委譲している owner の該当する制約を読みます。Owner-First Read Trace は担当と必要な文脈を見つける案内であり、必要な内容を実際に読む責任は変わりません。bounded route は execution route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ## Skill read admission
 
 The canonical [`agent-orchestration` Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace)
-owns point-of-use branch selection, required-section EOF, and the
-no-duplicate-receipt/body rule. This workflow preserves its existing-tool-before-read
-exception. Readiness applies only to the current action; inactive branches and
-whole-file EOF are not admission requirements.
+helps identify the owner and applicable guidance. `skill-document-reader` may
+locate and return selected sections, but its EOF metadata cannot show that an
+instruction was understood or applied. Use the helper when it is useful; it is
+not a universal read route or an implementation-admission gate. Keep actual
+owner constraints, authorization, and the existing no-duplicate-receipt/body
+boundary in force. An already selected tool action may precede reading; its
+interpretation or repair still uses the applicable owner guidance.
 
 ```bash
 git grep -l "topic keywords" -- <responsibility-scoped dirs> \

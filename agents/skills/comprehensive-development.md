@@ -26,25 +26,21 @@ fingerprint、implementation target、review evidence を
 code、docs、tests、workflow、tools、runtime をまたぐ repo-wide な変更を、1 本の umbrella workflow と explicit subagent routing で進めます。
 この skill は route packet と reader contract に限定し、spawn budget、role topology、role ownership、write policy は正本 surface へ委譲します。
 
-## Procedure
+## Cross-surface work
 
-1. Fix the user/domain contract, semantic invariant, state/lifecycle owner, and
-   root mechanism for the cross-surface change. Start from existing callers and
-   capabilities; reuse the established owner before proposing a new surface.
-2. Select the smallest complete owning unit that includes affected code, docs,
-   tests, workflow/tool consumers, failure handling, migration, and selected
-   validation. Cross-surface mechanism decisions remain in the existing design
-   trace; this skill adds no second schema or principle checklist.
-3. Run the selected implementation slices in dependency order. Activate a
-   specialist, design review, or test design only when an unresolved claim or
-   changed guarantee needs that owner. Keep bounded slices complete rather than
-   turning them into a generic stage sequence.
-4. Migrate all affected consumers and retire superseded support in the same
-   responsibility unit. Use the existing coordination and writer-safety owners
-   when the selected route requires them.
-5. Validate the changed contract and consumer connections with the selected
-   static/targeted route, then use the selected closeout owner for integration and
-   review. A green check alone does not establish an unrun behavior guarantee.
+Start from the user/domain contract and current callers to identify the affected
+owners, semantic invariant, state/lifecycle boundary, and root mechanism. Include
+the consumer, failure, migration, and validation edges that can change the result;
+reuse established capabilities before proposing a new surface. Keep the existing
+design trace as the place for cross-surface decisions.
+
+Use actual dependency, collision, authority, and validation relationships to
+choose work order and parallelism. Keep each slice a complete responsibility
+unit, migrate its affected consumers, and retire superseded support when that
+unit requires it. Add a specialist, design review, or test design only for a
+decision or changed guarantee that needs it. Validate the affected contract and
+connections with the selected owner route. A passing check establishes only the
+property it covers.
 
 ## Use When
 

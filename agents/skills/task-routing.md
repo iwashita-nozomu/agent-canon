@@ -38,17 +38,18 @@ Historical names such as `SKILLS`, `ACTIVE_SKILLS`, `MATCHED_SKILLS`, `RELATED_S
 
 Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
 
-作業途中で新しい観測や要求変更が生じたら、次の判断に関係する
-[条件付き読込](#in-flight-skill-reads) を適用します。初回の選択だけで固定しません。
+作業途中で新しい観測や要求変更が生じたら、変わった判断に必要な owner
+guidance を読み直します。最初に解決した選択は、影響する前提が変わらない限り
+そのまま使います。
 
 ## In-flight skill reads
 
-呼び出し元スキルの操作中に条件が成立したら、その条件に依存する判断・編集・再実行の
-直前に、該当する節だけを読みます。同一ファイル内・入れ子の分岐と、リンクされた
-関連スキルのいずれにも [Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace)
-を適用します。初回に全候補・全分岐・リンク先を読まず、共通制約と現在必要な分岐の
-読了だけで進めます。後続stageや回復手順は必要になった時点で読み、既読で有効な内容は
-再利用します。新しい読込台帳や承認段階は作りません。
+呼び出し元スキルの操作中に新しい条件が成立したら、その判断や操作に必要な
+owner guidance を使う前に確認します。同一文書内の分岐やリンク先は、現在の条件と
+委譲された責務から選びます。inactive な説明まで網羅せず、既に確認した有効な文脈は
+再利用します。`skill-document-reader` は長い文書から必要箇所を探す補助にできますが、
+EOF metadata は実際に内容を理解・適用した証明ではなく、必須の admission gate でも
+ありません。新しい読込台帳や承認段階は作りません。
 
 このスキルから既存候補へ渡す判断点は次のとおりです。個別作業の条件はその呼び出し元に
 置き、候補辞書や選択状態の第二の正本にしません。
@@ -69,8 +70,7 @@ Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only
 ## Boundary
 
 Routing chooses owners; selected skills own their execution and validation. The full LCP policy is owned by [`agent-orchestration.md#Local Capability Priority`](./agent-orchestration.md#local-capability-priority). `DEFERRED_SKILLS` remains a skill candidate projection, not operation disposition.
-Before source reading, the selected route is consumed by
-[`agent-orchestration.md#Owner-First Read Trace`](./agent-orchestration.md#owner-first-read-trace):
-the selected Skill's current sections, and only the upstream sections to which
-they delegate an unresolved current decision, must resolve before a
-`downstream implementation` edge is opened.
+Before an implementation decision, use the selected Skill and its actual
+delegated owners to understand the applicable contract. A `downstream
+implementation` edge is opened when the active owner route needs that evidence;
+the existence of a link or reader-tool record does not itself settle the decision.

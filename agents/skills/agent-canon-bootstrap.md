@@ -95,31 +95,32 @@ evidence.
 
 ## User Flow
 
-1. Resolve the task and project owner first. Use the project repository's
-   normal Docker/test runner for project execution; select this skill only for
-   AgentCanon tools or their lifecycle.
-2. Reuse the source install root and authorized control root, then invoke the
-   catalog-qualified `tool run --root <project> <catalog-id> -- ...` directly.
-   Preserve argv, cwd, input/output, exit/signal, written paths, execution plane,
-   and responsibility owner from the result. Success needs no route preflight.
-3. Only after failure, diagnose the relevant route. Use `status` for an unresolved
-   runtime failure or target readback for a target rejection; do not scan every
-   surface or infer a project-code failure from a tool-plane rejection.
-4. Install/start or `target add` only for an explicit lifecycle request or an
-   authorized repair of that failure. Tool targets are read-only; use the tool's
-   native diff/output and host publication for authoring. Read back the changed target or
-   generation, then retry only when allowed. Preserve the one-container/image
-   limit and record task-created resource IDs for cleanup.
-5. For eval work, run the registered producers, collect the run bundle, sync
-   it through the archive adapter, and verify the remote repository and commit
-   readback. Producer definitions and manifests come from the image-owned
-   AgentCanon snapshot; the registered project remains only the observed,
-   read-only target. Use `$agent-eval-accumulation` for the producer/checker
-   details.
-6. Stop/release task leases, remove only resources created by this task, run
-   scoped garbage collection, and verify the source checkout and unrelated
-   Docker resources are unchanged. Keep the closeout receipt and cleanup
-   evidence outside the source tree.
+For project code, use the project repository's normal Docker/test runner. Use
+this runtime only for AgentCanon tools and lifecycle operations. For an ordinary
+tool request, reuse the source install and authorized control roots and invoke
+the catalog-qualified `tool run --root <project> <catalog-id> -- ...` directly.
+Carry the actual argv, cwd, input/output, exit/signal, written paths, execution
+plane, and owner from its result; success needs no route preflight.
+
+If a tool fails, diagnose only the relevant route: use `status` for an unresolved
+runtime failure or target readback for a target rejection. A tool-plane failure
+does not establish a project-code failure. Install/start or add a target only
+for an explicit lifecycle request or an authorized repair. Targets remain
+read-only; authoring uses the tool's output and host publication. Read back the
+changed target or generation, retry only when the owner permits it, and retain
+the one-container/image limit and task-created resource IDs for cleanup.
+
+Eval collection is its own selected branch: run registered producers, collect
+the run bundle, sync through the archive adapter, and verify remote repository
+and commit readback. Producer definitions and manifests come from the
+image-owned AgentCanon snapshot; the registered project remains a read-only
+observation target. Use `$agent-eval-accumulation` for producer/checker detail.
+
+When a selected lifecycle operation creates leases or resources, release or
+remove only those task-owned items through the existing owner. Use scoped
+garbage collection for cleanup and confirm pre-existing source and unrelated
+Docker state remain untouched. Routine successful tool use creates no cleanup
+or health-probe requirement. Keep cleanup evidence outside the source tree.
 
 The host records the exact resident `Config.Image` reference and immutable ID
 in `host-state/active-image.tsv` after install/update/rollback readback.

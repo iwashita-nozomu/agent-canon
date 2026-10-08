@@ -680,12 +680,7 @@ def decide_execution(root: Path, context: object) -> dict[str, object]:
         "selected_validation": validation,
         "verification_status": "need verification" if status == "unavailable" else status,
     }
-    if bounded:
-        states = route.get("states")
-        if not isinstance(states, list) or not states or not all(isinstance(state, str) for state in states):
-            raise ValueError("execution-route-states-invalid")
-        result["states"] = states
-    else:
+    if not bounded:
         # The full scheduling fields belong only to an activated coordination route.
         scheduling = catalog.get("execution_time_policy")
         if not isinstance(scheduling, dict) or scheduling.get("applies_to") != "coordination":

@@ -74,21 +74,23 @@ workflow matrix here.
 
 Consume `agents/task_catalog.yaml#execution_route_policy` through the
 [execution-time owner](agent-orchestration.md#execution-time-aware-work-conservation-contract).
-For `bounded_fast_path`, carry `route -> execute -> verify_close` using the existing
-task/Issue result. For `coordination`, carry the selected run-bundle evidence to its
-existing closeout owner. Both retain exact-diff review, selected validation,
-current-main integration, authorized PR publication, and Issue/user evidence.
-Unavailable required validation remains `need verification`, not a successful check.
+For `bounded_fast_path`, use the existing task or Issue evidence and let the
+execution owner choose the needed work order from the actual dependencies and
+requested operations. For `coordination`, carry the selected run-bundle evidence
+to its closeout owner. Both retain the exact-diff review, selected validation,
+current-base integration, authorized publication, and completion evidence that
+the request requires. Unavailable required validation remains `need verification`,
+not a successful check.
 
 ## Owner-First Readback
 
-Before interpreting or changing implementation, follow
-[Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace).
-Read common constraints, decide the current branch, and read its necessary delegated
-sections through `section_eof=true`. The existing update identifies the active root
-row, selected Skill, operational owner and section, and `docs_first_status` /
-`implementation_read`. Unread inactive branches and whole-file EOF are not requirements.
-A path or reader metadata alone does not establish that the owner was read.
+Before interpreting or changing implementation, use
+[Owner-First Read Trace](agent-orchestration.md#owner-first-read-trace) to find
+the selected Skill and any owner it delegates to. Read the actual constraints
+that apply to the current action; follow links when they resolve a live decision
+or required guarantee. `skill-document-reader` may help locate or return text,
+but EOF metadata is not proof of comprehension and does not create a readiness
+field or admission gate.
 
 Use the established [checkout identity](../canonical/CODEX_INTAKE.md#optional-context)
 and trace the actual in-scope dependency and consumer before selecting the replaceable
@@ -103,10 +105,13 @@ of every linked document or a new per-read receipt.
 
 ## Stages
 
-Use the current [phase row](../canonical/CODEX_WORKFLOW.md#reader-map), preserving the
-user's `requested_scope` while deriving the working responsibility unit. A bounded
-work packet does not reduce a broader request: retain covered, deferred, and omitted
-surfaces and the evidence for their disposition in the existing task record.
+Use the current [phase row](../canonical/CODEX_WORKFLOW.md#reader-map) to locate
+the owner for the action at hand, while preserving the user's `requested_scope`
+and complete responsibility unit. The row is a decision aid, not a fixed
+sequence: follow actual dependencies, skip inactive work, and parallelize
+independent work only when authority and validation boundaries allow it. If the
+request spans more than the current slice, keep covered, deferred, and omitted
+surfaces with their reasons in the existing task record.
 
 The [Design Integrity Gate](../canonical/CODEX_IMPLEMENTATION.md#design-integrity-gate)
 owns the 責務 model, 差し替え可能な単位, 実装 scope, implementation mechanism,
@@ -171,11 +176,12 @@ second ledger, or turn a checkpoint into delivery.
 
 ## Required Output
 
-The work update records `workflow=<family>`, `skills=<...>`, and `review=<...>` from
-the selected policy, including `$agent-orchestration`; reuse an established selection.
-Report to the user in Japanese and keep technical identifiers in their actual
-commands, paths, tables, or evidence references. The existing task record preserves
-scope, decisions, exact result, evidence, and limits through updates and handoff.
+When an execution update needs routing context, record the selected workflow,
+active Skills, and review owner from the existing policy; reuse a settled
+selection. Respond in the user's language and keep technical identifiers in
+their actual commands, paths, tables, or evidence references. The existing task
+record preserves scope, decisions, actual result, evidence, and limits through
+updates and handoff.
 
 For source maintenance use [agent-canon-update](agent-canon-update.md#change-route);
 for local branch integration use [integration](integration.md); for authorized remote

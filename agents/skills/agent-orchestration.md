@@ -104,6 +104,8 @@ the current owner. Read the applicable constraints and decision guidance before
 changing a repository surface. Follow a linked owner only when it resolves a
 decision the active route delegates or a material fact remains open; do not
 traverse every reference or inspect inactive branches just to complete a trace.
+This guidance does not relax higher-priority requirements to read a selected
+runtime Skill in full.
 When ownership is still unclear, use the bounded purpose search in
 [documents/tools/search-coordination.md](../../documents/tools/search-coordination.md)
 and verify the nominated owner against its actual responsibility.
@@ -242,25 +244,20 @@ elapsed-time limit, or timeout cutoff may cut the requested scope. An
 operational timeout may mark a node blocked and trigger recovery; it may not
 turn incomplete work into completion.
 
-When coordination is selected, dispatch decisions:
-
-1. Refresh only the dependency and collision edges that can change the next
-   owner, order, or merge decision.
-2. Dispatch every ready node that is non-conflicting and admissible under actual
-   capacity; serialize colliding units and do not invent timed stages.
-3. Batch remote reads, queue snapshots, and tool operations that share an
-   authority, input, or readback boundary. Preserve each node's identity and
-   exact evidence even when operations are batched.
-4. Reuse the warm worker and reviewer contexts for repeated repair when the
-   responsibility unit and route are unchanged. Invalidate only evidence
-   affected by the repaired node and its dependent closure; retain unaffected
-   evidence.
-5. Compute owner, schema, dependency, validation, and publication closure only
-   when the selected workflow requires those edges. Review the exact candidate
-   closure once; accepted findings create only affected repair nodes.
-6. Wait only when the useful ready set is empty. Record the predecessor,
-   conflict, capacity, or external-state blocker that makes it empty, then
-   resume when that state changes. Waiting is not an elapsed-time scope gate.
+For a selected coordination route, let the current dependency, collision,
+authority, and evidence state determine the next operation. Refresh only edges
+that could change the next owner, order, or merge decision. Dispatch every ready
+node that is non-conflicting and admissible under actual capacity; serialize
+collisions and do not invent timed stages. Batch remote reads, queue snapshots,
+and tool operations only when they share an authority, input, or readback
+boundary, preserving each node's identity and evidence. Reuse the warm worker
+and reviewer contexts for repeated repair when the owner and route remain
+compatible. Invalidate only evidence affected by the repaired node and its
+dependent closure. Compute owner, schema, dependency, validation, and publication
+closure when the selected workflow needs those edges. Review the exact candidate
+closure once; accepted findings create only affected repair nodes. Wait only
+when the useful ready set is empty; record the concrete predecessor, collision,
+capacity, or external-state blocker, and resume when it changes.
 
 For autonomous review and repair, one exact candidate digest defines one
 candidate epoch. The initial owning review runs at most once in that epoch and
@@ -322,22 +319,20 @@ Consumers may transport the selected record but do not redefine its meaning.
 
 ## Outputs
 
-- current provisional workflow route, plus the evidence that will freeze or revise it
-- semantic decision-sufficiency record: owner, replaceable unit, implementation
-  mechanism, validation route, and unresolved branches that can change them;
-  durable packet reference only when coordination or resumption needs it
-- request mode (`repo-changing execution` or `routing-only/advisory`)
-- 必要な role / specialist
-- 契約に必要な review と handoff 構成
-- `Pre-Edit Repository Investigation Packet` の path と write-capable handoff
-  packet path
-- repo-editing task なら、owner-critical route を先に選ぶ。requirements、plan、
-  design、document-flow、implementation、review の段階は、各 surface の未解決
-  decision と validation need が実際に要求する場合だけ起動する
-- 着手時の作業 update 用の `workflow=<family>`, `skills=<active-now>`, `review=<...>` 宣言。`skills=<...>` では `$agent-orchestration` を先頭に置き、後続 skill は dynamic wave trigger として run bundle 側へ残す
-- PR を作る task では、同じ routing 宣言と `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を PR body、run bundle、または linked comment に残す
-- coordination/resumption が必要な場合だけ、選択された workflow owner の既存 run-bundle
-  と handoff を materialize する
+Return the route and evidence needed for the next decision: whether the request
+is advisory or executable, the selected workflow/owner, any active role or
+review, the required validation, and unresolved facts that could change them.
+Use the existing task update, tool result, or handoff; do not create an artifact
+or repeat a settled selection merely to fill this list.
+
+For repository changes, let actual dependencies and unresolved decisions choose
+the work order. Activate requirements, design, document flow, implementation,
+review, or specialist work only when the affected surface needs it. A bounded
+task can carry decision evidence directly; materialize the selected workflow's
+run bundle and handoff only for coordination or resumption. When creating a PR,
+include the selected routing declaration and, when the route tool provides them,
+its `ACTIVE_SKILLS` / `DEFERRED_SKILLS` in the PR body, run bundle, or linked
+comment.
 
 ## Review Activation And Adjudication
 
@@ -412,38 +407,49 @@ JIT、runtime、routing、environment、CI、architecture work は通常 route �
 
 ## Entrypoint Precedence
 
-- repo-editing task や kickoff command が必要な task では `bootstrap_agent_run.py` を優先します
-- `bootstrap_agent_run.py` は routing-only starter guidance に向きます
-- `task id がある` ことだけでは `bootstrap_agent_run.py` を優先する理由にはなりません。repo-changing execution なら task id 付きでも bootstrap を使います
+Use `bootstrap_agent_run.py` when the selected route needs its catalog-driven
+starter guidance or durable coordination/resumption record. It can provide
+routing-only starter guidance without turning every advisory request into a
+run bundle. A repository-changing mode or task ID alone does not require one;
+bounded work can use its existing task evidence.
 
 ## Review And Specialist Expectations
 
-- family に応じた reviewer / specialist stack まで出します
-- math-intent route では `mathematical_correctness_reviewer` が equations、variables、units、
-  assumptions、derivation、update / stopping map、equation-to-code correspondence、math
-  oracle、changed-path scope を検証します。この reviewer の finding は数学 correspondence
-  と scope の判定だけを行い、architecture / JIT / backend / runtime / routing / environment /
-  proof-tool の編集を承認しません。必要なら別 owner の sibling handoff を返します
-- `Research-Driven Change` では research / report / reproducibility / benchmark / artifact 系 reviewer を落としません
-- `Research-Driven Change` のどの分岐でも、文献・一次資料に基づく実装 claim は
-  `literature-survey` の source packet から design、implementation、benchmark、
-  report へ trace します。`literature-survey` を `research-workflow` の後段や
-  report-only cleanup に回して source claim を実装後に補う skill call sequence
-  にはしません。
-- 一般説明 prose adapter を使う docs では、docs-impact がある場合に `document_flow_reviewer` と docs completeness review を使います
-- academic/paper work では notation / logic review を落とさず、paper draft では `citation_evidence_reviewer` も追加します
+Choose review and specialist owners from the selected catalog route and the
+claims that need judgment; a workflow family alone does not require a fixed
+review stack. On the mathematical-intent route, `mathematical_correctness_reviewer`
+checks equations, assumptions, correspondence, oracle, and changed-path scope.
+That review does not approve architecture, JIT, backend, runtime, routing,
+environment, or proof-tool changes; hand those claims to their owner.
+
+For research-backed claims, carry the source packet from `literature-survey`
+into design, implementation, benchmark, and report decisions that use it.
+Reader-facing prose may need `document_flow_reviewer` or docs completeness
+review when the document path is part of the requested result. Academic work
+may need notation and logic review; paper drafts also need citation-evidence
+review. Select each for the actual deliverable and unresolved claim.
 
 ## Codex Implementation Routing
 
-- implementation が scope に入るときだけ routing を出します
-- selected execution profile が Luna の場合は、logical role、selected Skills、reasoning effort、authority、bounded paths、expected output、validation route を `direct_luna_handoff_packet_v1` に合成します。Effective model と effort は選択済み profile と `$direct-luna-communication` owner から解決し、`fork_turns="none"` で direct child を起動します。effective model / effort の一致前に work を admit せず、unavailable / hidden / mismatch を legacy role alias や別 model へ fallback しません。
-- `bootstrap_agent_run.py` の output で `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認してから route します
-- prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
-- coding / implementation / patch / doc-edit work を求める repo-changing task は、typed route が child handoff を要求する場合に限り、read-only survey / review role だけで完了扱いにしません。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、追加の read-only wave より先に selected write-capable implementer を起動または schedule します。parent は実装者ではなく orchestrator として、handoff packet、起動、packet relay、依存順、status、最終 readback を所有します。
-- Runtime authorization や tool gate で write-capable subagent を起動できない場合は、local/tool context に blocker evidence を記録します。
-- Routine docs / Focused code でも implementation / patch / doc-edit work は、catalog の typed route が要求する場合だけ write-capable handoff を選び、実装 role/profile は [Codex Subagents](../canonical/CODEX_SUBAGENTS.md) の選択結果を消費します。ここで default、Spark eligibility、blocked-candidate fields、candidate re-selection を再定義しません。
-- 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
-- `spark_worker` は詳細設計、review、final judgment には使いません。
+When implementation is in scope, consume the selected catalog route and
+implementation role. Use a child only when the typed route requires one. Give
+the selected writer the source, caller, scope, allowed paths, validation, and
+rejection evidence needed for its responsibility; investigate only facts that
+can change those decisions. When the write handoff is ready, do not hold it for
+unrelated read-only work. Let dependencies and collisions determine ordering,
+and run independent work in parallel when authority and validation boundaries
+permit it. The parent owns handoff, packet relay, dependency order, status, and
+final external readback.
+
+For a selected Luna profile, use `$direct-luna-communication` to build the
+bounded packet and read back effective model/effort before admitting work. An
+unavailable, hidden, or mismatched runtime remains a blocker; do not fall back
+to another model or role alias. Use the selected profile and role configuration
+from their registry owners rather than a local role matrix. A prompt/config
+change may need `prompt_config_reviewer` when that review is selected; do not
+rewrite a shared policy surface from chat context alone. If a runtime or tool
+gate blocks a selected child, preserve its blocker evidence and authority
+boundary.
 
 ## Runtime Contract Clauses
 
