@@ -35,8 +35,9 @@ seeing this Skill or a C++ path does not activate every row.
 
 Review C/C++ changes for build/header boundaries, ABI, ownership, lifetime,
 exceptions/error paths, and required test/documentation follow-through. For a selected
-performance change, establish workload and metric, then investigate algorithm,
-data movement, memory hierarchy, concurrency, and toolchain in that order.
+performance change, establish the workload, metric, and supported bottleneck
+hypothesis. Use the relevant performance dimensions below in the order needed to
+test that hypothesis; skip dimensions that cannot affect the changed path.
 Complex low-level code or a compiler flag alone is not performance evidence.
 
 ## Use When
@@ -183,7 +184,10 @@ do not mark an unmeasured improvement verified.
 
 ## Performance review order
 
-Select the relevant subsections only after the activation decision above.
+Select the relevant subsections only after the activation decision above. Start
+from the measured or otherwise supported bottleneck and follow its causal
+dependencies; these dimensions are not a fixed checklist or execution sequence.
+Retain the numerical solver handoff when the changed claim crosses that owner.
 
 ### Numerical solver handoff boundary
 
@@ -208,7 +212,7 @@ is `evidence_missing` / `unattributed_total`; obtain relevant component evidence
 before proposing a JIT-boundary change. Non-solver performance uses the native
 workload/data-movement route without a convergence-record requirement.
 
-### 1. Contract、workload、metric
+### Contract、workload、metric
 
 Fix latency, throughput, memory, allocation, startup, binary size or scaling metrics
 and representative input size/distribution/state, concurrency/device counts,
@@ -217,7 +221,7 @@ Support a critical-path hypothesis with profile, trace, call frequency, complexi
 working-set estimate or existing regression evidence. Preserve semantic/ABI/numeric
 and resource guarantees instead of changing them after seeing results.
 
-### 2. Algorithm と不要処理
+### Algorithm と不要処理
 
 Start with total asymptotic work/space, iterations/passes, search, data structures,
 batching and I/O/syscall/transfer/synchronization counts. Check redundant conversions,
@@ -228,7 +232,7 @@ to the end-to-end metric. Branchless tricks, unrolling, allocators, intrinsics a
 assembly require compiler/profile/benchmark evidence and justified maintenance and
 portability cost, not speculative speed claims.
 
-### 3. Data movement、layout、allocation
+### Data movement、layout、allocation
 
 Relate access patterns, contiguous traversal, working sets, cache reuse, pointer
 chasing, strides and randomness to actual fields and architecture. Check AoS/SoA,
@@ -239,7 +243,7 @@ peak memory, exceptions and ownership. Evaluate ABI/cache/vectorization/false-sh
 impacts. Neither moves nor references nor heap allocation is a universal improvement;
 use value category, alias/escape, frequency, lifetime and size evidence.
 
-### 4. Branch、alias、vectorization、generated code
+### Branch、alias、vectorization、generated code
 
 Check branch prediction, dependency chains, aliases, alignment, trip counts,
 reductions and call boundaries. Support vectorization/inlining/unrolling claims with
@@ -247,7 +251,7 @@ compiler remarks, assembly, profiles or relevant counters. Expose clear data and
 dependencies rather than copying compiler transformations. Include code size,
 instruction cache, compile time and register-pressure costs.
 
-### 5. Concurrency と heterogeneous runtime
+### Concurrency と heterogeneous runtime
 
 When parallel execution is involved, inspect contention, atomics/cache-line traffic,
 false sharing, barriers, queueing, task size, load balance and oversubscription.
@@ -257,7 +261,7 @@ total work, memory, tail latency, determinism and failure propagation as well as
 speedup. Preserve memory order, locking, lifetimes, stream/event dependencies and
 race freedom even when a weaker implementation benchmarks faster.
 
-### 6. Toolchain optimization と numerical semantics
+### Toolchain optimization と numerical semantics
 
 Compare optimized builds with matched compiler/version, architecture, standard
 library, flags and link mode. LTO/IPO needs compile/link support and evidence about
