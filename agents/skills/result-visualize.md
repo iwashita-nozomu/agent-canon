@@ -19,7 +19,7 @@ downstream implementation ../../.codex/personal/skills/result-visualize/SKILL.md
 - Scope: Reusable Figure Contracts for indexed result artifacts, independent of any specific domain.
 - Use When: Figure-level contracts are needed for plotting, status summaries, or visual comparison planning.
 - Boundary: Raw persistence belongs to `result-artifact-writeout`, interpretation belongs to `report-writing`, rendering belongs to `html-output`, execution belongs to `experiment-lifecycle`.
-- Section Path: Use `Purpose`, `Use When`, `Figure Contract`, `Coverage`, `Required Calculation Patterns`, `Workflow`, `Chart Families`, `Output Schema`.
+- Section Path: Use `Purpose`, `Use When`, `Figure Contract`, `Coverage`, `Common Calculation Patterns`, `Workflow`, `Chart Families`, `Output Schema`.
 
 ## Purpose
 
@@ -27,14 +27,18 @@ Define reusable, testable result visualization contracts where each figure expli
 
 ## Use When
 
-- You need standardized figure design for one or more result artifacts.
-- You need explicit coverage and denominator logic with no silent filtering.
-- You need complete-key coverage planning rather than representative slicing.
-- You need a per-result-view status summary before figure-level content.
+- The requested visualization needs an explicit calculation and interpretation
+  contract.
+- Coverage, denominator, pairing, or missingness can change the claim a figure
+  supports.
 
 ## Figure Contract
 
-Each figure must be defined as one contract block with all required fields:
+Give each requested figure a contract sufficient to reproduce and interpret its
+calculation. Core inputs are the question, source, included population,
+calculation, displayed geometry, and the reading the result supports. Add the
+following details when they affect that figure; do not fill fields for unused
+dimensions or invent extra figures to satisfy the list:
 
 - `figure_id`: short stable identifier
 - `question`: one-sentence question this figure answers
@@ -54,34 +58,36 @@ Each figure must be defined as one contract block with all required fields:
 - `conditioning_population`: slice and conditioning population used for this figure
 - `scope_limit`: population or condition outside which the supported statement does not extend
 
-The first figure contract is the execution-status view. It appears exactly once
-and is not repeated as a preface or inside later result sections.
+An execution-status view is useful when run outcomes or missing cases affect the
+comparison. Include it only when it answers a question the requested figures
+need to establish.
 
 ## Workflow
 
-1. Artifact schema and status: define `input artifact schema`, status counts, and quality flags from run artifacts.
-2. Expected key product: map required key set to explicit expected keys and coverage denominator.
-3. Question and estimand: formulate one question and one estimand per figure.
-4. Formula, grouping, weighting: write exact formulas, grouping fields, and weights for each figure.
-5. Geometry: choose chart geometry that matches question, scale type, and missingness policy.
-6. Coverage validation: validate complete-key handling via observed/missing/failed/not_applicable reporting.
-7. Choice resolution: replace every unresolved `or`, `optional`, and alternative
-   encoding with one concrete design; create separate figure blocks when both
-   alternatives are required.
-8. Figure inventory: emit one figure block for each required figure.
+For each requested figure, connect its source and relevant population to the
+question, estimand, calculation, and geometry. State grouping, weighting,
+pairing, units, or coverage when they affect the result. Resolve choices that
+would otherwise make the figure ambiguous; keep alternatives separate only
+when the user needs both comparisons. Check that the rendered figure does not
+silently change the population or direction of the claim.
 
 ## Coverage
 
-Default is complete-population coverage over expected keys:
+When the claim is about a complete expected population, make coverage explicit:
 - every expected key has either `observed` or explicit status (`missing`, `failed`, `not_applicable`),
 - no silent exclusion from figures.
 - complete coverage is represented through density/ECDF/quantile/heatmap outputs, not by plotting every raw series.
 
-For each figure, state explicit aggregation coverage for the index levels actually present. Do not require unused levels.
+For other claims, define the population the figure actually represents and
+state material exclusions. For each figure, describe aggregation coverage only
+for index levels that are present; do not require unused levels.
 
 Define full-coverage behavior for distribution views (density, ECDF, quantiles, heatmaps): if a key is absent or not eligible, route it to missingness rather than dropping it from the contract.
 
-## Required Calculation Patterns
+## Common Calculation Patterns
+
+Use the pattern that matches the figure. These examples are not a required set
+of calculations for every visualization.
 
 1. Status counts
    - For expected key set $K$ and status category $s$,
@@ -152,12 +158,12 @@ contains one resolved geometry, axis mapping, scale, grouping, and facet plan.
 
 ## Output Schema
 
-Produce a human-readable Markdown figure inventory by default. Include one row/section per figure with all fields above and colocated formula+geometry.
+Produce a human-readable Markdown figure inventory by default, with one row or
+section per requested figure and its relevant calculation and geometry details.
 
 If a figure renderer consumes machine-readable input, include only the required machine-readable form in that renderer path and cite the file.
 
 ## Closeout
 
-Record:
-
-`result_visualize=complete`, `result_visualize_inventory=<path>`, `result_visualize_status_summary=<path>`
+When an inventory is created, give its path. Include a status summary only when
+the requested visualization produced one.
