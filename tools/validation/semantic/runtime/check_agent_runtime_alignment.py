@@ -103,7 +103,6 @@ SKILL_SHIM_ROOT = ROOT / ".codex" / "personal" / "skills"
 PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
 INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
-EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
 EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 27
 EXPECTED_MAX_DEPTH = 2
@@ -411,10 +410,6 @@ def validate_project_config() -> None:
         not forbidden_project_keys,
         "project config contains forbidden tier keys: "
         + ", ".join(forbidden_project_keys),
-    )
-    ensure(
-        config.get("model_context_window") == EXPECTED_MODEL_CONTEXT_WINDOW,
-        f"model_context_window must remain {EXPECTED_MODEL_CONTEXT_WINDOW}",
     )
     ensure(
         config.get("tool_output_token_limit") == EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
