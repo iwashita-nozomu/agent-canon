@@ -63,32 +63,6 @@ code、docs、tests、workflow、tools、runtime をまたぐ repo-wide な変�
 - [documents/conventions/common/03_comments.md](../../documents/conventions/common/03_comments.md)
 - [documents/design/semantic-responsibility-contract.md](../../documents/design/semantic-responsibility-contract.md)
 
-## Standard Bundle
-
-```bash
-python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-  --task "comprehensive development pass" \
-  --task-id T12 \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-## Default Sequence
-
-1. family を `Comprehensive Development` に固定します。
-1. 最新の明示的合意と必要な contract を既存設計の target state へ反映し、material な clause、canonical owner、forbidden interpretation を固定します。
-1. [Existing Capability Before Implementation](#existing-capability-before-implementation) で責務ごとにタスク別の基準案を選び、必要な能力を比較して mechanism と implementation target を選びます。
-1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
-1. material かつ code から理由を復元できない decision は、共通コメント規約に従って最も狭い安定 owner の近傍へ残し、変更された既存コメントも同じ差分で同期します。
-1. regression / fixture / mock の追加前に [Regression Evidence Admission](#regression-evidence-admission) の判断を行います。
-1. 選択した catalog/config owner の route が coordination を要求するときだけ、その既存
-   run bundle と handoff owner を使います。未選択の stage、role、artifact を materialize
-   しません。
-1. write-capable work は approved design trace から導いた bounded slice に限定し、
-   選択済み owner が integration order と validation rerun を管理します。
-1. closeout は選択された owner の既存 review/closeout route で、canonical contract と
-   実 diff の整合を確認します。
-
 ## Parent-Managed Write Scope
 
 - parent は選択した coordination route の writer placement を
