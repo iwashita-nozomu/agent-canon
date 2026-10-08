@@ -2273,5 +2273,8 @@ def test_eval_producer_failure_is_not_masked_by_missing_export(
     collection = json.loads((spool / "collection.json").read_text(encoding="utf-8"))
     assert collection["status"] == "failed"
     assert collection["failure"] == "eval_producer_failed"
-    assert len(collection["producer_matrix"]) == 4
+    assert sorted(producer["name"] for producer in collection["producer_matrix"]) == [
+        "codex-agent-role",
+        "workflow-selection",
+    ]
     assert (spool / "producer-logs").is_dir()
