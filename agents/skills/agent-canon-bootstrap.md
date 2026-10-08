@@ -70,21 +70,25 @@ evidence.
   `~/.agents/skills` directory link, `~/.codex/agents/<role>.toml`, and
   `~/.codex/config.toml` links. The last points to the ignored personal config
   source under the AgentCanon checkout; existing regular config bytes and mode
-  are migrated losslessly and restored on uninstall. Project hooks and
+  are migrated before the two canonical context settings are applied, while
+  unrelated personal TOML remains intact. Those settings are
+  `model_context_window = 1050000` and
+  `model_auto_compact_token_limit = 900000`. The saved source is restored on
+  uninstall. Project hooks and
   authentication, session, history, cache, plugins, rules, MCP, and TUI/trust
   state remain outside this link set. `codex prepare` remains runtime-local.
-- `sync` acquires `replacement.lock` once, runs exactly `git -C
-  <install-root> pull --ff-only origin main`, publishes
-  `.runtime/source-sync/source-sync.json`, and selects the shared
+- `install` and `sync` use one source transition under `replacement.lock`:
+  `git -C <install-root> fetch origin main` followed by
+  `git -C <install-root> checkout --force -B main FETCH_HEAD`. It publishes
+  `.runtime/source-sync/source-sync.json`; sync then selects the shared
   `:env-<key>` image through `bootstrap/container/image/digest.sh`.
   An exact local image and resident with current source/cache mounts are
   reused; otherwise the image is pulled or built once and the resident is
-  replaced. Detached and shallow checkouts are accepted when Git accepts the
-  pull. No remote-ref comparison, candidate checkout, Git rollback, or
+  replaced. No remote-ref comparison, candidate checkout, Git rollback, or
   secondary source-sync lock is allowed. Source-mounted Rust tools are then
   compiled by the container's generic `tools/**/Cargo.toml` scan into cache/bin.
-  For caller compatibility, sync also accepts and ignores historical
-  `--remote` and `--branch` arguments; the operation always uses `origin main`.
+  For caller compatibility, `sync` accepts and ignores `--remote` and `--branch`;
+  the source remote and branch remain fixed to `origin main`.
 - Eval collection is append-only and is handed to the repository-qualified
   `iwashita-nozomu/agent-canon-log` archive through the host adapter. Never
   write archive output back into the AgentCanon source tree.

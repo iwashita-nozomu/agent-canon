@@ -156,6 +156,57 @@ _agent_canon_install_global_links
     assert not (repository / ".codex" / "personal" / "config.toml").exists()
 
 
+def test_shell_install_applies_only_canonical_context_defaults(tmp_path: Path) -> None:
+    """Managed global config adopts project context defaults and keeps user TOML."""
+    home = tmp_path / "home"
+    repository = tmp_path / "repository"
+    state = tmp_path / "state"
+    source = repository / ".codex" / "personal" / "skills"
+    source.mkdir(parents=True)
+    (source / "current" / "SKILL.md").parent.mkdir(parents=True)
+    (source / "current" / "SKILL.md").write_text("current\n", encoding="utf-8")
+    project_config = repository / ".codex" / "config.toml"
+    project_config.parent.mkdir(parents=True, exist_ok=True)
+    project_config.write_text(
+        'model_context_window = 1050000\n'
+        'model_auto_compact_token_limit = 900000\n'
+        '[agents]\nmax_threads = 3\n',
+        encoding="utf-8",
+    )
+    global_config = home / ".codex" / "config.toml"
+    global_config.parent.mkdir(parents=True)
+    global_config.write_text(
+        'model_context_window = 1000000\n'
+        'approval_policy = "on-request"\n'
+        '[agents]\nmax_threads = 8\n',
+        encoding="utf-8",
+    )
+    state.mkdir(parents=True)
+    script = f"""
+source {str(ADAPTER)!r}
+set -e
+HOME={str(home)!r}
+AGENT_CANON_CONTROL_ROOT={str(home)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_STATE_ROOT={str(state)!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
+_agent_canon_install_global_links
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert global_config.is_symlink()
+    personal_config = repository / ".codex" / "personal" / "config.toml"
+    assert global_config.resolve() == personal_config.resolve()
+    assert personal_config.read_text(encoding="utf-8") == (
+        'approval_policy = "on-request"\n'
+        "model_context_window = 1050000\n"
+        "model_auto_compact_token_limit = 900000\n"
+        "[agents]\nmax_threads = 8\n"
+    )
+
+
 def test_update_transaction_has_candidate_restore_path() -> None:
     """Host update retains the previous image until candidate finalization."""
     text = ADAPTER.read_text(encoding="utf-8")
@@ -2264,10 +2315,14 @@ printf '%s\\n' "$AGENT_CANON_TARGET_PRUNE_DIGESTS"
 
 
 def test_sync_uses_forced_main_checkout_without_candidate_admission() -> None:
-    """The source transaction fetches and force-checks out remote main."""
+    """Install and sync share one forced-main source transition."""
     text = ADAPTER.read_text(encoding="utf-8")
     assert 'git -C "$install_root" fetch origin main' in text
     assert 'git -C "$install_root" checkout --force -B main FETCH_HEAD' in text
+    assert '_agent_canon_advance_source "$install_root"' in text
+    assert '_agent_canon_advance_source "$AGENT_CANON_REPOSITORY_ROOT"' in text
+    assert text.count('fetch origin main') == 1
+    assert text.count('checkout --force -B main FETCH_HEAD') == 1
     assert "source-staging" not in text
     assert 'git clone --no-hardlinks "$install_root"' not in text
     assert 'git -C "$install_root" merge --ff-only' not in text
@@ -2278,14 +2333,14 @@ def test_sync_uses_forced_main_checkout_without_candidate_admission() -> None:
 @pytest.mark.parametrize(
     "compatibility_args",
     (
-        ("--remote", "legacy-remote", "--branch", "feature"),
+        ("--remote", "origin", "--branch", "main"),
         ("--remote=legacy-remote", "--branch=feature"),
     ),
 )
-def test_sync_accepts_legacy_dotfiles_argv_but_keeps_fixed_git_target(
+def test_sync_ignores_legacy_remote_and_branch_values(
     tmp_path: Path, compatibility_args: tuple[str, ...]
 ) -> None:
-    """Legacy caller flags are syntax-only and cannot change fixed source sync."""
+    """Legacy caller flags remain accepted while Git uses the fixed source target."""
     repository = tmp_path / "agent-canon"
     repository.mkdir()
     runtime = tmp_path / "runtime"
@@ -3485,7 +3540,8 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
             check=True,
             capture_output=True,
         )
-    runtime = repository / ".runtime"
+    # Runtime state belongs to the selected control root, not the source checkout.
+    runtime = control / ".runtime"
     state_path = tmp_path / "docker-state.json"
     calls_path = tmp_path / "docker-calls"
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
@@ -4629,9 +4685,13 @@ def test_sync_never_projects_links_from_staging() -> None:
     sync = text.split("_agent_canon_sync_operation() (", 1)[1].split(
         "_agent_canon_scheduler_locked enable", 1
     )[0]
-    assert 'git -C "$install_root" fetch origin main' in sync
-    assert 'git -C "$install_root" checkout --force -B main FETCH_HEAD' in sync
-    assert "_agent_canon_source_sync_write success" in sync
+    source_transition = text.split("_agent_canon_advance_source() {", 1)[1].split(
+        "_agent_canon_sync_operation() (", 1
+    )[0]
+    assert '_agent_canon_advance_source "$install_root"' in sync
+    assert 'git -C "$install_root" fetch origin main' in source_transition
+    assert 'git -C "$install_root" checkout --force -B main FETCH_HEAD' in source_transition
+    assert "_agent_canon_source_sync_write success" in source_transition
     assert '_agent_canon_image ""' in sync
     assert "_agent_canon_replace_resident_locked" in sync
     assert "source-staging" not in sync
