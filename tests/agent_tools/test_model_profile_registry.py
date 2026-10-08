@@ -97,6 +97,7 @@ priority = 1
         encoding="utf-8",
     )
     (root / ".codex" / "config.toml").write_text(
+        "model_context_window = 1050000\nmodel_auto_compact_token_limit = 900000\n"
         '[agents]\nmax_threads = 1\n[agents.sol_parent]\ndescription = "Parent"\nconfig_file = "agents/sol_parent.toml"\n',
         encoding="utf-8",
     )
@@ -201,6 +202,8 @@ def test_canonical_generator_and_readback(workspace: Path, capsys: pytest.Captur
     assert "generated role view: generated_role_view_v1" in role_text
     assert "@dependency-start" not in role_text
     assert 'model = "model-sol"' in role_text
+    assert "model_context_window = 1050000" in role_text
+    assert "model_auto_compact_token_limit = 900000" in role_text
     assert "Use the role-specific contract." in role_text
     projection = json.loads((workspace / "agents" / "agents_config.json").read_text(encoding="utf-8"))
     assert projection["roles"][0]["projection_digest"]
