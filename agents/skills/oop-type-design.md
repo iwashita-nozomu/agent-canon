@@ -12,7 +12,6 @@ upstream design ../internal-routines/design-implementation-correspondence.md uni
 downstream implementation ../../.codex/personal/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
 downstream implementation ../../tools/agent/orchestration/route.py explicit capability route
-downstream implementation ../../eval/definitions/skill_workflow_prompt_eval.toml prompt-evaluation targets
 @dependency-end
 -->
 

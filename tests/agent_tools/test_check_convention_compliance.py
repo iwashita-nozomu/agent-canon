@@ -27,7 +27,14 @@ from tools.validation.semantic.convention.check_convention_compliance import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py"
+CHECKER = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "convention"
+    / "check_convention_compliance.py"
+)
 
 
 MINIMAL_REPO_FILES: dict[str, str] = {
@@ -40,7 +47,6 @@ path: tools/validation/semantic/logging/check_log_helper_names.py
 path: tools/validation/notebooks/notebook_quality.py
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
-path: eval/producers/evaluate_skill_workflow_prompts.py
 path: eval/producers/evaluate_agent_run.py
 path: tools/validation/semantic/skills/check_skill_frontmatter.py
 path: tools/validation/semantic/convention/check_convention_compliance.py
@@ -75,9 +81,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "documents/conventions/python/15_jax_rules.md": "jax\n",
     "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
     "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
-    "documents/conventions/coding-conventions-python.md": (
-        "python conventions\n"
-    ),
+    "documents/conventions/coding-conventions-python.md": ("python conventions\n"),
     "documents/conventions/coding-conventions-cpp.md": "cpp\n",
     "documents/conventions/coding-conventions-project.md": "project conventions\n",
     "documents/conventions/coding-conventions-house-style.md": (
@@ -129,13 +133,9 @@ path: tools/validation/ci/checks/check_github_workflows.py
     ),
     "tools/validation/semantic/tools/tool_rejection_preflight.py": "preflight owner\n",
     "agents/COMMUNICATION_PROTOCOL.md": "communication protocol\n",
-    "agents/canonical/CODEX_WORKFLOW.md": (
-        "Codex Workflow phase reader map\n"
-    ),
+    "agents/canonical/CODEX_WORKFLOW.md": ("Codex Workflow phase reader map\n"),
     "agents/canonical/CODEX_INTAKE.md": "repository task intake\n",
-    "agents/canonical/CODEX_IMPLEMENTATION.md": (
-        "distinct unresolved claim/risk\n"
-    ),
+    "agents/canonical/CODEX_IMPLEMENTATION.md": ("distinct unresolved claim/risk\n"),
     "agents/canonical/CODEX_BOOTSTRAP.md": "Runtime evidence\n",
     "agents/canonical/CODEX_ROUTING.md": "routing owner map\n",
     "agents/canonical/CODEX_COMPLETION.md": (
@@ -237,11 +237,6 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "Implementation design uses the four-entry active design packet.\n"
     ),
     "templates/agents/test_plan.md": "validation route behavior-owned cases\n",
-    "eval/definitions/skill_workflow_prompt_eval.toml": (
-        "CONVENTION-WORKFLOW CONVENTION-SKILL "
-        "write-capable handoff ORCH-SHIM-TOOLCALL-1 WORKFLOW-GENERIC-1\n"
-        "evaluate_skill_workflow_prompts.py\n"
-    ),
     "eval/definitions/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
     "agents/USER_GUIDE_JA.md": "user guide owner route\n",
     "templates/agents/closeout_gate.md": "selected closeout inputs\n",
@@ -255,7 +250,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/skills/adaptive-improvement-loop.md": (
-        "evaluate_skill_workflow_prompts.py check_convention_compliance.py\n"
+        "check_convention_compliance.py\n"
         "Before closeout, run "
         "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
@@ -345,7 +340,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "| Contract | Owner Surface | Validation |\n"
         "| -------- | ------------- | ---------- |\n"
         "| root runtime entrypoint | `ROOT_AGENTS.md` | "
-            "`bash bootstrap.sh --help` |\n"
+        "`bash bootstrap.sh --help` |\n"
         "| workflow family, spawn budget, role topology | "
         "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
         "| public skill registry | `agents/skills/catalog.yaml` | "
@@ -409,7 +404,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
         }
 
         self.assertFalse(
-            any(path.startswith(".codex/personal/skills/") for path in paths | tool_references)
+            any(
+                path.startswith(".codex/personal/skills/")
+                for path in paths | tool_references
+            )
         )
 
     def test_missing_workflow_hook_fails(self) -> None:
@@ -417,7 +415,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+            workflow = (
+                root
+                / "tools"
+                / "validation"
+                / "ci"
+                / "checks"
+                / "check_agent_canon_pr.sh"
+            )
             workflow.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
 
             result = self.run_checker(root)
@@ -434,7 +439,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+            workflow = (
+                root
+                / "tools"
+                / "validation"
+                / "ci"
+                / "checks"
+                / "check_agent_canon_pr.sh"
+            )
             workflow.write_text(
                 "#!/usr/bin/env bash\n# Mention check_convention_compliance.py only.\n",
                 encoding="utf-8",
@@ -453,7 +465,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+            workflow = (
+                root
+                / "tools"
+                / "validation"
+                / "ci"
+                / "checks"
+                / "check_agent_canon_pr.sh"
+            )
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
                 'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py"'
@@ -473,7 +492,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+            workflow = (
+                root
+                / "tools"
+                / "validation"
+                / "ci"
+                / "checks"
+                / "check_agent_canon_pr.sh"
+            )
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
@@ -494,7 +520,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+            workflow = (
+                root
+                / "tools"
+                / "validation"
+                / "ci"
+                / "checks"
+                / "check_agent_canon_pr.sh"
+            )
             workflow.write_text(
                 "#!/usr/bin/env bash\n"
                 "python3 tools/validation/semantic/convention/check_convention_compliance.py\n"
@@ -621,7 +654,8 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "hook_guardrail_policy:tools/runtime/authority/hook_safety.py", result.stdout
+                "hook_guardrail_policy:tools/runtime/authority/hook_safety.py",
+                result.stdout,
             )
             self.assertIn("missing-marker:operation", result.stdout)
 
@@ -837,7 +871,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             review_process = root / "documents" / "conventions" / "REVIEW_PROCESS.md"
-            review_process.write_text("review policy without durable follow-up\n", encoding="utf-8")
+            review_process.write_text(
+                "review policy without durable follow-up\n", encoding="utf-8"
+            )
 
             result = self.run_checker(root)
 
@@ -887,8 +923,12 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            file_roles = root / "documents" / "conventions" / "python" / "09_file_roles.md"
-            file_roles.write_text("python file roles without ordering owner\n", encoding="utf-8")
+            file_roles = (
+                root / "documents" / "conventions" / "python" / "09_file_roles.md"
+            )
+            file_roles.write_text(
+                "python file roles without ordering owner\n", encoding="utf-8"
+            )
 
             result = self.run_checker(root)
 
@@ -936,7 +976,14 @@ class CheckConventionComplianceTest(unittest.TestCase):
             target = root / tool_path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-        github_checker = root / "tools" / "validation" / "ci" / "checks" / "check_github_workflows.py"
+        github_checker = (
+            root
+            / "tools"
+            / "validation"
+            / "ci"
+            / "checks"
+            / "check_github_workflows.py"
+        )
         github_checker.parent.mkdir(parents=True, exist_ok=True)
         github_checker.write_text(
             "#!/usr/bin/env python3\ncheck_skill_frontmatter.py\n",

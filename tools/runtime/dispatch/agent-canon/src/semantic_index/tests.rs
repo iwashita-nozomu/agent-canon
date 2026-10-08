@@ -965,7 +965,7 @@ fn responsibility_scope_bucket_tracks_manifest_surfaces() {
         "eval-and-hook-evidence"
     );
     assert_eq!(
-        responsibility_scope_bucket("eval/definitions/skill_workflow_prompt_eval.toml"),
+        responsibility_scope_bucket("eval/definitions/eval_result_families.toml"),
         "eval-and-hook-evidence"
     );
     assert_eq!(

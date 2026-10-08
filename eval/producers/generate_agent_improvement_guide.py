@@ -31,10 +31,12 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
-    eval_result_search_dirs,
     hook_result_search_dirs,
 )
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)  # noqa: E402
 from tools.runtime.archive.historical_skill_usage_reader import read_skill_usage_history  # noqa: E402
 
 COMMIT_TIME_FORMAT = "%ct"
@@ -98,8 +100,6 @@ class EvidenceSummary:
 
     github_issue_refs: tuple[str, ...]
     knowledge_entries: dict[str, int]
-    skill_eval_reports: tuple[Path, ...]
-    failed_skill_eval_reports: tuple[Path, ...]
     hook_counts: HookEvidenceCounts
 
 
@@ -339,7 +339,9 @@ class HookEvidenceCounter:
         action = str(entry.get("feedback_action") or "")
         if action:
             self.state.feedback_actions[action] += 1
-        if entry.get("prompt_feedback_detected") is True and not self.normalized_strings(entry.get("feedback_labels")):
+        if entry.get(
+            "prompt_feedback_detected"
+        ) is True and not self.normalized_strings(entry.get("feedback_labels")):
             self.state.quality["feedback_detected_without_labels"] += 1
         skills = tuple(
             skill
@@ -370,9 +372,13 @@ class HookEvidenceCounter:
 
     def trusted_skill_source(self, sources: tuple[str, ...]) -> bool:
         """Return whether source fields are trusted for explicit skill ids."""
-        return not sources or any(source in TRUSTED_SKILL_SOURCE_FIELDS for source in sources)
+        return not sources or any(
+            source in TRUSTED_SKILL_SOURCE_FIELDS for source in sources
+        )
 
-    def countable_feedback_target(self, target: str, trusted_skill_source: bool) -> bool:
+    def countable_feedback_target(
+        self, target: str, trusted_skill_source: bool
+    ) -> bool:
         """Return whether a feedback target should be counted as actionable."""
         if target.startswith("skill:"):
             skill = target.removeprefix("skill:")
@@ -381,7 +387,9 @@ class HookEvidenceCounter:
                 return False
             if self.known_skills and skill not in self.known_skills:
                 self.state.quality["noncanonical_skill_feedback_target_ignored"] += 1
-                self.state.quality[f"noncanonical_skill_feedback_target_ignored:{skill}"] += 1
+                self.state.quality[
+                    f"noncanonical_skill_feedback_target_ignored:{skill}"
+                ] += 1
                 return False
         return True
 
@@ -407,7 +415,9 @@ class HookEvidenceCounter:
             return True
         return self.skill_signal_in_active_window(target.removeprefix("skill:"), entry)
 
-    def skill_signal_in_active_window(self, skill: str, entry: dict[str, object]) -> bool:
+    def skill_signal_in_active_window(
+        self, skill: str, entry: dict[str, object]
+    ) -> bool:
         """Return whether one skill signal is not archived by a source-path cutover."""
         reset_epoch = self.skill_reset_epoch(skill)
         entry_epoch = hook_entry_epoch(entry)
@@ -457,7 +467,9 @@ class HookEvidenceCounter:
             command = command_entry.get("command")
             if not isinstance(command, list):
                 continue
-            args = tuple(arg for arg in cast(list[object], command) if isinstance(arg, str))
+            args = tuple(
+                arg for arg in cast(list[object], command) if isinstance(arg, str)
+            )
             for target in command_targets(args):
                 self.state.failure_targets[target] += 1
         if not saw_failed_command:
@@ -494,19 +506,15 @@ class AgentImprovementGuide:
         """Store the AgentCanon root."""
         self.requested_root = root.resolve()
         self.root = resolve_agentcanon_root(root)
-        self.runtime_root = runtime_artifact_boundary(self.requested_root, runtime_root).root
+        self.runtime_root = runtime_artifact_boundary(
+            self.requested_root, runtime_root
+        ).root
 
     def collect(self) -> EvidenceSummary:
         """Collect all evidence families needed by the guide."""
-        skill_eval_reports = self.skill_eval_report_paths()
-        failed_skill_eval_reports = tuple(
-            path for path in skill_eval_reports if self.skill_eval_failed(path)
-        )
         return EvidenceSummary(
             github_issue_refs=self.github_issue_refs(),
             knowledge_entries=self.knowledge_entry_counts(),
-            skill_eval_reports=skill_eval_reports,
-            failed_skill_eval_reports=failed_skill_eval_reports,
             hook_counts=self.hook_counts(),
         )
 
@@ -539,24 +547,13 @@ class AgentImprovementGuide:
             value = payload.get("issue_url")
             if isinstance(value, str) and value.startswith("https://github.com/"):
                 refs.add(value)
-            elif isinstance(payload.get("repository"), str) and isinstance(payload.get("number"), str):
-                refs.add(f"https://github.com/{payload['repository']}/issues/{payload['number']}")
+            elif isinstance(payload.get("repository"), str) and isinstance(
+                payload.get("number"), str
+            ):
+                refs.add(
+                    f"https://github.com/{payload['repository']}/issues/{payload['number']}"
+                )
         return tuple(sorted(refs))
-
-    def skill_eval_report_paths(self) -> tuple[Path, ...]:
-        """Return skill prompt eval reports from the mounted archive."""
-        reports = {
-            path
-            for result_dir in (
-                *eval_result_search_dirs(
-                    self.root, "skill-workflow-prompt", self.runtime_root
-                ),
-            )
-            if result_dir.is_dir()
-            for path in result_dir.glob("*.md")
-            if path.name != "README.md"
-        }
-        return tuple(sorted(reports))
 
     def knowledge_entry_counts(self) -> dict[str, int]:
         """Return private knowledge candidate counts without reading bodies."""
@@ -569,14 +566,6 @@ class AgentImprovementGuide:
         except OSError:
             count = 0
         return {"agent-canon-log/knowledge": count}
-
-    def skill_eval_failed(self, path: Path) -> bool:
-        """Return whether one accumulated skill eval report is failing."""
-        name = path.relative_to(self.root).name if path.is_relative_to(self.root) else path.name
-        if "-fail-" in name:
-            return True
-        text = path.read_text(encoding="utf-8")
-        return "EVAL_STATUS=fail" in text or "status: `fail`" in text
 
     def hook_counts(self) -> HookEvidenceCounts:
         """Return hook counters."""
@@ -598,8 +587,12 @@ class AgentImprovementGuide:
             *hook_result_search_dirs(self.requested_root, self.root, self.runtime_root),
         ]
         for hook_dir in hook_dirs:
-            direct = tuple(sorted(hook_dir.glob("*.jsonl"))) if hook_dir.is_dir() else ()
-            sharded = tuple(sorted(hook_dir.glob("**/*.jsonl"))) if hook_dir.is_dir() else ()
+            direct = (
+                tuple(sorted(hook_dir.glob("*.jsonl"))) if hook_dir.is_dir() else ()
+            )
+            sharded = (
+                tuple(sorted(hook_dir.glob("**/*.jsonl"))) if hook_dir.is_dir() else ()
+            )
             paths.extend(direct + sharded)
         return tuple(sorted(set(paths)))
 
@@ -634,8 +627,6 @@ def evidence_summary_lines(root: Path, summary: EvidenceSummary) -> list[str]:
         f"- evidence_root: `{root.as_posix()}`",
         f"- github_issue_refs: `{len(summary.github_issue_refs)}`",
         f"- knowledge_entries: `{sum(summary.knowledge_entries.values())}`",
-        f"- skill_eval_reports: `{len(summary.skill_eval_reports)}`",
-        f"- failed_skill_eval_reports: `{len(summary.failed_skill_eval_reports)}`",
         f"- hook_status_counts: `{dict(counts.statuses)}`",
         f"- hook_file_counts: `{dict(counts.files)}`",
         f"- hook_event_counts: `{dict(counts.events)}`",
@@ -658,20 +649,77 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
     """Return all detailed guide sections after the summary."""
     sections: list[str] = []
     sections.extend(named_section("Improvement Guidance", guidance(summary)))
-    sections.extend(named_section("Skill Usage Evidence", counter_lines(summary.hook_counts.skills)))
-    sections.extend(named_section("Prompt Candidate Skills", counter_lines(summary.hook_counts.candidate_skills)))
-    sections.extend(named_section("Prompt Candidate Workflows", counter_lines(summary.hook_counts.candidate_workflows)))
-    sections.extend(named_section("Prompt Candidate Tools", counter_lines(summary.hook_counts.candidate_tools)))
-    sections.extend(named_section("Skill Event Coverage", counter_lines(summary.hook_counts.skill_events)))
-    sections.extend(named_section("Skill Source Fields", counter_lines(summary.hook_counts.skill_sources)))
-    sections.extend(named_section("Human Feedback Labels", counter_lines(summary.hook_counts.feedback_labels)))
-    sections.extend(named_section("Human Feedback Targets", counter_lines(summary.hook_counts.feedback_targets)))
-    sections.extend(named_section("Human Feedback Actions", counter_lines(summary.hook_counts.feedback_actions)))
-    sections.extend(named_section("Hook Runtime Namespaces", counter_lines(summary.hook_counts.namespaces)))
-    sections.extend(named_section("Hook Tool Evidence", counter_lines(summary.hook_counts.tools)))
-    sections.extend(named_section("Code Checker Targets", counter_lines(summary.hook_counts.checker_targets)))
-    sections.extend(named_section("Observed Failure Targets", counter_lines(summary.hook_counts.failure_targets)))
-    sections.extend(named_section("Hook Observability Counters", counter_lines(summary.hook_counts.quality)))
+    sections.extend(
+        named_section("Skill Usage Evidence", counter_lines(summary.hook_counts.skills))
+    )
+    sections.extend(
+        named_section(
+            "Prompt Candidate Skills",
+            counter_lines(summary.hook_counts.candidate_skills),
+        )
+    )
+    sections.extend(
+        named_section(
+            "Prompt Candidate Workflows",
+            counter_lines(summary.hook_counts.candidate_workflows),
+        )
+    )
+    sections.extend(
+        named_section(
+            "Prompt Candidate Tools", counter_lines(summary.hook_counts.candidate_tools)
+        )
+    )
+    sections.extend(
+        named_section(
+            "Skill Event Coverage", counter_lines(summary.hook_counts.skill_events)
+        )
+    )
+    sections.extend(
+        named_section(
+            "Skill Source Fields", counter_lines(summary.hook_counts.skill_sources)
+        )
+    )
+    sections.extend(
+        named_section(
+            "Human Feedback Labels", counter_lines(summary.hook_counts.feedback_labels)
+        )
+    )
+    sections.extend(
+        named_section(
+            "Human Feedback Targets",
+            counter_lines(summary.hook_counts.feedback_targets),
+        )
+    )
+    sections.extend(
+        named_section(
+            "Human Feedback Actions",
+            counter_lines(summary.hook_counts.feedback_actions),
+        )
+    )
+    sections.extend(
+        named_section(
+            "Hook Runtime Namespaces", counter_lines(summary.hook_counts.namespaces)
+        )
+    )
+    sections.extend(
+        named_section("Hook Tool Evidence", counter_lines(summary.hook_counts.tools))
+    )
+    sections.extend(
+        named_section(
+            "Code Checker Targets", counter_lines(summary.hook_counts.checker_targets)
+        )
+    )
+    sections.extend(
+        named_section(
+            "Observed Failure Targets",
+            counter_lines(summary.hook_counts.failure_targets),
+        )
+    )
+    sections.extend(
+        named_section(
+            "Hook Observability Counters", counter_lines(summary.hook_counts.quality)
+        )
+    )
     sections.extend(
         named_section(
             "GitHub Issues",
@@ -681,12 +729,12 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
     )
     sections.extend(
         named_section(
-            "Failed Skill Eval Reports",
-            path_lines(root, summary.failed_skill_eval_reports),
+            "Repeated Hook Failures", failure_lines(summary.hook_counts.failures)
         )
     )
-    sections.extend(named_section("Repeated Hook Failures", failure_lines(summary.hook_counts.failures)))
-    sections.extend(named_section("Private Knowledge Entry Counts", knowledge_entry_lines(summary)))
+    sections.extend(
+        named_section("Private Knowledge Entry Counts", knowledge_entry_lines(summary))
+    )
     return sections
 
 
@@ -706,7 +754,9 @@ def knowledge_entry_lines(summary: EvidenceSummary) -> list[str]:
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", default=".", help="AgentCanon root. Default: current directory.")
+    parser.add_argument(
+        "--root", default=".", help="AgentCanon root. Default: current directory."
+    )
     parser.add_argument(
         "--runtime-root",
         type=Path,
@@ -737,7 +787,9 @@ def is_agentcanon_root(root: Path) -> bool:
         return (
             (root / "agents" / "evals" / "README.md").is_file()
             or (root / ".codex" / "personal" / "skills").is_dir()
-            or (root / "eval" / "producers" / "generate_agent_improvement_guide.py").is_file()
+            or (
+                root / "eval" / "producers" / "generate_agent_improvement_guide.py"
+            ).is_file()
             or (root / "agents" / "evals" / "results").is_dir()
         )
     except OSError:
@@ -838,11 +890,6 @@ def guidance(summary: EvidenceSummary) -> list[str]:
             "- Use linked Issues to confirm the current owner and authorized scope; "
             "their presence does not make resolving every Issue part of this task."
         )
-    if summary.failed_skill_eval_reports:
-        lines.append(
-            "- Inspect failed eval reports against the active contract and producer; "
-            "a failed report alone does not identify a prompt defect."
-        )
     if summary.hook_counts.failures:
         lines.append(
             "- Inspect repeated hook failure fingerprints to locate the concrete "
@@ -864,9 +911,7 @@ def guidance(summary: EvidenceSummary) -> list[str]:
             "the producing contract establishes that those fields were required."
         )
     if not lines:
-        lines.append(
-            "- No failing eval or hook evidence was found in the scanned inputs."
-        )
+        lines.append("- No failing hook evidence was found in the scanned inputs.")
     return lines
 
 
@@ -932,5 +977,8 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except RuntimeArtifactError as exc:
-        print(f"generate_agent_improvement_guide.py: runtime_root_required: {exc}", file=sys.stderr)
+        print(
+            f"generate_agent_improvement_guide.py: runtime_root_required: {exc}",
+            file=sys.stderr,
+        )
         raise SystemExit(2) from exc

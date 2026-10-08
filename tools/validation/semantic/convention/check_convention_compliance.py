@@ -31,7 +31,9 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-MARKER_CONTRACTS_PATH = Path("tools/validation/semantic/convention/convention_compliance_contracts.toml")
+MARKER_CONTRACTS_PATH = Path(
+    "tools/validation/semantic/convention/convention_compliance_contracts.toml"
+)
 
 
 def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
@@ -44,7 +46,9 @@ def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
         surfaces: dict[str, tuple[str, ...]] = {}
         for surface in contract.get("surfaces", []):
             path = surface["path"]
-            if path.startswith(".codex/personal/skills/") and path.endswith("/SKILL.md"):
+            if path.startswith(".codex/personal/skills/") and path.endswith(
+                "/SKILL.md"
+            ):
                 raise ValueError(
                     "generated skill shims cannot own convention marker contracts: "
                     f"{path}"
@@ -127,10 +131,6 @@ TOOL_GATES = {
     ),
     "oop_cpp_readability": (
         "tools/validation/code/oop/cpp/readability.py",
-        (TOOL_CATALOG_PATH,),
-    ),
-    "prompt_eval": (
-        "eval/producers/evaluate_skill_workflow_prompts.py",
         (TOOL_CATALOG_PATH,),
     ),
     "behavior_eval": (

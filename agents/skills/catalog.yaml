@@ -508,7 +508,6 @@ skill_families:
       conditional:
       - {"executable": "tools/validation/code/oop/<language>/readability.py", "argv": ["--format", "json"]}
       - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py"]}
-      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default"}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
@@ -688,7 +687,7 @@ skill_families:
       required: []
       conditional:
       - {"tool_id": "eval-accumulation-check", "operation_id": "default", "argv_suffix": ["--root", ".", "--compact-out", "reports/agents/<run-id>/eval-accumulation-before.json", "--format", "text"]}
-      - {"tool_id": "run-accumulated-agent-evals", "operation_id": "default", "argv_suffix": ["python3", "eval/producers/run_accumulated_agent_evals.py", "--root", ".", "--run-id", "<run-id>", "--report-dir", "reports/agents/<run-id>"]}
+      - {"tool_id": "run-accumulated-agent-evals", "operation_id": "default", "argv_suffix": ["python3", "eval/producers/run_accumulated_agent_evals.py", "--root", ".", "--run-id", "<run-id>"]}
       - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "sync"]}
       - {"tool_id": "generated-artifact-guard", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "eval-accumulation-check", "operation_id": "default"}
@@ -1716,12 +1715,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml"]}
       - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<run>", "--runtime-feedback", "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op>"]}
       - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<run>", "--behavior-event", "..."]}
       - {"tool_id": "compare-agent-run-paths", "operation_id": "default", "argv_suffix": ["--baseline-run", "<run-a>", "--candidate-run", "<run-b>"]}
       - {"tool_id": "evaluate-agent-run", "operation_id": "default", "argv_suffix": ["--report-dir", "<run>", "--behavior-manifest", "eval/definitions/agent_behavior_eval.toml", "--write"]}
-      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml", "--accumulate", "--run-id", "<run-id>", "--skill-used", "<skill>"]}
       - {"executable": "eval/checkers/compare_agent_run_paths.py", "argv": ["--baseline-run", "<run-a>", "--candidate-run", "<run-b>"]}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
@@ -2128,8 +2125,7 @@ skill_families:
       description: "Use when a reusable skill, prompt, or instruction surface needs fresh empirical evaluation against frozen baseline and hold-out scenarios, followed by evidence-based iteration to convergence."
     tool_commands:
       required: []
-      conditional:
-      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml"]}
+      conditional: []
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}

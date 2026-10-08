@@ -24,13 +24,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.runtime.artifacts.runtime_artifacts import RuntimeSymlinkEscape  # noqa: E402
 
-MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
-BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
+MONITOR_SCRIPT = (
+    PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
+)
+BOOTSTRAP_SCRIPT = (
+    PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
+)
 RUNTIME_PROFILE_INVENTORY = (
-    PROJECT_ROOT
-    / "documents"
-    / "runtime"
-    / "runtime-profiles-and-check-matrix.json"
+    PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )
 
 
@@ -60,7 +61,9 @@ def load_monitor_module() -> WorkflowMonitorModule:
     """Load workflow_monitor.py for constant-level regression checks."""
     sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
     try:
-        spec = importlib.util.spec_from_file_location("workflow_monitor", MONITOR_SCRIPT)
+        spec = importlib.util.spec_from_file_location(
+            "workflow_monitor", MONITOR_SCRIPT
+        )
         if spec is None or spec.loader is None:
             raise AssertionError("failed to load workflow_monitor module spec")
         module = importlib.util.module_from_spec(spec)
@@ -134,7 +137,9 @@ class WorkflowMonitorTest(unittest.TestCase):
         module = load_monitor_module()
         entries_type = getattr(module, "MonitoringEntries")
         append_monitoring = getattr(module, "append_monitoring")
-        with tempfile.TemporaryDirectory(prefix="agent-canon-workflow-monitor-") as tmp_dir:
+        with tempfile.TemporaryDirectory(
+            prefix="agent-canon-workflow-monitor-"
+        ) as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             report_dir.mkdir(parents=True)
             prepared = "prepared-monitoring-prefix\n"
@@ -146,9 +151,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                 entries_type(signals=("source=post-move",)),
                 runtime_root=Path(tmp_dir),
             )
-            text = (report_dir / "workflow_monitoring.md").read_text(
-                encoding="utf-8"
-            )
+            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
 
         self.assertTrue(text.startswith(prepared))
         self.assertIn("source=post-move", text)
@@ -249,10 +252,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(
                 (
-                    runtime
-                    / "reports"
-                    / "env-runtime-run"
-                    / "workflow_monitoring.md"
+                    runtime / "reports" / "env-runtime-run" / "workflow_monitoring.md"
                 ).is_file()
             )
             request = runtime / "spool" / "private-feedback" / "sync-request.json"
@@ -442,11 +442,17 @@ class WorkflowMonitorTest(unittest.TestCase):
             monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
                 encoding="utf-8"
             )
-            self.assertIn("| WAVE-2 | parent | parent_checkpoint_then_send_input |", schedule_text)
+            self.assertIn(
+                "| WAVE-2 | parent | parent_checkpoint_then_send_input |", schedule_text
+            )
             self.assertIn("event_kind=mid_task_user_input", monitoring_text)
-            self.assertIn("input_classification=same_active_task_delta", monitoring_text)
+            self.assertIn(
+                "input_classification=same_active_task_delta", monitoring_text
+            )
             self.assertIn("redispatch_action=send_input", monitoring_text)
-            self.assertIn("updated_packet=reports/agents/run-1/user_delta_001.md", monitoring_text)
+            self.assertIn(
+                "updated_packet=reports/agents/run-1/user_delta_001.md", monitoring_text
+            )
             self.assertIn("mid_task_user_input=checkpointed", monitoring_text)
 
     def test_monitor_replaces_initial_blocker_with_actual_subagent_wave(self) -> None:
@@ -519,7 +525,9 @@ class WorkflowMonitorTest(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertEqual(schedule_text.count("| WAVE-1 |"), 1)
-            self.assertIn("| WAVE-1 | parent | parent_runtime_authority |", schedule_text)
+            self.assertIn(
+                "| WAVE-1 | parent | parent_runtime_authority |", schedule_text
+            )
             self.assertNotIn("blocked_authority_required", schedule_text)
             self.assertIn("event_kind=spawned", monitoring_text)
             self.assertIn("subagent_wave=recorded wave_id=WAVE-1", monitoring_text)
@@ -1166,7 +1174,6 @@ class WorkflowMonitorTest(unittest.TestCase):
             )
             self.assertIn("execution_path_comparison_not_required", text)
             self.assertIn("token_efficiency_not_required", text)
-            self.assertIn("prompt_eval_required", text)
             self.assertNotIn("EVAL_RUN_ID=recorded", text)
             self.assertNotIn("EVAL_ACCUMULATED_REPORT=recorded", text)
             self.assertIn("runtime_feedback_not_observed", text)
@@ -1178,9 +1185,18 @@ class WorkflowMonitorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             result = subprocess.run(
-                [sys.executable, str(MONITOR_SCRIPT), "--report-dir", str(report_dir),
-                 "--behavior-event", evidence],
-                cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                [
+                    sys.executable,
+                    str(MONITOR_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                    "--behavior-event",
+                    evidence,
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")

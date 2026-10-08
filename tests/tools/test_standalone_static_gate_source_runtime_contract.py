@@ -2,9 +2,9 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies standalone static units own no-runtime dependency regressions and prompt-eval skill evidence.
+# responsibility Verifies standalone static unit source/runtime routing and eval failure evidence retention.
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns contract and eval unit commands
-# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py consumes explicit skill-used evidence
+# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs the selected eval producer collection
 # upstream design ../../documents/design/source-owned-dependency-validation.md source and persisted graph authority split
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs selected unit owners
 # @dependency-end
@@ -19,7 +19,14 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNNER = ROOT / "tools" / "validation" / "ci" / "runners" / "run_standalone_static_gate_unit.sh"
+RUNNER = (
+    ROOT
+    / "tools"
+    / "validation"
+    / "ci"
+    / "runners"
+    / "run_standalone_static_gate_unit.sh"
+)
 
 SOURCE_REGRESSION_MODULES = (
     "tests.agent_tools.test_graph_client_source_projection",
@@ -49,46 +56,29 @@ def test_contract_unit_runs_all_source_runtime_regressions() -> None:
         assert module not in remainder
 
 
-def test_eval_unit_declares_the_skills_used_by_its_prompt_evaluation() -> None:
-    """Prompt eval receives run-owned skill evidence instead of false negatives."""
-    text = RUNNER.read_text(encoding="utf-8")
-    body = text.split("run_eval() (", 1)[1].split("\n)\n\nrun_workflow_container()", 1)[0]
-    remainder = text.replace(body, "", 1)
-
-    for skill in ("agent-orchestration", "result-artifact-writeout"):
-        command = f"--skill-used {skill}"
-        assert body.count(command) == 1
-        assert command not in remainder
-
-
-def test_eval_failure_evidence_is_filtered_before_temporary_cleanup() -> None:
-    """Failure rows remain observable even though bounded captures are deleted."""
-    text = RUNNER.read_text(encoding="utf-8")
-    body = text.split("run_eval() (", 1)[1].split("\n)\n\nrun_workflow_container()", 1)[0]
-
-    assert "AGENT_CANON_STATIC_EVAL_FAILURE_LINES_BEGIN" in body
-    assert "status=fail|_STATUS=fail|_FAILED=[1-9][0-9]*" in body
-    assert body.index("AGENT_CANON_STATIC_EVAL_FAILURE_LINES_BEGIN") < body.index(
-        "return \"${primary_status}\""
-    )
-
-
-def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots() -> None:
+def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots() -> (
+    None
+):
     """A source checkout cannot become either the control or runtime owner."""
-    source = (ROOT / "tools" / "validation" / "ci" / "runners" / "run_standalone_static_gate_unit.sh").read_text(
-        encoding="utf-8"
-    )
-    run_all = (ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh").read_text(
-        encoding="utf-8"
-    )
-    pr = (ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh").read_text(
-        encoding="utf-8"
-    )
+    source = (
+        ROOT
+        / "tools"
+        / "validation"
+        / "ci"
+        / "runners"
+        / "run_standalone_static_gate_unit.sh"
+    ).read_text(encoding="utf-8")
+    run_all = (
+        ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh"
+    ).read_text(encoding="utf-8")
+    pr = (
+        ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+    ).read_text(encoding="utf-8")
     for text in (run_all, pr):
         assert "control_parent_root_required" in text
         assert "runtime_root_required" in text
         assert "control_parent_root_is_source" in text
-        assert "AGENT_CANON_PARENT_ROOT=\"${AGENT_CANON_CONTROL_PARENT_ROOT}\"" in text
+        assert 'AGENT_CANON_PARENT_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT}"' in text
         assert "${RUNNER_TEMP:-${TMPDIR:-/tmp}}" not in text
     assert "AGENT_CANON_TARGET_ROOT:?AGENT_CANON_TARGET_ROOT is required" in source
     assert 'AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"' in source
@@ -104,14 +94,14 @@ def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots(
         (0, 0, 11, ["producer", "checker", "smoke"]),
     ],
 )
-def test_eval_owns_bounded_archive_and_preserves_failure_cleanup(
+def test_eval_preserves_failed_producer_logs_until_ci_capture(
     tmp_path: Path,
     producer_status: int,
     checker_status: int,
     smoke_status: int,
     expected_names: list[str],
 ) -> None:
-    """Inherited private logging is not the static eval's synthetic archive."""
+    """Failed producer logs survive; successful temporary output is still cleaned."""
     source = tmp_path / "source"
     runtime = tmp_path / "runtime with spaces"
     runtime.mkdir()
@@ -119,36 +109,56 @@ def test_eval_owns_bounded_archive_and_preserves_failure_cleanup(
     paths = (
         ("eval/producers/run_accumulated_agent_evals.py", "producer", producer_status),
         ("eval/checkers/eval_accumulation_check.py", "checker", checker_status),
-        ("eval/checkers/smoke_test_research_perspective_pack.py", "smoke", smoke_status),
+        (
+            "eval/checkers/smoke_test_research_perspective_pack.py",
+            "smoke",
+            smoke_status,
+        ),
     )
     for relative, name, status in paths:
         script = source / relative
         script.parent.mkdir(parents=True, exist_ok=True)
+        producer_logs = (
+            "log_dir = Path(sys.argv[sys.argv.index('--log-dir') + 1])\n"
+            "log_dir.mkdir(parents=True, exist_ok=True)\n"
+            "stdout = ''.join(f'producer stdout line {index + 1}\\n' for index in range(161))\n"
+            "stderr = ''.join(f'producer stderr line {index + 1}\\n' for index in range(161))\n"
+            "(log_dir / '02-workflow-selection.stdout.txt').write_text(stdout, encoding='utf-8')\n"
+            "(log_dir / '02-workflow-selection.stderr.txt').write_text(stderr, encoding='utf-8')\n"
+            "report_dir = Path(os.environ['AGENT_CANON_HOOK_ARCHIVE_DIR']) / 'eval-results' / 'workflow-selection'\n"
+            "report_dir.mkdir(parents=True, exist_ok=True)\n"
+            "(report_dir / 'agent-canon-pr-gate-pass.md').write_text('synthetic report\\n', encoding='utf-8')\n"
+            if name == "producer"
+            else (
+                "report = Path(os.environ['AGENT_CANON_HOOK_ARCHIVE_DIR']) / "
+                "'eval-results/workflow-selection/agent-canon-pr-gate-pass.md'\n"
+                "if not report.is_file():\n"
+                "    raise SystemExit(87)\n"
+                if name == "checker"
+                else ""
+            )
+        )
         script.write_text(
-            "import json, os\n"
+            "import json, os, sys\n"
             "from pathlib import Path\n"
             "with Path(os.environ['CALLS']).open('a') as stream:\n"
             f"    stream.write(json.dumps([{name!r}, "
-            "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR')]) + '\\n')\n"
-            f"raise SystemExit({status})\n",
+            "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR'), "
+            "os.environ.get('AGENT_CANON_LOG_ROOT')]) + '\\n')\n"
+            + producer_logs
+            + f"raise SystemExit({status})\n",
             encoding="utf-8",
         )
     text = RUNNER.read_text(encoding="utf-8")
-    body = "run_eval() (" + text.split("run_eval() (", 1)[1].split(
-        "\n)\n\nrun_workflow_container()", 1
-    )[0] + "\n)\n"
-    # Boundary double: the real resolver remains owned by runtime_artifacts.py.
-    boundary = r"""
-runtime_boundary_path() {
-  printf '%s\n' "$1" >> "$BOUNDARY_CALLS"
-  case "$1" in
-    "${AGENT_CANON_STATIC_RUNTIME_ROOT}/"*) printf '%s\n' "$1" ;;
-    *) return 42 ;;
-  esac
-}
-"""
+    body = (
+        "run_eval() ("
+        + text.split("run_eval() (", 1)[1].split("\n)\n\nrun_workflow_container()", 1)[
+            0
+        ]
+        + "\n)\n"
+    )
     result = subprocess.run(
-        ["bash", "-euo", "pipefail", "-c", boundary + body + "run_eval"],
+        ["bash", "-euo", "pipefail", "-c", body + "run_eval"],
         cwd=source,
         env={
             **os.environ,
@@ -156,8 +166,8 @@ runtime_boundary_path() {
             "RUNTIME_ROOT": str(source),
             "AGENT_CANON_STATIC_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
+            "AGENT_CANON_LOG_ROOT": "/var/lib/agent-canon/private-log",
             "CALLS": str(calls),
-            "BOUNDARY_CALLS": str(tmp_path / "boundary-calls"),
         },
         capture_output=True,
         text=True,
@@ -168,7 +178,24 @@ runtime_boundary_path() {
     )
     records = [json.loads(line) for line in calls.read_text().splitlines()]
     assert [record[0] for record in records] == expected_names
-    archive = str(runtime / "archive/agent-canon-log")
-    assert (tmp_path / "boundary-calls").read_text().splitlines() == [archive]
-    assert all(value == archive for name, value in records if name != "smoke")
-    assert not (runtime / "eval/agent-canon-pr-gate").exists()
+    archive = str(runtime)
+    assert all(
+        record[1:] == [archive, archive] for record in records if record[0] != "smoke"
+    )
+    report_path = (
+        runtime / "eval-results" / "workflow-selection" / "agent-canon-pr-gate-pass.md"
+    )
+    assert report_path.is_file()
+    temporary_logs = (
+        runtime / "eval/agent-canon-pr-gate/agent-eval-runs/agent-canon-pr-gate"
+    )
+    if producer_status or checker_status or smoke_status:
+        assert temporary_logs.is_dir()
+        assert "producer stdout line 161" in (
+            temporary_logs / "02-workflow-selection.stdout.txt"
+        ).read_text(encoding="utf-8")
+        assert "producer stderr line 161" in (
+            temporary_logs / "02-workflow-selection.stderr.txt"
+        ).read_text(encoding="utf-8")
+    else:
+        assert not temporary_logs.exists()
