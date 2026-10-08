@@ -2,9 +2,9 @@
 # @dependency-start
 # contract implementation
 # responsibility Defines task-local contract observation schema and state transitions.
-# upstream design ../../documents/runtime/task-contract-observation.md defines the state machine
+# upstream design ../../../documents/runtime/task-contract-observation.md defines the state machine
 # downstream implementation ./task_contract_observation.py records and evaluates run evidence
-# downstream implementation ../../tests/agent_tools/test_task_contract_observation.py tests it
+# downstream implementation ../../../tests/agent_tools/test_task_contract_observation.py tests it
 # @dependency-end
 """Task-local contract observation schema and state-machine evaluation."""
 

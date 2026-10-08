@@ -177,14 +177,6 @@ python3 tools/runtime/lifecycle/workflow_monitor.py \
   --runtime-feedback "source=<tool|hook|reviewer|subagent|user> target=<skill-or-workflow-or-handoff> action=prompt_repair reason=<short-reason>"
 ```
 
-1. shared skill / workflow prompt を直した場合は、該当 prompt eval を確認し、
-   実行可能なら次を rerun します。
-
-```bash
-python3 eval/producers/evaluate_skill_workflow_prompts.py \
-  --manifest eval/definitions/skill_workflow_prompt_eval.toml
-```
-
 ## Refactor Integration
 
 `refactor-loop` は、この skill が作った finding packet を入力として使います。

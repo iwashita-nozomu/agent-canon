@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the typed, immutable AgentCanon hook-retirement tombstone manifest.
-# upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md fixes the 23-child/1-moved-source ledger.
-# downstream implementation ./check_hook_retirement.py validates absence and caller closure.
-# downstream implementation ../../.codex/hooks/hook_dispatcher.py exposes manifest readback.
-# downstream implementation ../../tests/agent_tools/test_hook_retirement.py validates digest and typed counts.
+# upstream design ../../../documents/design/agentcanon-hook-simplification-wave3.md fixes the 23-child/1-moved-source ledger.
+# downstream implementation ../../validation/semantic/hooks/check_hook_retirement.py validates absence and caller closure.
+# downstream implementation ../../../.codex/hooks/hook_dispatcher.py exposes manifest readback.
+# downstream implementation ../../../tests/agent_tools/test_hook_retirement.py validates digest and typed counts.
 # @dependency-end
 """Single source of truth for retired hook metadata."""
 

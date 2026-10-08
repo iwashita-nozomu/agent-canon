@@ -177,20 +177,28 @@ or a new read ledger requirement.
 ## Decision Order
 
 1. Classify the request as `routing-only/advisory` or `repo-changing execution`.
-2. Resolve the owner, replaceable unit, mechanism, validation route, and any
-   unresolved branch that could change those decisions. Use an existing canonical
-   tool when it owns the question; search only when owner or mechanism remains
-   ambiguous. A handoff or tool result is enough unless coordination/resumption
-   needs durable state.
+2. Identify premises that could change the owner, mechanism, required guarantee,
+   scope, or validation; verify them against current source, callers, inputs/state,
+   constraints, and source authority. Distinguish observed facts, inferences, and
+   unresolved decision-relevant premises; investigate only missing facts that can
+   change the decision. For repo-wide or multi-surface execution, first establish
+   the shared repository orientation required by `ROOT_AGENTS.md`, then follow
+   relevant cross-directory callers and consumers to resolve the replaceable unit.
+   Use an existing canonical tool when it owns the question; search only when owner
+   or mechanism remains ambiguous. A handoff or tool result is enough unless
+   coordination/resumption needs durable state.
 3. Resolve family, stage, and role candidates from `agents/task_catalog.yaml`.
    A bounded owner/path/validation route runs through its execution owner; a
    child exists only when the selected typed route requires it.
 4. Materialize model/profile and ToolCall values through their registry owners.
    For Luna, use `direct-luna-communication`; preserve the logical role and do
    not turn aliases into new capacity or approval rules.
-5. Carry only selected owner context and validation into the next operation. Do
-   not repeat completed searches, full scans, inactive stages, or generic review
-   packs when they cannot change the next owner/edit/validation decision.
+5. When work is split, carry the shared repository orientation through the existing
+   handoff, then add only the owner-specific context and validation each operation
+   needs. Update it with new cross-owner findings. Bounded source context narrows
+   reading, not responsibility. Do not repeat completed searches, full scans,
+   inactive stages, or generic review packs when they cannot change the next
+   owner/edit/validation decision.
 6. Select review, specialist, and artifact routes only when the changed contract
    or an unresolved risk needs them; return to the selected workflow after the
    decision is closed.
@@ -493,7 +501,7 @@ JIT、runtime、routing、environment、CI、architecture work は通常 route �
 ## Codex Implementation Routing
 
 - implementation が scope に入るときだけ routing を出します
-- selected execution profile が Luna の場合は、logical role、selected Skills、reasoning effort、authority、bounded paths、expected output、validation route を `direct_luna_handoff_packet_v1` に合成し、`$direct-luna-communication` で `model="gpt-5.6-luna"`、`fork_turns="none"` の direct child を起動します。effective model / effort の一致前に work を admit せず、unavailable / hidden / mismatch を legacy role alias や別 model へ fallback しません。
+- selected execution profile が Luna の場合は、logical role、selected Skills、reasoning effort、authority、bounded paths、expected output、validation route を `direct_luna_handoff_packet_v1` に合成します。Effective model と effort は選択済み profile と `$direct-luna-communication` owner から解決し、`fork_turns="none"` で direct child を起動します。effective model / effort の一致前に work を admit せず、unavailable / hidden / mismatch を legacy role alias や別 model へ fallback しません。
 - `bootstrap_agent_run.py` の output で `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認してから route します
 - prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
 - coding / implementation / patch / doc-edit work を求める repo-changing task は、typed route が child handoff を要求する場合に限り、read-only survey / review role だけで完了扱いにしません。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、追加の read-only wave より先に selected write-capable implementer を起動または schedule します。parent は実装者ではなく orchestrator として、handoff packet、起動、packet relay、依存順、status、最終 readback を所有します。

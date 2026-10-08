@@ -120,6 +120,15 @@ def _local_remote(tmp_path: Path) -> tuple[Path, Path]:
     return remote, seed
 
 
+@pytest.fixture
+def private_feedback_git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give commits made by test-owned archive clones a deterministic identity."""
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "private-feedback-test")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "test@example.invalid")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "private-feedback-test")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "test@example.invalid")
+
+
 def test_no_annex_remote_keeps_raw_spool_pending(tmp_path: Path) -> None:
     """Raw content is not committed as an ordinary Git blob without annex."""
     remote, _seed = _local_remote(tmp_path)
@@ -134,7 +143,9 @@ def test_no_annex_remote_keeps_raw_spool_pending(tmp_path: Path) -> None:
 
 
 def test_mixed_spool_preflights_annex_before_normal_copy_and_retries_after_remote_advance(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    private_feedback_git_identity: None,
 ) -> None:
     """An unavailable raw capability cannot partially publish normal feedback."""
     remote, seed = _local_remote(tmp_path)
@@ -237,7 +248,9 @@ def test_sync_failure_retains_spool(tmp_path: Path) -> None:
 
 
 def test_operational_clone_uses_control_root_and_ignores_old_runtime_archive(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    private_feedback_git_identity: None,
 ) -> None:
     """The control-root clone is the sole private archive checkout owner."""
     remote, _seed = _local_remote(tmp_path)
@@ -253,7 +266,10 @@ def test_operational_clone_uses_control_root_and_ignores_old_runtime_archive(
     assert (tmp_path / "log/.git").is_dir()
 
 
-def test_sync_request_host_readback_and_private_log_mount_are_separate(tmp_path: Path) -> None:
+def test_sync_request_host_readback_and_private_log_mount_are_separate(
+    tmp_path: Path,
+    private_feedback_git_identity: None,
+) -> None:
     """The container request is consumed by host Git and its checkout is RO-mounted."""
     remote, _seed = _local_remote(tmp_path)
     control = tmp_path / "control"
@@ -291,7 +307,10 @@ def test_sync_request_host_readback_and_private_log_mount_are_separate(tmp_path:
     assert mount["mode"] == "read-only"
 
 
-def test_sync_request_is_reused_across_k_and_f_and_publishes_stable_branch(tmp_path: Path) -> None:
+def test_sync_request_is_reused_across_k_and_f_and_publishes_stable_branch(
+    tmp_path: Path,
+    private_feedback_git_identity: None,
+) -> None:
     """One valid request is shared by k/f and removed only after branch readback."""
     remote, _seed = _local_remote(tmp_path)
     runtime = tmp_path / "runtime"

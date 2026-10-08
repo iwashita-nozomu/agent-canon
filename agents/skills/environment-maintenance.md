@@ -136,7 +136,9 @@ CIで同じimageとtest commandを再利用できる状態にします。
   substitutes for the configured runtime-pack image tag.
 - 既存のrunning Dev Container内でcommandが通ることをenvironment acceptanceにしません。
   previous mutable stateを排除したimage build/runがacceptance ownerです。
-- validation failureを解消するためにtest範囲やoracleを弱めません。imageに不足するcapabilityを
+- validation failureを解消するためにtest範囲やoracleを弱めません。Authorized CI/environment
+  repairでは、affected canonical validation path上のpre-existing failureもscopeに含め、
+  skipped/no-op validationをruntime behaviorの根拠にしません。imageに不足するcapabilityを
   Dockerfileへ戻すか、canonical commandの実責務が誤っていることをowner evidenceで修正します。
 
 ## Validation

@@ -536,6 +536,8 @@ def test_capture_exports_only_the_bootstrap_validated_container(
         AGENT_CANON_CANDIDATE_SOURCE=str(source),
         AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
         RUNNER_TEMP=str(tmp_path),
+        SELECTED_UNITS="docs",
+        EVAL_UNIT_STATUS="not-selected",
         PATH=f"{bin_dir}:{os.environ['PATH']}",
         CALLS=str(calls),
         STATUS_JSON=json.dumps(native_status),

@@ -84,27 +84,32 @@ the owning topic with their reproduction conditions and verified conclusions.
 ## Public API additions
 
 A requested fix covers necessary replacement, removal, signature changes, unavoidable
-additions, and affected consumer migration. Preserve explicit compatibility
-requirements and actual authority boundaries while correcting the root contract.
+additions, and affected consumer migration. Resolve concrete compatibility or
+authority conflicts through the existing owner routes while correcting the root
+contract.
 
 Before implementation, use [API surface traversal](../../documents/design/api-surface-traversal-policy.md)
 to inspect current abstractions, real callers, APIs, configuration, extension
 points, standard facilities, and adopted dependencies. New functionality starts
-with direct use or composition before a new API. For a repair, choose the simplest
-complete correction, including replacement when justified. Test a concrete candidate
-use against the required property, including relevant configuration and composition.
+with direct use or composition before a new API. Keep one exposed API per
+functional capability. Alternate names or routes, forwarding aliases, independent
+duplicate APIs, and compatibility wrappers are additional APIs for that capability.
+Private implementation decomposition is not an API; preserve distinct
+responsibilities and do not add aliases, adapters, or guards merely to announce
+policy. For a repair, choose the simplest complete correction, including
+replacement when justified. Test a concrete candidate use against the required
+property, including relevant configuration and composition.
 State the checked input/source, actual result, and conclusion; investigate a missing
 guarantee until the material decision is settled. Record candidates, verified unmet
 contracts, and necessary owner/API changes in the existing design.
 
-Fix the root, then trace references and callers through the existing dependency
-or LSP owner and migrate affected implementations, tests, and documentation in
-the same change. Stop tracing at unchanged contracts, not at the originally
-named files. Validate required semantics and the corrected public contract;
-do not freeze defective behavior in tests or move the defect into caller
-workarounds. Remove obsolete implementation paths and dedicated support code;
-retain a compatibility entrypoint only for an actual required contract and
-connect it to the canonical implementation, not a second implementation.
+Fix the root, then trace references and actual callers through the existing
+dependency or LSP owner against the required contract. Use or migrate affected
+implementations, tests, and documentation to the existing/latest canonical API
+in the same change; stop tracing at unchanged contracts, not at the originally
+named files. Validate required semantics and the corrected public contract; do
+not freeze defective behavior in tests or move the defect into caller workarounds.
+Retire duplicate/obsolete entrypoints and exclusive support in the same change.
 
 Keep existing safety, access, and publication authority. A concrete conflict
 with an explicit compatibility constraint or unavailable consumer write access
@@ -134,10 +139,14 @@ add or update a concise section under existing design conventions when needed.
 Record the latest explicit agreement in that section before editing; its older
 text must not override the agreement. Chat, Issue/PR discussion, and code comments
 may support or link to the rationale but do not replace the durable explanation.
-If necessity cannot be justified, reconsider the implementation rather than inventing
-a reason. Use the existing design and
-review owners; do not add a checker, schema, approval gate, or unrelated
-retrospective documentation task.
+At nonobvious code boundaries, keep the local necessity, guaranteed behavior or
+effect boundary, and owning responsibility readable with concise comments or
+docstrings; link the actual design owner where useful. Do not restate symbol names
+or invent rationale, and do not require a comment for every line or function. If
+necessity or ownership cannot be explained from evidence, investigate or
+reconsider the implementation instead of writing a comment to bless it. Use the
+existing design and review owners; do not add a checker, schema, approval gate,
+or unrelated retrospective documentation task.
 
 ## Dependency constraints
 

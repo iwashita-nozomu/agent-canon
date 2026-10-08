@@ -54,6 +54,8 @@ _PARENT_BOUNDARY_PATH_KEYS = (
     "AGENT_CANON_EXPECTED_IMAGE_TAG",
     "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
 )
+
+
 def parent_bound_environment(root: Path) -> dict[str, str]:
     """Return a clean environment for one real eval fixture repository."""
     subprocess.run(
@@ -102,8 +104,8 @@ def parent_bound_environment(root: Path) -> dict[str, str]:
 class RunAccumulatedAgentEvalsTest(unittest.TestCase):
     """Validate command construction and output bounding."""
 
-    def test_build_producers_uses_accumulation_for_every_eval_family(self) -> None:
-        """Every registered eval producer should run with append-only accumulation."""
+    def test_build_producers_uses_accumulation_for_registered_producers(self) -> None:
+        """Registered behavior/routing producers accumulate without source-prose scans."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "source"
             root.mkdir()
@@ -112,9 +114,6 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
             producers = build_producers(
                 root=root,
                 run_id="run-123",
-                skill_used=("agent-orchestration", "result-artifact-writeout"),
-                report_dir=root.parent / "runtime" / "tasks" / "run-123" / "reports",
-                prompt_eval_manifest=root / "eval" / "definitions" / "skill_workflow_prompt_eval.toml",
                 python_bin=sys.executable,
                 runtime_root=runtime_root,
             )
@@ -124,23 +123,16 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
             names,
             {
                 "codex-agent-role",
-                "skill-workflow-prompt",
                 "workflow-selection",
-                "report-quality",
             },
         )
         for producer in producers:
             self.assertIn("--accumulate", producer.command)
-        prompt = next(producer for producer in producers if producer.name == "skill-workflow-prompt")
-        workflow = next(producer for producer in producers if producer.name == "workflow-selection")
-        self.assertIn("--run-id", prompt.command)
-        self.assertIn("run-123", prompt.command)
+        workflow = next(
+            producer for producer in producers if producer.name == "workflow-selection"
+        )
         self.assertIn("--run-id", workflow.command)
         self.assertIn("run-123", workflow.command)
-        self.assertIn("--skill-used", prompt.command)
-        self.assertIn("agent-orchestration", prompt.command)
-        self.assertIn("result-artifact-writeout", prompt.command)
-        self.assertIn("--report-dir", prompt.command)
 
     def test_run_producers_writes_logs_and_renders_bounded_status(self) -> None:
         """Producer stdout/stderr should be stored in files, with compact status on stdout."""

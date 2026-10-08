@@ -10,7 +10,6 @@ upstream design ../../documents/experiments/experiment-report-style.md evidence 
 upstream design code-visualization.md selected visualization rendering and coverage owner
 upstream design structure-planning.md storyboard topology owner when a real structural choice exists
 downstream implementation ../../.codex/personal/skills/slides/SKILL.md exposes this skill as a runtime skill
-downstream implementation ../../eval/definitions/skill_workflow_prompt_eval.toml evaluates skill routing coverage
 @dependency-end
 -->
 

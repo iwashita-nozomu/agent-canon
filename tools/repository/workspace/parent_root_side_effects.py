@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Authenticates the selected parent repository and owns parent-local filesystem capabilities.
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md repository mutation and managed-clone authority
-# downstream implementation ../bin/agent-canon bounds CLI child state
-# downstream implementation ../ci/run_all_checks.sh bounds integrated CI child state and scratch
-# downstream implementation ../ci/check_agent_canon_pr.sh bounds PR gate child state and scratch
-# downstream implementation ../ci/agent_canon_pr_graph_selector.py bounds selector publication and graph children
-# downstream implementation ../../tests/agent_tools/test_parent_root_side_effects.py verifies capabilities and authenticated child environments
+# upstream design ../../../agents/canonical/CODEX_WORKFLOW.md repository mutation and managed-clone authority
+# downstream implementation ../../bin/agent-canon bounds CLI child state
+# downstream implementation ../../validation/ci/runners/run_all_checks.sh bounds integrated CI child state and scratch
+# downstream implementation ../../validation/ci/checks/check_agent_canon_pr.sh bounds PR gate child state and scratch
+# downstream implementation ../../validation/ci/checks/agent_canon_pr_graph_selector.py bounds selector publication and graph children
+# downstream implementation ../../../tests/agent_tools/test_parent_root_side_effects.py verifies capabilities and authenticated child environments
 # @dependency-end
 
 """Authenticate the parent repository and perform parent-owned effects.

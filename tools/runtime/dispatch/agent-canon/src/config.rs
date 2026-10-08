@@ -21,7 +21,7 @@ fn root_integer(document: &DocumentMut, key: &str) -> Option<i64> {
 fn set_root_integer(document: &mut DocumentMut, key: &str, number: i64) {
     if let Some(item) = document.get_mut(key) {
         let decor = item.as_value().map(|current| current.decor().clone());
-        *item = toml_value(number).into();
+        *item = toml_value(number);
         if let (Some(decor), Some(updated)) = (decor, item.as_value_mut()) {
             *updated.decor_mut() = decor;
         }

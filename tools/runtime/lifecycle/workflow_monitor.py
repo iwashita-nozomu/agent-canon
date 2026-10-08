@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Appends workflow monitoring evidence to run bundles.
-# upstream design ../../templates/agents/workflow_monitoring.md defines monitor sections
-# upstream implementation ./work_log.py owns canonical semantic-ledger append/read
-# upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
-# upstream implementation ./work_log.py appends canonical logical-ledger events
+# upstream design ../../../templates/agents/workflow_monitoring.md defines monitor sections
+# upstream implementation ../archive/work_log.py owns canonical semantic-ledger append/read
+# upstream implementation ../../agent/orchestration/mid_task_user_input_policy.py defines mid-task user input evidence policy
+# upstream implementation ../archive/work_log.py appends canonical logical-ledger events
 # upstream implementation ./update_lifecycle_contract.py owns update states and evidence identity.
-# downstream implementation ../../tests/agent_tools/test_workflow_monitor.py tests it
+# downstream implementation ../../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
 
@@ -47,7 +47,10 @@ from tools.agent.orchestration.mid_task_user_input_policy import (
     is_empty_policy_value,
 )
 from tools.runtime.lifecycle.update_lifecycle_contract import TRANSACTION_STATES
-from tools.runtime.archive.work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
+from tools.runtime.archive.work_log import (
+    MONITOR_PASSTHROUGH_FIELDS,
+    append_ledger_event,
+)
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -61,6 +64,8 @@ DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
 def _runtime_path(path: Path, runtime_root: Path | str | None = None) -> Path:
     """Resolve one monitoring artifact through the external runtime boundary."""
     return resolve_runtime_artifact_path(path, runtime_root=runtime_root)
+
+
 TOOL_WARNING_REQUIRED_KEYS = (
     "warning_id",
     "source_tool",
@@ -166,7 +171,9 @@ def validation_failure_taxonomy_values(field: str) -> frozenset[str]:
     data = cast(dict[str, object], raw_data)
     raw_response = data.get("validation_failure_response")
     if not isinstance(raw_response, dict):
-        raise ValueError("runtime profile inventory missing validation_failure_response")
+        raise ValueError(
+            "runtime profile inventory missing validation_failure_response"
+        )
     response = cast(dict[str, object], raw_response)
     raw_values = response.get(field)
     if not isinstance(raw_values, list) or not raw_values:
@@ -211,7 +218,6 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "validation_failure_not_observed reason=standard-closeout-preset",
     "execution_path_comparison_not_required reason=single-active-route",
     "token_efficiency_not_required reason=no-comparable-session",
-    "prompt_eval_required action=run_evaluate_skill_workflow_prompts_with_accumulate",
     "runtime_feedback_not_observed",
     "review_decision=approve review_findings_integrated=yes",
     "diff_check_agent_decision=approve diff_check_agent_complete=yes",
@@ -326,7 +332,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--report-dir", help="Explicit run bundle directory.")
-    target.add_argument("--run-id", help="Run id under the external reports/agents root.")
+    target.add_argument(
+        "--run-id", help="Run id under the external reports/agents root."
+    )
     parser.add_argument(
         "--report-root",
         help="Optional external report root. Defaults below --runtime-root.",
@@ -368,7 +376,7 @@ def add_monitoring_entry_arguments(parser: argparse.ArgumentParser) -> None:
         default=[],
         help=(
             "Agent behavior event to append, such as skill invocation, subagent routing, "
-            "tool call, review decision, prompt eval result, or feedback action."
+            "tool call, review decision, or feedback action."
         ),
     )
     parser.add_argument(
@@ -493,8 +501,7 @@ def default_monitoring_text(report_dir: Path) -> str:
             "<!--",
             "@dependency-start",
             "responsibility Records workflow monitoring for this run bundle.",
-            "upstream design ../../../templates/agents/"
-            "workflow_monitoring.md template",
+            "upstream design ../../../templates/agents/workflow_monitoring.md template",
             "@dependency-end",
             "-->",
             "",
@@ -588,8 +595,11 @@ def semantic_event_record(entry: str, report_dir: Path) -> dict[str, object]:
         raise ValueError(
             "semantic event must include required keys: " + ",".join(missing)
         )
+
     def refs(name: str) -> list[str]:
-        values = [item.strip() for item in fields.get(name, "").split(",") if item.strip()]
+        values = [
+            item.strip() for item in fields.get(name, "").split(",") if item.strip()
+        ]
         if not values:
             raise ValueError(f"semantic event requires non-empty {name}")
         return values
@@ -660,10 +670,14 @@ def normalize_subagent_wave(entry: str) -> dict[str, str]:
         if fields.get(key, "").strip().lower() in {"", "missing"}
     ]
     if missing:
-        raise ValueError("subagent wave must include required keys: " + ",".join(missing))
+        raise ValueError(
+            "subagent wave must include required keys: " + ",".join(missing)
+        )
     normalized = dict(fields)
     normalized.setdefault("event_kind", "spawned")
-    normalized.setdefault("delegated_policy_ref", "team_manifest.yaml#run.delegated_spawn_policy")
+    normalized.setdefault(
+        "delegated_policy_ref", "team_manifest.yaml#run.delegated_spawn_policy"
+    )
     event_kind = normalized["event_kind"]
     if event_kind not in SUBAGENT_WAVE_EVENT_KINDS:
         raise ValueError(
@@ -684,9 +698,7 @@ def normalize_subagent_wave(entry: str) -> dict[str, str]:
     if is_delegated and is_empty_policy_value(
         normalized.get("remaining_spawn_budget", "")
     ):
-        raise ValueError(
-            "delegated subagent wave must include remaining_spawn_budget"
-        )
+        raise ValueError("delegated subagent wave must include remaining_spawn_budget")
     validate_validation_failure_wave(normalized)
     return normalized
 
@@ -845,8 +857,9 @@ def validate_mid_task_target_and_evidence(
     classification: str,
 ) -> None:
     """Validate classification-specific target and evidence fields."""
-    if classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS and is_empty_policy_value(
-        fields.get("target_agents", "")
+    if (
+        classification in MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS
+        and is_empty_policy_value(fields.get("target_agents", ""))
     ):
         raise ValueError(
             f"mid-task target_agents for {classification} must identify an agent or role"
@@ -1048,9 +1061,7 @@ def upsert_subagent_wave_schedule_rows(
             replaced.add(wave_id)
             index += 1
         missing_rows = [
-            desired[wave_id]
-            for wave_id in desired
-            if wave_id not in replaced
+            desired[wave_id] for wave_id in desired if wave_id not in replaced
         ]
         if missing_rows:
             insert_entries(lines, "## Agent Wave Ledger", missing_rows)
@@ -1301,13 +1312,9 @@ def normalized_wave_rows(
     """Return normalized mid-task and subagent wave rows."""
     return (
         tuple(
-            normalize_mid_task_user_input(item)
-            for item in entries.mid_task_user_inputs
+            normalize_mid_task_user_input(item) for item in entries.mid_task_user_inputs
         ),
-        tuple(
-            normalize_subagent_wave(item)
-            for item in entries.subagent_waves
-        ),
+        tuple(normalize_subagent_wave(item) for item in entries.subagent_waves),
     )
 
 
@@ -1336,10 +1343,7 @@ def lifecycle_monitoring_record(
         raise ValueError("lifecycle_monitoring:evidence_ref_invalid")
     if len(evidence.evidence_refs) != len(set(evidence.evidence_refs)):
         raise ValueError("lifecycle_monitoring:evidence_ref_duplicate")
-    if (
-        evidence.lifecycle_state == "closed"
-        and not evidence.close_agent_tool_call_ref
-    ):
+    if evidence.lifecycle_state == "closed" and not evidence.close_agent_tool_call_ref:
         raise ValueError("lifecycle_monitoring:close_tool_call_ref_missing")
     return {
         "schema": UPDATE_LIFECYCLE_MONITORING_SCHEMA,
@@ -1374,12 +1378,10 @@ def append_monitoring_sections(
 ) -> None:
     """Apply normalized monitoring rows to workflow_monitoring.md sections."""
     signal_entries = [
-        normalize_entry(item, entries.timestamp)
-        for item in entries.signals
+        normalize_entry(item, entries.timestamp) for item in entries.signals
     ]
     behavior_entries = [
-        normalize_entry(item, entries.timestamp)
-        for item in entries.behavior_events
+        normalize_entry(item, entries.timestamp) for item in entries.behavior_events
     ]
     behavior_entries.extend(
         normalize_entry(normalize_semantic_event(item), entries.timestamp)
@@ -1410,8 +1412,7 @@ def append_monitoring_sections(
         for item in entries.tool_warnings
     ]
     intervention_entries = [
-        normalize_entry(item, entries.timestamp)
-        for item in entries.interventions
+        normalize_entry(item, entries.timestamp) for item in entries.interventions
     ]
     insert_entries(lines, "## Signals", signal_entries)
     insert_entries(lines, "## Behavior Events", behavior_entries)
@@ -1483,7 +1484,9 @@ def emit_behavior_projection(
 ) -> MonitorProjectionResult:
     """Project one already-assembled event without writing the canonical JSONL artifact."""
     try:
-        encoded = json.dumps(event, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        encoded = json.dumps(
+            event, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+        )
         path = append_monitoring(
             report_dir,
             MonitoringEntries(behavior_events=(f"behavior_event_json={encoded}",)),
@@ -1491,15 +1494,19 @@ def emit_behavior_projection(
         )
         return MonitorProjectionResult("spooled", path)
     except Exception as exc:
-        return MonitorProjectionResult("failed", report_dir / "workflow_monitoring.md", type(exc).__name__)
+        return MonitorProjectionResult(
+            "failed", report_dir / "workflow_monitoring.md", type(exc).__name__
+        )
 
 
 def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
-    effective_runtime_root = args.runtime_root or os.environ.get(
-        "AGENT_CANON_RUNTIME_ROOT", ""
-    ).strip() or None
+    effective_runtime_root = (
+        args.runtime_root
+        or os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+        or None
+    )
     decisions = dict(parse_decision(item) for item in args.decision)
     signals = list(args.signal)
     behavior_events = list(args.behavior_event)

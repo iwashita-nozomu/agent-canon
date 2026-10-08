@@ -22,7 +22,9 @@ from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_agent_run.py"
-MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
+MONITOR_SCRIPT = (
+    PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
+)
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )
@@ -60,24 +62,6 @@ def load_evaluate_module() -> EvaluateAgentRunModule:
 def write_lines(path: Path, lines: list[str]) -> None:
     """Write one fixture artifact from lines."""
     path.write_text("\n".join(lines), encoding="utf-8")
-
-
-def write_prompt_eval_report(report_dir: Path) -> None:
-    """Write the prompt eval fixture."""
-    write_lines(
-        report_dir / "prompt-eval-report.md",
-        [
-            "# Skill Workflow Prompt Eval",
-            "",
-            "## Summary",
-            "",
-            "- eval_run_id: `skill-eval-test`",
-            "- run_id: `unit-run`",
-            "- used_skills: `agent-orchestration, codex-task-workflow`",
-            "- EVAL_STATUS=pass",
-            "",
-        ],
-    )
 
 
 def write_planning_artifacts(report_dir: Path) -> None:
@@ -187,12 +171,6 @@ def write_workflow_monitoring(report_dir: Path) -> None:
                 "protocol_feedback_reason=unit-test-protocol-routing"
             ),
             (
-                "- tool_call=evaluate_skill_workflow_prompts.py prompt_eval=pass "
-                "EVAL_STATUS=pass EVAL_RUN_ID=skill-eval-test "
-                "EVAL_USED_SKILLS=agent-orchestration,codex-task-workflow "
-                "EVAL_ACCUMULATED_REPORT=prompt-eval-report.md"
-            ),
-            (
                 "- runtime_feedback=observed source=user "
                 "target=.codex/personal/skills/agent-learning/SKILL.md "
                 "action=prompt_repair evidence=unit-test"
@@ -225,9 +203,18 @@ def write_child_execution_receipts(report_dir: Path) -> None:
     """Write the hashed spawn/mutation/close correlation fixture."""
     value: dict[str, object] = {
         "schema": "agent-canon.child-execution-receipts.v1",
-        "spawn": {"agent_id": "worker-1", "role_id": "implementer", "scope_digest": "scope-1"},
+        "spawn": {
+            "agent_id": "worker-1",
+            "role_id": "implementer",
+            "scope_digest": "scope-1",
+        },
         "mutations": [
-            {"actor_id": "worker-1", "role_id": "implementer", "scope_digest": "scope-1", "status": "allowed"}
+            {
+                "actor_id": "worker-1",
+                "role_id": "implementer",
+                "scope_digest": "scope-1",
+                "status": "allowed",
+            }
         ],
         "close": {"agent_id": "worker-1", "status": "closed"},
         "receipt_sha256": "",
@@ -235,7 +222,9 @@ def write_child_execution_receipts(report_dir: Path) -> None:
     unsigned = dict(value)
     unsigned.pop("receipt_sha256")
     value["receipt_sha256"] = hashlib.sha256(
-        json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+        json.dumps(
+            unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode()
     ).hexdigest()
     target = report_dir / "runtime" / "child_execution_receipts.json"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -301,7 +290,6 @@ def write_review_closeout_artifacts(report_dir: Path) -> None:
 def write_ready_run(report_dir: Path) -> None:
     """Write a minimal passing run bundle."""
     report_dir.mkdir(parents=True, exist_ok=True)
-    write_prompt_eval_report(report_dir)
     write_planning_artifacts(report_dir)
     write_workflow_monitoring(report_dir)
     write_child_execution_receipts(report_dir)
@@ -416,14 +404,6 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "generated_role_view_v1 profile-attribution topology_derived_v1 "
                     "declared_team_peak_plus_nested_reservations_v1 requested_capacity_loader "
                     "model-capacity thread-capacity",
-                    "--behavior-event",
-                    (
-                        "tool_call=evaluate_skill_workflow_prompts.py "
-                        "prompt_eval=pass EVAL_STATUS=pass "
-                        "EVAL_RUN_ID=skill-eval-test "
-                        "EVAL_USED_SKILLS=agent-orchestration,codex-task-workflow "
-                        "EVAL_ACCUMULATED_REPORT=prompt-eval-report.md"
-                    ),
                     "--decision",
                     "skill_improvement_decision=recorded",
                     "--decision",
@@ -509,7 +489,10 @@ class EvaluateAgentRunTest(unittest.TestCase):
             "not-approved": "not approved",
         }
         for case_id, decision in cases.items():
-            with self.subTest(case_id=case_id), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(case_id=case_id),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 report_dir = Path(tmp_dir) / "run"
                 write_ready_run(report_dir)
                 (report_dir / "final_review.md").write_text(
@@ -571,7 +554,9 @@ class EvaluateAgentRunTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
             (report_dir / "workflow_monitoring.md").write_text(
                 monitoring.replace(
                     "- workflow_improvement_decision: not_applicable",
@@ -629,7 +614,9 @@ class EvaluateAgentRunTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
             before, _, after = monitoring.partition("## Behavior Events")
             _, _, tail = after.partition("## Interventions")
             (report_dir / "workflow_monitoring.md").write_text(
@@ -737,69 +724,6 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("fix-now tool warning must be resolved: W1", result.stdout)
 
-    def test_evaluate_missing_accumulated_prompt_eval_report_fails(self) -> None:
-        """Prompt eval evidence must point to a real accumulated report."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "run"
-            write_ready_run(report_dir)
-            monitoring_path = report_dir / "workflow_monitoring.md"
-            monitoring = monitoring_path.read_text(encoding="utf-8")
-            monitoring_path.write_text(
-                monitoring.replace(
-                    "EVAL_ACCUMULATED_REPORT=prompt-eval-report.md",
-                    "EVAL_ACCUMULATED_REPORT=missing-prompt-eval-report.md",
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
-            self.assertIn("accumulated prompt eval report missing", result.stdout)
-
-    def test_evaluate_mismatched_accumulated_prompt_eval_run_id_fails(self) -> None:
-        """Prompt eval report run ids must match the monitoring event."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "run"
-            write_ready_run(report_dir)
-            report_path = report_dir / "prompt-eval-report.md"
-            report_path.write_text(
-                report_path.read_text(encoding="utf-8").replace(
-                    "skill-eval-test",
-                    "skill-eval-other",
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
-            self.assertIn("accumulated prompt eval run-id mismatch", result.stdout)
-
     def test_evaluate_inefficient_execution_path_fails(self) -> None:
         """Known inefficient route selection should trigger behavior eval feedback."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -867,7 +791,9 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("runtime feedback", result.stdout.lower())
 
-    def test_evaluate_observed_runtime_feedback_requires_improvement_decision(self) -> None:
+    def test_evaluate_observed_runtime_feedback_requires_improvement_decision(
+        self,
+    ) -> None:
         """Observed user feedback should not pass with all improvements not applicable."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
@@ -1239,7 +1165,9 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
-            self.assertIn("ruff code_checker=fail missing validation-failure", result.stdout)
+            self.assertIn(
+                "ruff code_checker=fail missing validation-failure", result.stdout
+            )
             self.assertIn("intent_preservation=<canonical_slug>", result.stdout)
 
     def test_evaluate_missing_validation_failure_observation_fails(self) -> None:
@@ -1317,7 +1245,11 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """Deletion, simplification, and validation downscope require escalation."""
-        forbidden_tokens = ("test_deleted=", "behavior_simplified=", "validation_downscope=")
+        forbidden_tokens = (
+            "test_deleted=",
+            "behavior_simplified=",
+            "validation_downscope=",
+        )
         for token in forbidden_tokens:
             with self.subTest(token=token), tempfile.TemporaryDirectory() as tmp_dir:
                 report_dir = Path(tmp_dir) / "run"

@@ -7,7 +7,6 @@ import json
 import hashlib
 import os
 import shutil
-import subprocess
 import sys
 import tarfile
 from pathlib import Path
@@ -1504,17 +1503,9 @@ def main(argv: list[str]) -> int:
             eval_failed = os.environ.get("FAKE_EVAL_FAIL") == "1"
             (exchange / "eval-results").mkdir(parents=True, exist_ok=True)
             families = {
-                "skill-workflow-prompt": (
-                    "skill-eval-20260101T000000000000Z-0123456789-pass-bootstrap.md",
-                    f"EVAL_RUN_ID=skill-{run_id}\n",
-                ),
                 "workflow-selection": (
                     "workflow-selection-eval-20260101T000000000000Z-0123456789-pass.md",
                     f"WORKFLOW_SELECTION_EVAL_RUN_ID=workflow-{run_id}\n",
-                ),
-                "report-quality": (
-                    "report-quality-eval-20260101T000000000000Z-0123456789-pass.md",
-                    f"REPORT_QUALITY_EVAL_RUN_ID=quality-{run_id}\n",
                 ),
                 "codex-agent-role": (
                     "codex-agent-role-eval-20260101T000000000000Z-0123456789-pass.md",
@@ -1538,25 +1529,17 @@ def main(argv: list[str]) -> int:
                 f"stdout=tasks/{run_id}/logs/01-codex-agent-role.stdout.txt:"
                 f"stderr=tasks/{run_id}/logs/01-codex-agent-role.stderr.txt"
             )
-            for name in (
-                "skill-workflow-prompt",
-                "workflow-selection",
-                "report-quality",
-            ):
+            for name in ("workflow-selection",):
                 print(
                     "ACCUMULATED_AGENT_EVAL_PRODUCER="
                     f"{name}:{producer_status}:"
                     f"stdout=tasks/{run_id}/logs/{name}.stdout.txt:"
                     f"stderr=tasks/{run_id}/logs/{name}.stderr.txt"
                 )
-            print("ACCUMULATED_AGENT_EVAL_PRODUCERS=4")
+            print("ACCUMULATED_AGENT_EVAL_PRODUCERS=2")
             print(
                 "ACCUMULATED_AGENT_EVAL_FAILED="
-                + (
-                    "codex-agent-role,skill-workflow-prompt,workflow-selection,report-quality"
-                    if eval_failed
-                    else "-"
-                )
+                + ("codex-agent-role,workflow-selection" if eval_failed else "-")
             )
             print(f"ACCUMULATED_AGENT_EVAL={'fail' if eval_failed else 'pass'}")
             return 1 if eval_failed else 0
