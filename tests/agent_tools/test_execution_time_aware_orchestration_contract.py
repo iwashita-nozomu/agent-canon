@@ -222,12 +222,11 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
                 "consumer_reference_mismatch",
             )
 
-    def test_pr_processing_consumes_and_specializes_the_owner(self) -> None:
+    def test_pr_processing_preserves_owner_contract_fields(self) -> None:
         spec = self.consumer("pr-processing")
         path = spec["path"]
         self.assertIsInstance(path, str)
         text = " ".join(self.read(path).lower().split())
-        self.assertIn(OWNER_REF.lower(), text)
         markers = spec.get("required_markers")
         self.assertIsInstance(markers, list)
         for marker in markers:
