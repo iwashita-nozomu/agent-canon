@@ -20,8 +20,9 @@ downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_
   から実行と検証が完結する構造へそろえます。
 - Use When: runtime image、dependency、CI、Dev Container、Compose、container profile、
   environment compatibility guidance を変更するときに使います。
-- Section path: Expected Structure を判断の起点にし、Required Change Fields、
-  Operating Rules、Validation、Completion の順で閉じます。
+- Section path: Expected Structure defines the environment outcome. Select the
+  change fields, owner routes, and validation that match the affected image,
+  dependency, runtime wiring, or documentation surface.
 - Boundary: source、data、model、credential、GPU driver/device などの runtime input は
   image 外に置けますが、標準環境の構築には使いません。
 
@@ -92,14 +93,11 @@ CIで同じimageとtest commandを再利用できる状態にします。
 
 ## Required Change Fields
 
-- canonical image targetとprofile
-- profileごとのcanonical full test command
-- imageへ含めるruntime/build/test dependency
-- image外に残すsource/data/model/credential/device等のruntime input
-- Dev Container、Compose、CIが参照する同一image target
-- Dockerfile外installerを削除する変更面
-- 置換する旧環境・専用資源、必要データの移行先、削除確認
-- validation commandと失敗時の復旧方法（旧環境の温存ではなく正本から再構築）
+Record the fields that apply to this change: the affected image target/profile
+and command, dependencies versus runtime inputs, consumers that select the
+target, any installer or superseded environment being removed, and the
+validation/recovery route. Do not create placeholder values for unaffected
+profiles, consumers, or retired resources.
 
 ## Operating Rules
 
@@ -122,7 +120,9 @@ CIで同じimageとtest commandを再利用できる状態にします。
   先に実行します。経路・空き確認は実失敗に関係する場合だけ行います。
   通常実行に専用admissionやJAX/XLA設定を要求せず、排他予約が必要な場合だけ
   同skillの任意経路を選びます。
-- Dockerfile、Dev Container、Compose、CI、READMEの project image target と command を同じ変更でそろえます。
+- When a changed target or command is referenced by the Dockerfile, Dev
+  Container, Compose, CI, or README, update the affected consumers to the same
+  contract. Do not edit unrelated references or consumers.
 - Project runners reuse the image tag selected by the current environment owner and
   runtime pack across checkouts. They perform one native local-tag presence lookup;
   a missing tag is built with the builder's normal cache, while an explicit
@@ -159,8 +159,9 @@ image buildや実機acceptanceを実施したとは報告しません。
 - 変更の影響を受けるsupported profileを検証します。未使用profileの整備を開始条件にしません。
 - GPU deviceを必要とするtestはGPU runner上で実行し、対象commandが実際にGPU backendを
   使用したことを確認します。JAXのbackend確認はJAXを使用する場合だけ行います。
-- focused policy testで、Dockerfile外のdependency導入とDev Container/CIのalternate
-  environment constructionを拒否します。
+- When a code or policy change affects the environment construction rule, use
+  its focused policy test for Dockerfile-external dependency installation and
+  alternate environment construction.
 - 文書変更はrepositoryのcanonical docs checkで検証します。
 
 ## Completion
