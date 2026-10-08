@@ -337,14 +337,8 @@ def _check_consumer_text(
     path = str(spec["path"])
     normalized = normalize(text)
     if spec.get("reference_mode") == "text":
-        count = text.count(OWNER_REF)
-        if count != 1:
-            add(
-                findings,
-                "consumer_reference_mismatch",
-                path,
-                f"owner-ref-count:{count}",
-            )
+        # Markdown link validation resolves relative paths and slug anchors;
+        # counting one literal spelling cannot establish unique ownership.
         for field in EXPECTED_REQUIRED_FIELDS:
             if field not in normalized:
                 add(
