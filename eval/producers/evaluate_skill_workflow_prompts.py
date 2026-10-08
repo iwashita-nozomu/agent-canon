@@ -4,8 +4,8 @@
 # responsibility Evaluates skill and workflow prompt surfaces against frozen prompt evals.
 # upstream design ../../eval/definitions/README.md prompt eval directory contract
 # upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml default prompt eval manifest
-# upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
-# upstream implementation ./runtime_artifacts.py owns external prompt-eval artifact writes
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves accumulated eval archive paths
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external prompt-eval artifact writes
 # upstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py owns canonical monitoring appends
 # downstream implementation ../../tests/agent_tools/test_evaluate_skill_workflow_prompts.py tests it
 # @dependency-end

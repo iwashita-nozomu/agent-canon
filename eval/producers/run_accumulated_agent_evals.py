@@ -11,8 +11,8 @@
 # upstream implementation ./evaluate_skill_workflow_prompts.py writes skill and workflow prompt eval reports
 # upstream implementation ./evaluate_workflow_selection.py writes workflow selection eval reports
 # upstream implementation ./evaluate_report_quality.py writes report quality eval reports
-# downstream implementation ../ci/check_agent_canon_pr.sh runs producers before accumulation validation
-# downstream implementation ../ci/run_all_checks.sh runs producers before accumulation validation
+# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh runs producers before accumulation validation
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs producers before accumulation validation
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs producers before accumulation validation
 # downstream implementation ../../tests/agent_tools/test_run_accumulated_agent_evals.py validates command construction and log writeout
 # @dependency-end

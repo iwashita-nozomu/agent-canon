@@ -2,13 +2,13 @@
 # @dependency-start
 # contract implementation
 # responsibility Owns the typed declarative dependency plan, merge, and image receipt installer.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap manifest and image lifecycle
-# upstream design ../../CONTAINER_OPERATIONS.md shared tool-runtime and project execution boundary
-# upstream design ../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
-# downstream environment ../../bootstrap/container/image/dependencies.toml AgentCanon shared tool records
-# downstream implementation ../../bootstrap/container/image/Dockerfile image installation and receipt verification
-# downstream implementation ../../tools/validation/dependencies/docker_dependency_validator.sh no-install validation route
-# downstream implementation ../../tests/agent_tools/test_devcontainer_dependencies.py focused model and security tests
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap manifest and image lifecycle
+# upstream design ../../../CONTAINER_OPERATIONS.md shared tool-runtime and project execution boundary
+# upstream design ../../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
+# downstream environment ../../../bootstrap/container/image/dependencies.toml AgentCanon shared tool records
+# downstream implementation ../../../bootstrap/container/image/Dockerfile image installation and receipt verification
+# downstream implementation ../../validation/dependencies/docker_dependency_validator.sh no-install validation route
+# downstream implementation ../../../tests/agent_tools/test_devcontainer_dependencies.py focused model and security tests
 # @dependency-end
 """Compatibility implementation for the typed shared dependency planner.
 

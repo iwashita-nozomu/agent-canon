@@ -4,8 +4,8 @@
 # responsibility Generates bounded PR/manual guidance from private knowledge/feedback, eval, hook, and Issue evidence.
 # upstream design ../../eval/definitions/README.md eval evidence contract
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
-# upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
-# upstream implementation ./historical_skill_usage_reader.py reads archived skill_usage.jsonl read-only
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted archive result paths
+# upstream implementation ../../tools/runtime/archive/historical_skill_usage_reader.py reads archived skill_usage.jsonl read-only
 # upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet storage
 # downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs this on selected PR paths and manual dispatch
 # downstream implementation ../../tests/agent_tools/test_generate_agent_improvement_guide.py tests guide generation

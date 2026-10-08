@@ -2,15 +2,15 @@
 # @dependency-start
 # contract tool
 # responsibility Defines shared tool-path hygiene rules for retired legacy surfaces.
-# upstream design ../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
-# upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
-# downstream implementation ./tool_catalog.py rejects retired legacy catalog paths
-# downstream implementation ./tool_drift.py detects orphaned retired legacy tool files
-# downstream implementation ./vector_search.py excludes retired legacy files from search indexes
-# downstream implementation ../../tests/agent_tools/test_tool_catalog.py validates catalog findings
-# downstream implementation ../../tests/agent_tools/test_tool_drift.py validates orphan detection
-# downstream implementation ../../tests/agent_tools/test_vector_search.py validates search exclusion
-# downstream implementation ../../tests/agent_tools/test_search.py validates search-card pruning
+# upstream design ../../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
+# upstream design ../../catalog.yaml structured AgentCanon tool catalog
+# downstream implementation ../manifest/tool_catalog.py rejects retired legacy catalog paths
+# downstream implementation ../../validation/semantic/tools/tool_drift.py detects orphaned retired legacy tool files
+# downstream implementation ../../analysis/search/vector_search.py excludes retired legacy files from search indexes
+# downstream implementation ../../../tests/agent_tools/test_tool_catalog.py validates catalog findings
+# downstream implementation ../../../tests/agent_tools/test_tool_drift.py validates orphan detection
+# downstream implementation ../../../tests/agent_tools/test_vector_search.py validates search exclusion
+# downstream implementation ../../../tests/agent_tools/test_search.py validates search-card pruning
 # @dependency-end
 """Shared path policy for retired AgentCanon tool surfaces."""
 

@@ -91,8 +91,11 @@ research, or specialist routes only when their conditions apply. AgentCanon sour
 maintenance does not authorize editing a consumer's generated instructions.
 
 Continue through required implementation, migration, retirement, verification,
-and authorized delivery. A checkpoint or draft PR is not completion. Honor an
-explicit step boundary or pause. If blocked, identify the failed operation,
+and authorized delivery. For an authorized implementation or repair request,
+include pre-existing failures within its scope in the required work; diagnosis
+alone does not complete the request, and skipped or no-op checks do not establish
+runtime behavior. A checkpoint or draft PR is not completion. Honor an explicit
+step boundary or pause. If blocked, identify the failed operation,
 unverified property, and next owner/action, and finish independent required work.
 
 Consider commit and push separately, preserving mixed work and publication scope.

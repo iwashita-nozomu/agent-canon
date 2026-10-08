@@ -2,16 +2,16 @@
 # @dependency-start
 # contract tool
 # responsibility Resolves AgentCanon runtime hook and eval archive paths without mutating repositories.
-# upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
-# downstream implementation ../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
-# downstream implementation ./generate_agent_improvement_guide.py reads mounted hook log archives
+# upstream design ../../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
+# downstream implementation ../../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
+# downstream implementation ../../../eval/producers/generate_agent_improvement_guide.py reads mounted hook log archives
 # downstream implementation ./export_codex_runtime_summary.py writes bounded Codex runtime summaries
-# downstream implementation ./eval_accumulation_check.py validates mounted hook log archives
+# downstream implementation ../../../eval/checkers/eval_accumulation_check.py validates mounted hook log archives
 # downstream implementation ./runtime_log_archive_git.py archives run-bundle agent reports
-# downstream implementation ./evaluate_skill_workflow_prompts.py writes accumulated eval reports through this resolver
-# downstream implementation ./evaluate_workflow_selection.py writes accumulated eval reports through this resolver
-# downstream implementation ./evaluate_report_quality.py writes accumulated eval reports through this resolver
-# downstream implementation ./evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver
+# downstream implementation ../../../eval/producers/evaluate_skill_workflow_prompts.py writes accumulated eval reports through this resolver
+# downstream implementation ../../../eval/producers/evaluate_workflow_selection.py writes accumulated eval reports through this resolver
+# downstream implementation ../../../eval/producers/evaluate_report_quality.py writes accumulated eval reports through this resolver
+# downstream implementation ../../../eval/producers/evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver
 # downstream implementation ./runtime_log_archive_git.py copies agent reports into this archive
 # @dependency-end
 """Resolve AgentCanon runtime log and eval archive paths."""

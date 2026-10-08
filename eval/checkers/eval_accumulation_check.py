@@ -6,9 +6,9 @@
 # upstream design ../../eval/definitions/eval_result_families.toml eval family artifact registry
 # upstream design ../../documents/runtime/runtime-log-archive.md eval and hook result archive contract
 # upstream design ../../documents/runtime/runtime-log-archive-migration.md legacy in-tree result migration contract
-# upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
-# upstream implementation ./runtime_artifacts.py owns the external artifact boundary
-# upstream implementation ./prompt_capture.py owns prompt secret redaction patterns
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted archive result paths
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns the external artifact boundary
+# upstream implementation ../../tools/agent/orchestration/prompt_capture.py owns prompt secret redaction patterns
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs eval accumulation checks

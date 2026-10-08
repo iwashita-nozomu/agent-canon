@@ -2,15 +2,15 @@
 # @dependency-start
 # contract tool
 # responsibility Rejects mechanically regenerated report artifacts left in the source tree.
-# upstream design ../../documents/design/request-intent-and-update-relation.md generated-artifact guard readback projection
-# upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md canonical artifact placement policy
-# upstream design ../../templates/agents/closeout_gate.md closeout evidence template
-# upstream design ../../tools/README.md shared tool index
-# upstream design ../../documents/tools/README.md user-facing tool index
-# upstream design ../../tools/catalog.yaml structured tool catalog
+# upstream design ../../../documents/design/request-intent-and-update-relation.md generated-artifact guard readback projection
+# upstream design ../../../agents/canonical/ARTIFACT_PLACEMENT.md canonical artifact placement policy
+# upstream design ../../../templates/agents/closeout_gate.md closeout evidence template
+# upstream design ../../README.md shared tool index
+# upstream design ../../../documents/tools/README.md user-facing tool index
+# upstream design ../../catalog.yaml structured tool catalog
 # upstream implementation ./report_artifact_checks.py classifies generated report paths
-# downstream implementation ../ci/check_agent_canon_pr.sh runs this guard in PR validation
-# downstream implementation ../../tests/agent_tools/test_generated_artifact_guard.py verifies guard behavior
+# downstream implementation ../../validation/ci/checks/check_agent_canon_pr.sh runs this guard in PR validation
+# downstream implementation ../../../tests/agent_tools/test_generated_artifact_guard.py verifies guard behavior
 # @dependency-end
 """Fail when mechanically regenerated report artifacts remain in the tree."""
 

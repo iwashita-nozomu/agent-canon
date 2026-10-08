@@ -1427,6 +1427,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     stage = tmp_path / "stage"
     codex_stage = tmp_path / "codex-stage"
     guide_stage = tmp_path / "guide-stage"
+    dashboard_stage = tmp_path / "dashboard-stage"
     volume_root = tmp_path / "volume"
     fake_install = tmp_path / "fake-install"
     control.mkdir()
@@ -1434,6 +1435,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     stage.mkdir()
     codex_stage.mkdir()
     guide_stage.mkdir()
+    dashboard_stage.mkdir()
     (fake_install / ".codex" / "personal" / "skills" / "managed").mkdir(parents=True)
     (fake_install / ".codex" / "config.toml").write_text("config\n", encoding="utf-8")
     (
@@ -1543,6 +1545,107 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert (guide_stage / "agent-improvement-guide-123-1.md").read_text(
         encoding="utf-8"
     ) == "# guide\n"
+    dashboard_source = (
+        volume_root
+        / "runtime"
+        / "reports"
+        / "agent-runtime-dashboard"
+        / "agent-runtime-dashboard-123-1.md"
+    )
+    dashboard_source.parent.mkdir(parents=True)
+    dashboard_source.write_text("# dashboard\n", encoding="utf-8")
+    dashboard_target = dashboard_stage / "agent-runtime-dashboard-123-1.md"
+    dashboard_target.write_text("# stale dashboard\n", encoding="utf-8")
+    dashboard_sentinel = dashboard_stage / "keep.txt"
+    dashboard_sentinel.write_text("preserve me\n", encoding="utf-8")
+    dashboard_export = subprocess.run(
+        [
+            "bash",
+            "-c",
+            common
+            + (
+                f"_agent_canon_volume_copy export dashboard "
+                f"{str(dashboard_stage)!r} 123-1"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_VOLUME_NAME": volume_name,
+            "FAKE_VOLUME_ROOT": str(volume_root),
+        },
+    )
+    assert dashboard_export.returncode == 0, dashboard_export.stderr
+    assert (
+        dashboard_target.read_text(encoding="utf-8") == "# dashboard\n"
+    )
+    assert dashboard_sentinel.read_text(encoding="utf-8") == "preserve me\n"
+    bad_dashboard_stage = tmp_path / "bad-dashboard-stage"
+    bad_dashboard_stage.mkdir()
+    bad_dashboard_source = dashboard_source.parent / "agent-runtime-dashboard-bad.md"
+    bad_dashboard_source.symlink_to(dashboard_source)
+    bad_dashboard_export = subprocess.run(
+        [
+            "bash",
+            "-c",
+            common
+            + (
+                f"_agent_canon_volume_copy export dashboard "
+                f"{str(bad_dashboard_stage)!r} bad"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_VOLUME_NAME": volume_name,
+            "FAKE_VOLUME_ROOT": str(volume_root),
+        },
+    )
+    assert bad_dashboard_export.returncode == 2
+    assert json.loads(bad_dashboard_export.stderr)["code"] == "volume_copy_failed"
+    assert not (bad_dashboard_stage / "agent-runtime-dashboard-bad.md").exists()
+
+    dashboard_destination = control / "dashboard-route"
+    dashboard_route = subprocess.run(
+        [
+            "bash",
+            "-c",
+            " ".join(
+                (
+                    f"source {str(ADAPTER)!r};",
+                    f"AGENT_CANON_DOCKER={str(docker)!r};",
+                    f"AGENT_CANON_DOCKER_CMD={str(docker)!r};",
+                    "_agent_canon_prepare_host_runtime() {",
+                    f"AGENT_CANON_STATE_ROOT={str(runtime)!r};",
+                    f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r};",
+                    "export AGENT_CANON_STATE_ROOT AGENT_CANON_STATE_VOLUME_NAME;",
+                    "};",
+                    "_agent_canon_volume_copy() { "
+                    "printf 'route=%s|%s|%s|%s\\n' \"$@\"; };",
+                    "_agent_canon_use_active_image() { :; };",
+                    "_agent_canon_ensure_container() { printf fake-container; };",
+                    "_agent_canon_rewrite_target_args() { :; };",
+                    f"bootstrap_host_entrypoint {str(fake_install)!r}",
+                    f"--control-parent-root {str(control)!r}",
+                    "tool export dashboard --destination",
+                    f"{str(dashboard_destination)!r} --run-id 123-1",
+                )
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert dashboard_route.returncode == 0, dashboard_route.stderr
+    assert (
+        f"route=export|dashboard|{dashboard_destination}|123-1"
+        in dashboard_route.stdout
+    )
+
     outside = tmp_path / "outside-guide"
     outside.mkdir()
     sentinel = outside / "sentinel"
@@ -1675,6 +1778,41 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert rejected.returncode == 2
     assert json.loads(rejected.stderr)["code"] == "volume_copy_failed"
     assert codex_stage.is_dir()
+
+
+def test_failed_eval_collection_still_exports_its_spool(tmp_path: Path) -> None:
+    """Producer failure retains the diagnostic spool through the typed export."""
+    repository = tmp_path / "repository"
+    control = tmp_path / "control"
+    route_log = tmp_path / "volume-copy-route.txt"
+    repository.mkdir()
+    control.mkdir()
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_DOCKER=/bin/false
+export AGENT_CANON_DOCKER
+_agent_canon_use_active_image() {{ :; }}
+_agent_canon_ensure_container() {{ printf fake-container; }}
+_agent_canon_rewrite_target_args() {{ :; }}
+_agent_canon_volume_copy() {{
+  printf '%s\\t%s\\t%s\\t%s\\n' "$@" >> {str(route_log)!r}
+}}
+bootstrap_host_entrypoint {str(repository)!r} \\
+  --control-parent-root {str(control)!r} \\
+  eval collect --root {str(repository)!r} --run-id failed-run
+printf 'result=%s\\n' "$?"
+"""
+    result = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "result=1" in result.stdout
+    assert (
+        f"export\teval\t{control / '.runtime' / 'container-state' / 'spool'}"
+        "\tfailed-run\n"
+    ) in route_log.read_text(encoding="utf-8")
 
 
 def test_volume_export_digest_corruption_is_rejected(tmp_path: Path) -> None:

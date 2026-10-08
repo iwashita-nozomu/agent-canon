@@ -834,7 +834,7 @@ printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ) || init_rc=$?
 _agent_canon_apply_volume_export() (
   set -e
   local kind=$1 host_path=$2 relative=$3 stream_path=$4 expected_digest=$5
-  local temporary member_list member relative_path source_digest name staged target
+  local temporary member_list member relative_path source_digest name staged target dashboard_name dashboard_staged
   local backup_root= transaction_target= transaction_backup= transaction_kind= transaction_had_old=0
   cleanup_export() {
     local cleanup_rc=$?
@@ -853,8 +853,13 @@ _agent_canon_apply_volume_export() (
         mv -- "$transaction_backup" "$transaction_target" || true
       fi
     fi
-    rm -f -- "${member_list:-}" "${stream_path:-}"
-    rm -rf -- "${temporary:-}" "${backup_root:-}"
+    if [[ -n "${member_list:-}" || -n "${stream_path:-}" ||
+          -n "${dashboard_staged:-}" ]]; then
+      rm -f -- "${member_list:-}" "${stream_path:-}" "${dashboard_staged:-}"
+    fi
+    if [[ -n "${temporary:-}" || -n "${backup_root:-}" ]]; then
+      rm -rf -- "${temporary:-}" "${backup_root:-}"
+    fi
     exit "$cleanup_rc"
   }
   trap cleanup_export EXIT
@@ -1041,6 +1046,32 @@ _agent_canon_apply_volume_export() (
         return 2
       }
       ;;
+    dashboard)
+      dashboard_name="agent-runtime-dashboard-${relative}.md"
+      [[ -f "$temporary/$dashboard_name" && ! -L "$temporary/$dashboard_name" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "runtime dashboard report is missing or invalid"
+      }
+      target="$host_path/$dashboard_name"
+      if [[ -e "$target" || -L "$target" ]]; then
+        [[ -f "$target" && ! -L "$target" ]] || {
+          _agent_canon_json_error volume_export_destination_invalid "runtime dashboard target is not a regular file"
+          return 2
+        }
+      fi
+      dashboard_staged=$(mktemp "$host_path/.agent-canon-dashboard.XXXXXX") || {
+        _agent_canon_json_error volume_export_failed "runtime dashboard staging file could not be created"
+        return 2
+      }
+      cp --preserve=mode,timestamps -- "$temporary/$dashboard_name" "$dashboard_staged" || {
+        _agent_canon_json_error volume_export_failed "runtime dashboard report could not be staged"
+        return 2
+      }
+      source_digest=$(_agent_canon_sha256 "$dashboard_staged") || {
+        _agent_canon_json_error volume_export_failed "runtime dashboard staged digest could not be computed"
+        return 2
+      }
+      ;;
     guide)
       [[ -d "$temporary/agent-improvement-guide" && ! -L "$temporary/agent-improvement-guide" ]] || {
         rm -rf -- "$temporary"
@@ -1129,8 +1160,27 @@ _agent_canon_apply_volume_export() (
     _agent_canon_json_error volume_copy_failed "volume export digest readback differs"
     return 2
   }
-  finish_transaction
-  rm -rf -- "$temporary"
+  if [[ "$kind" == dashboard ]]; then
+    if ! rm -f -- "$member_list" "$stream_path"; then
+      _agent_canon_json_error volume_export_failed "runtime dashboard staging cleanup failed"
+      return 2
+    fi
+    member_list=
+    stream_path=
+    if ! rm -rf -- "$temporary"; then
+      _agent_canon_json_error volume_export_failed "runtime dashboard extraction cleanup failed"
+      return 2
+    fi
+    temporary=
+    mv -fT -- "$dashboard_staged" "$target" || {
+      _agent_canon_json_error volume_export_failed "runtime dashboard report could not be published"
+      return 2
+    }
+    dashboard_staged=
+  else
+    finish_transaction
+    rm -rf -- "$temporary"
+  fi
 )
 
 _agent_canon_volume_copy() {
@@ -1146,7 +1196,7 @@ _agent_canon_volume_copy() {
   fi
   [[ "$kind" == mount-registry || "$kind" == host-mounts ||
      "$kind" == private-log || "$kind" == codex-home || "$kind" == projection ||
-     "$kind" == eval || "$kind" == guide ||
+     "$kind" == eval || "$kind" == dashboard || "$kind" == guide ||
      "$kind" == private-feedback ]] ||
     _agent_canon_json_error volume_copy_invalid "volume copy kind is not allowlisted"
   if [[ "$direction" == import ]]; then
@@ -1156,7 +1206,7 @@ _agent_canon_volume_copy() {
     mkdir -p -- "$host_path" ||
       _agent_canon_json_error volume_copy_destination_invalid "volume copy destination is unavailable: $kind"
   fi
-  if [[ "$kind" == eval || "$kind" == private-feedback ]]; then
+  if [[ "$kind" == eval || "$kind" == dashboard || "$kind" == private-feedback ]]; then
     [[ "$relative" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
       _agent_canon_json_error volume_copy_invalid "volume copy relative ID is invalid"
   fi
@@ -1345,6 +1395,12 @@ else
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 74
       source_digest=$(tree_digest "$source")
       tar -cf - -C "$root/spool" "$relative" ;;
+    dashboard)
+      dashboard_name="agent-runtime-dashboard-$relative.md"
+      source="$root/runtime/reports/agent-runtime-dashboard/$dashboard_name"
+      [ -f "$source" ] && [ ! -L "$source" ] || exit 80
+      source_digest=$(file_digest "$source")
+      tar -cf - -C "$root/runtime/reports/agent-runtime-dashboard" "$dashboard_name" ;;
     guide)
       source="$root/runtime/reports/agent-improvement-guide"; [ -d "$source" ] && [ ! -L "$source" ] || exit 80
       [ -z "$(find "$source" -type l -print -quit)" ] || exit 81
@@ -4533,8 +4589,9 @@ bootstrap_host_entrypoint() {
       elif [[ "$operation" == tool || "$operation" == template || "$operation" == eval || "$operation" == exec ]]; then
         _agent_canon_rewrite_target_args "${command_args[@]}"
       fi
-      if [[ "$operation" == tool && "${command_args[1]:-}" == export ]]; then
-        [[ "${command_args[2]:-}" == guide && ${#command_args[@]} -eq 5 &&
+      if [[ "$operation" == tool && "${command_args[1]:-}" == export &&
+            "${command_args[2]:-}" == guide ]]; then
+        [[ ${#command_args[@]} -eq 5 &&
            "${command_args[3]:-}" == --destination ]] ||
           _agent_canon_json_error argument_invalid \
             "tool export accepts only guide --destination <host-dir>"
@@ -4554,6 +4611,34 @@ bootstrap_host_entrypoint() {
         _agent_canon_volume_copy export guide "$guide_destination"
         return $?
       fi
+      if [[ "$operation" == tool && "${command_args[1]:-}" == export &&
+            "${command_args[2]:-}" == dashboard ]]; then
+        [[ ${#command_args[@]} -eq 7 &&
+           "${command_args[3]:-}" == --destination &&
+           "${command_args[5]:-}" == --run-id ]] ||
+          _agent_canon_json_error argument_invalid \
+            "tool export dashboard accepts --destination <host-dir> --run-id <id>"
+        local dashboard_destination dashboard_run_id dashboard_relative
+        dashboard_run_id=${command_args[6]}
+        dashboard_destination=$(realpath -m -- "${command_args[4]}" 2>/dev/null) ||
+          _agent_canon_json_error volume_copy_destination_invalid \
+            "runtime dashboard destination could not be canonicalized"
+        dashboard_relative=$(realpath -m --relative-to="$AGENT_CANON_CONTROL_ROOT" \
+          "$dashboard_destination") ||
+          _agent_canon_json_error volume_copy_destination_invalid \
+            "runtime dashboard destination could not be authorized"
+        [[ "$dashboard_relative" != . && "$dashboard_relative" != .. &&
+           "$dashboard_relative" != ../* ]] ||
+          _agent_canon_json_error volume_copy_destination_invalid \
+            "runtime dashboard destination must be a strict control-root descendant"
+        _agent_canon_validate_new_path "$dashboard_destination" "runtime dashboard destination"
+        _agent_canon_volume_copy export dashboard "$dashboard_destination" "$dashboard_run_id"
+        return $?
+      fi
+      if [[ "$operation" == tool && "${command_args[1]:-}" == export ]]; then
+        _agent_canon_json_error argument_invalid \
+          "tool export accepts only guide or dashboard exports"
+      fi
       local output_file error_file rc
       output_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stdout.XXXXXX")
       error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
@@ -4568,7 +4653,7 @@ bootstrap_host_entrypoint() {
       cat "$output_file"
       cat "$error_file" >&2
       rm -f -- "$output_file" "$error_file"
-      if ((rc == 0)) && [[ "$operation" == eval && "${command_args[1]:-}" == collect ]]; then
+      if [[ "$operation" == eval && "${command_args[1]:-}" == collect ]]; then
         local eval_collect_run_id= eval_collect_index=2
         while ((eval_collect_index < ${#command_args[@]})); do
           if [[ "${command_args[eval_collect_index]}" == --run-id &&
@@ -4580,7 +4665,12 @@ bootstrap_host_entrypoint() {
         done
         [[ "$eval_collect_run_id" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
           _agent_canon_json_error argument_missing "eval collect requires a valid --run-id"
-        _agent_canon_volume_copy export eval "$AGENT_CANON_STATE_ROOT/spool" "$eval_collect_run_id" || rc=$?
+        local eval_collect_export_rc=0
+        _agent_canon_volume_copy export eval "$AGENT_CANON_STATE_ROOT/spool" \
+          "$eval_collect_run_id" || eval_collect_export_rc=$?
+        if ((rc == 0 && eval_collect_export_rc != 0)); then
+          rc=$eval_collect_export_rc
+        fi
       fi
       if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then
         _agent_canon_private_feedback_sync "$container" || rc=$?

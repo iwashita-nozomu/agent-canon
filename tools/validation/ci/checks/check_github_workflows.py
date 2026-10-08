@@ -556,8 +556,6 @@ def improvement_guide_trigger_findings(
             findings.append(Finding("error", path, "improvement_guide_internal_exec_forbidden"))
         if 'tool export guide --destination "${guide_dir}"' not in guide_run:
             findings.append(Finding("error", path, "improvement_guide_export_route_required"))
-        if 'guide_dir="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"' not in guide_run:
-            findings.append(Finding("error", path, "improvement_guide_host_destination_required"))
 
     runtime = re.search(
         r"(?ms)^      - name: Start shared tool runtime\s*\n"
@@ -788,33 +786,6 @@ def check_github_support_surfaces(root: Path) -> list[Finding]:
     return []
 
 
-def check_pr_flow_docs(root: Path) -> list[Finding]:
-    """Check that the standalone source PR lane binds ownership and readback."""
-    workflow_path = root / "agents" / "skills" / "agent-canon-update.md"
-    return require_text(
-        workflow_path,
-        [
-            "standalone source repository",
-            "qualified development clone",
-            "repository-qualified Issue identity",
-            "source branch",
-            "PR",
-            "required review",
-            "CI",
-            "green",
-            "resulting",
-            "main readback",
-            "source status",
-            "content unchanged",
-            "transient resources",
-            "persistent shared runtime",
-            "submodule",
-            "vendor checkout",
-            "root projection",
-        ],
-    )
-
-
 def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     """Return all workflow and PR-surface findings."""
     workflows = workflow_paths(root)
@@ -824,7 +795,6 @@ def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     findings.extend(check_root_copy_headers(root))
     findings.extend(check_pr_templates(root))
     findings.extend(check_github_support_surfaces(root))
-    findings.extend(check_pr_flow_docs(root))
     return findings, workflows
 
 

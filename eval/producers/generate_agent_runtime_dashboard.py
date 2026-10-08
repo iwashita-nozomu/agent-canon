@@ -6,7 +6,7 @@
 # upstream design ../../documents/runtime/runtime-log-archive.md eval and hook result storage contract
 # upstream design ../../references/README.md external-source capture and Markdown retention contract
 # upstream implementation ./generate_agent_improvement_guide.py summarizes hook, private knowledge/feedback, eval, and Issue evidence
-# upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted archive result paths
 # downstream implementation ../../.github/workflows/agent-runtime-dashboard.yml publishes standalone AgentCanon dashboards
 # downstream implementation ../../tests/agent_tools/test_generate_agent_runtime_dashboard.py tests dashboard rendering
 # @dependency-end

@@ -4,12 +4,12 @@
 # responsibility Evaluates Codex subagent role configuration, routing, model settings, and runtime metrics.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../eval/definitions/README.md eval directory contract
-# upstream implementation ./team_config.py loads team and task routing metadata
-# upstream implementation ./implementation_dispatch.py owns capacity and wave routing
-# upstream implementation ./model_profile_registry.py owns canonical model/profile expectations
-# upstream implementation ./capacity_handshake.py owns typed capacity provenance
-# upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
-# upstream implementation ./runtime_artifacts.py owns external role-eval artifact writes
+# upstream implementation ../../tools/agent/orchestration/team_config.py loads team and task routing metadata
+# upstream implementation ../../tools/agent/orchestration/implementation_dispatch.py owns capacity and wave routing
+# upstream implementation ../../tools/agent/orchestration/model_profile_registry.py owns canonical model/profile expectations
+# upstream implementation ../../tools/agent/orchestration/capacity_handshake.py owns typed capacity provenance
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves accumulated eval archive paths
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external role-eval artifact writes
 # downstream implementation ../../tests/agent_tools/test_evaluate_codex_agent_roles.py tests role eval behavior
 # @dependency-end
 """Evaluate Codex custom agent role definitions and routing policy."""

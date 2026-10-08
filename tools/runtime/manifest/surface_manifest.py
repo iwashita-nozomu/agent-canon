@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Parses and validates AgentCanon-owned standalone runtime surface classification.
-# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md bootstrap runtime surface policy
-# upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable runtime inventory
-# upstream implementation ./skill_projection_registry.py resolves generated skill-view owner paths
-# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs consumes normalized source classification
-# downstream implementation ./check_convention_compliance.py validates runtime catalog wiring
+# upstream design ../../../documents/runtime/SHARED_RUNTIME_SURFACES.md bootstrap runtime surface policy
+# upstream design ../../../documents/runtime/shared-runtime-surfaces.toml machine-readable runtime inventory
+# upstream implementation ../../agent/skills/skill_projection_registry.py resolves generated skill-view owner paths
+# downstream implementation ../dispatch/agent-canon/src/dependency_manifest.rs consumes normalized source classification
+# downstream implementation ../../validation/semantic/convention/check_convention_compliance.py validates runtime catalog wiring
 # @dependency-end
 """Parse AgentCanon standalone runtime-surface classification metadata.
 

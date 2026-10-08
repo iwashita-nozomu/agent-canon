@@ -44,27 +44,14 @@ def create_remote(tmp_path: Path) -> Path:
     subprocess.run(
         ["git", "init", "-b", "main", str(source)], check=True, capture_output=True
     )
+    run_git(source, "config", "user.name", "Test")
+    run_git(source, "config", "user.email", "test@example.invalid")
     (source / "README.md").write_text("source\n", encoding="utf-8")
     run_git(source, "add", "README.md")
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(source),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "-m",
-            "initial",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    run_git(source, "commit", "-m", "initial")
     run_git(source, "remote", "add", "origin", str(remote))
     run_git(source, "push", "origin", "main")
+    run_git(remote, "symbolic-ref", "HEAD", "refs/heads/main")
     return remote
 
 
@@ -124,6 +111,7 @@ def create_parent(
     )
     run_git(parent_source, "remote", "add", "origin", str(parent_remote))
     run_git(parent_source, "push", "origin", "main")
+    run_git(parent_remote, "symbolic-ref", "HEAD", "refs/heads/main")
     selected = tmp_path / "host" / "parent"
     selected.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(

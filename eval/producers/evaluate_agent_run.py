@@ -5,8 +5,8 @@
 # upstream design ../../agents/skills/agent-learning.md behavior feedback
 # upstream design ../../templates/agents/agent_evaluation.md defines evaluation artifact shape
 # upstream design ../../templates/agents/workflow_monitoring.md monitoring evidence
-# upstream implementation ./report_artifact_checks.py validates schedule and work log completeness
-# upstream implementation ./runtime_artifacts.py owns external evaluation artifact writes
+# upstream implementation ../../tools/runtime/artifacts/report_artifact_checks.py validates schedule and work log completeness
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external evaluation artifact writes
 # downstream implementation ../../tests/agent_tools/test_evaluate_agent_run.py verifies scoring
 # @dependency-end
 """Evaluate one run bundle and write actionable agent feedback."""

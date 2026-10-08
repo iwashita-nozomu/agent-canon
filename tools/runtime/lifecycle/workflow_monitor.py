@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Appends workflow monitoring evidence to run bundles.
-# upstream design ../../templates/agents/workflow_monitoring.md defines monitor sections
-# upstream implementation ./work_log.py owns canonical semantic-ledger append/read
-# upstream implementation ./mid_task_user_input_policy.py defines mid-task user input evidence policy
-# upstream implementation ./work_log.py appends canonical logical-ledger events
+# upstream design ../../../templates/agents/workflow_monitoring.md defines monitor sections
+# upstream implementation ../archive/work_log.py owns canonical semantic-ledger append/read
+# upstream implementation ../../agent/orchestration/mid_task_user_input_policy.py defines mid-task user input evidence policy
+# upstream implementation ../archive/work_log.py appends canonical logical-ledger events
 # upstream implementation ./update_lifecycle_contract.py owns update states and evidence identity.
-# downstream implementation ../../tests/agent_tools/test_workflow_monitor.py tests it
+# downstream implementation ../../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
 

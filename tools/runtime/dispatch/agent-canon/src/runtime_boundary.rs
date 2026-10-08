@@ -16,6 +16,27 @@ pub(crate) fn runtime_root_is_explicit() -> bool {
     env::var_os(RUNTIME_ROOT_ENV).is_some_and(|value| !value.is_empty())
 }
 
+#[cfg(test)]
+pub(crate) fn test_runtime_root_path(source_root: &Path) -> Result<PathBuf, String> {
+    let source = fs::canonicalize(source_root).map_err(|error| {
+        format!(
+            "canonicalize source root {}: {error}",
+            source_root.display()
+        )
+    })?;
+    Ok(test_runtime_root_for_source(&source))
+}
+
+#[cfg(test)]
+fn test_runtime_root_for_source(source: &Path) -> PathBuf {
+    let digest = Sha256::digest(source.to_string_lossy().as_bytes());
+    let key = digest[..8]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    env::temp_dir().join(format!("agent-canon-test-runtime-{key}"))
+}
+
 fn absolute(path: &Path) -> Result<PathBuf, String> {
     if path.is_absolute() {
         Ok(path.to_path_buf())
@@ -43,10 +64,20 @@ fn canonical_existing_parent(path: &Path) -> Result<PathBuf, String> {
 /// use a deterministic temporary root so that existing pure Rust fixtures can
 /// continue to exercise the public command semantics without writing source.
 pub(crate) fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String> {
-    let requested = env::var_os(RUNTIME_ROOT_ENV)
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from);
-    resolve_runtime_root_at(source_root, requested.as_deref())
+    #[cfg(test)]
+    {
+        // Unit tests use their deterministic fixture root, not the resident
+        // container's inherited runtime root. Explicit test roots use the
+        // resolve_runtime_root_at(..., Some(...)) API below.
+        resolve_runtime_root_at(source_root, None)
+    }
+    #[cfg(not(test))]
+    {
+        let requested = env::var_os(RUNTIME_ROOT_ENV)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from);
+        resolve_runtime_root_at(source_root, requested.as_deref())
+    }
 }
 
 pub(crate) fn resolve_runtime_root_at(
@@ -67,12 +98,7 @@ pub(crate) fn resolve_runtime_root_at(
         None => {
             #[cfg(test)]
             {
-                let digest = Sha256::digest(source.to_string_lossy().as_bytes());
-                let key = digest[..8]
-                    .iter()
-                    .map(|byte| format!("{byte:02x}"))
-                    .collect::<String>();
-                Some(env::temp_dir().join(format!("agent-canon-test-runtime-{key}")))
+                Some(test_runtime_root_for_source(&source))
             }
             #[cfg(not(test))]
             {

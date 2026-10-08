@@ -5,7 +5,7 @@
 # upstream design ../../../agents/skills/catalog.yaml structured command item contract
 # upstream design ../../../tools/catalog.yaml existing tool and dispatch catalog
 # upstream implementation ../../runtime/source/agent_canon_source_root.py source-root resolution
-# downstream implementation ../../../.codex/personal/skills/*/SKILL.md generated command projection
+# downstream implementation skill_projection_registry.py maps generated runtime skill views to canonical skill sources
 # downstream implementation ../../../tests/agent_tools/test_skill_tool_commands.py typed command tests
 # @dependency-end
 """Resolve structured Skill command items and execute native argv plans."""

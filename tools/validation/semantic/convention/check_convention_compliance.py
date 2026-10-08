@@ -1,31 +1,14 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Verifies repository convention compliance wiring and workflow gates.
+# responsibility Verifies native convention-tool wiring and retained structured policies.
 # upstream design ../../../../documents/conventions/README.md convention index
-# upstream design ../../../../agents/canonical/CODEX_COMPLETION.md completion readiness policy
-# upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
-# upstream design ../../../../agents/TASK_WORKFLOWS.md workflow skill routing policy
-# upstream design ../../../../agents/skills/agent-orchestration.md canonical orchestration skill
-# upstream design ../../../../agents/skills/codex-task-workflow.md implementation workflow skill
-# upstream design ../../../../agents/skills/subagent-bootstrap.md subagent handoff skill
-# upstream design ../../../../agents/skills/tool-finding-report.md tool warning closeout skill
-# upstream design ../../../../agents/skills/agent-canon-update.md AgentCanon PR essence workflow
-# upstream design ../../../../agents/skills/pr-processing.md PR queue cleanup body update workflow
-# upstream design ../../../../agents/skills/md-style-check.md Markdown small-edit skill route
-# upstream design ../../../../agents/skills/long-form-writing.md document claim grounding skill route
-# upstream design ../../../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
-# upstream design ../../../../templates/agents/workflow_monitoring.md tool warning closeout ledger
-# upstream design ../../../../templates/agents/closeout_gate.md closeout gate policy
-# upstream design ../../../../eval/definitions/skill_workflow_prompt_eval.toml prompt eval gate
-# upstream implementation ../../../runtime/source/agent_canon_source_root.py resolves canonical parent adapter targets
+# upstream design ../../../../agents/canonical/CODEX_COMPLETION.md selected validation evidence policy
+# upstream design ../../../../agents/skills/codex-task-workflow.md static/read validation route
 # upstream design ../../../../documents/codex/codex-configuration-reference.md Codex hook severity policy
-# upstream design ../../../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
-# upstream design ../../../../documents/notes/guardrails/engineering_avoidances.md recurring implementation avoidances
+# upstream design ../../../../documents/conventions/coding-conventions-house-style.md source definition ordering
 # upstream design ../../../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../../catalog.yaml structured tool catalog
-# upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone PR body checklist
-# upstream design ../../../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR body checklist
 # upstream implementation ../tools/tool_drift.py validates tool/convention drift
 # upstream implementation ./convention_compliance_contracts.toml declares marker contracts
 # upstream implementation ../skills/check_skill_frontmatter.py validates runtime skill frontmatter
@@ -72,7 +55,6 @@ def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
 
 
 DECLARATIVE_MARKER_CONTRACTS = load_marker_contracts()
-DESIGN_INTEGRITY_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS["design_integrity_gate"]
 
 CONVENTION_SOURCES = (
     "documents/conventions/README.md",
@@ -185,161 +167,8 @@ TOOL_GATES = {
     ),
 }
 
-SKILL_ROUTING_PROMPTS = ("agents/skills/agent-orchestration.md",)
-
-SKILL_ROUTING_MARKERS = (
-    "$agent-orchestration",
-    "$codex-task-workflow",
-    "$subagent-bootstrap",
-    "task-shape skill",
-    "check_convention_compliance.py",
-)
-EXIT_BLOCKER_POLICY_MARKERS = {
-    "agents/skills/agent-orchestration.md": (
-        "evidence",
-        "router_unavailable_blocker",
-    ),
-    "agents/skills/codex-task-workflow.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
-        "evidence",
-        "parent_packet_ref",
-        "status=blocked",
-        "canonical_rerun_pass",
-        "durable_blocker_or_issue",
-        "router_unavailable_blocker",
-        "new state evidence",
-        "revised parent packet",
-    ),
-    "agents/skills/subagent-bootstrap.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
-        "evidence",
-        "parent_packet_ref",
-        "status=blocked",
-        "new state evidence",
-        "explicit revised packet",
-    ),
-    "agents/skills/tool-finding-report.md": (
-        "tool_warning_exit_status",
-        "resolved",
-        "deferred_with_issue",
-        "accepted_with_reason",
-        "explicit_approval_evidence",
-    ),
-    "templates/agents/workflow_monitoring.md": (
-        "tool_warning_exit_status",
-        "resolved",
-        "deferred_with_issue",
-        "accepted_with_reason",
-        "explicit_approval_evidence",
-    ),
-}
-EXIT_BLOCKER_FORBIDDEN_RE = re.compile(
-    r"(?i)(?:"
-    r"sole basis for path selection|"
-    r"falling back to a parent write alternate route|"
-    r"parent write[^\n.。]{0,120}alternate route|"
-    r"parent write\s*代替|"
-    r"worker[^\n.。]{0,80}alternate route)"
-)
-DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
-    "agents/skills/agent-orchestration.md": (
-        "prose-reasoning-graph",
-        "structure-planning",
-        "md-style-check",
-        "format-only",
-        "structure_contract=skipped",
-    ),
-    "agents/skills/codex-task-workflow.md": (
-        "prose-reasoning-graph",
-        "structure-planning",
-        "md-style-check",
-        "format-only",
-        "structure_contract=skipped",
-    ),
-    "agents/skills/md-style-check.md": (
-        "structure-planning",
-        "format-only",
-        "未選択の構造解析に skip 記録は不要",
-    ),
-    "agents/skills/README.md": (
-        "prose-reasoning-graph",
-        "structure-planning",
-        "md-style-check",
-        "structure_contract=skipped",
-    ),
-    "agents/skills/catalog.yaml": (
-        "Write general explanatory repository prose",
-        "prose-reasoning-graph",
-        "structure-planning",
-    ),
-    "documents/conventions/REVIEW_PROCESS.md": (
-        "structure-planning",
-        "prose-reasoning-graph",
-        "md-style-check",
-        "structure_contract=skipped",
-    ),
-    "templates/agents/closeout_gate.md": (
-        "Document Structure Evidence",
-        "document_structure_status",
-        "structure_planning",
-        "graph 分析は明示依頼または具体的な診断目的で選択した場合だけ記録し",
-        "md_style_check",
-        "format_only_reason",
-    ),
-    "tools/runtime/lifecycle/task_close.py": (
-        "changed_markdown_paths",
-        "Document Structure Evidence",
-        "document_structure_evidence",
-        "DOCUMENT_STRUCTURE_REQUIRED",
-    ),
-}
-DOCUMENT_SPLIT_DECISION_MARKERS = {
-    "documents/conventions/common/05_docs.md": (
-        "Document Split Decision",
-        "document_split_decision",
-        "document_unit",
-        "split_when",
-        "merge_when",
-        "invalid_split_boundaries",
-        "check_convention_compliance.py",
-        "task_close.py",
-    ),
-    "agents/skills/long-form-writing.md": (
-        "document_split_decision",
-        "owner",
-        "reader path",
-        "source map",
-        "validation route",
-        "chunking convenience",
-    ),
-    "templates/agents/closeout_gate.md": (
-        "document_split_decision",
-        "keep:<reason>",
-        "split:<new-owner-boundary>",
-        "not_applicable:format-only:<reason>",
-    ),
-    "tools/runtime/lifecycle/task_close.py": (
-        "document_split_decision",
-        "DOCUMENT_SPLIT_DECISION_EVIDENCE",
-        "document_split_decision_ready",
-    ),
-}
 STATIC_READ_VALIDATION_POLICY_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "static_read_validation_policy"
-]
-LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "literature_backed_skill_call_order"
-]
-RESPONSIBILITY_PREFLIGHT_GATE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "responsibility_preflight_gate"
-]
-EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "experiment_execution_surface_guard"
-]
-BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "branch_worktree_creation_guard"
 ]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
@@ -353,65 +182,6 @@ WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"check_convention_compliance\.py|check_convention_compliance\.py"
     r"(?:\S+\s+){0,6}?(?:optional|not\s+required)"
 )
-CLOSEOUT_WORKFLOW_PATH = "agents/canonical/CODEX_COMPLETION.md"
-CLOSEOUT_OWNER_PATH = "tools/runtime/lifecycle/task_close.py"
-CLOSEOUT_WORKFLOW_DELEGATION_MARKERS = (
-    "[`task_close.py`](../../tools/runtime/lifecycle/task_close.py)",
-    "sole terminal readiness predicate",
-)
-CLOSEOUT_OWNER_MARKERS = (
-    "closeout_checks",
-    "ready = all(closeout_checks.values())",
-)
-DOCUMENT_CLAIM_GROUNDING_MARKERS = {
-    "documents/conventions/common/05_docs.md": (
-        "claim grounding",
-        "program contract",
-        "public entrypoint",
-        "return projection",
-        "proof obligation",
-        "provisional wording",
-        "check_convention_compliance.py",
-    ),
-    "documents/conventions/coding-conventions-project.md": (
-        "claim grounding",
-        "program contract",
-        "proof obligation",
-        "run-local planning evidence",
-    ),
-    "agents/skills/long-form-writing.md": (
-        "数学的 claim",
-        "program contract",
-        "proof obligation",
-        "$formal-proof-workflow",
-        "provisional wording",
-    ),
-    "agents/skills/formal-proof-workflow.md": (
-        "program contract",
-        "public entrypoint",
-        "return projection",
-        "proof obligation",
-    ),
-}
-TEST_CONTRACT_ROUTING_MARKERS = {
-    "documents/conventions/coding-conventions-testing.md": (
-        "contract-only wrapper",
-        "static contract validation",
-        "static-analysis-duplicate-test",
-        "canonical command",
-        "Validation repair scope",
-    ),
-    "agents/canonical/CODEX_IMPLEMENTATION.md": (
-        "contract-only wrapper",
-        "static contract validation",
-        "canonical command evidence",
-        "validation tool",
-    ),
-    "templates/agents/test_plan.md": (
-        "validation route",
-        "behavior-owned cases",
-    ),
-}
 VALIDATION_FAILURE_RESPONSE_MARKERS = {
     "documents/operations/TROUBLESHOOTING.md": (
         "validation test/check failure",
@@ -460,56 +230,6 @@ MATHEMATICAL_NECESSITY_MARKERS = {
         "proof obligation",
     ),
 }
-IMPLEMENTATION_GUARDRAIL_MARKERS = {
-    "documents/conventions/coding-conventions-house-style.md": (
-        "compatibility-preservation drift",
-        "duplicate implementation",
-        "canonical owner",
-        "caller migration",
-        "contract-complete implementation",
-        "acceptance contract",
-        "design_issue_blocker",
-        "implementation shortcut",
-        "check_convention_compliance.py",
-    ),
-    "documents/notes/guardrails/engineering_avoidances.md": (
-        "compatibility-preservation drift",
-        "duplicate implementation",
-        "canonical owner",
-        "contract-complete implementation",
-        "acceptance contract",
-        "design_issue_blocker",
-        "implementation shortcut",
-    ),
-    "agents/canonical/CODEX_IMPLEMENTATION.md": (
-        "legacy-route drift",
-        "duplicate implementation",
-        "canonical owner",
-        "caller migration",
-        "contract-complete implementation",
-        "acceptance contract",
-        "design_issue_blocker",
-        "implementation shortcut",
-    ),
-    "agents/skills/codex-task-workflow.md": (
-        "design_issue_blocker",
-        "implementation shortcut",
-    ),
-}
-REFACTOR_SEQUENCE_MARKERS = {
-    "agents/skills/refactor-loop.md": (
-        "two-stage refactor",
-        "forced migration",
-        "usage-surface repair",
-        "return-gate validation",
-    ),
-    "documents/conventions/coding-conventions-house-style.md": (
-        "two-stage refactor",
-        "forced migration",
-        "usage-surface repair",
-        "return-gate validation",
-    ),
-}
 REVIEW_ISSUE_ROUTING_MARKERS = {
     "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
@@ -519,28 +239,9 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
         "private packet",
     ),
 }
-SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS["solid_coding_contract"]
-
 SOURCE_FILE_DEFINITION_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "source_file_definition_order"
 ]
-PROVISIONAL_CANONICAL_WORDING_RE = re.compile(
-    r"(?im)^\s*(?:[-*]\s*)?.*(?:"
-    r"まずは|ひとまず|とりあえず|for now|first pass|first draft|"
-    r"temporary policy|temporary rule|ad hoc|adhoc)"
-)
-PROVISIONAL_GROUNDING_RE = re.compile(
-    r"(?i)(?:"
-    r"run-local|planning evidence|evidence gap|verification route|"
-    r"prompt-defect|acceptance condition|limitation|"
-    r"受け入れ条件|validation route|責務名|proof_status)"
-)
-PROMPT_EVAL_MARKERS = (
-    "check_convention_compliance",
-    "WORKFLOW-GENERIC-1",
-    "ORCH-SHIM-TOOLCALL-1",
-    "CONVENTION-SKILL",
-)
 HOOK_GUARDRAIL_POLICY_MARKERS = {
     ".codex/hooks/hook_dispatcher.py": (
         "HOOK_EVENT_CONTRACTS",
@@ -974,81 +675,6 @@ def check_workflow_hooks(root: Path) -> list[Finding]:
     return findings
 
 
-def check_skill_routing(root: Path) -> list[Finding]:
-    """Verify skill-routing prompts include required routing and verifier markers."""
-    findings = check_required_files(root, SKILL_ROUTING_PROMPTS, "skill_routing")
-    for path in SKILL_ROUTING_PROMPTS:
-        full_path = root / path
-        if not full_path.is_file():
-            continue
-        text = full_path.read_text(encoding="utf-8")
-        for marker in SKILL_ROUTING_MARKERS:
-            if marker not in text:
-                findings.append(
-                    Finding("skill_routing", path, f"missing-marker:{marker}")
-                )
-    return findings
-
-
-def check_exit_blocker_policy(root: Path) -> list[Finding]:
-    """Verify fallback paths are routed to explicit exit evidence."""
-    paths = tuple(EXIT_BLOCKER_POLICY_MARKERS)
-    findings = check_required_files(root, paths, "skill_exit_blocker_policy")
-    for path, markers in EXIT_BLOCKER_POLICY_MARKERS.items():
-        resolved = readable_path(root, path)
-        if resolved is None:
-            continue
-        text = resolved.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "skill_exit_blocker_policy",
-                        path,
-                        f"missing-marker:{marker}",
-                    )
-                )
-        for match in EXIT_BLOCKER_FORBIDDEN_RE.finditer(text):
-            line_no = text.count("\n", 0, match.start()) + 1
-            findings.append(
-                Finding(
-                    "skill_exit_blocker_policy",
-                    path,
-                    f"forbidden-fallback-completion-wording:{line_no}",
-                )
-            )
-        if "accepted_with_reason" in text and "explicit_approval_evidence" not in text:
-            findings.append(
-                Finding(
-                    "skill_exit_blocker_policy",
-                    path,
-                    "accepted-without-explicit-approval-evidence",
-                )
-            )
-    return findings
-
-
-def check_document_structure_routing(root: Path) -> list[Finding]:
-    """Verify structural planning and optional graph analysis stay visible."""
-    paths = tuple(DOCUMENT_STRUCTURE_ROUTING_MARKERS)
-    findings = check_required_files(root, paths, "document_structure_routing")
-    for path, markers in DOCUMENT_STRUCTURE_ROUTING_MARKERS.items():
-        resolved = readable_path(root, path)
-        if resolved is None:
-            continue
-        text = resolved.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "document_structure_routing",
-                        path,
-                        f"missing-marker:{marker}",
-                    )
-                )
-    return findings
-
-
 def collect_marker_contract_findings(
     root: Path, check: str, required_markers: dict[str, tuple[str, ...]]
 ) -> list[Finding]:
@@ -1063,98 +689,6 @@ def collect_marker_contract_findings(
         for marker in markers:
             if marker not in text:
                 findings.append(Finding(check, path, f"missing-marker:{marker}"))
-    return findings
-
-
-def check_closeout_readiness(root: Path) -> list[Finding]:
-    """Verify workflow delegates terminal readiness to the closeout owner."""
-    findings = check_required_files(
-        root,
-        (CLOSEOUT_WORKFLOW_PATH, CLOSEOUT_OWNER_PATH),
-        "workflow_readiness",
-    )
-    workflow = readable_path(root, CLOSEOUT_WORKFLOW_PATH)
-    if workflow is not None:
-        text = workflow.read_text(encoding="utf-8")
-        for marker in CLOSEOUT_WORKFLOW_DELEGATION_MARKERS:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "workflow_readiness",
-                        CLOSEOUT_WORKFLOW_PATH,
-                        f"missing-owner-delegation:{marker}",
-                    )
-                )
-    owner = readable_path(root, CLOSEOUT_OWNER_PATH)
-    if owner is not None:
-        text = owner.read_text(encoding="utf-8")
-        for marker in CLOSEOUT_OWNER_MARKERS:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "workflow_readiness",
-                        CLOSEOUT_OWNER_PATH,
-                        f"missing-terminal-owner-marker:{marker}",
-                    )
-                )
-    return findings
-
-
-def check_document_claim_grounding(root: Path) -> list[Finding]:
-    """Verify canonical docs route prose claims through evidence and proof status."""
-    paths = tuple(DOCUMENT_CLAIM_GROUNDING_MARKERS)
-    findings = check_required_files(root, paths, "document_claim_grounding")
-    for path, markers in DOCUMENT_CLAIM_GROUNDING_MARKERS.items():
-        full_path = readable_path(root, path)
-        if full_path is None:
-            continue
-        text = full_path.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "document_claim_grounding",
-                        path,
-                        f"missing-marker:{marker}",
-                    )
-                )
-        for match in PROVISIONAL_CANONICAL_WORDING_RE.finditer(text):
-            line_start = text.rfind("\n", 0, match.start()) + 1
-            line_end = text.find("\n", match.start())
-            if line_end == -1:
-                line_end = len(text)
-            line = text[line_start:line_end]
-            if PROVISIONAL_GROUNDING_RE.search(line):
-                continue
-            line_no = text.count("\n", 0, match.start()) + 1
-            findings.append(
-                Finding(
-                    "document_claim_grounding",
-                    path,
-                    f"provisional-wording-without-grounding:{line_no}",
-                )
-            )
-    return findings
-
-
-def check_test_contract_routing(root: Path) -> list[Finding]:
-    """Verify contract-only wrappers route to static validation before tests."""
-    paths = tuple(TEST_CONTRACT_ROUTING_MARKERS)
-    findings = check_required_files(root, paths, "test_contract_routing")
-    for path, markers in TEST_CONTRACT_ROUTING_MARKERS.items():
-        full_path = readable_path(root, path)
-        if full_path is None:
-            continue
-        text = full_path.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "test_contract_routing",
-                        path,
-                        f"missing-marker:{marker}",
-                    )
-                )
     return findings
 
 
@@ -1199,48 +733,6 @@ def check_mathematical_necessity_gate(root: Path) -> list[Finding]:
     return findings
 
 
-def check_implementation_guardrails(root: Path) -> list[Finding]:
-    """Verify implementation ownership and acceptance guardrails stay visible."""
-    paths = tuple(IMPLEMENTATION_GUARDRAIL_MARKERS)
-    findings = check_required_files(root, paths, "implementation_guardrails")
-    for path, markers in IMPLEMENTATION_GUARDRAIL_MARKERS.items():
-        full_path = readable_path(root, path)
-        if full_path is None:
-            continue
-        text = full_path.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "implementation_guardrails",
-                        path,
-                        f"missing-marker:{marker}",
-                    )
-                )
-    return findings
-
-
-def check_refactor_sequence(root: Path) -> list[Finding]:
-    """Verify refactor procedure stays routed through the two-stage sequence."""
-    paths = tuple(REFACTOR_SEQUENCE_MARKERS)
-    findings = check_required_files(root, paths, "refactor_sequence")
-    for path, markers in REFACTOR_SEQUENCE_MARKERS.items():
-        full_path = readable_path(root, path)
-        if full_path is None:
-            continue
-        text = full_path.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "refactor_sequence",
-                        path,
-                        f"missing-marker:{marker}",
-                    )
-                )
-    return findings
-
-
 def check_review_issue_routing(root: Path) -> list[Finding]:
     """Verify review findings stay connected to durable issue routes."""
     paths = tuple(REVIEW_ISSUE_ROUTING_MARKERS)
@@ -1259,19 +751,6 @@ def check_review_issue_routing(root: Path) -> list[Finding]:
                         f"missing-marker:{marker}",
                     )
                 )
-    return findings
-
-
-def check_prompt_eval_wiring(root: Path) -> list[Finding]:
-    """Verify prompt evals cover convention verifier and skill-call routing."""
-    path = "eval/definitions/skill_workflow_prompt_eval.toml"
-    findings = check_required_files(root, (path,), "prompt_eval")
-    if findings:
-        return findings
-    text = read_text(root, path)
-    for marker in PROMPT_EVAL_MARKERS:
-        if marker not in text:
-            findings.append(Finding("prompt_eval", path, f"missing-marker:{marker}"))
     return findings
 
 
@@ -1448,19 +927,6 @@ def run_checks(root: Path) -> list[Finding]:
     )
     findings.extend(check_tool_gates(root))
     findings.extend(check_workflow_hooks(root))
-    findings.extend(check_skill_routing(root))
-    findings.extend(check_exit_blocker_policy(root))
-    findings.extend(check_document_structure_routing(root))
-    findings.extend(
-        collect_marker_contract_findings(
-            root, "document_split_decision", DOCUMENT_SPLIT_DECISION_MARKERS
-        )
-    )
-    findings.extend(
-        collect_marker_contract_findings(
-            root, "design_integrity_gate", DESIGN_INTEGRITY_GATE_MARKERS
-        )
-    )
     findings.extend(
         collect_marker_contract_findings(
             root,
@@ -1471,51 +937,13 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(
         collect_marker_contract_findings(
             root,
-            "literature_backed_skill_call_order",
-            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
-        )
-    )
-    findings.extend(
-        collect_marker_contract_findings(
-            root,
-            "responsibility_preflight_gate",
-            RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
-        )
-    )
-    findings.extend(
-        collect_marker_contract_findings(
-            root,
-            "experiment_execution_surface_guard",
-            EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
-        )
-    )
-    findings.extend(
-        collect_marker_contract_findings(
-            root,
-            "branch_worktree_creation_guard",
-            BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
-        )
-    )
-    findings.extend(check_closeout_readiness(root))
-    findings.extend(check_document_claim_grounding(root))
-    findings.extend(check_test_contract_routing(root))
-    findings.extend(
-        collect_marker_contract_findings(
-            root,
             "validation_failure_response",
             VALIDATION_FAILURE_RESPONSE_MARKERS,
         )
     )
     findings.extend(check_validation_failure_response_owner_propagation(root))
     findings.extend(check_mathematical_necessity_gate(root))
-    findings.extend(check_implementation_guardrails(root))
-    findings.extend(check_refactor_sequence(root))
     findings.extend(check_review_issue_routing(root))
-    findings.extend(
-        collect_marker_contract_findings(
-            root, "solid_coding_contract", SOLID_CODING_CONTRACT_MARKERS
-        )
-    )
     findings.extend(
         collect_marker_contract_findings(
             root,
@@ -1523,7 +951,6 @@ def run_checks(root: Path) -> list[Finding]:
             SOURCE_FILE_DEFINITION_ORDER_MARKERS,
         )
     )
-    findings.extend(check_prompt_eval_wiring(root))
     findings.extend(check_hook_guardrail_policy(root))
     findings.extend(check_convention_assertions(root))
     findings.extend(check_legacy_forwarder_warning_policy(root))

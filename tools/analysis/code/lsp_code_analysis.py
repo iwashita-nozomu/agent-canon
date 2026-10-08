@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Runs one-shot LSP 3.17 code analysis and emits deterministic code facts.
-# upstream design ../../documents/structured-analysis/code-analysis.md code-analysis boundary
-# upstream design ../../documents/tools/lsp_code_analysis.md LSP adapter contract
-# upstream implementation ./vector_search.py owns bounded LSP discovery and language mapping
-# downstream implementation ../../tests/agent_tools/test_lsp_code_analysis.py verifies protocol and report behavior
-# downstream implementation ./search.py consumes in-memory code-deps facts
+# upstream design ../../../documents/structured-analysis/code-analysis.md code-analysis boundary
+# upstream design ../../../documents/tools/lsp_code_analysis.md LSP adapter contract
+# upstream implementation ../search/vector_search.py owns bounded LSP discovery and language mapping
+# downstream implementation ../../../tests/agent_tools/test_lsp_code_analysis.py verifies protocol and report behavior
+# downstream implementation ../search/search.py consumes in-memory code-deps facts
 # @dependency-end
 """Small, dependency-free LSP 3.17 code-analysis adapter.
 

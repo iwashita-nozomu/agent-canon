@@ -2,16 +2,16 @@
 # @dependency-start
 # contract tool
 # responsibility Provides run managed experiment experiment workflow tooling.
-# upstream design ../README.md shared automation index
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 composition and terminal frame
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md external admitted CLI ownership and task boundary
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 composition and terminal frame
+# upstream design ../../../documents/experiments/gpu-admission-r5-source-packet.md external admitted CLI ownership and task boundary
 # upstream implementation ./execution_resource_plan.py canonical admission planning and terminal owner
-# upstream implementation ../../documents/experiments/experiment-runner-ff97-lifecycle.md fixed generic runner lifecycle and scheduler source identity
-# downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json ordered W2-W4 interface
-# downstream implementation ../../templates/experiments/_template/run.py exposes the topic main adapted from the frozen snapshot
-# downstream implementation ../../tests/tools/test_run_managed_experiment.py validates the sole composition and frozen topic adapter
-# upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
-# upstream environment ../../agent-canon-environment.toml audited ExperimentRunner provider identity and runtime item
+# upstream implementation ../../../documents/experiments/experiment-runner-ff97-lifecycle.md fixed generic runner lifecycle and scheduler source identity
+# downstream implementation ../../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json ordered W2-W4 interface
+# downstream implementation ../../../templates/experiments/_template/run.py exposes the topic main adapted from the frozen snapshot
+# downstream implementation ../../../tests/tools/test_run_managed_experiment.py validates the sole composition and frozen topic adapter
+# upstream design ../../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
+# upstream environment ../../../agent-canon-environment.toml audited ExperimentRunner provider identity and runtime item
 # @dependency-end
 
 # Static route evidence: run_cli -> execute_managed_run ->
