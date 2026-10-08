@@ -38,11 +38,10 @@ def context() -> dict[str, object]:
 
 
 @pytest.mark.parametrize("oracle", ["git diff --check", "python -m pytest tests/unit/test_example.py -q"])
-def test_document_and_code_tasks_have_only_three_states(context, oracle):
+def test_document_and_code_tasks_use_the_bounded_route(context, oracle):
     result = decide_execution(ROOT, {**context, "validation": oracle})
     assert result == {
         "execution_route": "bounded_fast_path",
-        "states": ["route", "execute", "verify_close"],
         "next_action": "report_selected_results_and_publication_readback",
         "commands": [],
         "selected_validation": oracle,

@@ -34,34 +34,30 @@ confirmed cause or completion.
 
 ## Procedure
 
-1. Classify the input as a direct runtime defect, an evidence-backed new Issue,
-   or an existing Issue-set repair. For a runtime defect, first distinguish an
-   AgentCanon-owned invariant failure from a consumer, host, credential, or
-   ownership-unknown failure.
-2. Record a direct runtime candidate immediately with the observed error/action,
-   immutable checkout/runtime snapshot, expected/actual behavior, and explicitly
-   uncertain hypotheses. Missing optional occurrence detail does not block the
-   record. Do not require a private receipt or second occurrence before recording.
-3. Investigate the current cause only as far as it can change owner, mechanism,
-   validation, or Issue boundary. Read callers/entrypoints, state/guards, effects,
-   cleanup, and relevant sibling evidence; stop when alternatives are excluded or
-   remain explicitly unresolved. Use the existing dependency-analysis evidence and
-   avoid turning a hypothesis into a required fix.
-4. Collect related open/closed Issues and linked PRs/commits when enriching or
-   reorganizing. Group clauses by one owner, mechanism closure, validation
-   authority, and independently satisfiable completion; split mixed Issues,
-   re-parent governing decisions, and preserve every unique clause. Similar titles
-   or a shared path are retrieval signals, not merge proof.
-5. Publish through the existing repository-qualified IssueWorker/host adapter:
-   create, comment, edit, reopen, or reorganize as selected, then read back the
-   URL/number/title/body/state. Use configured GitHub/transport credentials;
-   authentication failures return to that owner. Offline work keeps only the
-   existing private pending metadata route and does not write Issue bodies into
-   AgentCanon source.
-6. Validate the final Issue relation and clause destinations through the existing
-   readback owner. Leave unresolved cause or cross-repository ownership investigative
-   or deferred; do not close an Issue because text, labels, or a prior closed state
-   says it is complete.
+For a direct runtime observation, distinguish an AgentCanon-owned invariant
+failure from a consumer, host, credential, or unknown-owner failure. Preserve
+the observed action, current snapshot, expected/actual behavior, and uncertain
+hypotheses promptly; missing optional occurrence detail is not a reason to lose
+the observation. Include the immutable checkout/runtime snapshot when available;
+do not require a private receipt or second occurrence before recording. Investigate
+only as far as needed to change the owner,
+mechanism, validation, or Issue boundary. Use callers, state, effects, cleanup,
+and sibling evidence to narrow the cause, and keep an unproven hypothesis out of
+the required fix.
+
+When updating or reorganizing existing Issues, inspect the related Issues and
+linked PRs/commits that affect the requested clauses. Group by owner, mechanism,
+validation authority, and independently satisfiable completion. Split or
+re-parent when those responsibilities differ, preserving each unique clause;
+similar titles or shared paths are retrieval signals, not merge proof.
+
+Publish only the selected Issue operation through the existing
+repository-qualified IssueWorker/host adapter, then read back its identity,
+content, and state. Use configured GitHub/transport credentials; return
+authentication failures to that owner. Offline work uses only the existing
+private pending-metadata route and never writes Issue bodies into AgentCanon
+source. Leave unresolved cause or cross-repository ownership investigative or
+deferred, and do not close an Issue without completion evidence.
 
 ## Direct AgentCanon Defect Escalation
 

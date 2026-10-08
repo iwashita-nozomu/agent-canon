@@ -497,12 +497,12 @@ skill_families:
         - ["figure", "inventory"]
         - ["result", "figure", "inventory"]
   - id: tool-finding-report
-    purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
+    purpose: Run selected tools and checkers, preserve evidence for the requested scope, and conditionally prioritize findings when triage needs it; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
     shim: .codex/personal/skills/tool-finding-report/SKILL.md
     discovery:
       name: tool-finding-report
-      description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
+      description: "Use when running tools or checkers to report findings for the requested scope. Preserve raw or structured evidence as needed; prioritize findings when triage requires it and compare before/after impact only when requested."
     tool_commands:
       required: []
       conditional:
@@ -2117,12 +2117,12 @@ skill_families:
       stage_policy: active
       reason: public/module responsibility, reachability, or behavior-preserving code cleanup is in scope
   - id: empirical-prompt-tuning
-    purpose: Improve reusable agent instructions through fresh evaluation on frozen baseline and hold-out scenarios until qualitative and quantitative evidence converges.
+    purpose: Improve reusable instructions from observed outcomes; use fresh evaluation when a decision needs evidence about changed behavior.
     canonical_doc: agents/skills/empirical-prompt-tuning.md
     shim: .codex/personal/skills/empirical-prompt-tuning/SKILL.md
     discovery:
       name: empirical-prompt-tuning
-      description: "Use when a reusable skill, prompt, or instruction surface needs fresh empirical evaluation against frozen baseline and hold-out scenarios, followed by evidence-based iteration to convergence."
+      description: "Use when a reusable instruction has an observed or consequential behavior question that needs evidence-based evaluation and revision."
     tool_commands:
       required: []
       conditional: []

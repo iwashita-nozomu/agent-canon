@@ -29,8 +29,8 @@ refs を参照として含めます。この skill は handoff lifecycle を own
 - Boundary: this skill owns launch mechanics and evidence; workflow family
   selection stays with `agent-orchestration` and role behavior stays with
   `.codex/agents/*.toml`.
-- Model names: `.codex/config.toml` owns the `gpt-5.6-sol/high` parent;
-  `.codex/agents/*.toml` owns each child model and effort.
+- Model and effort: use the selected runtime profile and role configuration in
+  `.codex/config.toml` and `.codex/agents/*.toml`.
 
 ## Purpose
 
@@ -78,47 +78,7 @@ handoff contract.
 ```bash
 python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "repo-changing task" \
-  --task-id T1 \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-研究・実験つき変更:
-
-```bash
-python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-  --task "research-backed change" \
-  --task-id T4 \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-環境変更:
-
-```bash
-python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-  --task "platform or environment change" \
-  --task-id T8 \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-学術文章:
-
-```bash
-python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-  --task "academic writing task" \
-  --task-id T10 \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-包括的開発:
-
-```bash
-python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-  --task "comprehensive development pass" \
-  --task-id T12 \
+  --task-id <task-id> \
   --owner "codex" \
   --workspace-root "$PWD"
 ```
@@ -147,13 +107,12 @@ active runtime が explicit user request なしの `spawn_agent` を禁止する
 command output の generated model/profile view と `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認します。implementation-executable handoff は semantic decision sufficiency が mechanism と validation route を閉じた場合だけ materialize し、post-completion gate は実際に選択された owner gate だけを続けます。
 subagent の model / reasoning は該当 `.codex/agents/*.toml` を先に読みます。
 read-only exploration は [`agent-orchestration` の Decision Order](agent-orchestration.md#decision-order) にある checker-first guidance に従います。この skill は runtime projection と launch mechanics を引き続き所有します。
-repo inventory、tool drift survey、機械 report 要約、experiment/log execution は、implementation の critical path を塞がない独立検証または実験実行として Luna/high の通常 role に切ります。mini/medium は明示 T14 `skill_evaluation` の fresh read-only artifact-only `skill_evaluator` に限り、permanent team role にはありません。static validation triage、diff-local Python / C++ review、bounded review、report traceability、checklist-style review gate は、該当 decision があるときに一つの accountable `gpt-5.6-luna/high` review role へ切ります。writer と owner gate/review は、semantic decision と selected validation route が要求する場合だけ分けます。write-capable child は catalog の typed route が要求するときだけ起動します。
-- fixed packet の worker substitution、smaller slice、speculative test、repeated preflight、rollback checkpoint、compatibility fallback は禁止します。compile/static failure は `ImplementationFeedback`、exact target contradiction は一度の `StructuralDesignGap` と同じ Spark の resume です。
+repo inventory、tool drift survey、機械 report 要約、experiment/log execution は、選択された独立検証や実行に必要な場合に限ります。レビューや実装の役割、model、effort は task catalog と選択された runtime profile から解決し、ここでモデル名や固定 role set を再定義しません。writer と owner gate/review は、別々の責務や検証が必要な場合だけ分けます。write-capable child は catalog の typed route が要求するときだけ起動します。
+選択済み owner、権限、責務、または review gate を、失敗を通すためだけに差し替えません。再試行、slice変更、別 worker の選択は、観測した blocker がその判断を変えるときにだけ既存 owner へ戻します。intended behavior、authority、selected validation を暗黙に縮小しません。
 選択済み candidate が起動できない場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録します。candidate を変える場合は explicit revised parent packet と wave を必須にします。`skill_evaluator`、実験実行 role、または review role の起動失敗は、同じ role packet と該当 `.codex/agents/*.toml` の `model` / `model_reasoning_effort` で原因を切り分けます。
 command output の `WORKFLOW_SUBAGENT_PROMPT_PACKET` を確認し、すべての subagent handoff prompt は [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) の `Context Visibility Contract` と `Fresh Subagent Context Capsule` を満たすように、`team_manifest.yaml` の `run.subagent_prompt_packet` と該当 role の `prompt_contract` から selected fields だけを入れます。full packet、raw stdout、raw logs、broad chat summary は prompt に貼りません。
-固定の `STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only` を completion 条件にしません。
-各 wave は owner-critical な plan、review、edit のうち実際に必要な stage だけを
-記録し、未選択 stage の artifact を作りません。
+Role と段階は選択された route と現在の evidence から決めます。実際に必要な
+plan、review、edit、validation だけを記録し、未選択段階の artifact を作りません。
 command output の `DEFAULT_QUALITY_CHECKS=candidate_only`、
 candidate role / agent-type lines を確認し、
 review と edit の handoff では `team_manifest.yaml` の
@@ -197,15 +156,11 @@ risk がない場合は activation decision を記録して test-plan artifact �
 test-design tool run を省略し、ordinary code change、bug fix、parser change、
 validation failure だけでは起動しません。
 contract-only wrapper では checker-owned validation と static contract evidence を handoff に入れます。
-T12 の `scheduler`、`schedule_reviewer`、`project_reviewer`、
-`docs_workflow_steward`、`prompt_config_reviewer` は候補 specialists です。
-owner-critical な責務、unresolved branch、または selected validation route が
-有効化した role だけを active にします。change-review decision が active のときは
-`diff_triage_reviewer` が既定で、`python_reviewer` / `cpp_reviewer` は changed-path
-evidence、parent packet evidence、または明示 review-pack activation がある場合だけ
-materialize します。
-Codex で planning を含む parent session では、plan-mode command を先に使います。official Codex CLI では `/plan` です。
-runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
+Task-family role candidates and available review gates come from the selected
+catalog route. Activate only roles needed by an owner-critical decision or
+selected validation; consult the role registry for model and effort. Do not
+repeat a family-specific role matrix here. Use the runtime's available planning
+or agent-inventory capability when it helps resolve a real routing question.
 計画、詳細設計、文書通読、学術文章の review は candidate です。選択された review
 claims が同じ owner、responsibility、context、write authority、validation route を
 共有する場合は active instance を再利用し、独立 review や distinct unresolved
@@ -314,10 +269,9 @@ The runtime discovery adapter delegates these required operating clauses to this
    claim/risk that the owning gate cannot judge.
 1. Check the command output for `IMPLEMENTATION_CODEX_AGENTS` when an
    implementation wave is selected.
-1. Treat `STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only` as a candidate
-   projection, not a mandatory plan-review-edit sequence.
-   Record only selected plan, review, or edit evidence; no fixed sequence creates
-   an unselected stage.
+1. Let the selected route and dependency evidence determine which plan, review,
+   edit, or validation work is needed and how those units relate. Do not turn a
+   status projection into a mandatory stage list.
 1. Check the command output for `DEFAULT_QUALITY_CHECKS=candidate_only`,
    `DEFAULT_QUALITY_CHECK_ROLES`, and `DEFAULT_QUALITY_CHECK_AGENT_TYPES`.
    Review and edit handoffs include `team_manifest.yaml`
@@ -326,10 +280,13 @@ The runtime discovery adapter delegates these required operating clauses to this
    from the existing route readback. A caller may use native `--select-agent-type`
    before route selection; validate and preserve that input, but do not require it
    again as a Spark eligibility or approval gate after the route verdict is fixed.
-1. Resolve logical role, selected Skills, execution profile, and authority as separate fields. When the selected profile is Luna, use `$direct-luna-communication` with a direct `gpt-5.6-luna` override and do not require or select a role-specific physical alias. Read `.codex/agents/<role>.toml` only when a capability-specific or compatibility route explicitly selects that executable view.
+1. Resolve logical role, selected Skills, execution profile, and authority as separate decisions. When the selected profile is Luna, use `$direct-luna-communication`; it owns effective model / effort readback and does not require a role-specific physical alias. Use the selected role configuration only when its execution route needs that view.
 1. Before assigning read-only exploration, run the canonical checker, router, semantic index, or dashboard when one owns the question. Use subagents to interpret ambiguous structured tool artifacts or independently review non-tool-covered judgment, not to repeat deterministic tool checks by reading the same documents.
-1. For repo inventory, tool drift survey, machine-report summarization, and experiment/log execution, use the ordinary `gpt-5.6-luna/high` roles when they are independent verification or bounded execution that does not delay the implementation critical path. Reserve `gpt-5.4-mini/medium` for the fresh, read-only, artifact-only `skill_evaluator` in explicit T14 `skill_evaluation`; it is absent from permanent team roles.
-1. For static validation triage, diff-local Python / C++ review, bounded review, report traceability, and checklist-style review gates, select one accountable `gpt-5.6-luna/high` review role for the active decision; use `gpt-5.6-luna/xhigh` only for `ship_reviewer` findings.
+1. Select model and effort from the active runtime profile and role registry.
+   Use `skill_evaluator` only when the typed route selects empirical skill
+   evaluation; it remains a fresh, read-only, artifact-only role. Keep one
+   accountable reviewer for a responsibility unless another distinct claim or
+   risk needs a specialist.
 1. For coding / implementation / patch / doc-edit requests, describe the catalog-selected route first. When that typed route requires a child, route seed, responsibility search, reuse survey, stale-surface scan, dependency expansion, validation plan, and tool-rejection preflight produce a handoff packet; schedule or launch the selected write-capable implementer, while the parent owns packet selection, packet relay, dependency order, status, and final external readback.
 1. Treat role/profile eligibility as owned by the selected implementation route. This
    skill consumes the verdict and handoff; it does not re-derive Spark eligibility,
@@ -356,13 +313,9 @@ The runtime discovery adapter delegates these required operating clauses to this
    root.
 1. Build `allowed_paths` from dependency headers when possible: expand edited paths, search hits, checker findings, or changed files through `run_repo_dependency_review.sh` and pass `dependency_edit_scope.txt` / `dependency_graph.tsv` instead of only a hand-written file list.
 1. If the selected candidate cannot launch, record local/tool evidence with `selected_agent_type`, `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and `status=blocked`; changing candidates requires an explicit revised parent packet and wave.
-1. For T12, treat `scheduler`, `schedule_reviewer`, `project_reviewer`,
-   `docs_workflow_steward`, and `prompt_config_reviewer` as candidates. Activate
-   only owner-critical roles or roles selected by the validation route. When the
-   change-review decision activates, use `diff_triage_reviewer` as its default
-   executable; materialize `python_reviewer` / `cpp_reviewer` only from
-   changed-path evidence, parent packet evidence, or explicit review-pack
-   activation.
+1. Use the task catalog's selected roles and review gate. Candidate roles are
+   not automatic work; add a specialist only for a distinct claim or risk that
+   the owning gate cannot assess.
 1. If a write-capable coding / docs-edit subagent cannot be launched because authorization or tool gates are missing, record `WRITE_SUBAGENT_AUTHORIZATION=required` or the gate-specific blocker in the run bundle and stop expanding read-only analysis for that slice. Return a typed blocked/retry/user-report packet; no parent write route exists.
 1. Default to one writer in the current checkout. If multiple writers are necessary, use them only when `team_manifest.yaml` fixes dependency order, wave plan, disjoint write scope, integration order, and review gate. Colliding writers are serialized into later waves; independent streams use the repository-topic lifecycle's prepared `linked-worktree` or `independent-clone` under the same workspace/topic/repo placement rather than manual worktree setup.
 1. For multiple independent workstreams, schedule a stage owner per workstream and let that owner create a vertical dynamic wave under `run.delegated_spawn_policy` instead of flattening every role into one parent wave. Only sibling waves with disjoint input packets, write scopes, validation routes, and review gates may run together.
