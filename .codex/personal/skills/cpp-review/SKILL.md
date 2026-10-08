@@ -2,7 +2,7 @@
 name: cpp-review
 description: "Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"cce0505583b9fd0fb707eb631cbf62eaca0c1e5766f52b6ffcc2f1587f81dbd7"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"ff3c811946a6c750827c29d039052252e828d1606f26ad5fe7e808a452afc7ea"} -->
 
 <!--
 @dependency-start
