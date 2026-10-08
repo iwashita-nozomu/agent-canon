@@ -3,7 +3,10 @@
 # contract agent-runtime
 # responsibility Owns the host-only Docker/Git adapter for the shared AgentCanon container. AgentCanon Python is invoked only through docker exec.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared host/container bootstrap contract
+# upstream design ../../../documents/runtime/bootstrap-runtime.md source sync and global Codex config lifecycle
+# upstream implementation ../../../.codex/config.toml canonical managed context defaults
 # downstream implementation ../../../tools/runtime/container/bootstrap_runtime.py container-side runtime implementation
+# downstream implementation ../../../tests/bootstrap/test_bootstrap_shell.py host lifecycle behavior tests
 # @dependency-end
 
 set -euo pipefail
@@ -227,13 +230,46 @@ _agent_canon_source_sync_failure() {
   _agent_canon_json_error "$code" "$detail"
 }
 
+_agent_canon_advance_source() {
+  local install_root=$1 source_before
+  AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
+  AGENT_CANON_SYNC_REMOTE=origin
+  AGENT_CANON_SYNC_BRANCH=main
+  AGENT_CANON_SYNC_REMOTE_URL=unknown
+  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
+  AGENT_CANON_SYNC_SOURCE_TREE=unknown
+  AGENT_CANON_SYNC_CODE=updated
+  source_before=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) || :
+  if ! git -C "$install_root" fetch origin main; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
+    return 2
+  fi
+  if ! git -C "$install_root" checkout --force -B main FETCH_HEAD; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync checkout failed"
+    return 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_HEAD=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) ||
+    AGENT_CANON_SYNC_SOURCE_HEAD=unknown
+  AGENT_CANON_SYNC_SOURCE_TREE=$(git -C "$install_root" rev-parse --verify 'HEAD^{tree}' 2>/dev/null) ||
+    AGENT_CANON_SYNC_SOURCE_TREE=unknown
+  if [[ "$source_before" == "$AGENT_CANON_SYNC_SOURCE_HEAD" ]]; then
+    AGENT_CANON_SYNC_CODE=up_to_date
+  fi
+  _agent_canon_source_sync_write success "$AGENT_CANON_SYNC_CODE" "$install_root" \
+    "$AGENT_CANON_SYNC_SOURCE_HEAD" "$AGENT_CANON_SYNC_SOURCE_TREE" origin unknown main \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" || {
+      _agent_canon_json_error source_sync_state_write_failed \
+        "source-sync state could not be atomically published"
+      return 2
+    }
+}
+
 _agent_canon_sync_operation() (
   # SourceSync is deliberately a single host transaction.  Git owns source
   # advancement; resident/image/link failures never roll it back.
   set +e
   local install_root=${AGENT_CANON_REPOSITORY_ROOT:-}
-  local source_before=unknown source_head=unknown source_tree=unknown
-  local sync_code=updated candidate_image_ref candidate_image_id rc=0
+  local source_head candidate_image_ref candidate_image_id rc=0
   local sync_index=1 sync_token
   while ((sync_index < ${#command_args[@]})); do
     sync_token=${command_args[sync_index]}
@@ -264,37 +300,8 @@ _agent_canon_sync_operation() (
     esac
     ((sync_index += 1))
   done
-  AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
-  AGENT_CANON_SYNC_REMOTE=origin
-  AGENT_CANON_SYNC_BRANCH=main
-  AGENT_CANON_SYNC_REMOTE_URL=unknown
-  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
-  AGENT_CANON_SYNC_SOURCE_TREE=unknown
-  [[ -d "$install_root" && ! -L "$install_root" ]] || {
-    _agent_canon_source_sync_failure install_root_invalid "source-sync install root is not a directory"
-    exit 2
-  }
-  source_before=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) || :
-  if ! git -C "$install_root" fetch origin main; then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
-    exit 2
-  fi
-  if ! git -C "$install_root" checkout --force -B main FETCH_HEAD; then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync checkout failed"
-    exit 2
-  fi
-  source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) || source_head=unknown
-  source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null) || source_tree=unknown
-  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
-  [[ "$source_before" == "$source_head" ]] && sync_code=up_to_date
-  if ! _agent_canon_source_sync_write success "$sync_code" "$install_root" \
-    "$source_head" "$source_tree" origin unknown main \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
-    _agent_canon_json_error source_sync_state_write_failed \
-      "source-sync state could not be atomically published"
-    exit 2
-  fi
+  _agent_canon_advance_source "$install_root" || exit $?
+  source_head=$AGENT_CANON_SYNC_SOURCE_HEAD
   AGENT_CANON_REPOSITORY_ROOT=$install_root
   unset AGENT_CANON_LOCAL_BUILD
   _agent_canon_image_reference ""
@@ -330,7 +337,7 @@ _agent_canon_sync_operation() (
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","code":"systemd_user_unavailable","detail":"automatic sync remains manual"}\n' >&2
   fi
   printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"sync","code":"%s","commit":"%s"}\n' \
-    "$sync_code" "$source_head"
+    "$AGENT_CANON_SYNC_CODE" "$source_head"
   exit 0
 )
 
@@ -1748,6 +1755,11 @@ _agent_canon_finish_clean_install() {
 _agent_canon_container_exec() {
   local container=$1
   shift
+  local -a exec_options=()
+  if [[ "${1:-}" == --stdin ]]; then
+    exec_options=(-i)
+    shift
+  fi
   local image_id container_id source_head
   if [[ -n "${AGENT_CANON_ROLLBACK_MOUNTS_FILE:-}" ]]; then
     if [[ -f "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" && ! -L "$AGENT_CANON_ROLLBACK_MOUNTS_FILE" ]]; then
@@ -1797,7 +1809,7 @@ _agent_canon_container_exec() {
   extra_env+=(--env "AGENT_CANON_HOST_ARCHIVE_ROOT=$AGENT_CANON_ARCHIVE_DESTINATION")
   extra_env+=(--env "AGENT_CANON_HOST_CACHE_ROOT=$AGENT_CANON_CACHE_DESTINATION")
   extra_env+=(--env "AGENT_CANON_HOST_CODEX_HOME_ROOT=$AGENT_CANON_CODEX_HOME_DESTINATION")
-  "$AGENT_CANON_DOCKER_CMD" exec \
+  "$AGENT_CANON_DOCKER_CMD" exec "${exec_options[@]}" \
     --workdir "$AGENT_CANON_RUNTIME_DESTINATION" \
     --env "AGENT_CANON_CONTAINER_CONTROL=1" \
     --env "AGENT_CANON_IMAGE_REF=$AGENT_CANON_IMAGE_REF" \
@@ -3012,7 +3024,7 @@ _agent_canon_replace_resident_locked() {
     fi
   fi
   if ((rc == 0)) && [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
-    if _agent_canon_install_global_links; then
+    if _agent_canon_install_global_links "$candidate"; then
       :
     else
       rc=$?
@@ -3354,34 +3366,7 @@ _agent_canon_install_locked() {
   # named resident after ownership readback, then clear generated state before
   # building the candidate.  The EXIT trap restores the captured state if any
   # later phase fails.
-  local source_before source_head source_tree sync_code=updated
-  AGENT_CANON_SYNC_SOURCE_ROOT=$AGENT_CANON_REPOSITORY_ROOT
-  AGENT_CANON_SYNC_REMOTE=origin
-  AGENT_CANON_SYNC_BRANCH=main
-  AGENT_CANON_SYNC_REMOTE_URL=unknown
-  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
-  AGENT_CANON_SYNC_SOURCE_TREE=unknown
-  source_before=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
-  if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" fetch origin main; then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
-    return 2
-  fi
-  if ! git -C "$AGENT_CANON_REPOSITORY_ROOT" checkout --force -B main FETCH_HEAD; then
-    _agent_canon_source_sync_failure source_remote_unavailable "source-sync checkout failed"
-    return 2
-  fi
-  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || source_head=unknown
-  source_tree=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD^{tree} 2>/dev/null) || source_tree=unknown
-  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
-  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
-  [[ "$source_before" == "$source_head" ]] && sync_code=up_to_date
-  _agent_canon_source_sync_write success "$sync_code" "$AGENT_CANON_REPOSITORY_ROOT" \
-    "$source_head" "$source_tree" origin unknown main \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" || {
-      _agent_canon_json_error source_sync_state_write_failed \
-        "source-sync state could not be atomically published"
-      return 2
-    }
+  _agent_canon_advance_source "$AGENT_CANON_REPOSITORY_ROOT" || return $?
   local old_container=$(_agent_canon_container_name)
   local old_container_id= old_image_ref= old_image_id=
   local old_container_present=0
@@ -3844,7 +3829,35 @@ _agent_canon_remove_global_links() {
   fi
 }
 
+_agent_canon_apply_context_defaults() {
+  local container=$1 config_source=$2 config_mode config_tmp
+  [[ -f "$config_source" && ! -L "$config_source" ]] || {
+    _agent_canon_json_error config_source_invalid \
+      "personal Codex config is not a regular file: $config_source"
+    return 2
+  }
+  config_mode=$(stat -c '%a' -- "$config_source")
+  config_tmp=$(mktemp "${config_source%/*}/.config.toml.context.XXXXXX") || return $?
+  if ! _agent_canon_container_exec "$container" --stdin \
+    /var/lib/agent-canon/cache/bin/agent-canon codex-config \
+    --source-config "$AGENT_CANON_SOURCE_DESTINATION/.codex/config.toml" \
+    < "$config_source" > "$config_tmp"; then
+    rm -f -- "$config_tmp"
+    _agent_canon_json_error config_update_failed \
+      "managed context defaults could not be produced"
+    return 2
+  fi
+  if ! chmod "$config_mode" "$config_tmp" ||
+    ! mv -f -- "$config_tmp" "$config_source"; then
+    rm -f -- "$config_tmp"
+    _agent_canon_json_error config_update_failed \
+      "managed context defaults could not be written to $config_source"
+    return 2
+  fi
+}
+
 _agent_canon_install_global_links() {
+  local container=${1:-}
   local home_root
   home_root=$(realpath -e -- "$HOME")
   [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
@@ -3914,6 +3927,7 @@ _agent_canon_install_global_links() {
     mode=$(stat -c '%a' -- "$config_source")
     ln -s -- "$config_source" "$config_target"
   fi
+  _agent_canon_apply_context_defaults "$container" "$config_source" || return $?
   if [[ -L "$config_target" && "$(readlink -f -- "$config_target")" == "$config_source" ]]; then
     digest=$(_agent_canon_sha256 "$config_source")
     printf 'config\t%s\t%s\t%s\t%s\n' "$config_target" "$config_source" "$mode" "$digest" >> "$manifest"

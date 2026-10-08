@@ -150,9 +150,12 @@ Run:
 `prepare` writes only manifest-managed links beneath runtime-local isolated
 `codex-home/`; it remains separate from the global link lifecycle. When the
 explicit control root is `$HOME`, install/update manage one `~/.agents/skills`
-directory link, per-agent, and personal `~/.codex/config.toml` links. The regular config is
-migrated byte-for-byte to the ignored personal source and restored on
-uninstall. Hooks, authentication, sessions, history, cache, plugins, rules,
+directory link, per-agent, and personal `~/.codex/config.toml` links. A regular
+config is copied to the ignored personal source before the canonical
+`model_context_window = 1050000` and
+`model_auto_compact_token_limit = 900000` settings are applied; other personal
+TOML remains intact. Uninstall restores a regular file from that source. Hooks,
+authentication, sessions, history, cache, plugins, rules,
 MCP, and TUI/trust state remain outside the link set. The host shell owns
 global link projection; the resident does not enumerate or validate global
 skills. Uninstall removes the AgentCanon-owned skills directory link only.
