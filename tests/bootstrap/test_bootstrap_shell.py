@@ -111,26 +111,7 @@ AGENT_CANON_CONTROL_ROOT={str(home)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_STATE_ROOT={str(state)!r}
 export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
-_agent_canon_container_exec() {{
-  [[ "$1" == candidate ]] || return 90
-  shift
-  [[ "$1" == --stdin ]] || return 91
-  shift
-  [[ "$1" == /var/lib/agent-canon/cache/bin/agent-canon &&
-     "$2" == codex-config && "$3" == --source-config &&
-     "$4" == "$AGENT_CANON_SOURCE_DESTINATION/.codex/config.toml" ]] || return 92
-  local personal
-  personal=$(cat) || return 93
-  [[ "$personal" == *approval_policy* ]] || return 94
-  [[ "${{AGENT_CANON_TEST_CONFIG_FAIL:-0}}" != 1 ]] || return 2
-  printf '%s\n' \
-    'model_context_window = 1050000' \
-    'model_auto_compact_token_limit = 900000' \
-    'approval_policy = "on-request"' \
-    '[agents]' \
-    'max_threads = 8'
-}}
-_agent_canon_install_global_links candidate
+_agent_canon_install_global_links
 """
     result = subprocess.run(
         ["bash", "-c", script], check=False, capture_output=True, text=True
