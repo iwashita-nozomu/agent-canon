@@ -81,3 +81,20 @@ local registry routes to these names and records repo-specific evidence.
 | `$skill-installer` | Curated and external skill installation. |
 | `$imagegen` | Generated bitmap assets. |
 | `$plugin-creator` | Codex plugin scaffolding and marketplace metadata. |
+
+### Skill authoring and revision
+
+Use the host-provided `$skill-creator` for general skill authoring and
+refactoring. Revise instructions from observed task outcomes: explain the reason
+for a consequential constraint, generalize a failure across nearby cases, and
+remove directions that do not change a decision or result. Preserve real
+authority, safety, compatibility, and completion boundaries. Let the current
+task's dependencies and evidence determine order, branches, and parallel work;
+do not impose a universal task pipeline. Codex already supplies the authoring
+capability, so AgentCanon does not add a second creator or evaluator.
+
+This approach adopts the outcome-based test-and-refine guidance in
+[Anthropic's skill-creator revision](https://github.com/anthropics/skills/commit/b0cbd3df1533b396d281a6886d5132f623393a9c)
+and [its March 2026 write-up](https://claude.com/blog/improving-skill-creator-test-measure-and-refine-agent-skills),
+while keeping AgentCanon's catalog, generated adapters, and runtime boundaries
+with their existing owners.

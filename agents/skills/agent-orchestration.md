@@ -99,109 +99,44 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 
 ## Owner-First Read Trace
 
-Repository source is not the first discovery surface. Before opening an
-implementation file, test, hook, checker, or generated artifact, use this
-fixed route:
+Use the active root [AGENTS.md](../../AGENTS.md) and the selected Skill to find
+the current owner. Read the applicable constraints and decision guidance before
+changing a repository surface. Follow a linked owner only when it resolves a
+decision the active route delegates or a material fact remains open; do not
+traverse every reference or inspect inactive branches just to complete a trace.
+When ownership is still unclear, use the bounded purpose search in
+[documents/tools/search-coordination.md](../../documents/tools/search-coordination.md)
+and verify the nominated owner against its actual responsibility.
 
-1. Start at the active root [AGENTS.md](../../AGENTS.md) Reader Map and select the task Skill.
-   Resolve its canonical path from `agents/skills/catalog.yaml`; do not guess
-   from a nearby filename or a text-search hit.
-   The root row only needs to identify the routing owner; it does not need one
-   row per public Skill. Record the bridge as `Reader Map row -> routing owner
-   -> selected Skill` when `task-routing` performs the final selection.
-2. Read the selected discovered `SKILL.md`'s common constraints and short
-   branch conditions first. The Skill body is the first operational owner.
-   Select the branch needed for the current action before opening its details;
-   apply this inside one file, at nested branches, and across linked Skills.
-   Resolve an unknown condition with only the evidence needed to decide it,
-   not by reading every alternative. Read every currently applicable branch and
-   its shared safety constraints; leave later stages, validation, and recovery
-   details unread until their own condition becomes true.
-   Use `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`
-   with `index`, then `chunk --heading <selected-heading>`. A named section ends
-   before the next heading, including a child heading; selecting a parent does
-   not select its descendants. Continue the selected section from `next_offset`
-   until `section_eof=true`. Reuse unchanged reads instead of restarting them.
-   If responsibility, operation, and validation are resolved,
-   do not follow a registry or rationale edge merely to fill the trace. Follow a
-   task-relevant `upstream design` edge only when the active branch delegates a
-   decision or one of those items remains unresolved. Never open a
-   `downstream implementation` edge first. Apply the same section selection to
-   canonical `agents/skills/<skill>.md`; a link alone does not activate its body.
-3. Present the following short working update before implementation reading.
-   It is a transient readback in the existing task update, not a new packet,
-   schema, artifact, or closeout gate.
+`skill-document-reader` can help locate or read a long section. Its index,
+chunks, and EOF metadata describe returned text; they do not establish that an
+instruction was understood or applied. Use it when it helps, not as an admission
+gate or a substitute for reading the relevant instructions. Reuse context that
+still applies and revisit only premises changed by new evidence.
 
-   ```text
-   owner_trace_start=<active AGENTS.md Reader Map row>
-   selected_skill=<agents/skills/catalog.yaml id -> canonical_doc>
-   operational_owner=<selected Skill section or delegated upstream path + section>
-   owner_route=<skill-body section or header edge description>
-   docs_first_status=resolved|unresolved
-   implementation_read=locked|ready
-   ```
-
-4. Set `implementation_read=ready` only after the common constraints and all
-   sections needed for the current action have actually been consumed through
-   `section_eof=true`. Neither discovered nor canonical Skills require
-   `file_eof=true`; unread inactive branches do not lock the current action.
-   A required section prefix, an unresolved condition needed for this action,
-   or a named path alone leaves `docs_first_status=unresolved` and
-   `implementation_read=locked`.
-   `ready` is an admission state, not a claim that source was already opened.
-   The optional `admit --owner PATH#HEADING ...` checks only supplied sections'
-   readability/EOF metadata, not the model's reading or selection sufficiency.
-   Merely naming a delegated path does not unlock implementation. Do not create
-   a per-read receipt, identifier, approval gate, or duplicate canonical Skill body.
-   The existing-tool-before-read exception remains available for the tool action
-   itself, not for interpreting or repairing its result without the needed reads.
-5. If the Skill body and its task-relevant delegated edge do not resolve one
-   operational owner, report the unresolved item and use the bounded purpose search in
-   [documents/tools/search-coordination.md](../../documents/tools/search-coordination.md). Search results nominate an owner;
-   they do not unlock implementation until the selected Skill/upstream-owner
-   trace is resolved.
-
-When the Skill body resolves the owner, do not build a semantic index, sweep
-the repository, or traverse every dependency-header edge. This keeps the route
-short enough for low-reasoning agents while preserving the Skill body as the
-operational owner and the existing dependency header as the only delegated
-edge owner.
-
-When authoring or revising a branched Skill, keep common constraints and a short
-`condition -> [section](#heading)` route before the details. Put branch bodies
-under separate headings or linked files, not in the common read block. Do not
-hide shared safety requirements inside an optional branch or put branch
-selection conditions only inside the branch body. This is not a whole-file split
-or a new read ledger requirement.
+For branched Skills, state the condition that activates each branch near the
+branch guidance. Keep shared authority and safety constraints visible wherever
+they apply. Split content only when separate sections make the actual decision
+easier to find; a branch map or file split is not required for every Skill.
 
 ## Decision Order
 
-1. Classify the request as `routing-only/advisory` or `repo-changing execution`.
-2. Identify premises that could change the owner, mechanism, required guarantee,
-   scope, or validation; verify them against current source, callers, inputs/state,
-   constraints, and source authority. Distinguish observed facts, inferences, and
-   unresolved decision-relevant premises; investigate only missing facts that can
-   change the decision. For repo-wide or multi-surface execution, first establish
-   the shared repository orientation required by `ROOT_AGENTS.md`, then follow
-   relevant cross-directory callers and consumers to resolve the replaceable unit.
-   Use an existing canonical tool when it owns the question; search only when owner
-   or mechanism remains ambiguous. A handoff or tool result is enough unless
-   coordination/resumption needs durable state.
-3. Resolve family, stage, and role candidates from `agents/task_catalog.yaml`.
-   A bounded owner/path/validation route runs through its execution owner; a
-   child exists only when the selected typed route requires it.
-4. Materialize model/profile and ToolCall values through their registry owners.
-   For Luna, use `direct-luna-communication`; preserve the logical role and do
-   not turn aliases into new capacity or approval rules.
-5. When work is split, carry the shared repository orientation through the existing
-   handoff, then add only the owner-specific context and validation each operation
-   needs. Update it with new cross-owner findings. Bounded source context narrows
-   reading, not responsibility. Do not repeat completed searches, full scans,
-   inactive stages, or generic review packs when they cannot change the next
-   owner/edit/validation decision.
-6. Select review, specialist, and artifact routes only when the changed contract
-   or an unresolved risk needs them; return to the selected workflow after the
-   decision is closed.
+Classify whether the current request is advisory or authorizes repository
+execution, then resolve only facts that could change the owner, mechanism,
+required behavior, scope, or validation. Compare those facts with current source,
+callers, state, constraints, and source authority; keep observations, inferences,
+and unresolved premises distinct. For work crossing directories or surfaces,
+establish the shared repository orientation and follow only the callers and
+consumers that can affect the replaceable unit. Use an existing tool when it owns
+the question; search when the owner or mechanism remains uncertain.
+
+Resolve workflow, skills, roles, and runtime profile from `agents/task_catalog.yaml`
+and their registry owners. A bounded task stays with its execution owner; a child,
+review, specialist, artifact, or durable run bundle is selected only when its
+owner or the current coordination need calls for it. When actions depend on one
+another, respect those dependencies; independent, non-conflicting work can run
+in parallel when the selected route and runtime support it. Carry settled context
+forward and reopen a decision only when new evidence can change it.
 
 ### Local Capability Priority
 
@@ -276,19 +211,17 @@ publication, or resumption coordination selects `bounded_fast_path`; otherwise
 use existing `coordination`. Risk labels, prompt keywords, and file/line counts
 are not route predicates.
 
-The bounded route has exactly `route -> execute -> verify_close`. Its execution
-owner uses the existing task evidence directly; it does not materialize a run
-bundle, schedule, completion coverage, child packet, broad review, full suite,
-or inactive `not_applicable` / `not_selected` gate records.
-During `verify_close`, inspect the exact diff, run only selected validation,
-integrate latest main and resolve conflicts, then publish and read back the
-Issue branch/commit/PR and record scope, results, limitations, and status in the
-Issue and user report. Existing read-only/local-only/no-change exceptions still
-apply; the route does not manufacture commit/push evidence. Unavailable selected
-validation is `need verification`, not a pass or permission for unrelated tests.
-Failed validation remains failed. The router plans these operations; selecting
-an execution route never proves their completion. The existing coordinated
-`task_close.py` predicate is unchanged and is emitted only for `coordination`.
+The bounded route leaves execution with one owner using the existing task
+evidence; it does not materialize a run bundle, schedule, completion-coverage
+ledger, child packet, broad review, or inactive gate records. That owner carries
+out the requested work and its applicable closeout obligations: inspect the
+exact diff, use selected validation, integrate the current base when publication
+requires it, and read back any authorized Issue, branch, commit, or PR update.
+Read-only, local-only, and no-change requests do not manufacture commit or push
+evidence. Unavailable selected validation remains `need verification`; failed
+validation remains failed. Route selection plans work but never proves it
+finished. The existing coordinated `task_close.py` predicate remains limited to
+`coordination`.
 
 Use a dependency/overlap graph only when the selected work has real ordering,
 schema, validation, publication, or collision edges. A node is a full
@@ -434,9 +367,11 @@ A still-valid issue owned by another trust boundary is recorded with
 `reason_code=outside_active_trust_boundary` and handed to that owner separately;
 do not import it into the active task.
 
-Validation is static/targeted first. Full suites, full dependency review, and
-remote CI are selected once for the final candidate only when the touched
-contract requires them. Do not materialize empty reviewer or template artifacts.
+Choose validation from the changed contract and the guarantee the result must
+establish. Targeted evidence is sufficient when it covers that guarantee; use
+broader suites, dependency review, or remote CI when integration or remaining
+risk makes them relevant. Reuse evidence that still applies and do not create
+empty reviewer or template artifacts.
 
 ## Workflow Family Mapping
 
