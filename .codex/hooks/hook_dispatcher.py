@@ -76,7 +76,10 @@ from tools.agent.orchestration.subagent_selection import (  # noqa: E402
     select_subagents,
 )
 from tools.agent.orchestration.tool_selection import select_tools  # noqa: E402
-from tools.agent.orchestration.workflow_context import WorkflowContext, load_workflow_context  # noqa: E402
+from tools.agent.orchestration.workflow_context import (
+    WorkflowContext,
+    load_workflow_context,
+)  # noqa: E402
 from tools.runtime.lifecycle.workflow_monitor import emit_behavior_projection  # noqa: E402
 
 OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
@@ -97,11 +100,15 @@ def _parent_bound_report(path: Path, purpose: str) -> Path | None:
     try:
         parent = Path(configured)
         attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+            ParentRootAttestationRequest(
+                cwd=parent, explicit_root=parent, purpose=purpose
+            )
         )
-        return ParentRootSideEffectBoundary().resolve_parent_owned_path(
-            attestation, path, purpose, create=False
-        ).physical_path
+        return (
+            ParentRootSideEffectBoundary()
+            .resolve_parent_owned_path(attestation, path, purpose, create=False)
+            .physical_path
+        )
     except (ParentRootSideEffectError, OSError, RuntimeError, ValueError):
         return None
 
@@ -153,7 +160,9 @@ HOOK_EVENT_CONTRACTS: dict[str, HookEventContract] = {
     ),
     "PostToolUse": HookEventContract(
         active=True,
-        matchers=("Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent|send_message|followup_task|list_agents|interrupt_agent",),
+        matchers=(
+            "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent|send_message|followup_task|list_agents|interrupt_agent",
+        ),
         failure="invalid_projection=fail_open; malformed_payload=fail_open; spool_failure=fail_open",
         telemetry="one bounded fingerprint-only local spool event",
     ),
@@ -195,7 +204,9 @@ def reject_json_constant(value: str) -> None:
 
 
 def canonical_json_bytes(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("utf-8")
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
+    ).encode("utf-8")
 
 
 def parse_payload(raw_payload: bytes) -> dict[str, object] | None:
@@ -226,7 +237,11 @@ def normalize_post_tool_use_input(payload: dict[str, object]) -> dict[str, objec
     tool_response = payload["tool_response"]
     if not isinstance(tool_name, str) or not isinstance(tool_input, dict):
         raise ProjectionError("raw PostToolUse tool fields have invalid types")
-    if not isinstance(tool_response, dict) or set(tool_response) != {"exit_code", "stderr", "stdout"}:
+    if not isinstance(tool_response, dict) or set(tool_response) != {
+        "exit_code",
+        "stderr",
+        "stdout",
+    }:
         raise ProjectionError("raw PostToolUse response keys are not exact")
     if (
         type(tool_response["exit_code"]) is not int
@@ -237,7 +252,9 @@ def normalize_post_tool_use_input(payload: dict[str, object]) -> dict[str, objec
     normalized = {
         "hook_event_name": "PostToolUse",
         "schema_version": POST_TOOL_USE_INPUT_SCHEMA,
-        "tool_input_fingerprint": hashlib.sha256(canonical_json_bytes(tool_input)).hexdigest(),
+        "tool_input_fingerprint": hashlib.sha256(
+            canonical_json_bytes(tool_input)
+        ).hexdigest(),
         "tool_name": tool_name,
         "tool_input": tool_input,
         "tool_response": tool_response,
@@ -345,7 +362,11 @@ def resolve_report_target(state: HookRootState) -> Path | None:
             )
         except (OSError, RuntimeError, ValueError):
             return None
-        return _parent_bound_report(resolved, "hook-report-projection") if resolved.is_dir() else None
+        return (
+            _parent_bound_report(resolved, "hook-report-projection")
+            if resolved.is_dir()
+            else None
+        )
     report_root = state.active_root / REPORT_ROOT_RELATIVE
     target = _active_report_target(
         state.active_root / ACTIVE_RUN_POINTER,
@@ -360,7 +381,11 @@ def resolve_report_target(state: HookRootState) -> Path | None:
             active_root=state.active_root,
             report_root=report_root,
         )
-        return _parent_bound_report(standalone_target, "hook-report-projection") if standalone_target is not None else None
+        return (
+            _parent_bound_report(standalone_target, "hook-report-projection")
+            if standalone_target is not None
+            else None
+        )
     return None
 
 
@@ -407,7 +432,9 @@ def prepare_parts(
         tools = select_tools(payload_data)
         subagents = select_subagents(payload_data, context)
         rules = PromptClassifierInputs(
-            prompt=payload_data.get("prompt", "") if isinstance(payload_data.get("prompt"), str) else "",
+            prompt=payload_data.get("prompt", "")
+            if isinstance(payload_data.get("prompt"), str)
+            else "",
             repo_root=root,
             catalog=freeze({}),
             routing_rules=freeze({}),
@@ -424,8 +451,14 @@ def prepare_parts(
             payload_status="parsed" if parsed else "malformed_payload",
             handler_result=FinalHandlerResult(
                 status=status,
-                output_kind="block" if output else "additional_context" if status == "projection_forwarded" else "",
-                safe_fields={"safety_decision": "block"} if status.startswith("blocked_") else {},
+                output_kind="block"
+                if output
+                else "additional_context"
+                if status == "projection_forwarded"
+                else "",
+                safe_fields={"safety_decision": "block"}
+                if status.startswith("blocked_")
+                else {},
             ),
             classifier_rules=rules,
             tool_selection=tools,
@@ -490,18 +523,24 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         root_state.active_root,
         **telemetry,
     )
-    mutation_decision = evaluate_mutation_authority(
-        payload,
-        report_dir=report_dir,
-        active_root=root_state.active_root,
-        environment=os.environ,
-        hook_spool_root=context.spool_root(),
-    ) if event == "PreToolUse" else None
+    mutation_decision = (
+        evaluate_mutation_authority(
+            payload,
+            report_dir=report_dir,
+            active_root=root_state.active_root,
+            environment=os.environ,
+            hook_spool_root=context.spool_root(),
+        )
+        if event == "PreToolUse"
+        else None
+    )
     if mutation_decision is not None and mutation_decision.status == "blocked":
         target_blocked = mutation_decision.reason.startswith("writer_target")
         if output is None or target_blocked:
             output = official_payload(event, mutation_block_payload(mutation_decision))
-            status = "blocked_writer_target" if target_blocked else "blocked_parent_mutation"
+            status = (
+                "blocked_writer_target" if target_blocked else "blocked_parent_mutation"
+            )
     if mutation_decision is not None:
         spool_entry["mutation_control"] = mutation_decision.as_dict()
         spool_entry["status"] = status
@@ -556,7 +595,9 @@ def normalize_event(raw_event: str) -> str:
     event = EVENT_ALIASES.get(raw_event.casefold())
     if event is None:
         choices = ", ".join(HOOK_EVENT_CONTRACTS)
-        raise SystemExit(f"unknown hook event {raw_event!r}; expected one of: {choices}")
+        raise SystemExit(
+            f"unknown hook event {raw_event!r}; expected one of: {choices}"
+        )
     return event
 
 
@@ -574,7 +615,9 @@ def contract_payload(event: str | None = None) -> dict[str, object]:
             for name in names
         },
         "active_events": [name for name in names if HOOK_EVENT_CONTRACTS[name].active],
-        "inactive_events": [name for name in names if not HOOK_EVENT_CONTRACTS[name].active],
+        "inactive_events": [
+            name for name in names if not HOOK_EVENT_CONTRACTS[name].active
+        ],
         "active_handlers": sorted(ACTIVE_HOOK_HANDLERS),
         "retired_child_tombstones": [
             {
@@ -600,7 +643,8 @@ def contract_payload(event: str | None = None) -> dict[str, object]:
         "counts": {
             "retired_child_tombstones": len(RETIRED_CHILD_TOMBSTONES),
             "moved_source_absences": len(MOVED_SOURCE_ABSENCES),
-            "retired_filenames": len(RETIRED_CHILD_TOMBSTONES) + len(MOVED_SOURCE_ABSENCES),
+            "retired_filenames": len(RETIRED_CHILD_TOMBSTONES)
+            + len(MOVED_SOURCE_ABSENCES),
         },
         "source_digest": source_digest(),
     }
@@ -615,8 +659,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("event", nargs="?", help="Codex hook event to dispatch")
     parser.add_argument("--group", dest="group", help="Alias for the event argument")
-    parser.add_argument("--list", action="store_true", help="Print the active/inactive hook contract")
-    parser.add_argument("--contract", action="store_true", help="Print the canonical typed hook contract")
+    parser.add_argument(
+        "--list", action="store_true", help="Print the active/inactive hook contract"
+    )
+    parser.add_argument(
+        "--contract",
+        action="store_true",
+        help="Print the canonical typed hook contract",
+    )
     return parser.parse_args(argv)
 
 

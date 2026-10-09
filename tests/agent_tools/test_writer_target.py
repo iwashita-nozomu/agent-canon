@@ -476,7 +476,9 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
                 hook_spool_root=root,
             )
             assert redirected.status == "blocked"
-            assert redirected.reason == "writer_target_git_repository_redirect_forbidden"
+            assert (
+                redirected.reason == "writer_target_git_repository_redirect_forbidden"
+            )
         # These exact config forms retain this native non-bare fixture's root;
         # child scope is still decided from the paths Git selects here.
         configured_commits = (
@@ -572,7 +574,9 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
                 hook_spool_root=root,
             )
             assert out_of_scope_configured.status == "blocked"
-            assert out_of_scope_configured.reason == "mutation_scope_outside_child_receipt"
+            assert (
+                out_of_scope_configured.reason == "mutation_scope_outside_child_receipt"
+            )
             assert set(out_of_scope_configured.mutation_paths) == {
                 "src/owned.py",
                 "README.md",
@@ -807,7 +811,9 @@ def test_writer_commit_scope_uses_staged_paths_not_message_values() -> None:
         )
         assert decision.status == "allowed"
         assert decision.mutation_paths == ("src/owned.py",)
-        (root / "README.md").write_text("worktree input outside scope\n", encoding="utf-8")
+        (root / "README.md").write_text(
+            "worktree input outside scope\n", encoding="utf-8"
+        )
         all_tracked = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",

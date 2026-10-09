@@ -1403,9 +1403,9 @@ def finalize_merge_main(
     _run_git(clone, ["commit", "--no-edit"])
     merged_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
     merged_tree = _run_git(clone, ["rev-parse", f"{merged_sha}^{{tree}}"]).strip()
-    merged_parents = _run_git(
-        clone, ["show", "-s", "--format=%P", merged_sha]
-    ).strip().split()
+    merged_parents = (
+        _run_git(clone, ["show", "-s", "--format=%P", merged_sha]).strip().split()
+    )
     if merged_parents != [candidate_sha, origin_main_sha]:
         raise RepositoryTopicCloneError(
             "merge-finalize hold: native merge parent readback mismatch"

@@ -68,14 +68,35 @@ READONLY_GIT_SUBCOMMANDS = frozenset(
     {"branch", "diff", "log", "ls-files", "remote", "rev-parse", "show", "status"}
 )
 MUTATING_COMMANDS = frozenset(
-    {"apply_patch", "cargo", "chmod", "cp", "docker", "make", "mkdir", "mv", "perl", "pytest", "python", "python3", "rm", "sed", "tee", "touch"}
+    {
+        "apply_patch",
+        "cargo",
+        "chmod",
+        "cp",
+        "docker",
+        "make",
+        "mkdir",
+        "mv",
+        "perl",
+        "pytest",
+        "python",
+        "python3",
+        "rm",
+        "sed",
+        "tee",
+        "touch",
+    }
 )
-PATCH_PATH_RE = re.compile(r"^\*\*\*\s+(?:Update|Add|Delete) File:\s*(.+?)\s*$", re.MULTILINE)
+PATCH_PATH_RE = re.compile(
+    r"^\*\*\*\s+(?:Update|Add|Delete) File:\s*(.+?)\s*$", re.MULTILINE
+)
 SHELL_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 SHELL_CONTROL_TOKENS = frozenset(
     {";", "&&", "||", "|", "&", "(", ")", ";;", ";&", ";;&"}
 )
-SHELL_COMMAND_PREFIXES = frozenset({"env", "command", "sudo", "exec", "builtin", "time", "!"})
+SHELL_COMMAND_PREFIXES = frozenset(
+    {"env", "command", "sudo", "exec", "builtin", "time", "!"}
+)
 OPAQUE_SHELL_COMMANDS = frozenset({".", "source", "eval", "xargs"})
 SHELL_ANALYSIS_MAX_DEPTH = 32
 UNRESOLVED_SHELL_PATH = "/__agent_canon_unresolved_shell_path__"
@@ -149,7 +170,9 @@ class MutationAuthorityDecision:
 
 
 def _canonical(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
 
 
 def _text(mapping: Mapping[str, object], key: str) -> str:
@@ -158,7 +181,9 @@ def _text(mapping: Mapping[str, object], key: str) -> str:
 
 
 def _relative_paths(value: object) -> tuple[str, ...] | None:
-    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in value
+    ):
         return None
     paths = tuple(str(item) for item in value)
     if any(Path(item).is_absolute() or ".." in Path(item).parts for item in paths):
@@ -166,9 +191,16 @@ def _relative_paths(value: object) -> tuple[str, ...] | None:
     return paths
 
 
-def _scope_digest(allowed_files: tuple[str, ...], allowed_directories: tuple[str, ...]) -> str:
+def _scope_digest(
+    allowed_files: tuple[str, ...], allowed_directories: tuple[str, ...]
+) -> str:
     return hashlib.sha256(
-        _canonical({"allowed_files": list(allowed_files), "allowed_directories": list(allowed_directories)})
+        _canonical(
+            {
+                "allowed_files": list(allowed_files),
+                "allowed_directories": list(allowed_directories),
+            }
+        )
     ).hexdigest()
 
 
@@ -193,12 +225,20 @@ def _read_identity(report_dir: Path) -> tuple[dict[str, object] | None, str]:
         "status",
         "receipt_sha256",
     }
-    if set(value) != expected or value.get("schema") != IDENTITY_SCHEMA or value.get("status") != "active":
+    if (
+        set(value) != expected
+        or value.get("schema") != IDENTITY_SCHEMA
+        or value.get("status") != "active"
+    ):
         return None, str(path)
     allowed_files = _relative_paths(value.get("allowed_files"))
     allowed_directories = _relative_paths(value.get("allowed_directories"))
     receipt_sha = value.get("receipt_sha256")
-    if allowed_files is None or allowed_directories is None or not isinstance(receipt_sha, str):
+    if (
+        allowed_files is None
+        or allowed_directories is None
+        or not isinstance(receipt_sha, str)
+    ):
         return None, str(path)
     if value.get("scope_digest") != _scope_digest(allowed_files, allowed_directories):
         return None, str(path)
@@ -326,7 +366,9 @@ def _command_index(segment: tuple[str, ...]) -> int | None:
         if token in SHELL_COMMAND_PREFIXES:
             index += 1
             if token == "env":
-                while index < len(segment) and SHELL_ASSIGNMENT_RE.match(segment[index]):
+                while index < len(segment) and SHELL_ASSIGNMENT_RE.match(
+                    segment[index]
+                ):
                     index += 1
             continue
         return index
@@ -471,8 +513,11 @@ def _git_repository_redirect(
     }
     needs_binding = subcommand == "commit" or any(
         token in context_options
-        or token.startswith(("-C", "-c")) and len(token) > 2
-        or token.startswith(("--config-env=", "--git-dir=", "--namespace=", "--work-tree="))
+        or token.startswith(("-C", "-c"))
+        and len(token) > 2
+        or token.startswith(
+            ("--config-env=", "--git-dir=", "--namespace=", "--work-tree=")
+        )
         for token in global_options
     )
     if not needs_binding:
@@ -490,17 +535,13 @@ def _git_repository_redirect(
             value = global_options[index + 1]
             if not value:
                 return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
-            normalized, _outside = _shell_path(
-                value, cwd=cwd, active_root=active_root
-            )
+            normalized, _outside = _shell_path(value, cwd=cwd, active_root=active_root)
             return (normalized,), "git_repository_redirect"
         if token.startswith(("--git-dir=", "--work-tree=")):
             _option, value = token.split("=", maxsplit=1)
             if not value:
                 return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
-            normalized, _outside = _shell_path(
-                value, cwd=cwd, active_root=active_root
-            )
+            normalized, _outside = _shell_path(value, cwd=cwd, active_root=active_root)
             return (normalized,), "git_repository_redirect"
         if token == "-C":
             if index + 1 >= len(global_options):
@@ -725,9 +766,7 @@ def _git_commit_mutation_paths(
     if _git_commit_uses_pathspec_file(sub_args):
         return (UNRESOLVED_SHELL_PATH,)
 
-    path_arguments = _git_argument_paths(
-        sub_args, cwd=cwd, active_root=active_root
-    )
+    path_arguments = _git_argument_paths(sub_args, cwd=cwd, active_root=active_root)
     if UNRESOLVED_SHELL_PATH in path_arguments:
         return path_arguments
 
@@ -905,7 +944,9 @@ def _bash_mutation_inner(
             git_index = next(
                 (
                     index
-                    for index, token in enumerate(segment[command_index + 1 :], command_index + 1)
+                    for index, token in enumerate(
+                        segment[command_index + 1 :], command_index + 1
+                    )
                     if command_basename(token) == "git"
                 ),
                 None,
@@ -918,11 +959,15 @@ def _bash_mutation_inner(
             _git_options, env_git_subcommand, _env_git_args = _git_subcommand(
                 segment[git_index + 1 :]
             )
-            if env_git_subcommand not in READONLY_GIT_SUBCOMMANDS or env_git_subcommand in {
-                "branch",
-                "stash",
-                "worktree",
-            }:
+            if (
+                env_git_subcommand not in READONLY_GIT_SUBCOMMANDS
+                or env_git_subcommand
+                in {
+                    "branch",
+                    "stash",
+                    "worktree",
+                }
+            ):
                 mutation = True
                 paths.append(UNRESOLVED_SHELL_PATH)
                 reasons.append("shell_wrapper_unparseable_env")
@@ -939,7 +984,9 @@ def _bash_mutation_inner(
                     git_environment_overrides[token] = None
             continue
         if verb == "cd":
-            operands = [token for token in segment[command_index + 1 :] if token != "--"]
+            operands = [
+                token for token in segment[command_index + 1 :] if token != "--"
+            ]
             if not operands or len(operands) > 1 or operands[0].startswith("-"):
                 mutation = True
                 reasons.append("shell_cd_unresolved")
@@ -952,7 +999,9 @@ def _bash_mutation_inner(
                 paths.append(normalized)
                 reasons.append("shell_cd_outside_checkout")
             elif active_root is not None:
-                cwd = (active_root.resolve(strict=False) / normalized).resolve(strict=False)
+                cwd = (active_root.resolve(strict=False) / normalized).resolve(
+                    strict=False
+                )
             else:
                 cwd = (cwd / operands[0]).resolve(strict=False)
             continue
@@ -987,10 +1036,12 @@ def _bash_mutation_inner(
                 # create a filesystem mutation target.
                 continue
             if subcommand in {"worktree", "stash"}:
-                nested = next((token for token in sub_args if not token.startswith("-")), "")
-                if (subcommand == "worktree" and nested in {"list", "lock", "unlock"}) or (
-                    subcommand == "stash" and nested in {"list", "show"}
-                ):
+                nested = next(
+                    (token for token in sub_args if not token.startswith("-")), ""
+                )
+                if (
+                    subcommand == "worktree" and nested in {"list", "lock", "unlock"}
+                ) or (subcommand == "stash" and nested in {"list", "show"}):
                     continue
             if subcommand == "clean" and any(
                 token in {"-n", "--dry-run"}
@@ -1106,7 +1157,9 @@ def _repository_topic_clone_operation(command: str) -> str | None:
             continue
         try:
             interpreter = next(
-                index for index, token in enumerate(segment) if token in {"python", "python3"}
+                index
+                for index, token in enumerate(segment)
+                if token in {"python", "python3"}
             )
         except StopIteration:
             continue
@@ -1157,7 +1210,12 @@ def _mutation_request(
         patch = tool_input.get("patch")
         if not isinstance(patch, str):
             return True, (), "patch_payload_missing", ""
-        return True, tuple(match.group(1).strip() for match in PATCH_PATH_RE.finditer(patch)), "apply_patch", hashlib.sha256(patch.encode()).hexdigest()
+        return (
+            True,
+            tuple(match.group(1).strip() for match in PATCH_PATH_RE.finditer(patch)),
+            "apply_patch",
+            hashlib.sha256(patch.encode()).hexdigest(),
+        )
     if tool_name in {"python", "python3"}:
         return True, (), "python_execution", ""
     if tool_name in {"Bash", "bash"}:
@@ -1166,7 +1224,10 @@ def _mutation_request(
             return True, (), "bash_command_missing", ""
         mutation, paths, reason = _bash_mutation(command, active_root=active_root)
         lifecycle_operation = _repository_topic_clone_operation(command)
-        if lifecycle_operation is not None and lifecycle_operation != "repository_topic_clone_compound":
+        if (
+            lifecycle_operation is not None
+            and lifecycle_operation != "repository_topic_clone_compound"
+        ):
             return (
                 mutation,
                 (),
@@ -1196,7 +1257,12 @@ def _writer_target_violation(
     declared_root = environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip()
     declared_branch = environment.get(WRITER_BRANCH_ENV, "").strip()
     declared_paths = environment.get(WRITER_ALLOWED_PATHS_ENV, "").strip()
-    if not declared_root and not declared_branch and not declared_paths and not target_root:
+    if (
+        not declared_root
+        and not declared_branch
+        and not declared_paths
+        and not target_root
+    ):
         return None
     declared_root = declared_root or target_root
     declared_branch = declared_branch or target_branch
@@ -1235,7 +1301,9 @@ def _writer_target_violation(
             candidate = Path(segment[1]).expanduser()
             if not candidate.is_absolute():
                 candidate = target_root_path / candidate
-            if candidate.resolve(strict=False) != target_root_path.resolve(strict=False):
+            if candidate.resolve(strict=False) != target_root_path.resolve(
+                strict=False
+            ):
                 return "writer_target_checkout_root_mismatch"
         if segment and segment[0] == "git":
             for index in range(len(segment) - 1):
@@ -1244,7 +1312,9 @@ def _writer_target_violation(
                     candidate = Path(segment[index + 1]).expanduser()
                     if not candidate.is_absolute():
                         candidate = target_root_path / candidate
-                    if candidate.resolve(strict=False) != target_root_path.resolve(strict=False):
+                    if candidate.resolve(strict=False) != target_root_path.resolve(
+                        strict=False
+                    ):
                         return "writer_target_checkout_root_mismatch"
     return None
 
@@ -1260,14 +1330,21 @@ def _read_writer_target_packet(
         return None, None, str(exc)
     declared_root = environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip()
     declared_branch = environment.get(WRITER_BRANCH_ENV, "").strip()
-    if declared_root and Path(declared_root).expanduser().resolve(strict=False) != Path(target.normalized_root):
+    if declared_root and Path(declared_root).expanduser().resolve(strict=False) != Path(
+        target.normalized_root
+    ):
         return None, None, "writer_target_packet_identity_mismatch"
     if declared_branch and declared_branch != target.branch:
         return None, None, "writer_target_packet_identity_mismatch"
     return target, identity, None
 
 
-def _allowed_path(path: str, active_root: Path, allowed_files: tuple[str, ...], allowed_directories: tuple[str, ...]) -> bool:
+def _allowed_path(
+    path: str,
+    active_root: Path,
+    allowed_files: tuple[str, ...],
+    allowed_directories: tuple[str, ...],
+) -> bool:
     candidate = Path(path)
     if candidate.is_absolute() or ".." in candidate.parts:
         return False
@@ -1278,7 +1355,10 @@ def _allowed_path(path: str, active_root: Path, allowed_files: tuple[str, ...], 
         return True
     if normalized in allowed_files:
         return True
-    return any(normalized == directory or normalized.startswith(directory.rstrip("/") + "/") for directory in allowed_directories)
+    return any(
+        normalized == directory or normalized.startswith(directory.rstrip("/") + "/")
+        for directory in allowed_directories
+    )
 
 
 def evaluate_mutation_authority(
@@ -1302,8 +1382,7 @@ def evaluate_mutation_authority(
         active_root=active_root,
     )
     if reason == "git_commit" and any(
-        environment.get(name, "").strip()
-        for name in GIT_COMMIT_REPOSITORY_REDIRECT_ENV
+        environment.get(name, "").strip() for name in GIT_COMMIT_REPOSITORY_REDIRECT_ENV
     ):
         return MutationAuthorityDecision(
             "blocked",
@@ -1320,17 +1399,56 @@ def evaluate_mutation_authority(
         if isinstance(candidate, str):
             command_value = candidate
     if report_dir is None:
-        return MutationAuthorityDecision("blocked", "blocked_authority_required", True, mutation_paths=paths, command_sha256=command_sha)
+        return MutationAuthorityDecision(
+            "blocked",
+            "blocked_authority_required",
+            True,
+            mutation_paths=paths,
+            command_sha256=command_sha,
+        )
     identity, evidence_ref = _read_identity(report_dir)
     if identity is None:
-        return MutationAuthorityDecision("blocked", "blocked_authority_required", True, mutation_paths=paths, evidence_ref=evidence_ref, command_sha256=command_sha)
+        return MutationAuthorityDecision(
+            "blocked",
+            "blocked_authority_required",
+            True,
+            mutation_paths=paths,
+            evidence_ref=evidence_ref,
+            command_sha256=command_sha,
+        )
     actor_id = _text(identity, "agent_id")
     role_id = _text(identity, "role_id")
     parent_agent_id = _text(identity, "parent_agent_id")
-    if environment.get(RUNTIME_AGENT_ID_ENV) != actor_id or environment.get(RUNTIME_ROLE_ID_ENV) != role_id or environment.get(RUNTIME_PARENT_AGENT_ID_ENV) != parent_agent_id:
-        return MutationAuthorityDecision("blocked", "runtime_identity_mismatch", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
+    if (
+        environment.get(RUNTIME_AGENT_ID_ENV) != actor_id
+        or environment.get(RUNTIME_ROLE_ID_ENV) != role_id
+        or environment.get(RUNTIME_PARENT_AGENT_ID_ENV) != parent_agent_id
+    ):
+        return MutationAuthorityDecision(
+            "blocked",
+            "runtime_identity_mismatch",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
     if role_id in PARENT_ROLE_IDS or identity.get("authority") != "write_capable_child":
-        return MutationAuthorityDecision("blocked", "parent_mutation_forbidden", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
+        return MutationAuthorityDecision(
+            "blocked",
+            "parent_mutation_forbidden",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
     writer_target, _packet_identity, packet_error = _read_writer_target_packet(
         active_root,
         environment,
@@ -1416,10 +1534,23 @@ def evaluate_mutation_authority(
                 command_sha,
             )
     if hook_spool_root is None or not any(
-        _spawn_event_matches(path, actor_id, role_id, str(identity.get("scope_digest", "")))
+        _spawn_event_matches(
+            path, actor_id, role_id, str(identity.get("scope_digest", ""))
+        )
         for path in hook_spool_root.glob("**/*.json")
     ):
-        return MutationAuthorityDecision("blocked", "child_spawn_evidence_missing", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
+        return MutationAuthorityDecision(
+            "blocked",
+            "child_spawn_evidence_missing",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
     if writer_target is None:
         return MutationAuthorityDecision(
             "blocked",
@@ -1475,7 +1606,10 @@ def evaluate_mutation_authority(
             parsed_allowed = json.loads(explicit_allowed)
         except (TypeError, json.JSONDecodeError):
             parsed_allowed = None
-        if not isinstance(parsed_allowed, list) or tuple(parsed_allowed) != packet_paths:
+        if (
+            not isinstance(parsed_allowed, list)
+            or tuple(parsed_allowed) != packet_paths
+        ):
             return MutationAuthorityDecision(
                 "blocked",
                 "writer_target_allowed_paths_mismatch",
@@ -1495,11 +1629,35 @@ def evaluate_mutation_authority(
             for path in paths
         )
     ):
-        return MutationAuthorityDecision("blocked", "mutation_scope_outside_child_receipt", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
-    return MutationAuthorityDecision("allowed", "child_scope_verified", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
+        return MutationAuthorityDecision(
+            "blocked",
+            "mutation_scope_outside_child_receipt",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
+    return MutationAuthorityDecision(
+        "allowed",
+        "child_scope_verified",
+        True,
+        actor_id,
+        role_id,
+        parent_agent_id,
+        str(identity.get("scope_digest", "")),
+        paths,
+        evidence_ref,
+        command_sha,
+    )
 
 
-def _spawn_event_matches(path: Path, actor_id: str, role_id: str, scope_digest: str) -> bool:
+def _spawn_event_matches(
+    path: Path, actor_id: str, role_id: str, scope_digest: str
+) -> bool:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):

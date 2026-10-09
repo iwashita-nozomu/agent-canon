@@ -22,8 +22,12 @@ import pytest
 TOPIC = "dependency-module-change"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-TOOL = PROJECT_ROOT / "tools" / "repository" / "workspace" / "dependency_module_change.py"
-GENERIC_TOOL = PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py"
+TOOL = (
+    PROJECT_ROOT / "tools" / "repository" / "workspace" / "dependency_module_change.py"
+)
+GENERIC_TOOL = (
+    PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py"
+)
 
 
 def run_git(path: Path, *args: str) -> str:
@@ -147,11 +151,17 @@ def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
     workspace_tools.mkdir(parents=True)
     shutil.copy2(TOOL, workspace_tools / TOOL.name)
     shutil.copy2(GENERIC_TOOL, workspace_tools / GENERIC_TOOL.name)
-    shutil.copy2(TOOL.parent / "parent_root_side_effects.py", workspace_tools / "parent_root_side_effects.py")
+    shutil.copy2(
+        TOOL.parent / "parent_root_side_effects.py",
+        workspace_tools / "parent_root_side_effects.py",
+    )
     authority_tools = source_tools / "runtime" / "authority"
     authority_tools.mkdir(parents=True)
     for name in ("checkout_identity.py", "writer_target.py"):
-        shutil.copy2(PROJECT_ROOT / "tools" / "runtime" / "authority" / name, authority_tools / name)
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "runtime" / "authority" / name,
+            authority_tools / name,
+        )
     artifacts_tools = source_tools / "runtime" / "artifacts"
     artifacts_tools.mkdir(parents=True)
     shutil.copy2(

@@ -18,7 +18,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----"), "private key block"),
+    (
+        re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----"),
+        "private key block",
+    ),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "AWS access key id"),
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{30,}\b"), "GitHub token"),
     (re.compile(r"\bsk-[A-Za-z0-9_-]{32,}\b"), "OpenAI-style API key"),
@@ -36,13 +39,35 @@ DESTRUCTIVE_REASON_ENV = "AGENT_CANON_DESTRUCTIVE_GIT_REASON"
 ALLOWED_BRANCH_AUTHORITIES = {"user_request", "agent_canon_workflow"}
 DESTRUCTIVE_AUTHORITY = "explicit_user_approval"
 READ_ONLY_BRANCH_OPTIONS = {
-    "--all", "--color", "--contains", "--format", "--ignore-case", "--list",
-    "--merged", "--no-color", "--no-contains", "--no-merged", "--points-at",
-    "--remotes", "--show-current", "--sort", "--verbose", "-a", "-r", "-v", "-vv",
+    "--all",
+    "--color",
+    "--contains",
+    "--format",
+    "--ignore-case",
+    "--list",
+    "--merged",
+    "--no-color",
+    "--no-contains",
+    "--no-merged",
+    "--points-at",
+    "--remotes",
+    "--show-current",
+    "--sort",
+    "--verbose",
+    "-a",
+    "-r",
+    "-v",
+    "-vv",
 }
 READ_ONLY_BRANCH_VALUE_OPTIONS = {
-    "--color", "--contains", "--format", "--merged", "--no-contains",
-    "--no-merged", "--points-at", "--sort",
+    "--color",
+    "--contains",
+    "--format",
+    "--merged",
+    "--no-contains",
+    "--no-merged",
+    "--points-at",
+    "--sort",
 }
 BENIGN_BRANCH_OPTIONS = {"--edit-description", "--unset-upstream", "-u"}
 BENIGN_BRANCH_VALUE_OPTIONS = {"--set-upstream-to", "-u"}
@@ -54,7 +79,15 @@ PROTECTED_GIT_SUBCOMMANDS = frozenset(
     {"restore", "reset", "clean", "checkout", "switch", "stash", "branch", "worktree"}
 )
 OPAQUE_GIT_OPTIONS_WITH_VALUES = frozenset(
-    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
+    {
+        "-C",
+        "-c",
+        "--git-dir",
+        "--work-tree",
+        "--namespace",
+        "--exec-path",
+        "--config-env",
+    }
 )
 
 
@@ -144,7 +177,9 @@ def shell_tokens(command: str) -> tuple[str, ...]:
         return ()
 
 
-def backtick_command_substitutions(command: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def backtick_command_substitutions(
+    command: str,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Return complete and uncertain executable backtick bodies without shell I/O."""
     complete: list[str] = []
     active: list[str] | None = None
@@ -206,10 +241,7 @@ def backtick_command_substitutions(command: str) -> tuple[tuple[str, ...], tuple
             elif (
                 not active_single_quoted
                 and not active_double_quoted
-                and (
-                    character.isspace()
-                    or character in SHELL_COMMENT_BOUNDARY_CHARS
-                )
+                and (character.isspace() or character in SHELL_COMMENT_BOUNDARY_CHARS)
             ):
                 active_comment_boundary = True
             else:
@@ -255,10 +287,7 @@ def backtick_command_substitutions(command: str) -> tuple[tuple[str, ...], tuple
         elif (
             not single_quoted
             and not double_quoted
-            and (
-                character.isspace()
-                or character in SHELL_COMMENT_BOUNDARY_CHARS
-            )
+            and (character.isspace() or character in SHELL_COMMENT_BOUNDARY_CHARS)
         ):
             comment_boundary = True
         else:
@@ -352,7 +381,10 @@ def consume_exec_prefix(tokens: tuple[str, ...], index: int) -> int:
             index += 2
             continue
         if token in {"-c", "-l"} or (
-            token.startswith("-") and not token.startswith("--") and token[1:] and set(token[1:]) <= {"c", "l"}
+            token.startswith("-")
+            and not token.startswith("--")
+            and token[1:]
+            and set(token[1:]) <= {"c", "l"}
         ):
             index += 1
             continue
@@ -360,7 +392,9 @@ def consume_exec_prefix(tokens: tuple[str, ...], index: int) -> int:
     return index
 
 
-def consume_env_prefix(tokens: tuple[str, ...], index: int, values: dict[str, str]) -> int:
+def consume_env_prefix(
+    tokens: tuple[str, ...], index: int, values: dict[str, str]
+) -> int:
     if index >= len(tokens) or command_basename(tokens[index]) != "env":
         return index
     index += 1
@@ -396,16 +430,43 @@ def git_subcommand_index(tokens: tuple[str, ...], index: int) -> int:
     index += 1
     while index < len(tokens):
         token = tokens[index]
-        if token in {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}:
+        if token in {
+            "-C",
+            "-c",
+            "--git-dir",
+            "--work-tree",
+            "--namespace",
+            "--config-env",
+        }:
             index += 2
             continue
-        if token in {"-p", "-P", "--paginate", "--no-pager", "--bare", "--no-replace-objects", "--literal-pathspecs", "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs", "--exec-path"}:
+        if token in {
+            "-p",
+            "-P",
+            "--paginate",
+            "--no-pager",
+            "--bare",
+            "--no-replace-objects",
+            "--literal-pathspecs",
+            "--glob-pathspecs",
+            "--noglob-pathspecs",
+            "--icase-pathspecs",
+            "--exec-path",
+        }:
             index += 1
             continue
         if token.startswith(("-C", "-c")) and len(token) > 2:
             index += 1
             continue
-        if token.startswith(("--git-dir=", "--work-tree=", "--namespace=", "--exec-path=", "--config-env=")):
+        if token.startswith(
+            (
+                "--git-dir=",
+                "--work-tree=",
+                "--namespace=",
+                "--exec-path=",
+                "--config-env=",
+            )
+        ):
             index += 1
             continue
         break
@@ -449,7 +510,9 @@ def wrapper_script(segment: tuple[str, ...]) -> str:
     for option_index, token in enumerate(tokens[index + 1 :], start=index + 1):
         if token == "--":
             return ""
-        if token == "-c" or (token.startswith("-") and not token.startswith("--") and "c" in token[1:]):
+        if token == "-c" or (
+            token.startswith("-") and not token.startswith("--") and "c" in token[1:]
+        ):
             script_index = option_index + 1
             return tokens[script_index] if script_index < len(tokens) else ""
     return ""
@@ -466,7 +529,11 @@ def short_option_letters(arguments: tuple[str, ...]) -> set[str]:
 
 
 def has_long_option(arguments: tuple[str, ...], *options: str) -> bool:
-    return any(argument in options or any(argument.startswith(f"{option}=") for option in options) for argument in arguments)
+    return any(
+        argument in options
+        or any(argument.startswith(f"{option}=") for option in options)
+        for argument in arguments
+    )
 
 
 def branch_is_read_only(arguments: tuple[str, ...]) -> bool:
@@ -486,10 +553,17 @@ def branch_is_read_only(arguments: tuple[str, ...]) -> bool:
         if argument in READ_ONLY_BRANCH_VALUE_OPTIONS:
             index += 2
             continue
-        if any(argument.startswith(f"{option}=") for option in READ_ONLY_BRANCH_VALUE_OPTIONS):
+        if any(
+            argument.startswith(f"{option}=")
+            for option in READ_ONLY_BRANCH_VALUE_OPTIONS
+        ):
             index += 1
             continue
-        if argument.startswith("-u") and not argument.startswith("--") and argument != "-u":
+        if (
+            argument.startswith("-u")
+            and not argument.startswith("--")
+            and argument != "-u"
+        ):
             saw_benign_metadata = True
             index += 1
             continue
@@ -499,7 +573,11 @@ def branch_is_read_only(arguments: tuple[str, ...]) -> bool:
             saw_benign_metadata = True
             index += 2
             continue
-        if any(argument.startswith(f"{option}=") for option in BENIGN_BRANCH_VALUE_OPTIONS if option.startswith("--")):
+        if any(
+            argument.startswith(f"{option}=")
+            for option in BENIGN_BRANCH_VALUE_OPTIONS
+            if option.startswith("--")
+        ):
             saw_benign_metadata = True
             index += 1
             continue
@@ -521,14 +599,28 @@ def branch_intent(arguments: tuple[str, ...]) -> GitIntent | None:
     if branch_is_read_only(arguments):
         return None
     letters = short_option_letters(arguments)
-    if letters & BRANCH_FORCE_SHORTS or has_long_option(arguments, "--force", "--copy-force"):
-        return GitIntent("destructive_branch_creation", "branch", "force-create/ref-overwrite", True, True)
-    if letters & BRANCH_DESTRUCTIVE_SHORTS or has_long_option(arguments, "--delete", "--move"):
+    if letters & BRANCH_FORCE_SHORTS or has_long_option(
+        arguments, "--force", "--copy-force"
+    ):
+        return GitIntent(
+            "destructive_branch_creation",
+            "branch",
+            "force-create/ref-overwrite",
+            True,
+            True,
+        )
+    if letters & BRANCH_DESTRUCTIVE_SHORTS or has_long_option(
+        arguments, "--delete", "--move"
+    ):
         return GitIntent("destructive_git", "branch", "delete/rename", False, True)
     if letters & BRANCH_NORMAL_CREATE_SHORTS or has_long_option(arguments, "--copy"):
         return GitIntent("branch_creation", "branch", "create/copy", True, False)
-    if has_long_option(arguments, *BRANCH_CREATION_MODIFIERS) and any(not argument.startswith("-") for argument in arguments):
-        return GitIntent("branch_creation", "branch", "create with tracking/reflog", True, False)
+    if has_long_option(arguments, *BRANCH_CREATION_MODIFIERS) and any(
+        not argument.startswith("-") for argument in arguments
+    ):
+        return GitIntent(
+            "branch_creation", "branch", "create with tracking/reflog", True, False
+        )
     if arguments and not arguments[0].startswith("-"):
         return GitIntent("branch_creation", "branch", "branch name", True, False)
     return GitIntent("destructive_git", "branch", "metadata mutation", False, True)
@@ -539,7 +631,9 @@ def worktree_intent(arguments: tuple[str, ...]) -> GitIntent | None:
     while index < len(arguments) and arguments[index] in {"-v", "--verbose"}:
         index += 1
     if index >= len(arguments):
-        return GitIntent("destructive_git", "worktree", "worktree mutation", False, True)
+        return GitIntent(
+            "destructive_git", "worktree", "worktree mutation", False, True
+        )
     subcommand = arguments[index]
     rest = arguments[index + 1 :]
     if subcommand == "list":
@@ -551,7 +645,13 @@ def worktree_intent(arguments: tuple[str, ...]) -> GitIntent | None:
             argument = rest[index]
             if argument == "--reason":
                 if index + 1 >= len(rest) or rest[index + 1].startswith("-"):
-                    return GitIntent("destructive_git", "worktree", "worktree lock mutation", False, True)
+                    return GitIntent(
+                        "destructive_git",
+                        "worktree",
+                        "worktree lock mutation",
+                        False,
+                        True,
+                    )
                 index += 2
                 continue
             if argument.startswith("--reason="):
@@ -560,9 +660,13 @@ def worktree_intent(arguments: tuple[str, ...]) -> GitIntent | None:
             if argument == "--":
                 if not saw_path and len(rest[index + 1 :]) == 1:
                     return None
-                return GitIntent("destructive_git", "worktree", "worktree lock mutation", False, True)
+                return GitIntent(
+                    "destructive_git", "worktree", "worktree lock mutation", False, True
+                )
             if argument.startswith("-") or saw_path:
-                return GitIntent("destructive_git", "worktree", "worktree lock mutation", False, True)
+                return GitIntent(
+                    "destructive_git", "worktree", "worktree lock mutation", False, True
+                )
             saw_path = True
             index += 1
         if saw_path:
@@ -571,11 +675,21 @@ def worktree_intent(arguments: tuple[str, ...]) -> GitIntent | None:
         if rest and all(not argument.startswith("-") for argument in rest):
             return None
     if subcommand == "add":
-        force_overwrite = bool(short_option_letters(rest) & {"B", "f"}) or has_long_option(rest, "--force")
+        force_overwrite = bool(
+            short_option_letters(rest) & {"B", "f"}
+        ) or has_long_option(rest, "--force")
         if force_overwrite:
-            return GitIntent("destructive_worktree_creation", "worktree", "worktree force-add", True, True)
+            return GitIntent(
+                "destructive_worktree_creation",
+                "worktree",
+                "worktree force-add",
+                True,
+                True,
+            )
         return GitIntent("worktree_creation", "worktree", "worktree add", True, False)
-    return GitIntent("destructive_git", "worktree", f"worktree {subcommand}", False, True)
+    return GitIntent(
+        "destructive_git", "worktree", f"worktree {subcommand}", False, True
+    )
 
 
 def git_intent(command: GitCommand) -> GitIntent | None:
@@ -612,15 +726,33 @@ def git_intent(command: GitCommand) -> GitIntent | None:
             else None
         )
     if subcommand in {"checkout", "switch"}:
-        if has_long_option(arguments, "--help") or "h" in short_option_letters(arguments):
+        if has_long_option(arguments, "--help") or "h" in short_option_letters(
+            arguments
+        ):
             return None
         letters = short_option_letters(arguments)
-        force_create = (subcommand == "switch" and "C" in letters) or (subcommand == "checkout" and "B" in letters) or has_long_option(arguments, "--force-create")
-        normal_create = (subcommand == "switch" and "c" in letters) or (subcommand == "checkout" and "b" in letters) or has_long_option(arguments, "--create", "--orphan")
+        force_create = (
+            (subcommand == "switch" and "C" in letters)
+            or (subcommand == "checkout" and "B" in letters)
+            or has_long_option(arguments, "--force-create")
+        )
+        normal_create = (
+            (subcommand == "switch" and "c" in letters)
+            or (subcommand == "checkout" and "b" in letters)
+            or has_long_option(arguments, "--create", "--orphan")
+        )
         if force_create:
-            return GitIntent("destructive_branch_creation", subcommand, "force-create/ref-overwrite", True, True)
+            return GitIntent(
+                "destructive_branch_creation",
+                subcommand,
+                "force-create/ref-overwrite",
+                True,
+                True,
+            )
         if normal_create:
-            return GitIntent("branch_creation", subcommand, "create/orphan", True, False)
+            return GitIntent(
+                "branch_creation", subcommand, "create/orphan", True, False
+            )
         return GitIntent(
             "destructive_git",
             subcommand,
@@ -644,12 +776,20 @@ def assignment_map(command: GitCommand) -> dict[str, str]:
 
 def creation_authorized(command: GitCommand) -> bool:
     values = assignment_map(command)
-    return values.get(BRANCH_AUTHORITY_ENV, "").strip() in ALLOWED_BRANCH_AUTHORITIES and bool(values.get(BRANCH_REASON_ENV, "").strip())
+    return values.get(
+        BRANCH_AUTHORITY_ENV, ""
+    ).strip() in ALLOWED_BRANCH_AUTHORITIES and bool(
+        values.get(BRANCH_REASON_ENV, "").strip()
+    )
 
 
 def destructive_authorized(command: GitCommand) -> bool:
     values = assignment_map(command)
-    return values.get(DESTRUCTIVE_AUTHORITY_ENV, "").strip() == DESTRUCTIVE_AUTHORITY and bool(values.get(DESTRUCTIVE_REASON_ENV, "").strip())
+    return values.get(
+        DESTRUCTIVE_AUTHORITY_ENV, ""
+    ).strip() == DESTRUCTIVE_AUTHORITY and bool(
+        values.get(DESTRUCTIVE_REASON_ENV, "").strip()
+    )
 
 
 def intent_authorized(command: GitCommand, intent: GitIntent) -> bool:
@@ -673,7 +813,13 @@ def opaque_protected_intent(command: str) -> GitIntent | None:
                 index += 1
                 continue
             if option in PROTECTED_GIT_SUBCOMMANDS:
-                return GitIntent("destructive_git", "opaque", "opaque protected Git mutation", False, True)
+                return GitIntent(
+                    "destructive_git",
+                    "opaque",
+                    "opaque protected Git mutation",
+                    False,
+                    True,
+                )
             break
     return None
 
@@ -693,7 +839,11 @@ def _first_block_without_backticks(command: str) -> GitIntent | None:
             intent = git_intent(git_command)
             if intent is not None and not intent_authorized(git_command, intent):
                 return intent
-            if intent is None and git_command.tokens and git_command.tokens[0].startswith("-"):
+            if (
+                intent is None
+                and git_command.tokens
+                and git_command.tokens[0].startswith("-")
+            ):
                 if opaque := opaque_protected_intent(" ".join(segment)):
                     return opaque
             continue
@@ -724,7 +874,9 @@ def branch_block_payload(command: str, intent: GitIntent) -> dict[str, object]:
             f"same-segment {BRANCH_AUTHORITY_ENV}=user_request|agent_canon_workflow and nonempty {BRANCH_REASON_ENV}"
         )
     if intent.requires_destructive:
-        requirements.append(f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}")
+        requirements.append(
+            f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}"
+        )
     if intent.requires_creation and intent.requires_destructive:
         next_action = "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
     elif intent.requires_creation:
@@ -746,5 +898,3 @@ def branch_block_payload(command: str, intent: GitIntent) -> dict[str, object]:
         "operation": f"{intent.kind}:{intent.subcommand}",
         "command_sha256": command_sha256(command),
     }
-
-
