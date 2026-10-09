@@ -3887,7 +3887,7 @@ def test_update_rejects_foreign_before_candidate_build(
         "  if [[ \"${4:-}\" == *io.agent-canon.control-root-digest* ]]; then printf 'foreign-control-root\\n'; fi\n"
         "  exit 0\n"
         "fi\n"
-        'if [[ "$1:$2" == image:inspect ]]; then printf \'%s\\n\' sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; exit 0; fi\n'
+        "if [[ \"$1:$2\" == image:inspect ]]; then printf '%s\\n' sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; exit 0; fi\n"
         'if [[ "$1" == build ]]; then exit 99; fi\n'
         "exit 0\n",
         encoding="utf-8",
