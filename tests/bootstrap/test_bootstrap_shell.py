@@ -4766,10 +4766,10 @@ def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
     assert receipt["code"] == "runtime_unavailable"
 
 
-def test_legacy_runtime_argument_keeps_install_state_at_source_sibling_paths(
+def test_legacy_runtime_argument_keeps_install_state_at_control_runtime_path(
     tmp_path: Path,
 ) -> None:
-    """The removed workspace default cannot receive new runtime or log state."""
+    """The legacy argument cannot redirect control-owned runtime state."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
     repository.mkdir()
@@ -4802,8 +4802,9 @@ def test_legacy_runtime_argument_keeps_install_state_at_source_sibling_paths(
 
     assert completed.returncode == 0, completed.stderr
     receipt = json.loads(completed.stdout)
-    assert receipt["runtime_root"] == str(repository / ".runtime")
-    assert (repository / ".runtime" / "container-state").is_dir()
+    assert receipt["runtime_root"] == str(control / ".runtime")
+    assert (control / ".runtime" / "container-state").is_dir()
+    assert not (repository / ".runtime").exists()
     assert not legacy.exists()
     assert not (control / "agent-canon-log").exists()
     assert (tmp_path / "agent-canon-log").is_dir()
@@ -4897,10 +4898,10 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
     ).startswith("target\tstale\t")
 
 
-def test_symlinked_source_runtime_is_rejected_before_legacy_argument_mapping(
+def test_symlinked_control_runtime_is_rejected_before_legacy_argument_mapping(
     tmp_path: Path,
 ) -> None:
-    """A symlinked canonical runtime cannot redirect the legacy migration input."""
+    """A symlinked control runtime cannot redirect the legacy migration input."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
     outside = tmp_path / "outside-runtime"
@@ -4908,7 +4909,7 @@ def test_symlinked_source_runtime_is_rejected_before_legacy_argument_mapping(
     control.mkdir()
     outside.mkdir()
     (outside / "sentinel").write_text("untouched\n", encoding="utf-8")
-    (repository / ".runtime").symlink_to(outside, target_is_directory=True)
+    (control / ".runtime").symlink_to(outside, target_is_directory=True)
     legacy = control / "workspace" / "agent-canon-runtime" / "host"
 
     completed = subprocess.run(
@@ -4935,7 +4936,8 @@ def test_symlinked_source_runtime_is_rejected_before_legacy_argument_mapping(
     assert completed.returncode == 2
     assert json.loads(completed.stderr)["code"] == "symlink_path_rejected"
     assert (outside / "sentinel").read_text(encoding="utf-8") == "untouched\n"
-    assert (repository / ".runtime").is_symlink()
+    assert (control / ".runtime").is_symlink()
+    assert not (repository / ".runtime").exists()
     assert not (outside / "container-state").exists()
     assert not (control / "workspace").exists()
     assert not (tmp_path / "agent-canon-log").exists()
