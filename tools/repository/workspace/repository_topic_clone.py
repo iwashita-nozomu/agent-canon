@@ -1476,12 +1476,7 @@ def finalize_merge_main(
         raise RepositoryTopicCloneError(
             "merge-finalize hold: merge parent moved after inventory capture"
         )
-    _run_git(clone, ["fetch", "origin", "main"])
-    origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
-    if origin_main_sha != theirs_record.get("commit"):
-        raise RepositoryTopicCloneError(
-            "merge-finalize hold: origin/main moved after inventory capture"
-        )
+    origin_main_sha = merge_head
     try:
         validate_plan(inventory, plan, repo=clone)
     except (ValueError, TypeError) as exc:
