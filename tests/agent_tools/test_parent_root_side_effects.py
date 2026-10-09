@@ -72,10 +72,26 @@ def git_repo(path: Path, *, remote: str | None = None) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", "-b", "main", str(path)], check=True)
     if remote is not None:
-        subprocess.run(["git", "-C", str(path), "remote", "add", "origin", remote], check=True)
-    subprocess.run(["git", "-C", str(path), "-c", "user.name=Test", "-c",
-                    "user.email=test@example.invalid", "commit", "--allow-empty",
-                    "-m", "fixture"], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "-C", str(path), "remote", "add", "origin", remote], check=True
+        )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(path),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ],
+        check=True,
+        capture_output=True,
+    )
 
 
 def pending_handoff_nonces(root: Path) -> dict[str, object]:
@@ -90,7 +106,9 @@ def pending_handoff_nonces(root: Path) -> dict[str, object]:
 def attest(root: Path, **kwargs: object):
     git_repo(root, remote="https://example.invalid/parent.git")
     return ParentRootSideEffectBoundary().attest(
-        ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="test", **kwargs)
+        ParentRootAttestationRequest(
+            cwd=root, explicit_root=root, purpose="test", **kwargs
+        )
     )
 
 
@@ -102,43 +120,92 @@ def test_attestation_binds_parent_source_and_clone_identities(tmp_path: Path) ->
     git_repo(clone, remote="https://example.invalid/clone.git")
     module = tmp_path / ".gitmodules"
     module.write_text(
-        "[submodule \"vendor/agent-canon\"]\n"
+        '[submodule "vendor/agent-canon"]\n'
         "\tpath = vendor/agent-canon\n"
-        "\turl = https://example.invalid/source.git\n", encoding="utf-8"
+        "\turl = https://example.invalid/source.git\n",
+        encoding="utf-8",
     )
     module_sha = hashlib.sha256(module.read_bytes()).hexdigest()
-    source_commit = subprocess.run(["git", "-C", str(source), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
-    source_tree = subprocess.run(["git", "-C", str(source), "rev-parse", "HEAD^{tree}"], check=True, capture_output=True, text=True).stdout.strip()
+    source_commit = subprocess.run(
+        ["git", "-C", str(source), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    source_tree = subprocess.run(
+        ["git", "-C", str(source), "rev-parse", "HEAD^{tree}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     parent_repo_id = hashlib.sha256(
         f"{tmp_path.resolve()}\0https://example.invalid/parent.git".encode()
     ).hexdigest()
-    subprocess.run([
-        "git", "-C", str(tmp_path), "update-index", "--add", "--cacheinfo",
-        f"160000,{source_commit},vendor/agent-canon",
-    ], check=True)
-    subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=Test", "-c",
-                    "user.email=test@example.invalid", "commit", "-m", "gitlink"],
-                   check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            f"160000,{source_commit},vendor/agent-canon",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "gitlink",
+        ],
+        check=True,
+        capture_output=True,
+    )
     owner = tmp_path / "owner.json"
     owner_body = {
-        "schema": "agent-canon.owner-evidence.v1", "parent_repo_id": parent_repo_id,
-        "physical_parent": str(tmp_path), "module_path": "vendor/agent-canon",
-        "remote_url": "https://example.invalid/parent.git", "observed_commit": source_commit,
+        "schema": "agent-canon.owner-evidence.v1",
+        "parent_repo_id": parent_repo_id,
+        "physical_parent": str(tmp_path),
+        "module_path": "vendor/agent-canon",
+        "remote_url": "https://example.invalid/parent.git",
+        "observed_commit": source_commit,
         "observed_tree": source_tree,
     }
     owner_body["evidence_sha256"] = hashlib.sha256(
-        json.dumps(owner_body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(
+            owner_body, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode()
     ).hexdigest()
     owner.write_text(json.dumps({**owner_body}, sort_keys=True), encoding="utf-8")
     owner_sha = hashlib.sha256(owner.read_bytes()).hexdigest()
     marker = tmp_path / "marker.json"
-    marker.write_text(json.dumps({
-        "schema": "agent-canon.repository-topic.v2", "parent_repo_id": parent_repo_id,
-        "topic_slug": "topic", "repo_name": "agent-canon", "clone_path": str(clone),
-        "remote_url": "https://example.invalid/clone.git", "branch": "main",
-        "owner_evidence_sha256": owner_sha, "source_commit": source_commit,
-        "source_tree": source_tree, "created_at": "2026-08-10T00:00:00Z", "nonce": "nonce",
-    }), encoding="utf-8")
+    marker.write_text(
+        json.dumps(
+            {
+                "schema": "agent-canon.repository-topic.v2",
+                "parent_repo_id": parent_repo_id,
+                "topic_slug": "topic",
+                "repo_name": "agent-canon",
+                "clone_path": str(clone),
+                "remote_url": "https://example.invalid/clone.git",
+                "branch": "main",
+                "owner_evidence_sha256": owner_sha,
+                "source_commit": source_commit,
+                "source_tree": source_tree,
+                "created_at": "2026-08-10T00:00:00Z",
+                "nonce": "nonce",
+            }
+        ),
+        encoding="utf-8",
+    )
     receipt = ParentRootSideEffectBoundary().attest(
         ParentRootAttestationRequest(
             cwd=tmp_path,
@@ -157,8 +224,14 @@ def test_attestation_binds_parent_source_and_clone_identities(tmp_path: Path) ->
     assert receipt.parent_root == tmp_path.resolve()
     assert (receipt.parent_dev, receipt.parent_ino) != (0, 0)
     request = ParentRootAttestationRequest(
-        cwd=tmp_path, explicit_root=tmp_path, source_root=source, clone_root=clone,
-        topic_marker=marker, gitmodules=module, owner_evidence=owner, purpose="test",
+        cwd=tmp_path,
+        explicit_root=tmp_path,
+        source_root=source,
+        clone_root=clone,
+        topic_marker=marker,
+        gitmodules=module,
+        owner_evidence=owner,
+        purpose="test",
         expected_module_digest=module_sha,
     )
     marker_value = json.loads(marker.read_text(encoding="utf-8"))
@@ -169,9 +242,10 @@ def test_attestation_binds_parent_source_and_clone_identities(tmp_path: Path) ->
     assert marker_tamper.value.reject is ParentRootReject.MARKER_INVALID
     marker.write_text(json.dumps({**marker_value, "branch": "main"}), encoding="utf-8")
     module.write_text(
-        "[submodule \"vendor/agent-canon\"]\n"
+        '[submodule "vendor/agent-canon"]\n'
         "\tpath = vendor/agent-canon\n"
-        "\turl = https://example.invalid/tampered.git\n", encoding="utf-8"
+        "\turl = https://example.invalid/tampered.git\n",
+        encoding="utf-8",
     )
     with pytest.raises(ParentRootSideEffectError) as module_tamper:
         ParentRootSideEffectBoundary().attest(request)
@@ -184,7 +258,9 @@ def test_missing_and_spoofed_roots_are_typed(tmp_path: Path) -> None:
     with pytest.raises(ParentRootSideEffectError) as missing:
         boundary.attest(
             ParentRootAttestationRequest(
-                cwd=tmp_path / "missing", explicit_root=tmp_path / "missing", purpose="test"
+                cwd=tmp_path / "missing",
+                explicit_root=tmp_path / "missing",
+                purpose="test",
             )
         )
     assert missing.value.reject is ParentRootReject.ROOT_MISSING
@@ -202,40 +278,68 @@ def test_missing_and_spoofed_roots_are_typed(tmp_path: Path) -> None:
 def test_arbitrary_directory_and_remote_spoof_are_rejected(tmp_path: Path) -> None:
     boundary = ParentRootSideEffectBoundary()
     with pytest.raises(ParentRootSideEffectError) as arbitrary:
-        boundary.attest(ParentRootAttestationRequest(cwd=tmp_path, explicit_root=tmp_path, purpose="test"))
+        boundary.attest(
+            ParentRootAttestationRequest(
+                cwd=tmp_path, explicit_root=tmp_path, purpose="test"
+            )
+        )
     assert arbitrary.value.reject is ParentRootReject.ROOT_MISMATCH
     git_repo(tmp_path, remote="https://example.invalid/actual.git")
     with pytest.raises(ParentRootSideEffectError) as remote:
-        boundary.attest(ParentRootAttestationRequest(
-            cwd=tmp_path, explicit_root=tmp_path, expected_remote="https://example.invalid/expected.git", purpose="test"
-        ))
+        boundary.attest(
+            ParentRootAttestationRequest(
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                expected_remote="https://example.invalid/expected.git",
+                purpose="test",
+            )
+        )
     assert remote.value.reject is ParentRootReject.MARKER_INVALID
 
 
-def test_missing_module_digest_and_exact_bound_schema_are_rejected(tmp_path: Path) -> None:
+def test_missing_module_digest_and_exact_bound_schema_are_rejected(
+    tmp_path: Path,
+) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     module = tmp_path / ".gitmodules"
-    module.write_text("[submodule \"vendor/agent-canon\"]\n", encoding="utf-8")
+    module.write_text('[submodule "vendor/agent-canon"]\n', encoding="utf-8")
     digest = hashlib.sha256(module.read_bytes()).hexdigest()
     boundary = ParentRootSideEffectBoundary()
     with pytest.raises(ParentRootSideEffectError) as missing:
-        boundary.attest(ParentRootAttestationRequest(
-            cwd=tmp_path, explicit_root=tmp_path, gitmodules=module,
-            expected_module_digest="0" * 64, purpose="test"
-        ))
+        boundary.attest(
+            ParentRootAttestationRequest(
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                gitmodules=module,
+                expected_module_digest="0" * 64,
+                purpose="test",
+            )
+        )
     assert missing.value.reject is ParentRootReject.MODULE_INVALID
     with pytest.raises(ParentRootSideEffectError) as absent:
-        boundary.attest(ParentRootAttestationRequest(
-            cwd=tmp_path, explicit_root=tmp_path,
-            expected_module_digest=digest, purpose="test"
-        ))
+        boundary.attest(
+            ParentRootAttestationRequest(
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                expected_module_digest=digest,
+                purpose="test",
+            )
+        )
     assert absent.value.reject is ParentRootReject.MODULE_INVALID
     marker = tmp_path / "marker.json"
-    marker.write_text('{"schema":"agent-canon.repository-topic.v2","schema":"duplicate"}', encoding="utf-8")
+    marker.write_text(
+        '{"schema":"agent-canon.repository-topic.v2","schema":"duplicate"}',
+        encoding="utf-8",
+    )
     with pytest.raises(ParentRootSideEffectError) as malformed:
-        boundary.attest(ParentRootAttestationRequest(
-            cwd=tmp_path, explicit_root=tmp_path, topic_marker=marker, purpose="test"
-        ))
+        boundary.attest(
+            ParentRootAttestationRequest(
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                topic_marker=marker,
+                purpose="test",
+            )
+        )
     assert malformed.value.reject is ParentRootReject.MARKER_INVALID
     assert digest != "0" * 64
 
@@ -246,15 +350,21 @@ def test_regular_nested_git_is_not_a_submodule_gitlink(tmp_path: Path) -> None:
     git_repo(nested, remote="https://example.invalid/nested.git")
     module = tmp_path / ".gitmodules"
     module.write_text(
-        "[submodule \"vendor/nested\"]\n"
+        '[submodule "vendor/nested"]\n'
         "\tpath = vendor/nested\n"
-        "\turl = https://example.invalid/nested.git\n", encoding="utf-8"
+        "\turl = https://example.invalid/nested.git\n",
+        encoding="utf-8",
     )
     with pytest.raises(ParentRootSideEffectError) as rejected:
-        ParentRootSideEffectBoundary().attest(ParentRootAttestationRequest(
-            cwd=tmp_path, explicit_root=tmp_path, source_root=nested,
-            gitmodules=module, purpose="module-check",
-        ))
+        ParentRootSideEffectBoundary().attest(
+            ParentRootAttestationRequest(
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                source_root=nested,
+                gitmodules=module,
+                purpose="module-check",
+            )
+        )
     assert rejected.value.reject is ParentRootReject.MODULE_INVALID
 
 
@@ -262,7 +372,9 @@ def test_handoff_forgery_and_cross_instance_replay_are_rejected(tmp_path: Path) 
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     boundary = ParentRootSideEffectBoundary()
     token = boundary.issue_child_handoff(tmp_path, audience="test")
-    request = ParentRootAttestationRequest(cwd=tmp_path, explicit_root=tmp_path, purpose="test", child_handoff_token=token)
+    request = ParentRootAttestationRequest(
+        cwd=tmp_path, explicit_root=tmp_path, purpose="test", child_handoff_token=token
+    )
     boundary.attest(request)
     with pytest.raises(ParentRootSideEffectError) as replay:
         ParentRootSideEffectBoundary().attest(request)
@@ -270,7 +382,12 @@ def test_handoff_forgery_and_cross_instance_replay_are_rejected(tmp_path: Path) 
     forged = token[:-2] + ("AA" if token[-2:] != "AA" else "BB")
     with pytest.raises(ParentRootSideEffectError) as forgery:
         ParentRootSideEffectBoundary().attest(
-            ParentRootAttestationRequest(cwd=tmp_path, explicit_root=tmp_path, purpose="test", child_handoff_token=forged)
+            ParentRootAttestationRequest(
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                purpose="test",
+                child_handoff_token=forged,
+            )
         )
     assert forgery.value.reject is ParentRootReject.HANDOFF_INVALID
 
@@ -291,9 +408,13 @@ def test_handoff_nonce_receipt_survives_a_new_process(tmp_path: Path) -> None:
         "PYTHONPATH": str(Path.cwd()),
         "PYTHONPYCACHEPREFIX": str(Path.cwd().parent / "test-tmp" / "pycache"),
     }
-    accepted = subprocess.run([sys.executable, "-c", code, str(tmp_path), token], env=env, check=False)
+    accepted = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path), token], env=env, check=False
+    )
     assert accepted.returncode == 0
-    replayed = subprocess.run([sys.executable, "-c", code, str(tmp_path), token], env=env, check=False)
+    replayed = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path), token], env=env, check=False
+    )
     assert replayed.returncode != 0
 
 
@@ -306,23 +427,27 @@ def test_handoff_source_and_clone_bindings_are_symmetric(tmp_path: Path) -> None
         tmp_path, audience="test", source_root=source
     )
     with pytest.raises(ParentRootSideEffectError) as unexpected_source:
-        boundary.attest(ParentRootAttestationRequest(
-            cwd=tmp_path,
-            explicit_root=tmp_path,
-            purpose="test",
-            child_handoff_token=token_with_source,
-        ))
+        boundary.attest(
+            ParentRootAttestationRequest(
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                purpose="test",
+                child_handoff_token=token_with_source,
+            )
+        )
     assert unexpected_source.value.reject is ParentRootReject.HANDOFF_INVALID
 
     token_without_source = boundary.issue_child_handoff(tmp_path, audience="test")
     with pytest.raises(ParentRootSideEffectError) as missing_source:
-        boundary.attest(ParentRootAttestationRequest(
-            cwd=tmp_path,
-            explicit_root=tmp_path,
-            source_root=source,
-            purpose="test",
-            child_handoff_token=token_without_source,
-        ))
+        boundary.attest(
+            ParentRootAttestationRequest(
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                source_root=source,
+                purpose="test",
+                child_handoff_token=token_without_source,
+            )
+        )
     assert missing_source.value.reject is ParentRootReject.HANDOFF_INVALID
 
 
@@ -346,7 +471,9 @@ def test_clone_target_is_exclusively_reserved_and_fd_bound(tmp_path: Path) -> No
     assert not target.exists()
 
 
-def test_tree_copy_uses_parent_owned_operations_and_preserves_exclusions(tmp_path: Path) -> None:
+def test_tree_copy_uses_parent_owned_operations_and_preserves_exclusions(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
     source = tmp_path / "source-tree"
@@ -365,7 +492,9 @@ def test_tree_copy_uses_parent_owned_operations_and_preserves_exclusions(tmp_pat
     assert not (target / ".git").exists()
 
 
-def test_git_config_add_uses_inherited_boundary_file_and_reads_back(tmp_path: Path) -> None:
+def test_git_config_add_uses_inherited_boundary_file_and_reads_back(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
     config = tmp_path / "config" / "safe.directory.gitconfig"
@@ -383,7 +512,9 @@ def test_git_config_add_uses_inherited_boundary_file_and_reads_back(tmp_path: Pa
     assert published.target_ino is not None
 
 
-def test_checkout_index_uses_boundary_staging_and_atomic_publish(tmp_path: Path) -> None:
+def test_checkout_index_uses_boundary_staging_and_atomic_publish(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
     tracked = tmp_path / "tracked.txt"
@@ -414,7 +545,9 @@ def test_checkout_index_uses_boundary_staging_and_atomic_publish(tmp_path: Path)
     assert published.target_ino is not None
 
 
-def test_path_capability_accepts_in_root_symlink_and_rejects_escape(tmp_path: Path) -> None:
+def test_path_capability_accepts_in_root_symlink_and_rejects_escape(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
     target = tmp_path / "inside.txt"
@@ -517,7 +650,9 @@ def test_lexical_symlink_replacement_is_rejected_without_removing_replacement(
     assert link.resolve() == second_target
 
 
-def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path) -> None:
+def test_atomic_publish_and_child_environment_keep_home_unchanged(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
     path = boundary.resolve_parent_owned_path(receipt, "reports/result.json", "report")
@@ -545,9 +680,15 @@ def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path
     assert env["AGENT_CANON_SOURCE_ROOT"] == str(tmp_path.resolve())
     assert env["AGENT_CANON_ROOT"] == env["AGENT_CANON_SOURCE_ROOT"]
     for name in (
-        "TMPDIR", "TEMP", "TMP",
-        "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX", "AGENT_CANON_TOOLS_HOME",
-        "CARGO_HOME", "CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR",
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "XDG_CACHE_HOME",
+        "PYTHONPYCACHEPREFIX",
+        "AGENT_CANON_TOOLS_HOME",
+        "CARGO_HOME",
+        "CARGO_TARGET_DIR",
+        "AGENT_CANON_CLI_TARGET_DIR",
     ):
         assert Path(env[name]).resolve().is_relative_to(tmp_path.resolve())
     assert env["CARGO_TARGET_DIR"] == env["AGENT_CANON_CLI_TARGET_DIR"]
@@ -632,23 +773,32 @@ def test_abort_reserved_target_closes_fds_on_validation_error(
 def test_read_parent_owned_file_reads_exact_large_payload(tmp_path: Path) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
-    payload = (b"0123456789abcdef" * ((16 * 1024 * 1024) // 16 + 1))[: 16 * 1024 * 1024 + 17]
-    target = boundary.resolve_parent_owned_path(receipt, "reports/large.bin", "large-read")
+    payload = (b"0123456789abcdef" * ((16 * 1024 * 1024) // 16 + 1))[
+        : 16 * 1024 * 1024 + 17
+    ]
+    target = boundary.resolve_parent_owned_path(
+        receipt, "reports/large.bin", "large-read"
+    )
     published = boundary.atomic_publish(target, payload)
 
     assert boundary.read_parent_owned_file(published) == payload
 
 
-def test_read_parent_owned_bytes_returns_exact_capability_payload(tmp_path: Path) -> None:
+def test_read_parent_owned_bytes_returns_exact_capability_payload(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
     payload = b"authenticated-parent-payload\x00\xff\n"
-    target = boundary.resolve_parent_owned_path(receipt, "reports/result.bin", "bytes-read")
+    target = boundary.resolve_parent_owned_path(
+        receipt, "reports/result.bin", "bytes-read"
+    )
     boundary.atomic_publish(target, payload)
 
-    assert boundary.read_parent_owned_bytes(
-        receipt, target.physical_path, "bytes-read"
-    ) == payload
+    assert (
+        boundary.read_parent_owned_bytes(receipt, target.physical_path, "bytes-read")
+        == payload
+    )
 
 
 def test_read_presence_cli_has_typed_present_missing_and_reject_results(
@@ -672,7 +822,13 @@ def test_read_presence_cli_has_typed_present_missing_and_reject_results(
     assert (present.returncode, present.stdout, present.stderr) == (0, "present\n", "")
 
     missing = subprocess.run(
-        [*base, "--candidate", str(tmp_path / "reports" / "missing.json"), "--purpose", "presence-test"],
+        [
+            *base,
+            "--candidate",
+            str(tmp_path / "reports" / "missing.json"),
+            "--purpose",
+            "presence-test",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -701,7 +857,9 @@ def test_read_parent_owned_file_rejects_in_root_inode_replacement(
 ) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
-    target = boundary.resolve_parent_owned_path(receipt, "reports/result.txt", "inode-race")
+    target = boundary.resolve_parent_owned_path(
+        receipt, "reports/result.txt", "inode-race"
+    )
     published = boundary.atomic_publish(target, b"original\n")
     replacement = target.physical_path.with_name("replacement.txt")
     replacement.write_bytes(b"replacement\n")
@@ -718,7 +876,9 @@ def test_read_parent_owned_file_rejects_intermediate_and_root_replacement(
 ) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
-    target = boundary.resolve_parent_owned_path(receipt, "reports/nested/result.txt", "component-race")
+    target = boundary.resolve_parent_owned_path(
+        receipt, "reports/nested/result.txt", "component-race"
+    )
     published = boundary.atomic_publish(target, b"original\n")
     reports = tmp_path / "reports"
     moved_reports = tmp_path / "reports-moved"
@@ -749,7 +909,9 @@ def test_read_parent_owned_file_rejects_nonregular_replacement_without_blocking(
 ) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
-    target = boundary.resolve_parent_owned_path(receipt, "reports/result.txt", "nonregular-race")
+    target = boundary.resolve_parent_owned_path(
+        receipt, "reports/result.txt", "nonregular-race"
+    )
     published = boundary.atomic_publish(target, b"original\n")
     target.physical_path.unlink()
     if replacement_kind == "fifo":
@@ -776,9 +938,12 @@ def test_optional_missing_then_concurrent_create_preserves_winner_bytes(
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
     target = tmp_path / "reports" / "winner.json"
-    assert boundary.read_parent_owned_bytes(
-        receipt, target, "concurrent-create", allow_missing=True
-    ) is None
+    assert (
+        boundary.read_parent_owned_bytes(
+            receipt, target, "concurrent-create", allow_missing=True
+        )
+        is None
+    )
     target.parent.mkdir()
     target.write_bytes(b"winner\n")
 
@@ -786,7 +951,10 @@ def test_optional_missing_then_concurrent_create_preserves_winner_bytes(
         receipt, target, b"loser\n", "concurrent-create"
     )
     assert (outcome, detail) == ("failed", "spool_conflict")
-    assert boundary.read_parent_owned_bytes(receipt, target, "concurrent-create") == b"winner\n"
+    assert (
+        boundary.read_parent_owned_bytes(receipt, target, "concurrent-create")
+        == b"winner\n"
+    )
 
 
 def test_child_environment_rejects_target_alias_mismatch_before_creating_directories(
@@ -915,10 +1083,14 @@ def test_file_read_and_remove_reject_replaced_capability(tmp_path: Path) -> None
     assert replacement.exists()
 
 
-def test_temp_directory_capability_is_exclusive_and_parent_bound(tmp_path: Path) -> None:
+def test_temp_directory_capability_is_exclusive_and_parent_bound(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
-    base = boundary.ensure_parent_owned_directory(receipt, ".agent-canon/tmp", "temp-base")
+    base = boundary.ensure_parent_owned_directory(
+        receipt, ".agent-canon/tmp", "temp-base"
+    )
     temporary = boundary.create_parent_owned_temp_directory(
         receipt, base.physical_path, "temp-dir", "operation"
     )
@@ -931,7 +1103,9 @@ def test_temp_directory_capability_is_exclusive_and_parent_bound(tmp_path: Path)
     assert target.physical_path.read_text(encoding="utf-8") == "owned\n"
     boundary.remove_parent_owned_tree(receipt, temporary, "temp-dir-cleanup")
     assert not temporary.physical_path.exists()
-    assert boundary.remove_empty_parent_owned_directory(receipt, base, "temp-base-cleanup")
+    assert boundary.remove_empty_parent_owned_directory(
+        receipt, base, "temp-base-cleanup"
+    )
     assert not base.physical_path.exists()
 
 
@@ -959,7 +1133,9 @@ def test_temp_directory_replacement_is_typed_race(tmp_path: Path) -> None:
     moved_receipt = boundary.resolve_parent_owned_path(
         attestation, moved, "replacement-moved-cleanup", create=False
     )
-    boundary.remove_parent_owned_tree(attestation, moved_receipt, "replacement-moved-cleanup")
+    boundary.remove_parent_owned_tree(
+        attestation, moved_receipt, "replacement-moved-cleanup"
+    )
 
 
 def test_symlink_replacement_after_capability_is_typed_race(tmp_path: Path) -> None:
@@ -975,10 +1151,14 @@ def test_symlink_replacement_after_capability_is_typed_race(tmp_path: Path) -> N
     assert rejected.value.reject is ParentRootReject.SYMLINK_ESCAPE
 
 
-def test_create_capability_uses_openat_and_rejects_final_symlink(tmp_path: Path) -> None:
+def test_create_capability_uses_openat_and_rejects_final_symlink(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
-    created = boundary.resolve_parent_owned_path(receipt, "created/nested.txt", "create", create=True)
+    created = boundary.resolve_parent_owned_path(
+        receipt, "created/nested.txt", "create", create=True
+    )
     assert created.physical_path.is_file()
     outside = tmp_path.parent / "create-outside.txt"
     outside.write_text("sentinel", encoding="utf-8")
@@ -986,7 +1166,10 @@ def test_create_capability_uses_openat_and_rejects_final_symlink(tmp_path: Path)
     escaped.symlink_to(outside)
     with pytest.raises(ParentRootSideEffectError) as rejected:
         boundary.resolve_parent_owned_path(receipt, escaped, "create", create=True)
-    assert rejected.value.reject in {ParentRootReject.ROOT_RACE_DETECTED, ParentRootReject.SYMLINK_ESCAPE}
+    assert rejected.value.reject in {
+        ParentRootReject.ROOT_RACE_DETECTED,
+        ParentRootReject.SYMLINK_ESCAPE,
+    }
 
 
 def test_open_parent_owned_file_a_plus_creates_and_locks(tmp_path: Path) -> None:
@@ -1145,19 +1328,22 @@ def test_parent_file_io_uses_attested_git_common_directory(
     assert rejected_empty_remove.value.reject is ParentRootReject.ROOT_MISMATCH
     assert common_config.read_bytes() == config_before_rejected_mutations
     assert common_config.stat().st_mode == config_mode_before_rejected_mutations
-    assert subprocess.run(
-        [
-            "git",
-            "config",
-            "--file",
-            str(common_config),
-            "--get",
-            "agent-canon.test-owner",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip() == "verified"
+    assert (
+        subprocess.run(
+            [
+                "git",
+                "config",
+                "--file",
+                str(common_config),
+                "--get",
+                "agent-canon.test-owner",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == "verified"
+    )
 
     external = tmp_path / "outside-info-exclude"
     external_before = b"outside remains untouched\n"
@@ -1311,13 +1497,18 @@ def test_handoff_is_single_use_and_rejects_mutation_or_expiry(tmp_path: Path) ->
     with pytest.raises(ParentRootSideEffectError) as stale:
         ParentRootSideEffectBoundary().attest(
             ParentRootAttestationRequest(
-                cwd=tmp_path, explicit_root=tmp_path, purpose="test", child_handoff_token=expired
+                cwd=tmp_path,
+                explicit_root=tmp_path,
+                purpose="test",
+                child_handoff_token=expired,
             )
         )
     assert stale.value.reject is ParentRootReject.HANDOFF_INVALID
 
 
-def test_child_reattest_requires_handoff_even_when_root_env_is_present(tmp_path: Path) -> None:
+def test_child_reattest_requires_handoff_even_when_root_env_is_present(
+    tmp_path: Path,
+) -> None:
     """Dropping the handoff token cannot be replaced by ambient root variables."""
     boundary = ParentRootSideEffectBoundary()
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
@@ -1338,9 +1529,18 @@ def test_self_check_cli_reports_no_external_sentinel(tmp_path: Path) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     sentinel = tmp_path.parent / ".pbr-sentinel-not-created"
     result = subprocess.run(
-        [sys.executable, "tools/repository/workspace/parent_root_side_effects.py", "self-check",
-         "--root", str(tmp_path), "--sentinel-outside", str(sentinel)],
-        check=False, capture_output=True, text=True,
+        [
+            sys.executable,
+            "tools/repository/workspace/parent_root_side_effects.py",
+            "self-check",
+            "--root",
+            str(tmp_path),
+            "--sentinel-outside",
+            str(sentinel),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
@@ -1412,11 +1612,15 @@ def test_atomic_publish_surfaces_cleanup_failure_and_keeps_readback_identity(
     monkeypatch.setattr(side_effects.os, "unlink", failing_temp_unlink)
     with pytest.raises(ParentRootSideEffectError) as rejected:
         boundary.atomic_publish(
-            boundary.resolve_parent_owned_path(receipt, "cleanup/result.txt", "cleanup"),
+            boundary.resolve_parent_owned_path(
+                receipt, "cleanup/result.txt", "cleanup"
+            ),
             b"published-before-cleanup-error",
         )
     assert "cleanup failed" in str(rejected.value)
-    assert (tmp_path / "cleanup" / "result.txt").read_bytes() == b"published-before-cleanup-error"
+    assert (
+        tmp_path / "cleanup" / "result.txt"
+    ).read_bytes() == b"published-before-cleanup-error"
 
 
 def test_capture_subprocess_publishes_and_replays_stdout(tmp_path: Path) -> None:
@@ -1462,16 +1666,16 @@ def test_exec_parent_bound_preserves_home_and_bindings(tmp_path: Path) -> None:
     code = (
         "import json, os; "
         "print(json.dumps({"
-        "\"home\": os.environ.get(\"HOME\"), "
-        "\"tmpdir\": os.environ.get(\"TMPDIR\"), "
-        "\"temp\": os.environ.get(\"TEMP\"), "
-        "\"tmp\": os.environ.get(\"TMP\"), "
-        "\"cache\": os.environ.get(\"XDG_CACHE_HOME\"), "
-        "\"tools\": os.environ.get(\"AGENT_CANON_TOOLS_HOME\"), "
-        "\"cargo_target\": os.environ.get(\"CARGO_TARGET_DIR\"), "
-        "\"cli_target\": os.environ.get(\"AGENT_CANON_CLI_TARGET_DIR\"), "
-        "\"handoff\": os.environ.get(\"AGENT_CANON_CHILD_HANDOFF\"), "
-        "\"purpose\": os.environ.get(\"AGENT_CANON_CHILD_PURPOSE\")"
+        '"home": os.environ.get("HOME"), '
+        '"tmpdir": os.environ.get("TMPDIR"), '
+        '"temp": os.environ.get("TEMP"), '
+        '"tmp": os.environ.get("TMP"), '
+        '"cache": os.environ.get("XDG_CACHE_HOME"), '
+        '"tools": os.environ.get("AGENT_CANON_TOOLS_HOME"), '
+        '"cargo_target": os.environ.get("CARGO_TARGET_DIR"), '
+        '"cli_target": os.environ.get("AGENT_CANON_CLI_TARGET_DIR"), '
+        '"handoff": os.environ.get("AGENT_CANON_CHILD_HANDOFF"), '
+        '"purpose": os.environ.get("AGENT_CANON_CHILD_PURPOSE")'
         "}))"
     )
     result = subprocess.run(
@@ -1513,7 +1717,9 @@ def test_exec_parent_bound_preserves_home_and_bindings(tmp_path: Path) -> None:
     assert pending_handoff_nonces(tmp_path) == {}
 
 
-def test_exec_parent_bound_failure_does_not_leave_pending_handoff(tmp_path: Path) -> None:
+def test_exec_parent_bound_failure_does_not_leave_pending_handoff(
+    tmp_path: Path,
+) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     result = subprocess.run(
         [
@@ -1538,7 +1744,9 @@ def test_exec_parent_bound_failure_does_not_leave_pending_handoff(tmp_path: Path
     assert pending_handoff_nonces(tmp_path) == {}
 
 
-def test_exec_parent_bound_rejects_external_target_before_side_effects(tmp_path: Path) -> None:
+def test_exec_parent_bound_rejects_external_target_before_side_effects(
+    tmp_path: Path,
+) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     external = tmp_path.parent / "external-target"
     result = subprocess.run(
@@ -1564,7 +1772,9 @@ def test_exec_parent_bound_rejects_external_target_before_side_effects(tmp_path:
     assert not (tmp_path / ".agent-canon" / "tmp").exists()
 
 
-def test_child_environment_rejection_preserves_preexisting_entries(tmp_path: Path) -> None:
+def test_child_environment_rejection_preserves_preexisting_entries(
+    tmp_path: Path,
+) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
     preexisting_tmp = tmp_path / ".agent-canon" / "tmp"
@@ -1576,7 +1786,10 @@ def test_child_environment_rejection_preserves_preexisting_entries(tmp_path: Pat
     token_file.write_text(pre_token, encoding="utf-8")
 
     with pytest.raises(ParentRootSideEffectError):
-        boundary.child_environment(receipt, {"AGENT_CANON_CLI_TARGET_DIR": str(tmp_path.parent / "external-target")})
+        boundary.child_environment(
+            receipt,
+            {"AGENT_CANON_CLI_TARGET_DIR": str(tmp_path.parent / "external-target")},
+        )
 
     assert token_file.read_text(encoding="utf-8") == pre_token
 
@@ -1590,7 +1803,9 @@ def test_copy_mode_external_read_and_symlink_replacement_are_boundary_owned(
     source.parent.mkdir()
     source.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     source.chmod(0o755)
-    installed = tmp_path / ".agent-canon" / "tools" / "agent-canon" / "bin" / "agent-canon"
+    installed = (
+        tmp_path / ".agent-canon" / "tools" / "agent-canon" / "bin" / "agent-canon"
+    )
 
     published = boundary.copy_parent_owned_file(
         receipt,
@@ -1605,18 +1820,19 @@ def test_copy_mode_external_read_and_symlink_replacement_are_boundary_owned(
     link = tmp_path / ".agent-canon" / "tools" / "bin" / "agent-canon"
     link.parent.mkdir(parents=True)
     link.symlink_to("obsolete")
-    assert boundary.replace_parent_owned_symlink(
-        receipt, str(installed), link, "symlink-replacement-test"
-    ) == link
+    assert (
+        boundary.replace_parent_owned_symlink(
+            receipt, str(installed), link, "symlink-replacement-test"
+        )
+        == link
+    )
     assert link.is_symlink()
     assert os.readlink(link) == str(installed)
 
     external = tmp_path.parent / "read-only-input.txt"
     external.write_text("external input\n", encoding="utf-8")
     snapshot = tmp_path / ".agent-canon" / "tmp" / "snapshot.txt"
-    boundary.copy_read_only_file(
-        receipt, external, snapshot, "read-only-copy-test"
-    )
+    boundary.copy_read_only_file(receipt, external, snapshot, "read-only-copy-test")
     assert snapshot.read_text(encoding="utf-8") == "external input\n"
     assert external.read_text(encoding="utf-8") == "external input\n"
 

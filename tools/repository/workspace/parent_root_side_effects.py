@@ -1924,9 +1924,9 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.ROOT_RACE_DETECTED,
                 "parent identity changed during attestation",
             )
-        if (
-            _git_common_dir(root) != git_common_dir
-            or _identity(git_common_dir) != (git_common_dev, git_common_ino)
+        if _git_common_dir(root) != git_common_dir or _identity(git_common_dir) != (
+            git_common_dev,
+            git_common_ino,
         ):
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
@@ -1963,9 +1963,7 @@ class ParentRootSideEffectBoundary:
             purpose=request.purpose,
         )
 
-    def _verify_attested_roots(
-        self, attestation: ParentRootAttestationReceipt
-    ) -> None:
+    def _verify_attested_roots(self, attestation: ParentRootAttestationReceipt) -> None:
         if attestation.status != "attested":
             raise ParentRootSideEffectError(
                 ParentRootReject.HANDOFF_INVALID, "attestation is not active"
@@ -2951,9 +2949,7 @@ class ParentRootSideEffectBoundary:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_MISMATCH, "Git config value is invalid"
             )
-        receipt = self._resolve_parent_owned_file_path(
-            attestation, candidate, purpose
-        )
+        receipt = self._resolve_parent_owned_file_path(attestation, candidate, purpose)
         if receipt.target_dev is None or receipt.target_ino is None:
             with self.open_parent_owned_file(
                 attestation, candidate, purpose, create=True, mode="a+"
@@ -2964,7 +2960,9 @@ class ParentRootSideEffectBoundary:
             )
         _verify_parent_components(receipt)
         root = receipt.parent_root
-        physical, _ = _physical_in_root(root, receipt.physical_path, allow_missing=False)
+        physical, _ = _physical_in_root(
+            root, receipt.physical_path, allow_missing=False
+        )
         parent_fd, name, _ = _parent_directory(root, physical, create=False)
         config_fd = -1
         before_root = _identity(root)
@@ -3022,9 +3020,7 @@ class ParentRootSideEffectBoundary:
             if config_fd >= 0:
                 os.close(config_fd)
             os.close(parent_fd)
-        readback = self._resolve_parent_owned_file_path(
-            attestation, physical, purpose
-        )
+        readback = self._resolve_parent_owned_file_path(attestation, physical, purpose)
         if readback.target_dev is None or readback.target_ino is None:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
@@ -3810,9 +3806,7 @@ class ParentRootSideEffectBoundary:
         allow_missing: bool = False,
     ) -> bytes | None:
         """Resolve and read one parent or Git-admin file as authenticated bytes."""
-        receipt = self._resolve_parent_owned_file_path(
-            attestation, candidate, purpose
-        )
+        receipt = self._resolve_parent_owned_file_path(attestation, candidate, purpose)
         if receipt.target_dev is None or receipt.target_ino is None:
             if not receipt.lexical_entry_exists:
                 if allow_missing:
