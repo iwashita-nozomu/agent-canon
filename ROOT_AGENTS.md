@@ -65,10 +65,9 @@ behavior before changing implementation structure or tolerances.
 
 Use existing capabilities and standard facilities; implement only a demonstrated
 gap, with one exposed API per functional responsibility. A repair must not add a
-condition-specific branch, guard, bypass, or fallback solely to make the
-triggering case pass. Correct the existing mechanism, input, ordering, or
-ownership that leaves the requirement unmet, while preserving established domain
-and external-boundary behavior.
+condition-specific branch, guard, bypass, or fallback. Correct the existing
+mechanism, input, ordering, or ownership that leaves the requirement unmet, while
+preserving established domain and external-boundary behavior.
 When multiple paths exist, use the most recently incorporated implementation as
 the starting point, migrate necessary consumers, and remove obsolete paths and
 exclusive support. Keep committed history in Git, not backup implementations.

@@ -61,10 +61,10 @@ to establish that the current implementation fails a required contract and that
 existing guarantees do not already satisfy it.
 Remove redundant representations and mechanisms when the derivation permits.
 Consolidate the root responsibility and trace affected contracts to consumers;
-use that complete unit to determine the change scope. A specialized branch requires
-a verified difference in required behavior or input contract; a failure alone
-does not justify a condition-specific repair branch. Reuse sound parts and retire
-superseded branches together with the common correction.
+use that complete unit to determine the change scope. For repairs, correct the
+existing owner's mechanism rather than adding a specialized branch; preserve
+verified distinctions required by domain behavior or input contracts. Reuse sound
+parts and retire superseded branches together with the common correction.
 
 For replacement or retirement, close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
 in the same change: remove obsolete paths and support, migrate affected uses, and
