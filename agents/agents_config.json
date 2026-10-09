@@ -320,7 +320,7 @@
         "mode": "parent_assigned_scope_plus_artifacts",
         "allowed_artifacts": [
           "decision_log"
-        },
+        ],
         "allowed_directories": [
           "."
         ],
