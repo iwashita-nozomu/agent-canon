@@ -53,8 +53,8 @@ needed:
 bash tools/validation/ci/checks/run_python_quality_checks.sh
 ```
 
-The PR quick chain intentionally runs pytest and pyright while skipping Ruff;
-the explicit full Python quality command adds Ruff and BasedPyright. The shared
+The PR quick chain runs pytest and BasedPyright while skipping Ruff; the explicit
+full Python quality command adds Ruff. The shared
 path uses the checked-in native Ruff overlays for Docstrings and magic values.
 
 For `check_agent_canon_pr.sh`, standalone and derived AgentCanon gates run

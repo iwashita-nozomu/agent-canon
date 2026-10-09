@@ -86,8 +86,8 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
         )))
     if any(Path(path).suffix in PYTHON_SUFFIXES for path in paths):
         active.append(PathRisk("python-tooling", "python_path_changed", (
-            "python3 -m ruff check <changed-python-paths>",
-            "PYTHONPATH=. python3 -m pyright <changed-python-paths>",
+            "ruff check <changed-python-paths>",
+            "basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json <changed-python-paths>",
             "python3 -m pytest -q <targeted-tests>",
         )))
     if any(path.startswith(CONTAINER_PREFIXES) for path in paths):

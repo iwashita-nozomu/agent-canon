@@ -29,7 +29,7 @@ downstream design ./object-oriented-design.md general OOP policy for Python clas
 | 5 | 配置と責務を決める | [09_file_roles.md](python/09_file_roles.md) |
 | 6 | 名前を確定する | [11_naming.md](python/11_naming.md) |
 | 7 | 数値リテラルの由来を確認 | [基本方針](common/01_principles.md#数値ハードコード検証) |
-| 8 | `pyright` と `pytest` を通す | [07_type_checker.md](python/07_type_checker.md), [coding-conventions-testing.md](./coding-conventions-testing.md) |
+| 8 | `basedpyright` と `pytest` を通す | [07_type_checker.md](python/07_type_checker.md), [coding-conventions-testing.md](./coding-conventions-testing.md) |
 
 ## よくある間違い
 
@@ -157,10 +157,9 @@ Markdown / JSON report の SOLID principle signal counts、OOP dimension、findi
 ## Python ファイル修正後
 
 - `ruff check --config tools/validation/code/config/ruff-magic-values.toml --select PLR2004 python`
-- `python3 -m pyright`
 - `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json python tests`
 - `python3 -m pytest tests/ -q --tb=short`
-- `python3 -m ruff check --config tools/validation/code/config/ruff-docstrings.toml python tests --select D,E,F,I,UP --ignore E501`
+- `ruff check --config tools/validation/code/config/ruff-docstrings.toml python tests --select D,E,F,I,UP --ignore E501`
 
 ## Markdown ファイル修正後
 

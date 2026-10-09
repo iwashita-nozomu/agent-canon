@@ -125,20 +125,11 @@ else
 fi
 echo ""
 
-echo "4️⃣  pyright を実行中..."
-if "$PYTHON_BIN" -m pyright "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
-  echo "✅ pyright 成功"
-else
-  echo "❌ pyright 失敗"
-  EXIT_CODE=1
-fi
-echo ""
-
-echo "5️⃣  BasedPyright explicit Any checks を実行中..."
+echo "4️⃣  BasedPyright type checks を実行中..."
 if basedpyright --project "${BASEDPYRIGHT_CONFIG}" "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
-  echo "✅ BasedPyright explicit Any checks 成功"
+  echo "✅ BasedPyright 成功"
 else
-  echo "❌ BasedPyright explicit Any checks 失敗"
+  echo "❌ BasedPyright 失敗"
   EXIT_CODE=1
 fi
 echo ""
@@ -149,13 +140,13 @@ elif [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
   echo "RUFF=skip"
   echo "AgentCanon Python source roots are absent in this checkout; skipping ruff"
 else
-  echo "6️⃣  ruff を実行中..."
+  echo "5️⃣  ruff を実行中..."
   echo "   - E,F: コード品質（エラー・警告）"
   echo "   - I: Import 順序チェック"
   echo "   - D: Docstring 検証"
   echo "   - UP: Python 最新構文チェック"
   echo ""
-  if "$PYTHON_BIN" -m ruff check \
+  if ruff check \
     --config "${RUFF_DOCSTRING_CONFIG}" \
     "${PYTHON_SOURCE_PATHS[@]}" \
     --select D,E,F,I,UP \
@@ -166,7 +157,7 @@ else
     EXIT_CODE=1
   fi
   echo "   - PLR2004: Python magic-value 検証"
-  if "$PYTHON_BIN" -m ruff check \
+  if ruff check \
     --config "${RUFF_MAGIC_VALUE_CONFIG}" \
     "${PYTHON_SOURCE_PATHS[@]}" \
     --select PLR2004 2>&1; then
