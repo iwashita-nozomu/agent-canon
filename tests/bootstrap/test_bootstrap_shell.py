@@ -1420,6 +1420,175 @@ def test_target_add_init_failure_restores_previous_fake_resident(
     ) == ""
 
 
+def test_concurrent_target_add_serializes_resident_replacement(
+    tmp_path: Path,
+) -> None:
+    """Concurrent public target adds commit both mounts through one resident."""
+    home = tmp_path / "home"
+    control = tmp_path / "control"
+    repository = tmp_path / "agent-canon"
+    home.mkdir()
+    control.mkdir()
+    create_source_checkout(repository)
+    subprocess.run(
+        ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
+        check=True,
+    )
+    state_path = tmp_path / "docker-state.json"
+    fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    environment = {
+        **os.environ,
+        "HOME": str(home),
+        "AGENT_CANON_DOCKER": str(fake_docker),
+        "FAKE_DOCKER_STATE": str(state_path),
+        "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+    }
+    common = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(control),
+    ]
+    installed = subprocess.run(
+        [*common, "install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert installed.returncode == 0, installed.stderr
+
+    existing_target = tmp_path / "existing-target"
+    first_target = tmp_path / "first-target"
+    second_target = tmp_path / "second-target"
+    for target in (existing_target, first_target, second_target):
+        target.mkdir()
+    seeded = subprocess.run(
+        [
+            *common,
+            "target",
+            "add",
+            "--root",
+            str(existing_target),
+            "--mode",
+            "read-only",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert seeded.returncode == 0, seeded.stderr
+
+    tracker = tmp_path / "target-add-tracker"
+    tracker.mkdir()
+    wrapper = tmp_path / "docker-with-target-tracker"
+    wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"fake_docker={str(fake_docker)!r}\n"
+        f"tracker={str(tracker)!r}\n"
+        'target_id="${AGENT_CANON_TEST_TARGET_ID:-}"\n'
+        'transaction="$tracker/$target_id"\n'
+        'if [[ -n "$target_id" && "$1:$2" == "container:inspect" && ! -e "$transaction.active" ]]; then\n'
+        '  exec 9>"$tracker/counter.lock"\n'
+        '  flock -x 9\n'
+        '  count=0\n'
+        '  [[ ! -f "$tracker/active.count" ]] || read -r count < "$tracker/active.count"\n'
+        '  count=$((count + 1))\n'
+        '  printf "%s\\n" "$count" > "$tracker/active.count"\n'
+        '  if ((count > 1)); then : > "$tracker/overlap"; fi\n'
+        '  : > "$transaction.active"\n'
+        '  flock -u 9\n'
+        '  exec 9>&-\n'
+        '  sleep 0.05\n'
+        'fi\n'
+        'if "$fake_docker" "$@"; then rc=0; else rc=$?; fi\n'
+        'if [[ -n "$target_id" && "$1:$2" == "container:exec" && "$*" == *"target add"* && $rc -eq 0 ]]; then\n'
+        '  : > "$transaction.committed"\n'
+        'fi\n'
+        'if [[ -n "$target_id" && "$1:$2" == "container:inspect" && "$*" == *Mounts* && -e "$transaction.committed" && -e "$transaction.active" ]]; then\n'
+        '  exec 9>"$tracker/counter.lock"\n'
+        '  flock -x 9\n'
+        '  read -r count < "$tracker/active.count"\n'
+        '  count=$((count - 1))\n'
+        '  printf "%s\\n" "$count" > "$tracker/active.count"\n'
+        '  rm -f -- "$transaction.active" "$transaction.committed"\n'
+        '  flock -u 9\n'
+        '  exec 9>&-\n'
+        'fi\n'
+        'exit "$rc"\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+
+    def target_command(target: Path, target_id: str) -> subprocess.Popen[str]:
+        return subprocess.Popen(
+            [
+                *common,
+                "target",
+                "add",
+                "--root",
+                str(target),
+                "--mode",
+                "read-only",
+            ],
+            env={
+                **environment,
+                "AGENT_CANON_DOCKER": str(wrapper),
+                "AGENT_CANON_TEST_TARGET_ID": target_id,
+            },
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+    first = target_command(first_target, "first")
+    second = target_command(second_target, "second")
+    first_stdout, first_stderr = first.communicate(timeout=120)
+    second_stdout, second_stderr = second.communicate(timeout=120)
+    assert first.returncode == 0, first_stderr or first_stdout
+    assert second.returncode == 0, second_stderr or second_stdout
+    assert '"code": "target_registered"' in first_stdout
+    assert '"code": "target_registered"' in second_stdout
+    assert not (tracker / "overlap").exists()
+    assert (tracker / "active.count").read_text(encoding="utf-8").strip() == "0"
+
+    runtime = control / ".runtime"
+    mount_rows = [
+        line.split("\t")
+        for line in (runtime / "container-state" / "mounts.tsv")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    expected_targets = {
+        str(target.resolve())
+        for target in (existing_target, first_target, second_target)
+    }
+    assert {row[2] for row in mount_rows} == expected_targets
+    assert all(row[0] == "target" and row[4] == "read-only" for row in mount_rows)
+
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    container_name = f"agent-canon-tools-{control_digest[:16]}"
+    assert set(docker_state["containers"]) == {container_name}
+    resident = docker_state["containers"][container_name]
+    assert resident["State"]["Running"] is True
+    assert resident["State"]["Health"]["Status"] == "healthy"
+    target_mounts = {
+        mount["Source"]: mount
+        for mount in resident["Mounts"]
+        if mount["Source"] in expected_targets
+    }
+    assert set(target_mounts) == expected_targets
+    assert all(mount["RW"] is False for mount in target_mounts.values())
+
+
 def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) -> None:
     """The exact Docker run argv executes the embedded copy script with /bin/sh."""
     control = tmp_path / "control"
