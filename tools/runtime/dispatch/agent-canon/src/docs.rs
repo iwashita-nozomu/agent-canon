@@ -1737,12 +1737,6 @@ fn required_string(value: Option<&Value>, name: &str) -> Result<String, String> 
     Ok(value.to_string())
 }
 
-fn required_bool(value: Option<&Value>, name: &str) -> Result<bool, String> {
-    value
-        .and_then(Value::as_bool)
-        .ok_or_else(|| format!("{name} must be a boolean"))
-}
-
 fn required_array<'a>(value: Option<&'a Value>, name: &str) -> Result<&'a Vec<Value>, String> {
     value
         .and_then(Value::as_array)
