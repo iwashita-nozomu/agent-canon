@@ -207,44 +207,39 @@ archive state into the AgentCanon source checkout.
 
 ## Change route
 
-1. Resolve the owning Issue and read the current remote `main`, open PRs and
-   Issues, and relevant runtime documents. Record repository-qualified branch,
-   HEAD, remote, and dirty-state evidence; keep #841 and #821 separate.
-2. Reuse or create one Issue-qualified topic branch through
-   `repository-topic-clone` in the qualified standalone source checkout.
-   Select the lifecycle checkout-mode from the repository relationship. Branch reuse and creation reasons follow
-   `$agent-update-branch`; the parent never becomes the source checkout.
-3. Read the canonical owner, dependency-expanded callers, and selected
-   validation oracle before editing.
-4. For a source-free parent migration, freeze the exact management write set
-   and immutable parent surfaces above before inspecting implementation.
-5. Inspect the existing owner and implementation before proposing a change.
-   Search beyond the first failing checker and identify source-side effects,
-   impossible branches, duplicate gates, and downstream consumers.
-6. Record a contract-complete design: user command family, host/container
-   boundary, target mode, state roots, resource cap, failure/rollback, eval
-   archive route, cleanup, and validation oracle.
-7. Implement in the owning AgentCanon clone. Keep docs, manifest, code, tests,
-   and dependency headers aligned. Runtime/cache/eval/test artifacts use the
-   explicit external runtime root and never create source-local `.agent-canon`,
-   `target`, `__pycache__`, or generated reports. Do not modify a parent
-   checkout from this skill.
-8. Run focused validation and then the profile selected by the changed owner.
-   Preserve failure evidence by execution plane (AgentCanon tool container,
-   host adapter/archive, or project execution); for runtime/container changes,
-   remove task-created Docker resources at closeout and never run
-   `docker system prune`.
-9. Commit only the Issue-owned write set, push the topic branch, and open or
-   update the AgentCanon PR through `$pr-processing`. Record rationale, scope,
-   validation, cleanup, limitations, and PR identity on both the PR and Issue.
-   A PR-delivery request ends with this readback and handoff; it does not
-   authorize merge, parent adoption, or runtime deployment.
-10. Only when merge or parent adoption is requested, use `$pr-processing` for
-   the required review/CI and authorized merge. After merge, verify the merge
-   commit in fetched `main` and its tree before adopting that main revision.
-   These post-merge checks are not prerequisites for opening the PR. Existing
-   consumer-owned PR-pin validation follows [dependency-module-change](dependency-module-change.md);
-   it is not main adoption or permission to restore a vendor/submodule route.
+Resolve the owning Issue, current remote `main`, relevant PRs, and checkout
+identity from the task. Keep #841 and #821 with their separate owners. Reuse or
+create an Issue-qualified topic branch through `repository-topic-clone` in the
+qualified standalone source checkout; choose checkout mode from the repository
+relationship and use `$agent-update-branch` for lane selection. The parent does
+not become the AgentCanon source checkout.
+
+Read the canonical owner, the callers that can affect the selected mechanism,
+and the validation oracle for the requested change. For a source-free parent
+migration, freeze the exact management write set and immutable parent surfaces
+before any parent edit. The design record follows the open decision: when a
+cross-surface contract such as command shape, state roots, resource cap,
+rollback, archive route, cleanup, or validation remains unresolved, settle it
+in the existing design trace; for a bounded change with settled ownership,
+carry the decision in the existing task record.
+
+Implement in the owning AgentCanon clone, keeping affected docs, manifests,
+code, tests, and dependency headers aligned. Runtime, cache, eval, and test
+outputs stay under the external runtime root, not source-local `.agent-canon`,
+`target`, `__pycache__`, or generated-report directories. Do not modify a parent
+checkout from this skill. Choose validation from the changed owner and its
+execution plane. Preserve failures and unavailable checks as observed; for
+runtime/container changes, remove only task-created Docker resources and never
+run `docker system prune`.
+
+When source PR delivery is selected, commit only the Issue-owned write set, push
+the topic branch, and open or update the AgentCanon PR through `$pr-processing`.
+Record scope, validation, cleanup, limitations, and Issue/PR identity on both
+surfaces. PR delivery does not authorize merge, parent adoption, or runtime
+deployment. If merge or adoption is requested, use `$pr-processing`, then verify
+the merged commit and tree in fetched `main`. Consumer-owned PR-pin validation
+follows [dependency-module-change](dependency-module-change.md); it does not
+restore a vendor/submodule route.
 
 ## Validation and closeout
 

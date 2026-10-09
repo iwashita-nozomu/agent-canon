@@ -17,7 +17,7 @@ downstream implementation ../../.codex/personal/skills/parent-repository-audit/S
 
 - 目的: AgentCanon を利用する親 repository を semantic audit unit ごとに読み、finding を owner repair、対象 readback、closure まで進める。
 - 入口: [documents/parent-repository-audit/README.md](../../documents/parent-repository-audit/README.md)、catalog capability、dependency map、resolver が解決した tool command の順に読む。
-- 順序: `parent_repository_audit.py list` が返す unit を path 昇順で一つずつ処理し、unit receipt を残してから次へ進む。
+- 順序: `list` が返す selected unit とその依存・write boundary に従う。path 順は一覧表示の順であり、独立 unit の実行を直列化しない。
 - 境界: path owner/class は親の `responsibility-scope.toml`、path existence/kind は structure contract、AgentCanon runtime lifecycle は standalone `bootstrap.sh` と明示 runtime root が所有する。
 - 出力: selected surface/unit、tracked evidence count、unit ごとの `pass|closed|failed|deferred|blocked`、repair/readback evidence、全体 status。
 
@@ -28,9 +28,12 @@ downstream implementation ../../.codex/personal/skills/parent-repository-audit/S
 します。prompt の語句や directory 名から owner/unit を推測しません。capability が不明・
 重複・ambiguous、または source root が解決不能なら既存 typed failure を返します。
 
-必要な前提は `agent-orchestration`、`codex-task-workflow`、`structure-refactor`、
-`dependency-analysis`、`subagent-bootstrap` です。finding は change surface に応じて既存の
-owner skill/worker へ routing し、新しい path registry、checker、runtime graph を追加しません。
+監査や修正に必要な routing / execution owner を選びます。`agent-orchestration` と
+`codex-task-workflow` は repo-changing audit execution に適用し、`structure-refactor` と
+`dependency-analysis` は該当 unit の境界・依存がその判断を必要とするとき、
+`subagent-bootstrap` は選択 route が child handoff を必要とするときに使います。
+finding は change surface に応じて既存の owner skill/worker へ routing し、新しい
+path registry、checker、runtime graph を追加しません。
 
 ## Use When
 
@@ -84,15 +87,18 @@ python3 tools/analysis/code/parent_repository_audit.py check \
 `failed|deferred` が一件でもあれば failed、blocked があれば blocked、全 receipt が
 `pass|closed` の場合だけ pass とします。未実行 command を pass に昇格しません。
 
-## Sequential Audit And Repair Loop
+## Audit And Repair Loop
 
-1. README、catalog capability、dependency row、resolved tool command、`list` packet を readback する。
-2. selected unit の owner、invariant、evidence、repair、validation、close condition を読む。
-3. static evidence と parent-specific readback で invariant を判定する。
-4. finding は primary owner skill/worker へ bounded handoff し、親 orchestrator が write scope と validation route を保持する。
-5. 修正後に対象 source/config/path を再読し、必要十分な validation で finding 解消を確認する。
-6. blocked の場合は owner、blocker、attempted repair、欠けた readback を記録し、unit を閉じず次へ進む。
-7. 全 selected unit の receipt を集約し、pass/closed と blocked/unresolved を分離する。
+Read back the README, capability, dependency relation, resolved command, and
+`list` result needed to establish the selected units. For each unit, use its
+owner, invariant, evidence, repair, validation, and close condition. Independent
+units may be investigated or repaired in parallel when their write scopes,
+authorities, and dependencies permit; serialize conflicting writes. Keep each
+unit receipt with its evidence, and do not close a unit whose required readback
+or validation is missing. A blocked unit records its owner, blocker, attempted
+repair, and missing readback; continue with independent selected work. Aggregate
+only the selected unit receipts, keeping `pass|closed` distinct from
+`blocked|unresolved`.
 
 ## Owner Unit Routes
 

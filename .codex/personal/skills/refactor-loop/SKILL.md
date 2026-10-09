@@ -2,7 +2,7 @@
 name: refactor-loop
 description: "Use when a large refactor should run as a behavior-preserving refactor loop with explicit path mapping, semantic-delta controls, repair slices, and strong review gates."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"966ea150f13b5b12ac58d5c2e312177f7c6dd823f1df0f819d1e91af53b133bb"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1ab6b894d2c0bbe6cf213a557e1ef5dde52f3c9fdd367040f2af464b8178cc58"} -->
 
 <!--
 @dependency-start

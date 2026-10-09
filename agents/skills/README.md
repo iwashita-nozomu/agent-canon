@@ -196,27 +196,41 @@ skill の通常保守には持ち込まず、read-only review は編集・生成
 [Skill Maintenance Delegation](../../documents/design/responsibility-cleanup.md#skill-maintenance-delegation)
 を読み、通常の保守では既に解決した担当と判断を再利用します。
 
-1. 変更する canonical doc、catalog entry、依存関係、直接 caller と配布対象を特定します。
-   設計する場合は [PHILOSOPHY](../../PHILOSOPHY.md) と当該設計を基準に、目的・前提、
-   比較した案と証拠、順序・分岐・終了条件の理由、見直し条件を既存の担当設計へ残します。
-   根拠・手順・検証条件を同じ変更で揃え、全 Skill の棚卸しを着手条件にしません。
-2. 新しい再利用指示、大幅な挙動改訂、曖昧な指示による失敗修正、明示的な挙動評価では、
-   最初の挙動変更前に [empirical-prompt-tuning](empirical-prompt-tuning.md#workflow) の
-   Iteration 0 と Scenario Packet の凍結を行い、既存の独立評価経路へ渡します。
-   formatter-only、path-only、生成 view の stale 修正、one-off prompt だけでは起動しません。
-3. canonical doc と `catalog.yaml`、`skill-dependencies.yaml`、実際に影響する caller・
-   route・tool command を揃えます。廃止する公開入口は本体・catalog・依存関係・配布adapterを
-   同じ変更で取り除き、必要な caller を残る担当へ接続します。公式本文のコピーや
-   標準を呼ぶだけの代替 Skill は作りません。
-4. [md-style-check](md-style-check.md) の規定経路で変更文書を整形します。
-   [保守者用 materializer](../../README.md#source-and-artifact-boundary) で対象adapterを
-   生成・readbackし、必要な生成差分を正本と同じcommitへ含めます。利用時には生成しません。
-   `.codex/config.toml` はhost-wiringのsource/inputとして確認し、生成先や第二のinventoryにしません。
-5. 公開surface変更は [Public Skill Surface](#public-skill-surface) のruntime alignment・
-   dependency checkと、既存の `check_skill_tool_invocation_graph.py` で配布と参照を確認します。
-   graphは同節の既存materializerから生成し、通常の外部出力と明示的なtracked pair更新を区別します。
-   検証範囲は [既存のvalidation境界](agent-orchestration.md#write-capable-handoff-validation-trust-boundary)
-   に従い、構造整合の成功と独立した挙動評価の成功を区別します。
+Start from the observed task outcome, requested trigger, and canonical owner.
+Identify only the catalog, dependency, caller, and distribution surfaces that
+can change. Use the host-provided `$skill-creator` for general authoring
+guidance: explain consequential constraints, generalize repeated failures
+beyond one example, and remove directions that do not improve a decision or
+outcome. Keep existing authority, safety, compatibility, and completion
+requirements with their owner. Record material design rationale in the existing
+design owner; a bounded wording change does not need a new design artifact.
+
+If the user or selected workflow needs fresh behavior evidence, use
+[empirical-prompt-tuning](empirical-prompt-tuning.md#workflow). Freeze its
+Scenario Packet before changing the tested behavior and follow the selected
+task-catalog and [Codex Subagents](../canonical/CODEX_SUBAGENTS.md) contracts
+for evaluator input and report. This route applies to explicit empirical
+evaluation, not every new or substantially revised Skill. A benchmark or
+improvement claim requires actual comparable measurements; otherwise report
+observed behavior and its limits without a benchmark claim.
+
+Keep the canonical doc, `catalog.yaml`, `skill-dependencies.yaml`, and only the
+affected callers, routes, and tool commands aligned. When retiring an entry,
+remove it from the same public surfaces and connect necessary callers to the
+remaining owner. Do not copy official skill bodies or add a wrapper Skill that
+only forwards to an existing capability.
+
+Format changed Markdown through [md-style-check](md-style-check.md). When a
+canonical change requires an adapter update, use the maintainer
+[materializer](../../README.md#source-and-artifact-boundary), read back the
+generated adapter, and include required output in the same commit. Do not
+generate adapters during runtime use. `.codex/config.toml` is host-wiring input,
+not a generated target or second inventory. Select alignment, dependency,
+invocation-graph, or behavior checks from the changed public surface; generate
+the graph through its existing materializer only when needed. Structural
+alignment and fresh behavior evaluation establish different claims. The existing
+[validation boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary)
+controls selected commands.
 
 関連手順を配線する変更では、callerの判断・操作の直前に成立条件、具体的なMarkdownリンク、
 復帰先を置き、[条件付き読込](task-routing.md#in-flight-skill-reads) に従います。

@@ -4,7 +4,6 @@
 # responsibility Verifies native convention-tool wiring and retained structured policies.
 # upstream design ../../../../documents/conventions/README.md convention index
 # upstream design ../../../../agents/canonical/CODEX_COMPLETION.md selected validation evidence policy
-# upstream design ../../../../agents/skills/codex-task-workflow.md static/read validation route
 # upstream design ../../../../documents/codex/codex-configuration-reference.md Codex hook severity policy
 # upstream design ../../../../documents/conventions/coding-conventions-house-style.md source definition ordering
 # upstream design ../../../../.codex/README.md Codex runtime hook behavior summary

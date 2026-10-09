@@ -1,8 +1,8 @@
 ---
 name: pr-processing
-description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, preserve PR Essence in bodies and run bundles, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
+description: "Use for an authorized GitHub Issue or PR operation; build a queue only when candidates depend on or conflict with each other."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"43ff14dbbe17584ac05e20d7da9b68120a55ffe2a486bdd54876a52d3de62cc0"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"c46f2eb29e78f8904350b2d4c3bacdf5078ad69710805cfa7bf9ce2f3d26e0d4"} -->
 
 <!--
 @dependency-start

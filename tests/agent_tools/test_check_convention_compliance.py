@@ -143,10 +143,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/skills/agent-orchestration.md": "agent orchestration owner\n",
-    "agents/skills/codex-task-workflow.md": (
-        "静的解析・読み取り evidence primary validation evidence "
-        "supplemental evidence runtime behavior 未解決 finding\n"
-    ),
+    "agents/skills/codex-task-workflow.md": "task workflow owner\n",
     "agents/skills/refactor-loop.md": "refactor loop owner\n",
     "agents/skills/change-review.md": "change review owner\n",
     "agents/skills/pr-processing.md": "PR processing owner\n",
@@ -729,16 +726,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("missing-marker:FORWARDER_CALLER", result.stdout)
             self.assertIn("missing-marker:FORWARDER_ACTION", result.stdout)
 
-    def test_static_read_validation_policy_requires_markers(self) -> None:
-        """Validation policy must keep static/read evidence primary."""
+    def test_static_read_policy_requires_completion_owner(self) -> None:
+        """The completion owner keeps the selected validation policy."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            workflow = root / "agents" / "skills" / "codex-task-workflow.md"
-            workflow.write_text(
-                workflow.read_text(encoding="utf-8").replace(
-                    "primary validation evidence",
-                    "runtime confirmation",
+            completion = root / "agents" / "canonical" / "CODEX_COMPLETION.md"
+            policy_marker = (
+                "静的解析、読み取り確認、docs / targeted tests / agent checks"
+            )
+            completion.write_text(
+                completion.read_text(encoding="utf-8").replace(
+                    policy_marker, "runtime confirmation"
                 ),
                 encoding="utf-8",
             )
@@ -747,7 +746,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("static_read_validation_policy", result.stdout)
-            self.assertIn("missing-marker:primary validation evidence", result.stdout)
+            self.assertIn(f"missing-marker:{policy_marker}", result.stdout)
 
     def test_static_read_validation_policy_contract_is_manifest_backed(self) -> None:
         """Static/read validation policy surfaces are manifest-backed."""
@@ -755,23 +754,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "documents/runtime/runtime-profiles-and-check-matrix.md",
             STATIC_READ_VALIDATION_POLICY_MARKERS,
         )
+        completion_markers = STATIC_READ_VALIDATION_POLICY_MARKERS[
+            "agents/canonical/CODEX_COMPLETION.md"
+        ]
         self.assertIn(
-            "primary validation evidence",
-            STATIC_READ_VALIDATION_POLICY_MARKERS[
-                "agents/skills/codex-task-workflow.md"
-            ],
+            "静的解析、読み取り確認、docs / targeted tests / agent checks",
+            completion_markers,
         )
         self.assertFalse(
             any(
                 path.startswith(".codex/personal/skills/")
                 for path in STATIC_READ_VALIDATION_POLICY_MARKERS
             )
-        )
-        self.assertNotIn(
-            "動作確認",
-            STATIC_READ_VALIDATION_POLICY_MARKERS[
-                "agents/skills/codex-task-workflow.md"
-            ],
         )
 
     def test_minimal_fixture_covers_static_read_validation_policy_surfaces(
