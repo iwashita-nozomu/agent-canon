@@ -10,7 +10,6 @@ upstream design ../../documents/experiments/experiment-report-style.md evidence 
 upstream design code-visualization.md selected visualization rendering and coverage owner
 upstream design structure-planning.md storyboard topology owner when a real structural choice exists
 downstream implementation ../../.codex/personal/skills/slides/SKILL.md exposes this skill as a runtime skill
-downstream implementation ../../eval/definitions/skill_workflow_prompt_eval.toml evaluates skill routing coverage
 @dependency-end
 -->
 
@@ -28,7 +27,8 @@ downstream implementation ../../eval/definitions/skill_workflow_prompt_eval.toml
 
 ## Purpose
 
-Use one canonical presentation template and a small slot contract so that text,
+Use the requested template, or the applicable canonical template when none is
+supplied, with a small slot contract so that text,
 equations, generated images, and references remain readable after export. A
 deck is accepted from the rendered artifact and its layout evidence, not from
 the source text alone.
@@ -69,19 +69,18 @@ they support. Do not add an unused slot solely to satisfy this list.
 
 ## Workflow
 
-1. Lock one canonical template and record its path before writing slide content
-   or making layout decisions. Change it only when layout review finds a
-   concrete failure that the current template cannot resolve.
-1. Define the slide order and the slots each slide uses.
-1. Draft in slot order, keeping claim, equation, figure, and reference
-   placement explicit.
-1. Review the rendered deck for overlap, clipping, tiny text, inconsistent
-   spacing, theme drift, unreadable equations, and hidden references.
-1. Re-review after inserting or changing a generated image, equation, or other
-   non-trivial layout element.
-1. Save the deck path, template path, and selected review result in the run
-   bundle. Keep one screenshot or exported preview for slides with non-trivial
-   layout.
+Use the requested template when supplied; otherwise select the applicable
+canonical template. Record the chosen template when it constrains layout, and
+change it only when review finds a concrete failure it cannot resolve. Plan
+slide order and use only the slots each slide needs. Keep claims, equations,
+figures, and references close enough to show their relationship.
+
+Review the rendered deck for clipping, overlap, text and equation readability,
+reference visibility, spacing, and theme consistency. Recheck a slide after a
+change that could affect its layout. Keep the deck path, template path, and
+relevant review evidence with the deliverable; retain a preview when it helps
+resolve or communicate a non-trivial layout question, with no fixed screenshot
+count.
 
 For selected diagrams, hand the complete source facts and rendering call to
 `code-visualization`; this skill places the returned projection but does not
@@ -90,16 +89,8 @@ reimplement visualization coverage or omission policy.
 ## Closeout
 
 This skill owns the rendered deck's layout, reference, equation, and image
-readability closeout. Read back the rendered deck and the evidence actually
-selected for it:
-
-- the fixed template path;
-- the source packet used for the deck and its correspondence to the rendered
-  artifact;
-- slide-to-slot mapping;
-- layout review result;
-- post-insertion equation/image checks; and
-- readable reference placement.
+readability. Read back the rendered artifact and the source/template and layout
+evidence relevant to the requested deck.
 
 When a reader-facing cumulative report is needed, delegate its production to
 `report-writing`; this skill does not reimplement report generation or archive
@@ -121,13 +112,14 @@ this canonical owner.
    reports, HTML, experiments, and visualization rendering keep their owning
    skill unless deck production is also requested.
 1. Read the applicable source packet before drafting and record the selected
-   template path.
+   template path when it constrains the deck.
 1. Use `structure-planning` only for a genuine storyboard or reader-state
    decision, and use `code-visualization` for selected diagram rendering and
    coverage.
-1. Lock the template before drafting and map each slide to the slots it uses.
+1. Use the requested or applicable canonical template, and map each slide to
+   the slots it uses.
 1. Review the rendered result for layout drift, equation readability, image
    fit, reference visibility, and theme consistency.
 1. Re-review after a non-trivial image or equation insertion.
-1. Keep deck, template, and selected review evidence in the run bundle and
-   read back the rendered artifact at closeout.
+1. Keep the deck, applicable template reference, and selected review evidence
+   with the deliverable; read back the rendered artifact at closeout.

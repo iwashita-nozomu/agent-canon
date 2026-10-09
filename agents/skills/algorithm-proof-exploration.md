@@ -192,95 +192,39 @@ certificate construction.
 
 ## Completion Condition
 
-この skill の終了条件は、目的の public-root theorem に対する Goal checklist が
-checker-backed に `pass` することです。個々の proof row の `verified`、
-`refuted`、`unprovable_under_assumptions`、または checked boundary は checklist
-item の状態であり、top-level 完了分岐ではありません。
-`unverified_with_next_witness` は次に形式証明へ戻す witness queue です。
-有限停止・収束 task では、verified sufficient route は常に中間 evidence です。
-public-root target theorem の required check item がすべて閉じるまで
-`complete` にしてはいけません。
+Terminal proof status belongs to `$formal-proof-workflow`. When the user asks
+for a proved implementation claim, report it as complete only after that
+owner's checker-backed public-root Goal passes. A sufficient route does not
+close a request for convergence, finite stopping, or a necessary-and-sufficient
+condition unless it establishes that target. Algorithm guidance or a connected
+IR/graph alone is not proof.
 
-algorithm blocker の分類、algorithm-change guidance、IR/graph の接続確認、
-formal-proof handoff の明確化は中間成果です。これらだけでは終了しません。
-アルゴリズム変更が必要な場合も、その変更案を出しただけでは終了せず、変更後の
-アルゴリズムで同じ Goal checklist を再生成・再検査するところまで進めます。
-`unverified_with_next_witness` は formal-proof 側へ戻す探索 queue であり、
-アルゴリズム探索の完了ではありません。証明 path が閉じない場合は、
-current IR / assumption ledger から導けないことを checker-backed に示してから、
-直接の algorithm change、problem-class witness、または generated backend coverage boundary として
-採用します。
-connection / bridge / profile binding / witness instantiation が開いている場合も
-終了ではありません。その接続が caller lemma または target theorem edge を止めているなら、
-function frontier と同じように再帰展開します。user-facing に返せる途中状態は、
-user が明示的に status を求めた場合だけで、残り required check item がどの
-production code / algorithm choice、`Problem` / config / solve-input、
-backend/runtime architecture boundary に対応するかを示します。
-未接続の theorem graph edge、未展開の generated equation、未接続の generated Lean
-関数、`next_witness`、または repairable extractor / graph / proof-status gap は
-completion でも formal-proof handoff の終端でもありません。これらは
-`proof_tool_handoff` の proof-tool worker work item として、修正、再生成、再検査、または
-formal-proof 側での checker-backed refutation / unprovability へ進めます。
-handoff できるのは、Target Binding Packet が揃い、かつ未接続 row が
-Goal checklist の required item として機械的に追跡されている場合だけです。
-ユーザーが「何が足りないか」「どこがブロックしているか」と尋ねた場合も、
-未接続 row や helper lemma 名を返却しません。まずその row を public-root Goal
-checklist の required item に昇格し、`verified`、`refuted`、
-`unprovable_under_assumptions`、checked boundary、または selected route から
-pruned のいずれかへ落とします。返却できる説明は、その checked item がどの
-production code / algorithm choice、`Problem` / config / solve-input、
-backend/runtime architecture boundary に対応するかを示す因果鎖だけです。
-Multi-agent Wave はこの終了条件を実行する adaptive loop です。固定した agent 群を
-一度だけ走らせるのではなく、graph checker / proof search / reviewer output から
-次 frontier queue を作り、必要な bounded subagent を追加し、親が integrate して
-同じ target theorem と validation を再実行します。次 frontier が repository /
-code / tool action で進む限り、単発 wave の要約を terminal outcome にしません。
-Wave は全体 theorem board から開始し、frontier を initializer / recurrence、stopping
-scalar、nested solver return、generated tolerance、backend decode、problem / config
-witness などの route segment に分けます。1 回の batch は、同じ segment 上の connected
-frontier をまとめて検証・反証・剪定し、public-root theorem が次の抽象境界へ進んだことを
-示すまで続けます。下位 local bridge だけで止まる場合は、その bridge が選択 route を
-閉じたか、全 sibling frontier が checked boundary / profile-only / obsolete / refuted
-であることを board で示します。
-board は報告用の飾りではなく、作業開始の gate です。証明編集、algorithm 編集、
-subagent handoff の前に、target theorem、public return projection、sufficient route、
-necessary / reverse route、circularity / projection-only route、実装 / extractor route、
-backend route、public Problem / config expressivity route、algorithm-change route の
-現在状態を書きます。選択する作業は、どの board 行のどの route segment を閉じるのかを
-明示できる必要があります。明示できない場合は、最後に触った局所 theorem から始めず、
-board / graph extraction を先に直します。lower-level witness、local lemma、one-shot wave
-summary は queue item であり、それが属する board 行が terminal または checked boundary
-に達し、actionable sibling row が残らない場合だけ user-facing progress になります。
-収束 / finite-stop task では、各 Wave の最初に問題全体の board pass を行い、
-最終 theorem、sufficient route、necessary / reverse route、circularity route、
-実装 / extractor route、backend route、public Problem / config expressivity route、
-algorithm-change route を一枚で見ます。編集対象は、この board の一行を
-`verified`、`refuted`、`unprovable_under_assumptions`、または checked boundary へ
-動かす connected batch です。単一 bridge、generated field projection、local lemma は
-batch item にすぎず、その行を閉じるか sibling frontier が graph checker で剪定されるまで
-Wave の成果として返しません。
-収束 task では、編集前に問題全体の board 行を明示します。少なくとも sufficient route、
-necessary / reverse route、circularity rejection、実装 / extractor gap、backend semantics
-gap、public Problem / config expressivity gap、algorithm-change candidate を分けます。
-局所 theorem はこれらの行のどれを進めるかが明確な場合だけ扱います。十分条件 route
-だけが改善され、reverse または expressivity 行が開いている場合、Wave はそこで返答せず、
-その行が terminal になるか別の active row に handoff されるまで反復します。
-選択した行には batch frontier queue を付けます。queue は prose 順ではなく theorem graph
-から作り、同じ public theorem/profile から到達可能で、repository code、generated
-evidence、Lean proof、graph overlay、既存 backend/source artifact で進められる sibling
-frontier をまとめます。親は batch 全体を integrate し、graph / proof check を再実行してから、
-次 batch に進むか、その行を terminal / checked boundary として記録します。
-Wave parent は別エージェントまたは checker tool に state inspection を委譲し、
-自分の分類だけで user-facing return status を採用してはいけません。inspection packet は
-target theorem、public root、return projection、board rows、proof-status table、
-generated artifacts、selected repair / algorithm-change route、exit-gate criteria を
-含みます。inspector の責務は、新しい証明を作ることではなく、十分条件を Goal 達成と
-誤報していないか、free witness が theorem-critical path に残っていないか、open
-frontier を checked boundary と誤分類していないかを検査することです。finding が出たら
-親は repair / regenerate / recheck を行い、同じ public-root theorem の board を
-再計算してから user-facing に返します。
+This exploration is complete when its selected task is resolved or handed to
+the correct owner: change the algorithm only after a checker-backed mathematical
+mismatch authorizes `return_to_math`; send extractor, generated evidence,
+checker, or graph failures through the named `proof_tool_worker`; and send an
+open proof obligation to `$formal-proof-workflow` with the required Target
+Binding Packet. Keep implementation-derived values bound to the public inputs
+and code path, and do not add proof-only production fields.
+
+Choose proof detail to match the target. A simple claim can use its direct
+obligation and evidence. Use a public-root frontier board when several routes,
+especially sufficient and reverse convergence routes, affect the requested
+conclusion. Delegate a bounded connected proof-tool or algorithm task only when
+it can advance that frontier; there is no required wave size, independent review
+stack, or fixed sequence of artifacts. Reuse existing evidence, and do not
+repeat an unchanged search or repair. If the selected task reaches its available
+budget or a genuine external/tool boundary without closing the theorem, return
+that nonterminal status with the checked evidence, exact unresolved boundary,
+owner, and next action. Never describe an unverified witness as a proof result.
 
 ## Canonical Flow
+
+Use the evidence path that matches the selected claim. The public-root and
+implemented-transition relationship is required for implementation-derived
+claims; abstract design proofs do not need code extraction. Within a selected
+path, preserve logical dependencies, but do not create unneeded stages or
+artifacts merely to follow the numbered examples below.
 
 1. Target theorem:
    - 最初の target は JIT 可能な public entrypoint
@@ -651,7 +595,9 @@ frontier を checked boundary と誤分類していないかを検査するこ�
 
 ## Artifact Contract
 
-Use these names in run bundles, proof notes, or `lean/<proof-theme>/` artifacts:
+Use the existing names that fit the selected task in run bundles, proof notes,
+or `lean/<proof-theme>/` artifacts. This is a vocabulary of existing evidence,
+not a requirement to create a complete ledger for every exploration:
 
 - `proof_jit_canonical_ir`: source root, target theorem, operational ops, backend traces.
 - `proof_lemma_graph`: target chains and dependency edges.

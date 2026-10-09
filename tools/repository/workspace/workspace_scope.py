@@ -1,11 +1,11 @@
 # @dependency-start
 # contract tool
 # responsibility AgentTeam workspace scope owner module.
-# upstream design ../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
-# upstream implementation ./team_config.py provides role and artifact policy inputs.
-# downstream implementation ./agent_team.py facade consumes path APIs.
-# downstream implementation ./bootstrap_agent_run.py consumes path APIs.
-# downstream implementation ./task_close.py consumes path APIs.
+# upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream implementation ../../agent/orchestration/team_config.py provides role and artifact policy inputs.
+# downstream implementation ../../agent/orchestration/agent_team.py facade consumes path APIs.
+# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes path APIs.
+# downstream implementation ../../runtime/lifecycle/task_close.py consumes path APIs.
 # @dependency-end
 """Own AgentTeam workspace scope, path, and snapshot operations."""
 

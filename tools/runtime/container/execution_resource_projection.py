@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Validates and forwards the exact PostToolUse execution-resource projection only.
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md U-14/U-15 projection consumer contract and composition graph
-# downstream implementation ../../.codex/hooks/hook_dispatcher.py imports this pure owner for active PostToolUse.
+# upstream design ../../../documents/experiments/gpu-admission-r5-source-packet.md U-14/U-15 projection consumer contract and composition graph
+# downstream implementation ../../../.codex/hooks/hook_dispatcher.py imports this pure owner for active PostToolUse.
 # @dependency-end
 
 """Validate one canonical PostToolUse projection without becoming an authority."""

@@ -2,10 +2,10 @@
 # @dependency-start
 # contract implementation
 # responsibility Resolves stable source-repository identities for runtime log branches.
-# upstream design ../../documents/runtime/runtime-log-archive.md stable source identity and branch contract
+# upstream design ../../../documents/runtime/runtime-log-archive.md stable source identity and branch contract
 # downstream implementation ./runtime_log_paths.py derives runtime archive paths from stable identity
 # downstream implementation ./runtime_log_archive_git.py publishes archive data through runtime paths
-# downstream implementation ../../tests/agent_tools/test_log_repository_lifecycle.py verifies identity lifecycle behavior
+# downstream implementation ../../../tests/agent_tools/test_log_repository_lifecycle.py verifies identity lifecycle behavior
 # @dependency-end
 """Thin AgentCanon adapter for the agent-canon-log stable-branch protocol."""
 

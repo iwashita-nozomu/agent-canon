@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Validates and pushes Template/AgentCanon agent update branches.
-# upstream design ../../agents/skills/agent-update-branch.md defines branch lanes
-# downstream design ../../.codex/personal/skills/agent-update-branch/SKILL.md documents invocation
+# upstream design ../../../agents/skills/agent-update-branch.md defines branch lanes
+# downstream design ../../../.codex/personal/skills/agent-update-branch/SKILL.md documents invocation
 # @dependency-end
 set -euo pipefail
 

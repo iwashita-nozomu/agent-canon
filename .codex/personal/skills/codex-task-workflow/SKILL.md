@@ -1,8 +1,8 @@
 ---
 name: codex-task-workflow
-description: "Use when Codex needs a context-independent execution path for a repository task, from intake and workflow selection through artifact placement, implementation, validation, and closeout."
+description: "Use for repository-changing execution after workflow and owners are selected."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"ac1c0c840d540ca0e4c876bc7a40827a09ca3ee7e3e90b4976134c89403a7ee2"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"d902fb3ffef1dc64ff5fe58ccd4fec70c32528b85458035f80c288f725c0c270"} -->
 
 <!--
 @dependency-start

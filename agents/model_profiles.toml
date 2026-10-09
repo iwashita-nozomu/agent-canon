@@ -155,7 +155,7 @@ sandbox_mode = "workspace-write"
 [[model_profiles]]
 id = "sol_parent_high"
 model_alias = "sol"
-model = "gpt-5.6-sol"
+model = "gpt-6.1-sol"
 reasoning_effort = "high"
 owner = "sol_parent"
 capabilities = ["orchestration", "integration"]
@@ -188,7 +188,7 @@ priority = 2
 [[model_profiles]]
 id = "luna_reasoning_high"
 model_alias = "luna_reasoning"
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 reasoning_effort = "high"
 owner = "luna"
 capabilities = ["reasoning", "review"]
@@ -216,7 +216,7 @@ priority = 1
 [[model_profiles]]
 id = "luna_implementation_xhigh"
 model_alias = "luna_implementation"
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 reasoning_effort = "xhigh"
 owner = "luna"
 capabilities = ["implementation", "causal_repair", "cross_owner_integration"]
@@ -246,7 +246,7 @@ static_obligations = ["validation_owner", "parent_assignment", "parent_authority
 [[model_profiles]]
 id = "terra_cross_cutting_read_only"
 model_alias = "terra_cross_cutting"
-model = "gpt-5.6-terra"
+model = "gpt-6-astra"
 reasoning_effort = "high"
 owner = "terra"
 capabilities = ["cross_owner_integration", "context_reconstruction", "adversarial_contradiction_validation"]
@@ -274,7 +274,7 @@ priority = 1
 [[model_profiles]]
 id = "luna_ship_xhigh"
 model_alias = "luna_ship"
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 reasoning_effort = "xhigh"
 owner = "luna"
 capabilities = ["final_review", "release_readiness"]
@@ -302,7 +302,7 @@ priority = 1
 [[model_profiles]]
 id = "spark_implementation_low"
 model_alias = "spark_implementation"
-model = "gpt-5.3-codex-spark"
+model = "gpt-6-luna"
 reasoning_effort = "low"
 owner = "spark"
 capabilities = ["implementation", "fixed_packet"]
@@ -332,7 +332,7 @@ static_obligations = ["validation_owner", "parent_assignment", "parent_authority
 [[model_profiles]]
 id = "mini_skill_evaluator_medium"
 model_alias = "skill_evaluator"
-model = "gpt-5.4-mini"
+model = "gpt-6-luna"
 reasoning_effort = "medium"
 owner = "skill_evaluator"
 capabilities = ["skill_evaluation"]
