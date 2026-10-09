@@ -99,10 +99,14 @@ with direct use or composition before a new API. Keep one exposed API per
 functional capability. Alternate names or routes, forwarding aliases, independent
 duplicate APIs, and compatibility wrappers are additional APIs for that capability.
 Private implementation decomposition is not an API; preserve distinct
-responsibilities and do not add aliases, adapters, or guards merely to announce
-policy. For a repair, choose the simplest complete correction, including
-replacement when justified. Test a concrete candidate use against the required
-property, including relevant configuration and composition.
+responsibilities. Use existing domain types, API contracts, and responsibility
+abstractions for structural guarantees; keep workflow guidance with its owner
+instead of encoding it wholesale in flags, validators, or runtime admission
+gates. Validate real untrusted input and I/O at their boundary, but do not repeat
+guards for invariants already enforced by a type or API. For a repair, choose the
+simplest complete correction, including replacement when justified. Test a
+concrete candidate use against the required property, including relevant
+configuration and composition.
 State the checked input/source, actual result, and conclusion; investigate a missing
 guarantee until the material decision is settled. Record candidates, verified unmet
 contracts, and necessary owner/API changes in the existing design.
