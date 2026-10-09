@@ -63,7 +63,7 @@ GPUを使ったという主張は、そのcommandが実際にGPU backendを使�
 JAXを使う場合だけ、container内で`jax.default_backend() == "gpu"`を確認します。
 CPU-onlyやfake commandの成功を実機GPU検証と扱わず、実機未実行ならその点を明記します。
 
-局所回帰テスト:
+この実行経路やその contract を変更した場合の局所回帰テスト:
 
 ```text
 python3 -m unittest discover -s tests/agent_tools -p test_gpu_execution_docker_all_contract.py -v

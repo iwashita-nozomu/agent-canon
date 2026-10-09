@@ -31,12 +31,12 @@ skill_families:
   # Public user-facing skill ids use plain hyphen-case. Runtime-internal skill
   # shims use .codex/personal/skills/_<name>/SKILL.md and stay owner-routed.
   - id: agent-orchestration
-    purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
+    purpose: Resolve workflow family, active Skills, roles, and execution route for repository tasks.
     canonical_doc: agents/skills/agent-orchestration.md
     shim: .codex/personal/skills/agent-orchestration/SKILL.md
     discovery:
       name: agent-orchestration
-      description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
+      description: "Use at repository-task intake to select the workflow, Skills, roles, and execution route."
     tool_commands:
       required: []
       conditional:
@@ -194,12 +194,12 @@ skill_families:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: codex-task-workflow
-    purpose: Execute repository tasks with a context-independent Codex flow.
+    purpose: Carry a selected repository change through its current owners and closeout.
     canonical_doc: agents/skills/codex-task-workflow.md
     shim: .codex/personal/skills/codex-task-workflow/SKILL.md
     discovery:
       name: codex-task-workflow
-      description: "Use when Codex needs a context-independent execution path for a repository task, from intake and workflow selection through artifact placement, implementation, validation, and closeout."
+      description: "Use for repository-changing execution after workflow and owners are selected."
     tool_commands:
       required: []
       conditional:
@@ -217,12 +217,12 @@ skill_families:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: subagent-bootstrap
-    purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
+    purpose: Launch selected child handoffs and durable coordination without duplicating role policy.
     canonical_doc: agents/skills/subagent-bootstrap.md
     shim: .codex/personal/skills/subagent-bootstrap/SKILL.md
     discovery:
       name: subagent-bootstrap
-      description: "Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing."
+      description: "Use when a selected route needs child delegation or durable coordination/resumption."
     tool_commands:
       required: []
       conditional:
@@ -497,12 +497,12 @@ skill_families:
         - ["figure", "inventory"]
         - ["result", "figure", "inventory"]
   - id: tool-finding-report
-    purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
+    purpose: Run selected tools and checkers, preserve evidence for the requested scope, and conditionally prioritize findings when triage needs it; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
     shim: .codex/personal/skills/tool-finding-report/SKILL.md
     discovery:
       name: tool-finding-report
-      description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
+      description: "Use when running tools or checkers to report findings for the requested scope. Preserve raw or structured evidence as needed; prioritize findings when triage requires it and compare before/after impact only when requested."
     tool_commands:
       required: []
       conditional:
@@ -532,12 +532,12 @@ skill_families:
         - ["run_repo_dependency_review.sh", "dependency", "graph"]
         - ["run_repo_dependency_review.sh", "修正先"]
   - id: issue-finding-report
-    purpose: Convert observed defects or accumulated evidence into cause-qualified repository-qualified GitHub Issues, and reorganize related Issues into cohesive responsibility units without clause loss.
+    purpose: Turn AgentCanon-owned defects or structured evidence into investigative Issues and cohesive responsibility boundaries.
     canonical_doc: agents/skills/issue-finding-report.md
     shim: .codex/personal/skills/issue-finding-report/SKILL.md
     discovery:
       name: issue-finding-report
-      description: "Use when creating, splitting, merging, re-parenting, reopening, or superseding Issues by owner, decision, mechanism, validation, and completion responsibility; investigates cause hypotheses without overclaiming, preserves unique clauses, and can also convert accumulated runtime evidence into durable AgentCanon Issues through the shared dashboard tool."
+      description: "Use to record AgentCanon defect evidence or reorganize related Issues by owner and completion responsibility."
     tool_commands:
       required: []
       conditional:
@@ -822,12 +822,12 @@ skill_families:
         - ["独立", "source", "clone"]
         - ["モジュール", "cleanup"]
   - id: pr-processing
-    purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
+    purpose: Process authorized GitHub Issue and PR operations; queue planning is conditional on candidate dependencies.
     canonical_doc: agents/skills/pr-processing.md
     shim: .codex/personal/skills/pr-processing/SKILL.md
     discovery:
       name: pr-processing
-      description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, preserve PR Essence in bodies and run bundles, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
+      description: "Use for an authorized GitHub Issue or PR operation; build a queue only when candidates depend on or conflict with each other."
     tool_commands:
       required: []
       conditional:
@@ -2117,12 +2117,12 @@ skill_families:
       stage_policy: active
       reason: public/module responsibility, reachability, or behavior-preserving code cleanup is in scope
   - id: empirical-prompt-tuning
-    purpose: Improve reusable agent instructions through fresh evaluation on frozen baseline and hold-out scenarios until qualitative and quantitative evidence converges.
+    purpose: Improve reusable instructions from observed outcomes; use fresh evaluation when a decision needs evidence about changed behavior.
     canonical_doc: agents/skills/empirical-prompt-tuning.md
     shim: .codex/personal/skills/empirical-prompt-tuning/SKILL.md
     discovery:
       name: empirical-prompt-tuning
-      description: "Use when a reusable skill, prompt, or instruction surface needs fresh empirical evaluation against frozen baseline and hold-out scenarios, followed by evidence-based iteration to convergence."
+      description: "Use when a reusable instruction has an observed or consequential behavior question that needs evidence-based evaluation and revision."
     tool_commands:
       required: []
       conditional: []

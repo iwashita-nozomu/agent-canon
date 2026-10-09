@@ -13,7 +13,9 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structure
 
 ## Purpose
 
-補助文書、generated evidence、root view、重複見出し、stale 名称の文書を機械的に棚卸しし、どの文書を編集すべきかを先に固定します。
+文書の正本、generated evidence、root view、重複見出し、stale 名称の境界を
+確認します。編集対象と正本が既に分かっている範囲は直接確認し、候補や
+所有者が曖昧な範囲だけ inventory で調べます。
 
 ## Use When
 
@@ -45,16 +47,23 @@ that still names one to the Rust command before returning to the original task.
 - `duplicate_heading_candidate`: H1 が重複する active 文書。merge、retitle、または両方が必要な理由を明記します。
 - `stale_name_candidate`: path 名が backup / copy / legacy / old / snapshot / stale を示す候補。現行正本か確認します。
 
-## Cleanup Sequence
+## Cleanup Route
 
-1. `agent-canon structured-analysis document-inventory` を実行し、JSON と Markdown report を作ります。
-1. Findings を class ごとに分けます。
-1. `accumulated_eval_result`、`generated_report`、`closed_issue_record` は原則編集しません。必要なら generator、eval manifest、issue の open record、または正本文書を編集します。
-1. `missing_dependency_manifest` は文書として残すか、artifact として移すかを決めます。残す場合は nearest canonical anchor への `upstream` を足します。
-1. `duplicate_heading_candidate` は正本候補へ統合するか、reader が区別できる H1 に変更します。
-1. 変更後に再実行して、意図した finding だけが残ることを確認します。
+Use `agent-canon structured-analysis document-inventory` when the candidate set
+or source/evidence/generated boundary is unresolved, or when the request asks for
+an inventory report. Classify only the findings in that selected scope. Leave
+accumulated evaluation results, generated reports, and closed Issue records with
+their source owners; if one must change, update its generator, manifest, open
+Issue record, or canonical document instead. Resolve a missing dependency header
+or duplicate heading only when present in the changed surface. Re-run inventory
+only when the cleanup changes the inventory result or the selected validation
+requires that readback.
 
-## Closeout Checks
+## Selected Checks
+
+Choose the check that establishes the changed property. These commands are
+examples for their respective owners, not a required sequence for every document
+edit.
 
 ```bash
 agent-canon structured-analysis document-inventory --root .

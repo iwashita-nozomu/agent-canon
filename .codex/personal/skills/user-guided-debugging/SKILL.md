@@ -2,7 +2,7 @@
 name: user-guided-debugging
 description: "Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"de15fdcd10742f1fe36f67705706ec94281bab1b290ab5ceeebcf352240be750"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5d579b4d49bce8a33de7861873b87b24dcbbc7453e3ab8f4d9b496e4598c14f2"} -->
 
 <!--
 @dependency-start
