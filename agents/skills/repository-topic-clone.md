@@ -32,9 +32,9 @@ repository-topic checkout の操作を選び、
 選択した操作だけを実行し、引数は [CLI 参照](../../documents/tools/repository_topic_clone.md#基本操作)
 から組み立てます。handoff の identity と current owner evidence を引き継ぎ、write-capable な `prepare` には
 current allowed paths を渡します。`owner-evidence` digest は承認ではなく lifecycle metadata です。
-clean な exact canonical checkout は `prepare` / `merge-main` で current digest へ更新できます。
+exact canonical checkout の既存 task marker / writer packet は `prepare` で current metadata へ更新できます。
+この metadata-only operation は source と Git index を変更せず、dirty status を clean 扱いしません。
 `cleanup` は marker と current evidence の exact match を要求します。
-dirty linked checkout での reprepare は、既存 target identity を保った strict path extension だけを許します。
 
 | 操作 | 実行前に読む正本 |
 | --- | --- |
@@ -44,8 +44,9 @@ dirty linked checkout での reprepare は、既存 target identity を保った
 | `cleanup`（不要になった時点） | [起動・保持判断と復元可能性・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
 
 `linked-worktree` の `cleanup --apply` は request の exact worktree/topic path を回収しますが、
-local topic branch は保持します。branch の削除権限をこの lifecycle に追加せず、既存の cleanup authority
-と復旧可能性の契約をそのまま適用します。
+local topic branch は保持します。実行前に task owner が ignored / untracked / submodule / annex-only content を
+削除対象外へ保存したことを確認します。CLI の status と local superproject head はその内容の復元可能性を証明しません。
+branch の削除権限をこの lifecycle に追加せず、既存の cleanup authority と復旧可能性の契約をそのまま適用します。
 
 操作結果を read back し、失敗時は
 [例外/フォールバック](../../documents/rule/repository-topic-clone.md#例外フォールバック)

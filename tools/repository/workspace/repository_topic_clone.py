@@ -251,14 +251,12 @@ class MergeMainReceipt:
 
 @dataclass(frozen=True)
 class CleanupProof:
-    """Cleanup preflight result with applied removal mode and force reason."""
+    """Cleanup preflight result for one exact repository-topic checkout."""
 
     request: RepositoryTopicCloneRequest
     clone: Path
     removed: bool
     evidence: str
-    removal_mode: str | None = None
-    force_reason: str | None = None
 
 
 @runtime_checkable
@@ -802,92 +800,138 @@ def _inspect(
     return CloneState(path, "ready")
 
 
-def _extend_dirty_linked_writer_target(
+def _update_existing_prepare_metadata(
     request: RepositoryTopicCloneRequest,
     clone: Path,
     *,
     owner_sha: str,
 ) -> PrepareReceipt | None:
-    """Update only the reserved packet for an exact linked-target path extension."""
-    if request.checkout_mode != CHECKOUT_MODE_LINKED or not request.allowed_paths:
-        return None
-    current_owner_sha = _evidence_sha256(
-        _require_evidence(request.owner_evidence, request.workspace_root)
-    )
-    if current_owner_sha != owner_sha:
-        return None
-    state = _inspect(
-        clone, request, owner_sha=owner_sha, require_clean=False
-    )
+    """Refresh only canonical handoff metadata for an exact existing checkout."""
+    state = _inspect(clone, request, owner_sha=None, require_clean=False)
     if state.state != "ready":
         return None
 
     packet_path = clone / WRITER_TARGET_PACKET_RELATIVE
     if (
-        not packet_path.is_file()
-        or packet_path.is_symlink()
+        packet_path.is_symlink()
         or packet_path.parent.is_symlink()
-        or _run_git_bool(
-            clone,
-            [
-                "ls-files",
-                "--error-unmatch",
-                "--",
-                WRITER_TARGET_PACKET_RELATIVE.as_posix(),
-            ],
+        or (packet_path.parent.exists() and not packet_path.parent.is_dir())
+        or (packet_path.exists() and not packet_path.is_file())
+        or (
+            packet_path.exists()
+            and _run_git_bool(
+                clone,
+                [
+                    "ls-files",
+                    "--error-unmatch",
+                    "--",
+                    WRITER_TARGET_PACKET_RELATIVE.as_posix(),
+                ],
+            )
         )
     ):
         return None
-    try:
-        packet_target, _packet_identity = read_writer_target_packet(clone)
-        exclude = _git_path(clone, "info/exclude")
-        if exclude.is_symlink() or not exclude.is_file():
+
+    packet_target: WriterTarget | None = None
+    packet_identity: Mapping[str, object] | None = None
+    if packet_path.exists():
+        try:
+            packet_target, packet_identity = read_writer_target_packet(clone)
+        except (OSError, UnicodeDecodeError, WriterTargetError):
             return None
-        excluded_lines = {
-            line.strip() for line in exclude.read_text(encoding="utf-8").splitlines()
-        }
-    except (OSError, UnicodeDecodeError, WriterTargetError):
-        return None
-    if WRITER_TARGET_PACKET_RELATIVE.as_posix() not in excluded_lines:
-        return None
 
     checkout_identity = resolve_checkout_identity(clone).as_dict()
     branch = _run_git(
         clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]
     ).strip()
     try:
-        validate_writer_target_identity(packet_target, checkout_identity)
-        target = WriterTarget(
-            str(clone),
-            branch,
-            str(checkout_identity["remote"]),
-            request.allowed_paths,
+        if packet_target is not None:
+            validate_writer_target_identity(packet_target, checkout_identity)
+        allowed_paths = request.allowed_paths or (
+            packet_target.allowed_paths if packet_target is not None else ()
         )
-        validate_writer_target_identity(target, checkout_identity)
+        target = (
+            WriterTarget(
+                str(clone),
+                branch,
+                str(checkout_identity["remote"]),
+                allowed_paths,
+            )
+            if allowed_paths and checkout_identity["remote"] != "unknown"
+            else None
+        )
+        if target is not None:
+            validate_writer_target_identity(target, checkout_identity)
     except WriterTargetError:
         return None
-    if not set(packet_target.allowed_paths) < set(target.allowed_paths):
+
+    if packet_target is not None and target is None:
+        return None
+    if packet_target is None and target is None:
         return None
 
-    # The existing identity is sufficient. Only the reserved packet changes;
-    # checkout, Git config, and index state remain untouched.
+    marker = _marker_values(
+        clone,
+        MARKER_PREFIX,
+        CANONICAL_MARKER_FIELDS,
+        checkout_mode=request.checkout_mode,
+    )
+    marker_changed = marker["owner-evidence-sha256"] != owner_sha
+    packet_changed = target is not None and (
+        packet_target is None
+        or packet_target.as_dict() != target.as_dict()
+        or packet_identity != checkout_identity
+    )
+    if not marker_changed and not packet_changed:
+        return None
+
+    # This owner operation changes only the canonical task marker, the reserved
+    # writer-packet ignore entry, and that ignored packet. Source files and the
+    # Git index remain untouched.
+    effective_request = request
+    updated_packet: Path | None = None
+    if target is not None:
+        exclude = _git_path(clone, "info/exclude")
+        if exclude.is_symlink() or (exclude.exists() and not exclude.is_file()):
+            return None
+        if packet_path.exists():
+            try:
+                excluded_lines = {
+                    line.strip()
+                    for line in exclude.read_text(encoding="utf-8").splitlines()
+                }
+            except (OSError, UnicodeDecodeError):
+                return None
+            if WRITER_TARGET_PACKET_RELATIVE.as_posix() not in excluded_lines:
+                return None
+        _ensure_writer_target_packet_ignored(clone)
+        try:
+            updated_packet = materialize_writer_target_packet(
+                target, checkout_identity
+            )
+            updated_target, updated_identity = read_writer_target_packet(clone)
+        except WriterTargetError as exc:
+            raise RepositoryTopicCloneError(
+                "writer_target_packet:metadata_update_failed"
+            ) from exc
+        if (
+            updated_target.as_dict() != target.as_dict()
+            or updated_identity != checkout_identity
+        ):
+            raise RepositoryTopicCloneError(
+                "writer_target_packet:metadata_update_readback_mismatch"
+            )
+        if not request.allowed_paths:
+            effective_request = replace(request, allowed_paths=target.allowed_paths)
+    if marker_changed:
+        _set_marker(clone, effective_request, owner_sha=owner_sha, branch=branch)
+
     candidate_sha = _run_git(clone, ["rev-parse", branch]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]
     ).strip()
-    try:
-        updated_packet = materialize_writer_target_packet(target, checkout_identity)
-        updated_target, _updated_identity = read_writer_target_packet(clone)
-    except WriterTargetError as exc:
-        raise RepositoryTopicCloneError(
-            "writer_target_packet:metadata_update_failed"
-        ) from exc
-    if updated_target.as_dict() != target.as_dict():
-        raise RepositoryTopicCloneError(
-            "writer_target_packet:metadata_update_readback_mismatch"
-        )
     clone_identity = clone.stat()
     return PrepareReceipt(
-        request=request,
+        request=effective_request,
         clone=clone,
         branch=branch,
         candidate_sha=candidate_sha,
@@ -1097,18 +1141,18 @@ def request(
     clone = computed_clone_path(request_state, create_topic=True)
     if request_state.parent_attestation is None:
         raise RepositoryTopicCloneError("parent-root-attestation:boundary:attestation missing")
+    metadata_receipt = _update_existing_prepare_metadata(
+        request_state, clone, owner_sha=owner_sha
+    )
+    if metadata_receipt is not None:
+        if policy is not None:
+            policy.apply(
+                operation="prepare",
+                request=metadata_receipt.request,
+                receipt=metadata_receipt,
+            )
+        return metadata_receipt
     state = _inspect(clone, request_state, owner_sha=owner_sha)
-    if state.state == "dirty-worktree-index-or-untracked":
-        # A linked prepare may replace only its validated ignored writer packet.
-        metadata_receipt = _extend_dirty_linked_writer_target(
-            request_state, clone, owner_sha=owner_sha
-        )
-        if metadata_receipt is not None:
-            if policy is not None:
-                policy.apply(
-                    operation="prepare", request=request_state, receipt=metadata_receipt
-                )
-            return metadata_receipt
     owner_evidence_refresh = False
     if state.state == "owner-evidence-mismatch":
         # Only an otherwise exact canonical checkout can refresh this fingerprint.
@@ -1280,21 +1324,20 @@ def merge_main(
     policy: RepositoryPolicyCallback | None = None,
 ) -> MergeMainReceipt:
     """Fetch and merge origin/main with --no-edit and strict ancestor proof."""
-    if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
-        existing_clone = computed_clone_path(request_state, create_topic=False)
-        if existing_clone.exists():
-            current_owner_sha = _evidence_sha256(
-                _require_evidence(
-                    request_state.owner_evidence, request_state.workspace_root
-                )
+    existing_clone = computed_clone_path(request_state, create_topic=False)
+    if existing_clone.exists():
+        current_owner_sha = _evidence_sha256(
+            _require_evidence(
+                request_state.owner_evidence, request_state.workspace_root
             )
-            state = _inspect(
-                existing_clone, request_state, owner_sha=current_owner_sha
+        )
+        state = _inspect(
+            existing_clone, request_state, owner_sha=current_owner_sha
+        )
+        if state.state == "dirty-worktree-index-or-untracked":
+            raise RepositoryTopicCloneError(
+                "merge-main hold: dirty-worktree-index-or-untracked"
             )
-            if state.state == "dirty-worktree-index-or-untracked":
-                raise RepositoryTopicCloneError(
-                    "merge-main hold: dirty-worktree-index-or-untracked"
-                )
     prepared = request(
         request_state.url,
         request_state.repository,
@@ -1548,7 +1591,7 @@ def _remove_linked_worktree(
     request: RepositoryTopicCloneRequest,
     clone: Path,
     attestation: _parent_boundary.ParentRootAttestationReceipt,
-) -> tuple[str, str | None]:
+) -> None:
     """Remove exactly one native worktree while retaining its branch/ref."""
     capability = _parent_boundary.resolve_parent_owned_path(
         attestation, clone, "repository-topic-clone-worktree-cleanup", create=False
@@ -1563,58 +1606,10 @@ def _remove_linked_worktree(
         capability.target_ino,
     ):
         raise RepositoryTopicCloneError("cleanup hold: clone identity changed")
-    removal_mode = "normal"
-    force_reason: str | None = None
-    try:
-        _run_git(request.workspace_root, ["worktree", "remove", str(clone)])
-    except GitCommandError as exc:
-        submodule_remove_error = (
-            "working trees containing submodules cannot be moved or removed"
-        )
-        if (
-            not clone.is_dir()
-            or not str(exc).endswith(f"fatal: {submodule_remove_error}")
-            or not any(
-                line.partition(" ")[0] == "160000"
-                for line in _run_git(clone, ["ls-files", "--stage"]).splitlines()
-            )
-        ):
-            raise
-
-        owner_sha = _evidence_sha256(
-            _require_evidence(request.owner_evidence, request.workspace_root)
-        )
-        state = _inspect(clone, request, owner_sha=owner_sha)
-        if state.state != "ready":
-            raise RepositoryTopicCloneError(
-                f"cleanup hold: {state.state} after submodule remove refusal"
-            ) from exc
-        observed = clone.stat()
-        if (observed.st_dev, observed.st_ino) != (
-            capability.target_dev,
-            capability.target_ino,
-        ):
-            raise RepositoryTopicCloneError(
-                "cleanup hold: clone identity changed after submodule remove refusal"
-            ) from exc
-        retry_capability = _parent_boundary.resolve_parent_owned_path(
-            attestation, clone, "repository-topic-clone-worktree-cleanup", create=False
-        )
-        if (
-            retry_capability.physical_path != clone
-            or retry_capability.target_dev != capability.target_dev
-            or retry_capability.target_ino != capability.target_ino
-        ):
-            raise RepositoryTopicCloneError(
-                "cleanup hold: clone identity changed after submodule remove refusal"
-            ) from exc
-
-        _run_git(
-            request.workspace_root,
-            ["worktree", "remove", "--force", str(clone)],
-        )
-        removal_mode = "force"
-        force_reason = "git_worktree_contains_submodules"
+    _run_git(
+        request.workspace_root,
+        ["worktree", "remove", "--force", str(clone)],
+    )
     if clone.exists():
         raise RepositoryTopicCloneError("cleanup hold: linked worktree remains")
     worktrees = _run_git(
@@ -1630,7 +1625,6 @@ def _remove_linked_worktree(
         raise RepositoryTopicCloneError(
             "cleanup hold: linked worktree remains registered"
         )
-    return removal_mode, force_reason
 
 
 def cleanup(
@@ -1688,7 +1682,7 @@ def cleanup(
 
     if publication_readback is None:
         if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
-            evidence_kind = "linked-local-head"
+            evidence_kind = "linked-superproject-head"
         else:
             try:
                 _run_git(clone, ["fetch", "origin", request_state.branch])
@@ -1733,8 +1727,6 @@ def cleanup(
             request=request_state, clone=clone, removed=False, evidence=evidence_kind
         )
 
-    removal_mode: str | None = None
-    force_reason: str | None = None
     try:
         attestation = _attest_parent(
             _parent_request(
@@ -1743,9 +1735,7 @@ def cleanup(
             )
         )
         if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
-            removal_mode, force_reason = _remove_linked_worktree(
-                request_state, clone, attestation
-            )
+            _remove_linked_worktree(request_state, clone, attestation)
             capability = None
         else:
             capability = _parent_boundary.resolve_parent_owned_path(
@@ -1763,7 +1753,6 @@ def cleanup(
         _parent_boundary.ParentRootSideEffectBoundary().remove_parent_owned_tree(
             attestation, capability, "repository-topic-clone-cleanup"
         )
-        removal_mode = "parent-owned-tree"
     topic_capability = _parent_boundary.resolve_parent_owned_path(
         attestation, topic_root, "repository-topic-workspace-cleanup", create=False
     )
@@ -1775,8 +1764,6 @@ def cleanup(
         clone=clone,
         removed=True,
         evidence=evidence_kind,
-        removal_mode=removal_mode,
-        force_reason=force_reason,
     )
 
 
@@ -1950,10 +1937,6 @@ def main(argv: list[str] | None = None) -> None:
             )
             action = "removed" if args.apply else "would-remove"
             print(f"CLEANUP={proof.clone}:{action}")
-            if proof.removal_mode is not None:
-                print(f"CLEANUP_REMOVE_MODE={proof.removal_mode}")
-            if proof.force_reason is not None:
-                print(f"CLEANUP_FORCE_REASON={proof.force_reason}")
     except RepositoryTopicCloneError as exc:
         print(f"REPOSITORY_TOPIC_CLONE_ERROR={exc}", file=sys.stderr)
         raise SystemExit(1)
