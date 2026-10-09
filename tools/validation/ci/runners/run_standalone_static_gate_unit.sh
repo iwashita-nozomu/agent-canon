@@ -166,6 +166,7 @@ run_contracts() {
     tests.agent_tools.test_visualization_contract \
     tests.agent_tools.test_render_dependency_manifest_graph \
     tests.agent_tools.test_graph_client_source_projection \
+    tests.agent_tools.test_structured_document_inventory_cli \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_dependency_headers \
@@ -173,6 +174,8 @@ run_contracts() {
     tests.agent_tools.test_tool_drift \
     tests.agent_tools.test_vector_search \
     tests/agent_tools/test_dependency_*.py
+  python3 -m pytest -p no:cacheprovider \
+    tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
   python3 "${TOOLS_ROOT}/runtime/manifest/tool_catalog.py"
   python3 "${TOOLS_ROOT}/analysis/proof/tool_proof_coverage.py"
   python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
