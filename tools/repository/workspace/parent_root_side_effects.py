@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Authenticates the selected parent repository and owns parent-local filesystem capabilities.
+# responsibility Authenticates selected repositories and owns parent/Git-admin filesystem capabilities.
 # upstream design ../../../agents/canonical/CODEX_WORKFLOW.md repository mutation and managed-clone authority
 # downstream implementation ../../bin/agent-canon bounds CLI child state
 # downstream implementation ../../validation/ci/runners/run_all_checks.sh bounds integrated CI child state and scratch
@@ -9,12 +9,12 @@
 # downstream implementation ../../../tests/agent_tools/test_parent_root_side_effects.py verifies capabilities and authenticated child environments
 # @dependency-end
 
-"""Authenticate the parent repository and perform parent-owned effects.
+"""Authenticate a repository root and perform parent/Git-admin-owned effects.
 
 The boundary is intentionally the only place where these adapters may turn a
-path into a write capability.  Git identity is checked before a capability is
-issued, and Linux writes use directory file descriptors rather than pathname
-lookups after the check.
+repository or its actual Git common directory into a file capability. Git
+identity is checked before a capability is issued, and Linux writes use
+directory file descriptors rather than pathname lookups after the check.
 """
 
 from __future__ import annotations
@@ -395,11 +395,14 @@ class _TreeRemovalFrame:
 
 @dataclass(frozen=True)
 class ParentRootAttestationReceipt:
-    """Immutable authenticated parent/source/clone identity."""
+    """Immutable authenticated repository and Git-admin identity."""
 
     parent_root: Path
     parent_dev: int
     parent_ino: int
+    git_common_dir: Path
+    git_common_dev: int
+    git_common_ino: int
     source_root: Path | None
     clone_root: Path | None
     root_kind: str
@@ -526,6 +529,19 @@ def _git_toplevel(path: Path) -> Path:
             ParentRootReject.ROOT_MISSING, f"not an authenticated Git checkout: {path}"
         )
     return _physical(Path(result.stdout.strip()), strict=True)
+
+
+def _git_common_dir(path: Path) -> Path:
+    """Resolve the actual shared Git-admin directory for one checkout."""
+    value = Path(_git_value(path, "rev-parse", "--git-common-dir"))
+    candidate = value if value.is_absolute() else path / value
+    common_dir = _physical(candidate, strict=True)
+    if not common_dir.is_dir():
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"Git common directory is not a directory: {common_dir}",
+        )
+    return common_dir
 
 
 def _git_origin(path: Path) -> str:
@@ -1623,6 +1639,8 @@ class ParentRootSideEffectBoundary:
                 f"ambient active repository root is inconsistent: ambient={ambient_root} requested={root}",
             )
         parent_dev, parent_ino = _identity(root)
+        git_common_dir = _git_common_dir(root)
+        git_common_dev, git_common_ino = _identity(git_common_dir)
         source = (
             _physical(request.source_root, strict=True) if request.source_root else None
         )
@@ -1812,6 +1830,14 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.ROOT_RACE_DETECTED,
                 "parent identity changed during attestation",
             )
+        if (
+            _git_common_dir(root) != git_common_dir
+            or _identity(git_common_dir) != (git_common_dev, git_common_ino)
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "Git common-directory identity changed during attestation",
+            )
         kind = (
             "topic"
             if clone is not None
@@ -1825,6 +1851,9 @@ class ParentRootSideEffectBoundary:
             root,
             parent_dev,
             parent_ino,
+            git_common_dir,
+            git_common_dev,
+            git_common_ino,
             source,
             clone,
             kind,
@@ -1839,6 +1868,131 @@ class ParentRootSideEffectBoundary:
             else "",
             purpose=request.purpose,
         )
+
+    def _verify_attested_roots(
+        self, attestation: ParentRootAttestationReceipt
+    ) -> None:
+        if attestation.status != "attested":
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "attestation is not active"
+            )
+        if _identity(attestation.parent_root) != (
+            attestation.parent_dev,
+            attestation.parent_ino,
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed"
+            )
+        if _identity(attestation.git_common_dir) != (
+            attestation.git_common_dev,
+            attestation.git_common_ino,
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "Git common-directory identity changed",
+            )
+        if _git_common_dir(attestation.parent_root) != attestation.git_common_dir:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "selected checkout no longer resolves to its attested Git common directory",
+            )
+
+    def _parent_owned_file_target(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        *,
+        allow_missing: bool,
+    ) -> tuple[Path, tuple[int, int], Path, Path]:
+        """Bind one file path to its repository root or attested Git admin root."""
+        self._verify_attested_roots(attestation)
+        lexical = _lexical_candidate(attestation.parent_root, candidate)
+        owners = (
+            (
+                attestation.git_common_dir,
+                (attestation.git_common_dev, attestation.git_common_ino),
+            ),
+            (
+                attestation.parent_root,
+                (attestation.parent_dev, attestation.parent_ino),
+            ),
+        )
+        for root, expected in owners:
+            if _contains(root, lexical):
+                physical, _ = _physical_in_root(
+                    root, lexical, allow_missing=allow_missing
+                )
+                self._verify_attested_roots(attestation)
+                return root, expected, physical, lexical
+        raise ParentRootSideEffectError(
+            ParentRootReject.SYMLINK_ESCAPE,
+            f"parent-owned file is outside repository and Git admin roots: {lexical}",
+        )
+
+    def _parent_owned_path_receipt(
+        self,
+        root: Path,
+        expected: tuple[int, int],
+        physical: Path,
+        lexical: Path,
+        purpose: str,
+        token_digest: str,
+    ) -> ParentOwnedPathReceipt:
+        """Build a no-follow path receipt beneath one identified owner root."""
+        try:
+            parent_fd, _, _ = _parent_directory(root, physical, create=False)
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
+            parent_components: tuple[tuple[str, int, int], ...] = ()
+        else:
+            os.close(parent_fd)
+            parent_components = _component_identities(
+                root, tuple(physical.relative_to(root).parts)[:-1], create=False
+            )
+        if _identity(root) != expected:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "parent-owned path root identity changed",
+            )
+        target = None
+        try:
+            info = physical.stat()
+            target = (info.st_dev, info.st_ino)
+        except FileNotFoundError:
+            pass
+        receipt = ParentOwnedPathReceipt(
+            lexical,
+            physical,
+            purpose,
+            expected[0],
+            expected[1],
+            token_digest,
+            root,
+            *(target or (None, None)),
+            parent_components,
+        )
+        try:
+            return replace(receipt, **_lexical_snapshot(root, lexical))
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
+            return receipt
+
+    def _resolve_parent_owned_file_path(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        purpose: str,
+    ) -> ParentOwnedPathReceipt:
+        root, expected, physical, lexical = self._parent_owned_file_target(
+            attestation, candidate, allow_missing=True
+        )
+        receipt = self._parent_owned_path_receipt(
+            root, expected, physical, lexical, purpose, attestation.token_digest
+        )
+        self._verify_attested_roots(attestation)
+        return receipt
 
     def resolve_parent_owned_path(
         self,
@@ -1883,48 +2037,15 @@ class ParentRootSideEffectBoundary:
             finally:
                 os.close(parent_fd)
             physical, _ = _physical_in_root(root, candidate, allow_missing=False)
-        # Open every existing physical component once.  A missing parent is
-        # permitted for a later atomic create; publication will create it by
-        # dirfd before opening the final component.
-        try:
-            parent_fd, _, _ = _parent_directory(root, physical, create=False)
-        except ParentRootSideEffectError as exc:
-            if exc.reject is not ParentRootReject.ROOT_MISSING:
-                raise
-            parent_components: tuple[tuple[str, int, int], ...] = ()
-        else:
-            os.close(parent_fd)
-            parent_components = _component_identities(
-                root, tuple(physical.relative_to(root).parts)[:-1], create=False
-            )
-        if _identity(root) != (attestation.parent_dev, attestation.parent_ino):
-            raise ParentRootSideEffectError(
-                ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed"
-            )
         lexical = _lexical_candidate(root, candidate)
-        target = None
-        try:
-            info = physical.stat()
-            target = (info.st_dev, info.st_ino)
-        except FileNotFoundError:
-            pass
-        receipt = ParentOwnedPathReceipt(
-            lexical,
-            physical,
-            purpose,
-            attestation.parent_dev,
-            attestation.parent_ino,
-            attestation.token_digest,
+        return self._parent_owned_path_receipt(
             root,
-            *(target or (None, None)),
-            parent_components,
+            (attestation.parent_dev, attestation.parent_ino),
+            physical,
+            lexical,
+            purpose,
+            attestation.token_digest,
         )
-        try:
-            return replace(receipt, **_lexical_snapshot(root, lexical))
-        except ParentRootSideEffectError as exc:
-            if exc.reject is not ParentRootReject.ROOT_MISSING:
-                raise
-            return receipt
 
     def ensure_parent_owned_directory(
         self,
@@ -1981,7 +2102,7 @@ class ParentRootSideEffectBoundary:
         create: bool,
         mode: str,
     ) -> ParentOwnedFileHandle:
-        """Open and lock a receipt-bound ``a+`` or ``r+`` file without a path race."""
+        """Open a repository or Git-admin file through its attested owner."""
         if sys.platform != "linux":
             raise ParentRootSideEffectError(
                 ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
@@ -2001,19 +2122,20 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.ROOT_MISMATCH,
                 "a+ parent-owned files require create=True",
             )
-        root = attestation.parent_root
-        physical, _ = _physical_in_root(root, candidate, allow_missing=create)
+        root, before, physical, _ = self._parent_owned_file_target(
+            attestation, candidate, allow_missing=create
+        )
         parent_fd, name, _ = _parent_directory(root, physical, create=create)
         target_fd = -1
         handle: ParentOwnedFileHandle | None = None
         created = False
         created_info: os.stat_result | None = None
-        before = (attestation.parent_dev, attestation.parent_ino)
         try:
+            self._verify_attested_roots(attestation)
             if _identity(root) != before:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
-                    "parent identity changed before file open",
+                    "parent-owned file root changed before file open",
                 )
             try:
                 existing = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
@@ -2054,10 +2176,11 @@ class ParentRootSideEffectBoundary:
                     ParentRootReject.ROOT_RACE_DETECTED,
                     "parent-owned file identity changed during open",
                 )
+            self._verify_attested_roots(attestation)
             if _identity(root) != before:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
-                    "parent identity changed after file open",
+                    "parent-owned file root changed after file open",
                 )
             while True:
                 try:
@@ -2723,19 +2846,19 @@ class ParentRootSideEffectBoundary:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_MISMATCH, "Git config value is invalid"
             )
-        receipt = self.resolve_parent_owned_path(attestation, candidate, purpose)
+        receipt = self._resolve_parent_owned_file_path(
+            attestation, candidate, purpose
+        )
         if receipt.target_dev is None or receipt.target_ino is None:
             receipt = self.atomic_publish(receipt, b"")
         _verify_parent_components(receipt)
-        physical, _ = _physical_in_root(
-            attestation.parent_root, receipt.physical_path, allow_missing=False
-        )
-        parent_fd, name, _ = _parent_directory(
-            attestation.parent_root, physical, create=False
-        )
+        root = receipt.parent_root
+        physical, _ = _physical_in_root(root, receipt.physical_path, allow_missing=False)
+        parent_fd, name, _ = _parent_directory(root, physical, create=False)
         config_fd = -1
-        before_root = _identity(attestation.parent_root)
+        before_root = _identity(root)
         try:
+            self._verify_attested_roots(attestation)
             config_fd = os.open(
                 name,
                 os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC,
@@ -2771,10 +2894,11 @@ class ParentRootSideEffectBoundary:
                     f"Git config write failed: {result.stderr.strip() or 'command failed'}",
                 )
             os.fsync(config_fd)
-            if _identity(attestation.parent_root) != before_root:
+            self._verify_attested_roots(attestation)
+            if _identity(root) != before_root:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
-                    "parent identity changed during Git config write",
+                    "Git config owner identity changed during write",
                 )
         except ParentRootSideEffectError:
             raise
@@ -2787,7 +2911,9 @@ class ParentRootSideEffectBoundary:
             if config_fd >= 0:
                 os.close(config_fd)
             os.close(parent_fd)
-        readback = self.resolve_parent_owned_path(attestation, physical, purpose)
+        readback = self._resolve_parent_owned_file_path(
+            attestation, physical, purpose
+        )
         if readback.target_dev is None or readback.target_ino is None:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
@@ -3564,9 +3690,9 @@ class ParentRootSideEffectBoundary:
         *,
         allow_missing: bool = False,
     ) -> bytes | None:
-        """Resolve and read one parent-owned file as authenticated bytes."""
-        receipt = self.resolve_parent_owned_path(
-            attestation, candidate, purpose, create=False
+        """Resolve and read one parent or Git-admin file as authenticated bytes."""
+        receipt = self._resolve_parent_owned_file_path(
+            attestation, candidate, purpose
         )
         if receipt.target_dev is None or receipt.target_ino is None:
             if not receipt.lexical_entry_exists:
@@ -3580,7 +3706,9 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.ROOT_RACE_DETECTED,
                 f"parent-owned entry has no stable target: {receipt.physical_path}",
             )
-        return self.read_parent_owned_file(receipt)
+        payload = self.read_parent_owned_file(receipt)
+        self._verify_attested_roots(attestation)
+        return payload
 
     def remove_empty_parent_owned_directory(
         self,

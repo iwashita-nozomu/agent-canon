@@ -1391,18 +1391,26 @@ def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content
         pytest.param(True, ("updated.py",), id="metadata-refresh"),
     ],
 )
+@pytest.mark.parametrize(
+    "linked_workspace_root", [False, True], ids=["main-parent", "linked-parent"]
+)
 def test_prepare_holds_external_info_exclude_symlink_without_mutation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     packet_present: bool,
     requested_paths: tuple[str, ...],
+    linked_workspace_root: bool,
 ) -> None:
     """An exclude symlink outside the parent cannot receive writer metadata."""
     _, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
-    workspace = tmp_path / "parent"
-    init_workspace_parent(workspace)
-    run_git(workspace, "remote", "add", "origin", remote_url)
+    anchor = tmp_path / "parent"
+    init_workspace_parent(anchor)
+    run_git(anchor, "remote", "add", "origin", remote_url)
+    workspace = anchor
+    if linked_workspace_root:
+        workspace = tmp_path / "parent-linked"
+        run_git(anchor, "worktree", "add", "--detach", str(workspace), "HEAD")
     patch_linked_checkout_identity(monkeypatch)
     request = dict(
         url=remote_url,

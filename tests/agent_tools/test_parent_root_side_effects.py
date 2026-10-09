@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
-# responsibility Verifies authenticated parent capabilities, child state, publication, and exact cleanup.
-# upstream implementation ../../tools/repository/workspace/parent_root_side_effects.py owns parent-local filesystem effects
+# responsibility Verifies authenticated parent/Git-admin capabilities, child state, publication, and exact cleanup.
+# upstream implementation ../../tools/repository/workspace/parent_root_side_effects.py owns parent/Git-admin effects
 # @dependency-end
 
 """Focused tests for the parent-root side-effect boundary."""
@@ -996,6 +996,155 @@ def test_open_parent_owned_file_a_plus_creates_and_locks(tmp_path: Path) -> None
         handle.seek(0)
         assert handle.read() == "created\n"
     assert target.read_text(encoding="utf-8") == "created\n"
+
+
+@pytest.mark.parametrize(
+    "bare_common", [False, True], ids=["worktree-common", "bare-common"]
+)
+def test_parent_file_io_uses_attested_git_common_directory(
+    tmp_path: Path, bare_common: bool
+) -> None:
+    """File capabilities follow the selected checkout's actual Git-admin owner."""
+    source = tmp_path / "source"
+    git_repo(source)
+    common_owner = source / ".git"
+    linked = tmp_path / "linked"
+    if bare_common:
+        common_owner = tmp_path / "repository.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-q", "-b", "main", str(common_owner)],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(source), "remote", "add", "origin", str(common_owner)],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(source), "push", "origin", "main"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "--git-dir",
+                str(common_owner),
+                "worktree",
+                "add",
+                "--detach",
+                str(linked),
+                "main",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    else:
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(source),
+                "worktree",
+                "add",
+                "--detach",
+                str(linked),
+                "HEAD",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    boundary = ParentRootSideEffectBoundary()
+    attestation = boundary.attest(
+        ParentRootAttestationRequest(
+            cwd=linked, explicit_root=linked, purpose="linked-git-admin-file"
+        )
+    )
+    observed_common = Path(
+        subprocess.run(
+            ["git", "-C", str(linked), "rev-parse", "--git-common-dir"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
+    exclude = Path(
+        subprocess.run(
+            ["git", "-C", str(linked), "rev-parse", "--git-path", "info/exclude"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
+    if not observed_common.is_absolute():
+        observed_common = linked / observed_common
+    if not exclude.is_absolute():
+        exclude = linked / exclude
+    observed_common = observed_common.resolve()
+    exclude = exclude.resolve(strict=False)
+    assert attestation.parent_root == linked.resolve()
+    assert attestation.git_common_dir == observed_common == common_owner.resolve()
+    assert not exclude.is_relative_to(attestation.parent_root)
+    with pytest.raises(ParentRootSideEffectError) as parent_only:
+        boundary.resolve_parent_owned_path(
+            attestation, exclude, "linked-git-admin-is-not-parent-tree"
+        )
+    assert parent_only.value.reject is ParentRootReject.SYMLINK_ESCAPE
+
+    with boundary.open_parent_owned_file(
+        attestation, exclude, "linked-git-admin-exclude", create=True, mode="a+"
+    ) as handle:
+        handle.seek(0, os.SEEK_END)
+        handle.write("reserved packet\n")
+    assert exclude.read_text(encoding="utf-8").endswith("reserved packet\n")
+
+    common_config = observed_common / "config"
+    written_config = boundary.git_config_add(
+        attestation,
+        common_config,
+        "agent-canon.test-owner",
+        "verified",
+        "linked-git-admin-config",
+    )
+    assert written_config.parent_root == observed_common
+    assert subprocess.run(
+        [
+            "git",
+            "config",
+            "--file",
+            str(common_config),
+            "--get",
+            "agent-canon.test-owner",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip() == "verified"
+
+    external = tmp_path / "outside-info-exclude"
+    external_before = b"outside remains untouched\n"
+    external.write_bytes(external_before)
+    exclude.unlink()
+    exclude.symlink_to(external)
+    with pytest.raises(ParentRootSideEffectError) as rejected_read:
+        boundary.read_parent_owned_bytes(
+            attestation, exclude, "linked-git-admin-exclude-read"
+        )
+    assert rejected_read.value.reject is ParentRootReject.SYMLINK_ESCAPE
+    with pytest.raises(ParentRootSideEffectError) as rejected_write:
+        boundary.open_parent_owned_file(
+            attestation,
+            exclude,
+            "linked-git-admin-exclude-write",
+            create=True,
+            mode="a+",
+        )
+    assert rejected_write.value.reject is ParentRootReject.SYMLINK_ESCAPE
+    assert exclude.is_symlink()
+    assert external.read_bytes() == external_before
 
 
 def test_open_parent_owned_file_r_plus_requires_existing_file_and_does_not_truncate(
