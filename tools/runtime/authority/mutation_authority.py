@@ -228,7 +228,7 @@ def _backtick_bodies(command: str) -> tuple[tuple[tuple[int, str], ...], bool]:
     """Extract executable backtick substitutions without treating literals as code."""
     bodies: list[tuple[int, str]] = []
     current: list[str] | None = None
-    body_start = 0
+    substitution_start = 0
     single_quoted = False
     escaped = False
     for offset, character in enumerate(command):
@@ -250,9 +250,9 @@ def _backtick_bodies(command: str) -> tuple[tuple[tuple[int, str], ...], bool]:
         if character == "`" and not single_quoted:
             if current is None:
                 current = []
-                body_start = offset + 1
+                substitution_start = offset
             else:
-                bodies.append((body_start, "".join(current)))
+                bodies.append((substitution_start, "".join(current)))
                 current = None
             continue
         if current is not None:
@@ -844,9 +844,9 @@ def _bash_mutation_inner(
     if unterminated_backtick:
         mutation = True
         reasons.append("shell_wrapper_unparseable_backtick")
-    for body_start, body in backticks:
+    for substitution_start, body in backticks:
         substitution_environment = _git_environment_before_backtick(
-            command[:body_start], git_environment_overrides
+            command[:substitution_start], git_environment_overrides
         )
         if substitution_environment is None:
             nested_mutation, _nested_paths, _nested_reason = _bash_mutation_inner(
