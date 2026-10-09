@@ -482,6 +482,53 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
     assert updated.allowed_paths == ("src/owned.py", "tests/test_owned.py")
 
 
+def test_merge_main_keeps_dirty_independent_checkout_hold_after_metadata_refresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Metadata reuse does not let merge-main proceed on a dirty independent clone."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="local/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+    request = dict(
+        url=remote_url,
+        repository="repo-independent-dirty-metadata",
+        workspace_root=workspace,
+        topic="topic-independent-dirty-metadata",
+        branch="feature/independent-dirty-metadata",
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
+    )
+    prepared = rtc.request(**request, allowed_paths=("old.py",))
+    dirty = prepared.clone / "untracked.txt"
+    dirty.write_text("preserve\n", encoding="utf-8")
+
+    updated = rtc.request(**request, allowed_paths=("current.py",))
+    target, _identity = read_writer_target_packet(updated.clone)
+    assert target.allowed_paths == ("current.py",)
+    assert dirty.read_text(encoding="utf-8") == "preserve\n"
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="merge-main hold: dirty-worktree-index-or-untracked",
+    ):
+        rtc.merge_main(updated.request)
+
+    assert dirty.read_text(encoding="utf-8") == "preserve\n"
+    assert updated.clone.is_dir()
+
+
 @pytest.mark.parametrize("mode", [0o700, 0o755])
 def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: int
@@ -778,10 +825,10 @@ def test_linked_reuse_never_switches_and_preserves_branch_in_use_and_dirty_error
     assert dirty.read_text(encoding="utf-8") == "preserve\n"
 
 
-def test_prepare_extends_dirty_linked_target_without_touching_checkout_data(
+def test_prepare_updates_dirty_linked_target_without_touching_checkout_data(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An explicit target extension changes only the reserved writer packet."""
+    """An explicit current target changes only reserved prepare metadata."""
     _, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -838,12 +885,12 @@ def test_prepare_extends_dirty_linked_target_without_touching_checkout_data(
     before_head = run_git(prepared.clone, "rev-parse", "HEAD")
     before_branch = run_git(prepared.clone, "symbolic-ref", "--short", "HEAD")
 
-    extended_paths = ("first.py", "tools/analysis/documents")
-    updated = rtc.request(**{**request, "allowed_paths": extended_paths})
+    current_paths = ("tools/analysis/documents",)
+    updated = rtc.request(**{**request, "allowed_paths": current_paths})
 
     updated_target, _updated_identity = read_writer_target_packet(updated.clone)
-    assert updated.request.allowed_paths == extended_paths
-    assert updated_target.allowed_paths == extended_paths
+    assert updated.request.allowed_paths == current_paths
+    assert updated_target.allowed_paths == current_paths
     assert updated_target.normalized_root == str(updated.clone.resolve())
     assert updated_target.branch == before_branch
     assert updated_target.normalized_remote == "owner/repo"
@@ -960,13 +1007,13 @@ def test_prepare_refreshes_changed_owner_evidence_and_current_writer_scope(
     assert updated_target.allowed_paths == ("current.py",)
     proof = rtc.cleanup(updated_scope.request, apply=False)
     assert not proof.removed
-    assert proof.evidence == "linked-local-head"
+    assert proof.evidence == "linked-superproject-head"
 
 
-def test_prepare_owner_evidence_refresh_keeps_dirty_checkout_and_marker(
+def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Changed evidence cannot rebind a checkout with untracked user state."""
+    """Current exact identity can refresh metadata without adopting dirty content."""
     _, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -996,19 +1043,26 @@ def test_prepare_owner_evidence_refresh_keeps_dirty_checkout_and_marker(
     dirty = prepared.clone / "untracked.txt"
     dirty.write_text("preserve\n", encoding="utf-8")
 
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError, match="dirty-worktree-index-or-untracked"
-    ):
-        rtc.request(**request)
+    continued = rtc.request(**request)
 
+    current_sha = rtc._evidence_sha256(evidence)
+    assert current_sha != original_sha
+    assert continued.request.allowed_paths == ("first.py",)
     assert dirty.read_text(encoding="utf-8") == "preserve\n"
     assert run_git(
-        prepared.clone,
+        continued.clone,
         "config",
         "--local",
         "--get",
         f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
-    ) == original_sha
+    ) == current_sha
+    assert run_git(
+        continued.clone,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
 
 
 def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
@@ -1183,9 +1237,7 @@ def test_linked_cleanup_removes_one_worktree_and_keeps_branch_and_sibling(
     run_git(tmp_path / "source", "push", "origin", "--delete", "feature/first")
     proof = rtc.cleanup(first.request, apply=True)
     assert proof.removed
-    assert proof.evidence == "linked-local-head"
-    assert proof.removal_mode == "normal"
-    assert proof.force_reason is None
+    assert proof.evidence == "linked-superproject-head"
     assert not first.clone.exists()
     assert second.clone.is_dir()
     assert run_git(workspace, "show-ref", "--verify", "refs/heads/feature/first")
@@ -1196,10 +1248,10 @@ def test_linked_cleanup_removes_one_worktree_and_keeps_branch_and_sibling(
     assert not first.clone.parent.exists()
 
 
-def test_linked_cleanup_force_removes_clean_submodule_and_retains_branch(
+def test_linked_cleanup_requires_external_retention_for_local_only_content(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Known clean-submodule refusal uses force after retaining the topic branch."""
+    """Task-owner retention preserves ignored files and local submodule objects."""
     _, remote_url = init_remote(tmp_path)
     submodule_root = tmp_path / "submodule-source"
     submodule_root.mkdir()
@@ -1230,6 +1282,8 @@ def test_linked_cleanup_force_removes_clean_submodule_and_retains_branch(
         allowed_paths=("tests/",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
+    retained_root = tmp_path / "retained-content"
+    retained_root.mkdir()
     subprocess.run(
         [
             "git",
@@ -1246,6 +1300,69 @@ def test_linked_cleanup_force_removes_clean_submodule_and_retains_branch(
         capture_output=True,
         text=True,
     )
+    submodule_checkout = first.clone / "vendor" / "submodule"
+    submodule_only_file = submodule_checkout / "local-only.txt"
+    submodule_only_file.write_text("local submodule content\n", encoding="utf-8")
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(submodule_checkout),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "add",
+            "local-only.txt",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(submodule_checkout),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "local-only submodule commit",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    submodule_branch = run_git(submodule_checkout, "symbolic-ref", "--short", "HEAD")
+    submodule_commit = run_git(submodule_checkout, "rev-parse", "HEAD")
+    remote_commit = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(submodule_root / "repo.git"),
+            "cat-file",
+            "-e",
+            submodule_commit,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert remote_commit.returncode != 0
+    submodule_bundle = retained_root / "submodule.bundle"
+    run_git(submodule_checkout, "bundle", "create", str(submodule_bundle), "--all")
+
+    ignored_file = first.clone / "caller-retained.bin"
+    ignored_file.write_bytes(b"ignored local-only content\n")
+    exclude_path = git_metadata_path(first.clone, "info/exclude")
+    with exclude_path.open("a", encoding="utf-8") as stream:
+        stream.write("caller-retained.bin\n")
+    retained_ignored_file = retained_root / "caller-retained.bin"
+    retained_ignored_file.write_bytes(ignored_file.read_bytes())
+
     run_git(first.clone, "add", ".gitmodules", "vendor/submodule")
     subprocess.run(
         [
@@ -1265,14 +1382,38 @@ def test_linked_cleanup_force_removes_clean_submodule_and_retains_branch(
         text=True,
     )
     retained_head = run_git(first.clone, "rev-parse", "HEAD")
+    assert (
+        run_git(first.clone, "check-ignore", "--quiet", "--", "caller-retained.bin")
+        == ""
+    )
+    assert not run_git(
+        first.clone,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
 
     proof = rtc.cleanup(first.request, apply=True)
 
     assert proof.removed
-    assert proof.evidence == "linked-local-head"
-    assert proof.removal_mode == "force"
-    assert proof.force_reason == "git_worktree_contains_submodules"
+    assert proof.evidence == "linked-superproject-head"
     assert not first.clone.exists()
+    assert retained_ignored_file.read_bytes() == b"ignored local-only content\n"
+    restore = tmp_path / "submodule-restore"
+    subprocess.run(
+        ["git", "init", str(restore)], check=True, capture_output=True, text=True
+    )
+    run_git(
+        restore,
+        "fetch",
+        str(submodule_bundle),
+        f"refs/heads/{submodule_branch}",
+    )
+    assert (
+        run_git(restore, "show", f"{submodule_commit}:local-only.txt")
+        == "local submodule content"
+    )
     assert sibling.clone.is_dir()
     assert run_git(
         workspace,
@@ -1286,7 +1427,7 @@ def test_linked_cleanup_force_removes_clean_submodule_and_retains_branch(
     assert str(sibling.clone) in worktree_list
 
 
-def test_linked_cleanup_holds_dirty_submodule_without_force(
+def test_linked_cleanup_holds_dirty_submodule_before_removal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Dirty submodule content remains in place when cleanup is requested."""
@@ -1358,10 +1499,10 @@ def test_linked_cleanup_holds_dirty_submodule_without_force(
     )
 
 
-def test_linked_cleanup_does_not_force_unknown_remove_failures(
+def test_linked_cleanup_surfaces_native_remove_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Only the known submodule refusal can reach the force remove command."""
+    """Native removal errors remain visible and keep the registered worktree."""
     _, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -1380,14 +1521,15 @@ def test_linked_cleanup_does_not_force_unknown_remove_failures(
     )
     original_run_git = rtc._run_git
 
-    def reject_normal_remove(
+    def reject_native_remove(
         repo: Path, args: Sequence[str], *, pass_fds: tuple[int, ...] = ()
     ) -> str:
         if tuple(args[:2]) == ("worktree", "remove"):
+            assert args[2] == "--force"
             raise rtc.GitCommandError(repo, args, "fatal: permission denied")
         return original_run_git(repo, args, pass_fds=pass_fds)
 
-    monkeypatch.setattr(rtc, "_run_git", reject_normal_remove)
+    monkeypatch.setattr(rtc, "_run_git", reject_native_remove)
     with pytest.raises(rtc.RepositoryTopicCloneError, match="permission denied"):
         rtc.cleanup(prepared.request, apply=True)
 
