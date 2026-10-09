@@ -105,8 +105,8 @@ state と acceptance criteria は `requested_scope` として保存し、選択�
 である evidence がある場合だけ `not_applicable` にします。
 Large delivery / Shared canon でも、bounded responsibility route は作業順序を
 決める artifact です。対象範囲の正本は `requested_scope` に残します。読む
-slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfaces`、
-`omitted_surfaces` と理由を残してから進めます。
+slice を選ぶための coverage map は事前に要求しません。実際の範囲更新は、共通の
+[scope principle](../../ROOT_AGENTS.md#always-on-boundary) に従います。
 
 - `documents/`
 - repository-qualified GitHub Issue URLs/numbers and private packet locators

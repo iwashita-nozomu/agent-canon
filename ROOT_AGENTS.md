@@ -24,10 +24,10 @@ Reuse unchanged context and evidence rather than restarting discovery.
 
 ## Always-On Boundary
 
-The latest explicit user agreement defines the outcome and scope. Before working,
-confirm the directory, branch, and dependency HEADs; recheck changed premises only.
-Preserve unknown Git state and user data. Authority for the task does not authorize
-unrelated changes or publication.
+The latest explicit user agreement defines the requested outcome, acceptance, and
+authority. Before working, confirm the directory, branch, and dependency HEADs;
+recheck changed premises only. Preserve unknown Git state and user data. Authority
+for the task does not authorize unrelated changes or publication.
 
 Investigate the cause before choosing a repair; treat failure reports and review
 claims as hypotheses. Verify facts that could change the owner, mechanism, required
@@ -37,20 +37,16 @@ inferences, and unresolved decision-relevant premises; investigate only missing
 facts that could change the choice, and carry settled evidence and limits through
 the existing context. Follow callers, state, effects, and affected consumers far
 enough to close the owning mechanism, rather than minimizing the diff or expanding
-into unrelated architecture.
+into unrelated architecture. Carry the requested outcome and authority through
+cause discovery; do not turn preliminary paths, slices, or non-goals into a
+completion ceiling. After cause and guarantee are established, derive the
+necessary edit and validation closure from this evidence, updating an active
+handoff or write boundary when material facts change. Partition only for
+demonstrated independent responsibilities, collisions, or blockers.
 Choose the mechanism from the established cause, applicable constraints, and
 guarantee that must hold after the change. A procedure, role, artifact, or stage
 used by an earlier task is not a reason to repeat it; reuse it only when the
 current cause and guarantee require it.
-Before editing, state the existing responsibility and non-goals briefly. Before
-splitting repo-wide or multi-surface work, establish a reusable orientation from
-the current structure and owners: major directory responsibilities, entrypoints,
-key dependencies, and the source-to-execution/build-to-validation-to-artifact
-flow. Use it to trace relevant cross-directory callers and consumers, then inspect
-the changed implementation and actual caller at the depth needed to choose the
-owning unit. Carry the shared map with bounded relevant sources through the
-existing handoff and update it with new cross-owner findings. Bounded reading
-narrows evidence gathering, not task responsibility or user scope.
 At nonobvious code boundaries, keep the concrete necessity, guaranteed behavior
 or effect boundary, and owning responsibility readable in a concise comment or
 docstring; reference the actual design owner where useful. Use this selectively:
