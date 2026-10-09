@@ -166,14 +166,6 @@ language = "python"
 summary = "Generic repository topic checkout lifecycle and reconstructibility cleanup documentation."
 
 [[tool]]
-id = "conflict-preservation"
-classification = "public"
-tool = "tools/repository/git/conflict_preservation.py"
-doc = "documents/tools/conflict_preservation.md"
-language = "python"
-summary = "Three-way conflict and focused rework content-preservation packet documentation."
-
-[[tool]]
 id = "compose-consumer-entrypoint"
 classification = "public"
 tool = "tools/agent/templates/entrypoint_composer.py"
