@@ -1,8 +1,8 @@
 ---
 name: tool-finding-report
-description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
+description: "Use when running tools or checkers to report findings for the requested scope. Preserve raw or structured evidence as needed; prioritize findings when triage requires it and compare before/after impact only when requested."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1b9c5cb96e569ef852d88f325803640c5b8857be49172c3405e424dfaf4ac756"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"666f093898219cb324c8fcfffe357ed330acc63e6dfebe38e4fdcfb74dca6c95"} -->
 
 <!--
 @dependency-start

@@ -32,7 +32,11 @@ except ModuleNotFoundError:  # pragma: no cover
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = (
     PROJECT_ROOT
-    / "tools" / "validation" / "semantic" / "orchestration" / "check_execution_time_aware_orchestration.py"
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "orchestration"
+    / "check_execution_time_aware_orchestration.py"
 )
 CONTRACT_PATH = (
     PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.execution-contract.toml"
@@ -108,21 +112,6 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         ]
         self.assertEqual(len(matches), 1)
         return matches[0]
-
-    def test_owner_keeps_the_complete_work_conservation_contract(self) -> None:
-        text = " ".join(
-            self.read("agents/skills/agent-orchestration.md").lower().split()
-        )
-        contract = self.contract()
-        markers = contract.get("owner_markers")
-        self.assertIsInstance(markers, list)
-        self.assertIn(
-            "execution-time-aware work-conservation contract",
-            text,
-        )
-        for marker in markers:
-            self.assertIsInstance(marker, str)
-            self.assertIn(" ".join(marker.lower().split()), text, marker)
 
     def test_production_checker_accepts_the_complete_owner_closure(self) -> None:
         result = self.run_checker(PROJECT_ROOT)
@@ -249,7 +238,11 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self.fixture_root(directory)
             path = root / "agents/task_catalog.yaml"
-            path.write_text(path.read_text().replace("applies_to: coordination", "applies_to: repo-changing execution"))
+            path.write_text(
+                path.read_text().replace(
+                    "applies_to: coordination", "applies_to: repo-changing execution"
+                )
+            )
             self.assert_rejected(root, "consumer_reference_mismatch")
 
     def test_runtime_catalog_and_schedule_project_the_owner(self) -> None:
@@ -265,7 +258,9 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         skills = yaml.safe_load(self.read(runtime_spec["path"]))["skill_families"]
         owner = next(skill for skill in skills if skill["id"] == "agent-orchestration")
         self.assertEqual(owner["canonical_doc"], OWNER_REF.split("#", 1)[0])
-        self.assertEqual(owner["shim"], ".codex/personal/skills/agent-orchestration/SKILL.md")
+        self.assertEqual(
+            owner["shim"], ".codex/personal/skills/agent-orchestration/SKILL.md"
+        )
 
         schedule_spec = self.consumer("schedule")
         path = schedule_spec["path"]

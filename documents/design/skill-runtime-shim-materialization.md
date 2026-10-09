@@ -14,7 +14,6 @@ downstream implementation ../../tools/agent/skills/skill_dependency_map.py graph
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py host-discovery and catalog/shim parity checker
 downstream implementation ../../tools/validation/semantic/skills/check_skill_frontmatter.py frontmatter readback checker
 downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py graph projection readback checker
-downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py prompt checklist evaluator
 @dependency-end
 -->
 
@@ -840,9 +839,6 @@ python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
 python3 tools/agent/skills/skill_dependency_map.py check --root .
 python3 tools/validation/semantic/skills/check_skill_tool_invocation_graph.py --root .
-python3 eval/producers/evaluate_skill_workflow_prompts.py \
-  --root . --manifest eval/definitions/skill_workflow_prompt_eval.toml \
-  --report-out <run-dir>/skill-workflow-prompt.md
 python3 eval/producers/evaluate_workflow_selection.py \
   --root . --manifest eval/definitions/workflow_selection_eval.toml \
   --report-out <run-dir>/workflow-selection.md

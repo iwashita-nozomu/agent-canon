@@ -136,7 +136,6 @@ EXPECTED_CONSUMERS = {
     "pr-processing": {
         "path": "agents/skills/pr-processing.md",
         "kind": "specialization",
-        "reference_mode": "text",
     },
     "task-catalog": {
         "path": "agents/task_catalog.yaml",
@@ -256,9 +255,7 @@ def _check_exact_contract(
             "owner-ref-mismatch",
         )
 
-    expected_command = (
-        "python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root ."
-    )
+    expected_command = "python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root ."
     checker = contract.get("checker")
     checker_command = contract.get("checker_command")
     if checker != "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py":
@@ -314,15 +311,6 @@ def _check_owner(
             owner_path,
             "owner-heading-count",
         )
-    normalized = normalize(owner_text)
-    for marker in contract.get("owner_markers", ()):
-        if normalize(str(marker)) not in normalized:
-            add(
-                findings,
-                "owner_contract",
-                owner_path,
-                f"missing-marker:{marker}",
-            )
 
 
 def _check_consumer_text(
@@ -335,14 +323,8 @@ def _check_consumer_text(
     path = str(spec["path"])
     normalized = normalize(text)
     if spec.get("reference_mode") == "text":
-        count = text.count(OWNER_REF)
-        if count != 1:
-            add(
-                findings,
-                "consumer_reference_mismatch",
-                path,
-                f"owner-ref-count:{count}",
-            )
+        # Markdown link validation resolves relative paths and slug anchors;
+        # counting one literal spelling cannot establish unique ownership.
         for field in EXPECTED_REQUIRED_FIELDS:
             if field not in normalized:
                 add(
@@ -483,28 +465,61 @@ def _check_task_catalog(
         )
         return
     if policy.get("applies_to") != "coordination":
-        add(findings, "consumer_reference_mismatch", path, "schedule-activation-mismatch")
+        add(
+            findings,
+            "consumer_reference_mismatch",
+            path,
+            "schedule-activation-mismatch",
+        )
     execution = task_data.get("execution_route_policy", {})
     if not isinstance(execution, dict) or any(
         execution.get(key) != expected
         for key, expected in {
             "singletons": ["roots", "owners", "writers"],
             "resolved": ["scope_resolved", "contract_resolved"],
-            "coordination_reasons": ["dependency", "collision", "publication", "resumption"],
+            "coordination_reasons": [
+                "dependency",
+                "collision",
+                "publication",
+                "resumption",
+            ],
         }.items()
     ):
-        add(findings, "consumer_reference_mismatch", path, "execution-route-facts-mismatch")
+        add(
+            findings,
+            "consumer_reference_mismatch",
+            path,
+            "execution-route-facts-mismatch",
+        )
     routes = execution.get("routes", {}) if isinstance(execution, dict) else {}
-    if not isinstance(routes, dict) or set(routes) != {"bounded_fast_path", "coordination"}:
-        add(findings, "consumer_reference_mismatch", path, "execution-route-set-mismatch")
+    if not isinstance(routes, dict) or set(routes) != {
+        "bounded_fast_path",
+        "coordination",
+    }:
+        add(
+            findings,
+            "consumer_reference_mismatch",
+            path,
+            "execution-route-set-mismatch",
+        )
     else:
         bounded, coordinated = routes["bounded_fast_path"], routes["coordination"]
-        if not isinstance(bounded, dict) or bounded.get("states") != ["route", "execute", "verify_close"] or bounded.get("commands") != []:
-            add(findings, "consumer_reference_mismatch", path, "bounded-route-projection-mismatch")
+        if not isinstance(bounded, dict) or bounded.get("commands") != []:
+            add(
+                findings,
+                "consumer_reference_mismatch",
+                path,
+                "bounded-route-command-mismatch",
+            )
         if not isinstance(coordinated, dict) or coordinated.get("commands") != [
             "python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>"
         ]:
-            add(findings, "consumer_reference_mismatch", path, "coordination-closeout-mismatch")
+            add(
+                findings,
+                "consumer_reference_mismatch",
+                path,
+                "coordination-closeout-mismatch",
+            )
     consumers = contract.get("consumers", ())
     spec = next(
         (

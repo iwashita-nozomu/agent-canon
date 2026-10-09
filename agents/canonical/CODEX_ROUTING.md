@@ -45,9 +45,10 @@ test does not initiate environment maintenance. The selected environment owner
 keeps product validation separate from AgentCanon runtime validation.
 
 Use `execution_route_policy` to distinguish `bounded_fast_path` and
-`coordination`. Bounded work has one execution owner for edit and selected
-verification, without a child or run bundle. Coordination assigns its units and
-uses its declared run bundle.
+`coordination`. Bounded work has one execution owner and uses existing task
+evidence without requiring a child or run bundle; its internal work follows the
+selected owner and actual dependencies. Coordination assigns its units and uses
+its declared run bundle.
 
 ## Contract-Required Skill Set
 

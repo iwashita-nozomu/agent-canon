@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Reports Lean proof-obligation coverage for cataloged AgentCanon tools.
-# upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
-# upstream design ../../agents/skills/formal-proof-workflow.md formal proof status policy
-# upstream design ../../documents/tools/lean_capability_matrix.md Lean capability routing policy
-# upstream implementation ../../tools/runtime/manifest/tool_catalog.py validates tool catalog rows
-# downstream design ../../documents/tools/tool_proof_coverage.md documents proof coverage reports
-# downstream implementation ../../tests/agent_tools/test_tool_proof_coverage.py tests proof coverage reporting
+# upstream design ../../catalog.yaml structured AgentCanon tool catalog
+# upstream design ../../../agents/skills/formal-proof-workflow.md formal proof status policy
+# upstream design ../../../documents/tools/lean_capability_matrix.md Lean capability routing policy
+# upstream implementation ../../runtime/manifest/tool_catalog.py validates tool catalog rows
+# downstream design ../../../documents/tools/tool_proof_coverage.md documents proof coverage reports
+# downstream implementation ../../../tests/agent_tools/test_tool_proof_coverage.py tests proof coverage reporting
 # @dependency-end
 """Report formal proof-obligation coverage for cataloged AgentCanon tools."""
 

@@ -354,8 +354,8 @@ standard run bundle contains orchestration, review, verification, monitoring,
 evaluation, and closeout artifacts. They are not part
 of the evaluator prompt; its prompt contract references only the current
 Scenario Packet, packet-listed files, `do_not_read`, and the fixed output schema.
-The evaluator's `gpt-5.4-mini/medium` setting is reserved for this explicit T14
-lane; no permanent team role uses that model assignment.
+The evaluator's `mini_skill_evaluator_medium` profile (`gpt-6-luna/medium`) is
+reserved for this explicit T14 lane; no permanent team role uses that profile.
 
 1. Parent Iteration 0 freezes one answer-free Scenario Packet for each frozen
    scenario: `full` and `changed`. The packet carries
@@ -783,9 +783,10 @@ runtime inventory や review pack を変えたら、まず次を実行します�
 Fixed packet projection is owned by the canonical model/profile registry,
 implementation-route, capacity-handshake, and team/closeout consumers. Sol is
 the parent; Luna owns ambiguous design, causal repair, graph-owned cross-owner
-integration, and review; Spark is the fixed implementation owner; and
-`gpt-5.4-mini` is skill-evaluator-only. Model/profile policy stays out of
-`route.py`.
+integration, and review; Spark is the fixed implementation owner; and the
+`skill_evaluator` role is restricted to the explicit T14 lane through its
+dedicated `mini_skill_evaluator_medium` profile. Model/profile policy stays out
+of `route.py`.
 
 Tool calls are canonical `ToolCallToken` values from the registry: natural
 language carries intent and typed failure semantics only. The implementation

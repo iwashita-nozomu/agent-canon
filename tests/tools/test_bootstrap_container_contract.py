@@ -261,6 +261,7 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "pipx",
         "check-jsonschema",
         "yamllint",
+        "ruff",
         "pyright-language-server",
         "bash-language-server",
         "jq",

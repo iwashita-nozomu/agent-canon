@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Exports the canonical static AgentCanon seed from one committed allowlist without consumer runtime or network behavior.
-# upstream design ../../documents/contracts/static-seed-export.md static seed ownership and exclusion contract
-# upstream design ../../documents/contracts/static-seed-allowlist.toml canonical exact-path allowlist
-# downstream design ../../documents/tools/export_static_seed.md command and failure semantics
-# downstream implementation ../../tests/agent_tools/test_export_static_seed.py verifies deterministic, forbidden-surface, and source-hidden behavior
+# upstream design ../../../documents/contracts/static-seed-export.md static seed ownership and exclusion contract
+# upstream design ../../../documents/contracts/static-seed-allowlist.toml canonical exact-path allowlist
+# downstream design ../../../documents/tools/export_static_seed.md command and failure semantics
+# downstream implementation ../../../tests/agent_tools/test_export_static_seed.py verifies deterministic, forbidden-surface, and source-hidden behavior
 # @dependency-end
 """Export the canonical static AgentCanon seed from a committed source snapshot."""
 

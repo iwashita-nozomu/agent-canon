@@ -1052,28 +1052,6 @@ entries:
     tests:
       - tests/agent_tools/test_evaluate_workflow_selection.py
 
-  - id: report-quality-eval
-    summary: Validates report-writing skill quality checklist and report reviewer routing.
-    path: eval/producers/evaluate_report_quality.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 eval/producers/evaluate_report_quality.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_report_quality.py"]}
-    writes: true
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - eval/definitions/README.md
-      - eval/definitions/report_quality_eval.toml
-      - documents/runtime/runtime-log-archive.md
-      - agents/skills/report-writing.md
-    tests:
-      - tests/agent_tools/test_evaluate_report_quality.py
-
   - id: test-design-check
     public: true
     summary: Runs Rust-native diagnostics for brittle, redundant, or under-specified test design before code changes.
@@ -2303,24 +2281,6 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/agent_tools/test_evaluate_agent_run.py
-
-  - id: evaluate-skill-workflow-prompts
-    summary: Runs frozen prompt evals for skill and workflow surfaces.
-    path: eval/producers/evaluate_skill_workflow_prompts.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 eval/producers/evaluate_skill_workflow_prompts.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_skill_workflow_prompts.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_evaluate_skill_workflow_prompts.py
 
   - id: generate-agent-improvement-guide
     summary: Generates PR and push-time guidance from memory, eval, hook, and issue evidence.

@@ -3,9 +3,9 @@
 # contract tool
 # responsibility Resolves the selected AgentCanon source identity and validates active-source receipts for shell producers.
 # upstream design ../../../documents/runtime/bootstrap-runtime.md active standalone source and runtime boundary.
-# upstream design ../../documents/design/rust-agent-tool-migration.md compiled CLI provenance format.
-# downstream implementation ../../bootstrap/container/lifecycle/entrypoint.sh container CLI publication.
-# downstream implementation ../../tests/agent_tools/test_devcontainer_dependencies.py identity-focused regression fixtures.
+# upstream design ../../../documents/design/rust-agent-tool-migration.md compiled CLI provenance format.
+# downstream implementation ../../../bootstrap/container/lifecycle/entrypoint.sh container CLI publication.
+# downstream implementation ../../../tests/agent_tools/test_devcontainer_dependencies.py identity-focused regression fixtures.
 # @dependency-end
 
 agent_canon_source_identity() {

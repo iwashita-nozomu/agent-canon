@@ -37,8 +37,9 @@ when newly established owner/contract facts require it.
 
 ## Design Integrity Gate
 
-Before editing, establish the owning responsibility model, selected mechanism, complete
-change unit, necessary evidence, and unresolved decisions that could change them.
+Once cause and required guarantee show that an edit is necessary, establish the
+owner, mechanism, affected responsibility unit, evidence, and unresolved decisions
+that could change the edit before changing it.
 Use [agent orchestration](../skills/agent-orchestration.md#decision-sufficiency-packet)
 for decision sufficiency and reuse current owner evidence. An unresolved API,
 algorithm, dependency, configuration, naming, oracle, or responsibility decision
@@ -111,6 +112,10 @@ An existing `reuse_survey` supplies current asset and test context; reuse it und
 matching premises. Tests are evidence of current behavior, not a veto on the
 agreed correction. Preserve the necessary shared asset/history findings through
 related handoffs and consolidate changes to the same responsibility.
+
+When a related branch/PR or prepared checkout exists, verify it serves the same
+owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
+and [repository-topic-clone](../skills/repository-topic-clone.md) before creating a new path.
 
 ## File Dependency Manifest
 

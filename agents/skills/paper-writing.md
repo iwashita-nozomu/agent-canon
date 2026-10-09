@@ -16,8 +16,11 @@ paper-specific section contract と citation/evidence trace が必要な場合�
 
 ## Required working notes
 
-必要な section だけを選び、`paper intent brief`、`claim contract`、`section contract`、`citation and evidence matrix`、
-`notation ledger`、`paragraph claim map` を run bundle または linked note に置きます。標準 section の役割は次です。
+必要な section だけを選び、paper の判断に役立つ working note だけを既存の
+run bundle または linked note に残します。material claim の根拠を追う
+citation/evidence map と、数式を読むために必要な notation は明確にします。
+paragraph map や細かな section contract は、実際の重複、欠落、順序の問題を
+解く場合に限って作ります。標準 section の役割は次です。
 
 - `abstract`: problem、method、main result、implication
 - `introduction`: gap、contribution、paper map
@@ -29,11 +32,19 @@ paper-specific section contract と citation/evidence trace が必要な場合�
 
 ## Procedure
 
-1. intent/claim/section contract と citation/evidence matrix を固定する。section order、first figure/table、invalid interpretation が未決定なら `structure-planning` を先に使う。
-2. notation ledger と paragraph claim map を確認して reader order で draft する。graph/DSL や zero-finding を開始/完了条件にしない。
-3. reverse outline で section role の重複を除く。
-4. `document_flow_reviewer`、`citation_evidence_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、docs-completeness review を別々に通す。
-5. higher-order revision の後に line edit を行い、`tools/bin/agent-canon docs check` で閉じる。
+既存の draft、source、要求された section と claim から必要な執筆・根拠メモを
+選びます。section order、first figure/table、または invalid interpretation に
+未決定の構造選択がある場合だけ `structure-planning` を先に使います。
+
+Reader がたどる論理順で書き、section の役割が重なる場合は reverse outline
+で整理します。レビューは実際のリスクに合わせます。構造上の断絶には
+`document_flow_reviewer`、外部根拠には `citation_evidence_reviewer`、記号には
+`notation_definition_reviewer`、推論の飛躍には `logic_gap_reviewer` を選びます。
+docs-completeness review は要求された複数 section や関連文書の網羅性が問題に
+なる場合に追加します。未使用の reviewer を checklist のためだけに呼びません。
+
+大きな構造修正を済ませてから line edit を行い、`tools/bin/agent-canon docs
+check` は選択された文書 check として使います。
 
 ## Standard command
 

@@ -3,11 +3,11 @@
 # contract tool
 # responsibility Materializes and launches the host IssueWorker publisher route.
 # upstream implementation ./issue_sync.py qualifies candidates and applies Issue plans
-# upstream implementation ./checkout_identity.py supplies repository identity
-# upstream implementation ./model_profile_registry.py materializes publisher prompts
-# upstream implementation ./tool_calls.py materializes the IssueWorker ToolCall
-# downstream implementation ./agent_team.py exposes the orchestration facade
-# downstream implementation ../../tests/agent_tools/test_issue_worker_dispatch.py verifies route materialization
+# upstream implementation ../../runtime/authority/checkout_identity.py supplies repository identity
+# upstream implementation ../../agent/orchestration/model_profile_registry.py materializes publisher prompts
+# upstream implementation ../../agent/orchestration/tool_calls.py materializes the IssueWorker ToolCall
+# downstream implementation ../../agent/orchestration/agent_team.py exposes the orchestration facade
+# downstream implementation ../../../tests/agent_tools/test_issue_worker_dispatch.py verifies route materialization
 # @dependency-end
 """Orchestrate explicit IssueWorker candidates without giving GitHub to runtime."""
 

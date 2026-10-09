@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Runs integrated backlog-review scans across root and AgentCanon scopes.
-# upstream implementation ./file_surface_inventory.py writes inventory reports
-# upstream implementation ./run_repo_dependency_review.sh validates dependency manifests
-# upstream implementation ./scan_code_dependencies.sh extracts code dependency edges
-# upstream implementation ../oop/python/readability.py writes Python OOP readability reports
-# upstream implementation ../oop/cpp/readability.py writes C++ OOP readability reports
-# downstream design ../../tools/README.md documents the review backlog scan entrypoint
+# upstream implementation ../../analysis/code/file_surface_inventory.py writes inventory reports
+# upstream implementation ../../analysis/dependencies/run_repo_dependency_review.sh validates dependency manifests
+# upstream implementation ../../analysis/dependencies/scan_code_dependencies.sh extracts code dependency edges
+# upstream implementation ../../validation/code/oop/python/readability.py writes Python OOP readability reports
+# upstream implementation ../../validation/code/oop/cpp/readability.py writes C++ OOP readability reports
+# downstream design ../../README.md documents the review backlog scan entrypoint
 # @dependency-end
 set -euo pipefail
 
