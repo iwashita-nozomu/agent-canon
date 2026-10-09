@@ -10,26 +10,19 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.runtime.archive import private_feedback
-from tools.runtime.container.bootstrap_runtime import (
-    PRIVATE_LOG_DESTINATION,
-    BootstrapRuntime,
-)
-from tools.runtime.archive.log_repository_identity import stable_log_branch
-
-SOURCE_ROOT = Path(__file__).resolve().parents[2]
 
 
 def invoke(runtime: Path, *argv: str, log_root: Path | None = None) -> int:
     """Invoke the private feedback adapter against a test-owned runtime."""
-    args = ["--runtime-root", str(runtime), "--source-root", str(SOURCE_ROOT)]
+    args = ["--runtime-root", str(runtime)]
     if log_root is not None:
         args.extend(["--log-root", str(log_root)])
     args.extend(argv)
@@ -59,6 +52,26 @@ def test_direct_text_and_stdin_write_metadata_only(capsys: pytest.CaptureFixture
     }
     assert "direct prose" not in request.read_text(encoding="utf-8")
     assert "stdin prose" not in request.read_text(encoding="utf-8")
+
+
+def test_k_and_f_sync_reuse_the_body_free_publication_request(tmp_path: Path) -> None:
+    """The existing aliases keep one stable request while adding spool items."""
+    runtime = tmp_path / "runtime"
+    assert invoke(runtime, "k", "add", "knowledge", "private knowledge", "--task", "t1") == 0
+    assert invoke(runtime, "k", "sync") == 0
+    request = runtime / "spool/private-feedback/sync-request.json"
+    first_request = request.read_bytes()
+    assert invoke(runtime, "f", "add", "feedback", "private feedback", "--task", "t1") == 0
+    assert invoke(runtime, "f", "sync") == 0
+    assert request.read_bytes() == first_request
+    payload = json.loads(first_request)
+    assert payload["schema"] == private_feedback.SYNC_REQUEST_SCHEMA
+    assert payload["operation"] == "sync"
+    assert payload["execution_plane"] == "agentcanon_tool_container"
+    assert "private knowledge" not in first_request.decode("utf-8")
+    assert "private feedback" not in first_request.decode("utf-8")
+    assert (runtime / "spool/private-feedback/knowledge/topics/knowledge/candidate.md").is_file()
+    assert (runtime / "spool/private-feedback/feedback/feedback").is_dir()
 
 
 def test_body_redaction_receipt_rejects_secret_and_never_prints_body(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -99,242 +112,6 @@ def test_two_distinct_tasks_promote_to_private_skill_and_same_task_dedupes(tmp_p
     assert "not public AgentCanon policy" in skill.read_text(encoding="utf-8")
 
 
-def _local_remote(tmp_path: Path) -> tuple[Path, Path]:
-    remote = tmp_path / "remote.git"
-    seed = tmp_path / "seed"
-    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
-    subprocess.run(["git", "clone", str(remote), str(seed)], check=True, capture_output=True)
-    subprocess.run(["git", "-C", str(seed), "config", "user.email", "test@example.invalid"], check=True)
-    subprocess.run(["git", "-C", str(seed), "config", "user.name", "private-feedback-test"], check=True)
-    (seed / "README.md").write_text("private archive\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(seed), "add", "README.md"], check=True)
-    subprocess.run(["git", "-C", str(seed), "commit", "-m", "init"], check=True, capture_output=True)
-    subprocess.run(["git", "-C", str(seed), "push", "origin", "HEAD:main"], check=True, capture_output=True)
-    branch = stable_log_branch(SOURCE_ROOT)
-    subprocess.run(["git", "-C", str(seed), "branch", branch], check=True, capture_output=True)
-    subprocess.run(
-        ["git", "-C", str(seed), "push", "origin", f"HEAD:refs/heads/{branch}"],
-        check=True,
-        capture_output=True,
-    )
-    return remote, seed
-
-
-def test_no_annex_remote_keeps_raw_spool_pending(tmp_path: Path) -> None:
-    """Raw content is not committed as an ordinary Git blob without annex."""
-    remote, _seed = _local_remote(tmp_path)
-    runtime = tmp_path / "runtime"
-    raw = runtime / "spool/private-feedback/raw/topic/payload.bin"
-    raw.parent.mkdir(parents=True)
-    raw.write_bytes(b"payload")
-    assert invoke(runtime, "k", "sync", log_root=tmp_path / "log") == 0
-    assert invoke(runtime, "--remote", f"file://{remote}", "host-sync", log_root=tmp_path / "log") == 1
-    assert raw.is_file()
-    assert not (tmp_path / "log/raw/topic/payload.bin").exists()
-
-
-def test_mixed_spool_preflights_annex_before_normal_copy_and_retries_after_remote_advance(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """An unavailable raw capability cannot partially publish normal feedback."""
-    remote, seed = _local_remote(tmp_path)
-    runtime = tmp_path / "runtime"
-    log_root = tmp_path / "log"
-    invoke(runtime, "f", "add", "mixed", "normal feedback", "--task", "t1")
-    raw = runtime / "spool/private-feedback/raw/topic/payload.bin"
-    raw.parent.mkdir(parents=True)
-    raw.write_bytes(b"raw payload")
-    request = runtime / "spool/private-feedback/sync-request.json"
-
-    monkeypatch.setattr(private_feedback, "_annex_special_remote_available", lambda _root: False)
-    assert invoke(
-        runtime,
-        "--remote",
-        f"file://{remote}",
-        "host-sync",
-        log_root=log_root,
-    ) == 1
-    assert request.is_file()
-    assert not list((log_root / "feedback").rglob("*"))
-    assert not (log_root / "raw").exists()
-    assert subprocess.run(
-        ["git", "-C", str(log_root), "status", "--porcelain"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout == ""
-
-    branch = stable_log_branch(SOURCE_ROOT)
-    subprocess.run(["git", "-C", str(seed), "switch", branch], check=True, capture_output=True)
-    (seed / "remote-advance.txt").write_text("remote advance\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(seed), "add", "remote-advance.txt"], check=True)
-    subprocess.run(
-        ["git", "-C", str(seed), "commit", "-m", "advance private archive"],
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        ["git", "-C", str(seed), "push", "origin", f"HEAD:refs/heads/{branch}"],
-        check=True,
-        capture_output=True,
-    )
-
-    def copy_raw_for_test(spool: Path, destination: Path) -> list[Path]:
-        """Model a restored annex capability without requiring a special remote."""
-        source = spool / "raw/topic/payload.bin"
-        target = destination / "raw/topic/payload.bin"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(source.read_bytes())
-        subprocess.run(
-            ["git", "-C", str(destination), "add", "--", "raw/topic/payload.bin"],
-            check=True,
-            capture_output=True,
-        )
-        return [Path("raw/topic/payload.bin")]
-
-    monkeypatch.setattr(private_feedback, "_annex_special_remote_available", lambda _root: True)
-    monkeypatch.setattr(private_feedback, "_copy_raw_for_annex", copy_raw_for_test)
-    assert invoke(
-        runtime,
-        "--remote",
-        f"file://{remote}",
-        "host-sync",
-        log_root=log_root,
-    ) == 0
-    assert not request.exists()
-    assert not list((runtime / "spool/private-feedback").rglob("*"))
-    assert not subprocess.run(
-        ["git", "-C", str(log_root), "status", "--porcelain"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
-    local_head = subprocess.run(
-        ["git", "-C", str(log_root), "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    remote_head = subprocess.run(
-        ["git", "-C", str(log_root), "rev-parse", f"origin/{branch}"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert local_head == remote_head
-    assert (log_root / "feedback/mixed").is_dir()
-    assert (log_root / "raw/topic/payload.bin").is_file()
-
-
-def test_sync_failure_retains_spool(tmp_path: Path) -> None:
-    """Remote/network failure preserves private content for retry."""
-    runtime = tmp_path / "runtime"
-    invoke(runtime, "f", "add", "retry", "retain this", "--task", "t1")
-    assert invoke(runtime, "f", "sync", log_root=tmp_path / "log") == 0
-    with pytest.raises((private_feedback.PrivateFeedbackError, subprocess.CalledProcessError), match="git_failed|clone|does-not-exist"):
-        invoke(runtime, "--remote", "file:///tmp/private-feedback-does-not-exist.git", "host-sync", log_root=tmp_path / "log")
-    assert list((runtime / "spool/private-feedback/feedback").rglob("*.md"))
-
-
-def test_operational_clone_uses_control_root_and_ignores_old_runtime_archive(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The control-root clone is the sole private archive checkout owner."""
-    remote, _seed = _local_remote(tmp_path)
-    legacy = tmp_path / "runtime/archive/agent-canon-log"
-    subprocess.run(["git", "clone", str(remote), str(legacy)], check=True, capture_output=True)
-    runtime = tmp_path / "runtime"
-    invoke(runtime, "f", "add", "migration", "keep archive", "--task", "t1")
-    assert invoke(runtime, "f", "sync", log_root=tmp_path / "log") == 0
-    assert invoke(runtime, "--remote", f"file://{remote}", "host-sync", log_root=tmp_path / "log") == 0
-    payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert "migration" not in payload
-    assert legacy.is_dir()
-    assert (tmp_path / "log/.git").is_dir()
-
-
-def test_sync_request_host_readback_and_private_log_mount_are_separate(tmp_path: Path) -> None:
-    """The container request is consumed by host Git and its checkout is RO-mounted."""
-    remote, _seed = _local_remote(tmp_path)
-    control = tmp_path / "control"
-    log_root = control / "agent-canon-log"
-    runtime = control / "runtime"
-    log_root.mkdir(parents=True)
-    invoke(runtime, "k", "add", "boundary", "keep archive host-owned", "--task", "t1")
-    assert invoke(runtime, "k", "sync", log_root=log_root) == 0
-    request = runtime / "spool/private-feedback/sync-request.json"
-    assert request.is_file()
-    assert invoke(
-        runtime,
-        "--remote",
-        f"file://{remote}",
-        "host-sync",
-        log_root=log_root,
-    ) == 0
-    assert not request.exists()
-    remote_head = subprocess.run(
-        ["git", "-C", str(log_root), "rev-parse", f"origin/{stable_log_branch(SOURCE_ROOT)}"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    local_head = subprocess.run(
-        ["git", "-C", str(log_root), "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert local_head == remote_head
-    manager = BootstrapRuntime(control, runtime, repository_root=Path(__file__).resolve().parents[2])
-    manager._ensure_layout()
-    mount = next(item for item in manager._mounts({}) if item["destination"] == PRIVATE_LOG_DESTINATION)
-    assert mount["mode"] == "read-only"
-
-
-def test_sync_request_is_reused_across_k_and_f_and_publishes_stable_branch(tmp_path: Path) -> None:
-    """One valid request is shared by k/f and removed only after branch readback."""
-    remote, _seed = _local_remote(tmp_path)
-    runtime = tmp_path / "runtime"
-    log_root = tmp_path / "log"
-    invoke(runtime, "k", "add", "knowledge", "keep this knowledge", "--task", "t1")
-    assert invoke(runtime, "k", "sync") == 0
-    request = runtime / "spool/private-feedback/sync-request.json"
-    first_request = request.read_bytes()
-    invoke(runtime, "f", "add", "feedback", "keep this feedback", "--task", "t1")
-    assert invoke(runtime, "f", "sync") == 0
-    assert request.read_bytes() == first_request
-
-    assert invoke(
-        runtime,
-        "--remote",
-        f"file://{remote}",
-        "host-sync",
-        log_root=log_root,
-    ) == 0
-    branch = stable_log_branch(SOURCE_ROOT)
-    remote_head = subprocess.run(
-        ["git", "-C", str(log_root), "rev-parse", f"origin/{branch}"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    local_head = subprocess.run(
-        ["git", "-C", str(log_root), "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert local_head == remote_head
-    assert subprocess.run(
-        ["git", "-C", str(log_root), "branch", "--show-current"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip() == branch
-    assert not request.exists()
-    assert not list((runtime / "spool/private-feedback").rglob("*.md"))
-
-
 def test_invalid_sync_request_is_a_preserved_typed_blocker(tmp_path: Path) -> None:
     """A conflicting request is never replaced or discarded by a retry."""
     runtime = tmp_path / "runtime"
@@ -345,3 +122,48 @@ def test_invalid_sync_request_is_a_preserved_typed_blocker(tmp_path: Path) -> No
     with pytest.raises(private_feedback.PrivateFeedbackError, match="sync_request_invalid"):
         invoke(runtime, "k", "sync")
     assert request.read_bytes() == before
+
+
+def test_spool_writer_waits_for_host_snapshot_cleanup_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A producer cannot change feedback while the host compares and clears it."""
+    runtime = tmp_path / "runtime"
+    spool = private_feedback._spool_root(runtime)
+    started = threading.Event()
+    attempting_lock = threading.Event()
+    finished = threading.Event()
+    errors: list[BaseException] = []
+    original_flock = private_feedback.fcntl.flock
+
+    def observe_flock(descriptor: int, operation: int) -> None:
+        if threading.current_thread().name == "feedback-writer" and operation == private_feedback.fcntl.LOCK_EX:
+            attempting_lock.set()
+        original_flock(descriptor, operation)
+
+    monkeypatch.setattr(private_feedback.fcntl, "flock", observe_flock)
+
+    def write_feedback() -> None:
+        started.set()
+        try:
+            invoke(runtime, "f", "add", "concurrent", "new bytes", "--task", "t1")
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            finished.set()
+
+    with private_feedback._private_feedback_spool_lock(spool):
+        writer = threading.Thread(target=write_feedback, name="feedback-writer")
+        writer.start()
+        assert started.wait(1)
+        assert attempting_lock.wait(1)
+        assert not finished.wait(0.05)
+        assert not (spool / "feedback/concurrent").exists()
+    writer.join(1)
+
+    assert not writer.is_alive()
+    assert not errors
+    assert finished.is_set()
+    assert (spool / "feedback/concurrent").is_dir()
+    assert (spool / "sync-request.json").is_file()

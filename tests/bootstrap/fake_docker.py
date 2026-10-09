@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import fcntl
 import os
 import shutil
 import subprocess
@@ -623,6 +624,7 @@ def main(argv: list[str]) -> int:
             kind = copy_environment.get("AGENT_CANON_COPY_KIND", "")
             relative = copy_environment.get("AGENT_CANON_COPY_RELATIVE", "")
             expected_digest = copy_environment.get("AGENT_CANON_COPY_DIGEST", "")
+            acknowledged_digest = copy_environment.get("AGENT_CANON_COPY_EXPECTED_DIGEST", "")
             install_root = Path(copy_environment.get("AGENT_CANON_COPY_INSTALL_ROOT", ""))
 
             def valid_codex_links(root: Path) -> bool:
@@ -648,9 +650,76 @@ def main(argv: list[str]) -> int:
                 return True
             source = Path(input_source) if copy_direction == "import" else None
             if copy_direction == "clear":
-                if kind != "host-mounts":
+                if kind == "host-mounts":
+                    (backing / "host-mounts.tsv").unlink(missing_ok=True)
+                elif kind in {"eval", "private-feedback"}:
+                    lock_root = backing / "runtime"
+                    if not lock_root.is_dir() or lock_root.is_symlink():
+                        return 1
+                    lock_path = (
+                        lock_root / "lifecycle.lock"
+                        if kind == "eval"
+                        else lock_root / "spool" / ".private-feedback.lock"
+                    )
+                    lock_path.parent.mkdir(parents=True, exist_ok=True)
+                    if lock_path.is_symlink():
+                        return 1
+                    with lock_path.open("a+b") as lock_handle:
+                        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+                        source_root = (
+                            backing / "spool" / relative
+                            if kind == "eval"
+                            else lock_root / "spool" / "private-feedback"
+                        )
+                        if kind == "eval" and not source_root.exists() and not source_root.is_symlink():
+                            pass
+                        else:
+                            if source_root.is_symlink() or not source_root.is_dir():
+                                return 1
+                            if any(path.is_symlink() for path in source_root.rglob("*")):
+                                return 1
+                            if any(
+                                not path.is_dir() and not path.is_file()
+                                for path in source_root.rglob("*")
+                            ) or any(
+                                path.is_file() and path.stat().st_nlink > 1
+                                for path in source_root.rglob("*")
+                            ):
+                                return 1
+                            if tree_digest(source_root) != acknowledged_digest:
+                                return 1
+                            if kind == "private-feedback":
+                                for child in source_root.iterdir():
+                                    if child.is_dir() and not child.is_symlink():
+                                        shutil.rmtree(child)
+                                    else:
+                                        child.unlink()
+                            else:
+                                shutil.rmtree(source_root)
+                else:
                     return 1
-                (backing / "host-mounts.tsv").unlink(missing_ok=True)
+            elif copy_direction == "list":
+                if kind != "eval":
+                    return 1
+                source_root = backing / "spool"
+                if not source_root.is_dir() or source_root.is_symlink():
+                    return 1
+                if any(path.is_symlink() for path in source_root.iterdir()):
+                    return 1
+                pending = sorted(
+                    path.parent.name
+                    for path in source_root.glob("*/sync-request.tsv")
+                    if path.is_file() or path.is_symlink()
+                )
+                if any(
+                    not run_id
+                    or len(run_id) > 128
+                    or any(character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-" for character in run_id)
+                    for run_id in pending
+                ):
+                    return 1
+                for run_id in pending:
+                    print(run_id)
             elif copy_direction == "import":
                 destinations = {
                     "mount-registry": backing / "mount-registry.toml",
@@ -739,13 +808,24 @@ def main(argv: list[str]) -> int:
                     emit_tar(source_root.parent, [(source_root, source_root.name)])
                     readback_digest = tree_digest(source_root)
                 elif kind == "private-feedback":
-                    source_root = backing / "spool" / "private-feedback"
+                    source_root = backing / "runtime" / "spool" / "private-feedback"
+                    if not source_root.exists() and not source_root.is_symlink():
+                        return 75
                     if not source_root.is_dir() or source_root.is_symlink() or any(
-                        path.is_symlink() for path in source_root.rglob("*")
-                    ):
+                        path.is_symlink() for path in source_root.rglob("*")) or any(
+                        not path.is_dir() and not path.is_file()
+                        for path in source_root.rglob("*")):
                         return 1
-                    emit_tar(source_root, [(child, child.name) for child in sorted(source_root.iterdir())])
-                    readback_digest = tree_digest(source_root)
+                    lock_path = source_root.parent / ".private-feedback.lock"
+                    if lock_path.is_symlink():
+                        return 1
+                    with lock_path.open("a+b") as lock_handle:
+                        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_SH)
+                        emit_tar(
+                            source_root,
+                            [(child, child.name) for child in sorted(source_root.iterdir())],
+                        )
+                        readback_digest = tree_digest(source_root)
                 elif kind == "codex-home":
                     source_root = backing / "codex-home"
                     if not source_root.is_dir() or source_root.is_symlink() or not valid_codex_links(source_root):
@@ -888,6 +968,7 @@ def main(argv: list[str]) -> int:
             if marked and (not directory.is_dir() or directory.is_symlink()):
                 return 1
             directory.mkdir(parents=True, exist_ok=True)
+        (runtime_backing / "spool" / "private-feedback").mkdir(parents=True, exist_ok=True)
         for directory in (backing / "exchange", backing / "private-log"):
             if marked and (directory.exists() or directory.is_symlink()):
                 if not directory.is_dir() or directory.is_symlink():

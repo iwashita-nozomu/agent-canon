@@ -317,6 +317,13 @@ it does not dirty AgentCanon source. Successful publication is complete only
 after non-force push and remote ref/tree/blob readback. A local bare remote is
 the focused end-to-end test fixture for this sequence.
 
+The existing host scheduler's `sync` route also drains pending hook events,
+eval runs with explicit sync requests, and private-feedback requests. These
+deliveries are attempted after the source-refresh phase even when that phase
+fails; failed publications retain their pending inputs for the next scheduled
+retry. Eval continues to use the root `spool/<run-id>`, while private feedback
+uses the separate resident `runtime/spool/private-feedback` path.
+
 The archive checkout is a runtime lease under the selected runtime root. It is
 not a submodule, vendor checkout, symlink, or required source-tree directory.
 Secrets, authorization headers, SSH paths, and raw embedding payloads are not
