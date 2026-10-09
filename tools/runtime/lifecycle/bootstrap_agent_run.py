@@ -111,6 +111,11 @@ from tools.agent.orchestration.agent_team import (
     dispatch_issue_worker,
     prepare_run_bundle,
 )
+from tools.agent.orchestration.workflow_context import (
+    StoreResult,
+    context_from_workflows,
+    store_workflow_context,
+)
 
 from tools.repository.workspace.workspace_scope import (
     make_run_id,
@@ -1213,32 +1218,48 @@ def main(
         return 1
     active_pointer = context.report_root / ".active_run"
     review_roles = selected_review_roles(roles)
+    workflow_context_result: StoreResult | None = None
+
+    def post_move() -> None:
+        nonlocal workflow_context_result
+        if context.workflow_family_id is not None:
+            workflow_context_result = store_workflow_context(
+                context.report_dir / "skill_usage_context.json",
+                context_from_workflows(
+                    (context.workflow_family_id,), "bootstrap_agent_run.task_id"
+                ),
+            )
+        record_bootstrap_monitoring(
+            context,
+            roles,
+            selected_skills,
+            review_roles,
+            args.task,
+            repository_roots.agentcanon_source_root,
+        )
+
+    try:
+        publish_prepared_run(
+            run_spec,
+            prepared,
+            context.report_root,
+            post_move=post_move,
+        )
+    except (RuntimeError, OSError) as exc:
+        print(str(exc), flush=True)
+        return 1
+    created_files = prepared.created_files
+    if workflow_context_result is not None and workflow_context_result.status == "stored":
+        created_files = (*created_files, "skill_usage_context.json")
     runtime = BootstrapRuntime(
         roles=roles,
-        created_files=prepared.created_files,
+        created_files=created_files,
         active_pointer=active_pointer,
         agent_type_selections=agent_type_selections,
         active_design_packet=active_design_packet,
         math_intent_packet=math_intent_packet,
         issue_worker_dispatch=issue_worker_dispatch,
     )
-    try:
-        publish_prepared_run(
-            run_spec,
-            prepared,
-            context.report_root,
-            post_move=lambda: record_bootstrap_monitoring(
-                context,
-                roles,
-                selected_skills,
-                review_roles,
-                args.task,
-                repository_roots.agentcanon_source_root,
-            ),
-        )
-    except (RuntimeError, OSError) as exc:
-        print(str(exc), flush=True)
-        return 1
     emit_bootstrap_output(
         args=args,
         config=config,

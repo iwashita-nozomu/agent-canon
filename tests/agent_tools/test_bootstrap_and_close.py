@@ -2677,6 +2677,125 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 (report_root / run_id / "task_authority.yaml.sha256").is_file()
             )
 
+    def test_task_workflow_context_roundtrips_through_the_active_hook_report(self) -> None:
+        """The selected task family is stored in and read from its active run bundle."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_root = workspace_root / "reports" / "agents"
+            hook_runtime = Path(tmp_dir) / "hook-runtime"
+            workspace_root.mkdir(parents=True)
+            seed_workspace_config(workspace_root)
+            parent_root = Path(tmp_dir)
+            subprocess.run(["git", "init", "-q", str(parent_root)], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(parent_root),
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/workflow-context-fixture.git",
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(parent_root),
+                    "-c",
+                    "user.name=fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-qm",
+                    "initialize workflow context fixture",
+                ],
+                check=True,
+            )
+            run_id = "test-workflow-context"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "workflow context producer to active hook reader",
+                    "--task-id",
+                    "T1",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(workspace_root),
+                    "--report-root",
+                    str(report_root),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report_dir = report_root / run_id
+            context_path = report_dir / "skill_usage_context.json"
+            stored_context = json.loads(context_path.read_text(encoding="utf-8"))
+            self.assertEqual(stored_context["workflows"], ["owner_bounded_change"])
+            self.assertEqual(stored_context["source_event"], "bootstrap_agent_run.task_id")
+            stale_root_context = workspace_root / "skill_usage_context.json"
+            stale_root_context.write_text(
+                json.dumps(
+                    {
+                        "schema": "agent-canon.workflow-context.v1",
+                        "workflows": ["stale-root-context"],
+                        "timestamp": "stale",
+                        "source_event": "legacy-root-path",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            hook_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(PROJECT_ROOT / ".codex/hooks/hook_dispatcher.py"),
+                    "UserPromptSubmit",
+                ],
+                cwd=workspace_root,
+                input=json.dumps({"hookEventName": "UserPromptSubmit"}),
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_SOURCE_ROOT": str(workspace_root),
+                    "AGENT_CANON_PARENT_ROOT": str(parent_root),
+                    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": str(parent_root),
+                    "AGENT_CANON_RUNTIME_ROOT": str(hook_runtime),
+                },
+            )
+
+            self.assertEqual(hook_result.returncode, 0, hook_result.stderr)
+            events = []
+            for event_path in hook_runtime.rglob("*.json"):
+                try:
+                    event = json.loads(event_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if isinstance(event, dict) and "hook_run_id" in event:
+                    events.append(event)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(
+                events[0].get("workflow_context_workflows"),
+                ["owner_bounded_change"],
+                events[0],
+            )
+            self.assertEqual(events[0]["workflow_context_source_event"], "bootstrap_agent_run.task_id")
+            self.assertEqual(events[0]["workflow_attribution_kind"], "context")
+            self.assertEqual(events[0]["workflow_monitor_report_dir"], str(report_dir))
+
     def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
         """Bootstrap projects the task catalog budget into output and manifest."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
