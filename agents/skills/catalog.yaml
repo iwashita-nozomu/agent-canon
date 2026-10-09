@@ -880,12 +880,12 @@ skill_families:
         - ["すべてのスキル", "修正"]
         - ["全", "skill", "command"]
   - id: user-guided-debugging
-    purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
+    purpose: Carry user-guided one-issue edits and agreed validation forward while honoring explicit stop boundaries.
     canonical_doc: agents/skills/user-guided-debugging.md
     shim: .codex/personal/skills/user-guided-debugging/SKILL.md
     discovery:
       name: user-guided-debugging
-      description: "Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix."
+      description: "Use when the user explicitly requests one-issue-at-a-time debugging with visible pre-edit problems. Present the next issue after each fix while continuing agreed work and validation unless the user sets a stop or wait boundary."
     routing:
       stage_policy: active
       reason: user explicitly asks for one-issue-at-a-time debugging or visible problem statements before each edit
