@@ -16,10 +16,20 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh"
-PR_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
-PR_SELECTOR = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "agent_canon_pr_graph_selector.py"
-PRE_REVIEW_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "pre_review.sh"
-PYTHON_QUALITY_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "run_python_quality_checks.sh"
+PR_SCRIPT = (
+    PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+)
+PRE_REVIEW_SCRIPT = (
+    PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "pre_review.sh"
+)
+PYTHON_QUALITY_SCRIPT = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "ci"
+    / "checks"
+    / "run_python_quality_checks.sh"
+)
 
 
 class RunAllChecksScriptTest(unittest.TestCase):
@@ -45,7 +55,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertGreaterEqual(text.count(eval_runtime_marker), 2)
         self.assertIn(command_env_marker, text)
         self.assertIn(
-            '--run-id run-all-checks',
+            "--run-id run-all-checks",
             text,
         )
         self.assertLess(text.index(archive_marker), text.index(producer_marker))
@@ -135,9 +145,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
         text = SCRIPT.read_text(encoding="utf-8")
         self.assertIn('AGENT_CANON_CLI_TARGET_DIR="$(runtime_boundary_path', text)
         self.assertIn('CARGO_TARGET_DIR="$(runtime_boundary_path', text)
-        self.assertIn('AGENT_CANON_RUNTIME_ROOT', text)
-        self.assertNotIn('${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target', text)
-        self.assertNotIn('${HOME}/.tools/agent-canon/cargo-target', text)
+        self.assertIn("AGENT_CANON_RUNTIME_ROOT", text)
+        self.assertNotIn("${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target", text)
+        self.assertNotIn("${HOME}/.tools/agent-canon/cargo-target", text)
 
     def test_pr_gate_has_no_legacy_profile(self) -> None:
         """The PR gate must keep one explicit full maintenance/source route."""
@@ -148,28 +158,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertNotIn(legacy_flag, pr_text)
         self.assertNotIn(legacy_profile, pr_text)
 
-    def test_pr_gate_receipt_uses_source_owned_binary_status(self) -> None:
-        """The producer and consumer accept only source or skipped receipts."""
-        ci_text = SCRIPT.read_text(encoding="utf-8")
-        pr_text = PR_SCRIPT.read_text(encoding="utf-8")
-        selector_text = PR_SELECTOR.read_text(encoding="utf-8")
-
-        self.assertIn('PR_GATE_DEPENDENCY_SOURCE_STATUS="not_applicable"', ci_text)
-        self.assertIn('status=source)', ci_text)
-        self.assertIn('status=skipped)', ci_text)
-        self.assertIn('pr_gate_receipt.py" validate', ci_text)
-        self.assertIn("PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped", pr_text)
-        self.assertIn("parent_graph_completeness_not_selected", selector_text)
-        self.assertIn("write_pr_gate_receipt \\", pr_text)
-        self.assertIn('"${PR_GATE_DEPENDENCY_SOURCE_REASON}"', pr_text)
-        self.assertIn('"${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}"', pr_text)
-        self.assertIn("--selector-reason", pr_text)
-        self.assertIn("--selector-evidence", pr_text)
-        self.assertIn("validated_source_receipt_consumed", ci_text)
-        self.assertNotIn("strict_dependency_status", ci_text)
-        self.assertNotIn("PR_GATE_DEPENDENCY_GRAPH_STATUS", ci_text)
-
-    def test_pr_gate_keeps_structure_and_projection_checks_without_pin_integrity(self) -> None:
+    def test_pr_gate_keeps_structure_and_projection_checks_without_pin_integrity(
+        self,
+    ) -> None:
         """Pin freshness is not a parent gate, while structure/projection checks remain."""
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
 
@@ -184,21 +175,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertNotIn("agentcanon_pr_submodule_snapshot", pr_text)
         self.assertNotIn("AGENT_CANON_SUBMODULE_EVIDENCE", pr_text)
         self.assertNotIn("run_shared_surface_check", pr_text)
-        self.assertIn("AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=not_required", pr_text)
         self.assertNotIn("agentcanon_pr_branch_dirty", pr_text)
         self.assertNotIn("AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE=yes", pr_text)
         self.assertNotIn("deferred_branch_pr", pr_text)
-
-    def test_pr_gate_delegates_profile_surface_and_diff_selection(self) -> None:
-        """The shell gate delegates selection to the canonical fail-closed helper."""
-        pr_text = PR_SCRIPT.read_text(encoding="utf-8")
-
-        self.assertIn("agent_canon_pr_graph_selector.py", pr_text)
-        self.assertNotIn("agentcanon-shared-surface", pr_text)
-        self.assertNotIn("full-confidence-candidate", pr_text)
-        self.assertNotIn("agentcanon_pr_graph_migration_surface_touched", pr_text)
-        self.assertNotIn("git diff --name-only", pr_text)
-        self.assertNotIn("git diff --unified=0", pr_text)
 
     def test_python_quality_checks_are_shared(self) -> None:
         """Run-all and pre-review should use the same Python quality runner."""
@@ -207,7 +186,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
         quality_text = PYTHON_QUALITY_SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn('bash "${CANON_CI_ROOT}/run_python_quality_checks.sh"', ci_text)
-        self.assertIn("tools/validation/ci/checks/run_python_quality_checks.sh", pre_review_text)
+        self.assertIn(
+            "tools/validation/ci/checks/run_python_quality_checks.sh", pre_review_text
+        )
         self.assertIn(
             "python_quality_runner=tools/validation/ci/checks/run_python_quality_checks.sh",
             pre_review_text,

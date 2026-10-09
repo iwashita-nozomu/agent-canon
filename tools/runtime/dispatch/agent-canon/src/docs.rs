@@ -82,7 +82,6 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership po
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
 downstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh repo check runner
-downstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects strict parent graph requirement from canonical profile IDs
 downstream implementation ../../tools/catalog.yaml structured tool catalog
 @dependency-end
 -->
@@ -1617,10 +1616,6 @@ fn render_runtime_profile_inventory(path: &Path) -> Result<String, String> {
             .ok_or_else(|| "inventory.profile_classes entries must be objects".to_string())?;
         let profile_id = required_string(item.get("id"), "profile_classes.id")?;
         let profile = required_string(item.get("profile"), "profile_classes.profile")?;
-        let strict_dependency_graph_required = required_bool(
-            item.get("strict_dependency_graph_required"),
-            "profile_classes.strict_dependency_graph_required",
-        )?;
         let activates = required_string_array(item.get("activates"), "profile_classes.activates")?;
         let required_when =
             required_string(item.get("required_when"), "profile_classes.required_when")?;
@@ -1629,21 +1624,10 @@ fn render_runtime_profile_inventory(path: &Path) -> Result<String, String> {
             profile,
             activates.join(", "),
             required_when,
-            if strict_dependency_graph_required {
-                "yes".to_string()
-            } else {
-                "no".to_string()
-            },
         ]);
     }
     output.push_str(&render_table(
-        &[
-            "Profile ID",
-            "Profile",
-            "Activates",
-            "Required when",
-            "Strict dependency graph",
-        ],
+        &["Profile ID", "Profile", "Activates", "Required when"],
         &profile_rows,
     ));
     output.push('\n');
@@ -1751,12 +1735,6 @@ fn required_string(value: Option<&Value>, name: &str) -> Result<String, String> 
         return Err(format!("{name} must be a non-empty string"));
     }
     Ok(value.to_string())
-}
-
-fn required_bool(value: Option<&Value>, name: &str) -> Result<bool, String> {
-    value
-        .and_then(Value::as_bool)
-        .ok_or_else(|| format!("{name} must be a boolean"))
 }
 
 fn required_array<'a>(value: Option<&'a Value>, name: &str) -> Result<&'a Vec<Value>, String> {
@@ -2276,7 +2254,7 @@ mod tests {
   "title": "Runtime Profiles And Check Matrix",
   "summary": ["summary"],
   "profile_classes": [
-    {"id": "base-project", "profile": "Base project", "strict_dependency_graph_required": false, "activates": ["`README.md`"], "required_when": "Every repo"}
+    {"id": "base-project", "profile": "Base project", "activates": ["`README.md`"], "required_when": "Every repo"}
   ],
   "compatibility_note": ["compat note"],
   "risk_classes": [
@@ -2323,7 +2301,7 @@ mod tests {
         fs::remove_dir_all(&root).ok();
 
         assert!(rendered.contains("## Validation Failure Response"));
-        assert!(rendered.contains("Strict dependency graph"));
+        assert!(!rendered.contains("Strict dependency graph"));
         assert!(rendered.contains("`intent_preservation`"));
         assert!(rendered.contains("`stale_generated_artifact`"));
         assert!(rendered.contains(

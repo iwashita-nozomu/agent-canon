@@ -57,9 +57,9 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 <!-- diff が宣言された clause ID を満たすか、user が要求していない作業へ drift していないか記録します。 -->
 
-## Repo-Wide Dependency Review（repo-wide dependency レビュー）
+## Dependency Analysis（dependency analysis）
 
-<!-- 最初に static と targeted check を実行します。selected final candidate contract が要求する場合だけ全 repository に `bash tools/analysis/dependencies/run_repo_dependency_review.sh` を実行し、それ以外は targeted route と broad check を選ばなかった理由を記録します。 -->
+<!-- 依存分析を選択した場合だけ、その既存 route の結果を参照します。通常の review に repo-wide header gate を追加しません。 -->
 
 ## Revision Loop（改訂ループ）
 

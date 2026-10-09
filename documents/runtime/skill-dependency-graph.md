@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 
-<!-- graph_digest=79c2d4b898ae19f43d9f2f5063f0af8c2b97d2253c4a939d2067c40bbff0703a coverage_digest=2ba09481ee96d96efc62ac4edd1b491ea2f9b7fb29ec29a5e122b76b4ed4bb43 -->
+<!-- graph_digest=4559d6d4e662a62ef8dbcb69323eca06b14de4e3bb19a69e5a2da794248b6346 coverage_digest=b5dea82412c95602cf96348a63a494d3a0b73776ad2ceed82aa38c375fa883d6 -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -338,7 +338,7 @@ graph LR
   %% source kind=identity id=source:identity:00068:66e9548aede1ccde digest=33657fb62322c45bd2d7f5a567606aa0b98e0a9732b67812ebb1fadfdd131afd locator=agents/skills/catalog.yaml#skill:integration ordinal=68
   %% source kind=time id=source:time:00068:0541cf4f78b7bf82 digest=b5174be1931d52d15c215e9faf34dec112bcf1cb20d7333fe0365a5dcb187e1e locator=agents/skills/skill-dependencies.yaml#invocation:integration ordinal=68
   %% source kind=module id=source:module:00000:efcc8c1d91224b3c digest=929389bbc1c9cd97297a6137e33d39eafb83ad7ccb941f49da39bd7d31bbd642 locator=agents/skills/code-visualization.md ordinal=0
-  %% source kind=evidence id=source:evidence:00142:93671cfba49595aa digest=c6386fc79cfb5c8d90da5cbb96128ea4f939d0c137a1444cf7405ba3100b5250 locator=agents/skills/catalog.yaml ordinal=142
+  %% source kind=evidence id=source:evidence:00142:0d938c96501537dd digest=acd30ab646e9d71085f70ddf30d301ea8fe76c735ebb5ff2c7057c8da58d9355 locator=agents/skills/catalog.yaml ordinal=142
   %% source kind=evidence id=source:evidence:00143:5cd97ed8c8cb496f digest=da93557f2c617e5143bc91f96da7038d3185c55200a169a6385f2692ea779f93 locator=agents/skills/skill-dependencies.yaml ordinal=143
   %% source kind=evidence id=source:evidence:00144:473d52dcff02a34a digest=2534b083ceb2fcee2a4ef450f483311135c856e642ec9f24e93aa2d8bbd94a60 locator=agents/canonical/skills.md ordinal=144
   %% source kind=evidence id=source:evidence:00145:a543a2ed1b0f7d42 digest=8db3b89cf2fab6310ed9c11f6c64ebb47efdc0444df0fbd6ad5f959adc48f822 locator=agents/skills/catalog.yaml#routing ordinal=145
@@ -1263,5 +1263,5 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Coverage digest: `2ba09481ee96d96efc62ac4edd1b491ea2f9b7fb29ec29a5e122b76b4ed4bb43`.
-Graph digest: `79c2d4b898ae19f43d9f2f5063f0af8c2b97d2253c4a939d2067c40bbff0703a`.
+Coverage digest: `b5dea82412c95602cf96348a63a494d3a0b73776ad2ceed82aa38c375fa883d6`.
+Graph digest: `4559d6d4e662a62ef8dbcb69323eca06b14de4e3bb19a69e5a2da794248b6346`.

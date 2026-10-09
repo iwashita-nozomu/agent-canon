@@ -361,8 +361,7 @@ run_scope_checks() {
         "$REPORT_DIR/dependency_review_${scope_name}.txt" \
         bash "$TOOL_DIR/analysis/dependencies/run_repo_dependency_review.sh" \
           --root "$scope_root" \
-          --report-dir "$REPORT_DIR/dependency-review-${scope_name}" \
-          --fail-missing
+          --report-dir "$REPORT_DIR/dependency-review-${scope_name}"
     fi
     if has_check oop; then
       record_command \

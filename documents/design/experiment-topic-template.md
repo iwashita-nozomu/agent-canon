@@ -185,7 +185,6 @@ Targeted commands:
 python3 -m pytest -q tests/tools/test_experiment_template_contracts.py
 python3 -m pytest -q tests/tools/test_run_managed_experiment.py
 python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
 ```
 
 ## Design-to-Implementation Trace

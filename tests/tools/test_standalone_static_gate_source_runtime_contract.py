@@ -30,8 +30,8 @@ RUNNER = (
 
 SOURCE_REGRESSION_MODULES = (
     "tests.agent_tools.test_graph_client_source_projection",
-    "tests.tools.test_agent_canon_pr_dependency_source_gate",
-    "tests.tools.test_agent_canon_pr_graph_gate_integration",
+    "tests.agent_tools.test_structured_document_inventory_cli",
+    "tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker",
     "tests.agent_tools.test_check_dependency_headers",
     "tests.agent_tools.test_check_design_doc_claims",
     "tests.agent_tools.test_tool_drift",
