@@ -1682,10 +1682,6 @@ def manifest_run_lines(
             "implementation or write-capable handoff when design_brief.md exists"
         )
         lines.append(
-            "      - include run.repo_tool_routing_policy selected-skill ToolCall tokens, "
-            "dynamic skill candidates, and tool evidence in every handoff packet"
-        )
-        lines.append(
             "      - validation_failure_requires_parallel_triage waves stay read-only "
             "until failing_contract, observation_level, cause_classification, "
             "intent_preservation, and evidence are recorded for same-intent repair "
