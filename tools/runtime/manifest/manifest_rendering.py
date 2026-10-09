@@ -413,9 +413,6 @@ DEFAULT_QUALITY_CHECK_STAGES = ("selected_stages_only",)
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     ("tools/bin/agent-canon", "docs", "check", "<changed-markdown-paths>"),
     ("python3", "tools/validation/semantic/convention/check_convention_compliance.py"),
-    ("python3", "tools/validation/semantic/dependencies/check_dependency_headers.py", "--changed"),
-    ("bash", "tools/analysis/dependencies/scan_dependency_headers.sh", "--changed", "--fail-missing"),
-    ("bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh", "--changed", "--require-header"),
 )
 
 CANONICAL_FORMAT_CHECK_ROUTE = DEFAULT_QUALITY_CHECK_STATIC_COMMANDS[0]

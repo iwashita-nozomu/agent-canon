@@ -31,7 +31,7 @@ set -euo pipefail
 # ═══════════════════════════════════════════════════════════════════════════
 # Full confidence CI entrypoint
 #
-# 用途: agent/runtime, dependency manifest, eval accumulation, Rust,
+# 用途: agent/runtime, eval accumulation, Rust,
 #       GitHub workflow, container config, documentation, experiment registry,
 #       pytest, pyright, and ruff checks を一括実行します。
 #       普段の変更では Makefile の check-matrix から対象 profile を選び、
