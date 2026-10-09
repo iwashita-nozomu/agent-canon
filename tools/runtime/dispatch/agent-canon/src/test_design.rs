@@ -669,7 +669,6 @@ fn contains_static_analysis_command(text_lower: &str) -> bool {
         "check_convention_compliance.py",
         "repo_structure_contract.py",
         "responsibility_scope.py",
-        "import_responsibility.py",
         "agent-canon docs check",
         "agent-canon test-design check",
     ]

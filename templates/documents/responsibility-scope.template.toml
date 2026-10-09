@@ -28,35 +28,6 @@ class_values = [
   "external_dependency",
 ]
 
-[[import_rule]]
-source = "parent-repo-active-contract"
-targets = [
-  "parent-repo-active-contract",
-  "project-durable-state",
-  "parent-github-automation",
-  "external-vendor",
-]
-
-[[import_rule]]
-source = "project-durable-state"
-targets = [
-  "project-durable-state",
-  "parent-repo-active-contract",
-]
-
-[[import_rule]]
-source = "parent-github-automation"
-targets = [
-  "parent-github-automation",
-  "parent-repo-active-contract",
-]
-
-[[import_rule]]
-source = "external-vendor"
-targets = [
-  "external-vendor",
-]
-
 [[scope]]
 id = "parent-repo-active-contract"
 owner = "derived-project"
@@ -94,7 +65,6 @@ paths = [
 exclude_paths = []
 protecting_tools = [
   "tools/validation/semantic/responsibility/responsibility_scope.py",
-  "tools/analysis/code/import_responsibility.py",
 ]
 issues = []
 

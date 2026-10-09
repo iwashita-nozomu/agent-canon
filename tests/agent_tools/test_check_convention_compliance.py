@@ -47,7 +47,6 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
 path: tools/analysis/dependencies/scan_code_dependencies.sh
-path: tools/validation/semantic/logging/check_log_helper_names.py
 path: tools/validation/notebooks/notebook_quality.py
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
@@ -57,7 +56,6 @@ path: tools/validation/semantic/skills/check_skill_frontmatter.py
 path: tools/validation/semantic/convention/check_convention_compliance.py
 path: tools/runtime/manifest/tool_catalog.py
 path: tools/validation/semantic/tools/tool_drift.py
-path: tools/analysis/code/import_responsibility.py
 path: tools/validation/ci/checks/check_github_workflows.py
 """,
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
@@ -66,7 +64,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
     "documents/conventions/README.md": "conventions\n",
     "documents/conventions/common/01_principles.md": "ruff-magic-values.toml\n",
-    "documents/rule/naming.md": "check_log_helper_names.py\n",
+    "documents/rule/naming.md": "naming\n",
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
     "documents/conventions/common/05_docs.md": (
@@ -91,7 +89,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
     "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
     "documents/conventions/coding-conventions-python.md": (
-        "python import_responsibility.py\n"
+        "python Ruff F401 F403 F405 F406\n"
         "SOLID 設計契約 Single responsibility Open/closed Liskov substitution "
         "Interface segregation Dependency inversion "
         "tools/validation/code/oop/python/readability.py tools/validation/code/oop/shared/readability_core.py "
@@ -119,20 +117,19 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "mathematical necessity gate Numerical Trigger Non-Numerical Alternative "
         "checker-owned property SOLID / OOP boundary assertion "
         "$oop-readability-check tools/validation/code/oop/python/readability.py "
-        "tools/validation/code/oop/cpp/readability.py import_responsibility.py "
+        "tools/validation/code/oop/cpp/readability.py "
         "failing_contract cause_classification intent_preservation "
         "documents/runtime/runtime-profiles-and-check-matrix.json "
         "documents/runtime/runtime-profiles-and-check-matrix.md\n"
     ),
     "documents/conventions/coding-conventions-reviews.md": "reviews\n",
     "documents/conventions/coding-conventions-experiments.md": "experiments\n",
-    "documents/conventions/coding-conventions-logging.md": "check_log_helper_names.py\n",
+    "documents/conventions/coding-conventions-logging.md": "JSONL log record contract\n",
     "documents/design/algorithm-implementation-boundary.md": "algorithm\n",
     "documents/conventions/object-oriented-design.md": (
         "readability.py SOLID との対応 Single responsibility Open/closed "
         "Liskov substitution Interface segregation Dependency inversion "
-        "tools/validation/code/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND "
-        "import_responsibility.py\n"
+        "tools/validation/code/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND\n"
     ),
     "documents/experiments/experiment-registry.md": (
         "experiment_execution_surface_guard tool_rejection_preflight.py "
@@ -159,9 +156,9 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
         "caller chain canonical command\n"
     ),
-    "documents/design/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
+    "documents/design/responsibility-scope-management.md": "responsibility_scope.py\n",
     "documents/tools/README.md": (
-        "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
+        "tool_catalog.py tool_drift.py notebook_quality.py "
         "tool_rejection_preflight.py responsibility_scope responsibility-scope.toml "
         "protecting tools\n"
     ),
@@ -171,7 +168,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "implementation shortcut\n"
     ),
     "tools/README.md": (
-        "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
+        "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_runtime_profile_inventory.py tool_rejection_preflight.py "
         "responsibility_scope responsibility-scope.toml protecting tools\n"
     ),
@@ -490,7 +487,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
     ),
     "tools/validation/ci/runners/run_all_checks.sh": (
         "run_python_quality_checks.sh "
-        "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
+        "check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py bootstrap_runtime.py check_runtime_profile_inventory.py\n"

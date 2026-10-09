@@ -157,11 +157,11 @@ markers = ["SOLID 設計契約", "Single responsibility", "Open/closed", "Liskov
 
 [[contracts.surfaces]]
 path = "documents/conventions/object-oriented-design.md"
-markers = ["SOLID との対応", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/validation/code/oop/shared/readability_core.py", "SOLID_PRINCIPLES_BY_KIND", "import_responsibility.py"]
+markers = ["SOLID との対応", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/validation/code/oop/shared/readability_core.py", "SOLID_PRINCIPLES_BY_KIND"]
 
 [[contracts.surfaces]]
 path = "documents/conventions/coding-conventions-testing.md"
-markers = ["SOLID / OOP boundary assertion", "$oop-readability-check", "tools/validation/code/oop/python/readability.py", "tools/validation/code/oop/cpp/readability.py", "import_responsibility.py"]
+markers = ["SOLID / OOP boundary assertion", "$oop-readability-check", "tools/validation/code/oop/python/readability.py", "tools/validation/code/oop/cpp/readability.py"]
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"

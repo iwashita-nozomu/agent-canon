@@ -123,10 +123,6 @@ TOOL_GATES = {
         "tools/analysis/dependencies/scan_code_dependencies.sh",
         (TOOL_CATALOG_PATH,),
     ),
-    "log_helper_names": (
-        "tools/validation/semantic/logging/check_log_helper_names.py",
-        (TOOL_CATALOG_PATH,),
-    ),
     "notebook_quality": (
         "tools/validation/notebooks/notebook_quality.py",
         (TOOL_CATALOG_PATH,),
@@ -161,10 +157,6 @@ TOOL_GATES = {
     ),
     "tool_convention_drift": (
         "tools/validation/semantic/tools/tool_drift.py",
-        (TOOL_CATALOG_PATH,),
-    ),
-    "import_responsibility": (
-        "tools/analysis/code/import_responsibility.py",
         (TOOL_CATALOG_PATH,),
     ),
     "github_workflow_pr_flow": (

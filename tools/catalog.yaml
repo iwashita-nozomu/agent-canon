@@ -735,27 +735,6 @@ entries:
     tests:
       - tests/agent_tools/test_repo_structure_contract.py
 
-  - id: import-responsibility
-    summary: Checks Python imports for unused aliases and responsibility-scope boundary violations.
-    path: tools/analysis/code/import_responsibility.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/analysis/code/import_responsibility.py
-    dispatch: {argv: ["python3", "tools/analysis/code/import_responsibility.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/design/responsibility-scope-management.md
-      - documents/conventions/coding-conventions-python.md
-      - responsibility-scope.toml
-    tests:
-      - tests/agent_tools/test_import_responsibility.py
-
   - id: github-publish
     public: true
     summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
@@ -1941,24 +1920,6 @@ entries:
       - agents/skills/oop-readability-check.md
     tests:
       - tests/agent_tools/test_check_solid_evidence.py
-
-  - id: check-log-helper-names
-    summary: Checks logging helper functions use the required name prefix.
-    path: tools/validation/semantic/logging/check_log_helper_names.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/logging/check_log_helper_names.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/logging/check_log_helper_names.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/conventions/coding-conventions-logging.md
-    tests:
-      - tests/agent_tools/test_check_log_helper_names.py
 
   - id: check-run-log-contract
     summary: Checks that run-log summaries resolve from amp.Info and avoid direct writer surfaces.

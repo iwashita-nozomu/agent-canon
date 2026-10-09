@@ -126,7 +126,7 @@ The selected checkout is the only scan scope. Default checks are all checks.
 Checks:
   inventory, stale, code-dependencies, dependency-review, oop,
   basedpyright-explicit-any, ruff-magic-values, ruff-docstrings,
-  log-helper, convention, semantic-index
+  convention, semantic-index
 EOF
 }
 
@@ -236,7 +236,6 @@ if [[ ${#REQUESTED_CHECKS[@]} -eq 0 ]]; then
     basedpyright-explicit-any
     ruff-magic-values
     ruff-docstrings
-    log-helper
     convention
     semantic-index
   )
@@ -419,15 +418,6 @@ run_scope_checks() {
           --config "$TOOL_DIR/validation/code/config/ruff-docstrings.toml" \
           --select D \
           "${native_paths[@]}"
-    fi
-    if has_check log-helper; then
-      record_command \
-        "log-helper:${scope_name}" \
-        "$REPORT_DIR/log_helper_names_${scope_name}.txt" \
-        python3 "$TOOL_DIR/validation/semantic/logging/check_log_helper_names.py" \
-          --root "$scope_root" \
-          "${excludes[@]}" \
-          "${paths[@]}"
     fi
   done < <(scope_roots)
 }

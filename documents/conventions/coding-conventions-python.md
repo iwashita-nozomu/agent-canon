@@ -83,13 +83,9 @@ Docstring の意味契約へ混ぜません。
 
 ## Import と責務境界
 
-- 未使用 import、wildcard import、責務外 local import は変更に残しません。
-- 追加した import が local file に解決できる場合は、repo top-level
-  `responsibility-scope.toml` の `[[import_rule]]` に沿う必要があります。
-- 既存 scope を越える import が必要な場合は、先に設計上の依存方向を確認し、
-  scope rule を更新するか、薄い adapter を既存責務側へ置きます。
-- `python3 tools/analysis/code/import_responsibility.py --changed` を
-  `ruff F401` より前の軽量 gate として使い、tool rejection を実装前に予測します。
+- 未使用 import と wildcard import は Ruff の `F401`、`F403`、`F405`、`F406` で検出します。
+- `responsibility-scope.toml` は tracked path の所有権を定めます。Python module 間の依存規約は定義しません。
+- module boundary の設計が変更される場合は、変更対象 package の実際の契約 owner と caller evidence を確認します。
 
 ## Library と helper-first の禁止
 

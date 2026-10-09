@@ -178,10 +178,6 @@ run_contracts() {
   python3 "${TOOLS_ROOT}/runtime/manifest/tool_catalog.py"
   python3 "${TOOLS_ROOT}/analysis/proof/tool_proof_coverage.py"
   python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
-  local base_ref="${UNIT_ARGS[0]:-origin/main}"
-  git rev-parse --verify "${base_ref}^{commit}" >/dev/null
-  python3 "${TOOLS_ROOT}/analysis/code/import_responsibility.py" \
-    --changed --baseline-ref "${base_ref}"
   PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \

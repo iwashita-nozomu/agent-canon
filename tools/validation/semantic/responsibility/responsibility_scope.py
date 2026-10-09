@@ -66,19 +66,10 @@ class Scope:
 
 
 @dataclass(frozen=True)
-class ImportRule:
-    """One allowed responsibility-scope import boundary."""
-
-    source: str
-    targets: tuple[str, ...]
-
-
-@dataclass(frozen=True)
 class ScopeReport:
     """Responsibility scope validation report."""
 
     scopes: tuple[Scope, ...]
-    import_rules: tuple[ImportRule, ...]
     findings: tuple[Finding, ...]
 
 
@@ -158,14 +149,6 @@ def scope_from_mapping(raw_scope: Mapping[str, object]) -> Scope:
         exclude_paths=string_tuple(raw_scope.get("exclude_paths")),
         protecting_tools=string_tuple(raw_scope.get("protecting_tools")),
         issues=string_tuple(raw_scope.get("issues")),
-    )
-
-
-def import_rule_from_mapping(raw_rule: Mapping[str, object]) -> ImportRule:
-    """Convert one raw TOML import-rule mapping to an ImportRule."""
-    return ImportRule(
-        source=str(raw_rule.get("source") or ""),
-        targets=string_tuple(raw_rule.get("targets")),
     )
 
 
@@ -274,29 +257,6 @@ def ownership_findings(paths: Sequence[str], scopes: Sequence[Scope]) -> list[Fi
     return findings
 
 
-def validate_import_rules(
-    scopes: Sequence[Scope],
-    import_rules: Sequence[ImportRule],
-) -> list[Finding]:
-    """Validate scope import rules."""
-    findings: list[Finding] = []
-    scope_ids = {scope.scope_id for scope in scopes}
-    seen: set[str] = set()
-    for rule in import_rules:
-        label = rule.source or "<missing-source>"
-        if rule.source in seen:
-            findings.append(Finding("import_rule", label, "duplicate-source"))
-        seen.add(rule.source)
-        if rule.source not in scope_ids:
-            findings.append(Finding("import_rule", label, "unknown-source-scope"))
-        if not rule.targets:
-            findings.append(Finding("import_rule", label, "missing-targets"))
-        for target in rule.targets:
-            if target not in scope_ids:
-                findings.append(Finding("import_rule", label, f"unknown-target-scope:{target}"))
-    return findings
-
-
 def validate(root: Path, manifest: str) -> ScopeReport:
     """Validate responsibility scopes under one root."""
     scope_root = root.resolve()
@@ -304,14 +264,11 @@ def validate(root: Path, manifest: str) -> ScopeReport:
     catalog_paths, catalog_findings = load_catalog_paths(scope_root)
     findings.extend(catalog_findings)
     if data is None:
-        return ScopeReport((), (), tuple(findings))
+        return ScopeReport((), tuple(findings))
 
     owners = set(string_tuple(data.get("owner_values")))
     classes = set(string_tuple(data.get("class_values")))
     scopes = tuple(scope_from_mapping(item) for item in mapping_list(data.get("scope")))
-    import_rules = tuple(
-        import_rule_from_mapping(item) for item in mapping_list(data.get("import_rule"))
-    )
     if data.get("version") != 1:
         findings.append(Finding("manifest", manifest, "unsupported-version"))
     if not scopes:
@@ -327,10 +284,8 @@ def validate(root: Path, manifest: str) -> ScopeReport:
         findings.extend(validate_protecting_tools(scope_root, scope, catalog_paths))
     tracked = tracked_paths(scope_root)
     findings.extend(ownership_findings(tracked, scopes))
-    findings.extend(validate_import_rules(scopes, import_rules))
     return ScopeReport(
         scopes,
-        import_rules,
         tuple(sorted(findings, key=lambda item: (item.check, item.path, item.detail))),
     )
 
@@ -342,7 +297,6 @@ def render_json(report: ScopeReport) -> str:
             "status": "pass" if not report.findings else "fail",
             "findings": [asdict(item) for item in report.findings],
             "scopes": [asdict(item) for item in report.scopes],
-            "import_rules": [asdict(item) for item in report.import_rules],
         },
         indent=2,
         sort_keys=True,
@@ -359,7 +313,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         for finding in report.findings:
             print(finding.render())
         print(f"RESPONSIBILITY_SCOPE_SCOPES={len(report.scopes)}")
-        print(f"RESPONSIBILITY_SCOPE_IMPORT_RULES={len(report.import_rules)}")
         print(f"RESPONSIBILITY_SCOPE_FINDINGS={len(report.findings)}")
         print(f"RESPONSIBILITY_SCOPE={'pass' if not report.findings else 'fail'}")
     return 1 if report.findings else 0

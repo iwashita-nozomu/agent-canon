@@ -26,7 +26,7 @@ Default commands:
 ```
 
 `review_backlog_scan.sh` writes both JSON and Markdown inventory reports, then
-runs dependency, code-dependency, readability, native Ruff/BasedPyright,
-log-helper, and convention scans for the selected scope.
+runs dependency, code-dependency, readability, native Ruff/BasedPyright, and
+convention scans for the selected scope.
 Run the scan against one explicitly selected standalone source or project
 target. Cross-repository discovery is not implicit.

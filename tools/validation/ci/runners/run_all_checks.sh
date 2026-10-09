@@ -11,8 +11,6 @@
 # upstream implementation ../../semantic/dependencies/check_dependency_headers.py validates changed-file dependency manifests
 # upstream implementation ../../semantic/dependencies/check_dependency_header_format.sh validates changed-file manifest syntax
 # upstream implementation ../checks/run_python_quality_checks.sh owns Python static quality checks
-# upstream implementation ../../semantic/logging/check_log_helper_names.py validates log helper naming
-# upstream implementation ../../../analysis/code/import_responsibility.py validates import ownership boundaries
 # upstream implementation ../../notebooks/notebook_quality.py validates notebooks as readable runnable demos
 # upstream implementation ../../../bin/agent-canon invokes the canonical Rust algorithm contract checker
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
@@ -456,18 +454,6 @@ if [ "$PR_GATE_RECEIPT_VALID" -eq 0 ]; then
     echo "❌ dependency manifest format checks 失敗"
     EXIT_CODE=1
   fi
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/logging/check_log_helper_names.py" --changed --exclude reports 2>&1; then
-  echo "✅ log helper naming checks 成功"
-else
-  echo "❌ log helper naming checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/analysis/code/import_responsibility.py" --changed 2>&1; then
-  echo "✅ import responsibility checks 成功"
-else
-  echo "❌ import responsibility checks 失敗"
-  EXIT_CODE=1
 fi
 if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/validation/notebook_quality.py" --all 2>&1; then
   echo "✅ notebook quality checks 成功"

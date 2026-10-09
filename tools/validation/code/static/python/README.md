@@ -6,7 +6,6 @@ responsibility Documents Python static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
 upstream design ../../../../../documents/conventions/coding-conventions-python.md Python coding conventions
 upstream implementation ../../config/basedpyright-explicit-any.json configures explicit Any diagnostics
-upstream implementation ../../../semantic/logging/check_log_helper_names.py checks log helper names
 upstream implementation ../../oop/python/readability.py scores Python OOP readability
 @dependency-end
 -->
