@@ -63,5 +63,3 @@ closeout. Report what was actually established; unavailable required
 verification remains unverified. Use the selected integration or PR owner for
 authorized base integration and publication, and read back remote state after a
 write.
-
-

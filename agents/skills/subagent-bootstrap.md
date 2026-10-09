@@ -63,4 +63,3 @@ the concrete blocker and recovered evidence to the parent.
 
 Use only the selected validation and owning review gate. A child result is
 evidence for its assigned action, not proof of unrelated work or an unrun check.
-

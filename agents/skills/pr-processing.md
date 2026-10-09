@@ -112,4 +112,3 @@ Issue updates and PR creation/update or review handoff complete at the requested
 scope after publication readback. Merge completion also requires the selected
 checks, reviews, conflict preservation, expected-head merge, and post-merge
 readback. A PR existing does not complete unfinished in-scope work.
-
