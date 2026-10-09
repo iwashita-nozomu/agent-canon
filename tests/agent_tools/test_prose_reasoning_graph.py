@@ -59,7 +59,9 @@ def graph_runtime(root: Path) -> Iterator[None]:
 def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the prose reasoning graph CLI."""
     environment = os.environ.copy()
-    environment.setdefault("AGENT_CANON_RUNTIME_ROOT", str(_runtime_root_from_args(args)))
+    environment.setdefault(
+        "AGENT_CANON_RUNTIME_ROOT", str(_runtime_root_from_args(args))
+    )
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         cwd=PROJECT_ROOT,
@@ -70,10 +72,14 @@ def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def run_graph_with_env(env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+def run_graph_with_env(
+    env: dict[str, str], *args: str
+) -> subprocess.CompletedProcess[str]:
     """Run the prose reasoning graph CLI with environment overrides."""
     environment = {**os.environ, **env}
-    environment.setdefault("AGENT_CANON_RUNTIME_ROOT", str(_runtime_root_from_args(args)))
+    environment.setdefault(
+        "AGENT_CANON_RUNTIME_ROOT", str(_runtime_root_from_args(args))
+    )
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         cwd=PROJECT_ROOT,
@@ -95,6 +101,17 @@ def stdout_value(result: subprocess.CompletedProcess[str], key: str) -> str:
 
 class ProseReasoningGraphTest(unittest.TestCase):
     """Exercise graph ingest, analysis, projection, and handoff."""
+
+    def test_missing_dependency_annotation_is_not_a_blocker(self) -> None:
+        """Old inventory payloads cannot restore the retired header requirement."""
+        self.assertEqual(
+            prose_graph.document_canon_severity("missing_dependency_manifest"),
+            "info",
+        )
+        self.assertEqual(
+            prose_graph.document_canon_severity("broken_dependency_target"),
+            "blocker",
+        )
 
     def test_selected_ordering_topology_overrides_source_order(self) -> None:
         """Explicit ordering edges should control whole-document sentence order."""
@@ -144,11 +161,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
             }
         ]
 
-        ordered_ids, cycle_detected, relaxed_edges = prose_graph.priority_topological_order(
-            source_anchors,
-            ordering_edges,
-            "report",
-            {},
+        ordered_ids, cycle_detected, relaxed_edges = (
+            prose_graph.priority_topological_order(
+                source_anchors,
+                ordering_edges,
+                "report",
+                {},
+            )
         )
 
         self.assertEqual(ordered_ids, ["s:later", "s:earlier", "s:tail"])
@@ -202,11 +221,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
             },
         ]
 
-        ordered_ids, cycle_detected, relaxed_edges = prose_graph.priority_topological_order(
-            source_anchors,
-            ordering_edges,
-            "report",
-            {},
+        ordered_ids, cycle_detected, relaxed_edges = (
+            prose_graph.priority_topological_order(
+                source_anchors,
+                ordering_edges,
+                "report",
+                {},
+            )
         )
 
         self.assertEqual(ordered_ids, ["s:earlier", "s:later"])
@@ -251,11 +272,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
             }
         ]
 
-        ordered_ids, cycle_detected, relaxed_edges = prose_graph.priority_topological_order(
-            source_anchors,
-            ordering_edges,
-            "report",
-            {},
+        ordered_ids, cycle_detected, relaxed_edges = (
+            prose_graph.priority_topological_order(
+                source_anchors,
+                ordering_edges,
+                "report",
+                {},
+            )
         )
 
         self.assertLess(ordered_ids.index("s:later"), ordered_ids.index("s:earlier"))
@@ -321,9 +344,14 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 prose_graph.add_selected_ordering_cycle_diagnostic(connection, "report")
                 diagnostics = prose_graph.fetch_diagnostics(connection)
 
-            cycle_diagnostic = next(item for item in diagnostics if item.rule == "selected_ordering_cycle")
+            cycle_diagnostic = next(
+                item for item in diagnostics if item.rule == "selected_ordering_cycle"
+            )
             self.assertEqual(cycle_diagnostic.layer, "projection")
-            self.assertEqual(cycle_diagnostic.action["verification_route"], "ordering_cycle_verification")
+            self.assertEqual(
+                cycle_diagnostic.action["verification_route"],
+                "ordering_cycle_verification",
+            )
 
     def test_selected_ordering_cycle_relaxes_only_cyclic_hard_edges(self) -> None:
         """Cycle relaxation should preserve hard edges outside the cycle."""
@@ -383,11 +411,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
             },
         ]
 
-        ordered_ids, cycle_detected, relaxed_edges = prose_graph.priority_topological_order(
-            source_anchors,
-            ordering_edges,
-            "report",
-            {},
+        ordered_ids, cycle_detected, relaxed_edges = (
+            prose_graph.priority_topological_order(
+                source_anchors,
+                ordering_edges,
+                "report",
+                {},
+            )
         )
 
         self.assertTrue(cycle_detected)
@@ -404,7 +434,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             source = root / "sample.md"
             runtime_root = root / "runtime"
             stats = runtime_root / "ingest.stats.json"
-            source.write_text("# Sample\n\n根拠として本文を DB に入れる。", encoding="utf-8")
+            source.write_text(
+                "# Sample\n\n根拠として本文を DB に入れる。", encoding="utf-8"
+            )
 
             ingest = run_graph_with_env(
                 {"AGENT_CANON_RUNTIME_ROOT": str(runtime_root)},
@@ -416,13 +448,17 @@ class ProseReasoningGraphTest(unittest.TestCase):
 
             self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
             self.assertIn("PROSE_REASONING_GRAPH_STATS=", ingest.stdout)
-            stats_payload = cast(dict[str, object], json.loads(stats.read_text(encoding="utf-8")))
+            stats_payload = cast(
+                dict[str, object], json.loads(stats.read_text(encoding="utf-8"))
+            )
             stats_fields = cast(dict[str, object], stats_payload["fields"])
             db_path = Path(cast(str, stats_fields["PROSE_REASONING_GRAPH_DB"]))
             self.assertTrue(db_path.exists(), db_path)
             self.assertEqual(db_path.name, "prose_graph.sqlite")
             self.assertTrue(
-                db_path.resolve().as_posix().startswith(
+                db_path.resolve()
+                .as_posix()
+                .startswith(
                     (runtime_root / "prose-reasoning-graph").resolve().as_posix()
                 ),
                 db_path,
@@ -448,9 +484,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
             db_path = Path(stdout_value(ingest, "PROSE_REASONING_GRAPH_DB"))
             self.assertTrue(db_path.exists(), db_path)
-            self.assertEqual(stdout_value(ingest, "PROSE_REASONING_GRAPH_DOCUMENTS"), "2")
+            self.assertEqual(
+                stdout_value(ingest, "PROSE_REASONING_GRAPH_DOCUMENTS"), "2"
+            )
             self.assertTrue(
-                db_path.resolve().as_posix().startswith(
+                db_path.resolve()
+                .as_posix()
+                .startswith(
                     (runtime_root / "prose-reasoning-graph").resolve().as_posix()
                 ),
                 db_path,
@@ -463,7 +503,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             fake_home = root / "home"
             runtime_root = root / "runtime"
             source = root / "sample.md"
-            source.write_text("# Sample\n\n外部 runtime に DB を作る。", encoding="utf-8")
+            source.write_text(
+                "# Sample\n\n外部 runtime に DB を作る。", encoding="utf-8"
+            )
 
             ingest = run_graph_with_env(
                 {"HOME": str(fake_home), "AGENT_CANON_RUNTIME_ROOT": str(runtime_root)},
@@ -476,7 +518,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             expected_root = runtime_root / "prose-reasoning-graph"
             self.assertTrue(db_path.exists(), db_path)
             self.assertTrue(
-                db_path.resolve().as_posix().startswith(expected_root.resolve().as_posix()),
+                db_path.resolve()
+                .as_posix()
+                .startswith(expected_root.resolve().as_posix()),
                 db_path,
             )
             self.assertFalse(fake_home.exists())
@@ -539,12 +583,24 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 str(projection),
             )
             self.assertEqual(project.returncode, 0, project.stdout + project.stderr)
-            payload = cast(dict[str, object], yaml.safe_load(projection.read_text(encoding="utf-8")))
+            payload = cast(
+                dict[str, object],
+                yaml.safe_load(projection.read_text(encoding="utf-8")),
+            )
             self.assertEqual(payload["profile"], "all")
             self.assertEqual(payload["canonical_graph"], "text_anchored_semantic_graph")
             corpus_hints = typed_items(payload, "corpus_hints")
-            self.assertTrue(any(item.get("corpus_id") == "software_engineering" for item in corpus_hints))
-            self.assertTrue(any(item.get("corpus_id") == "academic_writing" for item in corpus_hints))
+            self.assertTrue(
+                any(
+                    item.get("corpus_id") == "software_engineering"
+                    for item in corpus_hints
+                )
+            )
+            self.assertTrue(
+                any(
+                    item.get("corpus_id") == "academic_writing" for item in corpus_hints
+                )
+            )
             semantic_ir = cast(dict[str, object], payload["semantic_prose_ir"])
             self.assertEqual(semantic_ir["schema"], "semantic-prose-ir/v1")
             self.assertGreaterEqual(len(cast(list[object], semantic_ir["terms"])), 1)
@@ -553,29 +609,49 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertIn("$formal-proof-workflow", handoff_targets(payload))
             diagnostics_payload = typed_items(payload, "diagnostics")
             verification_routes = {
-                cast(dict[str, object], item.get("action", {})).get("verification_route")
+                cast(dict[str, object], item.get("action", {})).get(
+                    "verification_route"
+                )
                 for item in diagnostics_payload
                 if isinstance(item.get("action"), dict)
             }
             self.assertIn("claim_support_verification", verification_routes)
             self.assertIn("connection_verification", verification_routes)
             recursive_payloads = [
-                cast(dict[str, object], cast(dict[str, object], item["action"])["recursive_verification"])
+                cast(
+                    dict[str, object],
+                    cast(dict[str, object], item["action"])["recursive_verification"],
+                )
                 for item in diagnostics_payload
                 if isinstance(item.get("action"), dict)
-                and isinstance(cast(dict[str, object], item["action"]).get("recursive_verification"), dict)
+                and isinstance(
+                    cast(dict[str, object], item["action"]).get(
+                        "recursive_verification"
+                    ),
+                    dict,
+                )
             ]
-            self.assertTrue(any(payload.get("max_depth") == 3 for payload in recursive_payloads))
+            self.assertTrue(
+                any(payload.get("max_depth") == 3 for payload in recursive_payloads)
+            )
             source_anchors = typed_items(payload, "source_anchors")
-            self.assertTrue(any(item.get("kind") == "sentence" for item in source_anchors))
-            sentence_anchor = next(item for item in source_anchors if item.get("kind") == "sentence")
+            self.assertTrue(
+                any(item.get("kind") == "sentence" for item in source_anchors)
+            )
+            sentence_anchor = next(
+                item for item in source_anchors if item.get("kind") == "sentence"
+            )
             sentence_payload = cast(dict[str, object], sentence_anchor["payload"])
             self.assertEqual(sentence_payload["span_kind"], "sentence")
             self.assertEqual(sentence_payload["segmentation_basis"], "sentence_split")
             selected_ordering = cast(dict[str, object], payload["selected_ordering"])
-            self.assertEqual(selected_ordering["scope"], "whole_document_source_anchors")
+            self.assertEqual(
+                selected_ordering["scope"], "whole_document_source_anchors"
+            )
             self.assertEqual(selected_ordering["unit_kind"], "sentence")
-            ordered_anchor_ids = cast(list[str], selected_ordering["ordered_anchor_ids"])
+            ordered_anchor_ids = cast(
+                list[str], selected_ordering["ordered_anchor_ids"]
+            )
             ordered_anchors = typed_items(selected_ordering, "ordered_anchors")
             self.assertEqual(len(ordered_anchor_ids), len(ordered_anchors))
             self.assertEqual(
@@ -594,27 +670,52 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertEqual(inference_basis["source"], "canonical_graph_projection")
             self.assertTrue(
                 any(
-                    view.get("recommended_format") in {"figure", "table", "bulleted_list"}
+                    view.get("recommended_format")
+                    in {"figure", "table", "bulleted_list"}
                     for view in projection_views
                 )
             )
 
-            lint = run_graph("lint", "--db", str(db), "--profile", "all", "--out", str(diagnostics))
+            lint = run_graph(
+                "lint", "--db", str(db), "--profile", "all", "--out", str(diagnostics)
+            )
             self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
             diagnostics_text = diagnostics.read_text(encoding="utf-8")
             self.assertIn("unsupported_claim", diagnostics_text)
             self.assertIn("metric_without_baseline", diagnostics_text)
-            self.assertIn("verification_route=`claim_support_verification`", diagnostics_text)
-            self.assertIn("verification_route=`connection_verification`", diagnostics_text)
+            self.assertIn(
+                "verification_route=`claim_support_verification`", diagnostics_text
+            )
+            self.assertIn(
+                "verification_route=`connection_verification`", diagnostics_text
+            )
 
-            explain = run_graph("explain", "--db", str(db), "--profile", "all", "--out", str(explanation))
+            explain = run_graph(
+                "explain",
+                "--db",
+                str(db),
+                "--profile",
+                "all",
+                "--out",
+                str(explanation),
+            )
             self.assertEqual(explain.returncode, 0, explain.stdout + explain.stderr)
             explanation_text = explanation.read_text(encoding="utf-8")
             self.assertIn("Main Claim Path", explanation_text)
             self.assertIn("`claim:", explanation_text)
 
-            integrate = run_graph("integrate", "--db", str(db), "--profile", "all", "--out", str(integration))
-            self.assertEqual(integrate.returncode, 0, integrate.stdout + integrate.stderr)
+            integrate = run_graph(
+                "integrate",
+                "--db",
+                str(db),
+                "--profile",
+                "all",
+                "--out",
+                str(integration),
+            )
+            self.assertEqual(
+                integrate.returncode, 0, integrate.stdout + integrate.stderr
+            )
             integration_text = integration.read_text(encoding="utf-8")
             self.assertIn("## Verification Routes", integration_text)
             self.assertIn("claim_support_verification", integration_text)
@@ -642,12 +743,26 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 )
 
             op_id = first_operation_id(db, "merge_paragraphs")
-            packet = run_graph("rewrite-packet", "--db", str(db), "--op", op_id, "--out", str(rewrite))
+            packet = run_graph(
+                "rewrite-packet", "--db", str(db), "--op", op_id, "--out", str(rewrite)
+            )
             self.assertEqual(packet.returncode, 0, packet.stdout + packet.stderr)
             self.assertIn("Do Not", rewrite.read_text(encoding="utf-8"))
 
-            handoff_result = run_graph("skill-handoff", "--db", str(db), "--profile", "all", "--out", str(handoff))
-            self.assertEqual(handoff_result.returncode, 0, handoff_result.stdout + handoff_result.stderr)
+            handoff_result = run_graph(
+                "skill-handoff",
+                "--db",
+                str(db),
+                "--profile",
+                "all",
+                "--out",
+                str(handoff),
+            )
+            self.assertEqual(
+                handoff_result.returncode,
+                0,
+                handoff_result.stdout + handoff_result.stderr,
+            )
             handoff_text = handoff.read_text(encoding="utf-8")
             self.assertIn("$paper-writing", handoff_text)
             self.assertIn("citation-evidence-review", handoff_text)
@@ -667,8 +782,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
             output = root / "projection.json"
             stats = root / "project.stats.json"
             source.write_text(sample_text(), encoding="utf-8")
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "report").returncode,
+                0,
+            )
 
             result = run_graph(
                 "project",
@@ -686,22 +806,31 @@ class ProseReasoningGraphTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("PROSE_REASONING_GRAPH_STATS=", result.stdout)
-            payload = cast(dict[str, object], json.loads(output.read_text(encoding="utf-8")))
+            payload = cast(
+                dict[str, object], json.loads(output.read_text(encoding="utf-8"))
+            )
             self.assertIn("layers", payload)
             self.assertEqual(payload["canonical_graph"], "text_anchored_semantic_graph")
             self.assertIn("projection_views", payload)
             self.assertIn("source_anchors", payload)
             self.assertIn("selected_ordering", payload)
             selected_ordering = cast(dict[str, object], payload["selected_ordering"])
-            self.assertEqual(selected_ordering["algorithm"], "priority_topological_sort_selected_ordering_subgraph")
+            self.assertEqual(
+                selected_ordering["algorithm"],
+                "priority_topological_sort_selected_ordering_subgraph",
+            )
             layers = payload["layers"]
             self.assertIsInstance(layers, dict)
             self.assertIn("edit-operation", cast(dict[str, object], layers))
             self.assertIn("$report-writing", handoff_targets(payload))
-            stats_payload = cast(dict[str, object], json.loads(stats.read_text(encoding="utf-8")))
+            stats_payload = cast(
+                dict[str, object], json.loads(stats.read_text(encoding="utf-8"))
+            )
             self.assertEqual(stats_payload["schema"], "prose_reasoning_graph.stats.v1")
 
-    def test_structured_analysis_db_without_edit_operations_can_project_and_integrate(self) -> None:
+    def test_structured_analysis_db_without_edit_operations_can_project_and_integrate(
+        self,
+    ) -> None:
         """Document-canon graph DBs may have diagnostics without prose rewrite operations."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -723,18 +852,42 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 str(projection),
             )
             self.assertEqual(project.returncode, 0, project.stdout + project.stderr)
-            payload = cast(dict[str, object], json.loads(projection.read_text(encoding="utf-8")))
+            payload = cast(
+                dict[str, object], json.loads(projection.read_text(encoding="utf-8"))
+            )
             self.assertEqual(payload["edit_operations"], [])
-            self.assertEqual(cast(dict[str, object], payload["layers"])["edit-operation"], 0)
+            self.assertEqual(
+                cast(dict[str, object], payload["layers"])["edit-operation"], 0
+            )
             diagnostics_payload = typed_items(payload, "diagnostics")
             self.assertEqual(diagnostics_payload[0]["layer"], "document-canon")
 
-            explain = run_graph("explain", "--db", str(db), "--profile", "all", "--out", str(explanation))
+            explain = run_graph(
+                "explain",
+                "--db",
+                str(db),
+                "--profile",
+                "all",
+                "--out",
+                str(explanation),
+            )
             self.assertEqual(explain.returncode, 0, explain.stdout + explain.stderr)
-            self.assertIn("No edit operations recorded.", explanation.read_text(encoding="utf-8"))
+            self.assertIn(
+                "No edit operations recorded.", explanation.read_text(encoding="utf-8")
+            )
 
-            integrate = run_graph("integrate", "--db", str(db), "--profile", "all", "--out", str(integration))
-            self.assertEqual(integrate.returncode, 0, integrate.stdout + integrate.stderr)
+            integrate = run_graph(
+                "integrate",
+                "--db",
+                str(db),
+                "--profile",
+                "all",
+                "--out",
+                str(integration),
+            )
+            self.assertEqual(
+                integrate.returncode, 0, integrate.stdout + integrate.stderr
+            )
             integration_text = integration.read_text(encoding="utf-8")
             self.assertIn("No edit operations recorded.", integration_text)
             self.assertIn("document_responsibility_verification", integration_text)
@@ -803,10 +956,16 @@ class ProseReasoningGraphTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            stats_payload = cast(dict[str, object], json.loads(stats.read_text(encoding="utf-8")))
+            stats_payload = cast(
+                dict[str, object], json.loads(stats.read_text(encoding="utf-8"))
+            )
             stats_fields = cast(dict[str, object], stats_payload["fields"])
-            self.assertEqual(stats_fields["PROSE_REASONING_GRAPH_DOCUMENT_CANON_FINDINGS"], 1)
-            self.assertGreater(cast(int, stats_fields["PROSE_REASONING_GRAPH_PROSE_DIAGNOSTICS"]), 0)
+            self.assertEqual(
+                stats_fields["PROSE_REASONING_GRAPH_DOCUMENT_CANON_FINDINGS"], 1
+            )
+            self.assertGreater(
+                cast(int, stats_fields["PROSE_REASONING_GRAPH_PROSE_DIAGNOSTICS"]), 0
+            )
             for key in (
                 "PROSE_REASONING_GRAPH_DOCUMENT_CHECK",
                 "PROSE_REASONING_GRAPH_DIAGNOSTICS",
@@ -819,9 +978,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
             report_text = (out_dir / "document_check.md").read_text(encoding="utf-8")
             self.assertIn("document-canon findings: `1`", report_text)
             self.assertIn("structured-analysis document-canon path", report_text)
-            diagnostics_text = (out_dir / "prose_diagnostics.md").read_text(encoding="utf-8")
+            diagnostics_text = (out_dir / "prose_diagnostics.md").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("document_responsibility_gap", diagnostics_text)
-            integration_text = (out_dir / "prose_integration.md").read_text(encoding="utf-8")
+            integration_text = (out_dir / "prose_integration.md").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("document_responsibility_verification", integration_text)
             self.assertIn("trace_downstream_claim", integration_text)
             self.assertIn("unsupported_claim", diagnostics_text)
@@ -840,8 +1003,15 @@ class ProseReasoningGraphTest(unittest.TestCase):
             db = root / "graph.sqlite"
             output = root / "projection.json"
             source.write_text(sample_text(), encoding="utf-8")
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph(
+                    "analyze", "--db", str(db), "--profile", "writing"
+                ).returncode,
+                0,
+            )
             result = run_graph(
                 "project",
                 "--db",
@@ -855,7 +1025,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-            payload = cast(dict[str, object], json.loads(output.read_text(encoding="utf-8")))
+            payload = cast(
+                dict[str, object], json.loads(output.read_text(encoding="utf-8"))
+            )
             views = typed_items(payload, "projection_views")
             nodes = typed_items(payload, "nodes")
             node_ids = {str(item["node_id"]) for item in nodes}
@@ -883,8 +1055,15 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph(
+                    "analyze", "--db", str(db), "--profile", "writing"
+                ).returncode,
+                0,
+            )
             result = run_graph(
                 "project",
                 "--db",
@@ -898,7 +1077,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-            payload = cast(dict[str, object], json.loads(output.read_text(encoding="utf-8")))
+            payload = cast(
+                dict[str, object], json.loads(output.read_text(encoding="utf-8"))
+            )
             views = typed_items(payload, "projection_views")
             self.assertEqual(views[0]["recommended_format"], "prose")
 
@@ -921,8 +1102,15 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph(
+                    "analyze", "--db", str(db), "--profile", "writing"
+                ).returncode,
+                0,
+            )
             result = run_graph(
                 "project",
                 "--db",
@@ -936,20 +1124,43 @@ class ProseReasoningGraphTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-            payload = cast(dict[str, object], json.loads(output.read_text(encoding="utf-8")))
+            payload = cast(
+                dict[str, object], json.loads(output.read_text(encoding="utf-8"))
+            )
             views = typed_items(payload, "projection_views")
             self.assertEqual(views[0]["recommended_format"], "figure")
             self.assertIn("relational_topology", str(views[0]["format_reason"]))
             basis = cast(dict[str, object], views[0]["inference_basis"])
-            presentation_evidence = cast(dict[str, object], basis["presentation_evidence"])
-            self.assertIn("relational_topology", cast(list[str], presentation_evidence["presentation_features"]))
-            self.assertGreater(len(cast(list[str], presentation_evidence["presentation_feature_edges"])), 0)
+            presentation_evidence = cast(
+                dict[str, object], basis["presentation_evidence"]
+            )
+            self.assertIn(
+                "relational_topology",
+                cast(list[str], presentation_evidence["presentation_features"]),
+            )
+            self.assertGreater(
+                len(
+                    cast(list[str], presentation_evidence["presentation_feature_edges"])
+                ),
+                0,
+            )
 
-            lint = run_graph("lint", "--db", str(db), "--profile", "writing", "--out", str(diagnostics))
+            lint = run_graph(
+                "lint",
+                "--db",
+                str(db),
+                "--profile",
+                "writing",
+                "--out",
+                str(diagnostics),
+            )
             self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
             diagnostics_text = diagnostics.read_text(encoding="utf-8")
             self.assertIn("presentation_format_candidate", diagnostics_text)
-            self.assertIn("verification_route=`presentation_format_verification`", diagnostics_text)
+            self.assertIn(
+                "verification_route=`presentation_format_verification`",
+                diagnostics_text,
+            )
 
     def test_experiment_diagnostics_have_unique_rules(self) -> None:
         """Experiment coverage diagnostics should not overwrite one another."""
@@ -961,8 +1172,15 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 "The experiment compares workflows without enough planning detail.",
                 encoding="utf-8",
             )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "experiment").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph(
+                    "analyze", "--db", str(db), "--profile", "experiment"
+                ).returncode,
+                0,
+            )
 
             rules = diagnostic_rules(db)
 
@@ -985,8 +1203,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 "The selected corpus id is `experimental_report`, used only as metadata.",
                 encoding="utf-8",
             )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "report").returncode,
+                0,
+            )
 
             rules = diagnostic_rules(db)
 
@@ -996,7 +1219,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertNotIn("experiment_without_expected_result", rules)
             self.assertEqual(nodes_by_layer(db, "experiment"), [])
 
-    def test_all_profile_does_not_require_experiment_layer_without_empirical_cues(self) -> None:
+    def test_all_profile_does_not_require_experiment_layer_without_empirical_cues(
+        self,
+    ) -> None:
         """Design prose should not need an experiment layer unless experiment cues apply."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -1014,8 +1239,12 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 ).strip(),
                 encoding="utf-8",
             )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0
+            )
 
             rules = diagnostic_rules(db)
 
@@ -1049,8 +1278,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 ).strip(),
                 encoding="utf-8",
             )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "report").returncode,
+                0,
+            )
 
             self.assertNotIn("topic_jump_without_bridge", diagnostic_rules(db))
 
@@ -1076,8 +1310,15 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 ).strip(),
                 encoding="utf-8",
             )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph(
+                    "analyze", "--db", str(db), "--profile", "writing"
+                ).returncode,
+                0,
+            )
 
             self.assertNotIn("topic_jump_without_bridge", diagnostic_rules(db))
             self.assertNotIn("merge_paragraphs", operation_payloads(db))
@@ -1105,12 +1346,19 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 ).strip(),
                 encoding="utf-8",
             )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "report").returncode,
+                0,
+            )
 
             self.assertNotIn("merge_paragraphs", operation_payloads(db))
 
-    def test_experiment_vocabulary_explanation_does_not_trigger_plan_diagnostics(self) -> None:
+    def test_experiment_vocabulary_explanation_does_not_trigger_plan_diagnostics(
+        self,
+    ) -> None:
         """Explaining experiment vocabulary should not become an experiment plan."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -1128,8 +1376,12 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 ).strip(),
                 encoding="utf-8",
             )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0
+            )
 
             rules = diagnostic_rules(db)
             self.assertNotIn("experiment_without_hypothesis", rules)
@@ -1157,13 +1409,25 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 ).strip(),
                 encoding="utf-8",
             )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0
+            )
 
-            self.assertGreaterEqual(len(nodes_by_layer_kind(db, "experiment", "hypothesis")), 1)
-            self.assertGreaterEqual(len(nodes_by_layer_kind(db, "experiment", "metric")), 1)
-            self.assertGreaterEqual(len(nodes_by_layer_kind(db, "experiment", "baseline")), 1)
-            self.assertGreaterEqual(len(nodes_by_layer_kind(db, "experiment", "expected_result")), 1)
+            self.assertGreaterEqual(
+                len(nodes_by_layer_kind(db, "experiment", "hypothesis")), 1
+            )
+            self.assertGreaterEqual(
+                len(nodes_by_layer_kind(db, "experiment", "metric")), 1
+            )
+            self.assertGreaterEqual(
+                len(nodes_by_layer_kind(db, "experiment", "baseline")), 1
+            )
+            self.assertGreaterEqual(
+                len(nodes_by_layer_kind(db, "experiment", "expected_result")), 1
+            )
             self.assertNotIn("experiment_without_metric", diagnostic_rules(db))
 
     def test_japanese_sentence_units_and_discourse_cues(self) -> None:
@@ -1195,8 +1459,13 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "report").returncode,
+                0,
+            )
 
             rules = diagnostic_rules(db)
             self.assertNotIn("topic_jump_without_bridge", rules)
@@ -1224,7 +1493,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
 
             sentences = node_texts_by_layer_kind(db, "form", "sentence")
             self.assertIn("The method cites e.g. v1.2.3 and Fig. 2.", sentences)
@@ -1256,8 +1527,15 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph(
+                    "analyze", "--db", str(db), "--profile", "writing"
+                ).returncode,
+                0,
+            )
 
             rules = diagnostic_rules(db)
             self.assertNotIn("unsupported_claim", rules)
@@ -1279,7 +1557,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             db = root / "graph.sqlite"
             projection = root / "projection.json"
             source.write_text("# Note\n\nPlain prose for routing.", encoding="utf-8")
-            prompt.write_text("Python code documentation for an academic paper.", encoding="utf-8")
+            prompt.write_text(
+                "Python code documentation for an academic paper.", encoding="utf-8"
+            )
 
             ingest = run_graph(
                 "ingest",
@@ -1305,15 +1585,33 @@ class ProseReasoningGraphTest(unittest.TestCase):
             )
             self.assertEqual(project.returncode, 0, project.stdout + project.stderr)
 
-            payload = cast(dict[str, object], json.loads(projection.read_text(encoding="utf-8")))
+            payload = cast(
+                dict[str, object], json.loads(projection.read_text(encoding="utf-8"))
+            )
             corpus_hints = typed_items(payload, "corpus_hints")
-            self.assertTrue(any(item.get("corpus_id") == "software_engineering" for item in corpus_hints))
-            self.assertTrue(any(item.get("corpus_id") == "academic_writing" for item in corpus_hints))
+            self.assertTrue(
+                any(
+                    item.get("corpus_id") == "software_engineering"
+                    for item in corpus_hints
+                )
+            )
+            self.assertTrue(
+                any(
+                    item.get("corpus_id") == "academic_writing" for item in corpus_hints
+                )
+            )
             semantic_ir = cast(dict[str, object], payload["semantic_prose_ir"])
             self.assertEqual(semantic_ir["source"], "deterministic_capability_evidence")
             self.assertEqual(len(cast(list[object], semantic_ir["documents"])), 1)
 
-            missing = run_graph("ingest", str(source), "--db", str(db), "--prompt-file", str(root / "missing.txt"))
+            missing = run_graph(
+                "ingest",
+                str(source),
+                "--db",
+                str(db),
+                "--prompt-file",
+                str(root / "missing.txt"),
+            )
             self.assertNotEqual(missing.returncode, 0)
             self.assertIn("prompt file does not exist", missing.stderr)
 
@@ -1325,8 +1623,12 @@ class ProseReasoningGraphTest(unittest.TestCase):
             second = root / "second.md"
             db = root / "graph.sqlite"
             projection = root / "projection.json"
-            first.write_text("# First\n\n根拠として第一文書は DB に入る。", encoding="utf-8")
-            second.write_text("# Second\n\n根拠として第二文書も DB に入る。", encoding="utf-8")
+            first.write_text(
+                "# First\n\n根拠として第一文書は DB に入る。", encoding="utf-8"
+            )
+            second.write_text(
+                "# Second\n\n根拠として第二文書も DB に入る。", encoding="utf-8"
+            )
 
             ingest = run_graph(
                 "ingest-set",
@@ -1341,7 +1643,9 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertIn("PROSE_REASONING_GRAPH_DOCUMENTS=2", ingest.stdout)
 
             with sqlite3.connect(db) as connection:
-                document_rows = connection.execute("SELECT id, path FROM documents ORDER BY id").fetchall()
+                document_rows = connection.execute(
+                    "SELECT id, path FROM documents ORDER BY id"
+                ).fetchall()
                 source_rows = connection.execute(
                     "SELECT id, document_id, text FROM nodes WHERE layer = 'source' ORDER BY id"
                 ).fetchall()
@@ -1349,16 +1653,25 @@ class ProseReasoningGraphTest(unittest.TestCase):
                     "SELECT id, document_id, text FROM nodes WHERE layer = 'form' AND kind = 'sentence' ORDER BY id"
                 ).fetchall()
 
-            self.assertEqual([row[0] for row in document_rows], ["doc:1", "doc:2", "doc:analysis"])
+            self.assertEqual(
+                [row[0] for row in document_rows], ["doc:1", "doc:2", "doc:analysis"]
+            )
             self.assertIn(str(first), [row[1] for row in document_rows])
             self.assertIn(str(second), [row[1] for row in document_rows])
             self.assertEqual(len(source_rows), 2)
             self.assertTrue(any("第一文書" in row[2] for row in source_rows))
             self.assertTrue(any("第二文書" in row[2] for row in source_rows))
-            self.assertTrue(any(str(row[0]).startswith("d1:s:") for row in sentence_rows))
-            self.assertTrue(any(str(row[0]).startswith("d2:s:") for row in sentence_rows))
+            self.assertTrue(
+                any(str(row[0]).startswith("d1:s:") for row in sentence_rows)
+            )
+            self.assertTrue(
+                any(str(row[0]).startswith("d2:s:") for row in sentence_rows)
+            )
 
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "report").returncode,
+                0,
+            )
             project = run_graph(
                 "project",
                 "--db",
@@ -1371,10 +1684,15 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 str(projection),
             )
             self.assertEqual(project.returncode, 0, project.stdout + project.stderr)
-            payload = cast(dict[str, object], json.loads(projection.read_text(encoding="utf-8")))
+            payload = cast(
+                dict[str, object], json.loads(projection.read_text(encoding="utf-8"))
+            )
             documents = typed_items(payload, "documents")
             self.assertEqual(len(documents), 3)
-            self.assertTrue(any(item.get("document_id") == "doc:analysis" for item in documents))
+            self.assertTrue(
+                any(item.get("document_id") == "doc:analysis" for item in documents)
+            )
+
     def test_rewrite_packet_reports_missing_operation(self) -> None:
         """Missing operation ids should fail clearly through the CLI."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1383,10 +1701,22 @@ class ProseReasoningGraphTest(unittest.TestCase):
             db = root / "graph.sqlite"
             output = root / "rewrite.md"
             source.write_text(sample_text(), encoding="utf-8")
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0)
+            self.assertEqual(
+                run_graph("ingest", str(source), "--db", str(db)).returncode, 0
+            )
+            self.assertEqual(
+                run_graph("analyze", "--db", str(db), "--profile", "all").returncode, 0
+            )
 
-            result = run_graph("rewrite-packet", "--db", str(db), "--op", "missing", "--out", str(output))
+            result = run_graph(
+                "rewrite-packet",
+                "--db",
+                str(db),
+                "--op",
+                "missing",
+                "--out",
+                str(output),
+            )
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing edit operation: missing", result.stderr)
@@ -1396,11 +1726,17 @@ class ProseReasoningGraphTest(unittest.TestCase):
         with sqlite3.connect(db) as connection:
             counts: dict[str, int] = {}
             for table in ("nodes", "edges"):
-                rows = connection.execute(f"SELECT layer, COUNT(*) FROM {table} GROUP BY layer")
+                rows = connection.execute(
+                    f"SELECT layer, COUNT(*) FROM {table} GROUP BY layer"
+                )
                 for layer, count in rows:
                     counts[str(layer)] = counts.get(str(layer), 0) + int(count)
-            diagnostics = connection.execute("SELECT COUNT(*) FROM diagnostics").fetchone()[0]
-            operations = connection.execute("SELECT COUNT(*) FROM edit_operations").fetchone()[0]
+            diagnostics = connection.execute(
+                "SELECT COUNT(*) FROM diagnostics"
+            ).fetchone()[0]
+            operations = connection.execute(
+                "SELECT COUNT(*) FROM edit_operations"
+            ).fetchone()[0]
             counts["diagnostics"] = counts.get("diagnostics", 0) + int(diagnostics)
             counts["edit-operation"] = counts.get("edit-operation", 0) + int(operations)
         return counts
@@ -1480,7 +1816,13 @@ def create_structured_analysis_style_db(db: Path) -> None:
         )
         connection.execute(
             "INSERT INTO documents(id, path, title, kind, created_at) VALUES (?, ?, ?, ?, ?)",
-            ("doc:structured", "documents/tools/example.md", "Tool Example", "document", "2026-06-04T00:00:00Z"),
+            (
+                "doc:structured",
+                "documents/tools/example.md",
+                "Tool Example",
+                "document",
+                "2026-06-04T00:00:00Z",
+            ),
         )
         connection.execute(
             """
@@ -1498,7 +1840,12 @@ def create_structured_analysis_style_db(db: Path) -> None:
                 0,
                 73,
                 1.0,
-                json.dumps({"span_kind": "paragraph", "segmentation_basis": "structured_analysis"}),
+                json.dumps(
+                    {
+                        "span_kind": "paragraph",
+                        "segmentation_basis": "structured_analysis",
+                    }
+                ),
             ),
         )
         connection.execute(
@@ -1569,7 +1916,9 @@ def typed_items(payload: dict[str, object], key: str) -> list[dict[str, object]]
 def diagnostic_rules(db: Path) -> list[str]:
     """Return diagnostic rules from the graph database."""
     with sqlite3.connect(db) as connection:
-        rows = connection.execute("SELECT rule FROM diagnostics ORDER BY rule").fetchall()
+        rows = connection.execute(
+            "SELECT rule FROM diagnostics ORDER BY rule"
+        ).fetchall()
     return [str(row[0]) for row in rows]
 
 
@@ -1596,15 +1945,22 @@ def node_texts_by_layer_kind(db: Path, layer: str, kind: str) -> list[str]:
 def nodes_by_layer(db: Path, layer: str) -> list[str]:
     """Return node ids for one layer."""
     with sqlite3.connect(db) as connection:
-        rows = connection.execute("SELECT id FROM nodes WHERE layer = ? ORDER BY id", (layer,)).fetchall()
+        rows = connection.execute(
+            "SELECT id FROM nodes WHERE layer = ? ORDER BY id", (layer,)
+        ).fetchall()
     return [str(row[0]) for row in rows]
 
 
 def operation_payloads(db: Path) -> dict[str, dict[str, object]]:
     """Return edit-operation payloads by operation kind."""
     with sqlite3.connect(db) as connection:
-        rows = connection.execute("SELECT kind, payload_json FROM edit_operations").fetchall()
-    return {str(kind): cast(dict[str, object], json.loads(str(payload))) for kind, payload in rows}
+        rows = connection.execute(
+            "SELECT kind, payload_json FROM edit_operations"
+        ).fetchall()
+    return {
+        str(kind): cast(dict[str, object], json.loads(str(payload)))
+        for kind, payload in rows
+    }
 
 
 def first_operation_id(db: Path, kind: str) -> str:

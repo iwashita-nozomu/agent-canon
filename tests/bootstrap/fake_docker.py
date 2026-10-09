@@ -7,7 +7,6 @@ import json
 import hashlib
 import os
 import shutil
-import subprocess
 import sys
 import tarfile
 from pathlib import Path
@@ -1315,16 +1314,45 @@ def main(argv: list[str]) -> int:
                     "mode": "read-only",
                     "digest": digest,
                 }
-                lifecycle.setdefault("targets", {})[digest] = target
+                targets = lifecycle.setdefault("targets", {})
+                if not isinstance(targets, dict):
+                    return 1
+                targets[digest] = target
+                # Match the controller's full projection, including prior targets.
+                mount_rows = []
+                mounts_toml = ['schema = "agent-canon.mount-registry.v2"', ""]
+                for target_digest, target_record in sorted(targets.items()):
+                    if not isinstance(target_record, dict):
+                        return 1
+                    target_root = target_record.get("root")
+                    target_host_root = target_record.get("host_root")
+                    target_mode = target_record.get("mode")
+                    if (
+                        not isinstance(target_root, str)
+                        or not isinstance(target_host_root, str)
+                        or target_mode != "read-only"
+                    ):
+                        return 1
+                    mount_rows.append(
+                        f"target\t{target_digest}\t{target_host_root}\t"
+                        f"/targets/{target_digest}\tread-only"
+                    )
+                    mounts_toml.extend(
+                        [
+                            f"[targets.{target_digest}]",
+                            f"root = {json.dumps(target_root)}",
+                            'mode = "read-only"',
+                            f"digest = {json.dumps(target_digest)}",
+                            "",
+                        ]
+                    )
                 state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
                 (exchange_root / "mounts.tsv").write_text(
-                    f"target\t{digest}\t{host_root}\t/targets/{digest}\tread-only\n",
+                    "\n".join(mount_rows) + ("\n" if mount_rows else ""),
                     encoding="utf-8",
                 )
                 (exchange_root / "mounts.toml").write_text(
-                    'schema = "agent-canon.mount-registry.v2"\n\n[targets.{}]\nroot = "{}"\nmode = "read-only"\ndigest = "{}"\n'.format(
-                        digest, container_root, digest
-                    ),
+                    "\n".join(mounts_toml),
                     encoding="utf-8",
                 )
                 print(
@@ -1504,17 +1532,9 @@ def main(argv: list[str]) -> int:
             eval_failed = os.environ.get("FAKE_EVAL_FAIL") == "1"
             (exchange / "eval-results").mkdir(parents=True, exist_ok=True)
             families = {
-                "skill-workflow-prompt": (
-                    "skill-eval-20260101T000000000000Z-0123456789-pass-bootstrap.md",
-                    f"EVAL_RUN_ID=skill-{run_id}\n",
-                ),
                 "workflow-selection": (
                     "workflow-selection-eval-20260101T000000000000Z-0123456789-pass.md",
                     f"WORKFLOW_SELECTION_EVAL_RUN_ID=workflow-{run_id}\n",
-                ),
-                "report-quality": (
-                    "report-quality-eval-20260101T000000000000Z-0123456789-pass.md",
-                    f"REPORT_QUALITY_EVAL_RUN_ID=quality-{run_id}\n",
                 ),
                 "codex-agent-role": (
                     "codex-agent-role-eval-20260101T000000000000Z-0123456789-pass.md",
@@ -1538,25 +1558,17 @@ def main(argv: list[str]) -> int:
                 f"stdout=tasks/{run_id}/logs/01-codex-agent-role.stdout.txt:"
                 f"stderr=tasks/{run_id}/logs/01-codex-agent-role.stderr.txt"
             )
-            for name in (
-                "skill-workflow-prompt",
-                "workflow-selection",
-                "report-quality",
-            ):
+            for name in ("workflow-selection",):
                 print(
                     "ACCUMULATED_AGENT_EVAL_PRODUCER="
                     f"{name}:{producer_status}:"
                     f"stdout=tasks/{run_id}/logs/{name}.stdout.txt:"
                     f"stderr=tasks/{run_id}/logs/{name}.stderr.txt"
                 )
-            print("ACCUMULATED_AGENT_EVAL_PRODUCERS=4")
+            print("ACCUMULATED_AGENT_EVAL_PRODUCERS=2")
             print(
                 "ACCUMULATED_AGENT_EVAL_FAILED="
-                + (
-                    "codex-agent-role,skill-workflow-prompt,workflow-selection,report-quality"
-                    if eval_failed
-                    else "-"
-                )
+                + ("codex-agent-role,workflow-selection" if eval_failed else "-")
             )
             print(f"ACCUMULATED_AGENT_EVAL={'fail' if eval_failed else 'pass'}")
             return 1 if eval_failed else 0

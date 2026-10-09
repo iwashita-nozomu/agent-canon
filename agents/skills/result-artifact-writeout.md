@@ -58,13 +58,13 @@ Use report-writing only when reader-facing interpretation, claims, limitations, 
 
 ## Output Contract
 
-- `source_result`: どの command、tool output、raw JSON / JSONL、run directory、hook line を正本にしたか
-- `artifact_id`: timestamp、run id、hook_run_id、commit SHA、または run_name から作る unique ID
-- `raw_artifact`: 生データまたは機械可読 result
-- `summary_artifact`: Markdown / table / short report
-- `manifest`: command、argv、cwd、branch、commit、runtime namespace、started / finished timestamp、exit code、status、input config、counts、schema version
-- `destination_class`: `run-local`, `accumulated-eval`, `hook-result`, `experiment-result`, `reader-report`, `generated-triage`
-- `overwrite_policy`: `append-only`, `unique-file`, `regenerate-from-source`, or explicit cleanup task
+For each artifact selected for writeout, identify its source result, stable
+identity, destination, semantic role, and overwrite policy. Preserve a raw
+machine-readable result, summary, or manifest only when the producer or request
+selects it. When a manifest is created, include provenance available from the
+run such as command, inputs, revision, runtime, timestamps, exit status, and
+schema version. The destination classes below are routing examples; choose the
+one that matches the actual artifact.
 
 ## Destination Rules
 
@@ -89,7 +89,7 @@ evidence.
 
 ## Required Shape
 
-1. Choose the destination class before writing.
+1. Choose a destination that matches the artifact's owner and retention need.
 1. Preserve the raw machine-readable source result before writing a prose summary when the caller selects a raw artifact. Raw, summary, manifest, report, and archive outputs are optional; do not materialize empty placeholders for unselected outputs.
 1. If the user asks for a reader-facing report from tool, JSON / JSONL, hook,
    eval, checker, experiment, review, or audit evidence, also use
@@ -126,29 +126,17 @@ evidence.
    derive them from the same report content model or run a mechanical parity
    check. Do not allow a thin Markdown file that only points to the HTML report
    unless the task explicitly chooses HTML as the only reader-facing report.
-1. For experiment reports where Markdown is the canonical reader report and
-   HTML is a rendered artifact, the Markdown must contain the same substantive
-   sections as HTML: method, summary table, item glossary, figure reading
-   guides or backing data, comparison tables, case table, limitations, evidence
-   trace, skill trace, report-quality eval, and artifact list.
-1. Write reader-facing explanations, item glossary entries, figure/table
-   reading guides, and report-quality eval descriptions in the repository's
-   human-facing primary language unless the user asks otherwise; for this
-   template root that means Japanese, while code identifiers and metric keys
-   may remain literal.
-1. If the report uses domain-specific item names, table columns, case IDs,
-   metric names, abbreviations, or score labels, include an item glossary that
-   defines each displayed item, unit, source artifact or measurement method,
-   and how to interpret high/low or pass/fail values.
-1. If the report includes figures or comparison tables, add a short reading
-   guide for each one: axes or columns, units, whether higher/lower is better,
-   the comparison baseline, and any metric-source caveat.
-1. If the report includes a report-quality eval, make it strict and
-   evidence-based: do not pass checks for mere section presence; require
-   concrete glossary coverage, figure/table reading guides, source artifact
-   traceability, metric-source caveats, limitations, and claim-to-artifact
-   support. Missing required explanations, Markdown/HTML section parity, or
-   Markdown standalone substance must fail the eval.
+1. When multiple reader-facing formats are produced, keep them materially
+   consistent and derive them from the same content model or use a parity check.
+   Each format should contain the substance needed for its requested readers;
+   do not require an unused case table, glossary, figure guide, skill trace, or
+   report-quality eval.
+1. Use the repository's primary human-facing language unless the user requests
+   another. Add a glossary when unfamiliar labels or units need explanation,
+   and a figure/table reading guide when its axes, units, direction, baseline, or
+   source could be misread.
+1. If a report-quality eval is selected, judge evidence and claim support rather
+   than section presence alone. Include only report-specific checks that apply.
 
 ## Closeout Tokens
 
@@ -182,9 +170,10 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. For an immutable publication snapshot of one run bundle, use `./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> exec --root <registered-source-root> -- python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>` followed by `./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> exec --root <registered-source-root> -- python3 tools/runtime/archive/runtime_log_archive_git.py push`; the tool writes `.agent-canon/log-archive/agent-reports/<repo-key>/<run-id>/<snapshot-id>/`, `archive_manifest.json`, and `index.jsonl`.
 1. Separate observation, interpretation, limitations, and next action in reader-facing summaries.
 1. If multiple reader-facing formats are generated, such as Markdown and HTML, derive them from the same report content model or run a mechanical parity check; do not allow a thin Markdown file that only points to HTML unless the task explicitly chooses HTML as the only reader-facing report.
-1. For experiment reports where Markdown is the canonical reader report and HTML is a rendered artifact, the Markdown must contain the same substantive sections as HTML: method, summary table, item glossary, figure reading guides or backing data, comparison tables, case table, limitations, evidence trace, skill trace, report-quality eval, and artifact list.
-1. Write reader-facing explanations, item glossary entries, figure/table reading guides, and report-quality eval descriptions in the repository's human-facing primary language unless the user asks otherwise; in this template root, use Japanese while leaving code identifiers and metric keys literal.
-1. For reader-facing reports with domain-specific item names, table columns, case IDs, metric names, abbreviations, or score labels, include an item glossary that defines each displayed item, unit, source artifact or measurement method, and high/low or pass/fail interpretation.
-1. For reader-facing figures or comparison tables, include a concise reading guide for each one: axes or columns, units, whether higher/lower is better, the comparison baseline, and any metric-source caveat.
-1. For report-quality evals, use strict evidence-based checks: mere section presence is not enough; missing item glossary coverage, reading guides, source artifact traceability, metric-source caveats, limitations, claim-to-artifact support, Markdown/HTML section parity, or Markdown standalone substance must fail the eval.
+1. Keep multiple requested formats materially consistent. Add a glossary or
+   figure/table reading guide when unfamiliar labels, units, baselines, axes, or
+   source limitations need explanation. Do not require unused report sections
+   or evaluation artifacts.
+1. If a report-quality eval is selected, test evidence and claim support rather
+   than section presence alone; include the content checks that apply.
 1. Record `result_writeout=complete`, `result_source=...`, the selected `result_artifacts=<path-role-checksum-readback-record>`, and `result_overwrite_policy=...`; omit unselected output tokens rather than writing placeholders.

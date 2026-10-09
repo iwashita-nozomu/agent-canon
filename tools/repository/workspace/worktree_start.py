@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Inspects legacy worktree scope evidence for cleanup diagnostics.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Inspect legacy worktree scope evidence and summarize cleanup actions."""

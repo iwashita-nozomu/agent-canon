@@ -166,14 +166,15 @@ run_contracts() {
     tests.agent_tools.test_visualization_contract \
     tests.agent_tools.test_render_dependency_manifest_graph \
     tests.agent_tools.test_graph_client_source_projection \
-    tests.tools.test_agent_canon_pr_dependency_source_gate \
-    tests.tools.test_agent_canon_pr_graph_gate_integration \
+    tests.agent_tools.test_structured_document_inventory_cli \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_dependency_headers \
     tests.agent_tools.test_tool_drift \
     tests.agent_tools.test_vector_search \
     tests/agent_tools/test_dependency_*.py
+  python3 -m pytest -p no:cacheprovider \
+    tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
   python3 "${TOOLS_ROOT}/runtime/manifest/tool_catalog.py"
   python3 "${TOOLS_ROOT}/analysis/proof/tool_proof_coverage.py"
   python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
@@ -185,7 +186,6 @@ run_contracts() {
     python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \
     --root "${ROOT}" --format json
-  python3 "${TOOLS_ROOT}/agent/skills/skill_tool_commands.py" check
 }
 
 run_eval() (
@@ -196,8 +196,11 @@ run_eval() (
     local trap_status=$?
     trap - EXIT
     set +e
-    rm -rf -- "${temp_root}"
-    cleanup_status=$?
+    # CI copies failed producer logs from the runtime volume before teardown.
+    if [[ "${primary_status}" -eq 0 && "${trap_status}" -eq 0 ]]; then
+      rm -rf -- "${temp_root}"
+      cleanup_status=$?
+    fi
     set -e
     if [[ "${primary_status}" -ne 0 ]]; then
       exit "${primary_status}"
@@ -208,21 +211,18 @@ run_eval() (
     exit "${cleanup_status}"
   }
   trap cleanup_eval EXIT
-  # Static evaluations own synthetic evidence, not the shared private hook log.
-  # Keep the existing archive location and runtime-boundary validation.
-  local hook_archive="${AGENT_CANON_STATIC_RUNTIME_ROOT}/archive/agent-canon-log"
+  # Static evaluations use the CI runtime root, not the shared private hook log.
+  local eval_archive_root="${AGENT_CANON_STATIC_RUNTIME_ROOT}"
   local eval_log_dir="${temp_root}/agent-eval-runs/agent-canon-pr-gate"
-  hook_archive="$(runtime_boundary_path "${hook_archive}")"
-  mkdir -p "${eval_log_dir}"
+  mkdir -p "${eval_log_dir}" "${eval_archive_root}/eval-results"
   set +e
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
+  AGENT_CANON_HOOK_ARCHIVE_DIR="${eval_archive_root}" \
+  AGENT_CANON_LOG_ROOT="${eval_archive_root}" \
     python3 "${RUNTIME_ROOT}/eval/producers/run_accumulated_agent_evals.py" \
       --run-id agent-canon-pr-gate \
       --root "${ROOT}" \
       --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
-      --log-dir "${eval_log_dir}" \
-      --skill-used agent-orchestration \
-      --skill-used result-artifact-writeout
+      --log-dir "${eval_log_dir}"
   primary_status=$?
   if [[ "${primary_status}" -ne 0 ]]; then
     local eval_log
@@ -239,7 +239,8 @@ run_eval() (
     done
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
-    AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
+    AGENT_CANON_HOOK_ARCHIVE_DIR="${eval_archive_root}" \
+    AGENT_CANON_LOG_ROOT="${eval_archive_root}" \
       python3 "${RUNTIME_ROOT}/eval/checkers/eval_accumulation_check.py" \
         --root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}"
     primary_status=$?

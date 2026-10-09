@@ -51,16 +51,14 @@ implementation or implementation-derived proof workflows.
    - stopping or certificate predicate
    - result classification semantics
    - inner-solver contract, if the outer step depends on one
-1. Create a fresh Lean design namespace under `lean/<topic>/` that does not
-   import generated implementation evidence unless the task explicitly asks to
-   compare with existing code.
-1. Encode the candidate algorithm as Lean definitions:
-   - problem structure
-   - state structure
-   - transition relation or transition function
-   - acceptance / restoration / line-search predicates
-   - inner-solver input-output contracts
-   - returned certificate predicates
+1. Use the existing Lean design namespace when it has the same topic and
+   ownership; create a namespace under `lean/<topic>/` only when a separate
+   design surface is needed. Keep the mathematical design independent of
+   generated implementation evidence unless the task compares it with existing
+   code.
+1. Encode the parts of the candidate algorithm that the target theorem needs:
+   problem and state, transition, acceptance/restoration or line-search rules,
+   inner-solver contract, and returned certificate as applicable.
 1. Prove local structural theorems first, but only when they feed the design
    target. Examples: epigraph equivalence, filter-progress implication,
    restoration acceptance, inner-solver contract composition, ranking decrease.

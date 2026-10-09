@@ -42,7 +42,6 @@ __all__ = (
     "CapabilityRootError",
     "CapabilityRoute",
     "CapabilityIndex",
-    "SkillToolCommandSpec",
     "SkillRoutingRule",
     "SkillDependencyRule",
     "SkillOrderConstraint",
@@ -71,8 +70,6 @@ __all__ = (
     "build_skill_dependency_edges",
     "derive_skill_invocation_order",
     "load_skill_related_map",
-    "load_skill_required_tool_commands",
-    "load_skill_tool_commands",
     "build_capability_index",
     "ordered_unique",
     "related_skill_candidates",
@@ -270,16 +267,6 @@ class CapabilityRoute:
     phase: str
     activation: str
     exclusive: bool
-
-
-@dataclass(frozen=True)
-class SkillToolCommandSpec:
-    """Structured command phases owned by one public skill catalog entry."""
-
-    required: tuple[Mapping[str, object], ...] = ()
-    conditional: tuple[Mapping[str, object], ...] = ()
-    maintenance: tuple[Mapping[str, object], ...] = ()
-    structured: bool = True
 
 
 @dataclass(frozen=True)
@@ -1009,38 +996,6 @@ def load_skill_route_rules_from_root(
 def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
     """Return catalog-backed related-skill candidates keyed by public skill id."""
     return {rule.skill: rule.related_skills for rule in load_skill_route_rules(root)}
-
-
-def load_skill_required_tool_commands(root: Path) -> dict[str, tuple[Mapping[str, object], ...]]:
-    """Return catalog-owned required commands keyed by public skill id."""
-    return {
-        skill: spec.required for skill, spec in load_skill_tool_commands(root).items()
-    }
-
-
-def load_skill_tool_commands(root: Path) -> dict[str, SkillToolCommandSpec]:
-    """Return all catalog-owned command phases keyed by public skill id.
-
-    A missing ``tool_commands`` block is retained as an unstructured fixture
-    marker for legacy/minimal roots.  The canonical catalog contains a block
-    for every public skill and therefore never falls back to prose discovery.
-    """
-    if not (root / SKILL_CATALOG_PATH).is_file():
-        return {}
-    from tools.agent.skills.skill_tool_commands import load_skill_command_items
-
-    try:
-        records = load_skill_command_items(root)
-    except ValueError as exc:
-        raise ValueError(f"structured skill command catalog invalid: {exc}") from exc
-    return {
-        skill: SkillToolCommandSpec(
-            required=phases["required"],
-            conditional=phases["conditional"],
-            maintenance=phases["maintenance"],
-        )
-        for skill, phases in records.items()
-    }
 
 
 def build_capability_index(rules: Sequence[SkillRoutingRule]) -> CapabilityIndex:

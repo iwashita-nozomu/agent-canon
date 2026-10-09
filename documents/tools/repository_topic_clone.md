@@ -43,14 +43,21 @@ python3 tools/repository/workspace/repository_topic_clone.py cleanup \
 `--checkout-mode` の選択は [Checkout mode](../rule/repository-topic-clone.md#checkout-mode) に従います。
 container 側に checkout-mode の別 flag はなく、exact target metadata から自動判定します。
 write-capable handoff の各 allowed path は repeated `--allowed-path <relative-path>` で渡します。
+exact identity の既存 checkout では、current owner evidence と明示 scope に応じて task marker、reserved packet の
+worktree `info/exclude` entry、および ignored writer-target packet のみを更新できます。これは source や Git index を変更せず、dirty checkout を clean 扱い
+しません。merge / cleanup の clean-state 条件も変更しません。dirty 状態を保った場合は prepare の出力に
+`REQUEST_CHECKOUT_STATUS=dirty-preserved` を含めます。
 
 作成・再利用・writer packet・merge の authority は
 [clone ライフサイクル](../rule/repository-topic-clone.md#clone-ライフサイクル)、
 復元可能性・marker・任意 publication evidence・削除可否は
 [クリーンアップ](../rule/repository-topic-clone.md#クリーンアップ) を確認してから操作します。
-`linked-worktree` の `cleanup --apply` は worktree/topic path のみを回収し、request の local topic branch
-を保持します。この command に branch deletion authority を追加せず、branch 操作は既存 owner の別 operation
-として扱います。
+`cleanup --apply` の前に task owner が exact path の利用終了と、必要な ignored / untracked / local-only
+submodule・annex content を削除対象外へ保存したことを確認します。CLI の clean-status proof は ignored content や
+submodule Git metadata/object の再取得可能性を示しません。linked cleanup は proof preflight 後に exact worktree path
+を `git worktree remove --force` で一様に回収し、request の local topic branch は保持します。この command に
+branch deletion authority を追加せず、branch 操作は既存 owner の別 operation として扱います。成功時は linked
+path が消え、`git worktree list` に残っていないことを確認します。
 `merge-main` の成功結果は ancestor proof を返します。
 adapter の `status` と `projected_clone_path` は directory を作らない read-only projection です。
 

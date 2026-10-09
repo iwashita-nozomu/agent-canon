@@ -224,8 +224,11 @@ no daemon, webhook listener, cron route, or `loginctl enable-linger` is added.
 Git-tracked `.codex/personal/skills` distribution, while `~/.codex/agents/<role>.toml`
 to the tracked role file, and `~/.codex/config.toml` to the ignored personal
 source under the AgentCanon checkout. An existing regular Codex config is moved
-byte-for-byte (including mode) before linking; update preserves it and uninstall
-restores a regular file. Foreign entries and foreign symlinks are preserved or
+byte-for-byte (including mode) before linking; install/update apply the canonical
+`model_context_window = 1050000` and
+`model_auto_compact_token_limit = 900000` defaults while preserving other
+personal TOML settings, and uninstall restores a regular file.
+Foreign entries and foreign symlinks are preserved or
 reported as collisions. Project hooks and user authentication, session,
 history, cache, plugins, rules, MCP, and TUI/trust settings are outside this
 projection. `codex prepare` remains the separate runtime-local isolated home

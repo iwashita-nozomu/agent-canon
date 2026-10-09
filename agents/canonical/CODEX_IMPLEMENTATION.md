@@ -22,7 +22,7 @@ when the phase changes.
 | Selected typed route requires full staging | [Coordination design packet](#coordination-design-packet) |
 | Editing a repository file | [Edit Execution Surface](#edit-execution-surface) |
 | Selecting an implementation or adding code/API | [Library And Reuse Sweep](#library-and-reuse-sweep) |
-| Editing a checkable canonical file or its dependency relation | [File Dependency Manifest](#file-dependency-manifest) |
+| Explicitly analyzing or editing a dependency-graph annotation | [File Dependency Manifest](#file-dependency-manifest) |
 | Executing the approved implementation | [5. Implementation](#5-implementation) |
 | Delegating implementation under a coordination route | [Coordination handoff](#coordination-handoff) |
 
@@ -37,8 +37,9 @@ when newly established owner/contract facts require it.
 
 ## Design Integrity Gate
 
-Before editing, establish the owning responsibility model, selected mechanism, complete
-change unit, necessary evidence, and unresolved decisions that could change them.
+Once cause and required guarantee show that an edit is necessary, establish the
+owner, mechanism, affected responsibility unit, evidence, and unresolved decisions
+that could change the edit before changing it.
 Use [agent orchestration](../skills/agent-orchestration.md#decision-sufficiency-packet)
 for decision sufficiency and reuse current owner evidence. An unresolved API,
 algorithm, dependency, configuration, naming, oracle, or responsibility decision
@@ -112,45 +113,35 @@ matching premises. Tests are evidence of current behavior, not a veto on the
 agreed correction. Preserve the necessary shared asset/history findings through
 related handoffs and consolidate changes to the same responsibility.
 
+When a related branch/PR or prepared checkout exists, verify it serves the same
+owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
+and [repository-topic-clone](../skills/repository-topic-clone.md) before creating a new path.
+
 ## File Dependency Manifest
 
-For checkable canonical design, workflow, tool, policy, and template text, use
-the existing [dependency manifest](../../documents/design/dependency-manifest-design.md).
-Its file-relative edges record responsibility relationships, not mandatory reads.
-Routine notes, generated reports, archives, commentless formats, binary, and
-vendored files follow the existing scanner classification.
+The [dependency manifest](../../documents/design/dependency-manifest-design.md)
+is optional metadata for explicitly selected graph analysis. Ordinary file
+creation, editing, and PR validation do not require a manifest or a matching
+`contract` entry.
 
-Read the edited file's header to select relevant owners. Follow an upstream
-edge before editing only when it determines an unresolved requirement, mechanism,
-or validation obligation. Trace downstream contracts and consumers affected by
-the change; stop at unchanged boundaries with the required guarantee preserved.
-For code changes, use the existing LSP/code-dependency owner to follow definitions,
-references, and callers recursively through those affected contracts. Record an
-unavailable analysis route honestly and preserve its verification gap.
+For ordinary scope discovery, follow actual import/include/call-site references,
+standard links, build/package configuration, and the responsible owner routes.
+Existing dependency annotations may add useful context when present. Add or
+change an annotation only when the requested work changes that annotation or an
+explicit graph-analysis task needs it. Missing annotations are not a repair
+requirement for other file changes.
 
-Keep `upstream`/`downstream` and `design`/`implementation`/`environment` semantics,
-file-relative paths, responsibility and contract metadata, and the existing
-comment-format placement. Add a required missing header with the edit. For a new
-relationship, update its reverse edge or record the actual migration reason in
-the existing review evidence. Handoffs carry only decision-relevant dependency
-and downstream evidence; they do not require an all-edge recursive reading list,
-`dependency_edit_scope.txt`, or `dependency_graph.tsv` on every task.
+When an annotation itself is edited, preserve its declared relation semantics,
+repository-relative paths, target existence, and comment syntax. For code
+changes, use the existing LSP/code-dependency owner to follow definitions,
+references, and callers through affected contracts. Handoffs carry the
+decision-relevant source evidence and consumer closure; they do not require an
+all-edge recursive listing, `dependency_edit_scope.txt`, or
+`dependency_graph.tsv` on every task.
 
-Select the existing changed-file header/format checks for changed checkable
-files. When dependency relations change, use the existing source-derived graph
-check for the affected contracts. Commands are logical routes through the
-[CLI owner](CLI_ENTRYPOINTS.md#tool-commands):
-
-```text
-check-dependency-headers --changed
-scan-dependency-headers --changed --fail-missing
-check-dependency-header-format --changed --require-header
-```
-
-The graph owner verifies normalized direction/kind, reverse relations, and cycles.
-Repository-wide evidence is selected by the changed contract and validation owner,
-not by a document link or a shared-canon label. Preserve required graph integrity
-without expanding unrelated baseline findings into this task's completion work.
+The explicit `dependency-analysis` route owns optional header scanning,
+format, graph, and design-claim tools. Do not activate that route as a generic
+gate for ordinary edits.
 
 ## 5. Implementation
 

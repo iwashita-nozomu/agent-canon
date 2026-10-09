@@ -27,8 +27,8 @@ abstraction admission は [documents/conventions/software-engineering-principles
 
 - Purpose: manage large refactors as behavior-preserving reorganizations with
   explicit scope, deltas, and review gates.
-- Section path: Purpose, Use When, and Core References lead into the ordered
-  Procedure; later sections cover Shared-structure order, Subagent Routing, and
+- Section path: Purpose, Use When, and Core References lead into the conditional
+  Procedure; later sections cover dependency ordering, Subagent Routing, and
   Review Emphasis.
 - Use when: file splits, renames, module boundaries, dependency direction, or
   implementation replacement require a controlled refactor loop.
@@ -57,16 +57,13 @@ refactor は、[ソフトウェア工学原則](../../documents/conventions/soft
 [`SEP-09`](../../documents/conventions/software-engineering-principles.md#sep-09-evidence-bounded-complete-owning-unit)
 を直接参照します。
 
-refactor 固有の実行契約は、挙動保存を次の順で閉じます。
-
-1. `Behavior Contract`、semantic invariant、state / lifecycle owner、
-   root mechanism を実装前に固定します。
-2. dependency-expanded scope から、root mechanism と evidence-linked consumer、failure handling、
-   cleanup、migration、docs、tests、validation を含む replaceable unit を選びます。
-3. `Allowed Structural Delta` と `Forbidden Semantic Delta` を分け、move、rename、split、
-   abstraction変更の各差分が contract、failure semantics、lifecycle を保存することを確認します。
-4. 判断へ影響した `SEP-*` clause と task-specific evidence だけを packet / handoff に記録し、
-   canonical policy の checklist、negative receipt、原則別 checker は追加しません。
+挙動保存に必要な判断を、変更の依存関係に沿って閉じます。意味上の変更に
+先立って `Behavior Contract`、invariant、state / lifecycle owner、root mechanism
+を解決し、必要な範囲だけから replaceable unit を選びます。移動、rename、split、
+abstraction の変更があるときは、`Allowed Structural Delta` と
+`Forbidden Semantic Delta` を区別して契約、failure semantics、lifecycle を守ります。
+判断へ影響した `SEP-*` clause と evidence だけを既存 packet / handoff に記録します。
+これらの判断は dependency に従いますが、全タスクへ同じ調査・記録・実装順を要求しません。
 
 ## Validation route
 
@@ -76,23 +73,15 @@ refactor-loop は親 packet または変更後 responsibility graph が明示し
 だけを消費します。global/full rescan が未指定なら実行せず、`unexpected-action` または
 `unresolved-risk` として親へ返します。
 
-## 共有構造 refactor の実行順
+## 共有構造 refactor の依存順
 
-共有 module、canonical tool、親 repository、consumer projection が同じ
-topology を構成する refactor は、次の順序を正本とします。
-RC-09 の置換・廃止でも、変更によって影響する利用側はこの手順に含めます。
-
-1. user-facing consumer / parent が必要とする完成形を**設計**し、責務、API、
-   パス、所有境界を固定する。利用側コードを依存先より先に完成させる指示ではない。
-2. shared module / canonical source/tool と、その同時変更が必要な利用側を
-   一つの修正単位で更新する。生成元より先に projection を手書きしない。
-3. 別 repository の実行入力に source の公開 revision が必要なら、source 側の
-   単位を検証・公開してから、既存の pin / 解決規約で dependent を更新する。
-   具体的な順序は [cross-module resolution](dependency-analysis.md#conditional-cross-module-resolution) に従う。
-4. 影響する consumer / parent / projection と checker / CI を新契約へ移行し、
-   旧 topology の固定を削除する。
-5. 変更した source と、実際にその revision を使う利用側の検証を対応付け、
-   全体の完成を判定する。source の公開だけで利用側の移行済みとはしない。
+共有 source と consumers の変更が一つの topology をまたぐ場合、実在する
+dependency edge で作業を順序付けます。利用側が公開 source revision を必要とするときは、
+source の検証・公開後に既存 pin / 解決規約で dependent を更新します。生成 projection は
+canonical source から更新し、影響する consumer だけを新契約へ移行します。独立して検証できる
+consumer 作業は、write scope と source availability が衝突しない範囲で並行できます。
+具体的な cross-repository 順序は
+[cross-module resolution](dependency-analysis.md#conditional-cross-module-resolution) に従います。
 
 source 単位の検証・公開と、全体移行の完了は別です。未公開 source を必要とする
 利用側の実行成功を、その source の公開条件に戻してはいけません。同一 repository
@@ -166,11 +155,13 @@ the design trace before accepting a path or dependency-direction change.
 
 ## Shared-structure order
 
-For a refactor spanning a shared source and consumers: establish the target state,
-update the canonical source and inseparable consumers, publish the source revision
-when required, migrate remaining consumers, then validate the final connections.
-Source publication and consumer adoption remain separate claims. Keep dependent
-changes in one commit only when they cannot be validated independently.
+For a refactor spanning a shared source and consumers, use the dependency edges to
+order only the required changes: establish the target contract, update the canonical
+source and any inseparable consumers, publish when a dependent checkout requires that
+revision, then migrate and validate affected consumers. Source publication and
+consumer adoption remain separate claims. Independent consumers may proceed in
+parallel when their inputs and write scopes are ready; keep dependent changes in one
+commit only when they cannot be validated independently.
 
 ## Subagent Routing
 

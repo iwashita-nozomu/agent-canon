@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Decomposes an authorized DOCX reference into a searchable, auditable bundle.
-# upstream design ../README.md shared documentation-tool placement and ownership
-# downstream implementation ../../tests/tools/test_extract_docx.py tests the DOCX bundle contract
-# downstream design ../../documents/tools/extract_docx.md documents the bundle layout and CLI
+# upstream design ../../../../README.md shared documentation-tool placement and ownership
+# downstream implementation ../../../../tests/tools/test_extract_docx.py tests the DOCX bundle contract
+# downstream design ../../../../documents/tools/extract_docx.md documents the bundle layout and CLI
 # @dependency-end
 """Extract a DOCX file into a searchable and auditable reference bundle.
 

@@ -82,7 +82,7 @@ jobs:
           git init --bare "${candidate_bare}"
           git push "${candidate_bare}" HEAD:refs/heads/main
           git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main
-          git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"
+          git clone --no-local --branch main --single-branch "${candidate_bare}" "${candidate_source}"
 
       - name: Start one shared tool runtime
         id: start_runtime
@@ -99,6 +99,7 @@ jobs:
           "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
       - name: Run selected units in the shared runtime
+        id: run_units
         if: needs.select-static-units.outputs.units != ''
         env:
           SELECTED_UNITS: ${{ needs.select-static-units.outputs.units }}
@@ -119,6 +120,7 @@ jobs:
           mapfile -d '' -t docs_paths < "${RUNNER_TEMP}/agent-canon-docs-paths"
           IFS=',' read -r -a units <<< "${SELECTED_UNITS}"
           status=0
+          eval_unit_status=not-selected
           unit_index=0
           for unit in "${units[@]}"; do
             unit_index=$((unit_index + 1))
@@ -131,18 +133,28 @@ jobs:
             if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
               exec --root "${GITHUB_WORKSPACE}" -- bash \
               /opt/agent-canon/source/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}" "${args[@]}" > "${receipt}" 2>&1; then
+              if [[ "${unit}" == "eval" ]]; then
+                eval_unit_status=pass
+              fi
               printf 'unit=%s status=pass\n' "${unit}" >> "${GITHUB_STEP_SUMMARY}"
             else
               result=$?
+              if [[ "${unit}" == "eval" ]]; then
+                eval_unit_status=fail
+              fi
               printf 'unit=%s status=fail exit=%s\n' "${unit}" "${result}" >> "${GITHUB_STEP_SUMMARY}"
               status=1
             fi
             cat -- "${receipt}"
           done
+          printf 'eval_unit_status=%s\n' "${eval_unit_status}" >> "${GITHUB_OUTPUT}"
           exit "${status}"
 
       - name: Capture shared runtime validation output
         if: always() && steps.start_runtime.outcome == 'success'
+        env:
+          SELECTED_UNITS: ${{ needs.select-static-units.outputs.units }}
+          EVAL_UNIT_STATUS: ${{ steps.run_units.outputs.eval_unit_status }}
         run: |
           evidence="${RUNNER_TEMP}/agent-canon-static-evidence"
           mkdir -p "${evidence}"
@@ -152,6 +164,14 @@ jobs:
           # drift. Export data without starting a command or extracting paths.
           docker cp -- "${container}:/var/lib/agent-canon/runtime/tasks" - > "${evidence}/runtime-task-output.tar.part"
           mv -- "${evidence}/runtime-task-output.tar.part" "${evidence}/runtime-task-output.tar"
+          if [[ ",${SELECTED_UNITS}," == *,eval,* ]]; then
+            docker cp -- "${container}:/var/lib/agent-canon/runtime/eval-results" - > "${evidence}/runtime-eval-results.tar.part"
+            mv -- "${evidence}/runtime-eval-results.tar.part" "${evidence}/runtime-eval-results.tar"
+            if [[ "${EVAL_UNIT_STATUS}" == "fail" ]]; then
+              docker cp -- "${container}:/var/lib/agent-canon/runtime/eval/agent-canon-pr-gate" - > "${evidence}/runtime-eval-producer-logs.tar.part"
+              mv -- "${evidence}/runtime-eval-producer-logs.tar.part" "${evidence}/runtime-eval-producer-logs.tar"
+            fi
+          fi
 
       - name: Upload static validation evidence
         if: always() && steps.start_runtime.outcome == 'success'
