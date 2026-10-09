@@ -182,20 +182,34 @@ def _git_path(repo: Path, path: str) -> Path:
     return result if result.is_absolute() else repo / result
 
 
-def _is_linked_worktree(path: Path) -> bool:
+def _git_common_dir(path: Path) -> Path:
+    """Resolve the shared Git directory through the selected checkout."""
+    common_dir = Path(_run_git(path, ["rev-parse", "--git-common-dir"]).strip())
+    if not common_dir.is_absolute():
+        common_dir = path / common_dir
+    return common_dir.resolve(strict=False)
+
+
+def _is_linked_worktree(path: Path, *, anchor: Path | None = None) -> bool:
     """Use Git's common-dir relationship as the checkout-kind witness."""
     if not (path / ".git").is_file():
         return False
     try:
         git_dir = Path(_run_git(path, ["rev-parse", "--git-dir"]).strip())
-        common_dir = Path(_run_git(path, ["rev-parse", "--git-common-dir"]).strip())
+        common_dir = _git_common_dir(path)
         if not git_dir.is_absolute():
             git_dir = path / git_dir
-        if not common_dir.is_absolute():
-            common_dir = path / common_dir
     except GitCommandError:
         return False
-    return git_dir.resolve(strict=False) != common_dir.resolve(strict=False)
+    if git_dir.resolve(strict=False) == common_dir:
+        return False
+    if anchor is not None:
+        try:
+            if common_dir != _git_common_dir(anchor):
+                return False
+        except GitCommandError:
+            return False
+    return True
 
 
 def _ensure_worktree_config(path: Path) -> None:
@@ -711,7 +725,7 @@ def _inspect(
     owner_sha: str | None,
     require_clean: bool = True,
 ) -> CloneState:
-    """Read checkout identity; a digest enforces exact owner-evidence matching."""
+    """Read computed-path Git identity and cross-check recorded lifecycle markers."""
     if not path.exists():
         return CloneState(path, "absent")
     if not path.is_dir() or not _run_git_bool(
@@ -721,7 +735,7 @@ def _inspect(
     if _git_path(path, "MERGE_HEAD").exists() or _git_path(path, "MERGE_MSG").exists():
         return CloneState(path, "merge-conflict-preserve")
     if request.checkout_mode == CHECKOUT_MODE_LINKED:
-        if not _is_linked_worktree(path):
+        if not _is_linked_worktree(path, anchor=request.workspace_root):
             return CloneState(path, "checkout-mode-mismatch")
     elif _is_linked_worktree(path):
         return CloneState(path, "checkout-mode-mismatch")
@@ -743,6 +757,8 @@ def _inspect(
     except GitCommandError:
         return CloneState(path, "missing-remote")
     requested_url = _normalise_url(request.url)
+    if remote != requested_url:
+        return CloneState(path, "url-mismatch")
     canonical = _marker_values(
         path,
         MARKER_PREFIX,
@@ -754,11 +770,11 @@ def _inspect(
         MARKER_PREFIX,
         checkout_mode=request.checkout_mode,
     )
-    marker_branch = ""
+    marker_branch = request.branch
     if canonical_present:
         if not all(canonical.values()):
             return CloneState(path, "marker-incomplete")
-        if remote != requested_url or canonical["url"] != requested_url:
+        if canonical["url"] != requested_url:
             return CloneState(path, "url-mismatch")
         if canonical["repository"] != request.repository:
             return CloneState(path, "repository-mismatch")
@@ -768,8 +784,6 @@ def _inspect(
             return CloneState(path, "owner-evidence-mismatch")
         marker_branch = canonical["branch"]
     else:
-        if request.checkout_mode == CHECKOUT_MODE_LINKED:
-            return CloneState(path, "repository-mismatch")
         legacy = _marker_values(
             path,
             LEGACY_MARKER_PREFIX,
@@ -777,21 +791,16 @@ def _inspect(
             checkout_mode=request.checkout_mode,
         )
         if any(legacy.values()):
+            if request.checkout_mode == CHECKOUT_MODE_LINKED:
+                return CloneState(path, "repository-mismatch")
             if not all(legacy.values()):
                 return CloneState(path, "legacy-marker-incomplete")
-            remote_mismatch = remote != requested_url
             if (
                 owner_sha is None
-                or remote_mismatch
                 or not _legacy_marker_matches(legacy, request, owner_sha)
             ):
-                return CloneState(
-                    path,
-                    "url-mismatch" if remote_mismatch else "legacy-marker-mismatch",
-                )
+                return CloneState(path, "legacy-marker-mismatch")
             marker_branch = legacy["branch"]
-        else:
-            return CloneState(path, "repository-mismatch")
     try:
         actual_branch = _run_git(
             path, ["symbolic-ref", "--quiet", "--short", "HEAD"]
@@ -1262,14 +1271,6 @@ def request(
                 "prepare collision: current writer target identity mismatch"
             ) from exc
     writer_target_packet: Path | None = None
-    if (
-        checkout_identity["remote"] != "unknown"
-        and not request_state.allowed_paths
-        and packet_target is None
-    ):
-        raise RepositoryTopicCloneError(
-            "writer_target_allowed_paths_required:forward explicit allowed_paths"
-        )
     writer_target: WriterTarget | None = None
     if checkout_identity["remote"] != "unknown" and request_state.allowed_paths:
         writer_target = WriterTarget(
@@ -1405,7 +1406,7 @@ def finalize_merge_main(
     if not clone.is_dir() or not (clone / ".git").exists():
         raise RepositoryTopicCloneError("merge-finalize hold: clone is unavailable")
     if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
-        if not _is_linked_worktree(clone):
+        if not _is_linked_worktree(clone, anchor=request_state.workspace_root):
             raise RepositoryTopicCloneError(
                 "merge-finalize hold: checkout mode mismatch"
             )

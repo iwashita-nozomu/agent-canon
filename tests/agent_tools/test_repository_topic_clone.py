@@ -488,6 +488,211 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
     assert updated.allowed_paths == ("src/owned.py", "tests/test_owned.py")
 
 
+def test_prepare_allows_source_discovery_without_writer_scope_then_materializes_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reader preparation can be reused when the actual write scope is known."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-discovery-before-scope",
+        workspace_root=workspace,
+        topic="topic-discovery-before-scope",
+        branch="feature/discovery-before-scope",
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+
+    discovered = rtc.request(**request)
+    marker_sha = run_git(
+        discovered.clone,
+        "config",
+        "--worktree",
+        "--get",
+        f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+    )
+    packet_path = discovered.clone / rtc.WRITER_TARGET_PACKET_RELATIVE
+    assert discovered.writer_target_packet is None
+    assert not packet_path.exists()
+    assert marker_sha == rtc._evidence_sha256(evidence)
+    assert not run_git(discovered.clone, "status", "--porcelain")
+
+    index_path = git_metadata_path(discovered.clone, "index")
+    config_path = git_metadata_path(discovered.clone, "config.worktree")
+    before_index = index_path.read_bytes()
+    before_config = config_path.read_bytes()
+    before_files = snapshot_checkout_files(discovered.clone)
+    before_head = run_git(discovered.clone, "rev-parse", "HEAD")
+    before_branch = run_git(discovered.clone, "symbolic-ref", "--short", "HEAD")
+
+    writable = rtc.request(
+        **request, allowed_paths=("agents/skills/README.md",)
+    )
+    target, _identity = read_writer_target_packet(writable.clone)
+
+    assert writable.clone == discovered.clone
+    assert writable.request.allowed_paths == ("agents/skills/README.md",)
+    assert target.allowed_paths == ("agents/skills/README.md",)
+    assert writable.writer_target_packet == packet_path
+    assert snapshot_checkout_files(writable.clone) == before_files
+    assert index_path.read_bytes() == before_index
+    assert config_path.read_bytes() == before_config
+    assert run_git(writable.clone, "rev-parse", "HEAD") == before_head
+    assert run_git(writable.clone, "symbolic-ref", "--short", "HEAD") == before_branch
+    assert not run_git(writable.clone, "status", "--porcelain")
+
+
+def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A clean unmarked native worktree is identified by its path and Git facts."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-unmarked-linked",
+        workspace_root=workspace,
+        topic="topic-unmarked-linked",
+        branch="feature/unmarked-linked",
+        owner_evidence=evidence,
+        allowed_paths=("agents/skills/README.md",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    clone = (
+        workspace
+        / "workspace"
+        / rtc.topic_slug(request["topic"])
+        / request["repository"]
+    )
+    clone.parent.mkdir(parents=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(workspace),
+            "worktree",
+            "add",
+            "-b",
+            request["branch"],
+            str(clone),
+            "main",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(clone, "config", "extensions.worktreeConfig", "true")
+    packet_path = clone / rtc.WRITER_TARGET_PACKET_RELATIVE
+    config_path = git_metadata_path(clone, "config.worktree")
+    index_path = git_metadata_path(clone, "index")
+    before_index = index_path.read_bytes()
+    before_files = snapshot_checkout_files(clone)
+    before_head = run_git(clone, "rev-parse", "HEAD")
+    assert not config_path.exists()
+    assert not packet_path.exists()
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="actual-branch-mismatch"
+    ):
+        rtc.request(**{**request, "branch": "feature/unmatched"})
+
+    assert not config_path.exists()
+    assert not packet_path.exists()
+    assert index_path.read_bytes() == before_index
+    assert snapshot_checkout_files(clone) == before_files
+
+    prepared = rtc.request(**request)
+    target, _identity = read_writer_target_packet(prepared.clone)
+
+    assert prepared.clone == clone
+    assert target.allowed_paths == request["allowed_paths"]
+    assert config_path.is_file()
+    assert (
+        run_git(
+            clone,
+            "config",
+            "--worktree",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.branch",
+        )
+        == request["branch"]
+    )
+    assert run_git(clone, "rev-parse", "HEAD") == before_head
+    assert index_path.read_bytes() == before_index
+    assert snapshot_checkout_files(clone) == before_files
+    assert not run_git(clone, "status", "--porcelain")
+
+
+def test_prepare_holds_unmarked_linked_worktree_from_foreign_common_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Matching branch and remote do not adopt a worktree registered elsewhere."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    foreign_workspace = tmp_path / "foreign-parent"
+    init_workspace_parent(foreign_workspace)
+    run_git(foreign_workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-foreign-common-dir",
+        workspace_root=workspace,
+        topic="topic-foreign-common-dir",
+        branch="feature/foreign-common-dir",
+        owner_evidence=evidence,
+        allowed_paths=("agents/skills/README.md",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    clone = (
+        workspace
+        / "workspace"
+        / rtc.topic_slug(request["topic"])
+        / request["repository"]
+    )
+    clone.parent.mkdir(parents=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(foreign_workspace),
+            "worktree",
+            "add",
+            "-b",
+            request["branch"],
+            str(clone),
+            "main",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(clone, "config", "extensions.worktreeConfig", "true")
+    before_status = run_git(clone, "status", "--porcelain")
+    assert not before_status
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="checkout-mode-mismatch"
+    ):
+        rtc.request(**request)
+
+    assert clone.is_dir()
+    assert run_git(clone, "symbolic-ref", "--short", "HEAD") == request["branch"]
+    assert run_git(clone, "status", "--porcelain") == before_status
+    assert not (clone / rtc.WRITER_TARGET_PACKET_RELATIVE).exists()
+
+
 def test_merge_main_keeps_dirty_independent_checkout_hold_after_metadata_refresh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -755,7 +960,7 @@ def test_linked_foreign_occupant_does_not_mutate_common_git_state(
     before_worktrees = run_git(workspace, "worktree", "list", "--porcelain")
     before_refs = run_git(workspace, "show-ref")
 
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="repository-mismatch"):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="actual-branch-mismatch"):
         rtc.request(
             remote_url,
             "repo-foreign",
