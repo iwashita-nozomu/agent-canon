@@ -217,7 +217,9 @@ def render_validation_failure_response(item: dict[str, object]) -> str:
     return "".join(output).rstrip() + "\n"
 
 
-def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_link: str) -> str:
+def bridge_inventory_to_markdown(
+    inventory: dict[str, object], inventory_rel_link: str
+) -> str:
     """Render the full runtime profile inventory Markdown document."""
     title = require_string(inventory.get("title"), "inventory.title")
     summary = require_string_list(inventory.get("summary"), "inventory.summary")
@@ -275,15 +277,21 @@ def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_lin
 
     output.append("## Risk Classes\n\n")
     risk_rows = collect_risk_class_rows(risk_classes)
-    output.append(render_table(["Risk", "Examples", "Required validation"], risk_rows) + "\n")
+    output.append(
+        render_table(["Risk", "Examples", "Required validation"], risk_rows) + "\n"
+    )
 
     output.append(render_paragraph(risk_note) + "\n")
 
-    output.append(render_validation_failure_response(validation_failure_response) + "\n")
+    output.append(
+        render_validation_failure_response(validation_failure_response) + "\n"
+    )
 
     output.append("## Check Matrix\n\n")
     check_rows = collect_check_matrix_rows(check_matrix)
-    output.append(render_table(["Changed surface", "Required check"], check_rows) + "\n")
+    output.append(
+        render_table(["Changed surface", "Required check"], check_rows) + "\n"
+    )
 
     output.append("## Closeout Rule\n\n")
     output.append(render_paragraph(closeout_rule))
@@ -308,9 +316,7 @@ def main() -> int:
         if current != rendered:
             print("RUNTIME_PROFILE_INVENTORY_DOC=drift")
             print(f"Rendered doc differs from {doc_path}.")
-            print(
-                f"Run: python3 {Path(__file__).as_posix()} --write --doc {doc_path}"
-            )
+            print(f"Run: python3 {Path(__file__).as_posix()} --write --doc {doc_path}")
             return 1
         print("RUNTIME_PROFILE_INVENTORY_DOC=pass")
         return 0

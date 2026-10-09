@@ -58,9 +58,7 @@ def materialize_generated_completeness_receipt(
     check_results: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
     """Materialize G2 only from the exact ordered passing owner checks."""
-    g1 = validate_gate_chain(
-        [g1_gate], expected_gate_ids=("G1",), require_pass=True
-    )[0]
+    g1 = validate_gate_chain([g1_gate], expected_gate_ids=("G1",), require_pass=True)[0]
     binding = cast(Mapping[str, object], g1["binding"])
     if binding["candidate_sha"] != candidate_sha or binding["tree_sha"] != tree_sha:
         raise ValueError("generated_completeness:candidate_identity_mismatch")
@@ -73,7 +71,10 @@ def materialize_generated_completeness_receipt(
         if not isinstance(check_id, str) or not isinstance(status, str):
             raise ValueError("generated_completeness:check_result_invalid")
         normalized.append({"check_id": check_id, "status": status})
-    if tuple(item["check_id"] for item in normalized) != GENERATED_COMPLETENESS_CHECK_IDS:
+    if (
+        tuple(item["check_id"] for item in normalized)
+        != GENERATED_COMPLETENESS_CHECK_IDS
+    ):
         raise ValueError("generated_completeness:check_order_invalid")
     if any(item["status"] != "pass" for item in normalized):
         raise ValueError("generated_completeness:check_not_passed")
@@ -140,9 +141,7 @@ def _persist(
         return dict(receipt)
     target = boundary.resolve(path)
     if target.is_file():
-        existing = validate_gate_verdict(
-            json.loads(target.read_text(encoding="utf-8"))
-        )
+        existing = validate_gate_verdict(json.loads(target.read_text(encoding="utf-8")))
         validate_immutable_replay(existing, receipt, field=str(path))
         return existing
     boundary.atomic_write_bytes(
@@ -180,7 +179,9 @@ def main() -> int:
         runtime = runtime_artifact_boundary(source_root, args.runtime_root, create=True)
     except (OSError, RuntimeError) as error:
         parser.error(f"external boundary rejected: {type(error).__name__}")
-    output_root = (args.output or runtime.root / "tasks" / "g2.generated-completeness.json").resolve()
+    output_root = (
+        args.output or runtime.root / "tasks" / "g2.generated-completeness.json"
+    ).resolve()
     try:
         output_root.relative_to(runtime.root)
     except ValueError as exc:
@@ -201,9 +202,9 @@ def main() -> int:
         if not isinstance(value, dict):
             raise SystemExit("agent_canon_pr_gate_bundle:gate_verdict_invalid")
         gate_values.append(cast(Mapping[str, object], value))
-    g1 = validate_gate_chain(
-        gate_values, expected_gate_ids=("G1",), require_pass=True
-    )[0]
+    g1 = validate_gate_chain(gate_values, expected_gate_ids=("G1",), require_pass=True)[
+        0
+    ]
     g1_binding = cast(Mapping[str, object], g1["binding"])
     transaction_id = cast(str, g1_binding["transaction_id"])
     output = args.output or (

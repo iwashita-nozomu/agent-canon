@@ -16,11 +16,27 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.validation.semantic.runtime import check_runtime_profile_inventory as profile_checker
+from tools.validation.semantic.runtime import (
+    check_runtime_profile_inventory as profile_checker,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECK_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "runtime" / "check_runtime_profile_inventory.py"
-RENDER_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "documentation" / "formatting" / "render_runtime_profile_inventory.py"
+CHECK_SCRIPT = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "runtime"
+    / "check_runtime_profile_inventory.py"
+)
+RENDER_SCRIPT = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "documentation"
+    / "formatting"
+    / "render_runtime_profile_inventory.py"
+)
 
 
 def write_minimal_inventory(path: Path) -> None:
@@ -148,9 +164,19 @@ class RuntimeProfileInventoryCheckTest(unittest.TestCase):
         verifies path resolution and does not turn a pending generated-doc
         refresh into a source-runtime side effect or an unrelated failure.
         """
-        self.assertEqual(profile_checker.DEFAULT_INVENTORY, PROJECT_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.json")
-        self.assertEqual(profile_checker.DEFAULT_DOC, PROJECT_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.md")
-        self.assertEqual(profile_checker.RENDER_SCRIPT, PROJECT_ROOT / "tools/validation/documentation/formatting/render_runtime_profile_inventory.py")
+        self.assertEqual(
+            profile_checker.DEFAULT_INVENTORY,
+            PROJECT_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.json",
+        )
+        self.assertEqual(
+            profile_checker.DEFAULT_DOC,
+            PROJECT_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.md",
+        )
+        self.assertEqual(
+            profile_checker.RENDER_SCRIPT,
+            PROJECT_ROOT
+            / "tools/validation/documentation/formatting/render_runtime_profile_inventory.py",
+        )
 
     def test_fails_when_doc_drifts(self) -> None:
         """Fail with a diff when the checked document drifts."""

@@ -64,8 +64,12 @@ class StructuredDocumentInventoryCliTest(unittest.TestCase):
             ),
             findings,
         )
-        self.assertNotIn(("documents/missing-header.md", "missing_dependency_manifest"), findings)
-        self.assertIn(("documents/duplicate-b.md", "duplicate_heading_candidate"), findings)
+        self.assertNotIn(
+            ("documents/missing-header.md", "missing_dependency_manifest"), findings
+        )
+        self.assertIn(
+            ("documents/duplicate-b.md", "duplicate_heading_candidate"), findings
+        )
         self.assertIn("Non-Canonical Document Inventory", markdown_text)
 
     def test_fail_on_findings_accepts_a_headerless_document(self) -> None:

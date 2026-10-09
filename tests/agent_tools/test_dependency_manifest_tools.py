@@ -24,15 +24,49 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCAN = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh"
-FORMAT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_header_format.sh"
-GRAPH = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "check_dependency_graph.sh"
-REPO_REVIEW = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "run_repo_dependency_review.sh"
-CODE_SCAN = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "scan_code_dependencies.sh"
-DESIGN_CLAIMS = PROJECT_ROOT / "tools" / "validation" / "semantic" / "documents" / "check_design_doc_claims.py"
-WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
+SCAN = (
+    PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh"
+)
+FORMAT = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "dependencies"
+    / "check_dependency_header_format.sh"
+)
+GRAPH = (
+    PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "check_dependency_graph.sh"
+)
+REPO_REVIEW = (
+    PROJECT_ROOT
+    / "tools"
+    / "analysis"
+    / "dependencies"
+    / "run_repo_dependency_review.sh"
+)
+CODE_SCAN = (
+    PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "scan_code_dependencies.sh"
+)
+DESIGN_CLAIMS = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "documents"
+    / "check_design_doc_claims.py"
+)
+WORKFLOW_MONITOR = (
+    PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
+)
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "agent_team.py"
-DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "validation" / "dependencies" / "docker_dependency_validator.sh"
+DOCKER_VALIDATOR = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "dependencies"
+    / "docker_dependency_validator.sh"
+)
 
 
 def runtime_root_for(root: Path) -> Path:
@@ -169,7 +203,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
             payload = json.loads(analysis.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema_version"], "agent-canon.lsp-code-analysis.v1")
+            self.assertEqual(
+                payload["schema_version"], "agent-canon.lsp-code-analysis.v1"
+            )
             self.assertEqual(payload["lifecycle"]["state"], "lexical-only")
 
     def test_code_scan_default_uses_lsp_and_fails_closed(self) -> None:
@@ -260,7 +296,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             args_file = root / "lsp-args.txt"
             fake_python = fake_bin / "python3"
             fake_python.write_text(
-                "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$SCAN_ARGS_FILE\"\n",
+                '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$SCAN_ARGS_FILE"\n',
                 encoding="utf-8",
             )
             os.chmod(fake_python, 0o755)
@@ -320,7 +356,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(result.stdout.strip(), "CODE_DEPENDENCY_SCAN=pass files=1")
             legacy_rows = [
-                line for line in result.stdout.splitlines() if line.startswith("CODE_DEPENDENCY\t")
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("CODE_DEPENDENCY\t")
             ]
             self.assertFalse(legacy_rows)
             self.assertTrue(all(len(line.split("\t")) == 7 for line in legacy_rows))
@@ -328,7 +366,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(payload["status"], "complete")
             self.assertEqual(payload["files"], ["main.rs"])
             self.assertTrue(payload["lexical_candidates"])
-            self.assertTrue(any(item["token"] == "helper" for item in payload["lexical_candidates"]))
+            self.assertTrue(
+                any(item["token"] == "helper" for item in payload["lexical_candidates"])
+            )
 
     def test_scan_accepts_large_file_with_manifest_markers_near_top(self) -> None:
         """Early marker matches in large files must not trip pipefail/SIGPIPE."""
@@ -813,12 +853,20 @@ class DependencyManifestToolTest(unittest.TestCase):
             container_tools = root / "tools" / "runtime" / "container"
             container_tools.mkdir(parents=True)
             (container_tools / "devcontainer_dependencies.py").symlink_to(
-                PROJECT_ROOT / "tools" / "runtime" / "container" / "devcontainer_dependencies.py"
+                PROJECT_ROOT
+                / "tools"
+                / "runtime"
+                / "container"
+                / "devcontainer_dependencies.py"
             )
             dependency_tools = root / "tools" / "analysis" / "dependencies"
             dependency_tools.mkdir(parents=True)
             (dependency_tools / "dependency_plan.py").symlink_to(
-                PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "dependency_plan.py"
+                PROJECT_ROOT
+                / "tools"
+                / "analysis"
+                / "dependencies"
+                / "dependency_plan.py"
             )
             manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"
             manifest.parent.mkdir(parents=True)
@@ -904,12 +952,16 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
-    def test_format_expands_generated_skill_glob_without_materialized_views(self) -> None:
+    def test_format_expands_generated_skill_glob_without_materialized_views(
+        self,
+    ) -> None:
         """Strict format validation checks registry owners instead of ignored shims."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "documents" / "design").mkdir(parents=True)
-            (root / "documents" / "design" / "dependency-contract-kinds.toml").write_text(
+            (
+                root / "documents" / "design" / "dependency-contract-kinds.toml"
+            ).write_text(
                 'allowed_kinds = [\n  "test"\n]\n',
                 encoding="utf-8",
             )
@@ -960,7 +1012,9 @@ class DependencyManifestToolTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "documents" / "design").mkdir(parents=True)
-            (root / "documents" / "design" / "dependency-contract-kinds.toml").write_text(
+            (
+                root / "documents" / "design" / "dependency-contract-kinds.toml"
+            ).write_text(
                 'allowed_kinds = [\n  "test"\n]\n',
                 encoding="utf-8",
             )
@@ -1042,7 +1096,9 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
+            result = run_tool(
+                str(FORMAT), "--root", str(root), str(workflow), root=root
+            )
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("dependency target escapes repository root", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
@@ -1475,7 +1531,14 @@ class DependencyManifestToolTest(unittest.TestCase):
                 / "PULL_REQUEST_TEMPLATE"
                 / "agent_canon.md"
             )
-            issue_readme = root / "vendor" / "agent-canon" / "documents" / "runtime" / "private-feedback-knowledge.md"
+            issue_readme = (
+                root
+                / "vendor"
+                / "agent-canon"
+                / "documents"
+                / "runtime"
+                / "private-feedback-knowledge.md"
+            )
             root_copy.parent.mkdir(parents=True)
             source_copy.parent.mkdir(parents=True)
             issue_readme.parent.mkdir(parents=True)
@@ -2868,25 +2931,43 @@ class DependencyManifestToolTest(unittest.TestCase):
     def test_graph_ensure_fails_closed_for_build_or_readback_failure(self) -> None:
         """Build failure and non-fresh readback stay closed."""
         cases = (
-            ([
-                ("stale", 2, "source_changed", "source_changed"),
-            ], 3, "GRAPH_REBUILD=failed rc=3", True),
-            ([
-                ("stale", 2, "source_changed", "source_changed"),
-                ("stale", 2, "source_changed", "source_changed"),
-            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
-            ([
-                ("stale", 2, "source_changed", "source_changed"),
-                (
-                    "stale",
-                    2,
-                    "persisted_readback_mismatch",
-                    "persisted_readback_mismatch",
-                ),
-            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
+            (
+                [
+                    ("stale", 2, "source_changed", "source_changed"),
+                ],
+                3,
+                "GRAPH_REBUILD=failed rc=3",
+                True,
+            ),
+            (
+                [
+                    ("stale", 2, "source_changed", "source_changed"),
+                    ("stale", 2, "source_changed", "source_changed"),
+                ],
+                0,
+                "REPO_DEPENDENCY_REVIEW=fail",
+                True,
+            ),
+            (
+                [
+                    ("stale", 2, "source_changed", "source_changed"),
+                    (
+                        "stale",
+                        2,
+                        "persisted_readback_mismatch",
+                        "persisted_readback_mismatch",
+                    ),
+                ],
+                0,
+                "REPO_DEPENDENCY_REVIEW=fail",
+                True,
+            ),
         )
         for statuses, build_exit, expected, build_expected in cases:
-            with self.subTest(statuses=statuses, build_exit=build_exit), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(statuses=statuses, build_exit=build_exit),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 result = self.run_graph_ensure_fixture(
                     Path(tmp_dir), statuses, build_exit
                 )

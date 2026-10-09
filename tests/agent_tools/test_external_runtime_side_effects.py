@@ -11,8 +11,16 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
-REVIEW_SCAN = PROJECT_ROOT / "tools" / "repository" / "github" / "review_backlog_scan.sh"
-DEPENDENCY_REVIEW = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "run_repo_dependency_review.sh"
+REVIEW_SCAN = (
+    PROJECT_ROOT / "tools" / "repository" / "github" / "review_backlog_scan.sh"
+)
+DEPENDENCY_REVIEW = (
+    PROJECT_ROOT
+    / "tools"
+    / "analysis"
+    / "dependencies"
+    / "run_repo_dependency_review.sh"
+)
 
 from tools.validation.ci.runners import container_runtime
 
@@ -112,7 +120,9 @@ def test_search_index_requires_and_uses_external_runtime(tmp_path: Path) -> None
     assert list(runtime.rglob("semantic-cards.jsonl"))
 
 
-def test_container_lifecycle_receipt_is_external(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_container_lifecycle_receipt_is_external(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Container receipts do not use a source checkout fallback."""
     control = tmp_path / "control"
     source = control / "repo"
