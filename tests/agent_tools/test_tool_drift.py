@@ -192,14 +192,20 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_convention_contract(root)
-            tool = root / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py"
+            tool = (
+                root
+                / "tools"
+                / "validation"
+                / "semantic"
+                / "convention"
+                / "check_convention_compliance.py"
+            )
             tool.write_text(
                 "\n".join(
                     [
                         "# @dependency-start",
                         "# responsibility Checks convention compliance.",
                         "# upstream design ../../documents/conventions/README.md conventions",
-                        "# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml evals",
                         "# upstream design ../../templates/agents/closeout_gate.md closeout",
                         "# upstream implementation ../ci/run_all_checks.sh ci",
                         "# upstream implementation ./tool_drift.py drift gate",
@@ -336,7 +342,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     with tempfile.TemporaryDirectory() as tmp_dir:
                         root = Path(tmp_dir)
                         self.write_agent_canon_pr_contract(root)
-                        script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+                        script = (
+                            root
+                            / "tools"
+                            / "validation"
+                            / "ci"
+                            / "checks"
+                            / "check_agent_canon_pr.sh"
+                        )
                         malformed = script.read_text(encoding="utf-8").replace(
                             canonical_command,
                             command_prefix + suffix + f"  {command_tail}",
@@ -360,7 +373,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+            script = (
+                root
+                / "tools"
+                / "validation"
+                / "ci"
+                / "checks"
+                / "check_agent_canon_pr.sh"
+            )
             text = script.read_text(encoding="utf-8").replace(
                 'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\\n',
                 "",
@@ -382,7 +402,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
+            script = (
+                root
+                / "tools"
+                / "validation"
+                / "ci"
+                / "checks"
+                / "check_agent_canon_pr.sh"
+            )
             text = script.read_text(encoding="utf-8").replace(
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"\n',
                 "",
@@ -600,7 +627,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagents",
                     "# upstream design ../../../../agents/TASK_WORKFLOWS.md workflows",
                     "# upstream design ../../../../agents/skills/agent-orchestration.md orchestration",
-                    "# upstream design ../../../../eval/definitions/skill_workflow_prompt_eval.toml evals",
                     "# upstream design ../../../../templates/agents/closeout_gate.md closeout",
                     "# upstream implementation ../../../ci/run_all_checks.sh ci",
                     "# upstream implementation ../tools/tool_drift.py drift gate",
@@ -615,7 +641,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "agents/canonical/CODEX_SUBAGENTS.md",
             "agents/TASK_WORKFLOWS.md",
             "agents/skills/agent-orchestration.md",
-            "eval/definitions/skill_workflow_prompt_eval.toml",
             "templates/agents/closeout_gate.md",
             "tools/validation/ci/runners/run_all_checks.sh",
             "tools/validation/semantic/tools/tool_drift.py",
@@ -635,7 +660,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents",
                     "# upstream design ../../agents/TASK_WORKFLOWS.md workflows",
                     "# upstream design ../../agents/skills/agent-orchestration.md orchestration",
-                    "# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml evals",
                     "# upstream implementation ./check_convention_compliance.py convention gate",
                     "# downstream implementation ../../tests/agent_tools/test_tool_drift.py tests",
                     "# @dependency-end",
@@ -669,11 +693,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     ]
                 ),
             )
-        self.write_file(
-            root,
-            "eval/definitions/skill_workflow_prompt_eval.toml",
-            "VERTICAL-WAVE-POLICY ORCH-SHIM-POINTER-1 ORCH-SHIM-TOOLCALL-1\n",
-        )
         self.write_file(
             root,
             "tests/agent_tools/test_tool_drift.py",
@@ -750,7 +769,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../templates/documents/github/pull-request/agent_canon.md template checklist",
                     "# upstream implementation ../agent_tools/run_accumulated_agent_evals.py accumulated evals",
                     "# upstream implementation ../agent_tools/generated_artifact_guard.py generated artifact guard",
-                    "# upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py prompt eval",
                     "# upstream implementation ../agent_tools/check_agent_runtime_alignment.py runtime alignment",
                     "# upstream implementation ../agent_tools/check_convention_compliance.py convention gate",
                     "# upstream implementation ./check_github_workflows.py github checks",
@@ -758,7 +776,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
-                    "python3 eval/producers/evaluate_skill_workflow_prompts.py --manifest eval/definitions/skill_workflow_prompt_eval.toml",
                     "SHARED_SURFACE_STATUS=not_applicable_standalone_source",
                     "",
                 ]
@@ -771,7 +788,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "templates/documents/github/pull-request/agent_canon.md",
             "eval/producers/run_accumulated_agent_evals.py",
             "tools/runtime/artifacts/generated_artifact_guard.py",
-            "eval/producers/evaluate_skill_workflow_prompts.py",
             "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
             "tools/validation/semantic/convention/check_convention_compliance.py",
             "tools/validation/ci/checks/check_github_workflows.py",

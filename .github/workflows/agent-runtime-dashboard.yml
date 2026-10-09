@@ -6,6 +6,8 @@
 # upstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated evidence
 # upstream implementation ../../eval/producers/run_accumulated_agent_evals.py produces accumulated eval evidence
 # upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py renders dashboard artifact
+# upstream implementation ../../tools/catalog.yaml registers the dashboard producer route
+# upstream implementation ../../bootstrap/host/lifecycle/entrypoint.sh exports dashboard reports from the named runtime volume
 # upstream implementation ../../tools/runtime/source/agent_canon_source_root.py resolves the canonical Graph CLI
 # @dependency-end
 
@@ -27,78 +29,194 @@ concurrency:
 jobs:
   dashboard:
     runs-on: ubuntu-latest
-    env:
-      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
-      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
     steps:
-      - name: PR required-check compatibility
-        if: github.event_name == 'pull_request'
-        run: echo "Runtime dashboard generation is intentionally skipped for pull requests."
-
       - name: Checkout repository
-        if: github.event_name != 'pull_request'
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Setup Python
-        if: github.event_name != 'pull_request'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dashboard dependencies
-        if: github.event_name != 'pull_request'
-        run: python3 -m pip install --upgrade pyyaml tomli
+      - name: Stage checked-out candidate and evidence roots
+        id: candidate
+        run: |
+          set -euo pipefail
+          suffix="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          candidate_bare="${RUNNER_TEMP}/agent-canon-dashboard-${suffix}.git"
+          candidate_source="${RUNNER_TEMP}/agent-canon-dashboard-${suffix}"
+          control_parent_root="${RUNNER_TEMP}/agent-canon-dashboard-control-${suffix}"
+          evidence_root="${control_parent_root}/agent-runtime-dashboard-evidence"
+          export_root="${control_parent_root}/agent-runtime-dashboard-export"
+          dashboard_run_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf 'AGENT_CANON_CANDIDATE_BARE=%s\n' "${candidate_bare}" >> "${GITHUB_ENV}"
+          printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\n' "${candidate_source}" >> "${GITHUB_ENV}"
+          printf 'AGENT_CANON_CONTROL_PARENT_ROOT=%s\n' "${control_parent_root}" >> "${GITHUB_ENV}"
+          printf 'AGENT_CANON_DASHBOARD_EVIDENCE_ROOT=%s\n' "${evidence_root}" >> "${GITHUB_ENV}"
+          printf 'AGENT_CANON_DASHBOARD_EXPORT_ROOT=%s\n' "${export_root}" >> "${GITHUB_ENV}"
+          printf 'AGENT_CANON_DASHBOARD_RUN_ID=%s\n' "${dashboard_run_id}" >> "${GITHUB_ENV}"
+          mkdir -p -- "${evidence_root}"
+          git init --bare "${candidate_bare}"
+          git push "${candidate_bare}" HEAD:refs/heads/main
+          git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main
+          git clone --no-local --branch main --single-branch "${candidate_bare}" "${candidate_source}"
 
       - name: Start shared tool runtime
-        if: github.event_name != 'pull_request'
+        id: runtime
         run: |
           set -euo pipefail
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
-
-      - name: Build and read back canonical graph
-        if: github.event_name != 'pull_request'
-        run: |
-          set -euo pipefail
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph build --root . --profile default --format json
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph status --root . --profile default --format json
+          run_logged() {
+            local name=$1 status
+            shift
+            if "$@" >"${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/${name}.log" 2>&1; then
+              cat -- "${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/${name}.log"
+            else
+              status=$?
+              cat -- "${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/${name}.log"
+              return "${status}"
+            fi
+          }
+          key_log="${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/runtime-image-key.log"
+          if key="$(bash "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap/container/image/digest.sh" "${AGENT_CANON_CANDIDATE_SOURCE}" 2>"${key_log}")"; then
+            cat -- "${key_log}"
+          else
+            status=$?
+            cat -- "${key_log}"
+            exit "${status}"
+          fi
+          image="ghcr.io/${GITHUB_REPOSITORY}:env-${key}"
+          if docker buildx imagetools inspect "${image}" \
+            >"${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/runtime-image-inspect.log" 2>&1; then
+            run_logged runtime-install "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+              --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+              install
+          else
+            run_logged runtime-local-build "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+              --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+              update --local-build
+          fi
+          run_logged runtime-start "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+            --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            start
+          run_logged runtime-target "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+            --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
       - name: Run accumulated eval producers
         if: github.event_name != 'pull_request'
         run: |
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+          set -euo pipefail
+          log="${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/eval-collect.log"
+          if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+            --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
             eval collect --root "${GITHUB_WORKSPACE}" \
-            --run-id "agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --run-id "agent-runtime-dashboard-${AGENT_CANON_DASHBOARD_RUN_ID}" \
+            >"${log}" 2>&1; then
+            cat -- "${log}"
+          else
+            status=$?
+            cat -- "${log}"
+            exit "${status}"
+          fi
 
       - name: Generate runtime dashboard
-        if: github.event_name != 'pull_request'
         id: dashboard
+        if: always() && steps.runtime.outcome == 'success'
         run: |
-          report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-runtime-dashboard")"
-          mkdir -p "${report_dir}"
-          dashboard_path="${report_dir}/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
-          container_dashboard="/var/lib/agent-canon/runtime/reports/agent-runtime-dashboard/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
-            exec --root "${GITHUB_WORKSPACE}" -- python3 \
-            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
-            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_dashboard}"
+          set -euo pipefail
+          container_dashboard="/var/lib/agent-canon/runtime/reports/agent-runtime-dashboard/agent-runtime-dashboard-${AGENT_CANON_DASHBOARD_RUN_ID}.md"
+          log="${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/dashboard-generate.log"
+          if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+            --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            tool run --root "${GITHUB_WORKSPACE}" generate-agent-runtime-dashboard -- \
+            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_dashboard}" \
+            >"${log}" 2>&1; then
+            cat -- "${log}"
+          else
+            status=$?
+            cat -- "${log}"
+            exit "${status}"
+          fi
+          export_log="${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/dashboard-export.log"
+          if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+            --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            tool export dashboard --destination "${AGENT_CANON_DASHBOARD_EXPORT_ROOT}" \
+            --run-id "${AGENT_CANON_DASHBOARD_RUN_ID}" >"${export_log}" 2>&1; then
+            cat -- "${export_log}"
+          else
+            status=$?
+            cat -- "${export_log}"
+            exit "${status}"
+          fi
+          dashboard_path="${AGENT_CANON_DASHBOARD_EXPORT_ROOT}/agent-runtime-dashboard-${AGENT_CANON_DASHBOARD_RUN_ID}.md"
+          [[ -s "${dashboard_path}" && ! -L "${dashboard_path}" ]]
           cat "${dashboard_path}" >> "${GITHUB_STEP_SUMMARY}"
-          echo "dashboard_path=${dashboard_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and read back canonical graph
+        if: always() && steps.runtime.outcome == 'success' && github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          build_log="${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/graph-build.log"
+          if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+            --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph build \
+            --root . --profile default --format json >"${build_log}" 2>&1; then
+            cat -- "${build_log}"
+          else
+            status=$?
+            cat -- "${build_log}"
+            exit "${status}"
+          fi
+          graph_status_log="${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/graph-status.log"
+          if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+            --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph status \
+            --root . --profile default --format json >"${graph_status_log}" 2>&1; then
+            cat -- "${graph_status_log}"
+          else
+            status=$?
+            cat -- "${graph_status_log}"
+            exit "${status}"
+          fi
+
+      - name: Capture shared runtime task output
+        if: always() && steps.runtime.outcome == 'success'
+        run: |
+          set -euo pipefail
+          status_path="${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/runtime-status.json"
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" \
+            --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
+            status >"${status_path}"
+          container="$(jq -er 'select(.schema == "agent-canon.bootstrap-receipt.v2" and .status == "ok" and .operation == "status") | .container | select(.drift == false) | select(.health | type == "string" and length > 0 and . != "absent") | .name | select(type == "string" and length > 0)' "${status_path}")"
+          docker cp -- "${container}:/var/lib/agent-canon/runtime/tasks" - \
+            >"${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/runtime-task-output.tar.part"
+          mv -- "${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/runtime-task-output.tar.part" \
+            "${AGENT_CANON_DASHBOARD_EVIDENCE_ROOT}/runtime-task-output.tar"
 
       - name: Upload runtime dashboard
-        if: github.event_name != 'pull_request'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: agent-runtime-dashboard-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ steps.dashboard.outputs.dashboard_path }}
+          path: |
+            ${{ runner.temp }}/agent-canon-dashboard-control-${{ github.run_id }}-${{ github.run_attempt }}/agent-runtime-dashboard-evidence/
+            ${{ runner.temp }}/agent-canon-dashboard-control-${{ github.run_id }}-${{ github.run_attempt }}/agent-runtime-dashboard-export/
+            ${{ runner.temp }}/agent-canon-dashboard-control-${{ github.run_id }}-${{ github.run_attempt }}/.runtime/container-state/spool/agent-runtime-dashboard-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Release shared tool runtime
-        if: always() && github.event_name != 'pull_request'
+        if: always()
         run: |
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" stop || true
-          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
+          set -euo pipefail
+          suffix="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          candidate_source="${AGENT_CANON_CANDIDATE_SOURCE:-${RUNNER_TEMP}/agent-canon-dashboard-${suffix}}"
+          candidate_bare="${AGENT_CANON_CANDIDATE_BARE:-${RUNNER_TEMP}/agent-canon-dashboard-${suffix}.git}"
+          control_parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-${RUNNER_TEMP}/agent-canon-dashboard-control-${suffix}}"
+          if [[ -x "${candidate_source}/bootstrap.sh" ]]; then
+            "${candidate_source}/bootstrap.sh" \
+              --control-parent-root "${control_parent_root}" \
+              stop || true
+            "${candidate_source}/bootstrap.sh" \
+              --control-parent-root "${control_parent_root}" \
+              uninstall || true
+          fi
+          rm -rf -- "${candidate_source}" "${candidate_bare}"

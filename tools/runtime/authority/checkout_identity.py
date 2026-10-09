@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Reads the current checkout identity at bounded workflow boundaries.
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md checkout identity readback
-# downstream implementation ./manifest_rendering.py projects the identity contract into handoffs
-# downstream implementation ./implementation_dispatch.py carries the observed identity to workers
-# downstream implementation ../../tests/agent_tools/test_checkout_identity.py verifies branch, detached, and cwd transitions
+# upstream design ../../../agents/COMMUNICATION_PROTOCOL.md checkout identity readback
+# downstream implementation ../manifest/manifest_rendering.py projects the identity contract into handoffs
+# downstream implementation ../../agent/orchestration/implementation_dispatch.py carries the observed identity to workers
+# downstream implementation ../../../tests/agent_tools/test_checkout_identity.py verifies branch, detached, and cwd transitions
 # @dependency-end
 """Read one repository-qualified checkout identity without changing Git state.
 

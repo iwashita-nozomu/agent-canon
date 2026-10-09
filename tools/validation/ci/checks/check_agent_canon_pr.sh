@@ -7,7 +7,6 @@
 # upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
 # upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns PR scratch, archive, and receipt output boundaries
-# upstream implementation ../../../../eval/producers/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
 # upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../../../runtime/artifacts/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
 # upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py Codex runtime role alignment eval

@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Implements repository-topic clone lifecycle with strict cleanup and evidence checks.
-# upstream design ../../documents/rule/repository-topic-clone.md defines generic clone and cleanup behavior
-# upstream implementation ./conflict_preservation.py captures conflict stages and validates finalization readback.
-# upstream implementation ./writer_target.py materializes the ignored static writer handoff packet.
-# downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates repository-topic clone lifecycle.
+# upstream design ../../../documents/rule/repository-topic-clone.md defines generic clone and cleanup behavior
+# upstream implementation ../git/conflict_preservation.py captures conflict stages and validates finalization readback.
+# upstream implementation ../../runtime/authority/writer_target.py materializes the ignored static writer handoff packet.
+# downstream implementation ../../../tests/agent_tools/test_repository_topic_clone.py validates repository-topic clone lifecycle.
 # @dependency-end
 """Manage repository-topic clones with explicit receipts and strict cleanup gates."""
 

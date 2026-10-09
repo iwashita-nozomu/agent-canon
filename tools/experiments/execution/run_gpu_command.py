@@ -3,9 +3,9 @@
 # contract tool
 # responsibility Provides the provider-independent admitted direct GPU command CLI.
 # upstream implementation ./gpu_command_admission.py owns strict admission, plan freeze, environment, execution, evidence, and release
-# upstream design ../../agents/skills/gpu-execution.md selects direct versus managed execution
-# upstream design ../../documents/experiments/gpu-direct-command.md CLI and evidence contract
-# downstream implementation ../../tests/tools/test_run_gpu_command.py validates parsing and no-provider execution
+# upstream design ../../../agents/skills/gpu-execution.md selects direct versus managed execution
+# upstream design ../../../documents/experiments/gpu-direct-command.md CLI and evidence contract
+# downstream implementation ../../../tests/tools/test_run_gpu_command.py validates parsing and no-provider execution
 # @dependency-end
 
 """Run an arbitrary argv on a conservatively admitted free GPU set."""

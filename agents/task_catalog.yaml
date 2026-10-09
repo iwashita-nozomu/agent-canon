@@ -53,7 +53,6 @@ review_activation_policy:
   validation:
     owner_ref: "agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary"
     route_source: parent_packet.validation_route
-    order: static_then_targeted
     full_suite_or_remote_ci: see_owner_ref
   artifacts:
     empty_reviewer_or_template_files: do_not_materialize
@@ -66,7 +65,6 @@ execution_route_policy:
   coordination_reasons: [dependency, collision, publication, resumption]
   routes:
     bounded_fast_path:
-      states: [route, execute, verify_close]
       next_action: report_selected_results_and_publication_readback
       commands: []
     coordination:

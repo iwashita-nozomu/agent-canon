@@ -1193,30 +1193,31 @@ fn parse_eval_output_args(args: &[String]) -> Result<EvalOutputArgs, String> {
 }
 
 pub(super) fn default_db_path(root: &Path) -> PathBuf {
-    semantic_index_home()
-        .join(repo_cache_key(root))
-        .join("index.sqlite")
+    #[cfg(test)]
+    let home = semantic_index_home(root);
+    #[cfg(not(test))]
+    let home = semantic_index_home();
+    home.join(repo_cache_key(root)).join("index.sqlite")
 }
 
+#[cfg(test)]
+fn semantic_index_home(root: &Path) -> PathBuf {
+    crate::runtime_boundary::test_runtime_root_path(root)
+        .unwrap_or_else(|_| env::temp_dir().join("agent-canon-test-runtime"))
+        .join("semantic-index")
+}
+
+#[cfg(not(test))]
 fn semantic_index_home() -> PathBuf {
     if let Ok(value) = env::var(crate::runtime_boundary::RUNTIME_ROOT_ENV) {
         if !value.trim().is_empty() {
             return PathBuf::from(value).join("semantic-index");
         }
     }
-    #[cfg(test)]
-    {
-        env::temp_dir()
-            .join("agent-canon-test-runtime")
-            .join("semantic-index")
-    }
-    #[cfg(not(test))]
-    {
-        // Execution resolves AGENT_CANON_RUNTIME_ROOT before opening this
-        // path. The absolute non-writable sentinel prevents an accidental
-        // HOME, /tmp, or source-local fallback if that gate regresses.
-        PathBuf::from("/__agent_canon_runtime_root_required__/semantic-index")
-    }
+    // Execution resolves AGENT_CANON_RUNTIME_ROOT before opening this path.
+    // The absolute non-writable sentinel prevents an accidental HOME, /tmp,
+    // or source-local fallback if that gate regresses.
+    PathBuf::from("/__agent_canon_runtime_root_required__/semantic-index")
 }
 
 fn repo_cache_key(root: &Path) -> String {

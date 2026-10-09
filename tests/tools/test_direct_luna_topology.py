@@ -10,7 +10,7 @@ def test_physical_team_is_profile_sized_and_luna_first() -> None:
     topology = json.loads((ROOT / "agents/execution_topology.json").read_text())
     profiles = topology["physical_execution_profiles"]
 
-    assert topology["default_subagent"]["model"] == "gpt-5.6-luna"
+    assert topology["default_subagent"]["model"] == "gpt-6-luna"
     assert topology["default_subagent"]["fork_turns"] == "none"
     assert topology["default_subagent"]["effective_runtime_readback"] == "required"
     assert len(profiles) == 6
@@ -20,6 +20,14 @@ def test_physical_team_is_profile_sized_and_luna_first() -> None:
         "luna_ship_xhigh",
     ]
     assert all("logical_role_id" not in profile for profile in profiles)
+    assert {profile["id"]: profile["model"] for profile in profiles} == {
+        "luna_reasoning_high": "gpt-6-luna",
+        "luna_implementation_xhigh": "gpt-6-luna",
+        "luna_ship_xhigh": "gpt-6-luna",
+        "terra_cross_cutting_read_only": "gpt-6-astra",
+        "spark_implementation_low": "gpt-6-luna",
+        "mini_skill_evaluator_medium": "gpt-6-luna",
+    }
 
 
 def test_logical_roles_and_skills_keep_separate_owners() -> None:

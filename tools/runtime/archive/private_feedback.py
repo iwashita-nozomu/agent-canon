@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the private feedback/knowledge spool adapter and the metadata-only promotion/readback boundary for agent-canon-log.
-# upstream design ../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
-# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs exposes the Rust CLI route
+# upstream design ../../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
+# downstream implementation ../dispatch/agent-canon/src/private_feedback.rs exposes the Rust CLI route
 # downstream implementation ../../../tests/agent_tools/test_private_feedback.py validates the bounded adapter
 # @dependency-end
 """Private feedback and reusable knowledge adapter.
@@ -33,6 +33,9 @@ from typing import Any, Iterable
 try:
     from .log_repository_identity import stable_log_branch
 except ImportError:  # pragma: no cover - direct script execution
+    source_root = str(Path(__file__).resolve().parents[3])
+    if source_root not in sys.path:
+        sys.path.insert(0, source_root)
     from tools.runtime.archive.log_repository_identity import stable_log_branch
 
 SCHEMA = "agent-canon.private-feedback.v1"
@@ -196,10 +199,10 @@ def _runtime_archive_module() -> Any:
 
         return runtime_log_archive_git
     except (ImportError, ModuleNotFoundError):  # pragma: no cover - direct script execution
-        tools_root = str(Path(__file__).resolve().parent)
-        if tools_root not in sys.path:
-            sys.path.insert(0, tools_root)
-        import tools.runtime.archive.runtime_log_archive_git
+        source_root = str(Path(__file__).resolve().parents[3])
+        if source_root not in sys.path:
+            sys.path.insert(0, source_root)
+        from tools.runtime.archive import runtime_log_archive_git
 
         return runtime_log_archive_git
 

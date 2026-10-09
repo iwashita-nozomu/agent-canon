@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Enforces runtime parent-orchestration-only mutation authority from authenticated child identity, writer-target environment, and scope receipts.
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns parent orchestration and child write contracts.
-# upstream implementation ./workspace_scope.py owns canonical role write-scope derivation.
-# downstream implementation ../../.codex/hooks/hook_dispatcher.py applies the PreToolUse decision.
-# downstream implementation ../../tests/agent_tools/test_mutation_authority.py validates parent rejection and child-scope admission.
+# upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns parent orchestration and child write contracts.
+# upstream implementation ../../repository/workspace/workspace_scope.py owns canonical role write-scope derivation.
+# downstream implementation ../../../.codex/hooks/hook_dispatcher.py applies the PreToolUse decision.
+# downstream implementation ../../../tests/agent_tools/test_mutation_authority.py validates parent rejection and child-scope admission.
 # @dependency-end
 """Pure runtime mutation authority for the active PreToolUse hook."""
 

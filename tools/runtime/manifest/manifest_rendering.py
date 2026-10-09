@@ -1,14 +1,14 @@
 # @dependency-start
 # contract tool
 # responsibility AgentTeam manifest rendering owner module.
-# upstream design ../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
-# upstream implementation ./team_config.py provides rendering configuration inputs.
-# upstream implementation ./packets.py provides rendering packet inputs.
-# upstream implementation ./workspace_scope.py provides rendering paths.
-# downstream implementation ./agent_team.py facade consumes rendering APIs.
-# downstream implementation ./code_template_rendering.py owns package-safe code source rendering.
-# downstream implementation ./bootstrap_agent_run.py consumes rendering APIs.
+# upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
+# upstream implementation ../../agent/orchestration/team_config.py provides rendering configuration inputs.
+# upstream implementation ../../agent/orchestration/packets.py provides rendering packet inputs.
+# upstream implementation ../../repository/workspace/workspace_scope.py provides rendering paths.
+# downstream implementation ../../agent/orchestration/agent_team.py facade consumes rendering APIs.
+# downstream implementation ../../agent/templates/code_template_rendering.py owns package-safe code source rendering.
+# downstream implementation ../lifecycle/bootstrap_agent_run.py consumes rendering APIs.
 # @dependency-end
 """Own AgentTeam manifest, template, and output rendering."""
 

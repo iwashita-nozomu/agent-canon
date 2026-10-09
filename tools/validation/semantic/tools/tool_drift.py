@@ -8,7 +8,6 @@
 # upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
 # upstream design ../../../../agents/TASK_WORKFLOWS.md workflow routing contract
 # upstream design ../../../../agents/skills/agent-orchestration.md orchestration routing contract
-# upstream design ../../../../eval/definitions/skill_workflow_prompt_eval.toml prompt routing eval contract
 # upstream design ../../../../documents/conventions/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../../catalog.yaml structured tool catalog
 # upstream design ../../../../documents/tools/tool-docs.toml one-to-one tool documentation map
@@ -187,7 +186,9 @@ CONTRACTS = (
         links=(
             LinkCheck("agents/COMMUNICATION_PROTOCOL.md"),
             LinkCheck("agents/skills/codex-task-workflow.md"),
-            LinkCheck("tools/validation/semantic/responsibility/responsibility_scope.py"),
+            LinkCheck(
+                "tools/validation/semantic/responsibility/responsibility_scope.py"
+            ),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tests/agent_tools/test_tool_rejection_preflight.py"),
@@ -264,9 +265,12 @@ CONTRACTS = (
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
             LinkCheck("eval/producers/run_accumulated_agent_evals.py"),
             LinkCheck("tools/runtime/artifacts/generated_artifact_guard.py"),
-            LinkCheck("eval/producers/evaluate_skill_workflow_prompts.py"),
-            LinkCheck("tools/validation/semantic/runtime/check_agent_runtime_alignment.py"),
-            LinkCheck("tools/validation/semantic/convention/check_convention_compliance.py"),
+            LinkCheck(
+                "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
+            ),
+            LinkCheck(
+                "tools/validation/semantic/convention/check_convention_compliance.py"
+            ),
             LinkCheck("tools/validation/ci/checks/check_github_workflows.py"),
         ),
         text_checks=(
@@ -296,7 +300,6 @@ CONTRACTS = (
             LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
             LinkCheck("agents/TASK_WORKFLOWS.md"),
             LinkCheck("agents/skills/agent-orchestration.md"),
-            LinkCheck("eval/definitions/skill_workflow_prompt_eval.toml"),
             LinkCheck("templates/agents/closeout_gate.md"),
             LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
             LinkCheck("tools/validation/semantic/tools/tool_drift.py"),
@@ -309,8 +312,9 @@ CONTRACTS = (
             LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
             LinkCheck("agents/TASK_WORKFLOWS.md"),
             LinkCheck("agents/skills/agent-orchestration.md"),
-            LinkCheck("eval/definitions/skill_workflow_prompt_eval.toml"),
-            LinkCheck("tools/validation/semantic/convention/check_convention_compliance.py"),
+            LinkCheck(
+                "tools/validation/semantic/convention/check_convention_compliance.py"
+            ),
             LinkCheck("tests/agent_tools/test_tool_drift.py"),
         ),
         text_checks=(
@@ -333,21 +337,6 @@ CONTRACTS = (
                 "agents/skills/agent-orchestration.md",
                 "write-capable handoff",
                 "missing-orchestration-write-capable-handoff-policy",
-            ),
-            TextCheck(
-                "eval/definitions/skill_workflow_prompt_eval.toml",
-                "VERTICAL-WAVE-POLICY",
-                "missing-vertical-wave-prompt-eval",
-            ),
-            TextCheck(
-                "eval/definitions/skill_workflow_prompt_eval.toml",
-                "ORCH-SHIM-POINTER-1",
-                "missing-orchestration-owner-pointer-eval",
-            ),
-            TextCheck(
-                "eval/definitions/skill_workflow_prompt_eval.toml",
-                "ORCH-SHIM-TOOLCALL-1",
-                "missing-orchestration-toolcall-eval",
             ),
         ),
     ),
@@ -651,9 +640,8 @@ def projected_runtime_snippet(root: Path, snippet: str) -> str:
         or (root / "tools" / "agent").exists()
     ):
         return snippet
-    return (
-        snippet.replace("tools/agent/", "tools/agent-canon/agent/")
-        .replace("tools/validation/", "tools/agent-canon/validation/")
+    return snippet.replace("tools/agent/", "tools/agent-canon/agent/").replace(
+        "tools/validation/", "tools/agent-canon/validation/"
     )
 
 

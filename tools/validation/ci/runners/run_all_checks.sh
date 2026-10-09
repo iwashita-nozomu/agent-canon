@@ -20,7 +20,6 @@
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 # upstream implementation ../../semantic/skills/check_skill_frontmatter.py validates runtime skill YAML frontmatter
 # upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py validates workflow selection routing cases
-# upstream implementation ../../../../eval/producers/evaluate_report_quality.py validates report writing quality checklist cases
 # upstream implementation ../checks/check_github_workflows.py validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
 # upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback

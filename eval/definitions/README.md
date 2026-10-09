@@ -1,24 +1,20 @@
 <!--
 @dependency-start
 contract data
-responsibility Documents skill and workflow prompt eval definitions.
+responsibility Documents active AgentCanon eval definitions and accumulation.
 upstream design ../../agents/canonical/skills.md skill canon registry
-downstream implementation ../producers/evaluate_skill_workflow_prompts.py runs these evals
 downstream implementation ../producers/evaluate_agent_run.py runs behavior evals
 downstream implementation ../producers/generate_agent_improvement_guide.py summarizes observations without creating task obligations
 downstream implementation ../checkers/eval_accumulation_check.py validates accumulated result evidence
 downstream implementation ../producers/evaluate_workflow_selection.py runs workflow selection evals
-downstream implementation ../producers/evaluate_report_quality.py runs report quality evals
 downstream implementation ../producers/evaluate_codex_agent_roles.py runs Codex subagent role evals
 @dependency-end
 -->
 
-# Skill And Workflow Prompt Evals
+# Eval Definitions
 
-This directory stores deterministic eval definitions for agent-facing skills, workflows, and
-run-bundle behavior evidence.
-Prompt evals are frozen checklists for one prompt surface or one glob-expanded prompt family.
-Behavior evals are frozen criteria for observable agent actions recorded in run artifacts.
+This directory stores eval definitions for observable run-bundle behavior,
+workflow routing, and Codex role behavior.
 
 Definitions, producers, checkers, and static fixtures are the eval source
 contract. These manifests stay in `eval/definitions/`; runtime outputs do not.
@@ -31,18 +27,20 @@ external bootstrap runtime spool and, when retained, the separate
 
 Use this README to answer which source-controlled eval manifests live under
 `eval/definitions/`, which producer owns each eval family, and how closeout
-uses prompt and behavior eval evidence. Read the manifest table first, then the
+uses behavior, workflow, and role evidence. Read the manifest table first, then the
 extension order before adding a new eval domain. The closeout and protocol
 sections explain how source manifests connect to accumulated runtime evidence
 without storing run outputs here.
 
 | Manifest or producer | Scope |
 | --- | --- |
-| `skill_workflow_prompt_eval.toml` | all discoverable skill shims, human-facing skill docs, and workflow docs. |
 | `agent_behavior_eval.toml` | observable run-bundle behavior evidence. |
 | `workflow_selection_eval.toml` | prompt-intake routing from user wording to workflow labels. |
-| `report_quality_eval.toml` | report-writing checklist, artifact separation, and reviewer routing. |
 | `evaluate_codex_agent_roles.py` | `.codex/agents/*.toml` role behavior, prohibitions, model / reasoning bucket, routing defaults, runtime metrics, and output-use evidence. |
+
+Reader-facing report artifacts follow `report-writing` and
+`result-artifact-writeout`; when selected, `report_reviewer` owns the report
+review artifact.
 
 Because the table fixes manifest ownership, the following commands are the
 execution contract for those source manifests.
@@ -50,8 +48,8 @@ execution contract for those source manifests.
 Because future evidence domains use the same registry, extend manifests in this
 order:
 
-1. Add more specific eval entries when a specific skill, workflow, role, or report
-   surface needs stronger invariants.
+1. Add more specific eval entries when an existing workflow, role, or observable
+   behavior owner needs stronger evidence.
 1. Declare accumulated eval result families in `eval_result_families.toml`.
 1. Treat that registry as the abstract contract between eval producers, archive
    paths, filename / run-id checks, and consumers such as
@@ -62,8 +60,8 @@ order:
    evidence, then have the producer emit reports that satisfy the declared
    filename and run-id contract.
 
-Use the bootstrap-owned collection route when changing a skill, workflow, or
-routing prompt. `eval collect` runs the registered producers and creates
+Use the bootstrap-owned collection route when selected validation requires
+accumulated eval evidence. `eval collect` runs the registered producers and creates
 `collection.json` in the runtime spool; `eval sync` publishes that collection
 to the external `agent-canon-log` archive:
 
@@ -85,47 +83,6 @@ details:
   eval collect --root <project-root> --run-id <run-id>
 ```
 
-When a run uses skills, run the same prompt eval with accumulated evidence.
-Detailed reports are tool-written, not agent-authored prose. They are first
-written to the explicit runtime spool and then published to the external
-`agent-canon-log` archive; they are never written to this source checkout or
-overwritten during normal agent work:
-
-```bash
-"$BOOTSTRAP" --control-parent-root "$ROOT" \
-  eval collect --root <project-root> --run-id <run-id>
-"$BOOTSTRAP" --control-parent-root "$ROOT" \
-  eval sync --run-id <run-id>
-```
-
-The file name convention is:
-
-```text
-<eval_run_id>-<status>-<skill-slug>.md
-```
-
-| Accumulated prompt eval field | Contract |
-| --- | --- |
-| `eval_run_id` | assigned by the tool as `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>`. |
-| `EVAL_RUN_ID=<eval_run_id>` | machine-readable run identity. |
-| `EVAL_USED_SKILLS=<comma-separated-skills>` | machine-readable skill-use evidence. |
-| `EVAL_ACCUMULATED_REPORT=<path>` | machine-readable accumulated report path. |
-| Run-bundle behavior path | must exist, must not be a placeholder, and must contain the matching eval run id. |
-| Existing `--report-out` path | writes a sibling path with the same `eval_run_id` appended instead of overwriting it. |
-
-## Prompt Eval Closeout Order
-
-1. Require every critical checklist item to pass.
-1. Require the manifest audit to pass.
-1. Treat duplicate eval IDs, duplicate explicit targets, and duplicate checklist IDs within an eval as fail-closed audit findings.
-1. Keep `EVAL_AUDIT_STATUS=pass` and `EVAL_GROWTH_CANDIDATES=0` before closing
-   skill or workflow prompt improvement work.
-1. When a prompt surface needs additional coverage, add checklist items to the
-   existing eval entry for that target instead of adding a second
-   explicit-target eval.
-1. If an eval reports drift, fix the target prompt and rerun the same manifest
-   until the report passes.
-
 ## Behavior Eval Closeout Gate
 
 ```bash
@@ -143,7 +100,7 @@ required behavior-event fields.
 | Behavior event family | Required evidence |
 | --- | --- |
 | Skill and subagent routing | skill invocation, subagent routing, tool gates, and subagent lifecycle closeout. |
-| Prompt and feedback resolution | accumulated prompt eval runs, feedback resolution, static-analysis feedback, and diff-check decisions. |
+| Feedback resolution | structured user/reviewer feedback and static-analysis feedback when present. |
 | Code checker results | `tool_call=pyright code_checker=pass`, `tool_call=ruff code_checker=pass`, `tool_call=oop-readability-check code_checker=pass`, or `code_checker_not_required`. |
 | Run comparison | execution path comparison and token footprint comparison when the task makes those comparisons relevant. |
 
@@ -176,8 +133,8 @@ collection and archive sync. Reading an existing guide does not activate them:
   eval sync --run-id <run-id>
 ```
 
-The collection command runs the registered role, skill/workflow prompt,
-workflow-selection, and report-quality evals; stdout/stderr and
+The collection command runs the registered role, skill/workflow prompt, and
+workflow-selection evals; stdout/stderr and
 `collection.json` go to the explicit `<install-root>/.runtime/spool/<run-id>/`
 path. The sync command is the only archive publication step. Agents do not
 hand-generate these reports. The gate validates directory mounted JSONL readability when available,
@@ -196,7 +153,6 @@ are transient producer output and are not an alternate oracle.
 | Eval surface | Command | Accumulated evidence and privacy rule |
 | --- | --- | --- |
 | Workflow selection | included in `bootstrap.sh ... eval collect --root <project-root> --run-id <run-id>` | reports list case IDs, expected workflow labels, and observed workflow labels; they do not store raw prompt text. |
-| Report quality | included in `bootstrap.sh ... eval collect --root <project-root> --run-id <run-id>` | reports list checklist IDs and missing patterns; they do not store raw report drafts or prompts. |
 | Codex subagent roles | included in `bootstrap.sh ... eval collect --root <project-root> --run-id <run-id>` | accumulated reports use `codex-agent-role-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>-<status>.md` and record `CODEX_AGENT_ROLE_EVAL_RUN_ID=<eval_run_id>`. |
 
 `workflow_selection_eval.toml` may define reusable `[[case_groups]]`.

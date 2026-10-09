@@ -37,8 +37,9 @@ when newly established owner/contract facts require it.
 
 ## Design Integrity Gate
 
-Before editing, establish the owning responsibility model, selected mechanism, complete
-change unit, necessary evidence, and unresolved decisions that could change them.
+Once cause and required guarantee show that an edit is necessary, establish the
+owner, mechanism, affected responsibility unit, evidence, and unresolved decisions
+that could change the edit before changing it.
 Use [agent orchestration](../skills/agent-orchestration.md#decision-sufficiency-packet)
 for decision sufficiency and reuse current owner evidence. An unresolved API,
 algorithm, dependency, configuration, naming, oracle, or responsibility decision

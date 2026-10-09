@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Builds formal-proof planning scaffolds from natural-language mathematical claims.
-# upstream design ../../agents/skills/formal-proof-workflow.md defines proof workflow boundaries.
-# upstream design ../../references/agent-canon-technology-bibliography.md records proof sources.
-# downstream design ../../documents/tools/formal_proof.md documents operator-facing usage.
-# downstream implementation ../../tests/agent_tools/test_formal_proof.py tests scaffold output.
+# upstream design ../../../agents/skills/formal-proof-workflow.md defines proof workflow boundaries.
+# upstream design ../../../references/agent-canon-technology-bibliography.md records proof sources.
+# downstream design ../../../documents/tools/formal_proof.md documents operator-facing usage.
+# downstream implementation ../../../tests/agent_tools/test_formal_proof.py tests scaffold output.
 # @dependency-end
 """Create a formal-proof scaffold from a natural-language claim."""
 
