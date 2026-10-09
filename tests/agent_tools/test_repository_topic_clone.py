@@ -576,9 +576,10 @@ def test_prepare_rejects_nested_parent_repo_without_mutating_ancestor(
     local_data = nested / "local-data.txt"
     local_data.write_text("preserve ancestor-owned checkout data\n", encoding="utf-8")
     assert not run_git(workspace, "status", "--porcelain")
-    common_config = git_metadata_path(workspace, "config")
-    index_path = git_metadata_path(workspace, "index")
-    exclude_path = git_metadata_path(workspace, "info/exclude")
+    common_dir = Path(run_git(workspace, "rev-parse", "--absolute-git-dir"))
+    common_config = common_dir / "config"
+    index_path = common_dir / "index"
+    exclude_path = common_dir / "info" / "exclude"
     before_config = common_config.read_bytes()
     before_index = index_path.read_bytes()
     before_exclude = exclude_path.read_bytes()
