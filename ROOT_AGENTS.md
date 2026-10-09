@@ -29,20 +29,21 @@ authority. Before working, confirm the directory, branch, and dependency HEADs;
 recheck changed premises only. Preserve unknown Git state and user data. Authority
 for the task does not authorize unrelated changes or publication.
 
-Investigate the cause before choosing a repair; treat failure reports and review
-claims as hypotheses. Verify facts that could change the owner, mechanism, required
-guarantee, scope, or validation against current source, actual callers, inputs and
-state, applicable constraints, and source authority. Separate observed facts,
-inferences, and unresolved decision-relevant premises; investigate only missing
-facts that could change the choice, and carry settled evidence and limits through
-the existing context. Follow callers, state, effects, and affected consumers far
-enough to close the owning mechanism, rather than minimizing the diff or expanding
-into unrelated architecture. Carry the requested outcome and authority through
-cause discovery; do not turn preliminary paths, slices, or non-goals into a
-completion ceiling. After cause and guarantee are established, derive the
-necessary edit and validation closure from this evidence, updating an active
-handoff or write boundary when material facts change. Partition only for
-demonstrated independent responsibilities, collisions, or blockers.
+Before a repair, state what required behavior the current implementation cannot
+meet and cite the current source, actual caller, relevant input/state, and trace
+or failure evidence for that gap. Treat failure reports and review claims as
+hypotheses; use the selected implementation owner's reachability/remedy guidance.
+Verify only facts that could change the owner, mechanism, required guarantee,
+scope, or validation. Separate observations, inferences, and unresolved
+decision-relevant premises; follow callers, effects, and affected consumers far
+enough to close the owning mechanism.
+
+Carry the requested outcome and authority through cause discovery; do not turn
+preliminary paths, slices, or non-goals into a completion ceiling. After cause
+and guarantee are established, derive the necessary edit and validation closure
+from evidence, updating an active handoff or write boundary when material facts
+change. Partition only for demonstrated independent responsibilities, collisions,
+or blockers.
 Choose the mechanism from the established cause, applicable constraints, and
 guarantee that must hold after the change. A procedure, role, artifact, or stage
 used by an earlier task is not a reason to repeat it; reuse it only when the
@@ -63,8 +64,11 @@ For numerical problems, establish the equations, assumptions, and convergence
 behavior before changing implementation structure or tolerances.
 
 Use existing capabilities and standard facilities; implement only a demonstrated
-gap, with one exposed API per functional responsibility. Add guards or fallbacks
-only for reachable conditions not already handled.
+gap, with one exposed API per functional responsibility. A repair must not add a
+condition-specific branch, guard, bypass, or fallback solely to make the
+triggering case pass. Correct the existing mechanism, input, ordering, or
+ownership that leaves the requirement unmet, while preserving established domain
+and external-boundary behavior.
 When multiple paths exist, use the most recently incorporated implementation as
 the starting point, migrate necessary consumers, and remove obsolete paths and
 exclusive support. Keep committed history in Git, not backup implementations.
