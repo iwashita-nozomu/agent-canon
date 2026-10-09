@@ -93,18 +93,9 @@ selected gate の判定後、implementation worker はこれを source packet �
 - independent reviewer:
 - reviewer source snapshot and readback:
 
-## Evidence And Assumption Ledger（証拠と仮定の ledger）
-
-<!-- design claim を current code、dependency header、既存 docs、parent document に結び付けます。file-by-file implementation design の前に first-use DSL term、problem standard form、normalization rule、governing parent-doc difference を記録します。design-doc claim check では code path、tool path、dependency-header evidence、parent document を stable path で引用します。 -->
-
-- Evidence sources:
-- Assumptions:
-- Parent-doc alignment:
-- Refactor handoff:
-
 ## Existing Code And Docs To Reuse（再利用する既存 code/docs）
 
-<!-- 再利用または mirror すべき local module、helper、test、doc、naming pattern を列挙します。 -->
+<!-- 再利用または mirror すべき local module、helper、test、doc、naming pattern を列挙します。標準の Markdown link と短い説明で、各 source が設計判断をどう支えるかを示します。 -->
 
 ## Upstream Requirement Packet（upstream 要件 packet）
 
