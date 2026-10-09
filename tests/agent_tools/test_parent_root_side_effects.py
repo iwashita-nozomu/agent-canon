@@ -17,11 +17,15 @@ import sys
 import threading
 import time
 from pathlib import Path
+from typing import cast
 
 import pytest
 import tools.repository.workspace.parent_root_side_effects as side_effects
 from tools.runtime.artifacts.runtime_artifacts import root_capability_environment
 from tools.repository.workspace.parent_root_side_effects import (
+    ParentOwnedGitAdminFileHandle,
+    ParentOwnedGitAdminFileReceipt,
+    ParentOwnedPathReceipt,
     ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
@@ -1094,10 +1098,13 @@ def test_parent_file_io_uses_attested_git_common_directory(
         )
     assert parent_only.value.reject is ParentRootReject.SYMLINK_ESCAPE
 
-    with boundary.open_parent_owned_file(
+    admin_handle = boundary.open_parent_owned_file(
         attestation, exclude, "linked-git-admin-exclude", create=True, mode="a+"
-    ) as handle:
-        handle.seek(0, os.SEEK_END)
+    )
+    assert isinstance(admin_handle, ParentOwnedGitAdminFileHandle)
+    assert not hasattr(admin_handle, "truncate")
+    with admin_handle as handle:
+        handle.seek(0)
         handle.write("reserved packet\n")
     assert exclude.read_text(encoding="utf-8").endswith("reserved packet\n")
 
@@ -1109,7 +1116,35 @@ def test_parent_file_io_uses_attested_git_common_directory(
         "verified",
         "linked-git-admin-config",
     )
-    assert written_config.parent_root == observed_common
+    assert isinstance(written_config, ParentOwnedGitAdminFileReceipt)
+    assert written_config.physical_path == common_config
+    assert not hasattr(written_config, "parent_root")
+    config_before_rejected_mutations = common_config.read_bytes()
+    config_mode_before_rejected_mutations = common_config.stat().st_mode
+    generic_path_receipt = cast(ParentOwnedPathReceipt, written_config)
+    with pytest.raises(ParentRootSideEffectError) as rejected_publish:
+        boundary.atomic_publish(generic_path_receipt, b"replacement\n")
+    assert rejected_publish.value.reject is ParentRootReject.ROOT_MISMATCH
+    with pytest.raises(ParentRootSideEffectError) as rejected_mode:
+        boundary.set_parent_owned_mode(attestation, generic_path_receipt, 0o600)
+    assert rejected_mode.value.reject is ParentRootReject.ROOT_MISMATCH
+    with pytest.raises(ParentRootSideEffectError) as rejected_file_remove:
+        boundary.remove_parent_owned_file(generic_path_receipt)
+    assert rejected_file_remove.value.reject is ParentRootReject.ROOT_MISMATCH
+    with pytest.raises(ParentRootSideEffectError) as rejected_tree_remove:
+        boundary.remove_parent_owned_tree(
+            attestation, generic_path_receipt, "linked-git-admin-config-tree-remove"
+        )
+    assert rejected_tree_remove.value.reject is ParentRootReject.ROOT_MISMATCH
+    with pytest.raises(ParentRootSideEffectError) as rejected_empty_remove:
+        boundary.remove_empty_parent_owned_directory(
+            attestation,
+            generic_path_receipt,
+            "linked-git-admin-config-empty-remove",
+        )
+    assert rejected_empty_remove.value.reject is ParentRootReject.ROOT_MISMATCH
+    assert common_config.read_bytes() == config_before_rejected_mutations
+    assert common_config.stat().st_mode == config_mode_before_rejected_mutations
     assert subprocess.run(
         [
             "git",

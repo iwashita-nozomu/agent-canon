@@ -382,6 +382,77 @@ class ParentOwnedFileHandle:
 
 
 @dataclass
+class ParentOwnedGitAdminFileHandle:
+    """Read and append capability for a file under the attested Git common dir."""
+
+    _handle: ParentOwnedFileHandle
+
+    @property
+    def closed(self) -> bool:
+        """Return whether the receipt-bound stream is closed."""
+        return self._handle.closed
+
+    def read(self, size: int = -1) -> str:
+        """Read from the locked Git-admin file."""
+        return self._handle.read(size)
+
+    def readline(self, size: int = -1) -> str:
+        """Read one line from the locked Git-admin file."""
+        return self._handle.readline(size)
+
+    def readlines(self, hint: int = -1) -> list[str]:
+        """Read lines from the locked Git-admin file."""
+        return self._handle.readlines(hint)
+
+    def write(self, text: str) -> int:
+        """Append text without exposing positioned writes or truncation."""
+        self._handle.seek(0, os.SEEK_END)
+        return self._handle.write(text)
+
+    def writelines(self, lines: Sequence[str]) -> None:
+        """Append each supplied line to the locked Git-admin file."""
+        self._handle.seek(0, os.SEEK_END)
+        self._handle.writelines(lines)
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Move the read cursor; subsequent writes remain append-only."""
+        return self._handle.seek(offset, whence)
+
+    def tell(self) -> int:
+        """Return the locked stream position."""
+        return self._handle.tell()
+
+    def flush(self) -> None:
+        """Flush the locked Git-admin file."""
+        self._handle.flush()
+
+    def __enter__(self) -> "ParentOwnedGitAdminFileHandle":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        return self._handle.__exit__(exc_type, exc_value, traceback)
+
+    def close(self) -> None:
+        """Close the locked Git-admin file exactly once."""
+        self._handle.close()
+
+
+@dataclass(frozen=True)
+class ParentOwnedGitAdminFileReceipt:
+    """Readback metadata that does not carry a generic parent-path capability."""
+
+    physical_path: Path
+    purpose: str
+    target_dev: int
+    target_ino: int
+
+
+@dataclass
 class _TreeRemovalFrame:
     """One opened directory in the iterative post-order removal stack."""
 
@@ -830,8 +901,31 @@ def _component_identities(
         os.close(fd)
 
 
+def _require_parent_path_receipt(receipt: object) -> ParentOwnedPathReceipt:
+    """Keep Git-admin file results out of generic parent-path operations."""
+    if not isinstance(receipt, ParentOwnedPathReceipt):
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            "operation requires a parent-root path receipt",
+        )
+    return receipt
+
+
+def _require_parent_tree_target(
+    candidate: object,
+) -> ParentOwnedPathReceipt | Path | str:
+    """Keep file-only Git-admin results out of generic tree operations."""
+    if not isinstance(candidate, (ParentOwnedPathReceipt, Path, str)):
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            "operation requires a parent-root path or path receipt",
+        )
+    return candidate
+
+
 def _verify_parent_components(receipt: ParentOwnedPathReceipt) -> None:
     """Reject replacement of any root-to-parent directory component."""
+    receipt = _require_parent_path_receipt(receipt)
     if not receipt.parent_components:
         raise ParentRootSideEffectError(
             ParentRootReject.ROOT_RACE_DETECTED,
@@ -2101,7 +2195,7 @@ class ParentRootSideEffectBoundary:
         *,
         create: bool,
         mode: str,
-    ) -> ParentOwnedFileHandle:
+    ) -> ParentOwnedFileHandle | ParentOwnedGitAdminFileHandle:
         """Open a repository or Git-admin file through its attested owner."""
         if sys.platform != "linux":
             raise ParentRootSideEffectError(
@@ -2125,6 +2219,7 @@ class ParentRootSideEffectBoundary:
         root, before, physical, _ = self._parent_owned_file_target(
             attestation, candidate, allow_missing=create
         )
+        git_admin_owner = root == attestation.git_common_dir
         parent_fd, name, _ = _parent_directory(root, physical, create=create)
         target_fd = -1
         handle: ParentOwnedFileHandle | None = None
@@ -2142,6 +2237,8 @@ class ParentRootSideEffectBoundary:
             except FileNotFoundError:
                 existing = None
             flags = os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
+            if git_admin_owner:
+                flags |= os.O_APPEND
             if mode == "a+":
                 flags |= os.O_APPEND | os.O_CREAT
             try:
@@ -2195,7 +2292,12 @@ class ParentRootSideEffectBoundary:
                     ) from exc
             stream = cast(
                 TextIO,
-                os.fdopen(target_fd, mode, encoding="utf-8", newline=""),
+                os.fdopen(
+                    target_fd,
+                    "a+" if git_admin_owner else mode,
+                    encoding="utf-8",
+                    newline="",
+                ),
             )
             target_fd = -1
             handle = ParentOwnedFileHandle(
@@ -2207,6 +2309,8 @@ class ParentRootSideEffectBoundary:
             )
             os.close(parent_fd)
             parent_fd = -1
+            if git_admin_owner:
+                return ParentOwnedGitAdminFileHandle(handle)
             return handle
         except Exception as exc:
             cleanup_errors: list[OSError] = []
@@ -2503,6 +2607,7 @@ class ParentRootSideEffectBoundary:
         mode: int = 0o600,
     ) -> ParentOwnedPathReceipt:
         """Publish with same-directory O_EXCL temp, fsync, renameat, and identity checks."""
+        receipt = _require_parent_path_receipt(receipt)
         if sys.platform != "linux":
             raise ParentRootSideEffectError(
                 ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
@@ -2836,8 +2941,8 @@ class ParentRootSideEffectBoundary:
         key: str,
         value: str,
         purpose: str,
-    ) -> ParentOwnedPathReceipt:
-        """Run Git config against an inherited, boundary-owned file fd."""
+    ) -> ParentOwnedPathReceipt | ParentOwnedGitAdminFileReceipt:
+        """Append a Git config value and return owner-scoped readback metadata."""
         if not key or any(character in key for character in "\r\n\x00"):
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_MISMATCH, "Git config key is invalid"
@@ -2850,7 +2955,13 @@ class ParentRootSideEffectBoundary:
             attestation, candidate, purpose
         )
         if receipt.target_dev is None or receipt.target_ino is None:
-            receipt = self.atomic_publish(receipt, b"")
+            with self.open_parent_owned_file(
+                attestation, candidate, purpose, create=True, mode="a+"
+            ):
+                pass
+            receipt = self._resolve_parent_owned_file_path(
+                attestation, candidate, purpose
+            )
         _verify_parent_components(receipt)
         root = receipt.parent_root
         physical, _ = _physical_in_root(root, receipt.physical_path, allow_missing=False)
@@ -2918,6 +3029,13 @@ class ParentRootSideEffectBoundary:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
                 "Git config target disappeared after write",
+            )
+        if readback.parent_root == attestation.git_common_dir:
+            return ParentOwnedGitAdminFileReceipt(
+                readback.physical_path,
+                readback.purpose,
+                readback.target_dev,
+                readback.target_ino,
             )
         return readback
 
@@ -3489,6 +3607,7 @@ class ParentRootSideEffectBoundary:
         purpose: str,
     ) -> None:
         """Remove one parent-local directory tree through no-follow dirfds."""
+        candidate = _require_parent_tree_target(candidate)
         if sys.platform != "linux":
             raise ParentRootSideEffectError(
                 ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
@@ -3717,6 +3836,7 @@ class ParentRootSideEffectBoundary:
         purpose: str,
     ) -> bool:
         """Remove an owned directory after an fd-bound empty check."""
+        candidate = _require_parent_tree_target(candidate)
         if sys.platform != "linux":
             raise ParentRootSideEffectError(
                 ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
@@ -3781,6 +3901,7 @@ class ParentRootSideEffectBoundary:
 
     def remove_parent_owned_file(self, receipt: ParentOwnedPathReceipt) -> None:
         """Unlink a lexical receipt entry through its no-follow parent fd."""
+        receipt = _require_parent_path_receipt(receipt)
         root = receipt.parent_root
         is_symlink = receipt.lexical_entry_type == stat.S_IFLNK
         if not is_symlink:
@@ -4259,8 +4380,8 @@ def git_config_add(
     key: str,
     value: str,
     purpose: str,
-) -> ParentOwnedPathReceipt:
-    """Append one Git config value through an inherited boundary file fd."""
+) -> ParentOwnedPathReceipt | ParentOwnedGitAdminFileReceipt:
+    """Append one Git config value through its owner-bound file descriptor."""
     return _DEFAULT_BOUNDARY.git_config_add(attestation, candidate, key, value, purpose)
 
 
