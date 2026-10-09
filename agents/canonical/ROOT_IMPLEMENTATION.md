@@ -56,10 +56,14 @@ reuse results under matching premises, and verify decision-relevant changed prem
 Within that starting point, apply SEP-06's mathematical simplicity comparison,
 including contract redesign, independent state, exceptional cases, coupled
 invariants, and proof obligations across the affected unit and its consumers.
+Before selecting a repair, use [SEP-07 Reachability and remedy necessity](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)
+to establish that the current implementation fails a required contract and that
+existing guarantees do not already satisfy it.
 Remove redundant representations and mechanisms when the derivation permits.
 Consolidate the root responsibility and trace affected contracts to consumers;
 use that complete unit to determine the change scope. A specialized branch requires
-a verified difference in behavior or input contract. Reuse sound parts and retire
+a verified difference in required behavior or input contract; a failure alone
+does not justify a condition-specific repair branch. Reuse sound parts and retire
 superseded branches together with the common correction.
 
 For replacement or retirement, close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
