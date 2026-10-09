@@ -66,4 +66,3 @@ the investigation or hand it to the qualified owner.
 
 Return the Issue URL or pending locator, owner and cause status, changed
 relation or clause destination, readback, and remaining uncertainty.
-

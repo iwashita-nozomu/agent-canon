@@ -116,4 +116,3 @@ witness or static-proof evidence.
 Return the selected route and owners, required validation, and any unresolved
 fact that could change the next action. Reuse the existing task update, tool
 result, or handoff.
-
