@@ -6,7 +6,6 @@
 # downstream implementation ../bin/agent-canon bounds CLI child state
 # downstream implementation ../ci/run_all_checks.sh bounds integrated CI child state and scratch
 # downstream implementation ../ci/check_agent_canon_pr.sh bounds PR gate child state and scratch
-# downstream implementation ../ci/agent_canon_pr_graph_selector.py bounds selector publication and graph children
 # downstream implementation ../../tests/agent_tools/test_parent_root_side_effects.py verifies capabilities and authenticated child environments
 # @dependency-end
 

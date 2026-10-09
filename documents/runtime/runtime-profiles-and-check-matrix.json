@@ -5,14 +5,12 @@
     "AgentCanon ships broad shared surfaces, but not every surface is mandatory for",
     "every repository task. Treat root views and tools as installed capability, then",
     "activate only the profile required by the current change.",
-    "Each profile ID and strict_dependency_graph_required value is canonical input",
-    "for parent AgentCanon PR graph selection; unknown IDs fail selection."
+    "Each profile ID is a canonical inventory key."
   ],
   "profile_classes": [
     {
       "id": "bootstrap",
       "profile": "Bootstrap",
-      "strict_dependency_graph_required": false,
       "activates": [
         "`bootstrap.sh`",
         "`bootstrap/`",
@@ -23,7 +21,6 @@
     {
       "id": "tool-runtime",
       "profile": "Tool runtime",
-      "strict_dependency_graph_required": false,
       "activates": [
         "Python/Rust tool dispatch",
         "catalog",
@@ -34,7 +31,6 @@
     {
       "id": "container",
       "profile": "Container",
-      "strict_dependency_graph_required": false,
       "activates": [
         "Dockerfile",
         "entrypoint",
@@ -45,7 +41,6 @@
     {
       "id": "mount-generation",
       "profile": "Mount generation",
-      "strict_dependency_graph_required": false,
       "activates": [
         "target registry",
         "generations",
@@ -56,7 +51,6 @@
     {
       "id": "codex-surfaces",
       "profile": "Codex surfaces",
-      "strict_dependency_graph_required": false,
       "activates": [
         "isolated skills",
         "agents",
@@ -68,7 +62,6 @@
     {
       "id": "eval-archive",
       "profile": "Eval archive",
-      "strict_dependency_graph_required": false,
       "activates": [
         "eval producer",
         "external spool",
@@ -79,7 +72,6 @@
     {
       "id": "docs",
       "profile": "Docs",
-      "strict_dependency_graph_required": false,
       "activates": [
         "README",
         "guides",
@@ -90,7 +82,6 @@
     {
       "id": "source",
       "profile": "Source",
-      "strict_dependency_graph_required": true,
       "activates": [
         "policy",
         "workflow",
@@ -102,7 +93,6 @@
     {
       "id": "project",
       "profile": "Project",
-      "strict_dependency_graph_required": false,
       "activates": [
         "project Docker",
         "project test runner",

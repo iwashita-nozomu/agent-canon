@@ -1235,15 +1235,6 @@ fn direct_findings(
             reason: "reports are generated run artifacts".to_string(),
         });
     }
-    if !record.has_dependency_manifest {
-        findings.push(DocumentFinding {
-            path: record.path.clone(),
-            kind: "missing_dependency_manifest".to_string(),
-            canonical_path: nearest_canonical_anchor(path),
-            action: "add a dependency manifest or move the artifact out of source docs".to_string(),
-            reason: "document lacks a top dependency manifest".to_string(),
-        });
-    }
     if stale_name_candidate(&record.path) {
         findings.push(DocumentFinding {
             path: record.path.clone(),
@@ -3032,7 +3023,7 @@ fn json_string(value: Option<&Value>) -> String {
 
 fn document_canon_severity(kind: &str) -> &'static str {
     match kind {
-        "missing_dependency_manifest" | "broken_dependency_target" => "blocker",
+        "broken_dependency_target" => "blocker",
         "duplicate_heading_candidate"
         | "stale_name_candidate"
         | "missing_reverse_edge"

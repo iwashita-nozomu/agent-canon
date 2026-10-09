@@ -14,11 +14,8 @@ downstream implementation ../../tools/validation/semantic/documents/check_design
 downstream implementation ../../tools/validation/semantic/tools/tool_drift.py consumes source-derived dependency facts
 downstream implementation ../../tools/analysis/search/vector_search.py consumes source-derived dependency facts
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh owns source review and opt-in graph preparation
-downstream implementation ../../tools/validation/ci/checks/run_pr_dependency_source_gate.sh owns explicit source dependency analysis
 downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py verifies source projection invariants
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies source header regression coverage
-downstream implementation ../../tests/tools/test_agent_canon_pr_dependency_source_gate.py verifies the no-runtime explicit route
-downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py prevents persisted graph orchestration from returning
 @dependency-end
 -->
 
@@ -116,7 +113,6 @@ falls back from a parse error to cached facts.
 | tool/convention drift links | canonical tracked source | no |
 | vector-search dependency context | canonical tracked source | no |
 | repository dependency review and TSV/DOT rendering | canonical tracked source | no |
-| PR dependency completeness | trusted base/head path packet plus canonical tracked source | no |
 | explicit `graph build` / `graph status` | persisted graph runtime | yes |
 | non-dependency graph relations and token graph context | persisted graph runtime | yes |
 
@@ -129,11 +125,8 @@ without making graph runtime state implicit.
 ## Explicit Dependency Analysis
 
 Dependency headers and source-derived graph projections remain available through
-the selected dependency-analysis route. `run_pr_dependency_source_gate.sh` is
-an explicit source-analysis command: it can scan trusted changed paths, review
-relations and cycles, and render projections without graph runtime state. The
-normal PR and CI routes do not invoke it, require its receipt, or turn its
-header/contract-kind checks into a completion condition.
+the selected dependency-analysis route. The normal PR and CI routes do not run
+header-completeness checks or consume dependency-specific receipts.
 
 Persisted graph commands remain explicit analysis capabilities. They are not
 used as an implicit substitute for the tracked source or as a prerequisite for
@@ -144,9 +137,7 @@ ordinary file edits and PRs.
 `tools/analysis/dependencies/run_repo_dependency_review.sh` is source-owned by default. Its normal route
 uses source scan, format, relation/cycle, TSV/DOT, and edit-scope projections in `tools/analysis/dependencies/run_repo_dependency_review.sh`;
 it does not require a graph executable, persisted database, or graph status in `tools/analysis/dependencies/run_repo_dependency_review.sh`. `--ensure-graph` is a separate opt-in operation that performs
-persisted graph status/build preparation and exits before source review. It is
-mutually exclusive with `--header-scan-only`, preventing one invocation from
-presenting optional graph preparation as dependency correctness evidence.
+persisted graph status/build preparation and exits before source review.
 
 ### Normalized cycle review and snapshot reuse (Issue #1306)
 
@@ -186,9 +177,9 @@ source consumers do not need a simultaneous rewrite. Compatibility applies only
 to response shape. It does not preserve the previous authority of persisted
 snapshots.
 
-The names `GraphClient` and `tools/validation/ci/checks/agent_canon_pr_graph_selector.py` may remain during
-this focused change because they also own explicit graph operations and trusted `tools/validation/ci/checks/agent_canon_pr_graph_selector.py` scope selection. Renaming them is a separate responsibility and must not be
-combined with the authority correction.
+`GraphClient` remains the source-owned adapter for explicit dependency analysis
+and persisted graph operations. PR graph selection was removed with the
+dependency-specific PR gate; it is not an alias for the selected analysis route.
 
 ## Non-Goals
 

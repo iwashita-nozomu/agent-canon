@@ -23,8 +23,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 class StructuredDocumentInventoryCliTest(unittest.TestCase):
     """Verify the canonical Rust document inventory CLI."""
 
-    def test_reports_missing_header_and_duplicate_titles(self) -> None:
-        """The inventory should classify document cleanup candidates."""
+    def test_reports_duplicate_titles_without_requiring_a_header(self) -> None:
+        """The inventory reports real document issues without requiring DSL metadata."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             root = temp_path / "repo"
@@ -64,12 +64,12 @@ class StructuredDocumentInventoryCliTest(unittest.TestCase):
             ),
             findings,
         )
-        self.assertIn(("documents/missing-header.md", "missing_dependency_manifest"), findings)
+        self.assertNotIn(("documents/missing-header.md", "missing_dependency_manifest"), findings)
         self.assertIn(("documents/duplicate-b.md", "duplicate_heading_candidate"), findings)
         self.assertIn("Non-Canonical Document Inventory", markdown_text)
 
-    def test_fail_on_findings_returns_nonzero(self) -> None:
-        """Optional fail mode should make the report usable as a gate."""
+    def test_fail_on_findings_accepts_a_headerless_document(self) -> None:
+        """The old missing-header blocker must not reject an ordinary document."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             root = temp_path / "repo"
@@ -88,8 +88,32 @@ class StructuredDocumentInventoryCliTest(unittest.TestCase):
                 ],
             )
 
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("STRUCTURED_ANALYSIS_DOCUMENT_FINDINGS=0", result.stdout)
+
+    def test_fail_on_findings_still_rejects_a_duplicate_title(self) -> None:
+        """A real inventory finding remains blocking even when both files lack headers."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            root = temp_path / "repo"
+            self.write_file(root, "documents/a.md", "# Duplicate\n")
+            self.write_file(root, "documents/b.md", "# Duplicate\n")
+            runtime_root = temp_path / "runtime"
+
+            result = self.run_agent_canon(
+                [
+                    "structured-analysis",
+                    "document-inventory",
+                    "--root",
+                    str(root),
+                    "--runtime-root",
+                    str(runtime_root),
+                    "--fail-on-findings",
+                ],
+            )
+
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("STRUCTURED_ANALYSIS_DOCUMENT_FINDINGS=1", result.stdout)
+        self.assertIn("duplicate_heading_candidate", result.stdout)
 
     @staticmethod
     def run_agent_canon(args: list[str]) -> subprocess.CompletedProcess[str]:

@@ -40,7 +40,7 @@ def clean_runtime_environment() -> dict[str, str]:
         ),
         (
             DEPENDENCY_REVIEW,
-            ("--root", str(PROJECT_ROOT), "--header-scan-only"),
+            ("--root", str(PROJECT_ROOT)),
             "runtime_root_required",
         ),
     ),

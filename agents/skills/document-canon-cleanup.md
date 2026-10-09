@@ -41,7 +41,6 @@ that still names one to the Rust command before returning to the original task.
 - `accumulated_eval_result`: `.agent-canon/log-archive/eval-results/` の蓄積結果。正本 policy ではなく evidence。
 - `generated_report`: `reports/` 配下。再生成または evidence として扱い、source policy にしません。
 - `github_issue_record`: repository-qualified GitHub Issue URL/number。GitHubを正本とし、source treeに履歴mirrorを作りません。
-- `missing_dependency_manifest`: 文書として残すなら dependency header を足し、artifact なら source tree 外へ移します。
 - `duplicate_heading_candidate`: H1 が重複する active 文書。merge、retitle、または両方が必要な理由を明記します。
 - `stale_name_candidate`: path 名が backup / copy / legacy / old / snapshot / stale を示す候補。現行正本か確認します。
 
@@ -50,7 +49,6 @@ that still names one to the Rust command before returning to the original task.
 1. `agent-canon structured-analysis document-inventory` を実行し、JSON と Markdown report を作ります。
 1. Findings を class ごとに分けます。
 1. `accumulated_eval_result`、`generated_report`、`closed_issue_record` は原則編集しません。必要なら generator、eval manifest、issue の open record、または正本文書を編集します。
-1. `missing_dependency_manifest` は文書として残すか、artifact として移すかを決めます。残す場合は nearest canonical anchor への `upstream` を足します。
 1. `duplicate_heading_candidate` は正本候補へ統合するか、reader が区別できる H1 に変更します。
 1. 変更後に再実行して、意図した finding だけが残ることを確認します。
 
@@ -58,7 +56,6 @@ that still names one to the Rust command before returning to the original task.
 
 ```bash
 agent-canon structured-analysis document-inventory --root .
-bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing
 python3 tools/validation/semantic/convention/check_convention_compliance.py
 ```
 

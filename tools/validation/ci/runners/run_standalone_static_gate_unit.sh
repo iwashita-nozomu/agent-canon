@@ -166,8 +166,6 @@ run_contracts() {
     tests.agent_tools.test_visualization_contract \
     tests.agent_tools.test_render_dependency_manifest_graph \
     tests.agent_tools.test_graph_client_source_projection \
-    tests.tools.test_agent_canon_pr_dependency_source_gate \
-    tests.tools.test_agent_canon_pr_graph_gate_integration \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_dependency_headers \

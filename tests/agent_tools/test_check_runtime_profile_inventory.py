@@ -33,7 +33,6 @@ def write_minimal_inventory(path: Path) -> None:
             {
                 "id": "base-project",
                 "profile": "Base project",
-                "strict_dependency_graph_required": False,
                 "activates": ["`README.md`"],
                 "required_when": "Every repo",
             }
