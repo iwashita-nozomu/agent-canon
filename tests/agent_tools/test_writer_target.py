@@ -348,6 +348,32 @@ def test_materialized_packet_contains_validated_identity(tmp_path: Path) -> None
     assert packet["checkout_identity"] == identity
 
 
+def test_materialize_rejects_symlink_packet_directory_without_external_write(
+    tmp_path: Path,
+) -> None:
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    outside_packet = outside / "writer-target.json"
+    original = b"external data must remain untouched\n"
+    outside_packet.write_bytes(original)
+    (checkout / ".agent-canon").symlink_to(outside, target_is_directory=True)
+    writer = WriterTarget(str(checkout), "fix/942", "local/repo", ("src/",))
+    identity = {
+        "cwd": str(checkout),
+        "git_root": str(checkout),
+        "branch": "fix/942",
+        "head": "b" * 40,
+        "remote": "local/repo",
+    }
+
+    with pytest.raises(WriterTargetError, match="writer_target_packet_path_unsafe"):
+        materialize_writer_target_packet(writer, identity)
+
+    assert outside_packet.read_bytes() == original
+
+
 def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)

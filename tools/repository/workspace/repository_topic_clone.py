@@ -811,34 +811,26 @@ def _update_existing_prepare_metadata(
     if state.state != "ready":
         return None
 
-    packet_path = clone / WRITER_TARGET_PACKET_RELATIVE
-    if (
-        packet_path.is_symlink()
-        or packet_path.parent.is_symlink()
-        or (packet_path.parent.exists() and not packet_path.parent.is_dir())
-        or (packet_path.exists() and not packet_path.is_file())
-        or (
-            packet_path.exists()
-            and _run_git_bool(
-                clone,
-                [
-                    "ls-files",
-                    "--error-unmatch",
-                    "--",
-                    WRITER_TARGET_PACKET_RELATIVE.as_posix(),
-                ],
-            )
-        )
-    ):
-        return None
-
     packet_target: WriterTarget | None = None
     packet_identity: Mapping[str, object] | None = None
-    if packet_path.exists():
-        try:
-            packet_target, packet_identity = read_writer_target_packet(clone)
-        except (OSError, UnicodeDecodeError, WriterTargetError):
-            return None
+    try:
+        packet_target, packet_identity = read_writer_target_packet(clone)
+    except WriterTargetError as exc:
+        if str(exc) != "writer_target_packet_missing":
+            raise RepositoryTopicCloneError(str(exc)) from exc
+
+    if packet_target is not None and _run_git_bool(
+        clone,
+        [
+            "ls-files",
+            "--error-unmatch",
+            "--",
+            WRITER_TARGET_PACKET_RELATIVE.as_posix(),
+        ],
+    ):
+        raise RepositoryTopicCloneError(
+            "prepare collision: writer-target packet is tracked"
+        )
 
     checkout_identity = resolve_checkout_identity(clone).as_dict()
     branch = _run_git(
@@ -894,7 +886,7 @@ def _update_existing_prepare_metadata(
         exclude = _git_path(clone, "info/exclude")
         if exclude.is_symlink() or (exclude.exists() and not exclude.is_file()):
             return None
-        if packet_path.exists():
+        if packet_target is not None:
             try:
                 excluded_lines = {
                     line.strip()
@@ -1293,10 +1285,13 @@ def request(
     )
     if writer_target is not None:
         _ensure_writer_target_packet_ignored(clone)
-        writer_target_packet = materialize_writer_target_packet(
-            writer_target,
-            checkout_identity,
-        )
+        try:
+            writer_target_packet = materialize_writer_target_packet(
+                writer_target,
+                checkout_identity,
+            )
+        except WriterTargetError as exc:
+            raise RepositoryTopicCloneError(str(exc)) from exc
     final_state = _inspect(clone, request_state, owner_sha=owner_sha)
     if final_state.state != "ready":
         raise RepositoryTopicCloneError(
@@ -1635,11 +1630,14 @@ def cleanup(
     publication_readback: Path | str | None = None,
     apply: bool,
 ) -> CleanupProof:
-    """Validate reconstructibility evidence and remove the clone if authorized.
+    """Validate Git-state and reconstructibility evidence before optional removal.
 
-    A clean, identity-matched clone whose local head exactly matches the fetched
-    topic branch is sufficient for ordinary cleanup. Publication receipts are
-    optional enrichment; when one is supplied, the complete coherent lifecycle
+    Linked-worktree evidence retains only the superproject commit/tree; independent
+    clone evidence compares the remote branch commit/tree. Neither establishes
+    whole-tree retention. Before ``apply=True``, the task owner must confirm that
+    the exact checkout is no longer in use and preserve required ignored, untracked,
+    submodule-only, or annex-only content outside the removal target. Publication
+    receipts are optional enrichment; when supplied, the complete coherent lifecycle
     receipt set is validated before it can authorize cleanup.
     """
     has_lifecycle_evidence = any(

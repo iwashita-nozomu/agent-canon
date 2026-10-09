@@ -950,6 +950,51 @@ def test_prepare_updates_dirty_linked_target_without_touching_checkout_data(
     assert index_path.read_bytes() == before_index
 
 
+def test_prepare_holds_symlinked_writer_packet_without_mutating_outside_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An ignored packet symlink cannot redirect the reserved metadata write."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-symlinked-writer-packet",
+        workspace_root=workspace,
+        topic="topic-symlinked-writer-packet",
+        branch="feature/symlinked-writer-packet",
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    prepared = rtc.request(**request, allowed_paths=("first.py",))
+    packet_path = prepared.writer_target_packet
+    assert packet_path is not None
+    packet_contents = packet_path.read_bytes()
+    outside_packet = tmp_path / "outside-writer-target.json"
+    outside_packet.write_bytes(packet_contents)
+    packet_path.unlink()
+    packet_path.symlink_to(outside_packet)
+    assert not run_git(
+        prepared.clone,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="writer_target_packet_path_unsafe",
+    ):
+        rtc.request(**request, allowed_paths=("replacement.py",))
+
+    assert packet_path.is_symlink()
+    assert outside_packet.read_bytes() == packet_contents
+
+
 def test_prepare_refreshes_changed_owner_evidence_and_current_writer_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
