@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -53,8 +54,12 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             PROJECT_ROOT / DEFAULT_JSON_PATH,
         )
         before = tuple(path.read_bytes() for path in tracked)
-        with self.assertRaisesRegex(GraphSourceMutationError, "runtime_root_required"):
-            write_artifacts(PROJECT_ROOT)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
+            with self.assertRaisesRegex(
+                GraphSourceMutationError, "runtime_root_required"
+            ):
+                write_artifacts(PROJECT_ROOT)
         self.assertEqual(before, tuple(path.read_bytes() for path in tracked))
 
     def test_graph_default_output_is_external_and_preserves_source(self) -> None:
