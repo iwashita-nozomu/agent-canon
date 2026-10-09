@@ -2,7 +2,7 @@
 name: long-form-writing
 description: "Use for reader-facing README, workflow, guide, migration, or specification writing and revision; proceed from existing sources, text, and brief structure notes, and do not select this skill by text length alone."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"e7004f978f3ebb67f01f9a84c1913d3ceb4cf5631ee574ec84998e3178bdeb86"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"20a6897135659debfcbb7386c074f2539b9e59d4e00c0aaa8b5e62d96044e16e"} -->
 
 <!--
 @dependency-start
