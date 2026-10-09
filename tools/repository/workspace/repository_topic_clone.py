@@ -136,18 +136,31 @@ class GitCommandError(RepositoryTopicCloneError):
         )
 
 
-def _ensure_writer_target_packet_ignored(clone: Path) -> None:
+def _ensure_writer_target_packet_ignored(
+    clone: Path,
+    attestation: _parent_boundary.ParentRootAttestationReceipt,
+) -> None:
     """Keep the task-local writer packet out of Git status in every clone."""
     exclude = _git_path(clone, "info/exclude")
     line = WRITER_TARGET_PACKET_RELATIVE.as_posix()
     try:
-        current = exclude.read_text(encoding="utf-8") if exclude.is_file() else ""
-        if line in {entry.strip() for entry in current.splitlines()}:
-            return
-        exclude.parent.mkdir(parents=True, exist_ok=True)
-        separator = "" if not current or current.endswith("\n") else "\n"
-        exclude.write_text(f"{current}{separator}{line}\n", encoding="utf-8")
-    except OSError as exc:
+        with _parent_boundary.ParentRootSideEffectBoundary().open_parent_owned_file(
+            attestation,
+            exclude,
+            "repository-topic-clone-writer-target-ignore",
+            create=True,
+            mode="a+",
+        ) as owned_exclude:
+            owned_exclude.seek(0)
+            current = owned_exclude.read()
+            if line in {entry.strip() for entry in current.splitlines()}:
+                return
+            separator = "" if not current or current.endswith("\n") else "\n"
+            owned_exclude.seek(0, os.SEEK_END)
+            owned_exclude.write(f"{separator}{line}\n")
+    except _parent_boundary.ParentRootSideEffectError as exc:
+        raise RepositoryTopicCloneError(_parent_error(exc)) from exc
+    except (OSError, UnicodeError) as exc:
         raise RepositoryTopicCloneError(
             f"writer_target_packet_ignore_failed:{exclude}"
         ) from exc
@@ -825,6 +838,7 @@ def _update_existing_prepare_metadata(
     clone: Path,
     *,
     owner_sha: str,
+    parent_attestation: _parent_boundary.ParentRootAttestationReceipt,
 ) -> PrepareReceipt | None:
     """Refresh only canonical handoff metadata for an exact existing checkout."""
     state = _inspect(clone, request, owner_sha=None, require_clean=False)
@@ -902,19 +916,26 @@ def _update_existing_prepare_metadata(
     updated_packet: Path | None = None
     if target is not None:
         exclude = _git_path(clone, "info/exclude")
-        if exclude.is_symlink() or (exclude.exists() and not exclude.is_file()):
-            return None
         if packet_target is not None:
+            try:
+                exclude_bytes = _parent_boundary.read_parent_owned_bytes(
+                    parent_attestation,
+                    exclude,
+                    "repository-topic-clone-writer-target-ignore-read",
+                    allow_missing=True,
+                )
+            except _parent_boundary.ParentRootSideEffectError as exc:
+                raise RepositoryTopicCloneError(_parent_error(exc)) from exc
             try:
                 excluded_lines = {
                     line.strip()
-                    for line in exclude.read_text(encoding="utf-8").splitlines()
+                    for line in (exclude_bytes or b"").decode("utf-8").splitlines()
                 }
-            except (OSError, UnicodeDecodeError):
+            except UnicodeDecodeError:
                 return None
             if WRITER_TARGET_PACKET_RELATIVE.as_posix() not in excluded_lines:
                 return None
-        _ensure_writer_target_packet_ignored(clone)
+        _ensure_writer_target_packet_ignored(clone, parent_attestation)
         try:
             updated_packet = materialize_writer_target_packet(target, checkout_identity)
             updated_target, updated_identity = read_writer_target_packet(clone)
@@ -1144,12 +1165,16 @@ def request(
             raise RepositoryTopicCloneError("prepare collision: anchor-origin-mismatch")
     owner_sha = _evidence_sha256(request_state.owner_evidence)
     clone = computed_clone_path(request_state, create_topic=True)
-    if request_state.parent_attestation is None:
+    parent_attestation = request_state.parent_attestation
+    if parent_attestation is None:
         raise RepositoryTopicCloneError(
             "parent-root-attestation:boundary:attestation missing"
         )
     metadata_receipt = _update_existing_prepare_metadata(
-        request_state, clone, owner_sha=owner_sha
+        request_state,
+        clone,
+        owner_sha=owner_sha,
+        parent_attestation=parent_attestation,
     )
     if metadata_receipt is not None:
         if policy is not None:
@@ -1286,6 +1311,8 @@ def request(
             request_state.allowed_paths,
         )
         validate_writer_target_identity(writer_target, checkout_identity)
+    if writer_target is not None:
+        _ensure_writer_target_packet_ignored(clone, parent_attestation)
     _set_marker(clone, request_state, owner_sha=owner_sha, branch=branch_name)
     _run_git(
         clone,
@@ -1297,7 +1324,6 @@ def request(
         ],
     )
     if writer_target is not None:
-        _ensure_writer_target_packet_ignored(clone)
         try:
             writer_target_packet = materialize_writer_target_packet(
                 writer_target,

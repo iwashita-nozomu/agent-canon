@@ -1383,6 +1383,83 @@ def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content
     )
 
 
+@pytest.mark.parametrize(
+    ("packet_present", "requested_paths"),
+    [
+        pytest.param(False, ("first.py",), id="metadata-create"),
+        pytest.param(True, ("first.py",), id="normal-prepare"),
+        pytest.param(True, ("updated.py",), id="metadata-refresh"),
+    ],
+)
+def test_prepare_holds_external_info_exclude_symlink_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    packet_present: bool,
+    requested_paths: tuple[str, ...],
+) -> None:
+    """An exclude symlink outside the parent cannot receive writer metadata."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-external-exclude",
+        workspace_root=workspace,
+        topic="topic-external-exclude",
+        branch="feature/external-exclude",
+        owner_evidence=evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+
+    prepared = rtc.request(**request)
+    packet = prepared.writer_target_packet
+    assert packet is not None
+    packet_before = packet.read_bytes() if packet_present else None
+    if not packet_present:
+        packet.unlink()
+
+    exclude = git_metadata_path(prepared.clone, "info/exclude")
+    external_exclude = tmp_path / "outside-info-exclude"
+    external_before = b".agent-canon/*\n"
+    external_exclude.write_bytes(external_before)
+    exclude.unlink()
+    exclude.symlink_to(external_exclude)
+
+    index = git_metadata_path(prepared.clone, "index")
+    config = git_metadata_path(prepared.clone, "config.worktree")
+    before_index = index.read_bytes()
+    before_config = config.read_bytes()
+    before_files = snapshot_checkout_files(prepared.clone)
+    before_head = run_git(prepared.clone, "rev-parse", "HEAD")
+    before_branch = run_git(prepared.clone, "symbolic-ref", "--short", "HEAD")
+    before_status = run_git(prepared.clone, "status", "--porcelain=v1")
+    assert before_status == ""
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="parent-root-attestation:symlink_escape",
+    ):
+        rtc.request(**{**request, "allowed_paths": requested_paths})
+
+    assert external_exclude.read_bytes() == external_before
+    assert exclude.is_symlink()
+    assert exclude.resolve() == external_exclude.resolve()
+    assert index.read_bytes() == before_index
+    assert config.read_bytes() == before_config
+    assert snapshot_checkout_files(prepared.clone) == before_files
+    assert run_git(prepared.clone, "rev-parse", "HEAD") == before_head
+    assert run_git(prepared.clone, "symbolic-ref", "--short", "HEAD") == before_branch
+    assert run_git(prepared.clone, "status", "--porcelain=v1") == before_status
+    if packet_before is None:
+        assert not packet.exists()
+    else:
+        assert packet.read_bytes() == packet_before
+
+
 def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
