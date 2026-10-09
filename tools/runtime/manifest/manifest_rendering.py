@@ -150,6 +150,7 @@ def _required_spec_source_root(spec: RunBundleSpec) -> Path:
         raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     return source_root.resolve()
 
+
 DEPENDENCY_MANIFEST_CLOSE_MARKER = "-->"
 
 NEWLINE = "\n"
@@ -373,9 +374,7 @@ PRE_HANDOFF_SCOPE_HANDOFF_RULE = (
     "known な reuse survey asset context から重複する責務 slice を統合する"
 )
 
-PRE_HANDOFF_GATE_STATUS_SOURCE = (
-    "agents/COMMUNICATION_PROTOCOL.md#Handoff Packet"
-)
+PRE_HANDOFF_GATE_STATUS_SOURCE = "agents/COMMUNICATION_PROTOCOL.md#Handoff Packet"
 
 PRE_HANDOFF_GATE_STATUS_DEFAULT = "pending_design_review_gate_check"
 
@@ -408,9 +407,23 @@ DEFAULT_QUALITY_CHECK_STAGES = ("selected_stages_only",)
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     ("tools/bin/agent-canon", "docs", "check", "<changed-markdown-paths>"),
     ("python3", "tools/validation/semantic/convention/check_convention_compliance.py"),
-    ("python3", "tools/validation/semantic/dependencies/check_dependency_headers.py", "--changed"),
-    ("bash", "tools/analysis/dependencies/scan_dependency_headers.sh", "--changed", "--fail-missing"),
-    ("bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh", "--changed", "--require-header"),
+    (
+        "python3",
+        "tools/validation/semantic/dependencies/check_dependency_headers.py",
+        "--changed",
+    ),
+    (
+        "bash",
+        "tools/analysis/dependencies/scan_dependency_headers.sh",
+        "--changed",
+        "--fail-missing",
+    ),
+    (
+        "bash",
+        "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+        "--changed",
+        "--require-header",
+    ),
 )
 
 CANONICAL_FORMAT_CHECK_ROUTE = DEFAULT_QUALITY_CHECK_STATIC_COMMANDS[0]
@@ -874,7 +887,9 @@ def public_command_for_spec(
 ) -> str:
     """Render one command through the selected source/public layout owner."""
     roots = spec.repository_roots
-    layout = getattr(roots, "layout", "standalone") if roots is not None else "standalone"
+    layout = (
+        getattr(roots, "layout", "standalone") if roots is not None else "standalone"
+    )
     return public_command_for_layout(command, layout)
 
 
@@ -889,10 +904,7 @@ def language_review_candidates(
     )
     has_python = any(
         normalized.startswith("python/")
-        or (
-            normalized.startswith("tests/")
-            and not normalized.startswith("tests/cpp/")
-        )
+        or (normalized.startswith("tests/") and not normalized.startswith("tests/cpp/"))
         or Path(normalized).suffix.lower() in PYTHON_SUFFIXES
         for normalized in normalized_paths
     )
@@ -977,7 +989,9 @@ def render_template_partial(
     if not path.is_file():
         raise RuntimeError(f"template partial not found: {partial_name}")
     content = strip_dependency_manifest(path.read_text(encoding="utf-8"))
-    return expand_template_partials(content, (*seen, partial_name), source_root=source_root)
+    return expand_template_partials(
+        content, (*seen, partial_name), source_root=source_root
+    )
 
 
 def expand_template_partials(
@@ -1019,7 +1033,10 @@ def render_template(
 
 def render_code_template(template_name: str) -> str:
     """互換 facade から package-safe code-template renderer を呼び出します."""
-    from tools.agent.templates.code_template_rendering import render_code_template as render_source
+    from tools.agent.templates.code_template_rendering import (
+        render_code_template as render_source,
+    )
+
     return render_source(template_name)
 
 
@@ -1120,7 +1137,11 @@ def initial_wave_execution_gate_lines(
     )
     return (
         ("schedule.md", "## Agent Wave Ledger", schedule_wave_row(row)),
-        ("workflow_monitoring.md", "## Actual Wave Events", workflow_wave_event_line(row)),
+        (
+            "workflow_monitoring.md",
+            "## Actual Wave Events",
+            workflow_wave_event_line(row),
+        ),
     )
 
 
@@ -1214,7 +1235,9 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
     if configured:
         parent = Path(configured).resolve(strict=True)
         attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="manifest-rendering")
+            ParentRootAttestationRequest(
+                cwd=parent, explicit_root=parent, purpose="manifest-rendering"
+            )
         )
         ParentRootSideEffectBoundary().write_parent_owned_file(
             attestation, path, rendered, "manifest-rendering"
@@ -1281,12 +1304,14 @@ def manifest_run_lines(
         f"  report_dir: {str(spec.report_dir)!r}",
         f"  workspace_root: {str(spec.workspace_root)!r}",
         f"  team_config: {str(source_root / 'agents' / 'agents_config.json')!r}",
-        f"  team_runtime: {str(source_root / "tools" / "agent" / "orchestration" / "agent_team.py")!r}",
+        f"  team_runtime: {str(source_root / 'tools' / 'agent' / 'orchestration' / 'agent_team.py')!r}",
         f"  task_catalog: {str(source_root / str(spec.config.team['task_catalog']))!r}",
         "  checkout_identity:",
         *(
             f"    {field}: {value!r}"
-            for field, value in resolve_checkout_identity(spec.workspace_root).as_dict().items()
+            for field, value in resolve_checkout_identity(spec.workspace_root)
+            .as_dict()
+            .items()
         ),
     ]
     if spec.issue_worker_dispatch is not None:
@@ -1720,7 +1745,9 @@ def manifest_run_lines(
         lines.append("    scope_source_ref: run.pre_handoff_scope_policy")
         lines.append("    handoff_scope_status: seed_then_expand_before_handoff")
         lines.append("    disjoint_write_scopes_required: true")
-        lines.append("    overlapping_write_scopes: reject_same_checkout_root_before_spawn")
+        lines.append(
+            "    overlapping_write_scopes: reject_same_checkout_root_before_spawn"
+        )
         lines.append(f"    max_write_subagents: {max_write_subagents}")
         lines.append("  writer_target_policy:")
         lines.append("    required_for: write_capable_handoffs")
@@ -2076,7 +2103,9 @@ def manifest_one_role_lines(
         "implementer",
         "mathematical_correctness_reviewer",
     }:
-        lines.append("    mathematical_intent_packet_ref: run.mathematical_intent_packet")
+        lines.append(
+            "    mathematical_intent_packet_ref: run.mathematical_intent_packet"
+        )
         lines.append("    math_intent_write_scope: mapped_allowed_paths_only")
         lines.append(
             "    math_intent_forbidden_surfaces: architecture,framework,jit,compiler,backend,runtime,container,docker,routing,environment,proof,ir"
@@ -2179,7 +2208,9 @@ def manifest_write_policy_lines(
         lines.append(f"        - {str(path)!r}")
     if role.write_policy.conditional_artifacts:
         lines.append("      conditional_artifacts:")
-        for condition, artifact_keys in sorted(role.write_policy.conditional_artifacts.items()):
+        for condition, artifact_keys in sorted(
+            role.write_policy.conditional_artifacts.items()
+        ):
             lines.append(f"        {condition}:")
             for artifact_key in artifact_keys:
                 lines.append(
@@ -2363,9 +2394,7 @@ def render_subagent_prompt_packet(
         "'run.decision_sufficiency.packet_ref'"
     )
     lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
-    lines.append(
-        f"{indent}  native_argv: 'run.repo_tool_routing_policy'"
-    )
+    lines.append(f"{indent}  native_argv: 'run.repo_tool_routing_policy'")
     lines.append(
         f"{indent}  tool_evidence: 'run.repo_tool_routing_policy.dynamic_skill_routing'"
     )
