@@ -530,19 +530,16 @@ def _git_repository_redirect(
         if outside or normalized != ".":
             return (normalized,), "git_repository_redirect"
 
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(cwd),
-            *global_options,
-            "rev-parse",
-            "--show-toplevel",
-        ],
-        check=False,
-        capture_output=True,
-        env=_git_process_environment(environment_overrides),
-    )
+    try:
+        result = subprocess.run(
+            ["git", *global_options, "rev-parse", "--show-toplevel"],
+            check=False,
+            capture_output=True,
+            cwd=cwd,
+            env=_git_process_environment(environment_overrides),
+        )
+    except OSError:
+        return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
     if result.returncode != 0:
         return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
     try:
@@ -640,12 +637,16 @@ def _git_name_only_paths(
     if base is not None:
         args.append(base)
     args.extend(("--name-only", "-z", "--no-renames"))
-    result = subprocess.run(
-        ["git", "-C", str(cwd), *global_options, *args],
-        check=False,
-        capture_output=True,
-        env=_git_process_environment(environment_overrides),
-    )
+    try:
+        result = subprocess.run(
+            ["git", *global_options, *args],
+            check=False,
+            capture_output=True,
+            cwd=cwd,
+            env=_git_process_environment(environment_overrides),
+        )
+    except OSError:
+        return (UNRESOLVED_SHELL_PATH,)
     if result.returncode != 0:
         return (UNRESOLVED_SHELL_PATH,)
     return tuple(
