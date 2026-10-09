@@ -56,11 +56,15 @@ reuse results under matching premises, and verify decision-relevant changed prem
 Within that starting point, apply SEP-06's mathematical simplicity comparison,
 including contract redesign, independent state, exceptional cases, coupled
 invariants, and proof obligations across the affected unit and its consumers.
+Before selecting a repair, use [SEP-07 Reachability and remedy necessity](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)
+to establish that the current implementation fails a required contract and that
+existing guarantees do not already satisfy it.
 Remove redundant representations and mechanisms when the derivation permits.
 Consolidate the root responsibility and trace affected contracts to consumers;
-use that complete unit to determine the change scope. A specialized branch requires
-a verified difference in behavior or input contract. Reuse sound parts and retire
-superseded branches together with the common correction.
+use that complete unit to determine the change scope. For repairs, correct the
+existing owner's mechanism rather than adding a specialized branch; preserve
+verified distinctions required by domain behavior or input contracts. Reuse sound
+parts and retire superseded branches together with the common correction.
 
 For replacement or retirement, close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
 in the same change: remove obsolete paths and support, migrate affected uses, and
@@ -95,10 +99,14 @@ with direct use or composition before a new API. Keep one exposed API per
 functional capability. Alternate names or routes, forwarding aliases, independent
 duplicate APIs, and compatibility wrappers are additional APIs for that capability.
 Private implementation decomposition is not an API; preserve distinct
-responsibilities and do not add aliases, adapters, or guards merely to announce
-policy. For a repair, choose the simplest complete correction, including
-replacement when justified. Test a concrete candidate use against the required
-property, including relevant configuration and composition.
+responsibilities. Use existing domain types, API contracts, and responsibility
+abstractions for structural guarantees; keep workflow guidance with its owner
+instead of encoding it wholesale in flags, validators, or runtime admission
+gates. Validate real untrusted input and I/O at their boundary, but do not repeat
+guards for invariants already enforced by a type or API. For a repair, choose the
+simplest complete correction, including replacement when justified. Test a
+concrete candidate use against the required property, including relevant
+configuration and composition.
 State the checked input/source, actual result, and conclusion; investigate a missing
 guarantee until the material decision is settled. Record candidates, verified unmet
 contracts, and necessary owner/API changes in the existing design.
