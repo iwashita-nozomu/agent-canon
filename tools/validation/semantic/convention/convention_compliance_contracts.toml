@@ -9,17 +9,13 @@
 
 schema_version = 1
 
-# Skill policy markers belong to agents/skills/<skill>.md canonical prose owners.
-# Generated .codex/personal/skills/<skill>/SKILL.md adapters use dedicated shim readback gates.
-# AGENTS.md and ROOT_AGENTS.md are reader maps; operational marker contracts stay in owners.
+# Marker contracts attach to the canonical source that owns each policy.
+# Generated skill adapters use dedicated shim readback gates.
+# AGENTS.md and ROOT_AGENTS.md are reader maps, not policy marker surfaces.
 
 [[contracts]]
 id = "static_read_validation_policy"
 description = "Validation keeps static/read evidence primary, adds targeted runtime evidence only for changed behavior or integration risk, and records unresolved runtime or static risk before broader execution."
-
-[[contracts.surfaces]]
-path = "agents/skills/codex-task-workflow.md"
-markers = ["静的解析・読み取り evidence", "primary validation evidence", "supplemental evidence", "runtime behavior", "未解決 finding"]
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_COMPLETION.md"
