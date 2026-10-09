@@ -117,6 +117,8 @@ def init_remote(tmp_path: Path) -> tuple[Path, str]:
     subprocess.run(
         ["git", "init", "-b", "main", str(source)], check=True, capture_output=True
     )
+    run_git(source, "config", "user.name", "Test")
+    run_git(source, "config", "user.email", "test@example.invalid")
     (source / "base.txt").write_text("base\n", encoding="utf-8")
     run_git(source, "add", "base.txt")
     subprocess.run(
@@ -124,10 +126,6 @@ def init_remote(tmp_path: Path) -> tuple[Path, str]:
             "git",
             "-C",
             str(source),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
             "commit",
             "-m",
             "init",
