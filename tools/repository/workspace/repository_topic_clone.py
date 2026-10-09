@@ -728,10 +728,17 @@ def _inspect(
     """Read computed-path Git identity and cross-check recorded lifecycle markers."""
     if not path.exists():
         return CloneState(path, "absent")
-    if not path.is_dir() or not _run_git_bool(
-        path, ["rev-parse", "--is-inside-work-tree"]
-    ):
+    if not path.is_dir():
         return CloneState(path, "not-git")
+    try:
+        observed_root = Path(
+            _run_git(path, ["rev-parse", "--show-toplevel"]).strip()
+        ).resolve(strict=True)
+        computed_root = path.resolve(strict=True)
+    except (GitCommandError, OSError, RuntimeError):
+        return CloneState(path, "not-git")
+    if observed_root != computed_root:
+        return CloneState(path, "repository-mismatch")
     if _git_path(path, "MERGE_HEAD").exists() or _git_path(path, "MERGE_MSG").exists():
         return CloneState(path, "merge-conflict-preserve")
     if request.checkout_mode == CHECKOUT_MODE_LINKED:

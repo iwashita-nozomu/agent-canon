@@ -547,6 +547,63 @@ def test_prepare_allows_source_discovery_without_writer_scope_then_materializes_
     assert not run_git(writable.clone, "status", "--porcelain")
 
 
+def test_prepare_rejects_nested_parent_repo_without_mutating_ancestor(
+    tmp_path: Path,
+) -> None:
+    """A computed directory inside the anchor repo cannot inherit its Git identity."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    branch = run_git(workspace, "symbolic-ref", "--short", "HEAD")
+    request = dict(
+        url=remote_url,
+        repository="repo-nested-parent",
+        workspace_root=workspace,
+        topic="topic-nested-parent",
+        branch=branch,
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
+    )
+    nested = (
+        workspace
+        / "workspace"
+        / rtc.topic_slug(request["topic"])
+        / request["repository"]
+    )
+    nested.mkdir(parents=True)
+    local_data = nested / "local-data.txt"
+    local_data.write_text("preserve ancestor-owned checkout data\n", encoding="utf-8")
+    assert not run_git(workspace, "status", "--porcelain")
+    common_config = git_metadata_path(workspace, "config")
+    index_path = git_metadata_path(workspace, "index")
+    exclude_path = git_metadata_path(workspace, "info/exclude")
+    before_config = common_config.read_bytes()
+    before_index = index_path.read_bytes()
+    before_exclude = exclude_path.read_bytes()
+    before_refs = run_git(workspace, "show-ref")
+    before_head = run_git(workspace, "rev-parse", "HEAD")
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="repository-mismatch"
+    ):
+        rtc.request(**request)
+
+    assert (
+        local_data.read_text(encoding="utf-8")
+        == "preserve ancestor-owned checkout data\n"
+    )
+    assert not (nested / ".git").exists()
+    assert not (nested / rtc.WRITER_TARGET_PACKET_RELATIVE).exists()
+    assert common_config.read_bytes() == before_config
+    assert index_path.read_bytes() == before_index
+    assert exclude_path.read_bytes() == before_exclude
+    assert run_git(workspace, "show-ref") == before_refs
+    assert run_git(workspace, "rev-parse", "HEAD") == before_head
+    assert not run_git(workspace, "status", "--porcelain")
+
+
 def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
