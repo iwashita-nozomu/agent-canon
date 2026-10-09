@@ -4,7 +4,6 @@ contract design
 responsibility Documents 設計ドキュメント for this repository.
 upstream design ../rule/README.md document rule canon
 upstream design dependency-manifest-design.md dependency evidence contract
-downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design-doc claim evidence
 @dependency-end
 -->
 
@@ -110,7 +109,7 @@ downstream implementation ../../tools/validation/semantic/documents/check_design
 
 - 実コードに対応する詳細設計が必要になった時点で、`documents/design/<topic>/` を追加します。
 - 詳細設計は、実装者がそのまま従える粒度の責務分割、公開境界、検証計画を含めます。
-- 詳細設計は、current code、dependency header evidence、parent documents に支えられた `Evidence And Assumption Ledger` を持ち、初出の DSL 用語や problem standard form をそこで明示します。
+- 詳細設計は通常の prose と Markdown links で current code、dependency context、parent documents を参照し、重要な判断を支える根拠と前提をその場で説明します。固定した ledger 見出しや claim-token 形式は要求しません。
 - 新しい設計入口は、対応する実装 path、dependency header edge、または親文書上の governing source と一緒に追加します。
 
 ## 更新ルール

@@ -152,14 +152,6 @@ language = "python"
 summary = "Git diff and dependency expansion summary documentation."
 
 [[tool]]
-id = "check-design-doc-claims"
-classification = "public"
-tool = "tools/validation/semantic/documents/check_design_doc_claims.py"
-doc = "documents/tools/check_design_doc_claims.md"
-language = "python"
-summary = "Design-document claim evidence checker documentation."
-
-[[tool]]
 id = "check-semantic-responsibility-contract"
 classification = "public"
 tool = "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"

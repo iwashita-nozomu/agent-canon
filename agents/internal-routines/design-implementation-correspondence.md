@@ -7,7 +7,6 @@ upstream design ../canonical/CODEX_WORKFLOW.md implementation entry and design-i
 upstream design ../../ROOT_AGENTS.md common code/API necessity-rationale persistence boundary
 downstream implementation ../../tools/agent/orchestration/route.py selects capability and stage routes
 downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py transports design fingerprints and handoff state
-downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design-backed claims
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates canonical runtime references
 downstream design ../skills/change-review.md consumes forward and reverse correspondence at review
 upstream design ../../documents/design/request-intent-and-update-relation.md compact request/update and related-document closure contract
@@ -163,7 +162,6 @@ read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
 最小の validation route は次です。
 
 ```bash
-python3 tools/validation/semantic/documents/check_design_doc_claims.py --root . --recursive-depth 3 <design-doc>
 python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
 python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 tools/bin/agent-canon docs check
@@ -183,7 +181,7 @@ tools/bin/agent-canon docs check
 | --- | --- | --- | --- |
 | `DIC-001..DIC-009` | current workflow and review owners | [agents/skills/agent-orchestration.md](../skills/agent-orchestration.md), [agents/skills/oop-type-design.md](../skills/oop-type-design.md), [agents/skills/change-review.md](../skills/change-review.md), this routine | active DIC route の changed path は DIC clause を cite し、missing design readback は block |
 | `DIC-003..DIC-004` | planned transport owner | `tools/runtime/lifecycle/bootstrap_agent_run.py`, [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) | handoff identity、`implementation_targets`、`validation_route` は各 digest で参照し、実行 readback は両 digest を再計算する |
-| `DIC-005..DIC-006` | current/planned review owner | [agents/skills/change-review.md](../skills/change-review.md), `tools/validation/semantic/documents/check_design_doc_claims.py` | every accepted finding has forward and reverse evidence; drift is a blocker |
+| `DIC-005..DIC-006` | current/planned review owner | [agents/skills/change-review.md](../skills/change-review.md) | every accepted finding has forward and reverse evidence; drift is a blocker |
 | `DIC-007..DIC-008` | current routing/path owners | `tools/agent/orchestration/route.py`, `tools/runtime/source/agent_canon_source_root.py` | capability and locator changes map back to the clause that authorized them |
 | `DIC-009` | current canonical-document owners | `agents/internal-routines/`, `agents/skills/`, `documents/design/` | a new policy copy or loophole maps to a rejected design change |
 | `DIC-010` | current DIC routine | this routine only; owner surfaces consume `DIC-010` path/section/clause/ref receipts | dependency headers, README map, target headers, validation/runtime docs, and root projections close the forward/reverse source packet |

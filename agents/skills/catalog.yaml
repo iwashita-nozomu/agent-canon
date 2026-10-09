@@ -1156,7 +1156,6 @@ skill_families:
       - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory", "--root", "<root>"]}
       - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json"]}
       - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "check-document", "<readme-path>", "--out-dir", "<run>/prose/<readme-id>", "--profile", "all", "--stats-out", "<run>/prose/<readme-id>.stats.json"]}
-      - {"tool_id": "check-design-doc-claims", "operation_id": "default", "argv_suffix": ["--root", "<root>", "<design-doc>"]}
       - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "<root>"]}
       - {"tool_id": "import-responsibility", "operation_id": "default", "argv_suffix": ["--root", "<root>"]}
       - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json"]}
@@ -1510,7 +1509,6 @@ skill_families:
       - {"executable": "agent-canon", "argv": ["semantic-index", "context-pack"]}
       - {"executable": "git", "argv": ["grep", "-l", "search phrase", "--", "<responsibility-scoped", "dirs>", ">", "reports/search_hits.txt"]}
       - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
-      - {"tool_id": "check-design-doc-claims", "operation_id": "default"}
       - {"executable": "agent-canon", "argv": ["python-structure-hash-scope-plan"]}
       - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--changed", "--print-edges", "--check-bidirectional"]}
       - {"tool_id": "scan-dependency-headers", "operation_id": "default"}

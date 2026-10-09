@@ -17,7 +17,6 @@ upstream design ../../agents/skills/task-routing.md public route/tool ownership 
 upstream design ../../agents/skills/oop-type-design.md approved OOP type and capability-route ownership
 upstream implementation ../../tools/agent/skills/skill_route_catalog.py canonical explicit skill capability catalog/index owner
 upstream implementation ../../tools/agent/orchestration/capability_route.py canonical explicit skill capability preflight/decision owner
-upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py current implementation-backed design claim checker
 downstream implementation ../../tools/agent/orchestration/agent_team.py packet projection, queueing, lineage, and generated views
 downstream implementation ../../tools/agent/orchestration/route.py existing public skill route composition/rendering; implementation-model imports forbidden
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py static runtime/profile/view checker
@@ -109,13 +108,10 @@ the implementation authority.
   consumes their successful gate identities without reimplementing either
   invariant.
 
-Claims in this artifact have three evidence classes: `current_state` uses the
-identities above; `request_contract` uses the RC clauses below; `target_state`
-is an approved but not-yet-implemented obligation closed only by final
-source/view/checker/eval readback. An unverified assumption blocks approval.
-The implementation extends `check_design_doc_claims.py` with this typed class
-distinction; it must not satisfy a target-state claim by pretending a planned
-file already exists.
+This artifact distinguishes current behavior, request clauses, and approved
+target behavior in ordinary prose. Source references identify the current
+implementation and governing documents; planned paths remain planned until the
+owning implementation and its selected readback establish them.
 
 ## 1. Request clauses and decision authority
 
@@ -630,12 +626,10 @@ checker_paths:
   - tools/validation/semantic/runtime/check_agent_runtime_alignment.py
   - eval/producers/evaluate_codex_agent_roles.py
   - eval/producers/evaluate_skill_workflow_prompts.py
-  - tools/validation/semantic/documents/check_design_doc_claims.py
 test_paths:
   - tests/agent_tools/test_model_profile_registry.py
   - tests/agent_tools/test_implementation_route.py
   - tests/agent_tools/test_capacity_handshake.py
-  - tests/agent_tools/test_check_design_doc_claims.py
   - tests/agent_tools/test_task_close.py
   - tests/agent_tools/test_agent_team_templates.py
   - tests/agent_tools/test_check_agent_runtime_alignment.py
@@ -1090,34 +1084,9 @@ stages consume prior evidence and must not re-open or duplicate an earlier
 decision. A missing, stale, or contradictory evidence identity is a typed
 boundary failure that returns to the owning stage.
 
-Design-claim evidence follows the same boundary instead of equating planned
-files with current implementation:
-
-```text
-ClaimEvidenceRecord {
-  record_version: uint64
-  claim_id: Id
-  claim_text_sha256: Sha256
-  evidence_class: current_state | request_contract | target_state | assumption
-  input_identity: InputIdentity
-  owner_id: Id
-  evidence_ids: list[Ref]
-  request_clause_ids: list[Id]
-  target_state_contract_sha256: Sha256 | none
-  final_readback_action_id: Id | none
-  status: verified | approved_pending_implementation | blocked
-}
-```
-
-`check_design_doc_claims.py` remains the claim-check owner but gains this
-typed ledger parser. `current_state` still requires existing dependency or
-implementation evidence; `request_contract` requires an exact RC identity;
-`target_state` requires the approved target-state digest and a deterministic
-final readback action; `assumption` must be verified or remains blocking. The
-checker reports those classes separately and never counts
-`approved_pending_implementation` as current implementation evidence. After
-implementation, every target-state record must transition to `verified` from
-the named readback before closeout.
+Design references are followed directly at the selected source revision.
+Owning checks establish implementation behavior; prose labels a planned target
+as planned until that owner readback is available.
 
 This design specifies the trust contract and packet fields only. It does not
 implement the update transaction that atomically updates the registry, source
@@ -3989,8 +3958,6 @@ review. The implementation worker may not invent an alternate path.
 | `tests/agent_tools/test_evaluate_skill_workflow_prompts.py` | Add capsule field-order and forbidden-context checklist tests. |
 | `tests/agent_tools/test_agent_team_templates.py` and `tests/agent_tools/test_bootstrap_and_close.py` | Add minimal worker projection, upstream-evidence identity, queue, reservation, full parent-visible topology, completed/errored handback, lifecycle, and lineage assertions. |
 | `tests/agent_tools/test_task_close.py` | Add closeout failures for completed-open, errored-open, missing durable handback, unknown descendant, missing per-terminal close-agent token, and reservation leaks, plus a passing full-topology lifecycle fixture. |
-| `tools/validation/semantic/documents/check_design_doc_claims.py` | Extend the existing owner with `ClaimEvidenceRecord` parsing and separate `current_state`, `request_contract`, `target_state`, and `assumption` outcomes; reject missing readback actions and never report planned targets as current implementation. |
-| `tests/agent_tools/test_check_design_doc_claims.py` | Add preimplementation approved-target, missing request clause, unresolved assumption, nonexistent planned path, and postimplementation readback-transition fixtures. |
 
 ### 5.5 Duplicate-surface removal and replacement set
 
@@ -4048,7 +4015,6 @@ Each decision is tied to the downstream surface that must change with it.
 | Dependency/import manifest | [documents/design/dependency-manifest-design.md](dependency-manifest-design.md), headers on every new source/test path | design -> implementation | detailed design | manifest/header checker and import graph | RC-08/17/21 | existing `@dependency-start` contracts |
 | Shared/root views | [documents/runtime/SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md), [AGENTS.md](../../AGENTS.md), [ROOT_AGENTS.md](../../ROOT_AGENTS.md), [documents/codex/AGENTS_COORDINATION.md](../codex/AGENTS_COORDINATION.md) | source -> generated/root view | document flow + structure | root/view parity and stale-surface sweep | RC-09/11/21 | shared runtime surface policy |
 | Evaluation provenance | `eval/definitions/agent_behavior_eval.toml`, `eval/definitions/skill_workflow_prompt_eval.toml`, role/prompt evaluators | implementation -> evaluation | prompt-config + detailed design | `PerformanceEvidenceRecord` plus machine-enforced `AssignmentEvidenceGate` | RC-15/18/19 | existing role and skill eval tools |
-| Claim evidence classification | design ledger, claim checker, final readback | design -> implementation -> closeout | detailed design + document flow | current/request/target/assumption fixtures and target verification transition | RC-09/10/11/17 | existing implementation-backed claim checker |
 
 ## 7. Design-to-implementation trace
 
@@ -4059,7 +4025,6 @@ Each decision is tied to the downstream surface that must change with it.
 | `agents/capacity_policy.toml` | 4.3 | RC-12/14 | task catalog spawn budget | policy/reference checker |
 | `tools/agent/orchestration/capacity_handshake.py` | 4.3 | RC-12/13/19/20/21/23 | workflow monitor lifecycle | loader, arithmetic, thread/model event, reclaim tests |
 | `tools/agent/orchestration/implementation_route.py` | 2.3/2.3.1/2.4/4.2/5.1 | RC-01/02/03/05/08/22/23/25/26 | landed immutable capability-decision envelope | executable-target immediate direct pass, fixed one-Spark/one-post-completion-gate/no-extra-agent, implementation-feedback continuity, same-Spark structural-gap repair/resume, graph-owned Luna, divergence-only design reopen, queue, negative-import tests |
-| `tools/validation/semantic/documents/check_design_doc_claims.py` | Evidence ledger/2.9/5.4 | RC-09/10/11/17 | current dependency-backed claim checker | claim-class parsing and pre/post implementation status tests |
 | landed `skill_route_catalog.py`, `capability_route.py`, and `route.py` | 2.1/9 | RC-08 | main `404678e1` OOP successor | exact identity plus positive/negative import checker; no edit |
 | `agent_team.py` | 4.2/4.3/4.4/4.5 | RC-05/06/12/13/26 | existing prompt packet and manifest projection | immediate direct materialization, same-worker gap continuation, team/lineage/queue tests, rebound deterministic search preservation |
 | `bootstrap_agent_run.py` | 4.3/5.3/10 | RC-12/13/14 | existing task/run manifest producers | requested-capacity derivation, loader identity, and no-static-default tests |
@@ -4090,7 +4055,6 @@ Each decision is tied to the downstream surface that must change with it.
 | `eval/definitions/agent_behavior_eval.toml` | 11 | RC-15/19/20/25/26 | role evaluation manifest | attributed performance, executable-target direct pass, feedback/gap split, same-Spark resume, no-compensation/no-extra-agent, divergence-only reopen, and lifecycle leak fixtures |
 | `eval/definitions/skill_workflow_prompt_eval.toml` | 11 | RC-15/18/25/26 | skill evaluation manifest | capsule/tool-token/Decision-Sufficiency/executable-target/direct-pass comprehension |
 | `tests/agent_tools/test_model_profile_registry.py` | 5.4 | RC-04/07/18/25/26 | registry/materializer tests | executable-target schema/order/nonblocking checkpoint/token/no-fallback/evidence-declaration tests |
-| `tests/agent_tools/test_check_design_doc_claims.py` | Evidence ledger/5.4 | RC-09/10/11/17 | current checker tests | current/request/target/assumption and final-readback fixtures |
 | `tests/agent_tools/test_capacity_handshake.py` | 5.4 | RC-12/13/19/20/21/23 | handshake tests | loader identity, unknown cap, min-known, thread/model event separation, completed/errored leak, queue, reload |
 | `tests/agent_tools/test_task_close.py` | 5.4/2.10 | RC-21 | closeout gate tests | completed-open/errored-open/handback/unknown/leak/token failures |
 
@@ -4413,14 +4377,11 @@ Validation is production-mechanism-first and proportional to the touched
 surface. Before source implementation, the artifact identity, typed target and
 packet digests, empty unresolved-decision set, direct user freeze identity, and
 one deterministic docs check close the freeze transaction. Earlier independent
-review records remain in the ledger and no new design wave is launched. The
-current implementation-backed claim checker cannot
-classify approved-but-unimplemented target claims; its legacy failure is
-recorded as `claim_checker_mechanism_pending`, never relabeled pass and never
-used to claim current implementation evidence.
+review records remain in the ledger and no new design wave is launched. Source
+references are read at their selected revision, and planned targets remain
+distinct from current behavior until their owner readback establishes them.
 
-After the typed claim mechanism and target owners exist, validation runs in
-this order:
+After target owners exist, validation runs in this order:
 
 The P1 owner gate includes
 `python3 tools/agent/orchestration/model_profile_registry.py --root . --check-role-views`.
@@ -4429,8 +4390,7 @@ The P2 owner gate includes
 P5 invokes those same check-only entrypoints as downstream evidence consumers;
 it neither owns their parsers nor repeats their invariants.
 
-1. `python3 tools/validation/semantic/documents/check_design_doc_claims.py --root . --recursive-depth 3 documents/design/codex-spark-implementation-routing.md`; require zero blocked assumptions, verified current/request identities, approved target-state identities before implementation, and verified target-state readbacks at closeout.
-2. `python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed` and the
+1. `python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed` and the
    dependency-header scanner for the new design and future implementation
    paths.
 3. `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` after registry
@@ -4475,12 +4435,11 @@ The unit order, owner, profile, write/deletion projection, source anchors,
 identifiers, public shapes, dependency edges, Decision Sufficiency action,
 owner gate, validation commands/oracles, clause IDs, runtime binding slots,
 checkpoint policy, return schema, and individual packet digest are fixed before
-editing. Spark is assigned only the four rows whose profile is
+editing. Spark is assigned only the three rows whose profile is
 `spark_implementation_low`; cross-owner rows are explicitly Luna-owned.
 
 | Packet | Packet SHA-256 | Exact owner/profile | Gate |
 | --- | --- | --- | --- |
-| `P0_claim_evidence` | `9ee9ec84502bea9adfffbc1b14526920b418096bd73279cf853f134bb652734b` | `check_design_doc_claims` / Spark | `claim_evidence_gate` |
 | `P1_model_profile_registry` | `eb878216bd63912e5cc03c80fa89ecd1010c9cb6c2d02c0fab9a420d33de301c` | `model_profile_registry` / Spark | `model_profile_registry_gate` |
 | `P2_capacity_handshake` | `81979526ce13ac177d80beb8c8f284e238b4172e7f4079ff6e09b53dbbedec61` | `capacity_handshake` / Spark | `capacity_handshake_gate` |
 | `P3_implementation_route` | `f2514c31409a5be8e04fedc67e2b6f76497213e28a0136967ebc6d1f72d64eb8` | `implementation_route` / Spark | `implementation_route_gate` |
@@ -4640,8 +4599,8 @@ producer owner.
 ### Spark-specific invariant values
 
 ```text
-first_static_packet_id: P0_claim_evidence
-first_static_packet_sha256: 9ee9ec84502bea9adfffbc1b14526920b418096bd73279cf853f134bb652734b
+first_static_packet_id: P1_model_profile_registry
+first_static_packet_sha256: eb878216bd63912e5cc03c80fa89ecd1010c9cb6c2d02c0fab9a420d33de301c
 objective: one target-state-complete implementation unit
 request_clause_ids: exact list
 target_state_evidence_id: approved identity required
@@ -4701,9 +4660,7 @@ The one recommended rollout is:
    another design wave.
 2. Verify the landed OOP owner paths/hashes from main `404678e1` and keep them
    outside the implementation write set.
-3. Execute Spark packet `P0_claim_evidence` in one direct pass, then run only
-   `claim_evidence_gate`.
-4. Execute and separately owner-gate Spark packets
+3. Execute and separately owner-gate Spark packets
    `P1_model_profile_registry` and `P2_capacity_handshake`; schedule them only
    from the current capacity snapshot. Both dependency interfaces must be
    complete before the next packet.

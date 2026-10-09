@@ -10,7 +10,6 @@ downstream implementation ../../tools/analysis/dependencies/source_dependency_gr
 downstream implementation ../../tools/analysis/dependencies/graph_client.py exposes source dependency compatibility and explicit graph runtime commands
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs owns the explicit graph-analysis source snapshot parser
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates canonical source manifests
-downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py consumes source-derived context
 downstream implementation ../../tools/validation/semantic/tools/tool_drift.py consumes source-derived dependency facts
 downstream implementation ../../tools/analysis/search/vector_search.py consumes source-derived dependency facts
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh owns source review and opt-in graph preparation
@@ -117,7 +116,6 @@ falls back from a parse error to cached facts.
 | Consumer | Authority | Persisted graph required |
 | --- | --- | --- |
 | changed-file dependency header check | canonical tracked source | no |
-| design-document claim evidence closure | canonical tracked source | no |
 | tool/convention drift links | canonical tracked source | no |
 | vector-search dependency context | canonical tracked source | no |
 | repository dependency review and TSV/DOT rendering | canonical tracked source | no |

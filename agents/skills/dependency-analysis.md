@@ -10,7 +10,6 @@ upstream design ./catalog.yaml registers this public skill
 upstream design ../../documents/tools/lsp_code_analysis.md owns LSP relation evidence and capability limits
 upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts file-level code dependency evidence
 upstream implementation ../../tools/analysis/code/helper_function_inventory.py extracts Python function-level call graph context
-upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design-document evidence claims
 @dependency-end
 -->
 
@@ -23,7 +22,7 @@ upstream implementation ../../tools/validation/semantic/documents/check_design_d
   Core References define how outputs feed planning and handoff. For cause repair,
   follow Root-Cause Repair Scope: fix the cause, then trace and repair LSP-linked issues.
 - Use when: dependency manifests, changed-file gates, graph edges, reverse
-  edges, design-claim evidence, or repair-planning packets are needed.
+  edges, source references, or repair-planning packets are needed.
 - Boundary: code dependency evidence and dependency-header evidence remain
   separate until summarized in a structured Change Impact Packet.
   Repository-wide dependency graph projection and rendering is owned by
@@ -104,31 +103,10 @@ bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --search-hits-file reports/search_hits.txt
 ```
 
-Design-document claim evidence gate:
-
-```bash
-python3 tools/validation/semantic/documents/check_design_doc_claims.py \
-  --root . \
-  --recursive-depth 3 \
-  documents/design/<topic>.md
-```
-
-or through the dependency review wrapper:
-
-```bash
-bash tools/analysis/dependencies/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review \
-  --check-design-doc-claims
-```
-
-For an explicit design document:
-
-```bash
-bash tools/analysis/dependencies/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review \
-  --check-design-doc-claims \
-  --design-doc-claim-path documents/design/<topic>.md
-```
+Design documents use ordinary prose and Markdown links to identify source and
+governing references. Read those sources directly at the selected revision;
+`agent-canon docs check` owns local-link and Markdown validation. No separate
+claim-token or evidence-ledger parser is part of this dependency route.
 
 ## Cause Investigation Surface
 
@@ -270,7 +248,7 @@ that fix; unresolved required verification still prevents a verified closeout.
 - default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
 - `run_repo_dependency_review.sh --report-dir` は dependency header 由来の `dependency_graph.tsv` を生成します。
 - search result を編集対象に変換するときは、responsibility-based context、bounded `git grep` hit、`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を issue / PR evidence に残します。raw text-search hit だけで編集対象を決めません。
-- design document を修正または作成するときは、major claim の code / path token、初出 DSL / standard-form terms、parent-doc alignment を `Evidence And Assumption Ledger` に接続し、`check_design_doc_claims.py` の finding を design evidence gap として扱います。
+- design document を修正または作成するときは、重要な implementation-facing statement を通常の Markdown source link と説明文で根拠に結び付け、関連 source と governing parent document を直接確認します。初出の専門用語や前提は、判断に影響する範囲で本文中に定義します。
 - Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は [AGENTS.md](../../AGENTS.md)、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
 - `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
 - baseline 扱いにする場合も、今回差分で old-format header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。
@@ -415,7 +393,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    - repo migration inventory: run full scan without `--changed`
    - dependency edge change: include graph validation
    - repo-wide search triage: run responsibility-based search first, then use bounded `git grep -l` only as comparison evidence or within selected source surfaces before search-to-edit-scope expansion
-   - design-document evidence: run `check_design_doc_claims.py` on changed or newly authored design docs
+   - design-source review: read linked implementation and governing documents directly; use the selected documentation owner's standard Markdown/link check for syntax and target validity
    - repair planning or subagent handoff: build a structured `Change Impact
      Packet` manifest before selecting implementation targets
 1. Use the `Required Commands` and `Change Impact Packet` sections above for

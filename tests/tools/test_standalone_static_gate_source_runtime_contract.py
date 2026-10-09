@@ -26,7 +26,6 @@ SOURCE_REGRESSION_MODULES = (
     "tests.tools.test_agent_canon_pr_dependency_source_gate",
     "tests.tools.test_agent_canon_pr_graph_gate_integration",
     "tests.agent_tools.test_check_dependency_headers",
-    "tests.agent_tools.test_check_design_doc_claims",
     "tests.agent_tools.test_tool_drift",
     "tests.agent_tools.test_vector_search",
     "tests/agent_tools/test_dependency_*.py",

@@ -8,7 +8,6 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design result-artifact-writeout.md raw result and summary artifact policy
 upstream design report-writing.md reader-facing evidence report policy
 downstream design refactor-loop.md consumes finding packets for repair slices
-upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py emits design evidence findings
 downstream implementation ../../.codex/personal/skills/tool-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -117,7 +116,6 @@ excerpt、実際に修正する対象の取捨選択は、この packet を使�
    - Module groups: `python-module-groups-check`
    - OOP readability: `tools/oop/<language>/readability.py --format json`
    - Dependency surface: `run_repo_dependency_review.sh` and related manifest tools
-   - Design evidence drift: `check_design_doc_claims.py`
 1. 全 finding に deterministic priority を付けます。tool が priority を持たない
    場合も、少なくとも severity、public API / algorithm contract 影響、dependency
    fan-in / fan-out、single-caller / duplicate / thin-structure signal、test /
@@ -215,7 +213,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    dependency review directory exists. The scope-plan JSON, not a chat
    summary, is the mechanical source for `impact_blocks`, `scope_candidates`,
    `selected_scope`, and `repair_batches`.
-1. Include the relevant checker family for the task: algorithm contract, module groups, OOP readability, dependency review, design-claim evidence, static analysis, hook logs, or workflow evals.
+1. Include the relevant checker family for the task: algorithm contract, module groups, OOP readability, dependency review, static analysis, hook logs, or workflow evals.
 1. If any tool, hook, checker, guardrail, or migration wrapper emits a warning, immediately register it as a closeout obligation in run-local `reports/agents/<run-id>/workflow_monitoring.md` with `workflow_monitor.py --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"`. The reusable template for that file is [templates/agents/workflow_monitoring.md](../../templates/agents/workflow_monitoring.md). After repair, append the same `warning_id` with `status=resolved evidence=<path-or-command>`. Normal warnings reach `tool_warning_exit_status` through `resolved`, `deferred_with_issue issue=<issue-or-pr>` with durable owner, or `accepted_with_reason` with `explicit_approval_evidence` and a durable rationale artifact; fix-now / S0 / S1 warnings must be resolved. If the run observed no warnings, run `workflow_monitor.py --tool-warning-status none` before closeout.
 1. Mechanically rank every finding. If the tool does not provide priority, derive a deterministic order from severity, public API or algorithm-contract impact, dependency fan-in/fan-out, duplicate/thin/single-caller signals, production vs test/experiment scope, and tool confidence. Record the ranking policy in the report.
 1. Write a finding packet with scope, scope exceptions if any, commands, raw artifacts, structured artifacts, full counts, full finding table or structured finding artifact reference, mechanical priority order, optional impact, and a handoff boundary. The caller or higher-level workflow chooses the repair slice and decides what to do next.
@@ -226,5 +224,4 @@ The runtime discovery adapter delegates these required operating clauses to this
    - The report may reference the full structured artifact instead of embedding every row, but it must state that the full finding table is preserved there and must not truncate the underlying artifact.
 1. If findings drive behavior-preserving implementation or refactor, pass the full finding packet and mechanical priority order to `$refactor-loop` instead of editing from a chat-only summary.
 1. Classify each tool/reviewer/subagent feedback item as `implementation_bug`, `missing_test_or_design_evidence`, `handoff_prompt_gap`, `shared_skill_or_workflow_gap`, `tool_gap`, or `review_required`.
-   Use `missing_design_claim_evidence` when `check_design_doc_claims.py` reports an implementation-backed design claim without code, dependency-header, parent-doc, or assumption-ledger support.
 1. For `handoff_prompt_gap` or `shared_skill_or_workflow_gap`, repair the next subagent handoff or shared skill/workflow prompt before launching the next write-capable subagent, and record `workflow_monitor.py --runtime-feedback ... action=prompt_repair`.
