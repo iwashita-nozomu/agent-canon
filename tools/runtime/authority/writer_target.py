@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import re
+import stat
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -207,13 +208,40 @@ def validate_mathematical_writer_target(
     return parsed
 
 
+def _writer_target_packet_path(checkout_root: Path | str) -> Path:
+    """Resolve the reserved packet path without accepting a symlink target."""
+    root = Path(checkout_root).expanduser().resolve(strict=False)
+    path = root / WRITER_TARGET_PACKET_RELATIVE
+    try:
+        parent_mode = path.parent.lstat().st_mode
+    except FileNotFoundError:
+        parent_mode = None
+    except OSError as exc:
+        raise WriterTargetError("writer_target_packet_path_unsafe") from exc
+    if parent_mode is not None and (
+        stat.S_ISLNK(parent_mode) or not stat.S_ISDIR(parent_mode)
+    ):
+        raise WriterTargetError("writer_target_packet_path_unsafe")
+    try:
+        packet_mode = path.lstat().st_mode
+    except FileNotFoundError:
+        packet_mode = None
+    except OSError as exc:
+        raise WriterTargetError("writer_target_packet_path_unsafe") from exc
+    if packet_mode is not None and (
+        stat.S_ISLNK(packet_mode) or not stat.S_ISREG(packet_mode)
+    ):
+        raise WriterTargetError("writer_target_packet_path_unsafe")
+    return path
+
+
 def materialize_writer_target_packet(
     target: WriterTarget | Mapping[str, object],
     checkout_identity: Mapping[str, object],
 ) -> Path:
     """Write the ignored static handoff packet for one prepared clone."""
     parsed = validate_writer_target_identity(target, checkout_identity)
-    path = Path(parsed.normalized_root) / WRITER_TARGET_PACKET_RELATIVE
+    path = _writer_target_packet_path(parsed.normalized_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     packet = {
         "schema": WRITER_TARGET_PACKET_SCHEMA,
@@ -237,7 +265,7 @@ def read_writer_target_packet(
 ) -> tuple[WriterTarget, Mapping[str, object]]:
     """Read and validate one existing static packet without rewriting it."""
     root = Path(checkout_root).expanduser().resolve(strict=False)
-    path = root / WRITER_TARGET_PACKET_RELATIVE
+    path = _writer_target_packet_path(root)
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
