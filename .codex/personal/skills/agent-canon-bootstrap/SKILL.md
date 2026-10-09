@@ -2,7 +2,7 @@
 name: agent-canon-bootstrap
 description: "Use when AgentCanon's shared Python, Rust, or LSP tool runtime must be installed, started, targeted, inspected, updated, evaluated, or removed; project builds and tests remain in the project Docker/test-runner plane."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"7b8bb8a462e0752cb8eb4a82374f7690d9ed63d662a70f405d02a4f01ed445d3"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"60769d5b92594cf6052a956efeb9d283f61d4454d85777034a78e4167e00e21a"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/agent-canon-bootstrap.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [agent-canon-bootstrap](../../../../agents/skills/agent-canon-bootstrap.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill agent-canon-bootstrap --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

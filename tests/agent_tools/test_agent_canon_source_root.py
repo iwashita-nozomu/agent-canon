@@ -4,7 +4,6 @@
 # contract test
 # responsibility Verifies CLI command execution anchored to the resolved source root.
 # upstream implementation ../../tools/runtime/source/agent_canon_source_root.py resolves source roots.
-# downstream implementation ../../tools/agent/skills/skill_tool_commands.py handles delegated commands.
 # @dependency-end
 
 from __future__ import annotations

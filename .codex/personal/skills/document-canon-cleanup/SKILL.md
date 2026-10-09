@@ -2,7 +2,7 @@
 name: document-canon-cleanup
 description: "Use when organizing repository documents, finding non-canonical docs, separating source canon from generated reports, eval results, closed issues, duplicate headings, or stale document paths."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"54497b383a100772275a88b2569c988638c2d58a4122b86fc5223343f23ea197"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5ea99cfe5997f664be3338ad397dedca6bbf639e46b547a3a53660d9ba18c8cd"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/document-canon-cleanup.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [document-canon-cleanup](../../../../agents/skills/document-canon-cleanup.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill document-canon-cleanup --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

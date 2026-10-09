@@ -55,6 +55,7 @@ owns roles and lifecycle; [COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md)
 owns handoff content. For a writing child, use
 [repository-topic-clone](repository-topic-clone.md) for the prepared checkout
 and target. Parent and child retain their assigned authorities.
+A newly selected related Skill is read from its current owner and executed through the existing native CLI/API/script entrypoint with argv and process-result semantics preserved.
 
 ## Validation and delivery
 

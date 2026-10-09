@@ -96,7 +96,6 @@ Validate the selected owner rather than every tool family:
 ```bash
 python3 tools/runtime/manifest/tool_catalog.py
 python3 tools/validation/semantic/convention/check_convention_compliance.py
-python3 tools/agent/skills/skill_tool_commands.py check
 python3 tools/validation/documentation/checks/check_bootstrap_docs.py --root .
 ```
 

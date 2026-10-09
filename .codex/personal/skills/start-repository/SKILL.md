@@ -2,7 +2,7 @@
 name: start-repository
 description: "Use when starting a repository from this template after clone, including project identity setup, source-free static-seed validation, and destination-remote setup without live AgentCanon integration."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"350085abbfe94f84cc4336db0d57cc268469e3ecc449a4a729b129af40033d23"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"9aae026fe2c8de9de8e4ea584eed49a23b6150f291ed06e3da4e06dfba0ddf19"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/start-repository.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [start-repository](../../../../agents/skills/start-repository.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill start-repository --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

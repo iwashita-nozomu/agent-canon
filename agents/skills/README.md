@@ -93,7 +93,8 @@ GPU profile の admission semantics は [`gpu-execution`](gpu-execution.md) に�
 確認入口:
 - public skill の一覧と shim/doc/config の整合: `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
 - prompt からの skill 選択: `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json`
-- skill ごとの command packet: `python3 tools/agent/skills/skill_tool_commands.py show --skill <skill> --format text`
+- selected tools use their existing CLI/API/script entrypoints with native argv;
+  execution and validation remain owned by those entrypoints.
 - 依存辞書の静的検査: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
 - 依存辞書の静的検査（source tree を変更しない）: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
 - 通常の Mermaid/JSON 生成（外部 runtime artifact）: `python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>`

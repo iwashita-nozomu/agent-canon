@@ -2,7 +2,7 @@
 name: md-style-check
 description: "Use when Markdown files changed, docs formatter/fixer output must be checked, or `agent-canon docs` formatting, heading, math, Mermaid, and link checks are in scope."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"4121fc5204cd4be5b124e400df96497e4f5bc18470116106b6ea8f8688c67c89"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"75e37de0d7094747fb7d6669d6cd52de94fe4093b751ece11e04514b5ecd1bed"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/md-style-check.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [md-style-check](../../../../agents/skills/md-style-check.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill md-style-check --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

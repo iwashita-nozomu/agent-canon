@@ -63,7 +63,7 @@ downstream implementation ../../tools/validation/semantic/documents/check_design
   - skill / capability / phase / tool / edge の identity、参照、coverage、readback
 - [skill-runtime-shim-materialization.md](skill-runtime-shim-materialization.md)
   - catalog-defined Codex discovery shim の schema、単一 materializer、移行、readback、prompt 評価
-  - `skill_tool_commands.py` は read-only packet producer、SKILL.md の writer は materializer
+  - the native tool dispatcher owns argv execution; the SKILL.md writer is the materializer
     一つだけとする command surface、shim routing と全体 `route.py` の所有境界
   - 実在する `workflow_selection_eval.toml` の 525 cases、固定 prompt/expected readback、
     graph/route/ToolID/ToolCall golden、fresh `gpt-5.4-mini` scenario と paired token contract

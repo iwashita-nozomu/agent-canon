@@ -2,7 +2,7 @@
 name: refactor-loop
 description: "Use when a large refactor should run as a behavior-preserving refactor loop with explicit path mapping, semantic-delta controls, repair slices, and strong review gates."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1ab6b894d2c0bbe6cf213a557e1ef5dde52f3c9fdd367040f2af464b8178cc58"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"9756cb76e9c24511072437cd273ac488bb061e1880b8abd92cd9fae2003950df"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/refactor-loop.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [refactor-loop](../../../../agents/skills/refactor-loop.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill refactor-loop --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

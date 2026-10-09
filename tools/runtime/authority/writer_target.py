@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import re
+import stat
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -207,21 +208,44 @@ def validate_mathematical_writer_target(
     return parsed
 
 
+def _writer_target_packet_path(checkout_root: Path | str) -> Path:
+    """Resolve the reserved packet path without accepting a symlink target."""
+    root = Path(checkout_root).expanduser().resolve(strict=False)
+    path = root / WRITER_TARGET_PACKET_RELATIVE
+    try:
+        parent_mode = path.parent.lstat().st_mode
+    except FileNotFoundError:
+        parent_mode = None
+    except OSError as exc:
+        raise WriterTargetError("writer_target_packet_path_unsafe") from exc
+    if parent_mode is not None and (
+        stat.S_ISLNK(parent_mode) or not stat.S_ISDIR(parent_mode)
+    ):
+        raise WriterTargetError("writer_target_packet_path_unsafe")
+    try:
+        packet_mode = path.lstat().st_mode
+    except FileNotFoundError:
+        packet_mode = None
+    except OSError as exc:
+        raise WriterTargetError("writer_target_packet_path_unsafe") from exc
+    if packet_mode is not None and (
+        stat.S_ISLNK(packet_mode) or not stat.S_ISREG(packet_mode)
+    ):
+        raise WriterTargetError("writer_target_packet_path_unsafe")
+    return path
+
+
 def materialize_writer_target_packet(
     target: WriterTarget | Mapping[str, object],
     checkout_identity: Mapping[str, object],
 ) -> Path:
     """Write the ignored static handoff packet for one prepared clone."""
     parsed = validate_writer_target_identity(target, checkout_identity)
-    path = Path(parsed.normalized_root) / WRITER_TARGET_PACKET_RELATIVE
+    path = _writer_target_packet_path(parsed.normalized_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     packet = {
         "schema": WRITER_TARGET_PACKET_SCHEMA,
-        **{
-            key: value
-            for key, value in parsed.as_dict().items()
-            if key != "schema"
-        },
+        **{key: value for key, value in parsed.as_dict().items() if key != "schema"},
         "checkout_identity": dict(checkout_identity),
     }
     path.write_text(
@@ -237,14 +261,17 @@ def read_writer_target_packet(
 ) -> tuple[WriterTarget, Mapping[str, object]]:
     """Read and validate one existing static packet without rewriting it."""
     root = Path(checkout_root).expanduser().resolve(strict=False)
-    path = root / WRITER_TARGET_PACKET_RELATIVE
+    path = _writer_target_packet_path(root)
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise WriterTargetError("writer_target_packet_missing") from exc
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise WriterTargetError("writer_target_packet_invalid") from exc
-    if not isinstance(value, Mapping) or value.get("schema") != WRITER_TARGET_PACKET_SCHEMA:
+    if (
+        not isinstance(value, Mapping)
+        or value.get("schema") != WRITER_TARGET_PACKET_SCHEMA
+    ):
         raise WriterTargetError("writer_target_packet_invalid")
     try:
         target = parse_writer_target(
@@ -341,7 +368,8 @@ def validate_spawn_handoff(
 
 def validate_wave_writer_targets(
     slots: Sequence[object],
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
 ) -> tuple[WriterTarget, ...]:
     """Validate role-instance slots with targets supplied by the handoff."""
     allocations: list[Mapping[str, object]] = []
@@ -353,7 +381,9 @@ def validate_wave_writer_targets(
             identity,
             targets.get(role_id, getattr(slot, "writer_target", None)),
         )
-        write_capable = bool(getattr(slot, "write_capable", False) or target is not None)
+        write_capable = bool(
+            getattr(slot, "write_capable", False) or target is not None
+        )
         allocations.append(
             {
                 "owner": identity,

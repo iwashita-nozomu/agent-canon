@@ -265,8 +265,9 @@ call relations, `$structure-refactor` for architecture and responsibility
 maps, `$algorithm-flowchart` for algorithm/proof overlays,
 `$prose-reasoning-graph` for prose graphs, `$html-output` for browser-readable
 large-graph views, and `$md-style-check` for embedded Markdown diagrams.
-Follow each related skill's current command packet; this selector describes the
-ownership route without reproducing those commands.
+Follow each related skill's current owner and native entrypoint; this selector
+describes the ownership route without reproducing or regenerating private command
+definitions.
 
 ## Renderer Choice
 

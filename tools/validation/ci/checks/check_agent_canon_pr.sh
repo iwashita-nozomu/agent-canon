@@ -11,7 +11,6 @@
 # upstream implementation ../../../runtime/artifacts/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
 # upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py Codex runtime role alignment eval
 # upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate wiring eval
-# upstream implementation ../../../agent/skills/skill_tool_commands.py runtime skill command packet gate
 # upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py owns G1-G3 receipt identity.
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/main.rs owns the Rust CLI build gate.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
@@ -149,7 +148,6 @@ fi
 run_direct_agent_checks() {
   run_convention_compliance_gate
   python3 "${WORKSPACE_ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
-  python3 "${WORKSPACE_ROOT}/tools/agent/skills/skill_tool_commands.py" check
 }
 
 run_convention_compliance_gate() {

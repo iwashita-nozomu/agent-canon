@@ -2543,12 +2543,12 @@ _agent_canon_ensure_container() {
     target_mount_args+=(--mount "type=bind,src=$git_source,dst=$git_destination,readonly")
   done <<< "$git_mounts"
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
-    if "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
-      _agent_canon_import_host_inputs
-    fi
     _agent_canon_validate_existing_container "$container"
     local validate_rc=$?
     ((validate_rc == 0)) || return "$validate_rc"
+    if "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
+      _agent_canon_import_host_inputs
+    fi
   else
     local caller_user
     caller_user=$(_agent_canon_caller_user)
@@ -3186,6 +3186,120 @@ _agent_canon_with_replacement_lock() {
     return 2
   fi
   return "$rc"
+}
+
+_agent_canon_target_operation_locked() {
+  local target_action=$1 target_host_root=$2 target_digest=$3 target_container_root=$4
+  local target_container=$(_agent_canon_container_name)
+  local -a target_command_args
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$target_container" >/dev/null 2>&1; then
+    # Both add and remove must reject a foreign resident before teardown.
+    _agent_canon_classify_existing_container "$target_container" || return $?
+  fi
+  if [[ "$target_action" == add ]]; then
+    _agent_canon_prune_stale_target_manifest
+  fi
+  local target_current_image target_current_image_id target_candidate target_rc=0 existing_target_digest=
+  existing_target_digest=$(_agent_canon_target_digest "$target_host_root" || true)
+  _agent_canon_use_active_image "$target_container"
+  target_current_image=$AGENT_CANON_IMAGE_REF
+  target_current_image_id=$AGENT_CANON_ACTIVE_IMAGE_ID
+  if [[ "$target_action" == add && "$existing_target_digest" == "$target_digest" &&
+        -z "${AGENT_CANON_TARGET_PRUNE_DIGESTS:-}" ]] &&
+     "$AGENT_CANON_DOCKER_CMD" container inspect "$target_container" >/dev/null 2>&1 &&
+     _agent_canon_validate_existing_container "$target_container" \
+       "$AGENT_CANON_STATE_ROOT/mounts.tsv" 0 >/dev/null 2>/dev/null; then
+    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"target_add","code":"target_unchanged","changed":false,"target_digest":"%s"}\n' \
+      "$target_digest"
+    return 0
+  fi
+  if [[ "$target_action" == add ]]; then
+    if ! _agent_canon_target_digest "$target_host_root" >/dev/null; then
+      AGENT_CANON_TARGET_PENDING_SOURCE=$target_host_root
+      AGENT_CANON_TARGET_PENDING_DIGEST=$target_digest
+      export AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
+    fi
+  fi
+  if [[ -n "$target_current_image" ]]; then
+    AGENT_CANON_IMAGE_REF=$target_current_image
+    export AGENT_CANON_IMAGE_REF
+    # Target add can repair owned resident drift (including stale mounts),
+    # but ownership was already classified above.  Full configuration
+    # readback remains the fast no-op gate and is not a precondition for
+    # replacement.
+    if _agent_canon_validate_existing_container "$target_container" \
+      "$AGENT_CANON_STATE_ROOT/mounts.tsv" 0 >/dev/null 2>/dev/null; then
+      :
+    fi
+    "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$target_container" >/dev/null
+    "$AGENT_CANON_DOCKER_CMD" rm "$target_container" >/dev/null
+  fi
+  if target_candidate=$(_agent_canon_ensure_container); then
+    :
+  else
+    target_rc=$?
+    unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
+    if [[ -n "$target_current_image_id" ]]; then
+      AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=$target_current_image
+      export AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF
+      if ! _agent_canon_restore_candidate_failure "$target_container" \
+        "$target_current_image_id" "$target_current_image_id"; then
+        _agent_canon_json_error rollback_failed \
+          "target mount replacement recovery was incomplete"
+        return 2
+      fi
+      unset AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF
+    fi
+    unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT
+    unset AGENT_CANON_TARGET_DIGEST
+    return "$target_rc"
+  fi
+  target_command_args=("target" "$target_action" --root "$target_container_root" --mode read-only)
+  AGENT_CANON_TARGET_HOST_ROOT=$target_host_root
+  AGENT_CANON_TARGET_CONTAINER_ROOT=$target_container_root
+  AGENT_CANON_TARGET_DIGEST=$target_digest
+  export AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT AGENT_CANON_TARGET_DIGEST
+  _agent_canon_run_controller "$target_candidate" "${target_command_args[@]}" || target_rc=$?
+  if ((target_rc == 0)); then
+    _agent_canon_publish_controller_projection || target_rc=$?
+  fi
+  # The pending bind exists only while the candidate is being created. The
+  # resident controller has now committed the target into mounts.tsv, so do
+  # not let the pre-create input participate in readback a second time.
+  unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
+  if [[ "$target_action" == remove && $target_rc -eq 0 ]]; then
+    # Recreate from the committed manifest before comparing mount sets.
+    # Keep the stable resident name for recovery even if ensure fails.
+    if "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$target_candidate" >/dev/null &&
+       "$AGENT_CANON_DOCKER_CMD" rm "$target_candidate" >/dev/null &&
+       _agent_canon_ensure_container >/dev/null &&
+       _agent_canon_run_controller "$target_candidate" start >/dev/null; then
+      :
+    else
+      target_rc=$?
+    fi
+  fi
+  if ((target_rc == 0)); then
+    # The resident has committed the host-source/container-target record.
+    # Read back the complete mount set once from the host Docker boundary;
+    # this confirms that the resident-side /targets/<digest> verification
+    # was backed by the bind mount that the host requested.
+    if _agent_canon_validate_existing_container "$target_candidate" \
+      "$AGENT_CANON_STATE_ROOT/mounts.tsv"; then
+      :
+    else
+      target_rc=$?
+    fi
+  fi
+  if ((target_rc != 0)) && [[ -n "$target_current_image_id" ]]; then
+    if ! _agent_canon_restore_candidate_failure "$target_candidate" "$target_current_image_id" "$target_current_image_id"; then
+      _agent_canon_json_error rollback_failed "target mount replacement recovery was incomplete"
+    fi
+  fi
+  unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
+  unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT
+  unset AGENT_CANON_TARGET_DIGEST
+  return "$target_rc"
 }
 
 _agent_canon_gc_array_contains() {
@@ -4226,12 +4340,6 @@ bootstrap_host_entrypoint() {
      [[ ! -x "$AGENT_CANON_DOCKER_CMD" ]]; then
     _agent_canon_json_error runtime_unavailable "Docker executable is unavailable"
   fi
-  # Claim an existing named resident before source/image work. Later lifecycle
-  # owners perform the full configuration readback for their operation.
-  local existing_container=$(_agent_canon_container_name)
-  if "$AGENT_CANON_DOCKER_CMD" container inspect "$existing_container" >/dev/null 2>&1; then
-    _agent_canon_classify_existing_container "$existing_container" || return $?
-  fi
   if [[ "$operation" == gc && "${command_args[1]:-}" == --dry-run ]]; then
     # A preview is read-only: dispatch before host-runtime preparation, which
     # creates directories, files, modes, and the normal replacement lock.
@@ -4382,115 +4490,9 @@ bootstrap_host_entrypoint() {
         _agent_canon_json_error target_root_invalid "target root must be a regular directory"
       target_digest=$(printf '%s' "$target_host_root" | sha256sum | awk '{print $1}')
       target_container_root="/targets/$target_digest"
-      local target_container=$(_agent_canon_container_name)
-      if "$AGENT_CANON_DOCKER_CMD" container inspect "$target_container" >/dev/null 2>&1; then
-        # Both add and remove must reject a foreign resident before teardown.
-        _agent_canon_classify_existing_container "$target_container" || return $?
-      fi
-      if [[ "$target_action" == add ]]; then
-        _agent_canon_prune_stale_target_manifest
-      fi
-      local target_current_image target_current_image_id target_candidate target_rc=0 existing_target_digest=
-      existing_target_digest=$(_agent_canon_target_digest "$target_host_root" || true)
-      _agent_canon_use_active_image "$target_container"
-      target_current_image=$AGENT_CANON_IMAGE_REF
-      target_current_image_id=$AGENT_CANON_ACTIVE_IMAGE_ID
-      if [[ "$target_action" == add && "$existing_target_digest" == "$target_digest" &&
-            -z "${AGENT_CANON_TARGET_PRUNE_DIGESTS:-}" ]] &&
-         "$AGENT_CANON_DOCKER_CMD" container inspect "$target_container" >/dev/null 2>&1 &&
-         _agent_canon_validate_existing_container "$target_container" \
-           "$AGENT_CANON_STATE_ROOT/mounts.tsv" 0 >/dev/null 2>/dev/null; then
-        printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"target_add","code":"target_unchanged","changed":false,"target_digest":"%s"}\n' \
-          "$target_digest"
-        return 0
-      fi
-      if [[ "$target_action" == add ]]; then
-        if ! _agent_canon_target_digest "$target_host_root" >/dev/null; then
-          AGENT_CANON_TARGET_PENDING_SOURCE=$target_host_root
-          AGENT_CANON_TARGET_PENDING_DIGEST=$target_digest
-          export AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
-        fi
-      fi
-      if [[ -n "$target_current_image" ]]; then
-        AGENT_CANON_IMAGE_REF=$target_current_image
-        export AGENT_CANON_IMAGE_REF
-        # Target add can repair owned resident drift (including stale mounts),
-        # but ownership was already classified above.  Full configuration
-        # readback remains the fast no-op gate and is not a precondition for
-        # replacement.
-        if _agent_canon_validate_existing_container "$target_container" \
-          "$AGENT_CANON_STATE_ROOT/mounts.tsv" 0 >/dev/null 2>/dev/null; then
-          :
-        fi
-        "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$target_container" >/dev/null
-        "$AGENT_CANON_DOCKER_CMD" rm "$target_container" >/dev/null
-      fi
-      if target_candidate=$(_agent_canon_ensure_container); then
-        :
-      else
-        target_rc=$?
-        unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
-        if [[ -n "$target_current_image_id" ]]; then
-          AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=$target_current_image
-          export AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF
-          if ! _agent_canon_restore_candidate_failure "$target_container" \
-            "$target_current_image_id" "$target_current_image_id"; then
-            _agent_canon_json_error rollback_failed \
-              "target mount replacement recovery was incomplete"
-            return 2
-          fi
-          unset AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF
-        fi
-        unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT
-        unset AGENT_CANON_TARGET_DIGEST
-        return "$target_rc"
-      fi
-      command_args=("target" "$target_action" --root "$target_container_root" --mode read-only)
-      AGENT_CANON_TARGET_HOST_ROOT=$target_host_root
-      AGENT_CANON_TARGET_CONTAINER_ROOT=$target_container_root
-      AGENT_CANON_TARGET_DIGEST=$target_digest
-      export AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT AGENT_CANON_TARGET_DIGEST
-      _agent_canon_run_controller "$target_candidate" "${command_args[@]}" || target_rc=$?
-      if ((target_rc == 0)); then
-        _agent_canon_publish_controller_projection || target_rc=$?
-      fi
-      # The pending bind exists only while the candidate is being created. The
-      # resident controller has now committed the target into mounts.tsv, so
-      # do not let the pre-create input participate in readback a second time.
-      unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
-      if [[ "$target_action" == remove && $target_rc -eq 0 ]]; then
-        # Recreate from the committed manifest before comparing mount sets.
-        # Keep the stable resident name for recovery even if ensure fails.
-        if "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$target_candidate" >/dev/null &&
-           "$AGENT_CANON_DOCKER_CMD" rm "$target_candidate" >/dev/null &&
-           _agent_canon_ensure_container >/dev/null &&
-           _agent_canon_run_controller "$target_candidate" start >/dev/null; then
-          :
-        else
-          target_rc=$?
-        fi
-      fi
-      if ((target_rc == 0)); then
-        # The resident has committed the host-source/container-target record.
-        # Read back the complete mount set once from the host Docker boundary;
-        # this confirms that the resident-side /targets/<digest> verification
-        # was backed by the bind mount that the host requested.
-        if _agent_canon_validate_existing_container "$target_candidate" \
-          "$AGENT_CANON_STATE_ROOT/mounts.tsv"; then
-          :
-        else
-          target_rc=$?
-        fi
-      fi
-      if ((target_rc != 0)) && [[ -n "$target_current_image_id" ]]; then
-        if ! _agent_canon_restore_candidate_failure "$target_candidate" "$target_current_image_id" "$target_current_image_id"; then
-          _agent_canon_json_error rollback_failed "target mount replacement recovery was incomplete"
-        fi
-      fi
-      unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
-      unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT
-      unset AGENT_CANON_TARGET_DIGEST
-      return "$target_rc"
+      _agent_canon_with_replacement_lock _agent_canon_target_operation_locked \
+        "$target_action" "$target_host_root" "$target_digest" "$target_container_root"
+      return $?
       ;;
     codex)
       local codex_action=${command_args[1]:-} codex_project=${AGENT_CANON_PROJECT_ROOT:-}
