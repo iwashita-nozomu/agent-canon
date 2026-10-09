@@ -2,7 +2,7 @@
 name: repository-topic-clone
 description: "Use for any parent, dependency, or standalone repository topic checkout under workspace/<topic>/<repo>; linked-worktree or independent-clone mode is selected by repository relationship, and repository kind is a post-checkout policy decorator."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"c6b756f6de94f07f955730e8ff6a01bc3c1d280311e6e11678d6a5817bdd1254"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"a0e0099126a87035d149bfb8c9e867e89d8278600063c899a839a454950e516c"} -->
 
 <!--
 @dependency-start

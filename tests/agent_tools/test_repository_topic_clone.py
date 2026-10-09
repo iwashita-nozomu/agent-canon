@@ -528,9 +528,7 @@ def test_prepare_allows_source_discovery_without_writer_scope_then_materializes_
     before_head = run_git(discovered.clone, "rev-parse", "HEAD")
     before_branch = run_git(discovered.clone, "symbolic-ref", "--short", "HEAD")
 
-    writable = rtc.request(
-        **request, allowed_paths=("agents/skills/README.md",)
-    )
+    writable = rtc.request(**request, allowed_paths=("agents/skills/README.md",))
     target, _identity = read_writer_target_packet(writable.clone)
 
     assert writable.clone == discovered.clone
@@ -583,9 +581,7 @@ def test_prepare_rejects_nested_parent_repo_without_mutating_ancestor(
     before_refs = run_git(workspace, "show-ref")
     before_head = run_git(workspace, "rev-parse", "HEAD")
 
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError, match="repository-mismatch"
-    ):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="repository-mismatch"):
         rtc.request(**request)
 
     assert (
@@ -655,9 +651,7 @@ def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
     assert not config_path.exists()
     assert not packet_path.exists()
 
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError, match="actual-branch-mismatch"
-    ):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="actual-branch-mismatch"):
         rtc.request(**{**request, "branch": "feature/unmatched"})
 
     assert not config_path.exists()
@@ -737,9 +731,7 @@ def test_prepare_holds_unmarked_linked_worktree_from_foreign_common_root(
     before_status = run_git(clone, "status", "--porcelain")
     assert not before_status
 
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError, match="checkout-mode-mismatch"
-    ):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="checkout-mode-mismatch"):
         rtc.request(**request)
 
     assert clone.is_dir()

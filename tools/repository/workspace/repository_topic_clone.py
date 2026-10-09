@@ -802,9 +802,8 @@ def _inspect(
                 return CloneState(path, "repository-mismatch")
             if not all(legacy.values()):
                 return CloneState(path, "legacy-marker-incomplete")
-            if (
-                owner_sha is None
-                or not _legacy_marker_matches(legacy, request, owner_sha)
+            if owner_sha is None or not _legacy_marker_matches(
+                legacy, request, owner_sha
             ):
                 return CloneState(path, "legacy-marker-mismatch")
             marker_branch = legacy["branch"]
