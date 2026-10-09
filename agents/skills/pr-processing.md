@@ -12,7 +12,6 @@ upstream design ../internal-routines/verification-result-structuring.md reader-r
 upstream design ./issue-finding-report.md Issue ownership and reorganization
 upstream design ./agent-canon-update.md source PR and parent-pin route
 upstream design ../../documents/conventions/coding-conventions-testing.md bug reproduction evidence
-upstream implementation ../../tools/repository/git/conflict_preservation.py conflict inventory and readback
 upstream implementation ../../tools/repository/github/github_publish.py authorized GitHub publication
 downstream design ../../.codex/personal/skills/pr-processing/SKILL.md runtime discovery adapter
 @dependency-end
@@ -67,19 +66,15 @@ is separate evidence, not a green hosted status.
 
 Creating or updating a PR and handing it to review do not authorize a merge. For
 an authorized merge, use [github-connected-work](../internal-routines/github-connected-work.md)
-and the [conflict-preservation owner](../../documents/tools/repository_topic_clone.md#競合の再開):
-integrate the current base on the PR branch, resolve each conflict against its
-source owner, preserve unrelated and unknown user content, validate the
-integrated head, and confirm the remote head still matches it before merging.
-Merge against that expected head and read back the merge commit, tree, and
-updated base.
+and the [integration owner](integration.md): integrate the current base on the
+PR branch, review actual native Git conflicts against their source owners, and
+preserve unrelated or unknown user content. Validate the integrated head and
+confirm the remote head still matches it before merging. Merge against that
+expected head and read back the merge commit, tree, and updated base.
 
-A conflict-free path list alone does not prove semantic preservation. Do not
-replace whole files or discard unknown state to make a merge pass; use the
-preservation inventory and readback. If any required check, review, thread
-resolution, or head/base fact is unproven, do not claim merge readiness. The
-preservation tool and connected-work route own the detailed packet and operation
-sequence.
+If any required check, review, thread resolution, or head/base fact is
+unproven, do not claim merge readiness. The integration owner and connected-
+work route own the review and operation sequence.
 
 ## Publication boundary
 
