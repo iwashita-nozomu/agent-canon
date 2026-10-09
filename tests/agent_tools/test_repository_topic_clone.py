@@ -50,7 +50,7 @@ def run_git(path: Path, *args: str) -> str:
 
 
 def git_metadata_path(root: Path, name: str) -> Path:
-    """Resolve the Git path emitted relative to this checkout's command cwd."""
+    """Resolve a Git path from this checkout, preserving absolute results."""
     value = Path(run_git(root, "rev-parse", "--git-path", name))
     return root / value
 
