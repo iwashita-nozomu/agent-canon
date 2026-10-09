@@ -207,10 +207,6 @@ skill_families:
       - {"tool_id": "agent-search", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/search/search.py", "--query-file", "<request-or-design-question.txt>", "--providers", "text,semantic,vector,tool,header-deps,code-deps", "--format", "json"]}
       - {"tool_id": "check-solid-evidence", "operation_id": "default"}
       - {"tool_id": "tool-rejection-preflight", "operation_id": "default", "argv_suffix": ["--root", ".", "<planned-edit-paths>"]}
-      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
-      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed", "--fail-missing"]}
-      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed", "--require-header"]}
-      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--print-edges"]}
       - {"tool_id": "check-convention-compliance", "operation_id": "default"}
       - {"tool_id": "bootstrap-agent-run", "operation_id": "default", "argv_suffix": ["...", "--task-id", "<T*>"]}
       maintenance:
@@ -418,7 +414,7 @@ skill_families:
       conditional:
       - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--capability", "oop_type_design"]}
       - {"tool_id": "check-static-any", "operation_id": "default", "argv_suffix": ["--submodule-aware"]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--report-dir", "<run-dir>/dependency-review", "--fail-missing"]}
+      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--report-dir", "<run-dir>/dependency-review"]}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
@@ -547,9 +543,8 @@ skill_families:
       - {"executable": "git", "argv": ["grep", "-n", "<cause keywords>", "--", "documents/notes/knowledge", "documents/notes/failures", "documents", "agents"]}
       - {"executable": "gh", "argv": ["issue", "view", "<owner/repository#number>", "--json", "number,title,body,state,url"]}
       - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
-      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
-      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed", "--fail-missing"]}
-      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed", "--require-header"]}
+      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
+      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed"]}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
@@ -894,7 +889,6 @@ skill_families:
       - {"executable": "bash", "argv": ["tools/repository/git/agent_update_branch.sh", "validate", "<lane>"]}
       - {"executable": "bash", "argv": ["tools/repository/git/agent_update_branch.sh", "push", "<lane>", "<branch>"]}
       - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "--runtime-root", "<runtime>", "status"]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--fail-missing"]}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
       - {"tool_id": "skill-tool-commands", "operation_id": "default"}
@@ -1430,7 +1424,6 @@ skill_families:
       conditional:
       - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory"]}
       - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory", "--root", "."]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--fail-missing"]}
       - {"tool_id": "check-convention-compliance", "operation_id": "default"}
       maintenance:
       - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}

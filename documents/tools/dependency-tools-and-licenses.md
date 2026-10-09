@@ -101,9 +101,9 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | Tool | Command | Purpose | Writes | License Status |
 | --- | --- | --- | --- | --- |
 | `run-repo-dependency-review` | `bash tools/analysis/dependencies/run_repo_dependency_review.sh` | dependency manifest の scan、format、graph review をまとめて実行します。 | no | local: Apache-2.0 |
-| `scan-dependency-headers` | `bash tools/analysis/dependencies/scan_dependency_headers.sh` | canonical graph の parser-owned manifest coverage を棚卸しします。 | no | local: Apache-2.0 |
+| `scan-dependency-headers` | `bash tools/analysis/dependencies/scan_dependency_headers.sh` | explicitly selected analysis scope の existing manifest annotation coverage を棚卸しします。 | no | local: Apache-2.0 |
 | `check-dependency-header-format` | `bash tools/validation/semantic/dependencies/check_dependency_header_format.sh` | selected path の manifest context projection を検証します。 | no | local: Apache-2.0 |
-| `check-dependency-headers` | `python3 tools/validation/semantic/dependencies/check_dependency_headers.py` | changed file に required dependency manifest があるか検証します。 | no | local: Apache-2.0 |
+| `check-dependency-headers` | `python3 tools/validation/semantic/dependencies/check_dependency_headers.py` | explicitly selected files の dependency manifest declaration を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-graph` | `bash tools/analysis/dependencies/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
 | `scan-code-dependencies` | `bash tools/analysis/dependencies/scan_code_dependencies.sh` | Python import、C/C++ include、shell source など code-level dependency edge を抽出します。 | no | local: Apache-2.0 |
 | `check-design-doc-claims` | `python3 tools/validation/semantic/documents/check_design_doc_claims.py` | design document の claim を bounded graph context と parent evidence で検査します。 | no | local: Apache-2.0 |

@@ -170,7 +170,7 @@ owners:
   are read back from [documents/design/cpp-build-layout.md](../../documents/design/cpp-build-layout.md).
 - Explicit `Any`: `python3 tools/validation/semantic/code/check_static_any.py --submodule-aware`.
 - OOP/SOLID signals: `$oop-readability-check`; keep its evidence with the owning review.
-- Dependency headers/graph: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.
+- Existing dependency graph context: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review` when the declared relations materially affect the type boundary. Missing annotations do not block the design.
 - Schema or algorithm checks: existing checker only when the changed implementation
   path is in that checker’s scope; otherwise `not_applicable`.
 

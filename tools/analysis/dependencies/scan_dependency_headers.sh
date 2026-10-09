@@ -294,7 +294,7 @@ while IFS= read -r raw_path; do
       *) missing_other=$((missing_other + 1)) ;;
     esac
     blocking_missing=$((blocking_missing + 1))
-    echo "MISSING_DEPENDENCY_MANIFEST=$(display_path "$path") owner=$owner classification=strict realpath=$(real_source_path "$path") reason=$(missing_reason "$path")"
+    echo "MISSING_DEPENDENCY_MANIFEST=$(display_path "$path") owner=$owner realpath=$(real_source_path "$path") reason=$(missing_reason "$path")"
     if [[ "$EXPLAIN_MISSING" -eq 1 ]]; then
       print_missing_explanation "$path"
     fi

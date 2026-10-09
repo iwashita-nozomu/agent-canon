@@ -96,6 +96,17 @@ def stdout_value(result: subprocess.CompletedProcess[str], key: str) -> str:
 class ProseReasoningGraphTest(unittest.TestCase):
     """Exercise graph ingest, analysis, projection, and handoff."""
 
+    def test_missing_dependency_annotation_is_not_a_blocker(self) -> None:
+        """Old inventory payloads cannot restore the retired header requirement."""
+        self.assertEqual(
+            prose_graph.document_canon_severity("missing_dependency_manifest"),
+            "info",
+        )
+        self.assertEqual(
+            prose_graph.document_canon_severity("broken_dependency_target"),
+            "blocker",
+        )
+
     def test_selected_ordering_topology_overrides_source_order(self) -> None:
         """Explicit ordering edges should control whole-document sentence order."""
         source_anchors = [

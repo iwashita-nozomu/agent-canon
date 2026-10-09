@@ -231,7 +231,7 @@ dependency relation kind ではありません。依存 manifest の relation �
 Dependency relation はこの3種に限定します。`test`、`review`、`report`
 などの file-level contract 分類は、`dependency-contract-kinds.toml` の
 contract kind として別に管理します。新しい relation kind を増やす場合は、
-parser、tool、docs、review gate、migration plan を同じ変更で更新します。
+parser、tool、docs、および明示的な graph-analysis instructions を同じ変更で更新します。
 
 ## Contract Kinds
 
@@ -659,8 +659,10 @@ Responsibilities:
 - expand text-search hits into edit-scope candidates with `--edit-scope`, `--edit-scope-changed`, or `--search-hits-file`
 - with `--check-bidirectional`, validate bidirectional consistency and kind match on reverse edges
 
-Default graph validation is the fail gate for isolated manifests, self reference, and cycles.
-Bidirectional consistency is a stricter migration gate because a partially migrated repository can have useful upstream/downstream context before every reverse edge is written.
+When explicitly invoked, default graph validation rejects isolated manifests,
+self reference, and cycles. Bidirectional consistency is an optional stricter
+check over declared reverse edges; it does not impose repository-wide annotation
+coverage.
 
 The shell may use `jq`, `awk`, and `sort` to project canonical query rows. It
 cannot read source headers, rebuild graph facts, or open SQLite.
@@ -673,9 +675,11 @@ Responsibilities:
 - keep the normal route independent of graph executable and persisted database
 - keep missing manifests report-only by default; ordinary edits and PRs do not
   require repository-wide manifest coverage
-- offer `--fail-missing` for strict checkpoint runs after a subtree or repo has been migrated
+- offer `--fail-missing` for a user-selected strict coverage audit; ordinary
+  edits and PRs do not use it
 - offer `--explain-missing` for owner-classified missing-header repair output
-- accept `--allow-frontmatter` and pass it to the manifest tools for policy-explicit CI callers
+- accept `--allow-frontmatter` and pass it to the manifest tools for
+  policy-explicit analysis callers
 - pass `--check-bidirectional` through to graph validation when strict reverse-edge review is requested
 - offer `--list-changed-dependencies` so checkpoint review can hand reviewers every surface that changed files declare or are referenced by
 - automatically write `dependency_graph.tsv` when `--report-dir` is set
@@ -698,5 +702,4 @@ analysis contract; that does not create a repository-wide migration or PR gate.
 ## Open Design Questions
 
 - Whether explicitly reviewed cycle debt needs any policy beyond report-only review
-- Whether generated files should point to generators via sidecar metadata or stay outside the checkable set
 - Whether closure output should be ordered by graph distance, kind, or stable path sort

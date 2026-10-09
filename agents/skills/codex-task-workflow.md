@@ -96,10 +96,10 @@ unit. Refresh only changed premises; an unperformed trace does not establish abs
 The existing-tool-before-read exception covers the tool action itself; interpreting
 or repairing its output still needs the applicable owner context.
 
-Dependency metadata records responsibility. Select decision-relevant edges using
-[File Dependency Manifest](../canonical/CODEX_IMPLEMENTATION.md#file-dependency-manifest).
-Carry that selected context and affected consumer closure, not a recursive inventory
-of every linked document or a new per-read receipt.
+Use actual import, include, call-site, standard-link, and build/package evidence
+to identify decision-relevant dependencies and affected consumers. Existing
+dependency annotations may add context when present, but ordinary edits do not
+require adding or completing them.
 
 ## Stages
 

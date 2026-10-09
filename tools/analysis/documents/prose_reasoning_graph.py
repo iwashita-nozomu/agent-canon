@@ -4678,7 +4678,7 @@ def string_value(value: object) -> str:
 
 def document_canon_severity(kind: str) -> str:
     """Return structured-analysis compatible severity for a document-canon finding kind."""
-    if kind in {"missing_dependency_manifest", "broken_dependency_target"}:
+    if kind == "broken_dependency_target":
         return "blocker"
     if kind in {
         "duplicate_heading_candidate",

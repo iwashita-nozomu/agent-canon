@@ -274,11 +274,11 @@ DEPENDENCY_GATE_TEMPLATES = (
         gate="dependency_review",
         command_template=(
             "bash tools/analysis/dependencies/run_repo_dependency_review.sh "
-            "--root . --fail-missing --list-changed-dependencies"
+            "--root . --list-changed-dependencies"
         ),
         handoff=(
-            "include dependency header and related edit-scope plan for created "
-            "or edited text files"
+            "include available dependency evidence and the related edit-scope "
+            "plan; resolve ordinary dependencies from their actual source"
         ),
     ),
 )
@@ -287,7 +287,7 @@ STRICT_SCHEMA_DEPENDENCY_GATE_TEMPLATES = (
         gate="dependency_review",
         command_template=(
             "bash tools/analysis/dependencies/run_repo_dependency_review.sh "
-            "--root . --fail-missing --list-changed-dependencies"
+            "--root . --list-changed-dependencies"
         ),
         handoff=(
             "preserve the strict JSON schema with top-level hooks only; record "
