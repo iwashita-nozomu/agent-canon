@@ -1314,16 +1314,45 @@ def main(argv: list[str]) -> int:
                     "mode": "read-only",
                     "digest": digest,
                 }
-                lifecycle.setdefault("targets", {})[digest] = target
+                targets = lifecycle.setdefault("targets", {})
+                if not isinstance(targets, dict):
+                    return 1
+                targets[digest] = target
+                # Match the controller's full projection, including prior targets.
+                mount_rows = []
+                mounts_toml = ['schema = "agent-canon.mount-registry.v2"', ""]
+                for target_digest, target_record in sorted(targets.items()):
+                    if not isinstance(target_record, dict):
+                        return 1
+                    target_root = target_record.get("root")
+                    target_host_root = target_record.get("host_root")
+                    target_mode = target_record.get("mode")
+                    if (
+                        not isinstance(target_root, str)
+                        or not isinstance(target_host_root, str)
+                        or target_mode != "read-only"
+                    ):
+                        return 1
+                    mount_rows.append(
+                        f"target\t{target_digest}\t{target_host_root}\t"
+                        f"/targets/{target_digest}\tread-only"
+                    )
+                    mounts_toml.extend(
+                        [
+                            f"[targets.{target_digest}]",
+                            f"root = {json.dumps(target_root)}",
+                            'mode = "read-only"',
+                            f"digest = {json.dumps(target_digest)}",
+                            "",
+                        ]
+                    )
                 state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
                 (exchange_root / "mounts.tsv").write_text(
-                    f"target\t{digest}\t{host_root}\t/targets/{digest}\tread-only\n",
+                    "\n".join(mount_rows) + ("\n" if mount_rows else ""),
                     encoding="utf-8",
                 )
                 (exchange_root / "mounts.toml").write_text(
-                    'schema = "agent-canon.mount-registry.v2"\n\n[targets.{}]\nroot = "{}"\nmode = "read-only"\ndigest = "{}"\n'.format(
-                        digest, container_root, digest
-                    ),
+                    "\n".join(mounts_toml),
                     encoding="utf-8",
                 )
                 print(
