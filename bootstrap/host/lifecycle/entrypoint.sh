@@ -300,12 +300,6 @@ _agent_canon_sync_operation() (
     esac
     ((sync_index += 1))
   done
-  # Claim the live resident before source advancement; replacement rechecks
-  # before teardown.
-  local existing_container=$(_agent_canon_container_name)
-  if "$AGENT_CANON_DOCKER_CMD" container inspect "$existing_container" >/dev/null 2>&1; then
-    _agent_canon_classify_existing_container "$existing_container" || exit $?
-  fi
   _agent_canon_advance_source "$install_root" || exit $?
   source_head=$AGENT_CANON_SYNC_SOURCE_HEAD
   AGENT_CANON_REPOSITORY_ROOT=$install_root
@@ -2549,14 +2543,12 @@ _agent_canon_ensure_container() {
     target_mount_args+=(--mount "type=bind,src=$git_source,dst=$git_destination,readonly")
   done <<< "$git_mounts"
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
-    # Host-input import writes the mounted state volume; validate its owner first.
-    _agent_canon_classify_existing_container "$container" || return $?
-    if "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
-      _agent_canon_import_host_inputs
-    fi
     _agent_canon_validate_existing_container "$container"
     local validate_rc=$?
     ((validate_rc == 0)) || return "$validate_rc"
+    if "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
+      _agent_canon_import_host_inputs
+    fi
   else
     local caller_user
     caller_user=$(_agent_canon_caller_user)
@@ -2734,16 +2726,11 @@ _agent_canon_commit_pending_rollback_plan() {
 
 _agent_canon_prepare_forced_update_locked() {
   local container=$(_agent_canon_container_name)
-  local container_present=0
   local pending="$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv"
   local old_image_ref old_image_id planned_image_id planned_image_ref
-  if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
-    _agent_canon_classify_existing_container "$container" || return $?
-    container_present=1
-  fi
   _agent_canon_discard_pending_rollback_plan
   if [[ ! -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]] &&
-     ((container_present == 0)); then
+     ! "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
     return 0
   fi
   if [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]]; then
@@ -2767,6 +2754,7 @@ _agent_canon_prepare_forced_update_locked() {
     AGENT_CANON_ACTIVE_IMAGE_ID=$old_image_id
     AGENT_CANON_EXPECTED_IMAGE_ID=$old_image_id
     export AGENT_CANON_IMAGE_REF AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID
+    _agent_canon_classify_existing_container "$container" || return $?
   fi
   old_image_ref=${AGENT_CANON_IMAGE_REF:-$old_image_ref}
   old_image_id=${AGENT_CANON_ACTIVE_IMAGE_ID:-$old_image_id}
@@ -3548,6 +3536,7 @@ _agent_canon_install_locked() {
   # named resident after ownership readback, then clear generated state before
   # building the candidate.  The EXIT trap restores the captured state if any
   # later phase fails.
+  _agent_canon_advance_source "$AGENT_CANON_REPOSITORY_ROOT" || return $?
   local old_container=$(_agent_canon_container_name)
   local old_container_id= old_image_ref= old_image_id=
   local old_container_present=0
@@ -3570,7 +3559,6 @@ _agent_canon_install_locked() {
   if ((old_container_present == 0)); then
     old_container=
   fi
-  _agent_canon_advance_source "$AGENT_CANON_REPOSITORY_ROOT" || return $?
   AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER=$old_container
   AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=$old_image_ref
   AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID=$old_image_id
@@ -4179,10 +4167,6 @@ _agent_canon_rollback_locked() {
   local rollback_image_id rollback_image_ref current_image_ref current_image_id rollback_container rollback_candidate rollback_rc=0
   local current_mounts_backup
   rollback_container=$(_agent_canon_container_name)
-  # The rollback reader writes a derived mount projection; claim before parsing it.
-  if "$AGENT_CANON_DOCKER_CMD" container inspect "$rollback_container" >/dev/null 2>&1; then
-    _agent_canon_classify_existing_container "$rollback_container" || return $?
-  fi
   _agent_canon_read_rollback_plan
   [[ -f "$AGENT_CANON_STATE_ROOT/mounts.tsv" && ! -L "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]] ||
     _agent_canon_json_error rollback_target_manifest_missing "current target mount manifest is unavailable"
