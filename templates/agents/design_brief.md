@@ -16,7 +16,8 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 ## Reader Map（読者 map）
 
 この template は implementation-facing な detailed design packet を所有します。handoff 前に
-goal、abstract design frame、evidence ledger、reuse survey、requirement packet、implementation
+goal、abstract design frame、Failure Cause And Conflict Intent の evidence/owner と escalation/rejection
+evidence、Alternatives And Independent Review の evidence、reuse survey、requirement packet、implementation
 source packet、side-effect map、reader path、clause mapping、file-by-file design、trace、naming
 plan、validation、rollback、risk を埋めます。unresolved responsibility、naming、validation、
 API-shape claim を owning review gate が判定できない場合だけ detailed design review を選択します。
