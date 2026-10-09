@@ -29,10 +29,12 @@ authority. Before working, confirm the directory, branch, and dependency HEADs;
 recheck changed premises only. Preserve unknown Git state and user data. Authority
 for the task does not authorize unrelated changes or publication.
 
-Before a repair, state what required behavior the current implementation cannot
-meet and cite the current source, actual caller, relevant input/state, and trace
-or failure evidence for that gap. Treat failure reports and review claims as
-hypotheses; use the selected implementation owner's reachability/remedy guidance.
+Before proposing a repair, state what required behavior the current implementation
+cannot meet by locating the current file/function and failing operation, then trace
+a relevant valid input/state from its actual caller through control/dataflow to the
+unmet behavior, citing the observed or statically established failure. Treat
+failure reports and review claims as hypotheses; use the selected implementation
+owner's reachability/remedy guidance.
 Verify only facts that could change the owner, mechanism, required guarantee,
 scope, or validation. Separate observations, inferences, and unresolved
 decision-relevant premises; follow callers, effects, and affected consumers far
