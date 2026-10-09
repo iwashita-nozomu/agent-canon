@@ -2132,10 +2132,9 @@ def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) 
 
     advanced = rtc.merge_main(receipt.request)
     assert advanced.origin_main_sha == latest_main_sha
-    assert (
-        (receipt.clone / "later-main.txt").read_text(encoding="utf-8")
-        == "advanced after conflict capture\n"
-    )
+    assert (receipt.clone / "later-main.txt").read_text(
+        encoding="utf-8"
+    ) == "advanced after conflict capture\n"
     assert (
         run_git(
             receipt.clone,
