@@ -124,39 +124,14 @@ memory は固定 packet/read の対象にしません。owner/path、failure evi
 decision が選択された後、必要な topic だけを `agent-canon k search` / `k read` で private
 logへ on-demand に検索します。stable preference は対象 owner への明示変更として扱います。
 
-raw text search の hit だけで編集対象を決めません。
-user、parent、handoff、router が示した path は候補として保存し、候補の確定と edit owner の確定を同一視しません。編集に入る前に既存の [`Owner-First Read Trace`](../skills/agent-orchestration.md#owner-first-read-trace) で selected Skill と operational owner を解決し、必要な dependency/downstream edge を入口、呼び元、実装、consumer、既存 test のうち判断を変える面へ bounded にたどって、候補が本当にその owner の差し替え可能な単位かを確認します。判断を変えない面は既存の `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` に理由付きで分類し、候補が支持されない場合は route を更新してから編集します。検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を作ります。write-capable child handoff は `agents/task_catalog.yaml#workflow_activation_policy` が要求する typed route だけで materialize します。空の unresolved-decision set は即時に選択 route へ遷移し、owner gate は完了後だけです。bounded owner/path/targeted-validation request は選択済み execution owner が直接扱い、child を要求する coordination route の場合だけ同じ typed handoff を使います。
-asset reuse investigation は decomposition / prototyping より前に行います。
-split / extraction または suspected predecessor の現行欠落では splitter が
-current module/helper/type/test/docs と `git log`、`-S`、deleted paths、prior PR /
-Issue、predecessor tests を調査します。bounded non-split edit には historical
-scan を一律適用しません。known な asset path、capability、disposition、reason、
-test paths は既存 `reuse_survey` に advisory context として載せ、選択した asset
-と test context から slice を導きます。同一 asset に触れる slice を merge してから
-child handoff に同じ known context を渡します。context の不在は dispatch または
-writing を block しません。
-bounded route では、選択済みの tool action を tool-owned evidence から開始できます。結果を解釈したり修正したりする前に、selected Skill と、その判断を委譲している owner の該当する制約を読みます。Owner-First Read Trace は担当と必要な文脈を見つける案内であり、必要な内容を実際に読む責任は変わりません。bounded route は execution route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
-
-## Skill read admission
-
-The canonical [`agent-orchestration` Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace)
-helps identify the owner and applicable guidance. `skill-document-reader` may
-locate and return selected sections, but its EOF metadata cannot show that an
-instruction was understood or applied. Use the helper when it is useful; it is
-not a universal read route or an implementation-admission gate. Keep actual
-owner constraints, authorization, and the existing no-duplicate-receipt/body
-boundary in force. An already selected tool action may precede reading; its
-interpretation or repair still uses the applicable owner guidance.
-
-```bash
-git grep -l "topic keywords" -- <responsibility-scoped dirs> \
-  | sed -n '1,200p' > reports/search_hits.txt
-bash tools/analysis/dependencies/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review \
-  --search-hits-file reports/search_hits.txt
-```
-
-`dependency_edit_scope.txt` は path artifact として残します。会話、Issue、PR body、または run bundle の本文には、件数、主要 path、編集した file、確認した file、意図的に外した candidate だけを書きます。
+Search hits and nominated paths are candidates, not edit authority. Confirm the
+selected owner and affected callers/consumers; follow only dependency edges that
+can change scope or validation.
+Before splitting or retiring an implementation, use the shared
+[owner and retirement rule](../../ROOT_AGENTS.md#always-on-boundary) to check
+existing assets and callers. A bounded edit needs no broad history scan. When
+the next action is settled, proceed through its owner; read the relevant owner
+before interpreting or repairing tool output.
 
 ## Missing File Or Path Triage
 

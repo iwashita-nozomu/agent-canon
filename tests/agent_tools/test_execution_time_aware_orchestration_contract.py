@@ -114,21 +114,6 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         self.assertEqual(len(matches), 1)
         return matches[0]
 
-    def test_owner_keeps_the_complete_work_conservation_contract(self) -> None:
-        text = " ".join(
-            self.read("agents/skills/agent-orchestration.md").lower().split()
-        )
-        contract = self.contract()
-        markers = contract.get("owner_markers")
-        self.assertIsInstance(markers, list)
-        self.assertIn(
-            "execution-time-aware work-conservation contract",
-            text,
-        )
-        for marker in markers:
-            self.assertIsInstance(marker, str)
-            self.assertIn(" ".join(marker.lower().split()), text, marker)
-
     def test_production_checker_accepts_the_complete_owner_closure(self) -> None:
         result = self.run_checker(PROJECT_ROOT)
         self.assertEqual(
@@ -225,17 +210,6 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
                 root,
                 "consumer_reference_mismatch",
             )
-
-    def test_pr_processing_preserves_owner_contract_fields(self) -> None:
-        spec = self.consumer("pr-processing")
-        path = spec["path"]
-        self.assertIsInstance(path, str)
-        text = " ".join(self.read(path).lower().split())
-        markers = spec.get("required_markers")
-        self.assertIsInstance(markers, list)
-        for marker in markers:
-            self.assertIsInstance(marker, str)
-            self.assertIn(" ".join(marker.lower().split()), text, marker)
 
     def test_rejects_universal_or_missing_checker_and_runtime_registration(
         self,

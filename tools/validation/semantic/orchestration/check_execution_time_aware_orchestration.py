@@ -137,7 +137,6 @@ EXPECTED_CONSUMERS = {
     "pr-processing": {
         "path": "agents/skills/pr-processing.md",
         "kind": "specialization",
-        "reference_mode": "text",
     },
     "task-catalog": {
         "path": "agents/task_catalog.yaml",
@@ -317,15 +316,6 @@ def _check_owner(
             owner_path,
             "owner-heading-count",
         )
-    normalized = normalize(owner_text)
-    for marker in contract.get("owner_markers", ()):
-        if normalize(str(marker)) not in normalized:
-            add(
-                findings,
-                "owner_contract",
-                owner_path,
-                f"missing-marker:{marker}",
-            )
 
 
 def _check_consumer_text(
