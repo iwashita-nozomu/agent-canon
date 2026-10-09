@@ -1060,7 +1060,7 @@ def _bash_mutation_inner(
                     active_root=active_root,
                     segment=segment,
                     command_index=command_index,
-                    inherited_git_environment_overrides=command_environment,
+                    git_environment_overrides=command_environment,
                 )
             )
             reasons.append(f"git_{subcommand or 'unknown'}")
