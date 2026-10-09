@@ -1495,6 +1495,13 @@ def test_concurrent_target_add_serializes_resident_replacement(
         f"tracker={str(tracker)!r}\n"
         'target_id="${AGENT_CANON_TEST_TARGET_ID:-}"\n'
         'transaction="$tracker/$target_id"\n'
+        'exec 9>"$tracker/counter.lock"\n'
+        'flock -x 9\n'
+        'count=0\n'
+        '[[ ! -f "$tracker/active.count" ]] || read -r count < "$tracker/active.count"\n'
+        'printf "start\\t%s\\t%s\\t%s\\t%s\\n" "$target_id" "$count" "${AGENT_CANON_RUNTIME_ROOT:-unset}" "$*" >> "$tracker/docker.events"\n'
+        'flock -u 9\n'
+        'exec 9>&-\n'
         'if [[ -n "$target_id" && "$1:$2" == "container:inspect" && ! -e "$transaction.active" ]]; then\n'
         '  exec 9>"$tracker/counter.lock"\n'
         '  flock -x 9\n'
@@ -1509,6 +1516,13 @@ def test_concurrent_target_add_serializes_resident_replacement(
         '  sleep 0.05\n'
         'fi\n'
         'if "$fake_docker" "$@"; then rc=0; else rc=$?; fi\n'
+        'exec 9>"$tracker/counter.lock"\n'
+        'flock -x 9\n'
+        'count=0\n'
+        '[[ ! -f "$tracker/active.count" ]] || read -r count < "$tracker/active.count"\n'
+        'printf "end\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$target_id" "$count" "$rc" "${AGENT_CANON_RUNTIME_ROOT:-unset}" "$*" >> "$tracker/docker.events"\n'
+        'flock -u 9\n'
+        'exec 9>&-\n'
         'if [[ -n "$target_id" && "$1:$2" == "container:exec" && "$*" == *"target add"* && $rc -eq 0 ]]; then\n'
         '  : > "$transaction.committed"\n'
         'fi\n'
@@ -1556,7 +1570,9 @@ def test_concurrent_target_add_serializes_resident_replacement(
     assert second.returncode == 0, second_stderr or second_stdout
     assert '"code": "target_registered"' in first_stdout
     assert '"code": "target_registered"' in second_stdout
-    assert not (tracker / "overlap").exists()
+    assert not (tracker / "overlap").exists(), (tracker / "docker.events").read_text(
+        encoding="utf-8"
+    )
     assert (tracker / "active.count").read_text(encoding="utf-8").strip() == "0"
 
     runtime = control / ".runtime"
