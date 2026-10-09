@@ -170,7 +170,11 @@ execution stage で [codex-task-workflow](codex-task-workflow.md)、handoff / wa
 
 この手順は AgentCanon source の登録・配布を変える場合だけに使います。分担を設計・変更するときは既存の [Skill Maintenance Delegation](../../documents/design/responsibility-cleanup.md#skill-maintenance-delegation) owner を参照し、解決済みの担当と判断を再利用します。
 
-1. 依頼された成果・起動条件と canonical owner を確認します。既存の API / CLI、library、history、関連 PR / checkout を再利用し、影響しうる catalog、dependency、caller、配布面を調べて、確認できた gap だけを修正します。
+1. 依頼の成果・有効な利用経路・canonical owner から始め、[Library And Reuse Sweep](../canonical/CODEX_IMPLEMENTATION.md#library-and-reuse-sweep) の順で候補を調べます。
+   対応する history を照合し、その caller から既存 API / configuration を直接使う・組み合わせる方法で
+   必要な保証を満たすか確認します。同じ owner の branch / PR / prepared checkout があれば
+   [Branch Reuse Default](../canonical/CODEX_INTAKE.md#branch-reuse-default) に沿って継続し、残る gap が
+   確認できた場合だけ、その owner と影響する skill surface を更新します。
 2. material な設計 rationale は既存 design owner に残します。bounded な文言変更に新しい design artifact は要りません。authority、safety、compatibility、completion の契約は既存 owner に保持します。
 3. public skill の canonical doc と catalog を整合させ、dependency、caller、配布面は影響する場合だけ更新します。既存 capability を包む skill を作りません。
 4. caller の選択を変えるときは、判断点に適用条件と canonical link を置き、条件成立時の到達と不成立時の非起動を確認します。[条件付き読込](task-routing.md#in-flight-skill-reads) に従います。
