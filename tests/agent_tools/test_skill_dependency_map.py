@@ -79,7 +79,9 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             self.assertTrue(json_path.is_relative_to(Path(runtime_dir)))
         self.assertEqual(before, tuple(path.read_bytes() for path in tracked))
 
-    def test_tracked_graph_requires_exact_capability_and_external_evidence(self) -> None:
+    def test_tracked_graph_requires_exact_capability_and_external_evidence(
+        self,
+    ) -> None:
         """Tracked projection updates require the fixed pair and leave evidence outside it."""
         with (
             tempfile.TemporaryDirectory() as source_dir,
@@ -105,11 +107,16 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             )
             graph = {"skill_count": 1, "commands": [], "tools": [], "edges": []}
             with (
-                mock.patch.object(skill_dependency_map, "build_graph", return_value=graph),
-                mock.patch(
-                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid", return_value="graph\n"
+                mock.patch.object(
+                    skill_dependency_map, "build_graph", return_value=graph
                 ),
-                mock.patch.object(skill_dependency_map, "_json_text", return_value="{}\n"),
+                mock.patch(
+                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid",
+                    return_value="graph\n",
+                ),
+                mock.patch.object(
+                    skill_dependency_map, "_json_text", return_value="{}\n"
+                ),
             ):
                 write_artifacts(
                     source,
@@ -117,10 +124,16 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                     runtime_root=Path(runtime_dir),
                     source_mutation_capability=capability_path,
                 )
-            evidence = Path(runtime_dir) / "graphs" / "skill-dependency-graph-source-mutation.json"
+            evidence = (
+                Path(runtime_dir)
+                / "graphs"
+                / "skill-dependency-graph-source-mutation.json"
+            )
             self.assertTrue(evidence.is_file())
             payload = json.loads(evidence.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema"], "agent_canon.skill_graph_source_mutation.v1")
+            self.assertEqual(
+                payload["schema"], "agent_canon.skill_graph_source_mutation.v1"
+            )
             self.assertEqual(
                 payload["allowed_paths"],
                 [DEFAULT_GRAPH_PATH.as_posix(), DEFAULT_JSON_PATH.as_posix()],
@@ -130,7 +143,10 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
 
     def test_tracked_graph_rejects_capability_with_unrelated_target(self) -> None:
         """A capability cannot broaden graph publication beyond the canonical pair."""
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as runtime_dir:
+        with (
+            tempfile.TemporaryDirectory() as source_dir,
+            tempfile.TemporaryDirectory() as runtime_dir,
+        ):
             source = Path(source_dir)
             (source / DEFAULT_GRAPH_PATH).parent.mkdir(parents=True)
             capability = source / "capability.json"
@@ -146,13 +162,20 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             )
             graph = {"skill_count": 1, "commands": [], "tools": [], "edges": []}
             with (
-                mock.patch.object(skill_dependency_map, "build_graph", return_value=graph),
-                mock.patch(
-                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid", return_value="graph\n"
+                mock.patch.object(
+                    skill_dependency_map, "build_graph", return_value=graph
                 ),
-                mock.patch.object(skill_dependency_map, "_json_text", return_value="{}\n"),
+                mock.patch(
+                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid",
+                    return_value="graph\n",
+                ),
+                mock.patch.object(
+                    skill_dependency_map, "_json_text", return_value="{}\n"
+                ),
             ):
-                with self.assertRaisesRegex(GraphSourceMutationError, "target_mismatch"):
+                with self.assertRaisesRegex(
+                    GraphSourceMutationError, "target_mismatch"
+                ):
                     write_artifacts(
                         source,
                         output=DEFAULT_GRAPH_PATH,
@@ -193,7 +216,9 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 "parallel",
             },
         )
-        self.assertNotIn("successor", {edge["display_label"] for edge in graph["edges"]})
+        self.assertNotIn(
+            "successor", {edge["display_label"] for edge in graph["edges"]}
+        )
         self.assertIn(
             "dependency-design", {item["display_label"] for item in graph["skills"]}
         )
