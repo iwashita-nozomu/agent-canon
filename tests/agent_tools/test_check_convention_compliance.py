@@ -767,6 +767,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 for path in STATIC_READ_VALIDATION_POLICY_MARKERS
             )
         )
+
     def test_minimal_fixture_covers_static_read_validation_policy_surfaces(
         self,
     ) -> None:
