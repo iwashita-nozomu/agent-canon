@@ -2037,6 +2037,7 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
 
 
 def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) -> None:
+    """Captured merge can finish after main advances, then next merge catches up."""
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -2104,8 +2105,47 @@ def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) 
     plan_path.write_text(json.dumps(plan) + "\n", encoding="utf-8")
     (receipt.clone / "base.txt").write_text("topic\n", encoding="utf-8")
     run_git(receipt.clone, "add", "base.txt")
+    captured_main_sha = inventory["theirs"]["commit"]
+    (source / "later-main.txt").write_text(
+        "advanced after conflict capture\n", encoding="utf-8"
+    )
+    run_git(source, "add", "later-main.txt")
+    run_git(
+        source,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-m",
+        "advance main after conflict capture",
+    )
+    run_git(source, "push", "origin", "main")
+    latest_main_sha = run_git(source, "rev-parse", "HEAD")
+    assert latest_main_sha != captured_main_sha
+
     finalized = rtc.finalize_merge_main(receipt.request)
+    assert finalized.origin_main_sha == captured_main_sha
     assert finalized.merged_sha != finalized.candidate_sha
+    assert run_git(receipt.clone, "status", "--porcelain") == ""
+    assert run_git(receipt.clone, "rev-parse", "origin/main") == captured_main_sha
+
+    advanced = rtc.merge_main(receipt.request)
+    assert advanced.origin_main_sha == latest_main_sha
+    assert (
+        (receipt.clone / "later-main.txt").read_text(encoding="utf-8")
+        == "advanced after conflict capture\n"
+    )
+    assert (
+        run_git(
+            receipt.clone,
+            "merge-base",
+            "--is-ancestor",
+            latest_main_sha,
+            advanced.merged_sha,
+        )
+        == ""
+    )
     assert run_git(receipt.clone, "status", "--porcelain") == ""
 
 
