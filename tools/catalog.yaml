@@ -1754,25 +1754,6 @@ entries:
     tests:
       - tests/agent_tools/test_check_skill_frontmatter.py
 
-  - id: skill-tool-commands
-    summary: Materializes and checks runtime skill Tool Commands packets.
-    path: tools/agent/skills/skill_tool_commands.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/agent/skills/skill_tool_commands.py check
-    dispatch: {argv: ["python3", "tools/agent/skills/skill_tool_commands.py", "check"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/skills/task-routing.md
-    tests:
-      - tests/agent_tools/test_skill_tool_commands.py
-
   - id: skill-document-reader
     summary: Reads compact Skills and task-relevant canonical sections in bounded UTF-8 chunks.
     path: tools/agent/skills/skill_document_reader.py

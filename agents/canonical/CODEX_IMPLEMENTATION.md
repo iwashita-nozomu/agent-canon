@@ -113,6 +113,10 @@ matching premises. Tests are evidence of current behavior, not a veto on the
 agreed correction. Preserve the necessary shared asset/history findings through
 related handoffs and consolidate changes to the same responsibility.
 
+When a related branch/PR or prepared checkout exists, verify it serves the same
+owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
+and [repository-topic-clone](../skills/repository-topic-clone.md) before creating a new path.
+
 ## File Dependency Manifest
 
 For checkable canonical design, workflow, tool, policy, and template text, use

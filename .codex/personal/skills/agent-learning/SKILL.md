@@ -2,7 +2,7 @@
 name: agent-learning
 description: "Use when private knowledge/feedback curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"4386e3c72da02633a2aa6ca4137e42f71663ed0337d366e56a060e37663566ca"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"fffb87ea804c075346aadd9e6d12198191ee6dc2030de63b499c9f0caf505ffb"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/agent-learning.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [agent-learning](../../../../agents/skills/agent-learning.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill agent-learning --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

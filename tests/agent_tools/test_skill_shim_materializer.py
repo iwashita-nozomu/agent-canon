@@ -231,27 +231,6 @@ class SkillShimMaterializerTest(unittest.TestCase):
             self.assertEqual(len(blocks), 2)
             self.assertTrue(all("locator" in block and "digest" in block for block in blocks))
 
-    def test_legacy_classification_blocks_expected_section_subset(self) -> None:
-        """An exact generated section subset is not a migration oracle."""
-        with writable_source_fixture() as source:
-            context = build_context(source)
-            skill = "agent-orchestration"
-            expected = render_shim(build_record(context, skill))
-            legacy = expected
-            canonical_start = legacy.index("## Canonical Skill")
-            commands_start = legacy.index("## Tool Commands")
-            subset = legacy[:canonical_start] + legacy[commands_start:]
-            runtime_path = source / ".codex/personal/skills" / skill / "SKILL.md"
-            original = runtime_path.read_text(encoding="utf-8")
-            runtime_path.write_text(subset, encoding="utf-8")
-            try:
-                receipt = classify_legacy(context, skill, expected)
-            finally:
-                runtime_path.write_text(original, encoding="utf-8")
-            self.assertEqual(receipt["classification"], "legacy_schema_mismatch")
-            self.assertEqual(receipt["resolution"], "blocked")
-            self.assertGreater(len(receipt["unmatched_blocks"]), 0)
-
     def test_legacy_classification_blocks_missing_owner_link(self) -> None:
         """A complete-looking old schema without its owner link fails closed."""
         with writable_source_fixture() as source:

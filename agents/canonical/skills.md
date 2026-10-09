@@ -54,11 +54,12 @@ checkout.
 An adapter's “Read the canonical owner” instruction uses that same point-of-use
 boundary: open the owner's Reader Map or short common conditions, then the selected
 section. The thin adapter is a pointer, not a second copy of branch policy.
-Its advertised Python command is a logical command packet, not a new Host entrypoint.
-Before executing it, use [Tool commands](CLI_ENTRYPOINTS.md#tool-commands) through
-[the Host entrypoint](CLI_ENTRYPOINTS.md#host-entrypoint), retaining the current
-registered target and existing source-root resolution. A resolved execution route
-is reused; this reference does not request installation, setup, or a status probe.
+When an owner invokes a tool, use the existing CLI, API, script, or Make entrypoint
+through [the Host entrypoint](CLI_ENTRYPOINTS.md#host-entrypoint), passing its
+native argv and retaining the current registered target and source-root resolution.
+AgentCanon does not materialize a private command packet or binding language before
+execution; the existing entrypoint remains responsible for its own arguments and
+semantics.
 
 Naming carries the visibility boundary:
 

@@ -2,7 +2,7 @@
 name: user-guided-debugging
 description: "Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5d579b4d49bce8a33de7861873b87b24dcbbc7453e3ab8f4d9b496e4598c14f2"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"bf8c6a03839241fbea7f38a9837b5e5ece9b211fe769e30a07d21ce87468e9b7"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/user-guided-debugging.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [user-guided-debugging](../../../../agents/skills/user-guided-debugging.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill user-guided-debugging --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

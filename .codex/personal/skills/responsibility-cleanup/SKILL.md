@@ -2,7 +2,7 @@
 name: responsibility-cleanup
 description: "Use when cleanup requires tree observation, source/view/generated/project/personal boundary classification, dependency closure, responsibility-unit dispatch, integration, or re-review."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1808fd5196df3e05f0461bfa4600f607830e3458ca6b75cca9927e9b7a9d0ba8"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"2cb7cab6750de2b6a8e330f02a2f4c70c4de07e7a28cea7c8a7e3d16127cc9b3"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/responsibility-cleanup.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [responsibility-cleanup](../../../../agents/skills/responsibility-cleanup.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill responsibility-cleanup --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

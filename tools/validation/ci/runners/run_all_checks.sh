@@ -19,7 +19,6 @@
 # upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../../../runtime/manifest/tool_catalog.py validates structured tool catalog
 # upstream implementation ../../semantic/tools/tool_drift.py validates tool/convention trace contracts
-# upstream implementation ../../../agent/skills/skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ../../semantic/responsibility/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../../../../eval/checkers/eval_accumulation_check.py validates eval result accumulation
@@ -498,12 +497,6 @@ if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/skills/check_skill
   echo "✅ runtime skill frontmatter checks 成功"
 else
   echo "❌ runtime skill frontmatter checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/agent/skills/skill_tool_commands.py" check 2>&1; then
-  echo "✅ runtime skill tool command checks 成功"
-else
-  echo "❌ runtime skill tool command checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/runtime/manifest/tool_catalog.py" 2>&1; then

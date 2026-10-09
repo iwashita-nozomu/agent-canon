@@ -3,7 +3,6 @@
 # contract tool
 # responsibility Resolve AgentCanon runtime source root for command execution and route entry.
 # upstream implementation ../../agent/orchestration/route.py consumes deterministic source root for route-root selection
-# upstream implementation ../../agent/skills/skill_tool_commands.py consumes deterministic command execution roots
 # @dependency-end
 """Resolve the AgentCanon source root used by runtime entrypoints."""
 
@@ -341,7 +340,6 @@ def resolve_agent_canon_source_root(
         return explicit
 
     current_repository_root = _find_current_repository_root(raw_root)
-    standalone_catalog = current_repository_root / "agents" / "skills" / "catalog.yaml"
     has_standalone = _has_catalog(current_repository_root)
 
     if not has_standalone:
