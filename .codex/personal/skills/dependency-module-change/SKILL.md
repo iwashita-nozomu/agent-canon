@@ -2,7 +2,7 @@
 name: dependency-module-change
 description: "Use when a dependency source change, independent topic checkout, or reconstructibility-based checkout cleanup is required."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"4dc8f77d458d7f6600da95c6ed6fe007a5abe3ec305a35345f90197b9e18f362"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"09112178c1be11bd3cfa2bff97cc131931e89cb7ccb2d00a64c5d698a2c22085"} -->
 
 <!--
 @dependency-start

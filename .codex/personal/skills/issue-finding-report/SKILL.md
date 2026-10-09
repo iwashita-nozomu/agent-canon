@@ -2,7 +2,7 @@
 name: issue-finding-report
 description: "Use to record AgentCanon defect evidence or reorganize related Issues by owner and completion responsibility."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5afaecf3e77c3bce358b2ce935437ea70c6158309b00ec5b73f661aff75fc4a1"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f60f404706e30655647aeabb9c7e8092cecff605d8334b33601218238f01b811"} -->
 
 <!--
 @dependency-start
