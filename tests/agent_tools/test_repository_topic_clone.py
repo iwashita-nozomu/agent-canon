@@ -1495,6 +1495,7 @@ def test_linked_cleanup_requires_external_retention_for_local_only_content(
         run_git(
             workspace,
             "show-ref",
+            "--hash",
             "--verify",
             "refs/heads/feature/submodule-cleanup",
         )
