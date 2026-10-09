@@ -636,7 +636,8 @@ def _git_name_only_paths(
         args.append("--cached")
     if base is not None:
         args.append(base)
-    args.extend(("--name-only", "-z", "--no-renames"))
+    # Scope needs the full repository path set, independent of diff.relative.
+    args.extend(("--name-only", "-z", "--no-renames", "--no-relative"))
     try:
         result = subprocess.run(
             ["git", *global_options, *args],
@@ -649,8 +650,9 @@ def _git_name_only_paths(
         return (UNRESOLVED_SHELL_PATH,)
     if result.returncode != 0:
         return (UNRESOLVED_SHELL_PATH,)
+    path_cwd = active_root if active_root is not None else cwd
     return tuple(
-        _shell_path(os.fsdecode(path), cwd=cwd, active_root=active_root)[0]
+        _shell_path(os.fsdecode(path), cwd=path_cwd, active_root=active_root)[0]
         for path in result.stdout.split(b"\0")
         if path
     )

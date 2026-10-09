@@ -516,7 +516,41 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
             )
             assert configured.status == "allowed"
             assert configured.mutation_paths == ("src/owned.py",)
+        nested_relative_commit = (
+            "bash -c 'cd src && git -c diff.relative=true commit -am update'"
+        )
+        nested_relative = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": nested_relative_commit},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert nested_relative.status == "allowed"
+        assert nested_relative.mutation_paths == ("src/owned.py",)
         (root / "README.md").write_text("unrelated unstaged input\n", encoding="utf-8")
+        nested_relative_out_of_scope = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": nested_relative_commit},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert nested_relative_out_of_scope.status == "blocked"
+        assert (
+            nested_relative_out_of_scope.reason
+            == "mutation_scope_outside_child_receipt"
+        )
+        assert set(nested_relative_out_of_scope.mutation_paths) == {
+            "src/owned.py",
+            "README.md",
+        }
         message_named_all = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",
