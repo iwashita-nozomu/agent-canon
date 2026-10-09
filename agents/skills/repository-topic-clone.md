@@ -32,9 +32,12 @@ repository-topic checkout の操作を選び、
 選択した操作だけを実行し、引数は [CLI 参照](../../documents/tools/repository_topic_clone.md#基本操作)
 から組み立てます。handoff の identity と current owner evidence を引き継ぎ、write-capable な `prepare` には
 current allowed paths を渡します。`owner-evidence` digest は承認ではなく lifecycle metadata です。
-exact canonical checkout の既存 task marker / writer packet は `prepare` で current metadata へ更新できます。
+computed path と actual Git identity が一致する checkout の task marker / writer packet は
+`prepare` で current metadata へ更新できます。
 この metadata-only operation は source と Git index を変更せず、dirty status を clean 扱いしません。
-`cleanup` は marker と current evidence の exact match を要求します。
+source discovery の `prepare` は writer scope 確定前でも可能で、その場合 packet は作られません。
+scope 確定後は同じ exact Git identity で再prepareし、current allowed paths を packet にします。
+`cleanup` は current Git identity を確認し、marker が存在する場合は marker と current evidence の一致も要求します。
 
 | 操作 | 実行前に読む正本 |
 | --- | --- |
