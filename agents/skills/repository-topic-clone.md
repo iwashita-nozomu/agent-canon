@@ -30,7 +30,11 @@ repository-topic checkout の操作を選び、
 
 共通入口は `python3 tools/repository/workspace/repository_topic_clone.py` です。
 選択した操作だけを実行し、引数は [CLI 参照](../../documents/tools/repository_topic_clone.md#基本操作)
-から組み立てます。handoff の identity と owner evidence を引き継ぎ、`prepare` には allowed paths も渡します。
+から組み立てます。handoff の identity と current owner evidence を引き継ぎ、write-capable な `prepare` には
+current allowed paths を渡します。`owner-evidence` digest は承認ではなく lifecycle metadata です。
+clean な exact canonical checkout は `prepare` / `merge-main` で current digest へ更新できます。
+`cleanup` は marker と current evidence の exact match を要求します。
+dirty linked checkout での reprepare は、既存 target identity を保った strict path extension だけを許します。
 
 | 操作 | 実行前に読む正本 |
 | --- | --- |
