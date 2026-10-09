@@ -1,8 +1,8 @@
 ---
 name: user-guided-debugging
-description: "Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix."
+description: "Use when the user explicitly requests one-issue-at-a-time debugging with visible pre-edit problems. Present the next issue after each fix while continuing agreed work and validation unless the user sets a stop or wait boundary."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"bf8c6a03839241fbea7f38a9837b5e5ece9b211fe769e30a07d21ce87468e9b7"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"4c9c5915cb17b23bd11994de353fb84dae0c32b430c4cc2ae522339e3c0592fc"} -->
 
 <!--
 @dependency-start

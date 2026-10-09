@@ -160,7 +160,7 @@ in the Codex host runtime.
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは [`dependency-analysis`](dependency-analysis.md) を使います。
 - 大規模 refactor では [`refactor-loop`](refactor-loop.md) を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に [`dependency-analysis`](dependency-analysis.md) の change-impact packet を正本入力にします。
 - directory 構造、directory README、root view、path mapping、responsibility-scope map を責務ベースで変えるときは [`structure-refactor`](structure-refactor.md) を追加し、recursive directory responsibility graph を先に作ります。
-- ユーザーが 1 件ずつ共同デバッグする進め方を明示した場合は [`user-guided-debugging`](user-guided-debugging.md) を使い、修正前の問題提示と修正後の次課題提示を固定します。
+- ユーザーが 1 件ずつの guided debugging を明示した場合は [`user-guided-debugging`](user-guided-debugging.md) を使い、編集前に問題を示して修正後に次課題を提示します。同じ作業で合意済みの完了・検証は継続し、ユーザーが選んだ停止・待機境界を尊重します。
 - C / C++ 差分では [`cpp-review`](cpp-review.md) を既定候補にします。
 - OOP readability tool の実行、表出力、結果解釈はいずれも [`oop-readability-check`](oop-readability-check.md) を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - tool、hook、eval、skill、experiment の結果を書き出すときは [`result-artifact-writeout`](result-artifact-writeout.md) を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
