@@ -657,7 +657,7 @@ def _bash_mutation_inner(
 
 
 def _repository_topic_clone_operation(command: str) -> str | None:
-    """Classify only the canonical conflict-preserving clone lifecycle command."""
+    """Classify only the canonical repository-topic clone lifecycle command."""
     segments = _command_segments(command)
     for segment in segments:
         if not segment:
@@ -684,11 +684,6 @@ def _repository_topic_clone_operation(command: str) -> str | None:
             continue
         if len(segments) != 1:
             return "repository_topic_clone_compound"
-        if operation in {"resume-merge", "finalize-merge"} and not {
-            "--inventory",
-            "--plan",
-        }.issubset(arguments):
-            return "repository_topic_clone_preservation_inputs_missing"
         return f"repository_topic_clone_{operation.replace('-', '_')}"
     return None
 
@@ -939,7 +934,7 @@ def evaluate_mutation_authority(
         "repository_topic_clone_resume_merge",
         "repository_topic_clone_finalize_merge",
     }
-    canonical_route = canonical_lifecycle or reason == "repository_topic_clone_preservation_inputs_missing"
+    canonical_route = canonical_lifecycle
     if reason == "repository_topic_clone_compound":
         return MutationAuthorityDecision(
             "blocked",
@@ -958,19 +953,6 @@ def evaluate_mutation_authority(
             return MutationAuthorityDecision(
                 "blocked",
                 "repository_topic_clone_lifecycle_requires_integration_executor",
-                True,
-                actor_id,
-                role_id,
-                parent_agent_id,
-                str(identity.get("scope_digest", "")),
-                paths,
-                evidence_ref,
-                command_sha,
-            )
-        if reason == "repository_topic_clone_preservation_inputs_missing":
-            return MutationAuthorityDecision(
-                "blocked",
-                "repository_topic_clone_preservation_inputs_missing",
                 True,
                 actor_id,
                 role_id,

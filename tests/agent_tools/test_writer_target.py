@@ -725,7 +725,7 @@ def test_git_output_dash_is_stdout_not_a_writer_target(command: str) -> None:
         assert read.status == "not_applicable"
 
 
-def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> None:
+def test_canonical_merge_main_and_finalize_are_integration_only() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         write_identity(root, role_id="integration_executor")
@@ -749,28 +749,11 @@ def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> No
             hook_spool_root=root,
         )
         assert allowed.status == "allowed"
-        missing_inputs = evaluate_mutation_authority(
-            {
-                "tool_name": "Bash",
-                "tool_input": {
-                    "command": command.replace("merge-main", "finalize-merge")
-                },
-            },
-            report_dir=root,
-            active_root=root,
-            environment=runtime_environment,
-            hook_spool_root=root,
-        )
-        assert (
-            missing_inputs.reason
-            == "repository_topic_clone_preservation_inputs_missing"
-        )
         finalized = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",
                 "tool_input": {
                     "command": command.replace("merge-main", "finalize-merge")
-                    + " --inventory inventory.json --plan plan.json"
                 },
             },
             report_dir=root,

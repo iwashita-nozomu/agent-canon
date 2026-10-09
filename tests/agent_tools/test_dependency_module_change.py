@@ -148,12 +148,6 @@ def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
     shutil.copy2(TOOL, workspace_tools / TOOL.name)
     shutil.copy2(GENERIC_TOOL, workspace_tools / GENERIC_TOOL.name)
     shutil.copy2(TOOL.parent / "parent_root_side_effects.py", workspace_tools / "parent_root_side_effects.py")
-    git_tools = source_tools / "repository" / "git"
-    git_tools.mkdir(parents=True)
-    shutil.copy2(
-        PROJECT_ROOT / "tools" / "repository" / "git" / "conflict_preservation.py",
-        git_tools / "conflict_preservation.py",
-    )
     authority_tools = source_tools / "runtime" / "authority"
     authority_tools.mkdir(parents=True)
     for name in ("checkout_identity.py", "writer_target.py"):

@@ -319,20 +319,12 @@
       "write_policy": {
         "mode": "parent_assigned_scope_plus_artifacts",
         "allowed_artifacts": [
-          "decision_log",
-          "conflict_preservation_inventory",
-          "preservation_readback"
-        ],
-        "conditional_artifacts": {
-          "conflict_or_rework": [
-            "conflict_preservation_inventory",
-            "preservation_readback"
-          ]
+          "decision_log"
         },
         "allowed_directories": [
           "."
         ],
-        "notes": "The integration executor owns normal merge/conflict resolution and records the exact branch, tree, stage/hunk preservation inventory, disposition/reconstruction rationale, and readback evidence; the parent only relays dependency order and status."
+        "notes": "The integration executor owns normal merge/conflict resolution, origin/main readback, and integration receipt; the parent only relays dependency order and status."
       }
     },
     {
@@ -1810,8 +1802,6 @@
     "design_brief": "design_brief.md",
     "design_review": "design_review.md",
     "document_flow_review": "document_flow_review.md",
-    "conflict_preservation_inventory": "conflict_preservation_inventory.yaml",
-    "preservation_readback": "preservation_readback.md",
     "active_design_packet": {
       "schema": "waterfall.design_packet.v1",
       "design_artifact": "design_brief.md",

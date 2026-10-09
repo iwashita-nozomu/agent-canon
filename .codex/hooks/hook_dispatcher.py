@@ -53,10 +53,6 @@ from tools.runtime.authority.hook_safety import (  # noqa: E402
     SHELL_TOOL_NAMES,
     branch_block_payload,
     first_block,
-    preservation_authorized,
-    preservation_block_payload,
-    preservation_command_roots,
-    preservation_intent,
     payload_prompt,
     payload_tool_command,
     payload_tool_name,
@@ -368,26 +364,6 @@ def resolve_report_target(state: HookRootState) -> Path | None:
     return None
 
 
-def conflict_inventory_present(active_root: Path, command: str = "") -> bool:
-    """Detect the ignored conflict inventory for the current checkout only."""
-    configured = os.environ.get("AGENT_CANON_CONFLICT_PRESERVATION_INVENTORY", "").strip()
-    candidates = [Path(configured)] if configured else []
-    candidates.extend(
-        (
-            Path.cwd() / ".agent-canon" / "conflict-preservation.json",
-            active_root / ".agent-canon" / "conflict-preservation.json",
-        )
-    )
-    candidates.extend(
-        (root / ".agent-canon" / "conflict-preservation.json")
-        for root in preservation_command_roots(command)
-    )
-    try:
-        return any(candidate.is_file() for candidate in candidates)
-    except OSError:
-        return False
-
-
 def spool_event(
     event: str,
     raw_payload: bytes,
@@ -490,20 +466,6 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
                     status = "blocked_destructive_git"
                     telemetry["safety_decision"] = "block"
                     telemetry["operation"] = str(safety["operation"])
-                elif conflict_inventory_present(root_state.active_root, command):
-                    preservation = preservation_intent(command)
-                    if preservation is not None and (
-                        preservation.subcommand == "commit"
-                        or not preservation_authorized(
-                            command, active_root=root_state.active_root
-                        )
-                    ):
-                        output = official_payload(
-                            event, preservation_block_payload(command, preservation)
-                        )
-                        status = "blocked_conflict_preservation"
-                        telemetry["safety_decision"] = "block"
-                        telemetry["operation"] = str(output["operation"])
         elif event == "PostToolUse":
             try:
                 normalized = normalize_post_tool_use_input(payload)
