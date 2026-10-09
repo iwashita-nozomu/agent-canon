@@ -741,7 +741,7 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
         "--control-parent-root",
         str(control),
     ]
-    runtime = repository / ".runtime"
+    runtime = control / ".runtime"
 
     def run(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -1415,7 +1415,7 @@ def test_target_add_init_failure_restores_previous_fake_resident(
     restored = state["containers"][container_name]
     assert restored["Config"]["Image"] == old_image
     assert restored["Mounts"] == old_mounts
-    assert (repository / ".runtime" / "container-state" / "mounts.tsv").read_text(
+    assert (control / ".runtime" / "container-state" / "mounts.tsv").read_text(
         encoding="utf-8"
     ) == ""
 
@@ -3084,8 +3084,7 @@ def _gc_fixture(
     """Build a small Docker/runtime fixture for host GC contract tests."""
     control = tmp_path / "control"
     control.mkdir()
-    # Use a test-owned Git checkout so the production default runtime location
-    # remains isolated at <repository>/.runtime.
+    # The host runtime is control-owned even when the install source is elsewhere.
     repository = tmp_path / "repository"
     subprocess.run(["git", "init", "-q", str(repository)], check=True)
     subprocess.run(
@@ -3104,7 +3103,7 @@ def _gc_fixture(
         ],
         check=True,
     )
-    runtime_root = repository / ".runtime"
+    runtime_root = control / ".runtime"
     if runtime:
         (runtime_root / "host-state").mkdir(parents=True)
         (runtime_root / "container-state").mkdir()
@@ -4233,7 +4232,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         env=environment,
     )
     assert installed.returncode == 0, installed.stderr
-    assert (repository / ".runtime").is_dir()
+    assert (home / ".runtime").is_dir()
     assert personal_skills.is_dir()
     assert list(personal_skills.glob("*/SKILL.md"))
     assert not legacy_runtime.exists()
@@ -4282,7 +4281,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     )
     assert added.returncode == 0, added.stderr
     mounts = (
-        (repository / ".runtime" / "container-state" / "mounts.tsv")
+        (home / ".runtime" / "container-state" / "mounts.tsv")
         .read_text(encoding="utf-8")
         .splitlines()
     )
@@ -4318,7 +4317,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     }
     fake_state.write_text(json.dumps(docker_state), encoding="utf-8")
 
-    state_root = repository / ".runtime" / "container-state"
+    state_root = home / ".runtime" / "container-state"
     docker_state = json.loads(fake_state.read_text(encoding="utf-8"))
     control_digest = hashlib.sha256(str(home.resolve()).encode("utf-8")).hexdigest()
     volume_root = Path(
@@ -4371,7 +4370,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     docker_state = json.loads(fake_state.read_text(encoding="utf-8"))
     active_values = dict(
         line.split("\t", 1)
-        for line in (repository / ".runtime" / "host-state" / "active-image.tsv")
+        for line in (home / ".runtime" / "host-state" / "active-image.tsv")
         .read_text(encoding="utf-8")
         .splitlines()
     )
@@ -4401,7 +4400,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     assert '"code": "target_registered"' in repeated_add.stdout
     assert (
         len(
-            (repository / ".runtime" / "container-state" / "mounts.tsv")
+            (home / ".runtime" / "container-state" / "mounts.tsv")
             .read_text(encoding="utf-8")
             .splitlines()
         )
@@ -4471,7 +4470,7 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
     )
     assert installed.returncode == 0, installed.stderr
 
-    runtime = repository / ".runtime"
+    runtime = home / ".runtime"
     state_root = runtime / "container-state"
     active_image = runtime / "host-state" / "active-image.tsv"
     active_values = dict(
@@ -5292,7 +5291,7 @@ bootstrap_host_entrypoint "$1" \
     assert completed.returncode == 2
     assert json.loads(completed.stderr)["code"] == "rollback_failed"
     backups = list(
-        (repository / ".runtime" / "container-state").glob(".rollback-current-mounts.*")
+        (control / ".runtime" / "container-state").glob(".rollback-current-mounts.*")
     )
     assert len(backups) == 1
     assert backups[0].read_bytes() == b""
