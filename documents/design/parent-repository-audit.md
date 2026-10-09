@@ -31,9 +31,9 @@ owns : P × S -> {false, true}
 
 とすると、path ownership の正しさは次の全域一意条件です。
 
-```text
-for every p in P: cardinality({s in S | owns(p, s)}) = 1
-```
+$$
+\forall p \in P:\; \operatorname{cardinality}\left(\{s \in S \mid \operatorname{owns}(p, s)\}\right) = 1
+$$
 
 この条件は実在する tracked path だけを分類します。ある scope glob の逆像が空であることは
 正常であり、path の存在を要求しません。存在と filesystem kind は structure contract が

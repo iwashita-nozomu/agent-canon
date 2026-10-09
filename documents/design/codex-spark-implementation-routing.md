@@ -22,7 +22,6 @@ downstream implementation ../../tools/agent/orchestration/agent_team.py packet p
 downstream implementation ../../tools/agent/orchestration/route.py existing public skill route composition/rendering; implementation-model imports forbidden
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py static runtime/profile/view checker
 downstream implementation ../../eval/producers/evaluate_codex_agent_roles.py role/profile/capacity evaluation
-downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py prompt-contract evaluation
 downstream design ./README.md design index entry
 @dependency-end
 -->
@@ -1005,7 +1004,6 @@ only where the new canonical owner is explicit:
 | `tools/agent/orchestration/route.py` | Public catalog-backed skill/area/prompt router | Preserve current task-routing ownership; it must not import or expose implementation capability/model selection |
 | `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` | Runtime alignment checker | Validates registry, generated views, capacity references, and role/profile constraints |
 | `eval/producers/evaluate_codex_agent_roles.py` | Static role/model evaluation | Adds target-state, profile, Spark-gate, saturation, and attribution checks |
-| `eval/producers/evaluate_skill_workflow_prompts.py` | Frozen prompt checklist evaluator | Checks generated profile/capsule prompt surfaces without becoming the registry owner |
 | [documents/design/dependency-manifest-design.md](dependency-manifest-design.md) | Dependency-header and manifest contract | Adds exact new-owner/header edges and rejects undocumented registry/handshake/ledger imports |
 | [documents/runtime/SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md) | Shared source/view policy | Records AgentCanon source, generated role-view, and template-root projection ownership |
 | [AGENTS.md](../../AGENTS.md), [ROOT_AGENTS.md](../../ROOT_AGENTS.md), [documents/codex/AGENTS_COORDINATION.md](../codex/AGENTS_COORDINATION.md) | Root/handoff guidance | Projects Target-State-First, queue/reclaim, and closeout lifecycle requirements without independent model/capacity prose |
@@ -4082,7 +4080,7 @@ Each decision is tied to the downstream surface that must change with it.
 | [ROOT_AGENTS.md](../../ROOT_AGENTS.md) | 5.2/8 | RC-09/11/21 | AgentCanon root guidance | source/view alignment |
 | [documents/codex/AGENTS_COORDINATION.md](../codex/AGENTS_COORDINATION.md) | 5.2/2.10 | RC-06/21 | coordination guidance | docs check and lifecycle term order |
 | [documents/runtime/SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md) | 2.8/5.2 | RC-07/08/21 | shared source/view policy | structure and generated-view ownership checks |
-| [documents/design/dependency-manifest-design.md](dependency-manifest-design.md) | 5.2/2.2 | RC-08/17/21 | dependency header contract | header and import graph checks |
+| [documents/design/dependency-manifest-design.md](dependency-manifest-design.md) | 5.2/2.2 | RC-08/17/21 | optional dependency-graph annotation contract | explicit graph analysis plus source/import evidence |
 | [documents/codex/prompt-skill-evaluation-checklist.md](../codex/prompt-skill-evaluation-checklist.md) | 4.4/11 | RC-04/15/18 | skill prompt checklist | tool-token/schema comprehensibility eval |
 | `.codex/config.toml` | 4.3/5.3 | RC-12/13/19 | runtime registration | generation/restart readback fixture |
 | [.codex/README.md](../../.codex/README.md) | 5.2/8 | RC-12/14/19 | runtime reader view | no hard-ceiling/fixed-budget claim |
@@ -4430,16 +4428,13 @@ P5 invokes those same check-only entrypoints as downstream evidence consumers;
 it neither owns their parsers nor repeats their invariants.
 
 1. `python3 tools/validation/semantic/documents/check_design_doc_claims.py --root . --recursive-depth 3 documents/design/codex-spark-implementation-routing.md`; require zero blocked assumptions, verified current/request identities, approved target-state identities before implementation, and verified target-state readbacks at closeout.
-2. `python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed` and the
-   dependency-header scanner for the new design and future implementation
-   paths.
-3. `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` after registry
+2. `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` after registry
    and generated-view implementation.
-4. `python3 tools/validation/semantic/convention/check_convention_compliance.py` in the selected
+3. `python3 tools/validation/semantic/convention/check_convention_compliance.py` in the selected
    workflow closeout.
-5. generated-view check-only comparison; fail if any role TOML differs from
+4. generated-view check-only comparison; fail if any role TOML differs from
    registry output.
-6. targeted pytest for registry/Decision Sufficiency decision/branch
+5. targeted pytest for registry/Decision Sufficiency decision/branch
    declarations, invariant-action one-Spark/one-gate/no-extra-agent routing,
    divergence-only investigation reopen, implementation route, capacity
    handshake and distinct thread/model events, agent-team projection,

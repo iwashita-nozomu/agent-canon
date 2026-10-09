@@ -7,7 +7,6 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership po
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
 downstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh repo check runner
-downstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects strict parent graph requirement from canonical profile IDs
 downstream implementation ../../tools/catalog.yaml structured tool catalog
 @dependency-end
 -->
@@ -19,22 +18,21 @@ Source of truth: [runtime-profiles-and-check-matrix.json](runtime-profiles-and-c
 AgentCanon ships broad shared surfaces, but not every surface is mandatory for
 every repository task. Treat root views and tools as installed capability, then
 activate only the profile required by the current change.
-Each profile ID and strict_dependency_graph_required value is canonical input
-for parent AgentCanon PR graph selection; unknown IDs fail selection.
+Each profile ID is a canonical inventory key.
 
 ## Profile Classes
 
-| Profile ID | Profile | Activates | Required when | Strict dependency graph |
-| --- | --- | --- | --- | --- |
-| bootstrap | Bootstrap | `bootstrap.sh`, `bootstrap/`, lifecycle parser and state | AgentCanon installation, start/stop, target, or lifecycle state changes | no |
-| tool-runtime | Tool runtime | Python/Rust tool dispatch, catalog, LSP | Shared AgentCanon analysis tools or language servers change | no |
-| container | Container | Dockerfile, entrypoint, manifest limits | The shared AgentCanon tool image or container contract changes | no |
-| mount-generation | Mount generation | target registry, generations, rollback | Target admission, mount generation, rollback, or concurrent lifecycle changes | no |
-| codex-surfaces | Codex surfaces | isolated skills, agents, hooks, runtime-local `CODEX_HOME` | Codex preparation, isolated runtime configuration, or owned-link cleanup changes | no |
-| eval-archive | Eval archive | eval producer, external spool, archive Git adapter | Eval collection, source-unchanged evidence, or agent-canon-log publication changes | no |
-| docs | Docs | README, guides, runtime contracts | User-facing AgentCanon command, owner, migration, or runtime documentation changes | no |
-| source | Source | policy, workflow, skills, canonical tools | AgentCanon source policy, workflow, skill, hook, or canonical tool changes | yes |
-| project | Project | project Docker, project test runner, project GPU | A parent project execution environment changes; never for AgentCanon internal tests | no |
+| Profile ID | Profile | Activates | Required when |
+| --- | --- | --- | --- |
+| bootstrap | Bootstrap | `bootstrap.sh`, `bootstrap/`, lifecycle parser and state | AgentCanon installation, start/stop, target, or lifecycle state changes |
+| tool-runtime | Tool runtime | Python/Rust tool dispatch, catalog, LSP | Shared AgentCanon analysis tools or language servers change |
+| container | Container | Dockerfile, entrypoint, manifest limits | The shared AgentCanon tool image or container contract changes |
+| mount-generation | Mount generation | target registry, generations, rollback | Target admission, mount generation, rollback, or concurrent lifecycle changes |
+| codex-surfaces | Codex surfaces | isolated skills, agents, hooks, runtime-local `CODEX_HOME` | Codex preparation, isolated runtime configuration, or owned-link cleanup changes |
+| eval-archive | Eval archive | eval producer, external spool, archive Git adapter | Eval collection, source-unchanged evidence, or agent-canon-log publication changes |
+| docs | Docs | README, guides, runtime contracts | User-facing AgentCanon command, owner, migration, or runtime documentation changes |
+| source | Source | policy, workflow, skills, canonical tools | AgentCanon source policy, workflow, skill, hook, or canonical tool changes |
+| project | Project | project Docker, project test runner, project GPU | A parent project execution environment changes; never for AgentCanon internal tests |
 
 Profiles may be combined, but every changed path must have one owner and one
 primary check route. Do not select `project` merely because a tool was invoked

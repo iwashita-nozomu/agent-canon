@@ -2,7 +2,7 @@
 name: environment-cleanup
 description: "Use when environment dependencies or runtime capabilities need cleanup through dependency-design and environment-maintenance with version, scope, security, and rollback evidence."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"dd3cccda200abbba3dfdd829dcc23388f3dc3de58308ff801b271a4c96e33b6d"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f6e753f1df6a6535703f03cb826ee77def90c34b58735cf9f9eebe5c13c5f919"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/environment-cleanup.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [environment-cleanup](../../../../agents/skills/environment-cleanup.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill environment-cleanup --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

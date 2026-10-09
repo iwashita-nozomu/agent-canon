@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Provides create experiment topic experiment workflow tooling.
-# upstream design ../README.md shared automation index
-# upstream design ../../documents/design/experiment-topic-template.md canonical topic template contract.
-# downstream implementation ../../templates/experiments/_template/run.py runnable topic scaffold and orchestration boundary.
-# downstream implementation ../../templates/experiments/_template/cases.py case models, registry, worker, and failure classification.
-# downstream implementation ../../templates/experiments/_template/visualization.py visualization status and renderer extension.
-# upstream design ../../documents/experiments/experiment-registry.md project experiment registry contract.
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../documents/design/experiment-topic-template.md canonical topic template contract.
+# downstream implementation ../../../templates/experiments/_template/run.py runnable topic scaffold and orchestration boundary.
+# downstream implementation ../../../templates/experiments/_template/cases.py case models, registry, worker, and failure classification.
+# downstream implementation ../../../templates/experiments/_template/visualization.py visualization status and renderer extension.
+# upstream design ../../../documents/experiments/experiment-registry.md project experiment registry contract.
 # @dependency-end
 
 """Create one experiment topic from the template and register it."""

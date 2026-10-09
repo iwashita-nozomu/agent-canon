@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Updates flat result-root latest pointers while selecting by variant metadata.
-# upstream design ../../documents/experiments/result-log-retention-and-visualization.md defines latest-result pointer policy.
-# upstream implementation ./experiment_identity.py owns the identity grammar.
-# downstream implementation ../../tests/tools/test_update_latest_result.py validates latest result pointer updates.
+# upstream design ../../../documents/experiments/result-log-retention-and-visualization.md defines latest-result pointer policy.
+# upstream implementation ../lifecycle/experiment_identity.py owns the identity grammar.
+# downstream implementation ../../../tests/tools/test_update_latest_result.py validates latest result pointer updates.
 # @dependency-end
 """Update flat result-root variant-scoped LATEST pointers."""
 

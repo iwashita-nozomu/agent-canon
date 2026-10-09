@@ -3817,7 +3817,8 @@ mod tests {
         let producer_identity = current_producer_identity(root).expect("fixture producer identity");
         GraphArgs {
             root: root.to_path_buf(),
-            runtime_root: None,
+            // Keep fixture writes isolated from a resident runner's ambient runtime root.
+            runtime_root: Some(resolve_runtime_root_at(root, None).expect("test runtime root")),
             profile: "default".to_string(),
             format: "json".to_string(),
             surface_manifest_producer: Some(PathBuf::from(&producer_identity.producer_path)),
@@ -4227,7 +4228,11 @@ mod tests {
             build_graph_with_failure(&graph_args(&fixture.root)).expect("first graph build");
         OpenOptions::new()
             .append(true)
-            .open(fixture.root.join("tools/runtime/manifest/surface_manifest.py"))
+            .open(
+                fixture
+                    .root
+                    .join("tools/runtime/manifest/surface_manifest.py"),
+            )
             .expect("producer for mutation")
             .write_all(b"\n# producer semantic mutation\n")
             .expect("mutate producer");
@@ -4254,7 +4259,11 @@ mod tests {
 
         OpenOptions::new()
             .append(true)
-            .open(fixture.root.join("tools/runtime/manifest/surface_manifest.py"))
+            .open(
+                fixture
+                    .root
+                    .join("tools/runtime/manifest/surface_manifest.py"),
+            )
             .expect("producer for mutation")
             .write_all(b"\n# producer status mutation\n")
             .expect("mutate producer");
@@ -4365,6 +4374,9 @@ mod tests {
                 command.to_string(),
                 "--root".to_string(),
                 root.to_string_lossy().into_owned(),
+                // Exercise default producer identity while pinning writes to this fixture.
+                "--runtime-root".to_string(),
+                fixture.runtime_root.to_string_lossy().into_owned(),
                 "--format".to_string(),
                 "json".to_string(),
             ]

@@ -16,206 +16,68 @@ downstream implementation ../../.codex/personal/skills/code-visualization/SKILL.
 
 ## Reader Map
 
-- Purpose: choose the right visualization family, source evidence owner, and
-  renderer for code, repository, workflow, proof, or document-embedded diagrams.
-- Section path: Purpose and Context Diagnosis classify the reader question;
-  Visualization Selection Record and Question-To-Diagram Projection define the
-  choice; Document Embedded Diagrams, Source Evidence Routes, Renderer Choice,
-  Handoff Packet, and Closeout cover execution.
-- Use when: a task asks to visualize code, dependencies, runtime behavior,
-  state, data movement, types, proof status, or repository structure.
-- Boundary: this skill selects and routes visualizations; source facts stay with
-  owner skills such as `dependency-analysis`, `structure-refactor`,
-  `algorithm-flowchart`, and `prose-reasoning-graph`.
+- Purpose: choose a useful view, source-evidence owner, and existing renderer for code, repository, workflow, proof, or document diagrams.
+- Section path: Purpose and Context Diagnosis identify the question and scope; Question-To-Diagram Projection selects a view; Source Evidence Routes and Renderer Choice describe execution.
+- Use when: a task asks to visualize code, dependencies, runtime behavior, state, data movement, types, proof status, or repository structure.
+- Boundary: source facts remain with their owning skills and tools; this skill selects the visualization and renderer without taking their correctness authority.
 
 ## Purpose
 
-`code-visualization` は、コードや repository を図示するときに、ユーザーや文書の
-読者が何を理解したいのかを文脈から分類し、その問いに合う図の種類、source
-evidence、所有 skill / tool、renderer を選ぶ skill です。
-
-この skill は visualization selector です。図種名の有無だけで選ばず、依頼文の
-対象、時間軸、必要な厳密さ、読者、source fact の所在から判断します。source
-fact の抽出は
-`dependency-analysis`、`structure-refactor`、`algorithm-flowchart`、
-`prose-reasoning-graph` などの owner に委譲し、図は抽出済み fact の projection
-として扱います。
+`code-visualization` classifies what the reader needs to understand, identifies the requested scope and source-evidence owner, and selects an existing visualization and renderer. Source facts are extracted by owners such as `dependency-analysis`, `structure-refactor`, `algorithm-flowchart`, and `prose-reasoning-graph`; the diagram projects those facts.
 
 ## Context Diagnosis
 
-図を作る前に、依頼文を次の context に分解します。
+Start from the reader's question and requested scope. Identify the existing skill, tool, or artifact that owns the source facts. Consider timing, precision, reader action, and document context only when they change the evidence or representation. If a diagram family is requested, check that it answers the question; add another view only when a requested relation would otherwise remain unclear.
 
-| Field | Meaning |
-| --- | --- |
-| `context_question` | 読者が図で答えたい問い。例: order、branch precision、call relation、interaction over time、state lifecycle、data movement、module dependency、concurrency timing、type responsibility |
-| `scope` | function、class、service、package、workflow、proof artifact などの対象範囲 |
-| `time_axis` | 時間順序が中心か、静的な関係が中心か |
-| `precision_need` | 説明用の概観か、compiler / static analysis / test design 向けの正確な分岐か |
-| `source_fact_owner` | code analyzer、dependency manifest、trace/log、schema、workflow contract、JIT-canonical IR など |
-| `reader_action` | 読者が図を見て行う判断。例: review、debug、refactor、test design、proof navigation、interactive inspection |
-| `embedding_context` | 図を文書に埋め込む場合の section、claim、reader path、`visual_plan` slot |
-
-この context を埋めてから図種へ射影します。図種がユーザー文面に直接書かれている
-場合も、context と矛盾しないか確認します。例: 「処理順を見たいコールグラフ」は
-call relation ではなく order の問いなので、flowchart / activity diagram を主候補
-にし、call graph は補助図にします。
-
-文書に図を埋め込む場合も同じです。README、design doc、report、skill 文書、
-workflow 文書、`structure-planning` の `visual_plan` で図が必要になったら、この
-skill で `context_question` と `embedding_context` を決めてから図種を選びます。
-「Mermaid 図を入れる」だけでは図種を確定せず、その section の claim、読者の
-次の行動、source evidence から flowchart、sequence diagram、state-transition
-diagram、dependency graph などへ射影します。
-
-## Visualization Selection Record
-
-図を作る前に次の record を残します。
-
-```text
-Visualization Selection:
-  context_question: <reader question inferred from the request>
-  embedding_context: <document section, claim, reader path, visual_plan slot, or not_embedded>
-  scope: <function, class, service, package, workflow, repository, or proof artifact>
-  time_axis: <static relation | ordered execution | concurrent time | state lifecycle>
-  precision_need: <overview | exact branch graph | review trace | interactive exploration>
-  visualization_kind: <kind>
-  question: <what the diagram must answer>
-  source_evidence: <command output, manifest, trace, IR, or graph artifact>
-  owner_skill_or_tool: <skill or tool that owns the source facts>
-  renderer: <Mermaid, DOT/Graphviz, HTML dashboard, notebook, or existing viewer>
-  output_path: <path for the rendered or embedded artifact>
-```
+For an embedded diagram, identify the local claim and reader action. Use `structure-planning` when document structure or reader path changes, and `md-style-check` for the changed Markdown properties.
 
 ## Question-To-Diagram Projection
 
-| Context question | Visualization kind | Use for | Source owner |
+| Reader question | Visualization | Typical use | Source owner |
 | --- | --- | --- | --- |
-| What happens in what order? | フローチャート / アクティビティ図 | `if`、loop、処理手順、主要 path の説明 | local code read; `$algorithm-flowchart` for JIT/proof overlays |
-| Which exact branches and joins exist? | 制御フローグラフ | compiler、static analysis、test design 向けの branch / join / loop | language analyzer or compiler artifact; `$test-design` for test use |
-| What calls or imports what? | コールグラフ / 依存関係図 | function call relation、file / package / skill dependency | `$dependency-analysis` |
-| Who exchanges messages over time? | シーケンス図 | API、class、service 間の時系列通信 | call traces, code entrypoint read, interface docs |
-| How do concurrent events overlap? | タイミング図 / 並行シーケンス図 | thread、event、async task、queue、race point | trace/log artifacts, async entrypoints, runtime contracts |
-| What states can exist and how do transitions occur? | 状態遷移図 | login、job lifecycle、workflow stage、retry state など | state enum, transition table, workflow contract |
-| Where does data or an artifact move? | データフロー図 | input、transform、store、output、artifact movement | data schema, IO code, dependency packet |
-| Which types, classes, protocols, or owners relate? | クラス図 / 型図 / architecture map | class、protocol、interface、ownership boundary | language-specific review; `$oop-readability-check`; `$structure-refactor` |
-| Where does proof or algorithm status sit on implemented operations? | algorithm/proof overlay | JIT-canonical operation path and theorem graph status | `$algorithm-flowchart` |
-| Which large graph needs filtering, navigation, or sharing? | HTML graph / dashboard | large graph inspection, report artifact, viewer sharing | `$html-output` after source graph exists |
+| What happens in what order? | Flowchart / activity diagram | Procedures, branches, and execution order | Code owner; `algorithm-flowchart` for JIT/proof overlays |
+| Which branches and joins exist? | Control-flow graph | Compiler, static-analysis, or test-design questions | Language analyzer or compiler artifact; `test-design` |
+| What calls or imports what? | Call or dependency graph | Function, file, package, or skill relations | `dependency-analysis` |
+| Who exchanges messages over time? | Sequence diagram | API, class, or service interactions | Traces, entrypoints, and interface docs |
+| How do concurrent events overlap? | Timing or concurrency diagram | Threads, events, async tasks, queues, and races | Trace/log artifacts and runtime contracts |
+| What states and transitions exist? | State-transition diagram | Job lifecycle, workflow stages, retries | State definitions and workflow contract |
+| Where does data or an artifact move? | Data-flow diagram | Inputs, transforms, stores, outputs | Data schema and I/O owner |
+| Which types, protocols, or owners relate? | Type or architecture map | Interfaces and responsibility boundaries | Language-specific owner; `structure-refactor` |
+| Where does proof or algorithm status sit? | Algorithm/proof overlay | Implemented operations and theorem status | `algorithm-flowchart` |
+| Which large graph needs navigation? | HTML graph or dashboard | Filtering and inspection when requested | `html-output` after source graph exists |
 
-When several questions are present, choose a primary diagram by `reader_action`
-and keep secondary diagrams as optional handoff items. Example: debugging an
-async API issue usually selects a sequence diagram or timing diagram over a
-static dependency graph, while refactoring package boundaries selects a
-dependency graph or architecture map over a sequence diagram.
+When several questions are present, choose the smallest set of views that answers them. Use reader action and the requested relations to select representation; source-fact authority remains with the producing owner.
 
 ## Document Embedded Diagrams
 
-Use this skill when a diagram will be embedded in Markdown, report prose,
-design docs, README, workflow docs, skill docs, or a `visual_plan`. The diagram
-choice is part of the document structure, so pair it with `$structure-planning`
-when the document structure or reader path changes, and close Markdown syntax,
-Mermaid, links, and heading checks with `$md-style-check`.
+Use this skill when a diagram is embedded in Markdown, reports, design docs, README, workflow or skill docs, or a `visual_plan`. Pair it with `structure-planning` when document structure or reader path changes; use `md-style-check` for relevant Markdown, Mermaid, link, and heading checks.
 
-For embedded diagrams, decide:
-
-- which section claim the diagram supports;
-- what the reader should be able to decide after seeing it;
-- whether the source fact is code, dependency manifest, trace/log, schema,
-  workflow contract, proof graph, or prose graph;
-- whether the diagram is the primary visual, a supporting visual, or a
-  replacement for prose that would otherwise repeat an edge list.
+For an embedded diagram, identify the section claim, the reader's next decision, the source-fact owner, and whether the visual is primary or supporting.
 
 ## Source Evidence Routes
 
-Use the selected source evidence before applying the renderer. For
-repository/code-space dependency visualization, the small-model direct route is
-self-sufficient:
+For repository dependency diagrams, use the existing native `render_dependency_manifest_graph.py` route. Supply `--graph-tsv` when using an existing checker TSV; otherwise preserve the tool's default checker input. Choose the requested full or changed scope and output flags, and retain the existing `--fail-on-broken` and nonzero checker behavior. The renderer documentation describes its native inputs, GraphIR, manifest, and output formats.
 
-```bash
-python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
-```
+For other diagrams, route source extraction through its owner: `dependency-analysis` for dependency and call relations, `structure-refactor` for architecture and responsibility maps, `algorithm-flowchart` for algorithm/proof views, and `prose-reasoning-graph` for prose graphs. Use `html-output` for browser-readable large graphs and `md-style-check` for embedded Markdown diagrams.
 
-Use this exact changed-scope command only when changed scope is explicit:
-
-```bash
-python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json
-```
-
-Treat these two commands as immutable flag templates. Copy the selected
-command with every shown flag: `--root .` and `--format json` are mandatory in
-both routes. Do not remove, add, or rename any flag.
-
-`--json` is invalid; use `--format json`.
-The canonical graph owns dependency status and facts. The renderer performs one
-typed dependency query through `GraphClient` and owns only Graph IR, Markdown,
-DOT, HTML, and bundle/manifest projection creation. There is no supplied-input,
-raw-checker, scan, helper, or Mermaid fallback. Its
-generated bundle contains exactly these six basenames:
-
-1. `dependency_graph.tsv`
-2. `dependency_graph.ir.json`
-3. `dependency_graph.md`
-4. `dependency_graph.dot`
-5. `dependency_graph.html`
-6. `manifest.json`
-
-Read the detailed renderer contract in:
-
-[documents/tools/render_dependency_manifest_graph.md](../../documents/tools/render_dependency_manifest_graph.md)
-
-For non-code-space visualization, delegate source ownership through the
-related skill that owns the facts: `$dependency-analysis` for dependency and
-call relations, `$structure-refactor` for architecture and responsibility
-maps, `$algorithm-flowchart` for algorithm/proof overlays,
-`$prose-reasoning-graph` for prose graphs, `$html-output` for browser-readable
-large-graph views, and `$md-style-check` for embedded Markdown diagrams.
-Follow each related skill's current source and renderer route; this selector
-describes the ownership route without reproducing those commands.
+See [the renderer documentation](../../documents/tools/render_dependency_manifest_graph.md) for the current command interface. When a handoff is needed, communicate the question, scope, source owner/artifact, native renderer input, and requested output; do not create a fixed packet or wrapper.
 
 ## Renderer Choice
 
-- Mermaid is the default for compact Markdown diagrams: flowchart, sequence,
-  state, class/type, and simple data-flow views.
-- DOT / Graphviz is the default for dense dependency or call graphs when edge
-  count or layout stability matters.
-- HTML dashboard is selected when the user requests browser interaction,
-  filtering, navigation, or inspection of a large graph.
-- Notebook visualization is selected for experiment results and reads existing
-  run artifacts from the experiment result directory.
-- JIT-canonical algorithm diagrams use `algorithm-flowchart` and its current
-  IR / Lean / theorem graph evidence route.
+- Mermaid suits compact Markdown flowcharts, sequence, state, type, and data-flow diagrams.
+- DOT / Graphviz suits dense dependency or call graphs when layout stability matters.
+- HTML dashboards suit requested browser interaction, filtering, or navigation.
+- Notebook visualization is selected for experiment results from their existing run artifacts.
+- JIT-canonical algorithm diagrams use `algorithm-flowchart` and its current IR, Lean, and theorem-graph evidence route.
 
-The selected renderer owns syntax and layout, while the source producer owns
-the correctness of the facts. Interactive filtering or navigation is a view
-choice and must not silently omit a user-requested node or relation.
-
-## Handoff Packet
-
-When another skill renders the diagram, pass this compact packet:
-
-```text
-Diagram Handoff:
-  visualization_kind:
-  embedding_context:
-  source_artifacts:
-  selected_nodes_or_paths:
-  renderer:
-  audience:
-  required_labels:
-  excluded_labels:
-  output_path:
-```
-
-`required_labels` names the code or artifact identifiers that must appear in
-the diagram. `excluded_labels` names generated、stale、or out-of-scope surfaces
-that the renderer should leave out.
+The source producer owns factual correctness. The renderer owns syntax and layout. Check the requested output with the existing renderer/formatter route; do not introduce a second source-fact or completeness protocol.
 
 ## Closeout
 
-Closeout cites:
+Report the source evidence and owner, the selected renderer and native input, the final artifact or embedding location, and the checks required by that output. Distinguish source validation from rendering/readback.
 
-- the `Visualization Selection` record;
-- the `embedding_context` when the diagram is embedded in a document;
-- the source evidence command or artifact;
-- the selected renderer and output path;
-- the owner skill / tool that retains correctness authority;
-- formatter and final-output checks required by the selected artifact.
+## Boundaries
+
+- Resolve the reader's question and requested scope before choosing a view.
+- Route source facts through their existing owner; a diagram does not replace code, dependency, proof, or runtime correctness checks.
+- Use only the existing renderer, native inputs, and output checks for the selected artifact. Add another view only when it answers a requested relation.

@@ -2,7 +2,7 @@
 name: oop-readability-check
 description: "Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"2aba90dab7331e645750c89489256662e580f4acacaee8f20b05b1330bf32b51"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"86ff4a73acaddf837d4f001575bc55d0855225efa4bbf08abc663fe6f17bc547"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/oop-readability-check.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [oop-readability-check](../../../../agents/skills/oop-readability-check.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill oop-readability-check --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

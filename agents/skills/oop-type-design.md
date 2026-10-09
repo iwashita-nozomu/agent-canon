@@ -12,7 +12,6 @@ upstream design ../internal-routines/design-implementation-correspondence.md uni
 downstream implementation ../../.codex/personal/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
 downstream implementation ../../tools/agent/orchestration/route.py explicit capability route
-downstream implementation ../../eval/definitions/skill_workflow_prompt_eval.toml prompt-evaluation targets
 @dependency-end
 -->
 
@@ -63,30 +62,34 @@ evaluator-writing route.
 
 ## Required output
 
-Produce exactly one packet in this order:
+Produce one `oop_type_design_packet` for the selected design decision. The
+concerns below are available records, not a required stage order. Include the
+ones that affect the requested boundary and omit unaffected sections rather than
+filling them with placeholders. Preserve fields required by the active design
+packet schema; do not add a second packet or schema.
 
-1. `Scope`: user request clauses, public behavior/schema impact, and owner boundary.
-2. `Reuse Survey`: existing functions, values, dataclasses, aggregates, Protocols,
-   interfaces, factories, adapters, checkers, docs, and tests with path and symbol.
-3. `Responsibility Map`: component, subject, reason, replaceable unit, owned state,
-   effects, and collaborators.
-4. `Semantic Responsibility Contract`: semantic deltas, one implementation action per
-   delta, obligations, primary verification owners, supporting properties/roles, and
-   hard-edge closure. Use the run-local instance referenced by the active design packet.
-5. `Type Contract`: abstract roles, minimal Protocol/interface methods and typed
-   signatures, type parameters, value-object fields, aggregate root, constructor or
-   factory API, and error type.
-6. `Invariant Ledger`: constructor, field, and aggregate invariants; legal and
-   illegal transitions; ownership/lifetime; and failure semantics.
-7. `Composition Map`: composition root, dependency direction, injected contracts,
-   concrete-construction and adapter boundaries, and forbidden reverse edges.
-8. `Boundary Contract Matrix`: API, serialization, external input, CLI/config, and
-   I/O/effect raw forms, normalized types, owners, validation points, and failures.
-9. `Static Delegation`: existing owner tool, command, expected evidence, and why no
-   runtime guard or test duplicates a statically decidable fact.
-10. `Implementation Trace`: exact files, symbols, names, edit order, validation, and
-    review gate.
-11. `Open Decisions`: genuine external blockers only; no worker naming or API choice.
+- `Scope`: user request clauses, public behavior/schema impact, and owner boundary.
+- `Reuse Survey`: existing functions, values, dataclasses, aggregates, Protocols,
+  interfaces, factories, adapters, checkers, docs, and tests with path and symbol.
+- `Responsibility Map`: component, subject, reason, replaceable unit, owned state,
+  effects, and collaborators.
+- `Semantic Responsibility Contract`: semantic deltas, one implementation action per
+  delta, obligations, primary verification owners, supporting properties/roles, and
+  hard-edge closure. Use the run-local instance referenced by the active design packet.
+- `Type Contract`: abstract roles, minimal Protocol/interface methods and typed
+  signatures, type parameters, value-object fields, aggregate root, constructor or
+  factory API, and error type.
+- `Invariant Ledger`: constructor, field, and aggregate invariants; legal and
+  illegal transitions; ownership/lifetime; and failure semantics.
+- `Composition Map`: composition root, dependency direction, injected contracts,
+  concrete-construction and adapter boundaries, and forbidden reverse edges.
+- `Boundary Contract Matrix`: API, serialization, external input, CLI/config, and
+  I/O/effect raw forms, normalized types, owners, validation points, and failures.
+- `Static Delegation`: existing owner tool, command, expected evidence, and why no
+  runtime guard or test duplicates a statically decidable fact.
+- `Implementation Trace`: exact files, symbols, names, edit order, validation, and
+  review gate.
+- `Open Decisions`: genuine external blockers only; no worker naming or API choice.
 
 ## Semantic Responsibility Contract
 
@@ -136,17 +139,18 @@ aggregate, persists it, and publishes effects; and a `CompositionRoot` that also
 validates domain rules, queries repositories, parses configuration, retries
 resources, or writes output.
 
-For each mutable state owner, record its named fields, constructor invariant,
+For each in-scope mutable state owner, record its named fields, constructor invariant,
 factory, legal transitions with preconditions/postconditions/failures, and forbidden
 transitions. For each value object, record typed immutable fields, one normalization
-boundary, equality, serialization, and typed construction failure. For each
-abstract role, record minimal operations, associated values, substitution law, and
-forbidden concrete dependencies. Every independent external effect and change reason
-is assigned to an owner before semantic grouping is selected.
+boundary, equality, serialization, and typed construction failure when those
+contracts change. For each changed abstract role, record minimal operations,
+associated values, substitution law, and forbidden concrete dependencies. Assign
+each in-scope external effect and change reason to an owner before semantic grouping
+is selected.
 
 ## Boundary and composition contract
 
-Every boundary records raw input, normalized typed form, owner, runtime validation,
+Each changed or introduced boundary records its raw input, normalized typed form, owner, runtime validation,
 serialization, failure, and static evidence. Public API, serialization,
 external-input, and effect boundaries remain distinct. The external adapter may
 parse and validate untrusted data once, construct a typed DTO/value object, and pass
@@ -170,7 +174,7 @@ owners:
   are read back from [documents/design/cpp-build-layout.md](../../documents/design/cpp-build-layout.md).
 - Explicit `Any`: `python3 tools/validation/semantic/code/check_static_any.py --submodule-aware`.
 - OOP/SOLID signals: `$oop-readability-check`; keep its evidence with the owning review.
-- Dependency headers/graph: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.
+- Existing dependency graph context: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review` when the declared relations materially affect the type boundary. Missing annotations do not block the design.
 - Schema or algorithm checks: existing checker only when the changed implementation
   path is in that checker’s scope; otherwise `not_applicable`.
 
@@ -194,9 +198,9 @@ of compiler facts or parent-owned evaluation artifacts.
 The implementation trace points to exact paths, symbols, validation, and review
 owners. `$oop-readability-check`, `$python-review`, and `$cpp-review` consume the
 later implementation diff; they do not feed ownership backward into this skill.
-T14 uses a fresh read-only `gpt-5.4-mini` evaluator. The evaluator reports observed
-status only; the parent owns raw bytes, critical-pass, convergence, final completion,
-and graph artifacts.
+When the active route selects T14, it uses a fresh read-only `gpt-5.4-mini`
+evaluator. The evaluator reports observed status only; the parent owns raw bytes,
+critical-pass, convergence, final completion, and graph artifacts.
 
 The packet schema is `agent_canon.oop_type_design_packet.v1`. No new checker,
 registry, task role, evaluator writer, or keyword route is introduced by this skill.

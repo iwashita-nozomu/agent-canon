@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Provides the shared external-output and explicit source-mutation boundary for documentation tools.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md runtime artifact and target mutation boundary
-# upstream implementation ../agent_tools/runtime_artifacts.py validates external runtime paths
-# downstream implementation ./audit_and_fix_links.py consumes explicit mutation capability
-# downstream implementation ./find_redundant_designs.py consumes explicit mutation capability
-# downstream implementation ./find_similar_designs.py consumes external report output
-# downstream implementation ./organize_designs.py consumes explicit mutation capability
+# upstream design ../../../../documents/design/agent-canon-bootstrap-tool-runtime.md runtime artifact and target mutation boundary
+# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py validates external runtime paths
+# downstream implementation ../../../validation/documentation/checks/audit_and_fix_links.py consumes explicit mutation capability
+# downstream implementation ../analysis/find_redundant_designs.py consumes explicit mutation capability
+# downstream implementation ../analysis/find_similar_designs.py consumes external report output
+# downstream implementation ../../../validation/documentation/authoring/organize_designs.py consumes explicit mutation capability
 # @dependency-end
 """Shared capability handling for documentation maintenance tools.
 

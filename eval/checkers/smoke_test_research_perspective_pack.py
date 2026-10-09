@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Provides smoke test research perspective pack agent workflow automation.
-# upstream implementation ./packets.py owns active design packet types.
-# upstream implementation ./team_config.py owns team and role configuration.
-# upstream implementation ./agent_team.py owns run bundle orchestration.
-# upstream implementation ./workspace_scope.py owns role write scope.
+# upstream implementation ../../tools/agent/orchestration/packets.py owns active design packet types.
+# upstream implementation ../../tools/agent/orchestration/team_config.py owns team and role configuration.
+# upstream implementation ../../tools/agent/orchestration/agent_team.py owns run bundle orchestration.
+# upstream implementation ../../tools/repository/workspace/workspace_scope.py owns role write scope.
 # @dependency-end
 
 """Smoke test the research perspective review pack runtime surfaces."""

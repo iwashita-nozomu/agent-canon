@@ -46,15 +46,6 @@ from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_pac
 class RouteToolTest(unittest.TestCase):
     """Exercise route.py output and routing aliases."""
 
-    def test_route_reexports_structured_skill_command_items(self) -> None:
-        """Route consumers receive typed catalog items from the shared loader."""
-        catalog = route_module.load_skill_tool_commands(PROJECT_ROOT)
-        self.assertEqual(catalog["agent-orchestration"].required, ())
-        item = catalog["agent-orchestration"].maintenance[0]
-        self.assertIsInstance(item, dict)
-        self.assertIn("tool_id", item)
-        self.assertNotIsInstance(item, str)
-
     def test_catalog_loading_needs_no_authoring_tools_or_schema_files(self) -> None:
         """Routing reads its two inputs without launching validation subprocesses."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -776,41 +767,6 @@ class RouteToolTest(unittest.TestCase):
             "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             direct_flat,
         )
-        packet_result = subprocess.run(
-            [
-                sys.executable,
-                str(PROJECT_ROOT / "tools" / "agent" / "skills" / "skill_tool_commands.py"),
-                "show",
-                "--skill",
-                "code-visualization",
-                "--format",
-                "json",
-            ],
-            cwd=PROJECT_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(
-            packet_result.returncode, 0, packet_result.stdout + packet_result.stderr
-        )
-        self.assertNotIn("check_dependency_graph.sh", packet_result.stdout)
-        self.assertNotIn("sed -n", packet_result.stdout)
-        packet_payload = json.loads(packet_result.stdout)
-        self.assertEqual(packet_payload["required_commands"], [])
-        self.assertEqual(
-            packet_payload["discovered_commands"],
-            [
-                '["catalog", "render-dependency-manifest-graph", "default"]',
-                '["catalog", "render-dependency-manifest-graph", "default", "python3", "tools/analysis/dependencies/render_dependency_manifest_graph.py", "--root", ".", "--scope", "changed", "--bundle-dir", "reports/dependency-graph", "--format", "json"]',
-            ],
-        )
-        for forbidden in (
-            "route.py",
-            "scan_code_dependencies.py",
-            "helper_function_inventory.py",
-        ):
-            self.assertNotIn(forbidden, packet_payload["discovered_commands"])
         self.assertEqual(
             [
                 "dependency_graph.tsv",
@@ -1524,8 +1480,8 @@ class RouteToolTest(unittest.TestCase):
                     decision["evidence"], "mode=repo-changing;matched=none"
                 )
 
-    def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
-        """All-skill command packet repair should not fall through."""
+    def test_prompt_routes_all_skill_native_tool_route_repair(self) -> None:
+        """All-skill native tool route repair should not fall through."""
         prompt = (
             "$task-routing $structure-refactor $comprehensive-development $agent-learning "
             "スキル内で明示的にツールの起動コマンドが書いていないから，"
@@ -2105,9 +2061,6 @@ class CapabilityRouteTest(unittest.TestCase):
                 "    discovery:",
                 f"      name: {skill}",
                 "      description: Capability fixture.",
-                "    tool_commands:",
-                "      required: []",
-                "      conditional: []",
                 "    routing:",
                 "      stage_policy: active",
                 "      reason: capability fixture",
@@ -2167,9 +2120,6 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    discovery:",
                         "      name: task-routing",
                         "      description: Fixture.",
-                        "    tool_commands:",
-                        "      required: []",
-                        "      conditional: []",
                     ]
                 ),
             )
@@ -2208,9 +2158,6 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    discovery:",
                         "      name: task-routing",
                         "      description: Fixture.",
-                        "    tool_commands:",
-                        "      required: []",
-                        "      conditional: []",
                     ]
                 ),
             )

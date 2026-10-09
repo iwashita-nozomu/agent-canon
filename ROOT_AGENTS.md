@@ -24,20 +24,38 @@ Reuse unchanged context and evidence rather than restarting discovery.
 
 ## Always-On Boundary
 
-The latest explicit user agreement defines the outcome and scope. Before working,
-confirm the directory, branch, and dependency HEADs; recheck changed premises only.
-Preserve unknown Git state and user data. Authority for the task does not authorize
-unrelated changes or publication.
+The latest explicit user agreement defines the requested outcome, acceptance, and
+authority. Before working, confirm the directory, branch, and dependency HEADs;
+recheck changed premises only. Preserve unknown Git state and user data. Authority
+for the task does not authorize unrelated changes or publication.
 
-Investigate the cause before choosing a repair. Follow actual callers, state,
-effects, and affected consumers far enough to close the owning mechanism, rather
-than minimizing the diff or expanding into unrelated architecture.
+Before proposing a repair, state what required behavior the current implementation
+cannot meet by locating the current file/function and failing operation, then trace
+a relevant valid input/state from its actual caller through control/dataflow to the
+unmet behavior, citing the observed or statically established failure. Treat
+failure reports and review claims as hypotheses; use the selected implementation
+owner's reachability/remedy guidance.
+Verify only facts that could change the owner, mechanism, required guarantee,
+scope, or validation. Separate observations, inferences, and unresolved
+decision-relevant premises; follow callers, effects, and affected consumers far
+enough to close the owning mechanism.
+
+Carry the requested outcome and authority through cause discovery; do not turn
+preliminary paths, slices, or non-goals into a completion ceiling. After cause
+and guarantee are established, derive the necessary edit and validation closure
+from evidence, updating an active handoff or write boundary when material facts
+change. Partition only for demonstrated independent responsibilities, collisions,
+or blockers.
 Choose the mechanism from the established cause, applicable constraints, and
 guarantee that must hold after the change. A procedure, role, artifact, or stage
 used by an earlier task is not a reason to repeat it; reuse it only when the
 current cause and guarantee require it.
-Before editing, state the existing responsibility and non-goals briefly, then
-inspect the changed implementation and actual caller. After a failure, separate
+At nonobvious code boundaries, keep the concrete necessity, guaranteed behavior
+or effect boundary, and owning responsibility readable in a concise comment or
+docstring; reference the actual design owner where useful. Use this selectively:
+do not restate names or invent rationale. If necessity or ownership is unclear,
+investigate or reconsider the implementation.
+After a failure, separate
 source cause, oracle/specification, fixture, and transport/environment causes;
 repair the owning source first, and change test inputs or wiring only for an
 established API/layout/specification migration or demonstrably incorrect test.
@@ -48,7 +66,10 @@ For numerical problems, establish the equations, assumptions, and convergence
 behavior before changing implementation structure or tolerances.
 
 Use existing capabilities and standard facilities; implement only a demonstrated
-gap. Add guards or fallbacks only for reachable conditions not already handled.
+gap, with one exposed API per functional responsibility. A repair must not add a
+condition-specific branch, guard, bypass, or fallback. Correct the existing
+mechanism, input, ordering, or ownership that leaves the requirement unmet, while
+preserving established domain and external-boundary behavior.
 When multiple paths exist, use the most recently incorporated implementation as
 the starting point, migrate necessary consumers, and remove obsolete paths and
 exclusive support. Keep committed history in Git, not backup implementations.
@@ -91,8 +112,11 @@ research, or specialist routes only when their conditions apply. AgentCanon sour
 maintenance does not authorize editing a consumer's generated instructions.
 
 Continue through required implementation, migration, retirement, verification,
-and authorized delivery. A checkpoint or draft PR is not completion. Honor an
-explicit step boundary or pause. If blocked, identify the failed operation,
+and authorized delivery. For an authorized implementation or repair request,
+include pre-existing failures within its scope in the required work; diagnosis
+alone does not complete the request, and skipped or no-op checks do not establish
+runtime behavior. A checkpoint or draft PR is not completion. Honor an explicit
+step boundary or pause. If blocked, identify the failed operation,
 unverified property, and next owner/action, and finish independent required work.
 
 Consider commit and push separately, preserving mixed work and publication scope.

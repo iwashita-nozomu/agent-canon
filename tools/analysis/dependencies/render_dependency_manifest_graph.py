@@ -3,9 +3,9 @@
 # contract tool
 # responsibility Renders dependency manifest graph TSV artifacts into deterministic bundle and projection reports.
 # upstream implementation ./check_dependency_graph.sh writes dependency graph TSV artifacts.
-# upstream design ../../documents/design/dependency-manifest-design.md defines manifest graph semantics.
-# downstream design ../../documents/tools/render_dependency_manifest_graph.md documents report generation.
-# downstream implementation ../../tests/agent_tools/test_render_dependency_manifest_graph.py tests graph rendering.
+# upstream design ../../../documents/design/dependency-manifest-design.md defines manifest graph semantics.
+# downstream design ../../../documents/tools/render_dependency_manifest_graph.md documents report generation.
+# downstream implementation ../../../tests/agent_tools/test_render_dependency_manifest_graph.py tests graph rendering.
 # @dependency-end
 """Render dependency manifest graph reports from graph TSV artifacts."""
 

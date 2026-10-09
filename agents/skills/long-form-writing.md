@@ -19,12 +19,25 @@ README、workflow、guide、migration、specification などの一般説明 pros
 
 ## Procedure
 
-1. `summary statement` で主張、目的、reader を短く固定し、既存本文・見出し・source map を読む。
-2. section order、reader path、responsibility、canonical source、split/merge、invalid interpretation が未決定なら `structure-planning` を使う。typo/link/format-only は `md-style-check` で足りる。
-3. roadmap と section contract を作り、reader order で draft する。workflow/dependency/ownership/state/handoff が読者判断の中心なら、図を選ぶ理由を決め、選択時だけ `code-visualization` に必要な source facts と選択した renderer の native input/output checks を委譲する。
-4. 数学的または implementation-derived claim は、必要なら `formal-proof-workflow` に渡し、scope・assumption・limitation・validation route として prose に射影する。
-5. reverse outline を取り、`document_flow_reviewer` と docs-completeness review を通す。複数 entrypoint/文書を変えた場合だけ consistency review を追加する。
-6. `tools/bin/agent-canon docs check` で閉じる。
+Read the request, existing text and headings, and canonical source. State the
+purpose and reader in the amount of detail needed to guide the revision. Use
+`structure-planning` only when the owner, reader path, section order,
+split/merge, or invalid interpretation still has a material unresolved choice;
+use `md-style-check` for a wording-independent typo, link, or formatting fix.
+
+Draft from the selected structure. If a diagram would clarify workflow,
+dependency, ownership, state, or handoff, explain the specific question it
+answers and use `code-visualization` for its selected rendering. Route a
+mathematical or implementation-derived claim through `formal-proof-workflow`
+when that proof is part of the request; present its scope, assumptions,
+limitations, and validation evidence accurately.
+For the selected renderer, provide its native input and check the requested
+output.
+
+Review the reader path and completeness against the requested scope. Use
+`document_flow_reviewer` for a structural gap and add docs-completeness or
+cross-document consistency review only when the changed material requires it.
+Run `tools/bin/agent-canon docs check` when selected for the document.
 
 ## Boundary
 

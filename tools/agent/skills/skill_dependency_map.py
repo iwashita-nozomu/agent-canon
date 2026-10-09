@@ -7,8 +7,7 @@
 # upstream design ../../catalog.yaml owns canonical ToolIDs
 # upstream design ../../../documents/design/skill-tool-invocation-graph.md owns the v2 schema and digest rules
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md owns the external runtime and explicit mutation boundary
-# upstream implementation ./skill_tool_commands.py resolves command packets and execution argv
-# upstream implementation ./skill_route_catalog.py owns public skill routing
+# upstream implementation ./skill_route_catalog.py owns typed visualization owner/adapter routing
 # upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external artifact publication and source exclusion
 # downstream implementation ../../../documents/runtime/skill-dependency-graph.md is generated Mermaid
 # downstream implementation ../../../documents/runtime/skill-dependency-graph.json is generated machine graph
@@ -39,20 +38,31 @@ import yaml
 
 from tools.agent.skills.skill_route_catalog import (
     SKILL_DEPENDENCY_MAP_PATH,
+    VISUALIZATION_ADAPTER_TOOL_IDS,
+    VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
+    VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
+    VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
+    VISUALIZATION_OWNER_TOOL_ID,
     SkillDependencyRule,
+    build_visualization_adapter_tool_call,
+    build_visualization_owner_tool_call,
     derive_skill_invocation_order,
     load_skill_catalog,
     load_skill_dependency_map,
     load_skill_route_rules,
 )
-from tools.agent.skills.skill_tool_commands import SkillCommandPacket, packet_for_skill
 from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactBoundary,
     RuntimeArtifactError,
     RuntimeRootRequired,
     runtime_artifact_boundary,
 )
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+from tools.validation.semantic.tools.visualization_contract import (
+    TOOL_ARGUMENT_SCHEMAS,
+    VisualizationSourceItem,
+    build_source_universe,
+    serialize_tool_call,
+)
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_GRAPH_PATH = Path("documents/runtime/skill-dependency-graph.md")
@@ -69,7 +79,7 @@ SOURCE_MUTATION_ALLOWED_PATHS = tuple(
 GRAPH_SCHEMA = "agent_canon.skill_tool_invocation_graph.v2"
 CHECK_SCHEMA = "agent_canon.skill_tool_invocation_check.v1"
 GRAPH_ARTIFACT_ID = "skill-tool-invocation-graph"
-PHASES = ("required", "conditional", "maintenance")
+GRAPH_RENDERER_ID = VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID
 EDGE_TYPES = (
     "prerequisite",
     "successor",
@@ -111,6 +121,7 @@ IDENTITY_KINDS = (
     "command",
     "tool",
     "capability",
+    "toolcall",
     "edge",
     "source",
     "manifest",
@@ -365,91 +376,8 @@ def _label(value: str) -> str:
     return _mermaid_label(value)
 
 
-def _load_tool_entries(root: Path) -> tuple[Mapping[str, object], ...]:
-    """Load ToolID-owned catalog entries in their canonical order."""
-    path = root / "tools/catalog.yaml"
-    try:
-        raw: object = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
-        raise ValueError(
-            "skill_tool_invocation_graph_tool_catalog_unavailable"
-        ) from exc
-    if not isinstance(raw, Mapping) or not isinstance(raw.get("entries"), list):
-        raise ValueError("skill_tool_invocation_graph_tool_catalog_invalid")
-    entries: list[Mapping[str, object]] = []
-    for entry in raw["entries"]:
-        if (
-            not isinstance(entry, Mapping)
-            or not isinstance(entry.get("id"), str)
-            or not isinstance(entry.get("path"), str)
-        ):
-            raise ValueError("skill_tool_invocation_graph_tool_catalog_invalid_entry")
-        entries.append(cast(Mapping[str, object], entry))
-    return tuple(entries)
-
-
-def _packets(root: Path, skill_ids: Sequence[str]) -> dict[str, SkillCommandPacket]:
-    """Resolve every public skill through the canonical command packet owner."""
-    resolution = resolve_agent_canon_source_root(root)
-    return {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
-
-
-def _packet_commands(
-    packet: SkillCommandPacket, phase: str
-) -> tuple[
-    tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
-]:
-    """Return one packet's resolved rows for an explicit phase."""
-    if phase == "required":
-        return packet.resolved_required_commands
-    if phase == "conditional":
-        return packet.resolved_conditional_commands
-    if phase == "maintenance":
-        return packet.resolved_maintenance_commands
-    raise ValueError(f"skill_tool_invocation_graph_unknown_phase:{phase}")
-
-
-def _packet_items(packet: SkillCommandPacket, phase: str) -> tuple[Mapping[str, object], ...]:
-    """Return canonical structured command items for one phase."""
-    if not packet.command_items:
-        return ()
-    return packet.command_items[PHASES.index(phase)]
-
-
-def _logical_item(root: Path, item: Mapping[str, object]) -> dict[str, object]:
-    """Normalize only logical catalog paths for cross-checkout identity."""
-    result: dict[str, object] = {}
-    for key, value in item.items():
-        if isinstance(value, list):
-            normalized: list[object] = []
-            for token in value:
-                if isinstance(token, str) and token.startswith("/"):
-                    candidate = Path(token)
-                    try:
-                        token = "@root/" + candidate.resolve().relative_to(root.resolve()).as_posix()
-                    except ValueError:
-                        token = "@absolute"
-                normalized.append(token)
-            result[key] = normalized
-        else:
-            result[key] = value
-    return result
-
-
-def _logical_item_argv(item: Mapping[str, object]) -> list[str]:
-    """Render structured item identity as argv-like tokens without parsing."""
-    if "tool_id" in item:
-        return [
-            "catalog",
-            cast(str, item["tool_id"]),
-            cast(str, item.get("operation_id", "default")),
-            *cast(Sequence[str], item.get("argv_suffix", [])),
-        ]
-    return [cast(str, item["executable"]), *cast(Sequence[str], item.get("argv", []))]
-
-
 def _route_snapshot(rules: Sequence[object]) -> list[dict[str, object]]:
-    """Create a logical route snapshot from public routing rules."""
+    """Create a logical, ToolCall-free route packet snapshot."""
     result: list[dict[str, object]] = []
     for rule in rules:
         typed = cast(Any, rule)
@@ -469,11 +397,56 @@ def _route_snapshot(rules: Sequence[object]) -> list[dict[str, object]]:
                     }
                     for route in typed.capabilities
                 ],
+                "visualization_role": typed.visualization_role,
+                "tool_id": typed.tool_id,
+                "argument_schema": typed.argument_schema,
                 "required_prerequisites": list(typed.required_prerequisites),
                 "successors": list(typed.successors),
             }
         )
     return result
+
+
+def _build_owner_and_adapter_calls(
+    capability_id: str,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Invoke the typed visualization owner before its dependency adapter."""
+    owner = build_visualization_owner_tool_call(
+        f"capability:{capability_id}",
+        f"agents/skills/catalog.yaml#capability:{capability_id}",
+    )
+    serialize_tool_call(owner)
+    adapter = build_visualization_adapter_tool_call(owner)
+    serialize_tool_call(adapter)
+    return cast(dict[str, object], owner), cast(dict[str, object], adapter)
+
+
+def _legacy_source_item(
+    kind: str, origin: str, locator: str, ordinal: int, payload: Mapping[str, object]
+) -> VisualizationSourceItem:
+    """Build the source item accepted by the public owner ToolCall contract."""
+    return {
+        "item_id": _digest(
+            {
+                "kind": kind,
+                "origin": origin,
+                "locator": locator,
+                "ordinal": ordinal,
+                "payload": payload,
+            }
+        ),
+        "kind": cast(Any, kind),
+        "origin": cast(Any, origin),
+        "source_locator": locator,
+        "source_start": None,
+        "source_end": None,
+        "ordinal": ordinal,
+        # visualization_contract owns this compatibility envelope's sorted-key
+        # serializer; the v2 graph never persists this full source payload.
+        "payload_json": json.dumps(
+            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ),
+    }
 
 
 def _source_record(
@@ -530,7 +503,7 @@ def _validate_projection_refs(
     graph: Mapping[str, object], identities: _IdentityStore
 ) -> None:
     """Validate every Ref-only projection against the IdentityRecord store."""
-    for field in ("skills", "phases", "commands", "tools", "capabilities"):
+    for field in ("skills", "phases", "commands", "tools", "capabilities", "toolcalls"):
         for item in cast(Sequence[Mapping[str, object]], graph[field]):
             identities.require(cast(Mapping[str, object], item["ref"]))
             if (
@@ -602,6 +575,7 @@ def _projection_digest(graph: Mapping[str, object]) -> dict[str, str]:
                     "commands",
                     "tools",
                     "capabilities",
+                    "toolcalls",
                 )
             }
         ),
@@ -613,39 +587,23 @@ def _projection_digest(graph: Mapping[str, object]) -> dict[str, str]:
 def _source_snapshot(
     root: Path,
     rules: Sequence[object],
-    packets: Mapping[str, SkillCommandPacket],
+    toolcall_packet: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
-    """Build logical source locator/digest entries required by SG-003."""
-    skill_ids = tuple(packets)
-    command_packet = [
-        {
-            "skill": skill,
-            "phase": phase,
-            "commands": [
-                {
-                    "logical_item": _logical_item(root, item),
-                    "logical_argv": _logical_item_argv(item),
-                }
-                for item in _packet_items(packets[skill], phase)
-            ],
-        }
-        for skill in skill_ids
-        for phase in PHASES
-    ]
+    """Build the skill/dependency source snapshot without command packets."""
     route_packet = _route_snapshot(rules)
     locators = {
         "catalog_sha256": "agents/skills/catalog.yaml",
         "dependencies_sha256": "agents/skills/skill-dependencies.yaml",
         "reader_index_sha256": "agents/canonical/skills.md",
         "route_packet_sha256": "agents/skills/catalog.yaml#routing",
-        "command_packet_sha256": "tools/agent/skills/skill_tool_commands.py#canonical-resolution",
+        "toolcall_packet_sha256": "agents/skills/catalog.yaml#typed-visualization-toolcalls",
     }
     return {
         "catalog_sha256": _file_digest(root, locators["catalog_sha256"]),
         "dependencies_sha256": _file_digest(root, locators["dependencies_sha256"]),
         "reader_index_sha256": _file_digest(root, locators["reader_index_sha256"]),
         "route_packet_sha256": _digest(route_packet),
-        "command_packet_sha256": _digest(command_packet),
+        "toolcall_packet_sha256": _digest(toolcall_packet),
         "source_locators": locators,
     }
 
@@ -671,8 +629,17 @@ def _validate_design_correspondence(root: Path) -> dict[str, object]:
     design_text = design_path.read_text(encoding="utf-8")
     required_tokens = (*DESIGN_CLAUSE_IDS, *DIC_CLAUSE_IDS, *IMPLEMENTATION_TRACE_PATHS)
     missing = [token for token in required_tokens if token not in design_text]
-    if missing:
-        detail = ",".join(missing)
+    adapter_pairs = tuple(
+        (tool_id, TOOL_ARGUMENT_SCHEMAS[tool_id])
+        for tool_id in VISUALIZATION_ADAPTER_TOOL_IDS
+    )
+    missing_pairs = [
+        f"{tool_id}|{argument_schema}"
+        for tool_id, argument_schema in adapter_pairs
+        if tool_id not in design_text or argument_schema not in design_text
+    ]
+    if missing or missing_pairs:
+        detail = ",".join((*missing, *missing_pairs))
         raise ValueError(f"design_correspondence_missing:{detail}")
     return {
         "design_locator": DESIGN_LOCATOR,
@@ -680,6 +647,10 @@ def _validate_design_correspondence(root: Path) -> dict[str, object]:
         "clause_ids": list(DESIGN_CLAUSE_IDS),
         "dic_clause_ids": list(DIC_CLAUSE_IDS),
         "implementation_target_paths": list(IMPLEMENTATION_TRACE_PATHS),
+        "adapter_pairs": [
+            {"tool_id": tool_id, "argument_schema": argument_schema}
+            for tool_id, argument_schema in adapter_pairs
+        ],
     }
 
 
@@ -699,41 +670,19 @@ def build_graph(root: Path) -> dict[str, object]:
     route_by_skill = {rule.skill: rule for rule in route_rules}
     if set(skill_ids) != set(rules) or set(skill_ids) != set(route_by_skill):
         raise ValueError("skill_tool_invocation_graph_skill_identity_mismatch")
-    packets = _packets(root, skill_ids)
-    tools = _load_tool_entries(root)
     invocation_order = derive_skill_invocation_order(skill_ids, route_rules)
     invocation_ordinals = {skill: index for index, skill in enumerate(invocation_order)}
     identities = _IdentityStore()
     source_inventory: list[dict[str, object]] = []
     skill_refs: dict[str, dict[str, str]] = {}
-    phase_refs: dict[tuple[str, str], dict[str, str]] = {}
-    command_refs: dict[tuple[str, str, int], dict[str, str]] = {}
     capability_refs: dict[str, dict[str, str]] = {}
-    tool_refs: dict[str, dict[str, str]] = {}
-    tool_ids_by_command: dict[tuple[str, str, int], str | None] = {}
-    phase_commands: dict[
-        tuple[str, str], list[tuple[int, str, str, tuple[tuple[str, str], ...], tuple[str, ...]]]
-    ] = (
-        defaultdict(list)
-    )
 
     for skill in skill_ids:
         rule = rules[skill]
-        phase_ids = [f"phase:{skill}:{phase}" for phase in PHASES]
         capability_ids = [
             f"capability:{skill}:{route.capability_id}"
             for route in route_by_skill[skill].capabilities
         ]
-        command_ids: list[str] = []
-        for phase in PHASES:
-            for index, (logical, _source_root, _execution_cwd, _execution_env, argv) in enumerate(
-                _packet_commands(packets[skill], phase)
-            ):
-                command_id = f"command:{skill}:{phase}:{index:04d}"
-                command_ids.append(command_id)
-                phase_commands[(skill, phase)].append(
-                    (index, logical, _execution_cwd, _execution_env, argv)
-                )
         skill_refs[skill] = identities.add(
             "skill",
             f"skill:{skill}",
@@ -742,9 +691,9 @@ def build_graph(root: Path) -> dict[str, object]:
                 "catalog_locator": f"agents/skills/catalog.yaml#skill:{skill}",
                 "canonical_doc": f"agents/skills/{skill}.md",
                 "shim": f".codex/personal/skills/{skill}/SKILL.md",
-                "command_ids": command_ids,
+                "command_ids": [],
                 "capability_ids": capability_ids,
-                "phase_ids": phase_ids,
+                "phase_ids": [],
             },
         )
         _source_record(
@@ -775,6 +724,9 @@ def build_graph(root: Path) -> dict[str, object]:
                     "owner_id": skill,
                     "type": cap.activation,
                     "phase_id": f"phase:{skill}:conditional",
+                    "adapter_id": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID
+                    if cap.capability_id == "dependency_manifest_graph"
+                    else None,
                 },
             )
             _source_record(
@@ -788,84 +740,104 @@ def build_graph(root: Path) -> dict[str, object]:
                 phase=cap.phase,
             )
 
-    for skill in skill_ids:
-        for phase_index, phase in enumerate(PHASES):
-            phase_id = f"phase:{skill}:{phase}"
-            phase_refs[(skill, phase)] = identities.add(
-                "phase",
-                phase_id,
-                {"id": phase_id, "owner_id": skill, "order": phase_index},
-            )
-            _source_record(
-                identities,
-                source_inventory,
-                "phase",
-                f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}",
-                phase_index,
-                phase_refs[(skill, phase)],
-            )
-            direct_tool_ids = packets[skill].command_tool_ids[PHASES.index(phase)]
-            canonical_items = _packet_items(packets[skill], phase)
-            for index, logical, _cwd, _env, argv in phase_commands[(skill, phase)]:
-                command_id = f"command:{skill}:{phase}:{index:04d}"
-                tool_id = (direct_tool_ids[index] or None) if index < len(direct_tool_ids) else None
-                logical_item = _logical_item(root, canonical_items[index])
-                logical_argv = _logical_item_argv(canonical_items[index])
-                tool_ids_by_command[(skill, phase, index)] = tool_id
-                command_refs[(skill, phase, index)] = identities.add(
-                    "command",
-                    command_id,
-                    {
-                        "id": command_id,
-                        "skill_id": skill,
-                        "logical_item": logical_item,
-                        "logical_argv": logical_argv,
-                        "source_locator": f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}[{index}]",
-                        "execution_cwd": ".",
-                        "argv_digest": _digest(logical_argv),
-                    },
-                )
-                _source_record(
-                    identities,
-                    source_inventory,
-                    "identity",
-                    f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}[{index}]",
-                    index,
-                    command_refs[(skill, phase, index)],
-                    phase=phase,
-                )
-                _source_record(
-                    identities,
-                    source_inventory,
-                    "field",
-                    f"tools/agent/skills/skill_tool_commands.py#{skill}:{phase}:{index}",
-                    index,
-                    command_refs[(skill, phase, index)],
-                    logical_item=logical_item,
-                    logical_argv=logical_argv,
-                )
-                if tool_id is not None and tool_id not in tool_refs:
-                    entry = next(entry for entry in tools if entry["id"] == tool_id)
-                    tool_refs[tool_id] = identities.add(
-                        "tool",
-                        f"tool:{tool_id}",
-                        {
-                            "id": tool_id,
-                            "owner_id": "tools/catalog.yaml",
-                            "argument_schema_id": entry.get("argument_schema_id"),
-                            "logical_locator": cast(str, entry["path"]),
-                        },
-                    )
-                    _source_record(
-                        identities,
-                        source_inventory,
-                        "module",
-                        f"tools/catalog.yaml#tool:{tool_id}",
-                        len(tool_refs) - 1,
-                        tool_refs[tool_id],
-                    )
+    capability_id = "dependency_manifest_graph"
+    if not any(
+        route.capability_id == capability_id
+        for rule in route_rules
+        for route in rule.capabilities
+    ):
+        raise ValueError(
+            "typed_visualization_capability_missing:dependency_manifest_graph"
+        )
+    owner_call, adapter_call = _build_owner_and_adapter_calls(capability_id)
+    toolcall_summaries = (
+        {
+            "id": "toolcall:canonical-owner",
+            "tool_id": VISUALIZATION_OWNER_TOOL_ID,
+            "argument_schema_id": VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
+            "order": 0,
+            "locator_refs": [
+                "agents/skills/catalog.yaml#capability:dependency_manifest_graph"
+            ],
+        },
+        {
+            "id": "toolcall:dependency-manifest-adapter",
+            "tool_id": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
+            "argument_schema_id": VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
+            "order": 1,
+            "locator_refs": ["tools/analysis/dependencies/render_dependency_manifest_graph.py"],
+        },
+    )
+    toolcall_refs: dict[str, dict[str, str]] = {}
+    for summary in toolcall_summaries:
+        toolcall_refs[cast(str, summary["id"])] = identities.add(
+            "toolcall",
+            cast(str, summary["id"]),
+            {
+                "id": summary["id"],
+                "tool_id": summary["tool_id"],
+                "input_refs": [],
+                "output_refs": [],
+                "locator_refs": summary["locator_refs"],
+                "order": summary["order"],
+            },
+        )
+    _source_record(
+        identities,
+        source_inventory,
+        "module",
+        "agents/skills/code-visualization.md",
+        0,
+        toolcall_refs["toolcall:canonical-owner"],
+        owner_tool_id=VISUALIZATION_OWNER_TOOL_ID,
+    )
 
-    source_snapshot = _source_snapshot(root, route_rules, packets)
+    # Exercise the public source-universe contract after the owner ToolCall and before the adapter.
+    literal_items = [
+        _legacy_source_item(
+            "identity",
+            "literal_request",
+            "route:capability:dependency_manifest_graph",
+            0,
+            {"request": "complete public skill/tool invocation graph"},
+        )
+    ]
+    owner_items = [
+        _legacy_source_item(
+            "module",
+            "owner_closure",
+            "agents/skills/code-visualization.md",
+            0,
+            {"owner_skill": "code-visualization"},
+        )
+    ]
+    dependency_items = [
+        _legacy_source_item(
+            cast(str, item["kind"]),
+            "dependency_closure",
+            cast(str, item["source_locator"]),
+            cast(int, item["ordinal"]),
+            {"ref": item["ref"]},
+        )
+        for item in source_inventory
+    ]
+    source_universe = build_source_universe(
+        request_id=cast(
+            str, cast(Mapping[str, object], owner_call["arguments"])["request_id"]
+        ),
+        literal_request=cast(
+            str, cast(Mapping[str, object], owner_call["arguments"])["literal_request"]
+        ),
+        literal_items=literal_items,
+        owner_closure=owner_items,
+        dependency_closure=dependency_items,
+    )
+    if len(source_universe["items"]) != len(literal_items) + len(owner_items) + len(
+        dependency_items
+    ):
+        raise ValueError("source_universe_omission")
+
+    source_snapshot = _source_snapshot(root, route_rules, toolcall_summaries)
     for key, locator in cast(
         Mapping[str, str], source_snapshot["source_locators"]
     ).items():
@@ -882,31 +854,17 @@ def build_graph(root: Path) -> dict[str, object]:
 
     edges: list[dict[str, object]] = []
     edge_order = 0
-    for skill in skill_ids:
-        for phase in PHASES:
-            _add_edge(
-                identities,
-                edges,
-                source_inventory,
-                "invocation",
-                skill_refs[skill],
-                phase_refs[(skill, phase)],
-                edge_order,
-                {"phase": phase, "invocation_ordinal": invocation_ordinals[skill]},
-            )
-            edge_order += 1
-            for index, _logical, _cwd, _env, _argv in phase_commands[(skill, phase)]:
-                _add_edge(
-                    identities,
-                    edges,
-                    source_inventory,
-                    "invocation",
-                    phase_refs[(skill, phase)],
-                    command_refs[(skill, phase, index)],
-                    edge_order,
-                    {"phase": phase, "command_ordinal": index},
-                )
-                edge_order += 1
+    _add_edge(
+        identities,
+        edges,
+        source_inventory,
+        "order",
+        toolcall_refs["toolcall:canonical-owner"],
+        toolcall_refs["toolcall:dependency-manifest-adapter"],
+        edge_order,
+        {"reason": "owner-before-adapter"},
+    )
+    edge_order += 1
     for skill in skill_ids:
         rule = rules[skill]
         for prerequisite in rule.required_prerequisites:
@@ -966,19 +924,6 @@ def build_graph(root: Path) -> dict[str, object]:
                     edge_order,
                 )
                 edge_order += 1
-    for key, tool_id in tool_ids_by_command.items():
-        if tool_id is not None:
-            _add_edge(
-                identities,
-                edges,
-                source_inventory,
-                "tool-resolution",
-                command_refs[key],
-                tool_refs[tool_id],
-                edge_order,
-                {"tool_id": tool_id},
-            )
-            edge_order += 1
 
     if "dependency-design" not in skill_ids:
         raise ValueError("skill_tool_invocation_graph_dependency-design_omission")
@@ -992,23 +937,20 @@ def build_graph(root: Path) -> dict[str, object]:
         }
         for skill in skill_ids
     ]
-    phases_projection = [
-        _projection_entry(phase_refs[(skill, phase)], f"{skill}/{phase}", phase_index)
-        for skill in skill_ids
-        for phase_index, phase in enumerate(PHASES)
-    ]
-    commands_projection = [
-        _projection_entry(command_refs[(skill, phase, index)], logical, index)
-        for skill in skill_ids
-        for phase in PHASES
-        for index, logical, _cwd, _env, _argv in phase_commands[(skill, phase)]
-    ]
-    tools_projection = [
-        _projection_entry(ref, tool_id) for tool_id, ref in tool_refs.items()
-    ]
+    phases_projection: list[dict[str, object]] = []
+    commands_projection: list[dict[str, object]] = []
+    tools_projection: list[dict[str, object]] = []
     capabilities_projection = [
         _projection_entry(ref, capability_id)
         for capability_id, ref in capability_refs.items()
+    ]
+    toolcalls_projection = [
+        _projection_entry(
+            toolcall_refs[cast(str, summary["id"])],
+            cast(str, summary["tool_id"]),
+            cast(int, summary["order"]),
+        )
+        for summary in toolcall_summaries
     ]
     invocation_projection = [
         {"ref": dict(skill_refs[skill]), "order": invocation_ordinals[skill]}
@@ -1024,6 +966,7 @@ def build_graph(root: Path) -> dict[str, object]:
         "commands": commands_projection,
         "tools": tools_projection,
         "capabilities": capabilities_projection,
+        "toolcalls": toolcalls_projection,
         "edges": edges,
         "invocation_order": invocation_projection,
         "source_snapshot": source_snapshot,
@@ -1033,6 +976,14 @@ def build_graph(root: Path) -> dict[str, object]:
         "responsibility_groups": {
             skill: rules[skill].responsibility_group for skill in skill_ids
         },
+        "tool_call_order": [
+            "toolcall:canonical-owner",
+            "toolcall:dependency-manifest-adapter",
+        ],
+        "owner_tool_call_ref": dict(toolcall_refs["toolcall:canonical-owner"]),
+        "adapter_tool_call_ref": dict(
+            toolcall_refs["toolcall:dependency-manifest-adapter"]
+        ),
         "projection_digests": {},
     }
     graph["projection_digests"] = _projection_digest(graph)
@@ -1103,7 +1054,7 @@ def build_graph(root: Path) -> dict[str, object]:
             "dependencies_sha256",
             "reader_index_sha256",
             "route_packet_sha256",
-            "command_packet_sha256",
+            "toolcall_packet_sha256",
         )
     }
     graph["readback_ref"] = readback_ref
@@ -1149,6 +1100,7 @@ def _projection_nodes(
         ("command", "commands"),
         ("tool", "tools"),
         ("capability", "capabilities"),
+        ("toolcall", "toolcalls"),
     ):
         for index, item in enumerate(
             cast(Sequence[Mapping[str, object]], graph[field])
@@ -1213,40 +1165,10 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
                 f'    {_safe_mermaid_id(identity_id)}["{_rendered_node_label(item)}"]'
             )
         lines.append("  end")
-    for phase in PHASES:
-        lines.append(f'  subgraph phase_{phase}["Phase: {phase}"]')
-        for item in cast(Sequence[Mapping[str, object]], graph["phases"]):
-            reference = cast(Mapping[str, object], item["ref"])
-            if cast(str, reference["id"]).endswith(f":{phase}"):
-                identity_id = cast(str, reference["id"])
-                lines.append(
-                    f"    %% node kind=phase id={identity_id} digest={reference['digest']} order={item['order']}"
-                )
-                lines.append(
-                    f'    {_safe_mermaid_id(identity_id)}{{"{_rendered_node_label(item)}"}}'
-                )
-        for item in cast(Sequence[Mapping[str, object]], graph["commands"]):
-            identity_id = cast(str, cast(Mapping[str, object], item["ref"])["id"])
-            payload = cast(
-                Mapping[str, object], identity_by_id[identity_id]["canonical_payload"]
-            )
-            if (
-                cast(str, payload["source_locator"])
-                .split(".tool_commands.", 1)[1]
-                .split("[", 1)[0]
-                == phase
-            ):
-                reference = cast(Mapping[str, object], item["ref"])
-                lines.append(
-                    f"    %% node kind=command id={identity_id} digest={reference['digest']} order={item['order']}"
-                )
-                lines.append(
-                    f'    {_safe_mermaid_id(identity_id)}["{_rendered_node_label(item)}"]'
-                )
-        lines.append("  end")
     for kind, field, title, shape in (
         ("tool", "tools", "ToolID catalog", "[["),
         ("capability", "capabilities", "Typed capabilities", "[["),
+        ("toolcall", "toolcalls", "ToolCall order", "[["),
     ):
         entries = cast(Sequence[Mapping[str, object]], graph[field])
         if not entries:

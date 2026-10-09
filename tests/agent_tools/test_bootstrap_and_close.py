@@ -2910,8 +2910,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     subagent_prompt_packet["internal_skill_routes"],
                 )
                 self.assertEqual(
-                    subagent_prompt_packet["tool_call_tokens"],
-                    "run.repo_tool_routing_policy.sequential_tool_routes[].tool_call_token",
+                    subagent_prompt_packet["native_argv"],
+                    "run.repo_tool_routing_policy",
                 )
                 self.assertNotIn(
                     "tool_command_packet_command", subagent_prompt_packet

@@ -134,6 +134,14 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
 
 ## Mandatory Checklist
 
+Apply the checklist to the selected theorem route. Claim, assumption, and
+checker requirements apply to every formalized claim; implementation-derived
+items apply when the target is about code behavior, and backend, numerical, or
+multi-agent clauses apply only when that surface is selected. An abstract
+mathematical proof does not need implementation IR, a generated code graph, or
+unused proof artifacts. This keeps obligations tied to the theorem being
+claimed while preserving checker evidence for that theorem.
+
 - 形式化前に、claim、assumptions、definitions、target theorem、proof sketch を分けます。
 - 実装由来のアルゴリズム claim は、必ず実装正本の public entrypoint に対する
   全体命題から始めます。JIT route では
@@ -892,6 +900,13 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
 
 ## Required Outputs
 
+Treat this list as the available evidence vocabulary, not a fixed artifact
+count. Retain the entries needed to identify the selected claim, source route,
+checker result, and unresolved boundary. Generate JIT, theorem-graph, backend,
+or handoff artifacts only when that claim route uses them; omit unused outputs
+when the consumer allows omission, or use an established `none`/`not_run` value
+where the existing consumer requires a value.
+
 ```text
 proof_claim=<path-or-inline-summary>
 proof_jit_ir=<path>
@@ -937,7 +952,10 @@ checked direct boundary, not to an unconnected helper theorem.
 
 ## Proof Status Table
 
-Reader-facing proof notes must include a table shaped like this:
+For a durable note with multiple claims, proof states, or implementation
+surfaces, use a table like this to make their status easy to compare. A short
+single-claim proof note may state the target, status, and checker evidence
+directly, as long as its limits remain clear.
 
 | Claim     | Formal theorem / lemma | Implementation surface | Status                                                                                                                          | Evidence                               | Remaining obligation |
 | --------- | ---------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------- |
@@ -1364,77 +1382,32 @@ The runtime discovery adapter delegates these required operating clauses to this
    theorem. Resolve such a gap through the named `proof_tool_worker`; it does
    not authorize a math-writer to edit production code, algorithm shape, or JIT
    boundaries.
-   Before selecting a local witness, build a target-rooted frontier board for
-   the whole theorem: list every active route from the public-root conclusion to
-   its current leaves, classify each row as code-derived, Problem/config-derived,
-   backend-derived, library-derived, circular/projection-only, or actionable
-   frontier, and rank rows by expected impact on the final theorem. Work on a
-   local lemma only when the board shows it is on a highest-impact route or
-   unlocks multiple downstream routes. If a checked local bridge does not pass
-   a required checklist item or remove that item from all target routes, keep it
-   as intermediate evidence and continue to the next globally ranked frontier
-   before reporting.
-   A Wave must start from this board, not from the last edited theorem. Group
-   sibling frontiers by the route they serve, such as returned-value projection,
-   generated tolerance, backend decode, recurrence/ranking, or problem/config
-   witness. The minimum useful progress unit is one complete target route
-   segment or a batch of connected frontier nodes that moves the public-root
-   theorem to the next abstraction boundary. Do not spend a turn on a single
-   local bridge when another reachable frontier on the same target route remains
-   ready to prove, refute, prune as not-required for the selected theorem, or
-   reduce to a checked boundary. If only one node can move, record why every
-   sibling route is blocked, stale, profile-only, or outside the selected public
-   theorem before returning.
-   If the user asks what is missing, where the proof is disconnected, or why a
-   theorem cannot currently be proved, do not return an unconnected edge name,
-   helper lemma name, or "derive this later" statement as the terminal answer.
-   Add or use a required Goal checklist item for the same public-root theorem
-   and reduce that item to verified, refuted, unprovable under assumptions,
-   checked boundary, or pruned from every selected route. The explanation must
-   cite the checked item and its causal path to production code, algorithm
-   choice, Problem/config/solve input, or backend/runtime architecture boundary.
-   The board must also include the theorem-level objective classes, not only the
-   next local edge. For finite-stop / convergence tasks, keep separate rows for
-   the strongest checked sufficient route, the reverse / necessary direction,
-   circular projection candidates, implementation/extractor gaps, and possible
-   algorithm-change routes. Closing a sufficient route is not enough when the
-   user target asks for a necessary-and-sufficient condition or a checked
-   expressivity boundary; immediately continue to the reverse/boundary row and
-   either prove it, refute it, or reduce it to the exact public input,
-   implementation, or backend surface that prevents closure. A user-facing
-   update may summarize a local lemma only after the board-level milestone has
-   changed, such as "sufficient route verified and reverse classified by
-   checker-backed boundary", not merely "one bridge lemma added".
-   Treat the board as a precondition for proof search. Before invoking a tactic,
-   writing a bridge theorem, or accepting a subagent proof result, identify the
-   row and route segment that the step is meant to close. For finite-stop and
-   convergence work, the board rows are: sufficient route, reverse/necessary
-   route, circularity/projection-only route, implementation/extractor route,
-   backend semantics route, public Problem/config expressivity route, and
-   algorithm-change route. If a local theorem does not close its selected row
-   and a sibling frontier on that row is still reachable from the public-root
-   target, continue with that sibling in the same Wave before user-facing
-   reporting. A proof update must report a board-level status transition, not a
-   single theorem count.
-   For convergence and finite-stop targets, proof search begins with a
-   problem-level board pass, not a nearby unsolved lemma. The board pass must
-   identify the final theorem, all viable sufficient and reverse routes, the
-   public return projection consumed by each route, and the current terminal
-   leaf class for each route: code-derived, Problem/config-derived,
-   backend-derived, library-derived, circular/projection-only, algorithmic, or
-   actionable. Select a connected frontier batch for one row and keep re-entering
-   the batch until the row is terminal or checked-boundary. A local theorem that
-   merely advances one edge is internal evidence; it cannot be the user-facing
-   outcome while another sibling edge on the same row remains actionable.
-   Before any user-facing return, require an independent state inspection pass
-   by a read-only subagent or checker tool. Pass the target theorem, public
-   root/signature, return projection, theorem graph board, proof-status table,
-   generated evidence, exit-gate criteria, and current user target. The
-   inspector checks classification only: sufficient-route fragments are not
-   reported as Goal completion, theorem-critical values are not free witnesses,
-   and open frontiers are not mislabeled as checked boundaries. Parent must
-   integrate every finding, regenerate/recheck affected artifacts, and rerun the
-   exit gate before responding.
+   For a nontrivial implementation-derived theorem, use a target-rooted graph
+   slice or frontier board when it helps identify which code, input, backend,
+   library, or proof-tool dependencies affect the public-root claim. A direct
+   proof with few dependencies can use those dependencies without a full board.
+   A local lemma is evidence toward the target, not proof of the public claim;
+   report it as interim progress when requested and state the remaining target
+   obligation. Mark the claim complete only when the selected Goal checklist
+   passes. If asked what remains, name the observed open obligation or checked
+   boundary and its owner without calling an unverified route impossible.
+
+   For convergence or finite-stop work, distinguish a sufficient route from a
+   necessary-and-sufficient target. Explore the reverse route and run a
+   circularity check when the user's target asks for necessity, equivalence, or
+   an expressivity boundary; do not require those extra branches for a
+   sufficient-only claim. Use a graph board to organize multiple active routes,
+   not as a prerequisite for every tactic or proof attempt. If delegation is
+   useful, pass the existing Target Binding Packet and a bounded connected
+   obligation to its owner. There is no fixed wave size or minimum batch.
+   Integrate selected results and recheck any target property they affect.
+   For a complex implementation-derived claim, an independent inspection can
+   help check that the public-root projection, theorem graph, and final status
+   agree. Use a read-only reviewer or checker when that classification is not
+   already established by selected validation. If used, provide the target,
+   public root/signature, return projection, relevant graph/status evidence, and
+   exit criteria; resolve material findings before reporting. This is a
+   targeted status check, not a required reviewer stack for every formal proof.
 1. For algorithm-derived claims, consume the
    `$algorithm-proof-exploration` artifact when available. If it does not
    exist yet, lower the public root into the matching implementation evidence
@@ -1986,8 +1959,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    (g) theorem-critical return values are fixed by generated functions,
    projection lemmas, or uniqueness theorems from public inputs and the
    implementation path, not by free witnesses;
-   (h) independent state inspection has run and every finding has been
-   integrated; and
+   (h) if independent state inspection was selected for a material
+   classification risk, its findings have been integrated; and
    (i) if the user target asks for finite stop, convergence, Goal completion, or
    necessary/sufficient conditions, a verified sufficient route alone is not
    reported as `complete`. If the exit gate
@@ -1995,11 +1968,13 @@ The runtime discovery adapter delegates these required operating clauses to this
    work queue.
 1. Use a writing skill when producing reader-facing proof text: `$academic-writing` for symbol-dense proof notes, `$long-form-writing` for long guide/note form, and `$report-writing` for checker-evidence or audit summaries.
 1. Keep each proof topic's theorem target, assumptions, checked fragments, and remaining gaps in one canonical proof note whenever possible; implementation code-path explanation may live in Design docs, but the proof note must link that Design entry and the mathematical proof text must not be split across competing truth surfaces.
-1. Require a proof status table in every reader-facing proof note, with
+1. Keep proof status explicit in reader-facing notes. For notes with multiple
+   claims, states, or implementation surfaces, use a table with
    claim/theorem, implementation surface,
    `verified|refuted|unprovable_under_assumptions|unverified_with_next_witness|unverified|not_run|blocked`,
    checker evidence, and remaining obligation columns; do not hide proof status
-   in prose. For implementation-derived proof tasks, remaining-obligation cells
+   in prose. A short single-claim note may state the same information inline.
+   For implementation-derived proof tasks, remaining-obligation cells
    are internal frontier cells. Before any user-facing progress claim, either
    re-enter each named witness in the same Wave or add the exact code / input /
    backend / algorithm boundary as a failed or diagnostic Goal checklist item.
