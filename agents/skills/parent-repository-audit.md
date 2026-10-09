@@ -136,9 +136,3 @@ completion report には少なくとも次を残します。
 
 blocked または unresolved があれば全体を pass とせず、integration_executor または
 decision-owning reviewer へ typed next action を返します。
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill parent-repository-audit --format text`
-<!-- skill-tool-commands:end -->

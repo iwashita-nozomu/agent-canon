@@ -2,7 +2,7 @@
 name: adaptive-improvement-loop
 description: "Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"8169b6963205b536bd093e714df6bbda9ef877a7ab2a6ae782228991d293b90d"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"ae5f7a5cc670bb947d73b88c87a74fcfa013c65324fa374bf102496dc57856aa"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/adaptive-improvement-loop.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [adaptive-improvement-loop](../../../../agents/skills/adaptive-improvement-loop.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill adaptive-improvement-loop --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

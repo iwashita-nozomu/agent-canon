@@ -64,11 +64,11 @@ reader path changes.
 
 Subagent handoffs carry that machine-readable packet and the run bundle paths.
 Tool routing is carried through `team_manifest.yaml` under
-`run.repo_tool_routing_policy`. Each selected skill has a sequential command
-packet: show the skill packet, run required commands, run task-matching
-conditional commands, then run validation commands. When a related skill becomes
-active in a later wave, the same `skill_tool_commands.py show --skill <skill>`
-packet is regenerated for that skill before the handoff proceeds.
+`run.repo_tool_routing_policy`. Selected tools are invoked through their existing
+CLI, API, script, or Make entrypoint with native argv and retain the configured
+execution, permission, environment, and validation guarantees. A related skill
+becoming active in a later wave selects that owner directly; no private command
+packet or regenerated binding projection is required before handoff.
 
 ## Design Artifact Shape
 

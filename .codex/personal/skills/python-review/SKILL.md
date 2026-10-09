@@ -2,7 +2,7 @@
 name: python-review
 description: "Python 差分を pyright、pytest、ruff、型境界、API 挙動、OOP 可読性根拠で厳密に確認する。"
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"33821685b77bab616c056e3c89f5aefa52a4c82803b7f783619d75c4762e7f12"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"9e53b4c0cb39bf30c0999e2bbf4d5d684dcc3918f29ea1686eed4c297a46ec7d"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/python-review.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [python-review](../../../../agents/skills/python-review.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill python-review --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

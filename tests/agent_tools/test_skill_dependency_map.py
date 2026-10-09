@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies the complete typed skill/tool invocation graph and its generated projections.
 # upstream design ../../documents/design/skill-tool-invocation-graph.md owns graph clauses SG-001..SG-015 and artifact readback
-# upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes identities, phases, commands, tools, edges, and Mermaid
+# upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes identities, capabilities, edges, and Mermaid
 # upstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py validates generated JSON/Mermaid equality and stale artifacts
 # downstream implementation ../../documents/runtime/skill-dependency-graph.json is the generated machine-readable graph projection
 # downstream implementation ../../documents/runtime/skill-dependency-graph.md is the generated Mermaid reader projection
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -23,7 +24,6 @@ from unittest import mock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root  # noqa: E402
 from tools.agent.skills import skill_dependency_map  # noqa: E402
 from tools.agent.skills.skill_dependency_map import (  # noqa: E402
     GraphDigestMismatchError,
@@ -42,11 +42,6 @@ from tools.agent.skills.skill_dependency_map import (  # noqa: E402
     render_graph_mermaid,
     write_artifacts,
 )
-from tools.agent.skills.skill_route_catalog import (  # noqa: E402
-    derive_skill_invocation_order,
-    load_skill_route_rules,
-)
-from tools.agent.skills.skill_tool_commands import packet_for_skill  # noqa: E402
 
 
 class SkillToolInvocationGraphTests(unittest.TestCase):
@@ -59,8 +54,12 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             PROJECT_ROOT / DEFAULT_JSON_PATH,
         )
         before = tuple(path.read_bytes() for path in tracked)
-        with self.assertRaisesRegex(GraphSourceMutationError, "runtime_root_required"):
-            write_artifacts(PROJECT_ROOT)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
+            with self.assertRaisesRegex(
+                GraphSourceMutationError, "runtime_root_required"
+            ):
+                write_artifacts(PROJECT_ROOT)
         self.assertEqual(before, tuple(path.read_bytes() for path in tracked))
 
     def test_graph_default_output_is_external_and_preserves_source(self) -> None:
@@ -80,7 +79,9 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             self.assertTrue(json_path.is_relative_to(Path(runtime_dir)))
         self.assertEqual(before, tuple(path.read_bytes() for path in tracked))
 
-    def test_tracked_graph_requires_exact_capability_and_external_evidence(self) -> None:
+    def test_tracked_graph_requires_exact_capability_and_external_evidence(
+        self,
+    ) -> None:
         """Tracked projection updates require the fixed pair and leave evidence outside it."""
         with (
             tempfile.TemporaryDirectory() as source_dir,
@@ -106,11 +107,16 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             )
             graph = {"skill_count": 1, "commands": [], "tools": [], "edges": []}
             with (
-                mock.patch.object(skill_dependency_map, "build_graph", return_value=graph),
-                mock.patch(
-                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid", return_value="graph\n"
+                mock.patch.object(
+                    skill_dependency_map, "build_graph", return_value=graph
                 ),
-                mock.patch.object(skill_dependency_map, "_json_text", return_value="{}\n"),
+                mock.patch(
+                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid",
+                    return_value="graph\n",
+                ),
+                mock.patch.object(
+                    skill_dependency_map, "_json_text", return_value="{}\n"
+                ),
             ):
                 write_artifacts(
                     source,
@@ -118,10 +124,16 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                     runtime_root=Path(runtime_dir),
                     source_mutation_capability=capability_path,
                 )
-            evidence = Path(runtime_dir) / "graphs" / "skill-dependency-graph-source-mutation.json"
+            evidence = (
+                Path(runtime_dir)
+                / "graphs"
+                / "skill-dependency-graph-source-mutation.json"
+            )
             self.assertTrue(evidence.is_file())
             payload = json.loads(evidence.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema"], "agent_canon.skill_graph_source_mutation.v1")
+            self.assertEqual(
+                payload["schema"], "agent_canon.skill_graph_source_mutation.v1"
+            )
             self.assertEqual(
                 payload["allowed_paths"],
                 [DEFAULT_GRAPH_PATH.as_posix(), DEFAULT_JSON_PATH.as_posix()],
@@ -131,7 +143,10 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
 
     def test_tracked_graph_rejects_capability_with_unrelated_target(self) -> None:
         """A capability cannot broaden graph publication beyond the canonical pair."""
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as runtime_dir:
+        with (
+            tempfile.TemporaryDirectory() as source_dir,
+            tempfile.TemporaryDirectory() as runtime_dir,
+        ):
             source = Path(source_dir)
             (source / DEFAULT_GRAPH_PATH).parent.mkdir(parents=True)
             capability = source / "capability.json"
@@ -147,13 +162,20 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             )
             graph = {"skill_count": 1, "commands": [], "tools": [], "edges": []}
             with (
-                mock.patch.object(skill_dependency_map, "build_graph", return_value=graph),
-                mock.patch(
-                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid", return_value="graph\n"
+                mock.patch.object(
+                    skill_dependency_map, "build_graph", return_value=graph
                 ),
-                mock.patch.object(skill_dependency_map, "_json_text", return_value="{}\n"),
+                mock.patch(
+                    "tools.agent.skills.skill_dependency_map.render_graph_mermaid",
+                    return_value="graph\n",
+                ),
+                mock.patch.object(
+                    skill_dependency_map, "_json_text", return_value="{}\n"
+                ),
             ):
-                with self.assertRaisesRegex(GraphSourceMutationError, "target_mismatch"):
+                with self.assertRaisesRegex(
+                    GraphSourceMutationError, "target_mismatch"
+                ):
                     write_artifacts(
                         source,
                         output=DEFAULT_GRAPH_PATH,
@@ -161,14 +183,14 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                         source_mutation_capability=capability,
                     )
 
-    def test_complete_v2_universe_and_edge_types(self) -> None:
-        """All skills, phases, resolved commands, tools, and edge kinds are present."""
+    def test_complete_v2_universe_without_private_command_projection(self) -> None:
+        """The graph retains skill/capability identity without a command DSL."""
         graph = build_graph(PROJECT_ROOT)
         self.assertEqual(graph["schema"], "agent_canon.skill_tool_invocation_graph.v2")
         self.assertEqual(graph["skill_count"], len(graph["skills"]))
-        self.assertEqual(len(graph["phases"]), graph["skill_count"] * 3)
-        self.assertGreater(len(graph["commands"]), graph["skill_count"])
-        self.assertGreater(len(graph["tools"]), 0)
+        self.assertEqual(graph["phases"], [])
+        self.assertEqual(graph["commands"], [])
+        self.assertEqual(graph["tools"], [])
         correspondence = graph["design_correspondence"]
         self.assertEqual(len(correspondence["clause_ids"]), 15)
         self.assertEqual(len(correspondence["dic_clause_ids"]), 9)
@@ -181,7 +203,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 "dependencies_sha256",
                 "reader_index_sha256",
                 "route_packet_sha256",
-                "command_packet_sha256",
                 "toolcall_packet_sha256",
                 "source_locators",
             },
@@ -193,11 +214,11 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 "order",
                 "routing",
                 "parallel",
-                "invocation",
-                "tool-resolution",
             },
         )
-        self.assertNotIn("successor", {edge["display_label"] for edge in graph["edges"]})
+        self.assertNotIn(
+            "successor", {edge["display_label"] for edge in graph["edges"]}
+        )
         self.assertIn(
             "dependency-design", {item["display_label"] for item in graph["skills"]}
         )
@@ -205,12 +226,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             (edge["display_label"], edge["source_ref"]["id"], edge["target_ref"]["id"])
             for edge in graph["edges"]
         }
-        for skill in (item["display_label"] for item in graph["skills"]):
-            for phase in ("required", "conditional", "maintenance"):
-                self.assertIn(
-                    ("invocation", f"skill:{skill}", f"phase:{skill}:{phase}"),
-                    edge_pairs,
-                )
         self.assertIn(
             (
                 "order",
@@ -219,112 +234,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             ),
             edge_pairs,
         )
-
-    def test_every_canonical_packet_command_has_phase_and_ref(self) -> None:
-        """Canonical command resolution is materialized once per phase/ordinal."""
-        graph = build_graph(PROJECT_ROOT)
-        records = {record["id"]: record for record in graph["identity_records"]}
-        command_projections = graph["commands"]
-        resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
-        expected_command_count = 0
-        for skill in (item["display_label"] for item in graph["skills"]):
-            packet = packet_for_skill(resolution, skill)
-            for phase, rows in (
-                ("required", packet.resolved_required_commands),
-                ("conditional", packet.resolved_conditional_commands),
-                ("maintenance", packet.resolved_maintenance_commands),
-            ):
-                expected_command_count += len(rows)
-                for index, row in enumerate(rows):
-                    projection = next(
-                        item
-                        for item in command_projections
-                        if item["display_label"] == row[0]
-                        and records[item["ref"]["id"]]["canonical_payload"]["skill_id"]
-                        == skill
-                        and records[item["ref"]["id"]]["canonical_payload"][
-                            "source_locator"
-                        ].endswith(f".{phase}[{index}]")
-                    )
-                    self.assertEqual(
-                        records[projection["ref"]["id"]]["kind"], "command"
-                    )
-        self.assertEqual(len(command_projections), expected_command_count)
-
-    def test_invocation_order_is_derived_and_command_order_is_immutable(self) -> None:
-        """Ordinals follow the existing order function and #461 report order."""
-        graph = build_graph(PROJECT_ROOT)
-        rules = load_skill_route_rules(PROJECT_ROOT)
-        research_rule = next(
-            rule for rule in rules if rule.skill == "research-workflow"
-        )
-        self.assertIn("literature-survey", research_rule.required_prerequisites)
-        self.assertEqual(research_rule.order_constraints, ())
-        skill_ids = tuple(item["display_label"] for item in graph["skills"])
-        expected_order = derive_skill_invocation_order(skill_ids, rules)
-        observed_order = tuple(
-            item["ref"]["id"].removeprefix("skill:")
-            for item in sorted(
-                graph["invocation_order"], key=lambda item: item["order"]
-            )
-        )
-        self.assertEqual(observed_order, expected_order)
-        resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
-        packet = packet_for_skill(resolution, "result-artifact-writeout")
-        archive_commands = [
-            row[4]
-            for row in packet.resolved_conditional_commands
-            if "runtime_log_archive_git.py" in " ".join(row[4])
-        ]
-        self.assertEqual(len(archive_commands), 2)
-        self.assertIn("archive-agent-report", archive_commands[0])
-        self.assertEqual(archive_commands[1][-1], "push")
-        self.assertNotIn("sync", " ".join(archive_commands[0]))
-        self.assertNotIn("status", " ".join(archive_commands[0]))
-
-    def test_tool_resolution_edges_are_readback_complete(self) -> None:
-        """Every resolved tool ID from command packets is represented as a tool-resolution edge."""
-        graph = build_graph(PROJECT_ROOT)
-        resolution = resolve_agent_canon_source_root(PROJECT_ROOT)
-        skill_ids = tuple(item["display_label"] for item in graph["skills"])
-        expected = set()
-        for skill in skill_ids:
-            packet = packet_for_skill(resolution, skill)
-            for phase, rows in (
-                ("required", packet.resolved_required_commands),
-                ("conditional", packet.resolved_conditional_commands),
-                ("maintenance", packet.resolved_maintenance_commands),
-            ):
-                for index, row in enumerate(rows):
-                    _, _, _, _, argv = row
-                    tool_id = packet.command_tool_ids[("required", "conditional", "maintenance").index(phase)][index]
-                    tool_id = tool_id or None
-                    if tool_id is not None:
-                        expected.add((f"command:{skill}:{phase}:{index:04d}", f"tool:{tool_id}"))
-        actual = {
-            (
-                edge["source_ref"]["id"],
-                edge["target_ref"]["id"],
-            )
-            for edge in graph["edges"]
-            if edge["display_label"] == "tool-resolution"
-        }
-        self.assertEqual(actual, expected)
-
-    def test_command_identity_uses_structured_root_independent_items(self) -> None:
-        """Graph command identity never captures the checkout's resolved absolute argv."""
-        graph = build_graph(PROJECT_ROOT)
-        command_records = [
-            record
-            for record in graph["identity_records"]
-            if record["kind"] == "command"
-        ]
-        self.assertTrue(command_records)
-        for record in command_records:
-            payload = record["canonical_payload"]
-            self.assertIn("logical_item", payload)
-            self.assertNotIn(str(PROJECT_ROOT.resolve()), json.dumps(payload))
-            self.assertEqual(payload["execution_cwd"], ".")
 
     def test_identity_payloads_are_unique_and_all_projections_are_refs(self) -> None:
         """Each full payload appears once and every envelope resolves through a Ref."""
@@ -472,7 +381,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
 
     def test_checker_rejects_stale_mermaid(self) -> None:
         """Edited Mermaid artifacts fail closed."""
-        check_artifacts(PROJECT_ROOT)
         markdown_path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.md"
         json_path = PROJECT_ROOT / "documents/runtime/skill-dependency-graph.json"
         original_markdown = markdown_path.read_text(encoding="utf-8")

@@ -2,7 +2,7 @@
 name: comprehensive-development
 description: "Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"18a921e071541ebde48f6177206265bff156b0e026e21702ed7c7cd6396aab4e"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"61bfd3e9a8e6290069f7d04fe6fdc5c2de1bad84f9d7f8042e2ca801c47158a0"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/comprehensive-development.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [comprehensive-development](../../../../agents/skills/comprehensive-development.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill comprehensive-development --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

@@ -2,7 +2,7 @@
 name: worktree-health
 description: "Use this skill to review current checkout authority, run-bundle drift, legacy worktree cleanup evidence, and cleanup readiness."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"eaa67eab0a96cf5b12af59daf99f96040b069b436a5b9eff0ab29aac3b8b5a5b"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"0186dac44748e511be72d2480e0db60132adf538e8dd89d7890d024f5eaf747a"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/worktree-health.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [worktree-health](../../../../agents/skills/worktree-health.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill worktree-health --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

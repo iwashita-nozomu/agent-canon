@@ -2040,38 +2040,18 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         run.get("repo_tool_routing_policy"),
         f"task {task_id} manifest missing run.repo_tool_routing_policy",
     )
-    routes = require_list(
-        repo_tool_routing_policy.get("sequential_tool_routes"),
-        f"task {task_id} manifest missing sequential_tool_routes",
+    sequence = require_list(
+        repo_tool_routing_policy.get("sequence"),
+        f"task {task_id} manifest missing native tool sequence",
     )
-    for route in routes:
-        route = require_mapping(route, f"task {task_id} tool route must be a mapping")
-        tool_call_token = require_mapping(
-            route.get("tool_call_token"),
-            f"task {task_id} tool route missing tool_call_token",
-        )
-        for field in (
-            "schema",
-            "tool_id",
-            "argument_schema",
-            "arguments",
-            "intent",
-            "typed_failure_semantics",
-            "token_id",
-            "token_body_sha256",
-        ):
-            ensure(
-                field in tool_call_token,
-                f"task {task_id} tool_call_token missing {field}",
-            )
-        ensure(
-            "packet_command" not in route,
-            f"task {task_id} tool route must not embed packet_command prose",
-        )
-        ensure(
-            "commands" not in route,
-            f"task {task_id} tool route must not embed command menus",
-        )
+    ensure(
+        all(isinstance(stage, str) for stage in sequence),
+        f"task {task_id} native tool sequence must contain strings",
+    )
+    ensure(
+        "sequential_tool_routes" not in repo_tool_routing_policy,
+        f"task {task_id} tool route must not retain command packets",
+    )
     ensure(
         "subagent_lifecycle_policy:" in manifest_text,
         f"task {task_id} manifest missing subagent_lifecycle_policy",
@@ -2081,8 +2061,8 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest missing run.subagent_prompt_packet object",
     )
     ensure(
-        "tool_call_tokens" in prompt_packet,
-        f"task {task_id} subagent_prompt_packet missing tool_call_tokens",
+        "native_argv" in prompt_packet,
+        f"task {task_id} subagent_prompt_packet missing native_argv",
     )
     ensure(
         "tool_command_packet_command" not in prompt_packet

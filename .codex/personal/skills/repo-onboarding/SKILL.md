@@ -2,7 +2,7 @@
 name: repo-onboarding
 description: "Use when entering an unfamiliar repository or subdirectory and you need the fastest safe path to the repo overview, commands, conventions, and agent canon."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"98110daf4d144af681a827c63c99bd4df5a879e43e648a66cdad330e4dca5ddc"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"ddc5270143d9b251da785975ffef4a075f0e79a58e83ef08925f07caa7426214"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/repo-onboarding.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [repo-onboarding](../../../../agents/skills/repo-onboarding.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill repo-onboarding --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.
