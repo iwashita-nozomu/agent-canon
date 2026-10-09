@@ -467,6 +467,19 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
             "env git -C /tmp/other/repo commit -m update",
             "env git -C/tmp/other/repo commit -m update",
             "command git -C /tmp/other/repo commit -m update",
+        ):
+            redirected = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                report_dir=root,
+                active_root=root,
+                environment=environment,
+                hook_spool_root=root,
+            )
+            assert redirected.status == "blocked"
+            assert redirected.reason == "writer_target_git_repository_redirect_forbidden"
+        # These exact config forms retain this native non-bare fixture's root;
+        # child scope is still decided from the paths Git selects here.
+        configured_commits = (
             "env git -c core.worktree=/tmp/other/repo commit -am update",
             "command git -c core.worktree=/tmp/other/repo commit -am update",
             (
@@ -492,16 +505,17 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
                 "GIT_CONFIG_VALUE_0=/tmp/other/repo && "
                 "echo `git commit -am update`"
             ),
-        ):
-            redirected = evaluate_mutation_authority(
+        )
+        for command in configured_commits:
+            configured = evaluate_mutation_authority(
                 {"tool_name": "Bash", "tool_input": {"command": command}},
                 report_dir=root,
                 active_root=root,
                 environment=environment,
                 hook_spool_root=root,
             )
-            assert redirected.status == "blocked"
-            assert redirected.reason == "writer_target_git_repository_redirect_forbidden"
+            assert configured.status == "allowed"
+            assert configured.mutation_paths == ("src/owned.py",)
         (root / "README.md").write_text("unrelated unstaged input\n", encoding="utf-8")
         message_named_all = evaluate_mutation_authority(
             {
@@ -515,6 +529,20 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
         )
         assert message_named_all.status == "allowed"
         assert message_named_all.mutation_paths == ("src/owned.py",)
+        for command in configured_commits:
+            out_of_scope_configured = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                report_dir=root,
+                active_root=root,
+                environment=environment,
+                hook_spool_root=root,
+            )
+            assert out_of_scope_configured.status == "blocked"
+            assert out_of_scope_configured.reason == "mutation_scope_outside_child_receipt"
+            assert set(out_of_scope_configured.mutation_paths) == {
+                "src/owned.py",
+                "README.md",
+            }
         commit = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",
