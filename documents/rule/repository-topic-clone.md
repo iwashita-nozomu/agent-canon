@@ -88,6 +88,9 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
 - raw `git merge` / `git rebase` は writer route では使わず、integration executor が
   `repository_topic_clone.py merge-main`、`finalize-merge`、`resume-merge` を通す。
+  これは選択した integration workflow の owner route です。runtime は一般の
+  `git commit` を integration executor に限定しません。path-scoped commit admission や
+  role id は、実競合レビューや finalizer の parent/tree readback の証明にはなりません。
 - task owner の非空 `--owner-evidence` と computed path、remote、branch identity が一致
   する限り、canonical `prepare` と `merge-main` は operation-level の追加承認なしで
   実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle

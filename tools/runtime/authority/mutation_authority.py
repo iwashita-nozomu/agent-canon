@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shlex
 from dataclasses import dataclass
@@ -77,6 +78,10 @@ SHELL_ANALYSIS_MAX_DEPTH = 32
 UNRESOLVED_SHELL_PATH = "/__agent_canon_unresolved_shell_path__"
 GIT_NON_PATH_VALUE_OPTIONS = frozenset(
     {
+        "-C",
+        "-c",
+        "-F",
+        "-t",
         "-m",
         "--message",
         "--author",
@@ -85,11 +90,27 @@ GIT_NON_PATH_VALUE_OPTIONS = frozenset(
         "--reedit-message",
         "--fixup",
         "--squash",
-        "--gpg-sign",
         "--format",
         "--pretty",
         "--date",
         "--output",
+        "--file",
+        "--template",
+        "--trailer",
+    }
+)
+GIT_SHORT_VALUE_OPTIONS = frozenset({"C", "F", "c", "m", "t"})
+GIT_COMMIT_PATHSPEC_FILE_OPTIONS = frozenset(
+    {"--pathspec-from-file", "--pathspec-file-nul"}
+)
+GIT_COMMIT_REPOSITORY_REDIRECT_ENV = frozenset(
+    {
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+        "GIT_DIR",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_WORK_TREE",
     }
 )
 GIT_OUTPUT_SUBCOMMANDS = frozenset({"archive", "diff", "log", "show"})
@@ -200,13 +221,14 @@ def _command_segments(command: str) -> tuple[tuple[str, ...], ...]:
     return tuple(tuple(segment) for segment in segments if segment)
 
 
-def _backtick_bodies(command: str) -> tuple[tuple[str, ...], bool]:
+def _backtick_bodies(command: str) -> tuple[tuple[tuple[int, str], ...], bool]:
     """Extract executable backtick substitutions without treating literals as code."""
-    bodies: list[str] = []
+    bodies: list[tuple[int, str]] = []
     current: list[str] | None = None
+    body_start = 0
     single_quoted = False
     escaped = False
-    for character in command:
+    for offset, character in enumerate(command):
         if escaped:
             if current is not None:
                 current.append(character)
@@ -225,8 +247,9 @@ def _backtick_bodies(command: str) -> tuple[tuple[str, ...], bool]:
         if character == "`" and not single_quoted:
             if current is None:
                 current = []
+                body_start = offset + 1
             else:
-                bodies.append("".join(current))
+                bodies.append((body_start, "".join(current)))
                 current = None
             continue
         if current is not None:
@@ -307,68 +330,264 @@ def _command_index(segment: tuple[str, ...]) -> int | None:
     return None
 
 
-def _git_subcommand(git_args: tuple[str, ...]) -> tuple[str, tuple[str, ...]]:
-    """Find a Git subcommand while consuming global options with their values."""
+def _git_subcommand(
+    git_args: tuple[str, ...],
+) -> tuple[tuple[str, ...], str, tuple[str, ...]]:
+    """Return Git global options and the selected subcommand/arguments."""
     index = 0
-    value_options = {"-C", "--git-dir", "--work-tree", "-c", "--config-env"}
+    global_options: list[str] = []
+    value_options = {
+        "-C",
+        "--config-env",
+        "--exec-path",
+        "--git-dir",
+        "--namespace",
+        "--work-tree",
+        "-c",
+    }
     while index < len(git_args):
         token = git_args[index]
         if token == "--":
+            global_options.append(token)
             index += 1
             break
         if token in value_options:
+            if index + 1 >= len(git_args):
+                return tuple((*global_options, token)), "", ()
+            global_options.extend((token, git_args[index + 1]))
             index += 2
             continue
-        if any(token.startswith(option + "=") for option in value_options):
+        if any(
+            token.startswith(option + "=")
+            for option in value_options
+            if option.startswith("--")
+        ):
+            global_options.append(token)
+            index += 1
+            continue
+        if token.startswith(("-C", "-c")) and len(token) > 2:
+            global_options.append(token)
             index += 1
             continue
         if token.startswith("-"):
+            global_options.append(token)
             index += 1
             continue
         break
     if index >= len(git_args):
-        return "", ()
-    return git_args[index], git_args[index + 1 :]
+        return tuple(global_options), "", ()
+    return tuple(global_options), git_args[index], git_args[index + 1 :]
+
+
+def _git_process_environment(
+    overrides: Mapping[str, str | None],
+) -> dict[str, str]:
+    """Project the current process environment plus decoded shell assignments."""
+    result = os.environ.copy()
+    for name, value in overrides.items():
+        if value is None:
+            result.pop(name, None)
+        else:
+            result[name] = value
+    return result
+
+
+def _git_command_environment(
+    segment: tuple[str, ...],
+    command_index: int,
+    inherited_overrides: Mapping[str, str | None],
+) -> dict[str, str | None]:
+    """Carry parsed shell assignments into the same Git context probes."""
+    overrides = dict(inherited_overrides)
+    for token in segment[:command_index]:
+        name, separator, value = token.partition("=")
+        if separator and SHELL_ASSIGNMENT_RE.match(token):
+            overrides[name] = value
+    return overrides
+
+
+def _git_environment_before_backtick(
+    command_prefix: str,
+    inherited_overrides: Mapping[str, str | None],
+) -> dict[str, str | None] | None:
+    """Reuse parsed shell segments to carry only environment changes before a substitution."""
+    overrides = dict(inherited_overrides)
+    if not command_prefix.strip():
+        return overrides
+    sentinel = "__agent_canon_env_probe__"
+    while sentinel in command_prefix:
+        sentinel += "_"
+    probe_segments = _command_segments(f"{command_prefix} {sentinel}")
+    prefix_segments = _command_segments(command_prefix)
+    if not probe_segments or (command_prefix.strip() and not prefix_segments):
+        return None
+    ends_after_separator = probe_segments[-1] == (sentinel,)
+    for index, segment in enumerate(prefix_segments):
+        command_index = _command_index(segment)
+        if command_index is None:
+            if any(token not in SHELL_CONTROL_TOKENS for token in segment):
+                return None
+            continue
+        verb = command_basename(segment[command_index])
+        is_current_segment = (
+            index == len(prefix_segments) - 1 and not ends_after_separator
+        )
+        if is_current_segment:
+            for token in segment[:command_index]:
+                name, separator, value = token.partition("=")
+                if separator and SHELL_ASSIGNMENT_RE.match(token):
+                    overrides[name] = value
+        elif verb == "export":
+            for token in segment[command_index + 1 :]:
+                name, separator, value = token.partition("=")
+                if separator and SHELL_ASSIGNMENT_RE.match(token):
+                    overrides[name] = value
+        elif verb == "unset":
+            for token in segment[command_index + 1 :]:
+                if SHELL_ASSIGNMENT_RE.match(f"{token}="):
+                    overrides[token] = None
+    return overrides
 
 
 def _git_repository_redirect(
-    git_args: tuple[str, ...],
+    global_options: tuple[str, ...],
+    subcommand: str,
     *,
     cwd: Path,
     active_root: Path | None,
+    environment_overrides: Mapping[str, str | None],
 ) -> tuple[tuple[str, ...], str | None]:
-    """Find Git options that redirect work-tree or repository metadata."""
-    paths: list[str] = []
+    """Bind option-bearing or mutating Git invocations to the active checkout."""
+    context_options = {
+        "-C",
+        "--config-env",
+        "--git-dir",
+        "--namespace",
+        "--work-tree",
+        "-c",
+    }
+    needs_binding = subcommand == "commit" or any(
+        token in context_options
+        or token.startswith(("-C", "-c")) and len(token) > 2
+        or token.startswith(("--config-env=", "--git-dir=", "--namespace=", "--work-tree="))
+        for token in global_options
+    )
+    if not needs_binding:
+        return (), None
+    if active_root is None:
+        return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
+
     index = 0
-    for index, token in enumerate(git_args):
-        option: str | None = None
+    while index < len(global_options):
+        token = global_options[index]
         value: str | None = None
         if token in {"--git-dir", "--work-tree"}:
-            option = token
-            if index + 1 >= len(git_args):
-                return tuple(paths), "git_repository_redirect_unresolved"
-            value = git_args[index + 1]
-        elif token.startswith("--git-dir="):
-            option, value = "--git-dir", token.removeprefix("--git-dir=")
-        elif token.startswith("--work-tree="):
-            option, value = "--work-tree", token.removeprefix("--work-tree=")
-        if option is None or value is None:
+            if index + 1 >= len(global_options):
+                return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
+            value = global_options[index + 1]
+            if not value:
+                return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
+            normalized, _outside = _shell_path(
+                value, cwd=cwd, active_root=active_root
+            )
+            return (normalized,), "git_repository_redirect"
+        if token.startswith(("--git-dir=", "--work-tree=")):
+            _option, value = token.split("=", maxsplit=1)
+            if not value:
+                return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
+            normalized, _outside = _shell_path(
+                value, cwd=cwd, active_root=active_root
+            )
+            return (normalized,), "git_repository_redirect"
+        if token == "-C":
+            if index + 1 >= len(global_options):
+                return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
+            value = global_options[index + 1]
+            index += 2
+        elif token.startswith("-C") and len(token) > 2:
+            value = token[2:]
+            index += 1
+        elif token in {
+            "--config-env",
+            "--exec-path",
+            "--git-dir",
+            "--namespace",
+            "--work-tree",
+            "-c",
+        }:
+            index += 2
+            continue
+        else:
+            index += 1
+        if value is None:
             continue
         if not value:
-            return tuple(paths), "git_repository_redirect_unresolved"
-        normalized, _outside = _shell_path(value, cwd=cwd, active_root=active_root)
-        paths.append(normalized)
-        return tuple(paths), "git_repository_redirect"
-    return tuple(paths), None
+            return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
+        normalized, outside = _shell_path(value, cwd=cwd, active_root=active_root)
+        if outside or normalized != ".":
+            return (normalized,), "git_repository_redirect"
+
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(cwd),
+            *global_options,
+            "rev-parse",
+            "--show-toplevel",
+        ],
+        check=False,
+        capture_output=True,
+        env=_git_process_environment(environment_overrides),
+    )
+    if result.returncode != 0:
+        return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
+    try:
+        observed_root = Path(os.fsdecode(result.stdout.rstrip(b"\n"))).resolve(
+            strict=False
+        )
+        expected_root = active_root.resolve(strict=False)
+    except (OSError, RuntimeError):
+        return (UNRESOLVED_SHELL_PATH,), "git_repository_redirect_unresolved"
+    if observed_root != expected_root:
+        return (str(observed_root),), "git_repository_redirect"
+    return (), None
 
 
 def _git_mutation_paths(
+    subcommand: str,
+    global_options: tuple[str, ...],
+    sub_args: tuple[str, ...],
+    *,
+    cwd: Path,
+    active_root: Path | None,
+    segment: tuple[str, ...],
+    command_index: int,
+    git_environment_overrides: Mapping[str, str | None],
+) -> tuple[str, ...]:
+    """Return Git mutation inputs without treating option values as paths."""
+    if subcommand == "commit":
+        if _git_commit_repository_redirected(
+            segment, command_index, git_environment_overrides
+        ):
+            return (UNRESOLVED_SHELL_PATH,)
+        return _git_commit_mutation_paths(
+            global_options,
+            sub_args,
+            cwd=cwd,
+            active_root=active_root,
+            environment_overrides=git_environment_overrides,
+        )
+    return _git_argument_paths(sub_args, cwd=cwd, active_root=active_root)
+
+
+def _git_argument_paths(
     sub_args: tuple[str, ...],
     *,
     cwd: Path,
     active_root: Path | None,
 ) -> tuple[str, ...]:
-    """Return Git path operands without treating option values as paths."""
+    """Return explicit Git path operands without treating option values as paths."""
     paths: list[str] = []
     skip_value = False
     after_separator = False
@@ -387,10 +606,178 @@ def _git_mutation_paths(
             continue
         if any(token.startswith(option + "=") for option in GIT_NON_PATH_VALUE_OPTIONS):
             continue
+        if token.startswith("-") and not token.startswith("--") and token != "-":
+            short_options = token[1:]
+            value_index = next(
+                (
+                    index
+                    for index, option in enumerate(short_options)
+                    if option in GIT_SHORT_VALUE_OPTIONS
+                ),
+                None,
+            )
+            if value_index is not None and value_index == len(short_options) - 1:
+                skip_value = True
+            continue
         if token.startswith("-"):
             continue
         paths.append(_shell_path(token, cwd=cwd, active_root=active_root)[0])
     return tuple(paths)
+
+
+def _git_name_only_paths(
+    cwd: Path,
+    *,
+    global_options: tuple[str, ...],
+    active_root: Path | None,
+    environment_overrides: Mapping[str, str | None],
+    cached: bool,
+    base: str | None = None,
+) -> tuple[str, ...]:
+    """Read native Git paths selected by an index/worktree comparison."""
+    args = ["diff"]
+    if cached:
+        args.append("--cached")
+    if base is not None:
+        args.append(base)
+    args.extend(("--name-only", "-z", "--no-renames"))
+    result = subprocess.run(
+        ["git", "-C", str(cwd), *global_options, *args],
+        check=False,
+        capture_output=True,
+        env=_git_process_environment(environment_overrides),
+    )
+    if result.returncode != 0:
+        return (UNRESOLVED_SHELL_PATH,)
+    return tuple(
+        _shell_path(os.fsdecode(path), cwd=cwd, active_root=active_root)[0]
+        for path in result.stdout.split(b"\0")
+        if path
+    )
+
+
+def _git_has_option(
+    arguments: tuple[str, ...], long_option: str, short_option: str | None = None
+) -> bool:
+    """Find a Git option without scanning an earlier option value as another flag."""
+    index = 0
+    while index < len(arguments):
+        token = arguments[index]
+        if token == "--":
+            return False
+        if token in GIT_NON_PATH_VALUE_OPTIONS:
+            index += 2
+            continue
+        if token.startswith("--"):
+            if token == long_option or token.startswith(f"{long_option}="):
+                return True
+            index += 1
+            continue
+        if token.startswith("-") and token != "-":
+            short_options = token[1:]
+            for short_flag in short_options:
+                if short_flag == short_option:
+                    return True
+                if short_flag in GIT_SHORT_VALUE_OPTIONS:
+                    break
+        index += 1
+    return False
+
+
+def _git_commit_uses_pathspec_file(arguments: tuple[str, ...]) -> bool:
+    """Fail closed when commit paths are supplied by an uninspected file."""
+    index = 0
+    while index < len(arguments):
+        token = arguments[index]
+        if token == "--":
+            return False
+        if token in GIT_NON_PATH_VALUE_OPTIONS:
+            index += 2
+            continue
+        if any(
+            token.startswith(f"{option}=")
+            for option in GIT_NON_PATH_VALUE_OPTIONS
+        ):
+            index += 1
+            continue
+        if token in GIT_COMMIT_PATHSPEC_FILE_OPTIONS or any(
+            token.startswith(f"{option}=")
+            for option in GIT_COMMIT_PATHSPEC_FILE_OPTIONS
+        ):
+            return True
+        index += 1
+    return False
+
+
+def _git_commit_repository_redirected(
+    segment: tuple[str, ...],
+    command_index: int,
+    environment_overrides: Mapping[str, str | None],
+) -> bool:
+    """Reject a commit that redirects Git metadata or object input/output."""
+    if any(
+        name in GIT_COMMIT_REPOSITORY_REDIRECT_ENV and value is not None
+        for name, value in environment_overrides.items()
+    ):
+        return True
+    for token in segment[:command_index]:
+        name, separator, _value = token.partition("=")
+        if separator and name in GIT_COMMIT_REPOSITORY_REDIRECT_ENV:
+            return True
+    return False
+
+
+def _git_commit_mutation_paths(
+    global_options: tuple[str, ...],
+    sub_args: tuple[str, ...],
+    *,
+    cwd: Path,
+    active_root: Path | None,
+    environment_overrides: Mapping[str, str | None],
+) -> tuple[str, ...]:
+    """Scope commit writes to the paths in the native index and selected worktree input."""
+    if _git_commit_uses_pathspec_file(sub_args):
+        return (UNRESOLVED_SHELL_PATH,)
+
+    path_arguments = _git_argument_paths(
+        sub_args, cwd=cwd, active_root=active_root
+    )
+    if UNRESOLVED_SHELL_PATH in path_arguments:
+        return path_arguments
+
+    amend = _git_has_option(sub_args, "--amend")
+    include_all = any(
+        _git_has_option(sub_args, long_option, short_option)
+        for long_option, short_option in (
+            ("--all", "a"),
+            ("--include", "i"),
+            ("--interactive", "i"),
+            ("--patch", "p"),
+        )
+    )
+    if path_arguments and not include_all and not amend:
+        return tuple(dict.fromkeys(path_arguments))
+
+    staged_paths = _git_name_only_paths(
+        cwd,
+        global_options=global_options,
+        active_root=active_root,
+        environment_overrides=environment_overrides,
+        cached=True,
+        base="HEAD^" if amend else None,
+    )
+    paths = [*staged_paths, *path_arguments]
+    if include_all:
+        paths.extend(
+            _git_name_only_paths(
+                cwd,
+                global_options=global_options,
+                active_root=active_root,
+                environment_overrides=environment_overrides,
+                cached=False,
+            )
+        )
+    return tuple(dict.fromkeys(paths))
 
 
 def _git_output_paths(
@@ -458,6 +845,7 @@ def _bash_mutation_inner(
     active_root: Path | None,
     cwd: Path,
     depth: int,
+    inherited_git_environment_overrides: Mapping[str, str | None] | None = None,
 ) -> tuple[bool, tuple[str, ...], str]:
     if depth > SHELL_ANALYSIS_MAX_DEPTH:
         return True, (), "shell_wrapper_unparseable_depth"
@@ -467,17 +855,35 @@ def _bash_mutation_inner(
     paths: list[str] = []
     reasons: list[str] = []
     mutation = False
+    git_environment_overrides = dict(inherited_git_environment_overrides or {})
 
     backticks, unterminated_backtick = _backtick_bodies(command)
     if unterminated_backtick:
         mutation = True
         reasons.append("shell_wrapper_unparseable_backtick")
-    for body in backticks:
+    for body_start, body in backticks:
+        substitution_environment = _git_environment_before_backtick(
+            command[:body_start], git_environment_overrides
+        )
+        if substitution_environment is None:
+            nested_mutation, _nested_paths, _nested_reason = _bash_mutation_inner(
+                body,
+                active_root=active_root,
+                cwd=cwd,
+                depth=depth + 1,
+                inherited_git_environment_overrides=git_environment_overrides,
+            )
+            if nested_mutation:
+                mutation = True
+                paths.append(UNRESOLVED_SHELL_PATH)
+                reasons.append("shell_substitution_environment_unresolved")
+            continue
         nested_mutation, nested_paths, nested_reason = _bash_mutation_inner(
             body,
             active_root=active_root,
             cwd=cwd,
             depth=depth + 1,
+            inherited_git_environment_overrides=substitution_environment,
         )
         mutation = mutation or nested_mutation
         paths.extend(nested_paths)
@@ -504,6 +910,51 @@ def _bash_mutation_inner(
                 reasons.append("command_missing")
             continue
         verb = segment[command_index]
+        if verb.startswith("-") and any(
+            command_basename(token) == "env" for token in segment[:command_index]
+        ):
+            env_prefix = segment[:command_index]
+            git_index = next(
+                (
+                    index
+                    for index, token in enumerate(segment[command_index + 1 :], command_index + 1)
+                    if command_basename(token) == "git"
+                ),
+                None,
+            )
+            split_string = any(
+                token in {"-S", "--split-string"}
+                or token.startswith("--split-string=")
+                for token in env_prefix
+            )
+            if split_string or git_index is None:
+                mutation = True
+                paths.append(UNRESOLVED_SHELL_PATH)
+                reasons.append("shell_wrapper_unparseable_env")
+                continue
+            _git_options, env_git_subcommand, _env_git_args = _git_subcommand(
+                segment[git_index + 1 :]
+            )
+            if env_git_subcommand not in READONLY_GIT_SUBCOMMANDS or env_git_subcommand in {
+                "branch",
+                "stash",
+                "worktree",
+            }:
+                mutation = True
+                paths.append(UNRESOLVED_SHELL_PATH)
+                reasons.append("shell_wrapper_unparseable_env")
+                continue
+        if verb == "export":
+            for token in segment[command_index + 1 :]:
+                name, separator, value = token.partition("=")
+                if separator and SHELL_ASSIGNMENT_RE.match(token):
+                    git_environment_overrides[name] = value
+            continue
+        if verb == "unset":
+            for token in segment[command_index + 1 :]:
+                if SHELL_ASSIGNMENT_RE.match(f"{token}="):
+                    git_environment_overrides[token] = None
+            continue
         if verb == "cd":
             operands = [token for token in segment[command_index + 1 :] if token != "--"]
             if not operands or len(operands) > 1 or operands[0].startswith("-"):
@@ -524,15 +975,22 @@ def _bash_mutation_inner(
             continue
         if verb == "git":
             git_args = segment[command_index + 1 :]
+            global_options, subcommand, sub_args = _git_subcommand(git_args)
+            command_environment = _git_command_environment(
+                segment, command_index, git_environment_overrides
+            )
             redirect_paths, redirect_reason = _git_repository_redirect(
-                git_args, cwd=cwd, active_root=active_root
+                global_options,
+                subcommand,
+                cwd=cwd,
+                active_root=active_root,
+                environment_overrides=command_environment,
             )
             if redirect_reason is not None:
                 mutation = True
                 paths.extend(redirect_paths)
                 reasons.append(redirect_reason)
                 continue
-            subcommand, sub_args = _git_subcommand(git_args)
             output_paths, output_reason = _git_output_paths(
                 subcommand,
                 sub_args,
@@ -595,9 +1053,14 @@ def _bash_mutation_inner(
             mutation = True
             paths.extend(
                 _git_mutation_paths(
+                    subcommand or "",
+                    global_options,
                     sub_args,
                     cwd=cwd,
                     active_root=active_root,
+                    segment=segment,
+                    command_index=command_index,
+                    inherited_git_environment_overrides=command_environment,
                 )
             )
             reasons.append(f"git_{subcommand or 'unknown'}")
@@ -626,6 +1089,7 @@ def _bash_mutation_inner(
                 active_root=active_root,
                 cwd=cwd,
                 depth=depth + 1,
+                inherited_git_environment_overrides=git_environment_overrides,
             )
             mutation = mutation or nested_mutation
             paths.extend(nested_paths)
@@ -859,6 +1323,17 @@ def evaluate_mutation_authority(
         tool_input,
         active_root=active_root,
     )
+    if reason == "git_commit" and any(
+        environment.get(name, "").strip()
+        for name in GIT_COMMIT_REPOSITORY_REDIRECT_ENV
+    ):
+        return MutationAuthorityDecision(
+            "blocked",
+            "git_commit_repository_input_redirect_forbidden",
+            True,
+            mutation_paths=paths,
+            command_sha256=command_sha,
+        )
     if not mutation:
         return MutationAuthorityDecision("not_applicable", reason, False)
     command_value = ""
@@ -1035,8 +1510,7 @@ def evaluate_mutation_authority(
                 evidence_ref,
                 command_sha,
             )
-    target_metadata_only = writer_target is not None and reason == "git_commit"
-    if not canonical_lifecycle and not target_metadata_only and (
+    if not canonical_lifecycle and (
         not paths
         or not all(
             _allowed_path(path, active_root, allowed_files, allowed_directories)

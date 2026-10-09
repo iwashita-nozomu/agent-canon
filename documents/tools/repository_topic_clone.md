@@ -79,6 +79,6 @@ python3 tools/repository/workspace/repository_topic_clone.py finalize-merge \
 # `resume-merge` is an alias for `finalize-merge`.
 ```
 
-保持を明示した `expected_blob`、`hunk_identity`、`expected_gitlink` の消失・不一致は引き続き
-拒否します。plan の identity と inventory の path coverage、未解決 index の検出も維持します。
-この意味は単独の `validate` と、それを呼ぶ `finalize-merge` / `resume-merge` で共通です。
+`finalize-merge` は native Git index の未解決 entry を拒否し、resolved index tree と
+`MERGE_HEAD` を親とする commit を確認します。必要な競合判断は integration owner が実際の
+競合をレビューして行い、独自planや別checkerは要求しません。

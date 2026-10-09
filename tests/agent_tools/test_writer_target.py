@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -105,6 +106,35 @@ def write_identity(root: Path, role_id: str = "implementer") -> None:
     packet_path = root / ".agent-canon" / "writer-target.json"
     packet_path.parent.mkdir(parents=True, exist_ok=True)
     packet_path.write_text(json.dumps(packet, sort_keys=True), encoding="utf-8")
+
+
+def git(root: Path, *args: str) -> str:
+    """Run one Git fixture command and return its standard output."""
+    result = subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def init_writer_git_repo(root: Path) -> None:
+    """Create the target branch and one committed in-scope file."""
+    subprocess.run(
+        ["git", "-C", str(root), "init", "-q", "-b", "fix/942"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    git(root, "config", "user.name", "Test")
+    git(root, "config", "user.email", "test@example.invalid")
+    owned = root / "src" / "owned.py"
+    owned.parent.mkdir(parents=True, exist_ok=True)
+    owned.write_text("base\n", encoding="utf-8")
+    (root / "README.md").write_text("base readme\n", encoding="utf-8")
+    git(root, "add", "src/owned.py", "README.md")
+    git(root, "commit", "-m", "base")
 
 
 def test_shared_checkout_writer_targets_are_rejected_before_spawn() -> None:
@@ -402,6 +432,10 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         write_identity(root)
+        init_writer_git_repo(root)
+        owned = root / "src" / "owned.py"
+        owned.write_text("owned update\n", encoding="utf-8")
+        git(root, "add", "src/owned.py")
         environment = {
             **WriterTarget(
                 str(root),
@@ -429,6 +463,40 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
             hook_spool_root=root,
         )
         assert escaped.reason == "mutation_scope_outside_child_receipt"
+        for command in (
+            "env git -C /tmp/other/repo commit -m update",
+            "env git -C/tmp/other/repo commit -m update",
+            "command git -C /tmp/other/repo commit -m update",
+            "env git -c core.worktree=/tmp/other/repo commit -am update",
+            "command git -c core.worktree=/tmp/other/repo commit -am update",
+            (
+                "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.worktree "
+                "GIT_CONFIG_VALUE_0=/tmp/other/repo git commit -am update"
+            ),
+            (
+                "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.worktree "
+                "GIT_CONFIG_VALUE_0=/tmp/other/repo && git commit -am update"
+            ),
+            (
+                "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.worktree "
+                "GIT_CONFIG_VALUE_0=/tmp/other/repo && "
+                "bash -c 'git commit -am update'"
+            ),
+            (
+                "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.worktree "
+                "GIT_CONFIG_VALUE_0=/tmp/other/repo && "
+                "echo `git commit -am update`"
+            ),
+        ):
+            redirected = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                report_dir=root,
+                active_root=root,
+                environment=environment,
+                hook_spool_root=root,
+            )
+            assert redirected.status == "blocked"
+            assert redirected.reason == "writer_target_git_repository_redirect_forbidden"
         commit = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",
@@ -440,6 +508,39 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
             hook_spool_root=root,
         )
         assert commit.status == "allowed"
+        assert commit.mutation_paths == ("src/owned.py",)
+        (root / "README.md").write_text("unrelated staged input\n", encoding="utf-8")
+        git(root, "add", "README.md")
+        out_of_scope_commit = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git commit -qm update"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert out_of_scope_commit.status == "blocked"
+        assert out_of_scope_commit.reason == "mutation_scope_outside_child_receipt"
+        assert set(out_of_scope_commit.mutation_paths) == {
+            "src/owned.py",
+            "README.md",
+        }
+        selected_commit = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "git commit --only -m selected -- src/owned.py"
+                },
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert selected_commit.status == "allowed"
+        assert selected_commit.mutation_paths == ("src/owned.py",)
         switch = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",
@@ -601,11 +702,15 @@ def test_writer_rejects_unresolved_shell_path_tokens(command: str) -> None:
         assert decision.status == "blocked"
 
 
-def test_writer_does_not_treat_git_commit_message_as_a_path() -> None:
-    """Shell expansion in a non-path Git option value is not scope evidence."""
+def test_writer_commit_scope_uses_staged_paths_not_message_values() -> None:
+    """A commit is scoped by its staged path set, not its message value."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         write_identity(root)
+        init_writer_git_repo(root)
+        owned = root / "src" / "owned.py"
+        owned.write_text("message should not become a path\n", encoding="utf-8")
+        git(root, "add", "src/owned.py")
         decision = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",
@@ -621,7 +726,133 @@ def test_writer_does_not_treat_git_commit_message_as_a_path() -> None:
             hook_spool_root=root,
         )
         assert decision.status == "allowed"
-        assert decision.mutation_paths == ()
+        assert decision.mutation_paths == ("src/owned.py",)
+        (root / "README.md").write_text("worktree input outside scope\n", encoding="utf-8")
+        all_tracked = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git commit -am update"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert all_tracked.status == "blocked"
+        assert set(all_tracked.mutation_paths) == {"src/owned.py", "README.md"}
+        alternate_index = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "GIT_INDEX_FILE=/tmp/alternate-index git commit -m update"
+                },
+            },
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert alternate_index.status == "blocked"
+        exported_index = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "export GIT_INDEX_FILE=/tmp/alternate-index && git commit -m update"
+                },
+            },
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert exported_index.status == "blocked"
+        redirected_environment = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git commit -m update"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+                "GIT_INDEX_FILE": "/tmp/alternate-index",
+            },
+            hook_spool_root=root,
+        )
+        assert redirected_environment.status == "blocked"
+        assert (
+            redirected_environment.reason
+            == "git_commit_repository_input_redirect_forbidden"
+        )
+
+
+def test_writer_commit_scope_uses_native_merge_index_paths() -> None:
+    """A captured merge uses the same writer path scope as a normal commit."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        init_writer_git_repo(root)
+        owned = root / "src" / "owned.py"
+        git(root, "branch", "incoming")
+        git(root, "checkout", "incoming")
+        owned.write_text("incoming change\n", encoding="utf-8")
+        git(root, "add", "src/owned.py")
+        git(root, "commit", "-m", "incoming change")
+        git(root, "checkout", "fix/942")
+        owned.write_text("candidate change\n", encoding="utf-8")
+        git(root, "add", "src/owned.py")
+        git(root, "commit", "-m", "candidate change")
+        merge = subprocess.run(
+            ["git", "-C", str(root), "merge", "--no-commit", "--no-ff", "incoming"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert merge.returncode != 0
+        assert git(root, "rev-parse", "MERGE_HEAD")
+        owned.write_text("reviewed resolution\n", encoding="utf-8")
+        git(root, "add", "src/owned.py")
+        environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        allowed = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": "git commit --no-edit"}},
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert allowed.status == "allowed"
+        assert allowed.mutation_paths == ("src/owned.py",)
+
+        (root / "README.md").write_text("outside writer scope\n", encoding="utf-8")
+        git(root, "add", "README.md")
+        outside_scope = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": "git commit --no-edit"}},
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert outside_scope.status == "blocked"
+        assert outside_scope.reason == "mutation_scope_outside_child_receipt"
+        assert set(outside_scope.mutation_paths) == {"src/owned.py", "README.md"}
 
 
 @pytest.mark.parametrize(
