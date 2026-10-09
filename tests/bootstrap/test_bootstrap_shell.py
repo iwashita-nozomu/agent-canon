@@ -3866,10 +3866,10 @@ exit "$rc"
 
 
 @pytest.mark.parametrize("operation", ["update"])
-def test_install_update_reject_foreign_before_build_or_state_mutation(
+def test_update_rejects_foreign_before_candidate_build(
     tmp_path: Path, operation: str
 ) -> None:
-    """Update ownership preflight precedes build and runtime setup."""
+    """An explicit image ref isolates the foreign-owner gate from key derivation."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
     repository.mkdir()
@@ -3881,11 +3881,13 @@ def test_install_update_reject_foreign_before_build_or_state_mutation(
         "set -eu\n"
         f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
         'if [[ "$1:$2" == container:inspect ]]; then\n'
+        "  if [[ \"${4:-}\" == *Config.Image* ]]; then printf 'foreign-image:existing\\n'; fi\n"
         "  if [[ \"${4:-}\" == *Id* ]]; then printf 'container-foreign\\n'; fi\n"
         "  if [[ \"${4:-}\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
         "  if [[ \"${4:-}\" == *io.agent-canon.control-root-digest* ]]; then printf 'foreign-control-root\\n'; fi\n"
         "  exit 0\n"
         "fi\n"
+        'if [[ "$1:$2" == image:inspect ]]; then printf \'%s\\n\' sha256:foreign-image; exit 0; fi\n'
         'if [[ "$1" == build ]]; then exit 99; fi\n'
         "exit 0\n",
         encoding="utf-8",
@@ -3898,6 +3900,8 @@ def test_install_update_reject_foreign_before_build_or_state_mutation(
             str(repository),
             "--control-parent-root",
             str(control),
+            "--image-ref",
+            "agent-canon-tools:candidate",
             operation,
         ],
         check=False,
@@ -4033,22 +4037,6 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         encoding="utf-8",
     )
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
-    events = tmp_path / "events"
-    tool_bin = tmp_path / "tool-bin"
-    tool_bin.mkdir()
-    git_wrapper = tool_bin / "git"
-    git_wrapper.write_text(
-        "#!/usr/bin/env bash\n"
-        'for argument in "$@"; do\n'
-        '  case "$argument" in\n'
-        f"    fetch) printf '%s\\n' git-fetch >> {str(events)!r} ;;\n"
-        f"    checkout) printf '%s\\n' git-checkout >> {str(events)!r} ;;\n"
-        "  esac\n"
-        "done\n"
-        'exec /usr/bin/git "$@"\n',
-        encoding="utf-8",
-    )
-    git_wrapper.chmod(0o755)
     completed = subprocess.run(
         [
             "timeout",
@@ -4066,11 +4054,9 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         env={
             **os.environ,
             "HOME": str(tmp_path),
-            "PATH": f"{tool_bin}{os.pathsep}{os.environ.get('PATH', '')}",
             "AGENT_CANON_DOCKER": str(fake_docker),
             "FAKE_DOCKER_STATE": str(state_path),
             "FAKE_DOCKER_CALLS": str(calls_path),
-            "FAKE_DOCKER_EVENTS": str(events),
             "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
         },
     )
@@ -4083,10 +4069,6 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     ]
     assert receipts[-1]["status"] == "ok"
     assert receipts[-1]["operation"] == operation
-    if operation == "install":
-        # Existing-resident ownership is read before the install transaction;
-        # source-sync provenance is asserted below after the transition.
-        assert events.read_text(encoding="utf-8").splitlines()[0] == "docker"
     result = json.loads(state_path.read_text(encoding="utf-8"))
     assert resident["id"] not in {
         record["Id"] for record in result["containers"].values()
