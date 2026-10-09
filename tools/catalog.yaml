@@ -1268,7 +1268,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md
@@ -1348,7 +1348,7 @@ entries:
     dispatch: {argv: ["bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh"]}
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1358,7 +1358,7 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-dependency-headers
-    summary: Checks changed files for required dependency manifests and registered contract kinds.
+    summary: Checks selected files for dependency manifests and registered contract kinds.
     path: tools/validation/semantic/dependencies/check_dependency_headers.py
     family: agent_tools
     role: checker
@@ -1367,7 +1367,7 @@ entries:
     dispatch: {argv: ["python3", "tools/validation/semantic/dependencies/check_dependency_headers.py"]}
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md

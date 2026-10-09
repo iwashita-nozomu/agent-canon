@@ -137,12 +137,12 @@ Let `O(r)` be the set of observed identities in run `r`, `N(r)` the explicit
 no-event count, and `terminal(o)` mean that the latest valid state of `o` is
 terminal. Coverage is complete exactly when:
 
-```text
-coverage(r) =
-  (N(r) = 1 and |O(r)| = 0)
-  or
-  (N(r) = 0 and |O(r)| > 0 and for all o in O(r): terminal(o))
-```
+$$
+\operatorname{coverage}(r) =
+  (N(r) = 1 \land |O(r)| = 0)
+  \lor
+  (N(r) = 0 \land |O(r)| > 0 \land \forall o \in O(r): \operatorname{terminal}(o))
+$$
 
 The current-run behavior gate is green only when schema, token transport,
 identity, sequence, transition, and coverage checks all pass.
