@@ -251,7 +251,9 @@ def test_codex_prepare_places_config_at_code_home_root(tmp_path: Path) -> None:
     manager.codex_prepare()
     config_link = manager.paths.codex_home / "config.toml"
     assert config_link.is_symlink()
-    assert config_link.resolve() == (ROOT / ".codex" / "config.toml").resolve()
+    assert config_link.resolve() == (
+        manager.repository_root / ".codex" / "config.toml"
+    ).resolve()
     assert not (manager.paths.codex_home / "config" / "config.toml").exists()
 
 
