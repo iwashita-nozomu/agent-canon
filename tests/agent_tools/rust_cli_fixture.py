@@ -37,9 +37,7 @@ def standalone_agent_canon() -> Path:
     boundary = runtime_artifact_boundary(
         PROJECT_ROOT, os.environ.get("AGENT_CANON_RUNTIME_ROOT"), create=True
     )
-    build_root = Path(
-        tempfile.mkdtemp(prefix="rust-cli-tests-", dir=boundary.root)
-    )
+    build_root = Path(tempfile.mkdtemp(prefix="rust-cli-tests-", dir=boundary.root))
     atexit.register(shutil.rmtree, build_root, ignore_errors=True)
 
     target_dir = build_root / "cargo-target"

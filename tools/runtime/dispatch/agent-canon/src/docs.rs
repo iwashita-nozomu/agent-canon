@@ -1627,12 +1627,7 @@ fn render_runtime_profile_inventory(path: &Path) -> Result<String, String> {
         ]);
     }
     output.push_str(&render_table(
-        &[
-            "Profile ID",
-            "Profile",
-            "Activates",
-            "Required when",
-        ],
+        &["Profile ID", "Profile", "Activates", "Required when"],
         &profile_rows,
     ));
     output.push('\n');
