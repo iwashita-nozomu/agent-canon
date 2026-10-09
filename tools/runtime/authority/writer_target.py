@@ -245,11 +245,7 @@ def materialize_writer_target_packet(
     path.parent.mkdir(parents=True, exist_ok=True)
     packet = {
         "schema": WRITER_TARGET_PACKET_SCHEMA,
-        **{
-            key: value
-            for key, value in parsed.as_dict().items()
-            if key != "schema"
-        },
+        **{key: value for key, value in parsed.as_dict().items() if key != "schema"},
         "checkout_identity": dict(checkout_identity),
     }
     path.write_text(
@@ -272,7 +268,10 @@ def read_writer_target_packet(
         raise WriterTargetError("writer_target_packet_missing") from exc
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise WriterTargetError("writer_target_packet_invalid") from exc
-    if not isinstance(value, Mapping) or value.get("schema") != WRITER_TARGET_PACKET_SCHEMA:
+    if (
+        not isinstance(value, Mapping)
+        or value.get("schema") != WRITER_TARGET_PACKET_SCHEMA
+    ):
         raise WriterTargetError("writer_target_packet_invalid")
     try:
         target = parse_writer_target(
@@ -369,7 +368,8 @@ def validate_spawn_handoff(
 
 def validate_wave_writer_targets(
     slots: Sequence[object],
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
 ) -> tuple[WriterTarget, ...]:
     """Validate role-instance slots with targets supplied by the handoff."""
     allocations: list[Mapping[str, object]] = []
@@ -381,7 +381,9 @@ def validate_wave_writer_targets(
             identity,
             targets.get(role_id, getattr(slot, "writer_target", None)),
         )
-        write_capable = bool(getattr(slot, "write_capable", False) or target is not None)
+        write_capable = bool(
+            getattr(slot, "write_capable", False) or target is not None
+        )
         allocations.append(
             {
                 "owner": identity,

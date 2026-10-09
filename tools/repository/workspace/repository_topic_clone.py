@@ -28,7 +28,10 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 try:
-    from tools.repository.git.conflict_preservation import capture_inventory, validate_plan
+    from tools.repository.git.conflict_preservation import (
+        capture_inventory,
+        validate_plan,
+    )
     from tools.runtime.authority.checkout_identity import resolve_checkout_identity
     from tools.runtime.authority.writer_target import (
         WriterTarget,
@@ -39,7 +42,10 @@ try:
         validate_writer_target_identity,
     )
 except ImportError:  # direct CLI execution
-    from tools.repository.git.conflict_preservation import capture_inventory, validate_plan
+    from tools.repository.git.conflict_preservation import (
+        capture_inventory,
+        validate_plan,
+    )
     from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
     from tools.runtime.authority.writer_target import (  # type: ignore[no-redef]
         WriterTarget,
@@ -149,7 +155,10 @@ def _ensure_writer_target_packet_ignored(clone: Path) -> None:
 
 def _run_git(repo: Path, args: Sequence[str], *, pass_fds: tuple[int, ...] = ()) -> str:
     result = subprocess.run(
-        ["git", "-C", str(repo), *args], check=False, capture_output=True, text=True,
+        ["git", "-C", str(repo), *args],
+        check=False,
+        capture_output=True,
+        text=True,
         pass_fds=pass_fds,
     )
     if result.returncode != 0:
@@ -196,11 +205,7 @@ def _ensure_worktree_config(path: Path) -> None:
 
 def _marker_config_args(checkout_mode: str) -> list[str]:
     """Return the config scope that keeps markers local to one checkout."""
-    return [
-        "--worktree"
-        if checkout_mode == CHECKOUT_MODE_LINKED
-        else "--local"
-    ]
+    return ["--worktree" if checkout_mode == CHECKOUT_MODE_LINKED else "--local"]
 
 
 @dataclass(frozen=True)
@@ -281,8 +286,7 @@ def _normalise_checkout_mode(value: str) -> str:
     """Validate the explicit checkout implementation selected by a caller."""
     if value not in CHECKOUT_MODES:
         raise RepositoryTopicCloneError(
-            "checkout_mode must be linked-worktree or independent-clone: "
-            f"{value!r}"
+            f"checkout_mode must be linked-worktree or independent-clone: {value!r}"
         )
     return value
 
@@ -424,9 +428,7 @@ def _repository_workspace_root(
     _reject_symlink_components(root, "workspace root")
     _reject_symlink_components(root / "workspace", "workspace directory")
     if not root.is_dir():
-        raise RepositoryTopicCloneError(
-            f"workspace root must be a directory: {root}"
-        )
+        raise RepositoryTopicCloneError(f"workspace root must be a directory: {root}")
     try:
         git_root = _run_git(root, ["rev-parse", "--show-toplevel"]).strip()
     except GitCommandError as exc:
@@ -527,7 +529,9 @@ def computed_clone_path(
                 "repository-topic-workspace",
             )
         workspace = _topic_root(request.workspace_root, request.topic, create=False)
-        candidate = _safe_under(workspace, workspace / request.repository, "topic clone path")
+        candidate = _safe_under(
+            workspace, workspace / request.repository, "topic clone path"
+        )
         return _resolve_parent_path(attestation, candidate, "repository-topic-clone")
     except Exception as exc:
         raise RepositoryTopicCloneError(_parent_error(exc)) from exc
@@ -604,9 +608,7 @@ def _marker_values(
     }
 
 
-def _marker_namespace_present(
-    path: Path, prefix: str, *, checkout_mode: str
-) -> bool:
+def _marker_namespace_present(path: Path, prefix: str, *, checkout_mode: str) -> bool:
     """Return whether any local config key exists in a marker namespace."""
     try:
         output = _run_git(
@@ -723,15 +725,18 @@ def _inspect(
             return CloneState(path, "checkout-mode-mismatch")
     elif _is_linked_worktree(path):
         return CloneState(path, "checkout-mode-mismatch")
-    if require_clean and _run_git(
-        path,
-        [
-            "status",
-            "--porcelain=v1",
-            "--untracked-files=all",
-            "--ignore-submodules=none",
-        ],
-    ).strip():
+    if (
+        require_clean
+        and _run_git(
+            path,
+            [
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=all",
+                "--ignore-submodules=none",
+            ],
+        ).strip()
+    ):
         return CloneState(path, "dirty-worktree-index-or-untracked")
     try:
         remote = _normalise_url(_remote_url(path))
@@ -833,9 +838,7 @@ def _update_existing_prepare_metadata(
         )
 
     checkout_identity = resolve_checkout_identity(clone).as_dict()
-    branch = _run_git(
-        clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]
-    ).strip()
+    branch = _run_git(clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]).strip()
     try:
         if packet_target is not None:
             validate_writer_target_identity(packet_target, checkout_identity)
@@ -898,9 +901,7 @@ def _update_existing_prepare_metadata(
                 return None
         _ensure_writer_target_packet_ignored(clone)
         try:
-            updated_packet = materialize_writer_target_packet(
-                target, checkout_identity
-            )
+            updated_packet = materialize_writer_target_packet(target, checkout_identity)
             updated_target, updated_identity = read_writer_target_packet(clone)
         except WriterTargetError as exc:
             raise RepositoryTopicCloneError(
@@ -919,8 +920,7 @@ def _update_existing_prepare_metadata(
         _set_marker(clone, effective_request, owner_sha=owner_sha, branch=branch)
 
     candidate_sha = _run_git(clone, ["rev-parse", branch]).strip()
-    candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]
-    ).strip()
+    candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
     clone_identity = clone.stat()
     return PrepareReceipt(
         request=effective_request,
@@ -992,9 +992,7 @@ def _ensure_branch(path: Path, remote: str, branch: str) -> str:
     return f"origin/main@{base_sha}"
 
 
-def _prepare_linked_worktree(
-    request: RepositoryTopicCloneRequest, clone: Path
-) -> str:
+def _prepare_linked_worktree(request: RepositoryTopicCloneRequest, clone: Path) -> str:
     """Create one native linked worktree from the explicit anchor root."""
     if request.parent_attestation is None:
         raise RepositoryTopicCloneError(
@@ -1006,7 +1004,9 @@ def _prepare_linked_worktree(
     if _has_local_branch(anchor, request.branch):
         add_args = ["worktree", "add", request.branch]
         add_kind = "local"
-        branch_source = f"local:{_run_git(anchor, ['rev-parse', request.branch]).strip()}"
+        branch_source = (
+            f"local:{_run_git(anchor, ['rev-parse', request.branch]).strip()}"
+        )
     elif _remote_branch_exists(remote, request.branch):
         _run_git(anchor, ["fetch", "origin", request.branch])
         add_args = [
@@ -1126,13 +1126,13 @@ def request(
         anchor_url = _normalise_url(_remote_url(repository_root))
         request_url = _normalise_url(request_state.url)
         if anchor_url != request_url:
-            raise RepositoryTopicCloneError(
-                "prepare collision: anchor-origin-mismatch"
-            )
+            raise RepositoryTopicCloneError("prepare collision: anchor-origin-mismatch")
     owner_sha = _evidence_sha256(request_state.owner_evidence)
     clone = computed_clone_path(request_state, create_topic=True)
     if request_state.parent_attestation is None:
-        raise RepositoryTopicCloneError("parent-root-attestation:boundary:attestation missing")
+        raise RepositoryTopicCloneError(
+            "parent-root-attestation:boundary:attestation missing"
+        )
     metadata_receipt = _update_existing_prepare_metadata(
         request_state, clone, owner_sha=owner_sha
     )
@@ -1169,7 +1169,10 @@ def request(
                     pass_fds=(target.target_fd,),
                 )
                 observed = os.fstat(target.target_fd)
-                if (observed.st_dev, observed.st_ino) != (target.target_dev, target.target_ino):
+                if (observed.st_dev, observed.st_ino) != (
+                    target.target_dev,
+                    target.target_ino,
+                ):
                     raise RepositoryTopicCloneError(
                         "parent-root-attestation:root_race_detected:clone target identity changed"
                     )
@@ -1190,11 +1193,14 @@ def request(
             )
     elif state.state == "ready":
         if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
-            branch_source = _marker(
-                clone,
-                "branch-source",
-                checkout_mode=request_state.checkout_mode,
-            ) or "existing"
+            branch_source = (
+                _marker(
+                    clone,
+                    "branch-source",
+                    checkout_mode=request_state.checkout_mode,
+                )
+                or "existing"
+            )
         else:
             branch_source = _ensure_branch(
                 clone, request_state.url, request_state.branch
@@ -1326,9 +1332,7 @@ def merge_main(
                 request_state.owner_evidence, request_state.workspace_root
             )
         )
-        state = _inspect(
-            existing_clone, request_state, owner_sha=current_owner_sha
-        )
+        state = _inspect(existing_clone, request_state, owner_sha=current_owner_sha)
         if state.state == "dirty-worktree-index-or-untracked":
             raise RepositoryTopicCloneError(
                 "merge-main hold: dirty-worktree-index-or-untracked"
@@ -1441,29 +1445,49 @@ def finalize_merge_main(
     merge_head = merge_result.stdout.strip()
     if not merge_head:
         raise RepositoryTopicCloneError("merge-finalize hold: merge is not in progress")
-    inventory_file = Path(inventory_path) if inventory_path is not None else clone / ".agent-canon" / "conflict-preservation.json"
-    plan_file = Path(plan_path) if plan_path is not None else clone / ".agent-canon" / "conflict-preservation-plan.json"
+    inventory_file = (
+        Path(inventory_path)
+        if inventory_path is not None
+        else clone / ".agent-canon" / "conflict-preservation.json"
+    )
+    plan_file = (
+        Path(plan_path)
+        if plan_path is not None
+        else clone / ".agent-canon" / "conflict-preservation-plan.json"
+    )
     inventory = _read_json_artifact(inventory_file, "conflict preservation inventory")
     plan = _read_json_artifact(plan_file, "conflict preservation plan")
     if not isinstance(inventory, Mapping) or not isinstance(plan, Mapping):
-        raise RepositoryTopicCloneError("merge-finalize hold: preservation packets must be objects")
+        raise RepositoryTopicCloneError(
+            "merge-finalize hold: preservation packets must be objects"
+        )
     ours_record = inventory.get("ours")
     theirs_record = inventory.get("theirs")
     if not isinstance(ours_record, Mapping) or not isinstance(theirs_record, Mapping):
-        raise RepositoryTopicCloneError("merge-finalize hold: inventory stage identities are missing")
+        raise RepositoryTopicCloneError(
+            "merge-finalize hold: inventory stage identities are missing"
+        )
     candidate_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
     if candidate_sha != ours_record.get("commit"):
-        raise RepositoryTopicCloneError("merge-finalize hold: candidate moved after inventory capture")
+        raise RepositoryTopicCloneError(
+            "merge-finalize hold: candidate moved after inventory capture"
+        )
     if merge_head != theirs_record.get("commit"):
-        raise RepositoryTopicCloneError("merge-finalize hold: merge parent moved after inventory capture")
+        raise RepositoryTopicCloneError(
+            "merge-finalize hold: merge parent moved after inventory capture"
+        )
     _run_git(clone, ["fetch", "origin", "main"])
     origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
     if origin_main_sha != theirs_record.get("commit"):
-        raise RepositoryTopicCloneError("merge-finalize hold: origin/main moved after inventory capture")
+        raise RepositoryTopicCloneError(
+            "merge-finalize hold: origin/main moved after inventory capture"
+        )
     try:
         validate_plan(inventory, plan, repo=clone)
     except (ValueError, TypeError) as exc:
-        raise RepositoryTopicCloneError(f"merge-finalize hold: preservation validation failed: {exc}") from exc
+        raise RepositoryTopicCloneError(
+            f"merge-finalize hold: preservation validation failed: {exc}"
+        ) from exc
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
     _run_git(clone, ["commit", "--no-edit"])
     merged_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
@@ -1480,7 +1504,9 @@ def finalize_merge_main(
         origin_main_sha=origin_main_sha,
     )
     if policy is not None:
-        policy.apply(operation="finalize_merge_main", request=request_state, receipt=receipt)
+        policy.apply(
+            operation="finalize_merge_main", request=request_state, receipt=receipt
+        )
     return receipt
 
 
@@ -1594,7 +1620,9 @@ def _remove_linked_worktree(
     if capability.physical_path != clone or not capability.physical_path.is_dir():
         raise RepositoryTopicCloneError("cleanup hold: clone path identity changed")
     if capability.target_dev is None or capability.target_ino is None:
-        raise RepositoryTopicCloneError("cleanup hold: clone identity receipt is missing")
+        raise RepositoryTopicCloneError(
+            "cleanup hold: clone identity receipt is missing"
+        )
     observed = clone.stat()
     if (observed.st_dev, observed.st_ino) != (
         capability.target_dev,
@@ -1695,8 +1723,12 @@ def cleanup(
                     f"cleanup hold: remote branch unavailable ({request_state.branch})"
                 ) from exc
             if remote_head != candidate_sha or remote_tree != candidate_tree:
-                raise RepositoryTopicCloneError("cleanup hold: remote branch head mismatch")
-            evidence_kind = "publication-head" if has_lifecycle_evidence else "remote-head"
+                raise RepositoryTopicCloneError(
+                    "cleanup hold: remote branch head mismatch"
+                )
+            evidence_kind = (
+                "publication-head" if has_lifecycle_evidence else "remote-head"
+            )
     else:
         _run_git(clone, ["fetch", "origin", "main"])
         origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
@@ -1739,10 +1771,17 @@ def cleanup(
             capability = _parent_boundary.resolve_parent_owned_path(
                 attestation, clone, "repository-topic-clone-cleanup", create=False
             )
-            if capability.physical_path != clone or not capability.physical_path.is_dir():
-                raise RepositoryTopicCloneError("cleanup hold: clone path identity changed")
+            if (
+                capability.physical_path != clone
+                or not capability.physical_path.is_dir()
+            ):
+                raise RepositoryTopicCloneError(
+                    "cleanup hold: clone path identity changed"
+                )
             if capability.target_dev is None or capability.target_ino is None:
-                raise RepositoryTopicCloneError("cleanup hold: clone identity receipt is missing")
+                raise RepositoryTopicCloneError(
+                    "cleanup hold: clone identity receipt is missing"
+                )
     except Exception as exc:
         if isinstance(exc, RepositoryTopicCloneError):
             raise
