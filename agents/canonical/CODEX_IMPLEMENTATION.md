@@ -37,8 +37,9 @@ when newly established owner/contract facts require it.
 
 ## Design Integrity Gate
 
-Before editing, establish the owning responsibility model, selected mechanism, complete
-change unit, necessary evidence, and unresolved decisions that could change them.
+Once cause and required guarantee show that an edit is necessary, establish the
+owner, mechanism, affected responsibility unit, evidence, and unresolved decisions
+that could change the edit before changing it.
 Use [agent orchestration](../skills/agent-orchestration.md#decision-sufficiency-packet)
 for decision sufficiency and reuse current owner evidence. An unresolved API,
 algorithm, dependency, configuration, naming, oracle, or responsibility decision
@@ -49,8 +50,8 @@ The selected `workflow_activation_policy` owns child activation and authority.
 A blocked selected child preserves that boundary; it does not create a parent
 write fallback. User-guided debugging uses the common ROOT exception.
 
-A bounded owner/path/targeted-validation route uses its existing task or handoff
-for these decisions. When the selected route requires full staging, read
+A bounded route's selected execution owner performs its edit and verification
+without a child handoff. When the selected route requires full staging, read
 [Coordination design packet](#coordination-design-packet) before that handoff.
 Only an activated design-correspondence route reads
 [DIC](../internal-routines/design-implementation-correspondence.md) and carries
@@ -111,6 +112,10 @@ An existing `reuse_survey` supplies current asset and test context; reuse it und
 matching premises. Tests are evidence of current behavior, not a veto on the
 agreed correction. Preserve the necessary shared asset/history findings through
 related handoffs and consolidate changes to the same responsibility.
+
+When a related branch/PR or prepared checkout exists, verify it serves the same
+owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
+and [repository-topic-clone](../skills/repository-topic-clone.md) before creating a new path.
 
 ## File Dependency Manifest
 
@@ -195,10 +200,11 @@ style debt stays separate. A failed check immediately routes to its
 
 For selected delegation, read [Codex Subagents](CODEX_SUBAGENTS.md) and the selected
 role's current TOML. They own model/profile, authority, context capsule, and write
-scope; this file does not duplicate the role inventory. The existing typed route
-selects `worker` by default and permits `spark_worker` only with explicit
-`implementer=spark_worker:<evidence>` for a design-derived mechanical slice with
-no unresolved specification, public-interface, or dependency decision.
+scope; this file does not duplicate the role inventory. The selected delegation
+verdict supplies one implementer role/profile. Consume that verdict unchanged: a
+fixed `execute_spark` packet dispatches directly to `spark_worker`; unresolved
+design or repair stays with its selected reasoning owner. Do not apply a second
+default, re-selection, or model fallback after the verdict is fixed.
 
 Handoff includes the selected design path/section and request clauses, established
 reuse assets and relevant tests, dependency-expanded write scope, validation route,

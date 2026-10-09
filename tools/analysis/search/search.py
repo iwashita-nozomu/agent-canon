@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Coordinates purpose-based search across text, deterministic semantic cards, tool catalog, dependency headers, and Python code facts.
-# upstream design ../../documents/tools/search-coordination.md coordinated search provider contract
+# upstream design ../../../documents/tools/search-coordination.md coordinated search provider contract
 # upstream implementation ./vector_search.py provides text surfaces, TF-IDF search, dependency headers, and Python code facts
 # upstream implementation ./search_index.py builds repo-local deterministic semantic cards
-# downstream implementation ../../tests/agent_tools/test_search.py validates coordinated search providers
+# downstream implementation ../../../tests/agent_tools/test_search.py validates coordinated search providers
 # @dependency-end
 """Coordinate AgentCanon search providers from one purpose string."""
 

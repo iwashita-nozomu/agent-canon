@@ -82,9 +82,10 @@ make writers produce them as a prerequisite for ordinary work.
    runtime root. Never use a source-tree, user-home, XDG, or implicit cache
    fallback. Store generated outputs and stats under the same external runtime
    root, preferably below the active run bundle.
-1. Run `ingest` on the source Markdown/plain text with `--prompt` or
+1. Reuse an existing graph DB if it answers the selected question. Otherwise,
+   run `ingest` on the source Markdown/plain text with `--prompt` or
    `--prompt-file` when user request context can identify the intended corpus.
-   Always use `--stats-out`, then pass the emitted
+   Use `--stats-out` when ingesting, then pass the emitted
    `PROSE_REASONING_GRAPH_DB` path to later graph commands. The same stats
    artifact also carries `PROSE_REASONING_GRAPH_SEMANTIC_IR`; keep that JSON
    as the structure/corpus extraction artifact instead of recomputing corpus
@@ -100,10 +101,10 @@ make writers produce them as a prerequisite for ordinary work.
    export through one bounded tool path. A structured-analysis DB does not have
    to contain `edit_operations`; operations count `0` is valid for
    responsibility-only diagnosis.
-1. Export `project`, `lint`, `explain`, and `integrate` outputs with `--out`
-   and `--stats-out`; read the stats JSON before opening larger artifacts.
-   Do not print full projection, diagnostics, explanation, integration,
-   handoff, or rewrite structures to chat or CLI stdout.
+1. Export only the projections, diagnostics, explanations, or integration
+   results needed for the selected question, using `--out` and `--stats-out`
+   where those commands support them. Read stats before opening larger
+   artifacts. Do not print full graph structures to chat or CLI stdout.
    Do not treat `PROSE_REASONING_GRAPH_EDIT_OPERATIONS=0` as `no findings`.
    Always inspect diagnostic rules and counts. If diagnostics include
    `presentation_format_candidate`, record each target, recommended format,
@@ -112,11 +113,13 @@ make writers produce them as a prerequisite for ordinary work.
 1. For each proposed operation that should be rewritten, export
    `rewrite-packet --op <operation-id>`. Skip this step when the current DB has
    only diagnostics and no edit-operation ids.
-1. Export `skill-handoff` and pass it to the receiving skill or reviewer.
+1. Export `skill-handoff` only when another skill or reviewer needs the graph
+   evidence; pass the bounded packet to that owner.
 1. Treat `selected_ordering` as an optional candidate reader order from the
    graph analysis. Review it against source prerequisites and the reader's task;
    it does not bind the writing skill to a whole-document sentence sequence.
-1. If diagnostics include a verification route, verify before rewrite:
+1. If a material finding selected for rewrite has a verification route, check
+   that route before adopting the finding:
    `logic-gap-review` checks inference validity, `$literature-survey` and
    `citation-evidence-review` check external evidence, `$formal-proof-workflow`
    checks mathematical/proof-like or implementation-derived claims,
@@ -126,20 +129,18 @@ make writers produce them as a prerequisite for ordinary work.
    `document_responsibility_verification` expands dependency-manifest coverage
    rules, maps each missing group to the downstream document span that should
    carry it, and reruns `structured-analysis` to close or preserve the finding.
-1. Expand verification recursively inside this skill. For each unresolved
-   route, create child questions from the route's recursive steps, hand each
-   child to the listed verifier, add verified evidence or limitations back into
-   the structure packet, rerun graph diagnostics, and repeat until every leaf is
-   verified, explicitly limited, or recorded as an unresolved blocker/warn.
-   Unresolved leaves must not become settled prose.
+1. For a selected material finding, follow its verification route far enough to
+   understand the relevant source and limitation before revising that claim.
+   Keep unresolved evidence out of settled prose. Unrelated diagnostics can stay
+   advisory; they do not need a recursive handoff or a zero-findings result.
    A `presentation_format_candidate` remains unresolved until
    `$structure-planning` / `$report-writing` has adopted it, rejected it with
    renderer or reader-state evidence, combined it with prose, or preserved it as
    an explicit unresolved warning with owner and next command.
-1. Rerun only a selected analysis affected by changed graph inputs when its
-   result is still needed. Review new findings against the source; they do not
-   automatically establish a prose-generation prompt defect. Do not require
-   graph finding closure or a post-draft graph pass to permit writing.
+1. Rerun a selected analysis only when changed graph inputs could affect a
+   result still needed for the task. Review new findings against the source;
+   they do not automatically establish a prose-generation prompt defect.
+   Writing does not require graph finding closure or a post-draft graph pass.
 1. Treat graph diagnostics as advisory evidence. Final prose, review, and
    publication authority stays with the receiving skill.
 

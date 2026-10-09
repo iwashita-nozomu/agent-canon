@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Retires the former shell Git push implementation in favor of the gh-backed publish tool.
-# upstream implementation agent_tools/github_publish.py publishes GitHub branches and pull requests.
-# upstream design ../agents/skills/agent-canon-update.md defines the canonical publish route.
-# upstream design ../documents/tools/github_publish.md documents the replacement command.
+# upstream implementation ../github/github_publish.py publishes GitHub branches and pull requests.
+# upstream design ../../../agents/skills/agent-canon-update.md defines the canonical publish route.
+# upstream design ../../../documents/tools/github_publish.md documents the replacement command.
 # @dependency-end
 
 set -euo pipefail

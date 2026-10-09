@@ -1,8 +1,8 @@
 ---
 name: agent-orchestration
-description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
+description: "Use at repository-task intake to select the workflow, Skills, roles, and execution route."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"839df090f783c8f05976fd9931bbbe90d1ddc7455d19bb28c003d9ec6f990927"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"366e96a5ec7b10ab330bdd0d1acbfe92318c947644a87a6e0783560f4ae17bd1"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/agent-orchestration.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [agent-orchestration](../../../../agents/skills/agent-orchestration.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill agent-orchestration --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

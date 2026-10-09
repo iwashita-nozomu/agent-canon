@@ -3,9 +3,10 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents Shared Skill Canon for this repository.
+responsibility Indexes public skills and owns AgentCanon-specific skill maintenance.
 upstream design ./catalog.yaml enumerates public skill families
 upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
+upstream design ../../documents/design/responsibility-cleanup.md skill maintenance delegation rationale
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public and official skill boundaries
 upstream design code-visualization.md sole public visualization owner and typed projection contract
@@ -70,14 +71,14 @@ source checkout の `documents/runtime/` を暗黙に更新しません。tracke
 2 path の `--source-mutation-capability-json` と外部 before/after evidence を伴う明示保守操作です。
 図を手編集せず、辞書の変更から再生成します。
 
-次は既存の実行 owner が使う確認入口です。同じ検査を重複実行するチェックリストではありません。
+次は既存 owner の確認入口です。検査を一律に実行するチェックリストではありません。
 
 | 目的 | 入口 |
 | --- | --- |
-| public / shim / doc / config 整合 | `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` |
-| prompt に対する選択 | `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` |
-| skill の command packet | `python3 tools/agent/skills/skill_tool_commands.py show --skill <skill> --format text` |
-| 依存辞書の静的検査（source 非変更） | `python3 tools/agent/skills/skill_dependency_map.py check --root .` |
+| public skill / shim / doc / config の整合 | `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` |
+| prompt に対する skill 選択 | `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json` |
+| 選択した tool の実行 | 既存 CLI / API / script を native argv で呼び、実行と検証は各 owner に委譲します。 |
+| 依存辞書の静的検査 | `python3 tools/agent/skills/skill_dependency_map.py check --root .` |
 | 外部 graph 生成 | `python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` |
 | tracked reader pair の明示更新 | `python3 tools/agent/skills/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>` |
 
@@ -95,11 +96,11 @@ OpenAI system skill の本文は host runtime が提供します。AgentCanon �
 
 | Official System Skill | AgentCanon Route |
 | --- | --- |
-| `$openai-docs` | 現行 OpenAI / Codex product docs、model guidance、API reference、Codex manual の source。 |
-| `$skill-creator` | local owner surface を確定した後の skill 作成・refactor・指示品質改善。 |
-| `$skill-installer` | external skill の導入と curated skill 一覧。 |
-| `$imagegen` | HTML、report、dashboard、mockup 用 bitmap asset。 |
-| `$plugin-creator` | Codex plugin scaffold、manifest defaults、marketplace、reinstall。 |
+| `$openai-docs` | Current OpenAI / Codex product docs, model guidance, API reference, and Codex manual source route. |
+| `$skill-creator` | Direct owner for general skill creation, refactoring, and instruction quality; AgentCanon source changes also use [Updating Skills](#updating-skills). |
+| `$skill-installer` | External skill installation and curated skill listing. |
+| `$imagegen` | Bitmap visual asset generation for HTML, reports, dashboards, or visual mockups. |
+| `$plugin-creator` | Codex plugin scaffold, manifest defaults, marketplace entries, and plugin reinstall flow. |
 
 ## Codex Defaults
 
@@ -139,7 +140,7 @@ execution stage で [codex-task-workflow](codex-task-workflow.md)、handoff / wa
 | dependency manifest、reverse edge、cycle、全 inventory、change-impact / repair-planning packet | [dependency-analysis](dependency-analysis.md) |
 | 大規模 refactor | [refactor-loop](refactor-loop.md)。semantic delta を別管理し、target 選定・handoff 前に上記 change-impact packet を入力にする。 |
 | directory / README / root view / path mapping / responsibility map の責務変更 | [structure-refactor](structure-refactor.md)。recursive directory responsibility graph を先に作る。 |
-| ユーザーが1件ずつ共同デバッグする進め方を明示 | [user-guided-debugging](user-guided-debugging.md)。修正前の問題提示と修正後の次課題提示を保持。 |
+| ユーザーが1件ずつの guided debugging を明示 | [user-guided-debugging](user-guided-debugging.md)。編集前に問題を示し、各修正後に次課題を提示。同じ作業の合意済み完了・検証を続け、明示 stop / wait 境界を尊重します。 |
 | C / C++ 差分 | [cpp-review](cpp-review.md) を既定候補にする。 |
 | OOP readability tool の実行・表出力・解釈 | [oop-readability-check](oop-readability-check.md)。`Mechanical Result` と `Agent Analysis` を分ける。 |
 | tool / hook / eval / skill / experiment 結果の書出し | [result-artifact-writeout](result-artifact-writeout.md)。raw / summary / manifest / unique path / overwrite policy を区別。 |
@@ -167,6 +168,11 @@ execution stage で [codex-task-workflow](codex-task-workflow.md)、handoff / wa
 
 ## Updating Skills
 
-1. `agents/skills/<family>.md` と `agents/skills/catalog.yaml` を同じ変更で更新します。
-1. [保守者用 materializer](../../README.md#source-and-artifact-boundary) で adapter を更新し、正本と一緒に commit します。利用時には生成しません。
-1. routing に影響する場合は [CODEX_WORKFLOW](../canonical/CODEX_WORKFLOW.md) と [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md) の該当箇所を更新します。
+この手順は AgentCanon source の登録・配布を変える場合だけに使います。分担を設計・変更するときは既存の [Skill Maintenance Delegation](../../documents/design/responsibility-cleanup.md#skill-maintenance-delegation) owner を参照し、解決済みの担当と判断を再利用します。
+
+1. 依頼された成果・起動条件と canonical owner を確認します。既存の API / CLI、library、history、関連 PR / checkout を再利用し、影響しうる catalog、dependency、caller、配布面を調べて、確認できた gap だけを修正します。
+2. material な設計 rationale は既存 design owner に残します。bounded な文言変更に新しい design artifact は要りません。authority、safety、compatibility、completion の契約は既存 owner に保持します。
+3. public skill の canonical doc と catalog を整合させ、dependency、caller、配布面は影響する場合だけ更新します。既存 capability を包む skill を作りません。
+4. caller の選択を変えるときは、判断点に適用条件と canonical link を置き、条件成立時の到達と不成立時の非起動を確認します。[条件付き読込](task-routing.md#in-flight-skill-reads) に従います。
+5. canonical source の変更で adapter 更新が必要なら、保守者用 [materializer](../../README.md#source-and-artifact-boundary) を使って生成物を読み戻します。利用時には生成しません。変更した Markdown は [md-style-check](md-style-check.md)、他の検査は影響した surface の既存 owner に従います。
+6. 新しい behavior evidence がユーザー依頼または選択 workflow の要件なら [empirical-prompt-tuning](empirical-prompt-tuning.md#workflow) を使います。構造整合と実際の behavior は別の根拠であり、比較可能な測定なしに改善・benchmark を主張しません。

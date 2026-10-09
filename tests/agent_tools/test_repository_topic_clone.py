@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import json
 import subprocess
 import sys
@@ -22,7 +23,9 @@ from tools.runtime.authority.checkout_identity import CheckoutIdentity
 from tools.runtime.authority.writer_target import read_writer_target_packet
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL_PATH = PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py"
+TOOL_PATH = (
+    PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py"
+)
 sys.path.insert(0, str(TOOL_PATH.parent))
 
 from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
@@ -44,6 +47,41 @@ def run_git(path: Path, *args: str) -> str:
         capture_output=True,
         text=True,
     ).stdout.strip()
+
+
+def git_metadata_path(root: Path, name: str) -> Path:
+    """Resolve a Git path from this checkout, preserving absolute results."""
+    value = Path(run_git(root, "rev-parse", "--git-path", name))
+    return root / value
+
+
+def patch_linked_checkout_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide the normalized remote identity expected by writer-target packets."""
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="owner/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+
+
+def snapshot_checkout_files(root: Path) -> dict[str, bytes]:
+    """Read checkout files except Git metadata and the reserved writer packet."""
+    snapshot: dict[str, bytes] = {}
+    reserved_packet = rtc.WRITER_TARGET_PACKET_RELATIVE
+    for path in root.rglob("*"):
+        relative = path.relative_to(root)
+        if ".git" in relative.parts or relative == reserved_packet or path.is_symlink():
+            continue
+        if path.is_file():
+            snapshot[relative.as_posix()] = path.read_bytes()
+    return snapshot
 
 
 def test_computed_clone_path_uses_parent_boundary_for_escaping_symlinks(
@@ -77,6 +115,8 @@ def init_remote(tmp_path: Path) -> tuple[Path, str]:
     subprocess.run(
         ["git", "init", "-b", "main", str(source)], check=True, capture_output=True
     )
+    run_git(source, "config", "user.name", "Test")
+    run_git(source, "config", "user.email", "test@example.invalid")
     (source / "base.txt").write_text("base\n", encoding="utf-8")
     run_git(source, "add", "base.txt")
     subprocess.run(
@@ -84,10 +124,6 @@ def init_remote(tmp_path: Path) -> tuple[Path, str]:
             "git",
             "-C",
             str(source),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
             "commit",
             "-m",
             "init",
@@ -98,6 +134,7 @@ def init_remote(tmp_path: Path) -> tuple[Path, str]:
     )
     run_git(source, "remote", "add", "origin", str(remote))
     run_git(source, "push", "origin", "main")
+    run_git(remote, "symbolic-ref", "HEAD", "refs/heads/main")
     return remote, str(remote)
 
 
@@ -116,7 +153,7 @@ def init_workspace_parent(
     )
     (path / ".gitignore").write_text(ignore_content, encoding="utf-8")
     (path / "parent.txt").write_text("parent\n", encoding="utf-8")
-    run_git(path, "add", "parent.txt", *(('.gitignore',) if tracked_ignore else ()))
+    run_git(path, "add", "parent.txt", *((".gitignore",) if tracked_ignore else ()))
     subprocess.run(
         [
             "git",
@@ -435,16 +472,331 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
     assert merged.request.allowed_paths == ("src/owned.py",)
     after, _identity = read_writer_target_packet(prepared.clone)
     assert after.allowed_paths == ("src/owned.py",)
+    revised = rtc.request(
+        remote_url,
+        "repo-target",
+        workspace,
+        "topic-target",
+        "feature/target",
+        evidence,
+        allowed_paths=("src/owned.py", "tests/test_owned.py"),
+        checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
+    )
+    updated, _identity = read_writer_target_packet(revised.clone)
+    assert updated.allowed_paths == ("src/owned.py", "tests/test_owned.py")
 
 
-def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
+def test_prepare_allows_source_discovery_without_writer_scope_then_materializes_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reader preparation can be reused when the actual write scope is known."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-discovery-before-scope",
+        workspace_root=workspace,
+        topic="topic-discovery-before-scope",
+        branch="feature/discovery-before-scope",
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+
+    discovered = rtc.request(**request)
+    marker_sha = run_git(
+        discovered.clone,
+        "config",
+        "--worktree",
+        "--get",
+        f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+    )
+    packet_path = discovered.clone / rtc.WRITER_TARGET_PACKET_RELATIVE
+    assert discovered.writer_target_packet is None
+    assert not packet_path.exists()
+    assert marker_sha == rtc._evidence_sha256(evidence)
+    assert not run_git(discovered.clone, "status", "--porcelain")
+
+    index_path = git_metadata_path(discovered.clone, "index")
+    config_path = git_metadata_path(discovered.clone, "config.worktree")
+    before_index = index_path.read_bytes()
+    before_config = config_path.read_bytes()
+    before_files = snapshot_checkout_files(discovered.clone)
+    before_head = run_git(discovered.clone, "rev-parse", "HEAD")
+    before_branch = run_git(discovered.clone, "symbolic-ref", "--short", "HEAD")
+
+    writable = rtc.request(**request, allowed_paths=("agents/skills/README.md",))
+    target, _identity = read_writer_target_packet(writable.clone)
+
+    assert writable.clone == discovered.clone
+    assert writable.request.allowed_paths == ("agents/skills/README.md",)
+    assert target.allowed_paths == ("agents/skills/README.md",)
+    assert writable.writer_target_packet == packet_path
+    assert snapshot_checkout_files(writable.clone) == before_files
+    assert index_path.read_bytes() == before_index
+    assert config_path.read_bytes() == before_config
+    assert run_git(writable.clone, "rev-parse", "HEAD") == before_head
+    assert run_git(writable.clone, "symbolic-ref", "--short", "HEAD") == before_branch
+    assert not run_git(writable.clone, "status", "--porcelain")
+
+
+def test_prepare_rejects_nested_parent_repo_without_mutating_ancestor(
+    tmp_path: Path,
+) -> None:
+    """A computed directory inside the anchor repo cannot inherit its Git identity."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    branch = run_git(workspace, "symbolic-ref", "--short", "HEAD")
+    request = dict(
+        url=remote_url,
+        repository="repo-nested-parent",
+        workspace_root=workspace,
+        topic="topic-nested-parent",
+        branch=branch,
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
+    )
+    nested = (
+        workspace
+        / "workspace"
+        / rtc.topic_slug(request["topic"])
+        / request["repository"]
+    )
+    nested.mkdir(parents=True)
+    local_data = nested / "local-data.txt"
+    local_data.write_text("preserve ancestor-owned checkout data\n", encoding="utf-8")
+    assert not run_git(workspace, "status", "--porcelain")
+    common_config = git_metadata_path(workspace, "config")
+    index_path = git_metadata_path(workspace, "index")
+    exclude_path = git_metadata_path(workspace, "info/exclude")
+    before_config = common_config.read_bytes()
+    before_index = index_path.read_bytes()
+    before_exclude = exclude_path.read_bytes()
+    before_refs = run_git(workspace, "show-ref")
+    before_head = run_git(workspace, "rev-parse", "HEAD")
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="repository-mismatch"):
+        rtc.request(**request)
+
+    assert (
+        local_data.read_text(encoding="utf-8")
+        == "preserve ancestor-owned checkout data\n"
+    )
+    assert not (nested / ".git").exists()
+    assert not (nested / rtc.WRITER_TARGET_PACKET_RELATIVE).exists()
+    assert common_config.read_bytes() == before_config
+    assert index_path.read_bytes() == before_index
+    assert exclude_path.read_bytes() == before_exclude
+    assert run_git(workspace, "show-ref") == before_refs
+    assert run_git(workspace, "rev-parse", "HEAD") == before_head
+    assert not run_git(workspace, "status", "--porcelain")
+
+
+def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A clean unmarked native worktree is identified by its path and Git facts."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-unmarked-linked",
+        workspace_root=workspace,
+        topic="topic-unmarked-linked",
+        branch="feature/unmarked-linked",
+        owner_evidence=evidence,
+        allowed_paths=("agents/skills/README.md",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    clone = (
+        workspace
+        / "workspace"
+        / rtc.topic_slug(request["topic"])
+        / request["repository"]
+    )
+    clone.parent.mkdir(parents=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(workspace),
+            "worktree",
+            "add",
+            "-b",
+            request["branch"],
+            str(clone),
+            "main",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(clone, "config", "extensions.worktreeConfig", "true")
+    packet_path = clone / rtc.WRITER_TARGET_PACKET_RELATIVE
+    config_path = git_metadata_path(clone, "config.worktree")
+    index_path = git_metadata_path(clone, "index")
+    before_index = index_path.read_bytes()
+    before_files = snapshot_checkout_files(clone)
+    before_head = run_git(clone, "rev-parse", "HEAD")
+    assert not config_path.exists()
+    assert not packet_path.exists()
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="actual-branch-mismatch"):
+        rtc.request(**{**request, "branch": "feature/unmatched"})
+
+    assert not config_path.exists()
+    assert not packet_path.exists()
+    assert index_path.read_bytes() == before_index
+    assert snapshot_checkout_files(clone) == before_files
+
+    prepared = rtc.request(**request)
+    target, _identity = read_writer_target_packet(prepared.clone)
+
+    assert prepared.clone == clone
+    assert target.allowed_paths == request["allowed_paths"]
+    assert config_path.is_file()
+    assert (
+        run_git(
+            clone,
+            "config",
+            "--worktree",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.branch",
+        )
+        == request["branch"]
+    )
+    assert run_git(clone, "rev-parse", "HEAD") == before_head
+    assert index_path.read_bytes() == before_index
+    assert snapshot_checkout_files(clone) == before_files
+    assert not run_git(clone, "status", "--porcelain")
+
+
+def test_prepare_holds_unmarked_linked_worktree_from_foreign_common_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Matching branch and remote do not adopt a worktree registered elsewhere."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    foreign_workspace = tmp_path / "foreign-parent"
+    init_workspace_parent(foreign_workspace)
+    run_git(foreign_workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-foreign-common-dir",
+        workspace_root=workspace,
+        topic="topic-foreign-common-dir",
+        branch="feature/foreign-common-dir",
+        owner_evidence=evidence,
+        allowed_paths=("agents/skills/README.md",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    clone = (
+        workspace
+        / "workspace"
+        / rtc.topic_slug(request["topic"])
+        / request["repository"]
+    )
+    clone.parent.mkdir(parents=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(foreign_workspace),
+            "worktree",
+            "add",
+            "-b",
+            request["branch"],
+            str(clone),
+            "main",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(clone, "config", "extensions.worktreeConfig", "true")
+    before_status = run_git(clone, "status", "--porcelain")
+    assert not before_status
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="checkout-mode-mismatch"):
+        rtc.request(**request)
+
+    assert clone.is_dir()
+    assert run_git(clone, "symbolic-ref", "--short", "HEAD") == request["branch"]
+    assert run_git(clone, "status", "--porcelain") == before_status
+    assert not (clone / rtc.WRITER_TARGET_PACKET_RELATIVE).exists()
+
+
+def test_merge_main_keeps_dirty_independent_checkout_hold_after_metadata_refresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Metadata reuse does not let merge-main proceed on a dirty independent clone."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="local/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+    request = dict(
+        url=remote_url,
+        repository="repo-independent-dirty-metadata",
+        workspace_root=workspace,
+        topic="topic-independent-dirty-metadata",
+        branch="feature/independent-dirty-metadata",
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
+    )
+    prepared = rtc.request(**request, allowed_paths=("old.py",))
+    dirty = prepared.clone / "untracked.txt"
+    dirty.write_text("preserve\n", encoding="utf-8")
+
+    updated = rtc.request(**request, allowed_paths=("current.py",))
+    target, _identity = read_writer_target_packet(updated.clone)
+    assert target.allowed_paths == ("current.py",)
+    assert dirty.read_text(encoding="utf-8") == "preserve\n"
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="merge-main hold: dirty-worktree-index-or-untracked",
+    ):
+        rtc.merge_main(updated.request)
+
+    assert dirty.read_text(encoding="utf-8") == "preserve\n"
+    assert updated.clone.is_dir()
+
+
+@pytest.mark.parametrize("mode", [0o700, 0o755])
+def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: int
 ) -> None:
     """Linked topics share Git objects but keep indexes, markers, and packets separate."""
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
+    workspace.chmod(mode)
     run_git(workspace, "remote", "add", "origin", remote_url)
 
     def fake_identity(path: Path) -> CheckoutIdentity:
@@ -481,26 +833,34 @@ def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
     )
 
     assert first.clone != second.clone
+    assert (first.clone.stat().st_mode & 0o777) == mode
+    assert (second.clone.stat().st_mode & 0o777) == mode
     assert run_git(first.clone, "rev-parse", "--git-common-dir") == run_git(
         second.clone, "rev-parse", "--git-common-dir"
     )
     assert run_git(first.clone, "rev-parse", "--git-path", "index") != run_git(
         second.clone, "rev-parse", "--git-path", "index"
     )
-    assert run_git(
-        first.clone,
-        "config",
-        "--worktree",
-        "--get",
-        f"{rtc.MARKER_PREFIX}.topic",
-    ) == "topic-first"
-    assert run_git(
-        second.clone,
-        "config",
-        "--worktree",
-        "--get",
-        f"{rtc.MARKER_PREFIX}.topic",
-    ) == "topic-second"
+    assert (
+        run_git(
+            first.clone,
+            "config",
+            "--worktree",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.topic",
+        )
+        == "topic-first"
+    )
+    assert (
+        run_git(
+            second.clone,
+            "config",
+            "--worktree",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.topic",
+        )
+        == "topic-second"
+    )
     with pytest.raises(subprocess.CalledProcessError):
         run_git(
             first.clone,
@@ -513,7 +873,9 @@ def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
     second_packet, _ = read_writer_target_packet(second.clone)
     assert first_packet.allowed_paths == ("first.py",)
     assert second_packet.allowed_paths == ("second.py",)
-    assert run_git(first.clone, "config", "--get", "extensions.worktreeConfig") == "true"
+    assert (
+        run_git(first.clone, "config", "--get", "extensions.worktreeConfig") == "true"
+    )
     assert run_git(workspace, "status", "--porcelain") == ""
     assert remote.exists()
 
@@ -645,7 +1007,7 @@ def test_linked_foreign_occupant_does_not_mutate_common_git_state(
     before_worktrees = run_git(workspace, "worktree", "list", "--porcelain")
     before_refs = run_git(workspace, "show-ref")
 
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="repository-mismatch"):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="actual-branch-mismatch"):
         rtc.request(
             remote_url,
             "repo-foreign",
@@ -727,6 +1089,361 @@ def test_linked_reuse_never_switches_and_preserves_branch_in_use_and_dirty_error
     with pytest.raises(rtc.RepositoryTopicCloneError, match="dirty-worktree"):
         rtc.request(**request)
     assert dirty.read_text(encoding="utf-8") == "preserve\n"
+
+
+def test_prepare_updates_dirty_linked_target_without_touching_checkout_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An explicit current target changes only reserved prepare metadata."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-dirty-target-extension",
+        workspace_root=workspace,
+        topic="topic-dirty-target-extension",
+        branch="feature/dirty-target-extension",
+        owner_evidence=evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    prepared = rtc.request(**request)
+    packet_path = prepared.writer_target_packet
+    assert packet_path is not None
+    old_packet_bytes = packet_path.read_bytes()
+
+    tracked = prepared.clone / "base.txt"
+    tracked.write_text("tracked WIP\n", encoding="utf-8")
+    staged = prepared.clone / "staged.txt"
+    staged.write_text("staged WIP\n", encoding="utf-8")
+    run_git(prepared.clone, "add", "staged.txt")
+    known_wip = prepared.clone / "tools" / "analysis" / "documents" / "wip.md"
+    known_wip.parent.mkdir(parents=True)
+    known_wip.write_text("owned WIP\n", encoding="utf-8")
+    unknown_wip = prepared.clone / "unknown-user-data.txt"
+    unknown_wip.write_text("preserve unknown data\n", encoding="utf-8")
+    ignored = prepared.clone / "ignored-output.bin"
+    exclude_path = git_metadata_path(prepared.clone, "info/exclude")
+    old_excludes = exclude_path.read_bytes()
+    exclude_path.write_bytes(old_excludes + b"ignored-output.bin\n")
+    ignored.write_bytes(b"ignored WIP\n")
+    assert (
+        run_git(prepared.clone, "check-ignore", "--quiet", "--", "ignored-output.bin")
+        == ""
+    )
+
+    index_path = git_metadata_path(prepared.clone, "index")
+    config_path = git_metadata_path(prepared.clone, "config.worktree")
+    before_files = snapshot_checkout_files(prepared.clone)
+    before_index = index_path.read_bytes()
+    before_config = config_path.read_bytes()
+    before_excludes = exclude_path.read_bytes()
+    before_status = run_git(
+        prepared.clone,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
+    before_head = run_git(prepared.clone, "rev-parse", "HEAD")
+    before_branch = run_git(prepared.clone, "symbolic-ref", "--short", "HEAD")
+
+    current_paths = ("tools/analysis/documents",)
+    updated = rtc.request(**{**request, "allowed_paths": current_paths})
+
+    updated_target, _updated_identity = read_writer_target_packet(updated.clone)
+    assert updated.request.allowed_paths == current_paths
+    assert updated_target.allowed_paths == current_paths
+    assert updated_target.normalized_root == str(updated.clone.resolve())
+    assert updated_target.branch == before_branch
+    assert updated_target.normalized_remote == "owner/repo"
+    assert packet_path.read_bytes() != old_packet_bytes
+    assert snapshot_checkout_files(updated.clone) == before_files
+    assert index_path.read_bytes() == before_index
+    assert config_path.read_bytes() == before_config
+    assert exclude_path.read_bytes() == before_excludes
+    assert (
+        run_git(
+            updated.clone,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignore-submodules=none",
+        )
+        == before_status
+    )
+    assert run_git(updated.clone, "rev-parse", "HEAD") == before_head
+    assert run_git(updated.clone, "symbolic-ref", "--short", "HEAD") == before_branch
+    assert tracked.read_text(encoding="utf-8") == "tracked WIP\n"
+    assert staged.read_text(encoding="utf-8") == "staged WIP\n"
+    assert known_wip.read_text(encoding="utf-8") == "owned WIP\n"
+    assert unknown_wip.read_text(encoding="utf-8") == "preserve unknown data\n"
+    assert ignored.read_bytes() == b"ignored WIP\n"
+
+    updated_packet_bytes = packet_path.read_bytes()
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="dirty-worktree-index-or-untracked"
+    ):
+        rtc.request(**{**request, "branch": "feature/other"})
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="dirty-worktree-index-or-untracked"
+    ):
+        rtc.request(
+            **{
+                **request,
+                "allowed_paths": ("first.py", "../escape"),
+            }
+        )
+    assert packet_path.read_bytes() == updated_packet_bytes
+    assert snapshot_checkout_files(updated.clone) == before_files
+    assert index_path.read_bytes() == before_index
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="merge-main hold: dirty-worktree"
+    ):
+        rtc.merge_main(updated.request)
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="cleanup hold: dirty-worktree-index-or-untracked",
+    ):
+        rtc.cleanup(updated.request, apply=True)
+    assert updated.clone.is_dir()
+    assert packet_path.read_bytes() != old_packet_bytes
+    assert snapshot_checkout_files(updated.clone) == before_files
+    assert index_path.read_bytes() == before_index
+
+
+def test_prepare_holds_symlinked_writer_packet_without_mutating_outside_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An ignored packet symlink cannot redirect the reserved metadata write."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-symlinked-writer-packet",
+        workspace_root=workspace,
+        topic="topic-symlinked-writer-packet",
+        branch="feature/symlinked-writer-packet",
+        owner_evidence=evidence,
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    prepared = rtc.request(**request, allowed_paths=("first.py",))
+    packet_path = prepared.writer_target_packet
+    assert packet_path is not None
+    packet_contents = packet_path.read_bytes()
+    outside_packet = tmp_path / "outside-writer-target.json"
+    outside_packet.write_bytes(packet_contents)
+    packet_path.unlink()
+    packet_path.symlink_to(outside_packet)
+    assert not run_git(
+        prepared.clone,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="writer_target_packet_path_unsafe",
+    ):
+        rtc.request(**request, allowed_paths=("replacement.py",))
+
+    assert packet_path.is_symlink()
+    assert outside_packet.read_bytes() == packet_contents
+
+
+def test_prepare_refreshes_changed_owner_evidence_and_current_writer_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exact clean reuse advances evidence and carries or updates the writer target."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-evidence-refresh",
+        workspace_root=workspace,
+        topic="topic-evidence-refresh",
+        branch="feature/evidence-refresh",
+        owner_evidence=evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+
+    prepared = rtc.request(**request)
+    original_sha = run_git(
+        prepared.clone,
+        "config",
+        "--worktree",
+        "--get",
+        f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+    )
+    evidence.write_text("updated task evidence\n", encoding="utf-8")
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="cleanup hold: owner-evidence-mismatch",
+    ):
+        rtc.cleanup(prepared.request, apply=True)
+    assert prepared.clone.is_dir()
+
+    continued = rtc.request(**{**request, "allowed_paths": ()})
+    assert continued.clone == prepared.clone
+    assert continued.request.allowed_paths == ("first.py",)
+    current_sha = rtc._evidence_sha256(evidence)
+    assert current_sha != original_sha
+    assert (
+        run_git(
+            continued.clone,
+            "config",
+            "--worktree",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+        )
+        == current_sha
+    )
+    retained_target, _ = read_writer_target_packet(continued.clone)
+    assert retained_target.allowed_paths == ("first.py",)
+
+    updated_scope = rtc.request(**{**request, "allowed_paths": ("current.py",)})
+    updated_target, _ = read_writer_target_packet(updated_scope.clone)
+    assert updated_target.allowed_paths == ("current.py",)
+    proof = rtc.cleanup(updated_scope.request, apply=False)
+    assert not proof.removed
+    assert proof.evidence == "linked-superproject-head"
+
+
+def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Current exact identity can refresh metadata without adopting dirty content."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-dirty-evidence",
+        workspace_root=workspace,
+        topic="topic-dirty-evidence",
+        branch="feature/dirty-evidence",
+        owner_evidence=evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+
+    prepared = rtc.request(**request)
+    original_sha = run_git(
+        prepared.clone,
+        "config",
+        "--worktree",
+        "--get",
+        f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+    )
+    evidence.write_text("updated task evidence\n", encoding="utf-8")
+    dirty = prepared.clone / "untracked.txt"
+    dirty.write_text("preserve\n", encoding="utf-8")
+
+    continued = rtc.request(**request)
+
+    current_sha = rtc._evidence_sha256(evidence)
+    assert current_sha != original_sha
+    assert continued.request.allowed_paths == ("first.py",)
+    assert dirty.read_text(encoding="utf-8") == "preserve\n"
+    assert (
+        run_git(
+            continued.clone,
+            "config",
+            "--worktree",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+        )
+        == current_sha
+    )
+    assert run_git(
+        continued.clone,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
+
+
+def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Evidence refresh does not adopt a checkout with mismatched topic metadata."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-unknown-owner",
+        workspace_root=workspace,
+        topic="topic-unknown-owner",
+        branch="feature/unknown-owner",
+        owner_evidence=evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+
+    prepared = rtc.request(**request)
+    original_sha = run_git(
+        prepared.clone,
+        "config",
+        "--worktree",
+        "--get",
+        f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+    )
+    run_git(
+        prepared.clone,
+        "config",
+        "--worktree",
+        f"{rtc.MARKER_PREFIX}.topic",
+        "foreign-topic",
+    )
+    evidence.write_text("updated task evidence\n", encoding="utf-8")
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="topic-mismatch"):
+        rtc.request(**request)
+
+    assert (
+        run_git(
+            prepared.clone,
+            "config",
+            "--worktree",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+        )
+        == original_sha
+    )
+    assert (
+        run_git(
+            prepared.clone,
+            "config",
+            "--worktree",
+            "--get",
+            f"{rtc.MARKER_PREFIX}.topic",
+        )
+        == "foreign-topic"
+    )
 
 
 def test_linked_merge_conflict_uses_worktree_git_paths(
@@ -844,13 +1561,313 @@ def test_linked_cleanup_removes_one_worktree_and_keeps_branch_and_sibling(
     run_git(tmp_path / "source", "push", "origin", "--delete", "feature/first")
     proof = rtc.cleanup(first.request, apply=True)
     assert proof.removed
-    assert proof.evidence == "linked-local-head"
+    assert proof.evidence == "linked-superproject-head"
     assert not first.clone.exists()
     assert second.clone.is_dir()
     assert run_git(workspace, "show-ref", "--verify", "refs/heads/feature/first")
-    assert run_git(workspace, "cat-file", "-e", f"{first.candidate_sha}^{{commit}}") == ""
-    assert str(second.clone) in run_git(workspace, "worktree", "list")
+    assert (
+        run_git(workspace, "cat-file", "-e", f"{first.candidate_sha}^{{commit}}") == ""
+    )
+    worktree_list = run_git(workspace, "worktree", "list")
+    assert str(first.clone) not in worktree_list
+    assert str(second.clone) in worktree_list
     assert not first.clone.parent.exists()
+
+
+def test_linked_cleanup_requires_external_retention_for_local_only_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task-owner retention preserves ignored files and local submodule objects."""
+    _, remote_url = init_remote(tmp_path)
+    submodule_root = tmp_path / "submodule-source"
+    submodule_root.mkdir()
+    _, submodule_url = init_remote(submodule_root)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+
+    first = rtc.request(
+        remote_url,
+        "repo-submodule-cleanup",
+        workspace,
+        "topic-submodule-cleanup",
+        "feature/submodule-cleanup",
+        evidence,
+        allowed_paths=("src/",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    sibling = rtc.request(
+        remote_url,
+        "repo-submodule-cleanup",
+        workspace,
+        "topic-submodule-sibling",
+        "feature/submodule-sibling",
+        evidence,
+        allowed_paths=("tests/",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    retained_root = tmp_path / "retained-content"
+    retained_root.mkdir()
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(first.clone),
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            submodule_url,
+            "vendor/submodule",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    submodule_checkout = first.clone / "vendor" / "submodule"
+    submodule_only_file = submodule_checkout / "local-only.txt"
+    submodule_only_file.write_text("local submodule content\n", encoding="utf-8")
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(submodule_checkout),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "add",
+            "local-only.txt",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(submodule_checkout),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "local-only submodule commit",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    submodule_branch = run_git(submodule_checkout, "symbolic-ref", "--short", "HEAD")
+    submodule_commit = run_git(submodule_checkout, "rev-parse", "HEAD")
+    remote_commit = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(submodule_root / "repo.git"),
+            "cat-file",
+            "-e",
+            submodule_commit,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert remote_commit.returncode != 0
+    submodule_bundle = retained_root / "submodule.bundle"
+    run_git(submodule_checkout, "bundle", "create", str(submodule_bundle), "--all")
+
+    ignored_file = first.clone / "caller-retained.bin"
+    ignored_file.write_bytes(b"ignored local-only content\n")
+    exclude_path = git_metadata_path(first.clone, "info/exclude")
+    with exclude_path.open("a", encoding="utf-8") as stream:
+        stream.write("caller-retained.bin\n")
+    retained_ignored_file = retained_root / "caller-retained.bin"
+    retained_ignored_file.write_bytes(ignored_file.read_bytes())
+
+    run_git(first.clone, "add", ".gitmodules", "vendor/submodule")
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(first.clone),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "add clean submodule",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    retained_head = run_git(first.clone, "rev-parse", "HEAD")
+    assert (
+        run_git(first.clone, "check-ignore", "--quiet", "--", "caller-retained.bin")
+        == ""
+    )
+    assert not run_git(
+        first.clone,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
+
+    proof = rtc.cleanup(first.request, apply=True)
+
+    assert proof.removed
+    assert proof.evidence == "linked-superproject-head"
+    assert not first.clone.exists()
+    assert retained_ignored_file.read_bytes() == b"ignored local-only content\n"
+    restore = tmp_path / "submodule-restore"
+    subprocess.run(
+        ["git", "init", str(restore)], check=True, capture_output=True, text=True
+    )
+    run_git(
+        restore,
+        "fetch",
+        str(submodule_bundle),
+        f"refs/heads/{submodule_branch}",
+    )
+    assert (
+        run_git(restore, "show", f"{submodule_commit}:local-only.txt")
+        == "local submodule content"
+    )
+    assert sibling.clone.is_dir()
+    assert (
+        run_git(
+            workspace,
+            "show-ref",
+            "--hash",
+            "--verify",
+            "refs/heads/feature/submodule-cleanup",
+        )
+        == retained_head
+    )
+    assert run_git(workspace, "cat-file", "-e", f"{retained_head}^{{commit}}") == ""
+    worktree_list = run_git(workspace, "worktree", "list")
+    assert str(first.clone) not in worktree_list
+    assert str(sibling.clone) in worktree_list
+
+
+def test_linked_cleanup_holds_dirty_submodule_before_removal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dirty submodule content remains in place when cleanup is requested."""
+    _, remote_url = init_remote(tmp_path)
+    submodule_root = tmp_path / "submodule-source"
+    submodule_root.mkdir()
+    _, submodule_url = init_remote(submodule_root)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    prepared = rtc.request(
+        remote_url,
+        "repo-dirty-submodule",
+        workspace,
+        "topic-dirty-submodule",
+        "feature/dirty-submodule",
+        evidence,
+        allowed_paths=("src/",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(prepared.clone),
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            submodule_url,
+            "vendor/submodule",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    run_git(prepared.clone, "add", ".gitmodules", "vendor/submodule")
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(prepared.clone),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "add clean submodule",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    dirty = prepared.clone / "vendor" / "submodule" / "untracked.txt"
+    dirty.write_text("preserve\n", encoding="utf-8")
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="dirty-worktree-index-or-untracked"
+    ):
+        rtc.cleanup(prepared.request, apply=True)
+
+    assert dirty.read_text(encoding="utf-8") == "preserve\n"
+    assert prepared.clone.is_dir()
+    assert run_git(
+        workspace, "show-ref", "--verify", "refs/heads/feature/dirty-submodule"
+    )
+
+
+def test_linked_cleanup_surfaces_native_remove_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Native removal errors remain visible and keep the registered worktree."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    run_git(workspace, "remote", "add", "origin", remote_url)
+    patch_linked_checkout_identity(monkeypatch)
+    prepared = rtc.request(
+        remote_url,
+        "repo-unknown-remove-error",
+        workspace,
+        "topic-unknown-remove-error",
+        "feature/unknown-remove-error",
+        evidence,
+        allowed_paths=("src/",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+    original_run_git = rtc._run_git
+
+    def reject_native_remove(
+        repo: Path, args: Sequence[str], *, pass_fds: tuple[int, ...] = ()
+    ) -> str:
+        if tuple(args[:2]) == ("worktree", "remove"):
+            assert args[2] == "--force"
+            raise rtc.GitCommandError(repo, args, "fatal: permission denied")
+        return original_run_git(repo, args, pass_fds=pass_fds)
+
+    monkeypatch.setattr(rtc, "_run_git", reject_native_remove)
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="permission denied"):
+        rtc.cleanup(prepared.request, apply=True)
+
+    assert prepared.clone.is_dir()
+    assert str(prepared.clone) in run_git(workspace, "worktree", "list")
+    assert run_git(
+        workspace, "show-ref", "--verify", "refs/heads/feature/unknown-remove-error"
+    )
 
 
 def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(
@@ -1091,7 +2108,14 @@ def test_matching_but_unmanaged_module_uses_generic_relation(
 
 @pytest.mark.parametrize(
     "root_kind",
-    ("non-repository", "nested", "missing-ignore", "untracked-ignore", "global-ignore", "info-ignore"),
+    (
+        "non-repository",
+        "nested",
+        "missing-ignore",
+        "untracked-ignore",
+        "global-ignore",
+        "info-ignore",
+    ),
 )
 def test_prepare_rejects_invalid_workspace_roots_before_creation(
     tmp_path: Path, root_kind: str
@@ -1117,12 +2141,16 @@ def test_prepare_rejects_invalid_workspace_roots_before_creation(
     elif root_kind == "global-ignore":
         workspace = tmp_path / "parent"
         init_workspace_parent(
-            workspace, ignore_content="# repository has no workspace rule\n", global_ignore=True
+            workspace,
+            ignore_content="# repository has no workspace rule\n",
+            global_ignore=True,
         )
     else:
         workspace = tmp_path / "parent"
         init_workspace_parent(
-            workspace, ignore_content="# repository has no workspace rule\n", info_ignore=True
+            workspace,
+            ignore_content="# repository has no workspace rule\n",
+            info_ignore=True,
         )
 
     with pytest.raises(rtc.RepositoryTopicCloneError):
@@ -1236,7 +2264,9 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
     run_git(source, "commit", "-m", "main conflict")
     run_git(source, "push", "origin", "main")
 
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve") as raised:
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"
+    ) as raised:
         rtc.merge_main(receipt.request)
     inventory_path = receipt.clone / ".agent-canon" / "conflict-preservation.json"
     assert inventory_path.is_file()
@@ -1257,6 +2287,7 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
 
 
 def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) -> None:
+    """Captured merge can finish after main advances, then next merge catches up."""
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -1324,8 +2355,46 @@ def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) 
     plan_path.write_text(json.dumps(plan) + "\n", encoding="utf-8")
     (receipt.clone / "base.txt").write_text("topic\n", encoding="utf-8")
     run_git(receipt.clone, "add", "base.txt")
+    captured_main_sha = inventory["theirs"]["commit"]
+    (source / "later-main.txt").write_text(
+        "advanced after conflict capture\n", encoding="utf-8"
+    )
+    run_git(source, "add", "later-main.txt")
+    run_git(
+        source,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-m",
+        "advance main after conflict capture",
+    )
+    run_git(source, "push", "origin", "main")
+    latest_main_sha = run_git(source, "rev-parse", "HEAD")
+    assert latest_main_sha != captured_main_sha
+
     finalized = rtc.finalize_merge_main(receipt.request)
+    assert finalized.origin_main_sha == captured_main_sha
     assert finalized.merged_sha != finalized.candidate_sha
+    assert run_git(receipt.clone, "status", "--porcelain") == ""
+    assert run_git(receipt.clone, "rev-parse", "origin/main") == captured_main_sha
+
+    advanced = rtc.merge_main(receipt.request)
+    assert advanced.origin_main_sha == latest_main_sha
+    assert (receipt.clone / "later-main.txt").read_text(
+        encoding="utf-8"
+    ) == "advanced after conflict capture\n"
+    assert (
+        run_git(
+            receipt.clone,
+            "merge-base",
+            "--is-ancestor",
+            latest_main_sha,
+            advanced.merged_sha,
+        )
+        == ""
+    )
     assert run_git(receipt.clone, "status", "--porcelain") == ""
 
 
@@ -1498,10 +2567,22 @@ def test_cleanup_rejects_remote_head_mismatch_without_publication_packet(
     source = tmp_path / "source"
     run_git(source, "fetch", "origin", "feature/cleanup")
     run_git(source, "checkout", "-B", "feature/cleanup", "origin/feature/cleanup")
-    run_git(source, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "remote advance")
+    run_git(
+        source,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "remote advance",
+    )
     run_git(source, "push", "origin", "feature/cleanup")
 
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="remote branch head mismatch"):
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="remote branch head mismatch"
+    ):
         rtc.cleanup(request.request, apply=False)
     assert request.clone.exists()
 
@@ -1563,7 +2644,9 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     topic_root = workspace / "workspace" / topic
     sibling = topic_root / "keep.txt"
     sibling.write_text("keep", encoding="utf-8")
-    (workspace / ".gitignore").write_text("# placement ownership drift\n", encoding="utf-8")
+    (workspace / ".gitignore").write_text(
+        "# placement ownership drift\n", encoding="utf-8"
+    )
     drift_probe = subprocess.run(
         [
             "git",

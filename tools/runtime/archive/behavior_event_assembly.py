@@ -2,17 +2,17 @@
 # @dependency-start
 # contract tool
 # responsibility Assembles, deduplicates, and appends one canonical behavior event per eligible hook invocation.
-# upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md owns event identity, cardinality, and write order.
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination receipt semantics.
-# upstream implementation ./prompt_capture.py owns prompt evidence.
-# upstream implementation ./prompt_classifier.py owns pure prompt routing.
-# upstream implementation ./tool_selection.py owns tool evidence.
-# upstream implementation ./subagent_selection.py owns subagent evidence.
-# upstream implementation ./workflow_context.py owns context load/store.
-# upstream implementation ../../.codex/hooks/hook_event_log.py owns append-only transport primitives.
-# downstream implementation ./workflow_monitor.py emits the post-append projection.
-# downstream implementation ./generate_agent_runtime_dashboard.py reads canonical events.
-# downstream implementation ../../tests/agent_tools/test_behavior_event_assembly.py validates cardinality and fail-open behavior.
+# upstream design ../../../documents/design/agentcanon-hook-simplification-wave3.md owns event identity, cardinality, and write order.
+# upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns coordination receipt semantics.
+# upstream implementation ../../agent/orchestration/prompt_capture.py owns prompt evidence.
+# upstream implementation ../../agent/orchestration/prompt_classifier.py owns pure prompt routing.
+# upstream implementation ../../agent/orchestration/tool_selection.py owns tool evidence.
+# upstream implementation ../../agent/orchestration/subagent_selection.py owns subagent evidence.
+# upstream implementation ../../agent/orchestration/workflow_context.py owns context load/store.
+# upstream implementation ../../../.codex/hooks/hook_event_log.py owns append-only transport primitives.
+# downstream implementation ../lifecycle/workflow_monitor.py emits the post-append projection.
+# downstream implementation ../../../eval/producers/generate_agent_runtime_dashboard.py reads canonical events.
+# downstream implementation ../../../tests/agent_tools/test_behavior_event_assembly.py validates cardinality and fail-open behavior.
 # @dependency-end
 """Canonical behavior-event assembly and readback owner."""
 

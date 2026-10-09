@@ -580,7 +580,11 @@ mod tests {
             "documents/design/rust-agent-tool-migration.md",
             "fixture\n",
         );
-        write(&root, "tools/runtime/dispatch/agent-canon/Cargo.toml", "fixture\n");
+        write(
+            &root,
+            "tools/runtime/dispatch/agent-canon/Cargo.toml",
+            "fixture\n",
+        );
         write(&root, "tools/bin/agent-canon", "fixture\n");
 
         let foundation = inspect_foundation(&root);
@@ -606,7 +610,11 @@ mod tests {
             "documents/design/rust-agent-tool-migration.md",
             "fixture\n",
         );
-        write(root, "tools/runtime/dispatch/agent-canon/Cargo.toml", "fixture\n");
+        write(
+            root,
+            "tools/runtime/dispatch/agent-canon/Cargo.toml",
+            "fixture\n",
+        );
         write(root, "tools/bin/agent-canon", "fixture\n");
         for relative in [
             "bootstrap.sh",

@@ -44,11 +44,11 @@ contract is actually in scope. Existing-environment execution or an unavailable
 test does not initiate environment maintenance. The selected environment owner
 keeps product validation separate from AgentCanon runtime validation.
 
-Use `execution_route_policy` from the same catalog to distinguish
-`bounded_fast_path` and `coordination`. A bounded route carries owner, complete
-responsibility unit, implementation mechanism, selected verification, and
-publication evidence in the existing task/Issue or handoff. Coordination uses
-its declared run bundle. Family names and links alone do not create artifacts.
+Use `execution_route_policy` to distinguish `bounded_fast_path` and
+`coordination`. Bounded work has one execution owner and uses existing task
+evidence without requiring a child or run bundle; its internal work follows the
+selected owner and actual dependencies. Coordination assigns its units and uses
+its declared run bundle.
 
 ## Contract-Required Skill Set
 
@@ -60,19 +60,19 @@ related candidates belong to [the dependency dictionary](../skills/skill-depende
 Read [Skill Paths](skills.md#skill-paths) only for an unresolved adapter or
 command context, and read the selected Skill's active sections before use.
 
-For a selected routing action, the existing `route` command uses
-`--mode repo-changing` for repository changes and `--mode routing-only` for
-advisory routing. Its active/candidate distinction is preserved through handoff.
+The existing `route` command uses `--mode routing-only` for read-only work
+and `--mode repo-changing` for a selected repository/remote mutation. Reading
+source for an answer or diagnosis does not widen the mode.
 `codex-task-workflow` becomes active for execution transport; `subagent-bootstrap`
 becomes active only when the selected typed route requires child handoff.
 User invocation uses `$skill-name`.
 
 A later operation, finding, or changed premise can activate a related Skill.
 Select it under the caller's stated condition, read its current sections, and
-regenerate its command packet before a selected handoff. Required commands,
-task-matching conditional commands, and selected validation retain their order.
-Catalog command argv are logical tool routes, interpreted through the existing
-[CLI owner](CLI_ENTRYPOINTS.md#tool-commands), not Host execution recipes.
+use its existing native CLI/API/script entrypoint at handoff. Selected validation
+retains its owner-defined order and process-result semantics. Native argv remains
+owned by the existing [CLI owner](CLI_ENTRYPOINTS.md#host-entrypoint), not by a
+second AgentCanon command schema.
 
 Before claiming a capability gap in an API, dependency, configuration, or
 extension point, use [API surface traversal](../../documents/design/api-surface-traversal-policy.md).

@@ -33,12 +33,8 @@ if __package__ in (None, ""):
     # even when the caller's cwd is a standalone source root.
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    import yaml
-except ModuleNotFoundError:
-    from tools.runtime.container import stdlib_yaml as yaml
+import yaml
 
-from tools.runtime.source.agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
 from tools.agent.orchestration.capability_route import (
     FORMAT_VALUES,
     MODE_VALUES,
@@ -70,11 +66,9 @@ from tools.agent.skills.skill_route_catalog import (
 from tools.agent.skills.skill_route_catalog import (
     load_skill_related_map as _load_skill_related_map,
 )
-from tools.agent.skills.skill_route_catalog import (
-    load_skill_required_tool_commands as _load_skill_required_tool_commands,
-)
-from tools.agent.skills.skill_route_catalog import (
-    load_skill_tool_commands as _load_skill_tool_commands,
+from tools.runtime.source.agent_canon_source_root import (
+    SourceRootFailure,
+    resolve_agent_canon_source_root,
 )
 from tools.validation.semantic.tools.visualization_contract import (
     TOOL_ARGUMENT_SCHEMAS,
@@ -86,8 +80,6 @@ from tools.validation.semantic.tools.visualization_contract import (
 )
 
 load_skill_related_map = _load_skill_related_map
-load_skill_required_tool_commands = _load_skill_required_tool_commands
-load_skill_tool_commands = _load_skill_tool_commands
 
 
 ROUTE_NAME = "task-routing"
@@ -318,7 +310,9 @@ AREA_DATA: tuple[AreaData, ...] = (
         "conventions",
         "Route convention subchecks without making every rule a prompt clause.",
         "run_convention_subchecks",
-        ("python3 tools/validation/semantic/convention/check_convention_compliance.py",),
+        (
+            "python3 tools/validation/semantic/convention/check_convention_compliance.py",
+        ),
         (
             "convention_subcheck_router.py",
             "convention-gate-lite",
@@ -381,6 +375,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         ),
     ),
 )
+
 
 @dataclass(frozen=True)
 class RouteArea:
@@ -626,7 +621,9 @@ def decide_execution(root: Path, context: object) -> dict[str, object]:
     This plans closeout; it never executes validation or grants completion.
     Missing facts must be resolved, not inferred from risk or changed paths.
     """
-    catalog = yaml.safe_load((root / "agents/task_catalog.yaml").read_text(encoding="utf-8"))
+    catalog = yaml.safe_load(
+        (root / "agents/task_catalog.yaml").read_text(encoding="utf-8")
+    )
     if not isinstance(catalog, dict):
         raise ValueError("execution-catalog-not-mapping")
     policy = catalog.get("execution_route_policy")
@@ -635,17 +632,25 @@ def decide_execution(root: Path, context: object) -> dict[str, object]:
     names: dict[str, list[str]] = {}
     for key in ("singletons", "resolved", "coordination_reasons"):
         values = policy.get(key)
-        if not isinstance(values, list) or not values or not all(
-            isinstance(value, str) and value for value in values
-        ) or len(set(values)) != len(values):
+        if (
+            not isinstance(values, list)
+            or not values
+            or not all(isinstance(value, str) and value for value in values)
+            or len(set(values)) != len(values)
+        ):
             raise ValueError(f"execution-route-policy-invalid:{key}")
         names[key] = values
     routes = policy.get("routes")
-    if not isinstance(routes, dict) or set(routes) != {"bounded_fast_path", "coordination"}:
+    if not isinstance(routes, dict) or set(routes) != {
+        "bounded_fast_path",
+        "coordination",
+    }:
         raise ValueError("execution-routes-invalid")
     required = {*names["singletons"], *names["resolved"], "validation", "coordination"}
-    if not isinstance(context, dict) or not required <= context.keys() or (
-        context.keys() - required - {"validation_status"}
+    if (
+        not isinstance(context, dict)
+        or not required <= context.keys()
+        or (context.keys() - required - {"validation_status"})
     ):
         raise ValueError("execution-context-fields-invalid")
     for key in names["singletons"]:
@@ -659,7 +664,8 @@ def decide_execution(root: Path, context: object) -> dict[str, object]:
         raise ValueError("execution-validation-oracle-unresolved")
     reasons = context["coordination"]
     if not isinstance(reasons, list) or not all(
-        isinstance(reason, str) and reason in names["coordination_reasons"] for reason in reasons
+        isinstance(reason, str) and reason in names["coordination_reasons"]
+        for reason in reasons
     ):
         raise ValueError("execution-coordination-reasons-invalid")
     status = context.get("validation_status", "pending")
@@ -671,24 +677,26 @@ def decide_execution(root: Path, context: object) -> dict[str, object]:
     if not isinstance(route, dict) or not isinstance(route.get("next_action"), str):
         raise ValueError("execution-route-projection-invalid")
     commands = route.get("commands")
-    if not isinstance(commands, list) or not all(isinstance(command, str) for command in commands):
+    if not isinstance(commands, list) or not all(
+        isinstance(command, str) for command in commands
+    ):
         raise ValueError("execution-route-commands-invalid")
     result: dict[str, object] = {
         "execution_route": selected,
         "next_action": route["next_action"],
         "commands": commands,
         "selected_validation": validation,
-        "verification_status": "need verification" if status == "unavailable" else status,
+        "verification_status": "need verification"
+        if status == "unavailable"
+        else status,
     }
-    if bounded:
-        states = route.get("states")
-        if not isinstance(states, list) or not states or not all(isinstance(state, str) for state in states):
-            raise ValueError("execution-route-states-invalid")
-        result["states"] = states
-    else:
+    if not bounded:
         # The full scheduling fields belong only to an activated coordination route.
         scheduling = catalog.get("execution_time_policy")
-        if not isinstance(scheduling, dict) or scheduling.get("applies_to") != "coordination":
+        if (
+            not isinstance(scheduling, dict)
+            or scheduling.get("applies_to") != "coordination"
+        ):
             raise ValueError("execution-scheduling-policy-invalid")
         result["execution_time_policy"] = scheduling
     return result
@@ -943,7 +951,9 @@ def matched_skill_routes(
             continue
         explicit = public_skill_name_mentioned(text, rule.skill)
         if explicit:
-            matches.append(SkillRouteMatch(rule.skill, "prompt explicitly names public skill"))
+            matches.append(
+                SkillRouteMatch(rule.skill, "prompt explicitly names public skill")
+            )
             observed.add(rule.skill)
     return tuple(matches)
 
@@ -1486,9 +1496,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.execution_context is not None:
         if args.area != "closeout" or prompt_text or args.name or args.list:
-            parser.error("--execution-context requires --area closeout without another route selector")
+            parser.error(
+                "--execution-context requires --area closeout without another route selector"
+            )
         try:
-            raw = sys.stdin.read() if args.execution_context == "-" else args.execution_context
+            raw = (
+                sys.stdin.read()
+                if args.execution_context == "-"
+                else args.execution_context
+            )
             decision = decide_execution(source_root.source_root, json.loads(raw))
         except (OSError, ValueError, yaml.YAMLError) as exc:
             print(f"EXECUTION_ROUTE_ERROR={exc}", file=sys.stderr)
@@ -1496,9 +1512,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.format == "json":
             print(json.dumps(decision, indent=2))
         elif args.format == "markdown":
-            print("\n".join(f"**{key}**: `{json.dumps(value)}`" for key, value in decision.items()))
+            print(
+                "\n".join(
+                    f"**{key}**: `{json.dumps(value)}`"
+                    for key, value in decision.items()
+                )
+            )
         else:
-            print("\n".join(f"{key.upper()}={json.dumps(value)}" for key, value in decision.items()))
+            print(
+                "\n".join(
+                    f"{key.upper()}={json.dumps(value)}"
+                    for key, value in decision.items()
+                )
+            )
         return 0
 
     if args.area == "closeout" and not prompt_text and not args.name:

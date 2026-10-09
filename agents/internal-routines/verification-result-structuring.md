@@ -36,7 +36,7 @@ Optional document topology planning does not make the applicable steps optional.
 | Caller | Output boundary |
 | --- | --- |
 | [Evidence and delivery](../canonical/ROOT_DELIVERY.md#reader-facing-writing) | General writing, chat progress, final result, and handoff |
-| [Report writing](../skills/report-writing.md#source-packet) | Every report draft or revision, including proposals and procedures |
+| [Report writing](../skills/report-writing.md#procedure) | Every report draft or revision, including proposals and procedures |
 | [PR processing](../skills/pr-processing.md#publication-boundary) | Every Issue/PR body or comment |
 | [Connected work](github-connected-work.md#use-and-boundary) | The same outputs through authorized GitHub tools |
 

@@ -2,9 +2,9 @@
 # @dependency-start
 # contract implementation
 # responsibility Owns canonical PEP 508 requirements-lock parsing, logical records, hashes, and typed errors.
-# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md requirements lock parser ownership and checker projection
+# upstream design ../../../documents/design/devcontainer/parent-devcontainer-policy.md requirements lock parser ownership and checker projection
 # downstream implementation ./devcontainer_dependencies.py consumes parsed records and error projections
-# downstream implementation ../../tests/agent_tools/test_requirements_lock.py verifies parser behavior and error branches
+# downstream implementation ../../../tests/agent_tools/test_requirements_lock.py verifies parser behavior and error branches
 # @dependency-end
 """Parse pip-compile requirements files into one canonical typed result."""
 

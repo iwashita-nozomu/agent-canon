@@ -10,7 +10,6 @@
 # upstream design ../../../../documents/experiments/experiment-registry.md defines managed experiment registry contract
 # upstream design ../../../README.md documents tool entrypoints
 # upstream design ../../../../documents/tools/README.md documents user-facing tool routes
-# upstream implementation ../../../runtime/archive/log_surface_inventory.py checks hook/tool/skill log-surface drift
 # upstream implementation ../../../../.codex/personal/skills/oop-readability-check/SKILL.md owns OOP readability review routing
 # upstream implementation ../../../runtime/authority/task_authority.py owns library implementation authority.
 # upstream implementation ../../../bin/agent-canon owns selected style checks.
@@ -96,10 +95,6 @@ SKILL_SURFACE_PREFIXES = (
 )
 TOOL_SURFACE_PREFIXES = (
     "tools/",
-)
-LOG_SURFACE_PREFIXES = (
-    HOOK_SURFACE_PREFIXES + SKILL_SURFACE_PREFIXES
-    + TOOL_SURFACE_PREFIXES
 )
 GITHUB_SURFACE_PREFIXES = (".github/workflows/", ".github/actions/")
 AGENT_PROTOCOL_PATHS = frozenset(
@@ -300,19 +295,6 @@ STRICT_SCHEMA_DEPENDENCY_GATE_TEMPLATES = (
         ),
     ),
 )
-LOG_SURFACE_GATE_TEMPLATES = (
-    GateTemplate(
-        gate="log_surface_inventory_guard",
-        command_template=(
-            "python3 tools/runtime/archive/log_surface_inventory.py --root . "
-            "--check --baseline documents/runtime/log-surface-inventory.json"
-        ),
-        handoff=(
-            "state whether emitted hook/tool/skill fields changed and regenerate "
-            "the inventory baseline in the same branch"
-        ),
-    ),
-)
 GITHUB_GATE_TEMPLATES = (
     GateTemplate(
         gate="github_workflow_check",
@@ -472,8 +454,6 @@ def path_gates(root: Path, path: str, scope_report: ScopeReport) -> tuple[Predic
         templates.extend(dependency_gate_templates(path))
     if hook_runtime_surface_path(path):
         templates.extend(HOOK_RUNTIME_GATE_TEMPLATES)
-    if path.startswith(LOG_SURFACE_PREFIXES):
-        templates.extend(LOG_SURFACE_GATE_TEMPLATES)
     if agent_canon_new_tool_source_path(root, path):
         templates.extend(AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES)
     if path.startswith(SKILL_SURFACE_PREFIXES):

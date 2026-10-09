@@ -3,11 +3,9 @@
 # contract tool
 # responsibility Materializes and reads back the complete public Codex skill-shim adapter set.
 # upstream design ../../../documents/design/skill-runtime-shim-materialization.md owns the v3 schema, migration, and fixed-point contract
-# upstream design ../../../agents/skills/catalog.yaml owns public skill identity, discovery metadata, and command phases
+# upstream design ../../../agents/skills/catalog.yaml owns public skill identity and discovery metadata
 # upstream implementation ./skill_route_catalog.py owns typed route and dependency projections
 # upstream implementation ./skill_dependency_map.py owns graph/tool identity projections
-# upstream implementation ./skill_tool_commands.py owns read-only command packets
-# upstream implementation ../orchestration/tool_calls.py owns skill ToolCall token materialization
 # downstream implementation ../../../tests/agent_tools/test_skill_shim_materializer.py validates migration, readback, and fixed point
 # @dependency-end
 """Author Git-distributed skill adapters; never run during install or launch."""
@@ -25,21 +23,13 @@ import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, cast
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    import yaml
-except ModuleNotFoundError:  # clean host before the shared tool image exists
-    try:
-        from tools.runtime.container import stdlib_yaml as yaml
-    except ImportError:
-        import tools.runtime.container.stdlib_yaml as yaml  # type: ignore[no-redef]
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+import yaml
 
-from tools.agent.orchestration.tool_calls import materialize_skill_tool_call_token
 from tools.agent.skills.skill_dependency_map import build_graph
 from tools.agent.skills.skill_route_catalog import (
     SkillDependencyRule,
@@ -48,7 +38,6 @@ from tools.agent.skills.skill_route_catalog import (
     load_skill_dependency_map,
     load_skill_route_rules,
 )
-from tools.agent.skills.skill_tool_commands import SkillCommandPacket, packet_for_skill
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (
@@ -72,7 +61,6 @@ VERSION = 3
 FIXED_POINT_SCHEMA = "agent_canon.skill_runtime_shim.fixed_point"
 MATERIALIZER_ID = "skill_shim_materializer.v3"
 TEMPLATE_ID = "skill-runtime-shim-md-v3"
-COMMAND_PACKET_TEMPLATE_ID = "skill-tool-command-packet-v3"
 MATERIALIZATION_RECORD_SCHEMA = "agent_canon.skill_runtime_shim.materialization_record"
 MATERIALIZATION_RECORD_VERSION = 3
 RUNTIME_ROOT = Path(".codex/personal/skills")
@@ -130,14 +118,6 @@ class LegacyMigrationError(MaterializerError):
         self.receipt = [dict(row) for row in receipt]
 
 
-class SkillToolCallMaterializer(Protocol):
-    """Typed callable boundary for the agent-team ToolCall owner."""
-
-    def __call__(self, skill: str, *, phase: str = "required") -> dict[str, object]:
-        """Materialize one skill/phase ToolCall identity."""
-        ...
-
-
 @dataclass(frozen=True)
 class BuildContext:
     """All canonical inputs used by one materialization run."""
@@ -148,7 +128,6 @@ class BuildContext:
     catalog_entries: Mapping[str, Mapping[str, object]]
     routes: Mapping[str, SkillRoutingRule]
     dependencies: Mapping[str, SkillDependencyRule]
-    packets: Mapping[str, SkillCommandPacket]
     graph: Mapping[str, object]
     source_snapshot_digest: str
 
@@ -265,93 +244,6 @@ def _dependency_payload(rule: SkillDependencyRule) -> dict[str, object]:
     }
 
 
-def _packet_payload(packet: SkillCommandPacket, root: Path) -> dict[str, object]:
-    """Canonicalize a full command packet while removing machine-specific roots."""
-    result: dict[str, object] = {}
-    for field in SkillCommandPacket.__dataclass_fields__:
-        value = getattr(packet, field)
-        if field.startswith("resolved_"):
-            rows: list[list[object]] = []
-            resolved_commands = cast(
-                tuple[
-                    tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]],
-                    ...,
-                ],
-                value,
-            )
-            for (
-                logical,
-                _source_root,
-                _execution_cwd,
-                root_bindings,
-                argv,
-            ) in resolved_commands:
-                resolved_argv: list[str] = []
-                for token in argv:
-                    token_path = Path(token)
-                    normalized_token = token
-                    if token_path.is_absolute():
-                        try:
-                            normalized_token = (
-                                "@root/"
-                                + token_path.resolve()
-                                .relative_to(root.resolve())
-                                .as_posix()
-                            )
-                        except ValueError:
-                            normalized_token = "@absolute"
-                    resolved_argv.append(normalized_token)
-                normalized_bindings: list[list[str]] = []
-                for binding_key, binding in root_bindings:
-                    binding_path = Path(binding)
-                    if binding_path.is_absolute():
-                        try:
-                            binding = (
-                                "@root/"
-                                + binding_path.resolve()
-                                .relative_to(root.resolve())
-                                .as_posix()
-                            )
-                        except ValueError:
-                            binding = "@absolute"
-                    normalized_bindings.append([binding_key, binding])
-                rows.append(
-                    [logical, "@root", "@root", normalized_bindings, resolved_argv]
-                )
-            result[field] = rows
-        elif isinstance(value, tuple):
-            result[field] = list(cast(tuple[object, ...], value))
-        else:
-            result[field] = value
-    return result
-
-
-def _tool_call_refs(packet: SkillCommandPacket) -> tuple[list[dict[str, object]], str]:
-    """Read skill/phase ToolCall identities from their sole owner."""
-    phases = (
-        ("required", packet.required_commands),
-        ("discovered", packet.discovered_commands),
-        ("conditional", packet.conditional_commands),
-        ("maintenance", packet.maintenance_commands),
-    )
-    refs: list[dict[str, object]] = []
-    for phase, commands in phases:
-        if not commands:
-            continue
-        materialize_token = cast(
-            SkillToolCallMaterializer, materialize_skill_tool_call_token
-        )
-        token = materialize_token(packet.skill, phase=phase)
-        identity = cast(Mapping[str, object], token["identity"])
-        refs.append({"command_count": len(commands), **dict(identity)})
-    if not refs:
-        raise MaterializerError("tool_call_phase_missing", packet.skill)
-    payload = {"skill": packet.skill, "phase_refs": refs}
-    return refs, domain_digest(
-        "agent-canon.skill-runtime-shim.owner.tool-surface.v2", payload
-    )
-
-
 def _source_snapshot_digest(
     root: Path, graph: Mapping[str, object], skill_ids: Sequence[str]
 ) -> str:
@@ -386,13 +278,6 @@ def build_context(
         raise MaterializerError("owner_source_invalid", str(exc)) from exc
     if set(routes) != set(skill_ids) or set(dependencies) != set(skill_ids):
         raise MaterializerError("owner_skill_set_mismatch")
-    try:
-        resolution = resolve_agent_canon_source_root(root)
-        packets = {skill: packet_for_skill(resolution, skill) for skill in skill_ids}
-    except (OSError, ValueError) as exc:
-        raise MaterializerError("command_packet_invalid", str(exc)) from exc
-    if len(packets) != len(skill_ids):
-        raise MaterializerError("command_packet_count_mismatch", str(len(packets)))
     return BuildContext(
         root,
         output,
@@ -400,7 +285,6 @@ def build_context(
         entries,
         routes,
         dependencies,
-        packets,
         graph,
         _source_snapshot_digest(root, graph, skill_ids),
     )
@@ -424,11 +308,6 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
     canonical_path = context.root / canonical_doc
     if not canonical_path.is_file():
         raise MaterializerError("missing_canonical_doc", skill)
-    packet = context.packets[skill]
-    tool_call_refs, tool_surface_digest = _tool_call_refs(packet)
-    packet_digest = domain_digest(
-        "skill_tool_commands.v2", _packet_payload(packet, context.root)
-    )
     route = context.routes[skill]
     dependency = context.dependencies[skill]
     dependency_identity = domain_digest(
@@ -468,22 +347,16 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
             "catalog_ref": f"{CATALOG_PATH.as_posix()}#skill:{skill}",
             "dependency_ref": f"{DEPENDENCY_PATH.as_posix()}#invocation:{skill}",
             "route_ref": f"{CATALOG_PATH.as_posix()}#skill:{skill}.routing",
-            "command_ref": f"{CATALOG_PATH.as_posix()}#skill:{skill}.tool_commands",
-            "tool_surface_ref": "tools/agent/orchestration/agent_team.py#materialize_skill_tool_call_token",
             "graph_ref": f"{GRAPH_PATH.as_posix()}#skill:{skill}",
         },
         "identity": {
             "catalog_identity_digest": catalog_identity,
             "dependency_identity_digest": dependency_identity,
             "route_identity_digest": route_identity,
-            "command_packet_identity_digest": packet_digest,
-            "tool_surface_identity_digest": tool_surface_digest,
-            "tool_call_refs": tool_call_refs,
         },
         "render": {
             "mode": "adapter_only",
             "template_id": TEMPLATE_ID,
-            "command_packet_template_id": COMMAND_PACKET_TEMPLATE_ID,
         },
         "provenance": {
             "catalog_source_digest": source_digests["catalog_source_digest"],
@@ -492,8 +365,6 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
             "materializer_id": MATERIALIZER_ID,
         },
     }
-    if not tool_call_refs:
-        raise MaterializerError("argument_schema_missing", skill)
     record_digest = domain_digest("agent-canon.skill-runtime-shim.record.v3", record)
     cast(dict[str, object], record["provenance"])["record_digest"] = record_digest
     return record
@@ -558,12 +429,6 @@ def _render_shim_template(
         "## Canonical Skill",
         "",
         f"Canonical workflow and policy: [{skill}]({canonical_link}).",
-        "",
-        "## Tool Commands",
-        "",
-        "<!-- skill-tool-commands:start -->",
-        f"`python3 tools/agent/skills/skill_tool_commands.py show --skill {skill} --format text`",
-        "<!-- skill-tool-commands:end -->",
         "",
         "1. Read the canonical owner before applying this skill.",
         "",
@@ -804,8 +669,6 @@ def _staged_readback(context: BuildContext, rendered: Mapping[str, str]) -> None
             raise MaterializerError("staged_frontmatter_mismatch", skill)
         if rendered[skill].count("<!-- materialization-record:") != 1:
             raise MaterializerError("materialization_record_count", skill)
-        if rendered[skill].count("skill_tool_commands.py show --skill") != 1:
-            raise MaterializerError("command_packet_entry_count", skill)
 
 
 def materialize(

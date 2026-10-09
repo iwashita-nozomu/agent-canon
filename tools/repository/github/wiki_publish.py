@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Publishes AgentCanon wiki page sets to owner/repo.wiki.git with deterministic gates and exact readback.
-# upstream design ../../agents/skills/wiki-publication.md owns wiki publication workflow and source-binding contract.
-# upstream design ../../documents/agent-canon/agent-canon-github-remote.md defines verified GitHub remote policy.
-# downstream design ../../documents/tools/wiki_publish.md documents the public tool contract.
-# downstream implementation ../../tests/agent_tools/test_wiki_publish.py validates command shape and failure boundaries.
+# upstream design ../../../agents/skills/wiki-publication.md owns wiki publication workflow and source-binding contract.
+# upstream design ../../../documents/agent-canon/agent-canon-github-remote.md defines verified GitHub remote policy.
+# downstream design ../../../documents/tools/wiki_publish.md documents the public tool contract.
+# downstream implementation ../../../tests/agent_tools/test_wiki_publish.py validates command shape and failure boundaries.
 # @dependency-end
 
 """Publish an AgentCanon wiki sidecar page-set to a default-branch-only wiki remote."""

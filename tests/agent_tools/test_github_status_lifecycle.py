@@ -1,527 +1,374 @@
-"""Fake-runner coverage for the GitHub status lifecycle adapter."""
-
-# pyright: reportMissingTypeStubs=false
-# The test names and assertion bodies are the readable test contract; D rules
-# are not useful signal for unittest methods in this focused fixture module.
-# ruff: noqa: D101, D102, D103, D107
-
+"""Status reconciliation uses native comment IDs, without remote test writes."""
 # @dependency-start
 # contract test
-# responsibility Tests status lifecycle taxonomy, transport, evidence, drift, and failure boundaries.
-# upstream design ../../agents/internal-routines/github-status-lifecycle.md owns lifecycle semantics.
-# upstream implementation ../../tools/repository/github/github_status_lifecycle.py implements the adapter.
+# responsibility Verifies ordinary evidence comments, bounded label mutation, and uncertain-write handling.
+# upstream implementation ../../tools/repository/github/github_status_lifecycle.py owns status reconciliation
 # @dependency-end
 
 from __future__ import annotations
 
 import json
-import sys
 import unittest
-from collections.abc import Callable, Sequence
-from pathlib import Path
-from typing import cast
+from urllib.parse import unquote
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
-
-from tools.repository.github import github_publish  # noqa: E402
-import tools.repository.github.github_status_lifecycle as lifecycle  # noqa: E402
-
-
-class FakeRunner:
-    """Deterministic runner with exact token-array matching."""
-
-    def __init__(self) -> None:
-        self.commands: list[tuple[str, ...]] = []
-        self.outputs: dict[tuple[str, ...], list[github_publish.CommandResult]] = {}
-
-    def add(self, command: Sequence[str], stdout: object = "", *, returncode: int = 0) -> None:
-        key = tuple(command)
-        text = stdout if isinstance(stdout, str) else json.dumps(stdout)
-        self.outputs.setdefault(key, []).append(
-            github_publish.CommandResult(args=key, returncode=returncode, stdout=text, stderr="")
-        )
-
-    def __call__(self, command: Sequence[str]) -> github_publish.CommandResult:
-        key = tuple(command)
-        self.commands.append(key)
-        queue = self.outputs.get(key)
-        if not queue:
-            return github_publish.CommandResult(args=key, returncode=99, stdout="", stderr=f"unexpected {key}")
-        return queue.pop(0)
+from tools.repository.github.github_publish import CommandResult
+from tools.repository.github.github_status_lifecycle import (
+    GhStatusAdapter,
+    LabelMapping,
+    LifecycleFailure,
+    classify_lifecycle,
+    evaluate_final,
+    load_label_mapping,
+    mapping_from_data,
+    plan_operations,
+    reconcile_status,
+    validate_remote_catalog,
+)
 
 
 class StatefulRunner:
-    """Small in-memory GitHub API model for mutation/readback tests."""
+    """A fake native API; comments are addressed individually, not by history."""
 
-    def __init__(self, labels: Sequence[str], catalog: Sequence[str]) -> None:
-        self.labels = list(labels)
-        self.catalog = list(catalog)
-        self.comments: list[dict[str, object]] = []
-        self.commands: list[tuple[str, ...]] = []
-        self.next_comment_id = 1
-        self.fail_next_mutation = False
-        self.drop_created_comments = False
-        self.comment_reads = 0
-        self.inject_conflicting_comment_on_final_read = False
+    def __init__(self) -> None:
+        self.labels = {"bug", "in progress"}
+        self.catalog = ["in progress", "ready for review", "need verification"]
+        self.comments = {}
+        self.calls = []
+        self.next_id = 10
+        self.fail_label = False
+        self.lose_post_response = False
+        self.hide_comment = False
         self.issue_reads = 0
-        self.issue_read_hook: Callable[[StatefulRunner, int], None] | None = None
-        self.transient_aba_on_issue_read = False
+        self.comment_reads = 0
+        self.on_issue_read = lambda runner: None
+        self.on_comment_read = lambda runner: None
 
-    def __call__(self, command: Sequence[str]) -> github_publish.CommandResult:
-        key = tuple(command)
-        self.commands.append(key)
-        if key[:3] == ("gh", "api", "--paginate") and "/comments?per_page=100" in key[-1]:
+    def add_comment(self, body, issue=719):
+        identity = self.next_id
+        self.next_id += 1
+        self.comments[identity] = {
+            "id": identity,
+            "body": body,
+            "html_url": f"https://github.com/owner/repo/issues/{issue}#issuecomment-{identity}",
+            "issue_url": f"https://api.github.com/repos/owner/repo/issues/{issue}",
+        }
+        return dict(self.comments[identity])
+
+    def __call__(self, args, cwd=None):
+        args = list(args)
+        self.calls.append(args)
+        method = args[args.index("--method") + 1] if "--method" in args else "GET"
+        endpoint = next(arg for arg in args if arg.startswith("repos/"))
+        status = 0
+        if method == "GET" and endpoint.endswith("/labels?per_page=100"):
+            body = [
+                [{"name": name} for name in self.catalog[:2]],
+                [{"name": name} for name in self.catalog[2:]],
+            ]
+        elif method == "GET" and "/issues/comments/" in endpoint:
             self.comment_reads += 1
-            if self.inject_conflicting_comment_on_final_read and self.comment_reads == 3 and self.comments:
-                self.comments.append(
-                    {
-                        "id": self.next_comment_id,
-                        "body": f"{self.comments[0]['body']}\nconflict",
-                        "html_url": f"https://example/comments/{self.next_comment_id}",
-                    }
-                )
-                self.next_comment_id += 1
-            return github_publish.CommandResult(key, 0, json.dumps([self.comments]), "")
-        if key[:3] == ("gh", "api", "--paginate") and key[-1].endswith("/labels?per_page=100"):
-            return github_publish.CommandResult(key, 0, json.dumps([[{"name": name} for name in self.catalog]]), "")
-        if (
-            key[:2] == ("gh", "api")
-            and len(key) == 3
-            and "/issues/" in key[-1]
-            and "/labels" not in key[-1]
-            and "/comments" not in key[-1]
-        ):
+            self.on_comment_read(self)
+            identity = int(endpoint.rsplit("/", 1)[1])
+            if self.hide_comment or identity not in self.comments:
+                status, body = 1, {"message": "Not Found"}
+            else:
+                body = self.comments[identity]
+        elif method == "GET" and endpoint == "repos/owner/repo/issues/719":
             self.issue_reads += 1
-            if self.issue_read_hook is not None:
-                self.issue_read_hook(self, self.issue_reads)
-            if self.transient_aba_on_issue_read and self.issue_reads == 5:
-                original = list(self.labels)
-                self.labels.append("race")
-                self.labels = original
-            payload = issue(self.labels)
-            return github_publish.CommandResult(key, 0, json.dumps(payload), "")
-        if any("/comments" in token for token in key) and "--method" in key:
-            body = next(token[5:] for token in key if token.startswith("body="))
-            comment = cast(
-                dict[str, object],
-                {"id": self.next_comment_id, "body": body, "html_url": f"https://example/comments/{self.next_comment_id}"},
-            )
-            if not self.drop_created_comments:
-                self.comments.append(comment)
-            self.next_comment_id += 1
-            return github_publish.CommandResult(key, 0, json.dumps(comment), "")
-        if "--method" in key and any(token.endswith("/labels") for token in key):
-            if self.fail_next_mutation:
-                self.fail_next_mutation = False
-                return github_publish.CommandResult(key, 1, "", "mutation failed")
-            value = next(token[9:] for token in key if token.startswith("labels[]="))
-            if value not in self.labels:
-                self.labels.append(value)
-            return github_publish.CommandResult(key, 0, "{}", "")
-        if "--method" in key and "/labels/" in key[-1]:
-            value = key[-1].rsplit("/", 1)[-1]
-            from urllib.parse import unquote
+            self.on_issue_read(self)
+            body = {
+                "number": 719,
+                "html_url": "https://github.com/owner/repo/issues/719",
+                "state": "open",
+                "labels": [{"name": name} for name in sorted(self.labels)],
+            }
+        elif method == "POST" and endpoint.endswith("/comments"):
+            body = self.add_comment(args[args.index("-f") + 1].removeprefix("body="))
+            if self.lose_post_response:
+                status, body = 1, {"message": "connection lost after acceptance"}
+        elif method in {"POST", "DELETE"} and "/labels" in endpoint:
+            if self.fail_label:
+                status, body = 1, {"message": "write outcome unknown"}
+            elif method == "POST":
+                self.labels.add(args[args.index("-f") + 1].removeprefix("labels[]="))
+                body = [{"name": name} for name in self.labels]
+            else:
+                self.labels.remove(unquote(endpoint.rsplit("/", 1)[1]))
+                return CommandResult(args, 0, "", "")
+        else:
+            raise AssertionError(f"unexpected API call: {args}")
+        return CommandResult(args, status, json.dumps(body), "")
 
-            value = unquote(value)
-            if self.fail_next_mutation:
-                self.fail_next_mutation = False
-                return github_publish.CommandResult(key, 1, "", "mutation failed")
-            self.labels = [label for label in self.labels if label != value]
-            return github_publish.CommandResult(key, 0, "{}", "")
-        return github_publish.CommandResult(key, 99, "", f"unexpected {key}")
+    def writes(self):
+        return [args for args in self.calls if "--method" in args]
+
+    def comment_posts(self):
+        return [
+            args
+            for args in self.writes()
+            if "POST" in args and "repos/owner/repo/issues/719/comments" in args
+        ]
 
 
-def issue(labels: Sequence[str], number: int = 719) -> dict[str, object]:
-    return {
-        "number": number,
-        "html_url": f"https://github.com/owner/repo/issues/{number}",
-        "state": "open",
-        "labels": [{"name": name} for name in labels],
-    }
-
-
-class StatusLifecycleTest(unittest.TestCase):
+class StatusLifecycleTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.mapping = lifecycle.LabelMapping(
+        self.mapping = LabelMapping(
             "in progress",
             "ready for review",
             "need verification",
-            ("status:in-progress",),
-            ("status:ready-for-review",),
-            (),
+            legacy_active=("working",),
         )
-        self.evidence = {
-            "baseline": {"base_ref": "main", "base_sha": "b"},
-            "branch": "issue-719-status",
-            "head": "a" * 40,
-            "scope": {"owner": "github_status_lifecycle.py", "non_goals": ["merge"]},
-            "validation": {"command": "pytest", "status": "pass"},
-            "remaining_verification": "none",
-            "readback_expectation": {"managed_labels": ["ready for review"]},
+        self.runner = StatefulRunner()
+        self.adapter = GhStatusAdapter("owner/repo", 719, runner=self.runner)
+        self.facts = {
+            "work_started": True,
+            "handoff_ready": True,
+            "validation_complete": True,
         }
-        self.pr_identity = {
-            "repo": "owner/repo",
-            "number": 1,
-            "url": "https://example/pr/1",
-            "base_sha": "b" * 40,
-            "head_sha": "a" * 40,
+        self.body = "修正を公開。対象テストは成功。変更と根拠は同じIssueに記録済み。"
+
+    def reconcile(self, **overrides):
+        values = {
+            "mapping": self.mapping,
+            "facts": self.facts,
+            "comment_body": self.body,
         }
+        values.update(overrides)
+        return reconcile_status(self.adapter, **values)
 
-    def test_toml_mapping_and_remote_catalog(self) -> None:
-        loaded = lifecycle.load_label_mapping(ROOT)
-        self.assertEqual(loaded.active, "in progress")
-        self.assertEqual(loaded.legacy_aliases_needs_verification, ())
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.mapping_from_data({"status_lifecycle": {"active": "a", "ready_for_review": "a", "needs_verification": "b"}})
-        self.assertEqual(context.exception.code, "label_mapping_invalid")
-        self.assertEqual(context.exception.code_owner, lifecycle.MODULE_OWNER)
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.validate_remote_catalog(self.mapping, ["in progress", "ready for review"])
-        self.assertEqual(context.exception.code, "label_mapping_invalid")
-        self.assertEqual(context.exception.responsibility_scope, lifecycle.LIFECYCLE_SCOPE)
+    def assert_failure(self, code, action):
+        with self.assertRaises(LifecycleFailure) as caught:
+            action()
+        self.assertEqual(caught.exception.code, code)
+        return caught.exception
 
-    def test_required_evidence_and_pr_fields_fail_closed_before_mutation(self) -> None:
-        runner = StatefulRunner(["in progress"], list(self.mapping.canonical.values()))
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence={"head": "a"},
-                pr_identity={"repo": "owner/repo", "number": 1},
-            )
-        self.assertEqual(context.exception.code, "lifecycle_facts_incomplete")
-        self.assertFalse(
-            any(
-                "--method" in command
-                and any("/labels" in token for token in command)
-                for command in runner.commands
-            )
-        )
-
-    def test_issue_snapshot_requires_exact_identity_and_nonempty_fields(self) -> None:
-        runner = FakeRunner()
-        command = ["gh", "api", "repos/owner/repo/issues/719"]
-        runner.add(command, {"number": 718, "html_url": "u", "state": "open", "labels": []})
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.GhStatusAdapter("owner/repo", 719, runner).issue()
-        self.assertEqual(context.exception.code, "transport_failure")
-        self.assertEqual(context.exception.responsibility_scope, lifecycle.TRANSPORT_SCOPE)
-
-    def test_paginated_nested_response_normalization(self) -> None:
-        runner = FakeRunner()
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        command = ["gh", "api", "--paginate", "--slurp", "repos/owner/repo/issues/719/comments?per_page=100"]
-        runner.add(command, [[{"id": 9, "body": "b", "url": "u"}], [{"id": 3, "body": "a", "html_url": "ha"}, {"id": 9, "body": "b", "url": "u"}]])
-        self.assertEqual([comment.comment_id for comment in adapter.comments()], [3, 9])
-        self.assertIn("--slurp", runner.commands[0])
-        runner.add(command, [{"id": 1}])
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            adapter.comments()
-        self.assertEqual(context.exception.responsibility_scope, lifecycle.TRANSPORT_SCOPE)
-
-    def test_url_encoded_delete_and_post_commands(self) -> None:
-        runner = FakeRunner()
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        add = ["gh", "api", "--method", "POST", "repos/owner/repo/issues/719/labels", "-f", "labels[]=ready / 進行"]
-        delete = ["gh", "api", "--method", "DELETE", "repos/owner/repo/issues/719/labels/ready%20%2F%20%E9%80%B2%E8%A1%8C"]
-        comment = ["gh", "api", "--method", "POST", "repos/owner/repo/issues/719/comments", "-f", "body=payload"]
-        runner.add(add)
-        runner.add(delete)
-        runner.add(comment, {"id": 1})
-        adapter.add_label("ready / 進行")
-        adapter.remove_label("ready / 進行")
-        adapter.create_comment("payload")
-        self.assertEqual(runner.commands, [tuple(add), tuple(delete), tuple(comment)])
-
-    def test_pure_lifecycle_three_states(self) -> None:
-        self.assertEqual(lifecycle.classify_lifecycle({"work_started": True, "handoff_ready": False, "validation_complete": False}), "active")
-        self.assertEqual(lifecycle.classify_lifecycle({"work_started": True, "handoff_ready": True, "validation_complete": True}), "review-ready")
-        gap = {key: key for key in ("property", "reason", "attempt", "observed_result", "environment", "next_command")}
-        self.assertEqual(lifecycle.classify_lifecycle({"work_started": True, "handoff_ready": True, "validation_complete": True, "verification_unavailable": True, "verification_gap": gap}), "review-ready-unverified")
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.classify_lifecycle({"work_started": True, "handoff_ready": True, "validation_complete": True, "verification_unavailable": True, "verification_gap": {}})
-        self.assertEqual(context.exception.code, "verification_gap_incomplete")
-
-    def test_evidence_retry_identity_and_reuse(self) -> None:
-        payload = lifecycle.build_evidence_payload(
-            repo="owner/repo", issue_number=719, lifecycle="review-ready", evidence={"head": "a"},
-            pr_identity={"number": 1, "head": "a"}, source_snapshot={"issue": 719}, mapping=self.mapping,
-        )
-        first = lifecycle.evidence_comment(payload)
-        self.assertEqual(first, lifecycle.evidence_comment(payload))
-        self.assertIn("agent-canon:github-status-lifecycle:v1", first)
-        self.assertIn(payload["taxonomy_mapping_digest"], first)
-
-    def test_concurrent_comment_duplicate_is_typed_stop(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        lifecycle.reconcile_status(
-            adapter,
-            mapping=self.mapping,
-            facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-            evidence=self.evidence,
-            pr_identity=self.pr_identity,
-        )
-        runner.comments.append(
-            cast(dict[str, object], {"id": 2, "body": runner.comments[0]["body"], "html_url": "u2"})
-        )
-        runner.commands = []
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence=self.evidence,
-                pr_identity=self.pr_identity,
-            )
-        self.assertEqual(context.exception.code, "evidence_duplicate")
-        self.assertFalse(any("--method" in command for command in runner.commands))
-
-    def test_lost_comment_response_is_not_reposted(self) -> None:
-        runner = StatefulRunner([], list(self.mapping.canonical.values()))
-        runner.drop_created_comments = True
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence=self.evidence,
-                pr_identity=self.pr_identity,
-            )
-        self.assertEqual(context.exception.code, "evidence_readback_unavailable")
+    def test_taxonomy_is_loaded_from_existing_owner(self):
+        self.assertEqual(load_label_mapping().active, "in progress")
+        self.assertEqual(mapping_from_data(self.mapping.as_dict()), self.mapping)
         self.assertEqual(
-            len([cmd for cmd in runner.commands if "--method" in cmd and any("/comments" in token for token in cmd)]),
-            1,
+            validate_remote_catalog(self.mapping, self.runner.catalog),
+            frozenset(self.runner.catalog),
+        )
+        self.assert_failure(
+            "label_mapping_missing",
+            lambda: validate_remote_catalog(self.mapping, ["in progress"]),
         )
 
-    def test_plan_preserves_unrelated_and_aliases(self) -> None:
-        plan = lifecycle.plan_operations(["in progress", "status:ready-for-review", "bug"], {"ready for review"}, self.mapping)
-        self.assertEqual(plan, [("remove", "in progress"), ("remove", "status:ready-for-review"), ("add", "ready for review")])
-        self.assertTrue(lifecycle.evaluate_final(["ready for review", "bug"], {"ready for review"}, ["in progress", "bug"], self.mapping, 1))
-        self.assertFalse(lifecycle.evaluate_final(["ready for review", "need verification", "bug"], {"ready for review"}, ["in progress", "bug"], self.mapping, 1))
+    def test_invalid_taxonomy_does_not_mutate(self):
+        for table in (
+            {},
+            {"status_lifecycle": {}},
+            {
+                "status_lifecycle": {
+                    "active": "x",
+                    "ready_for_review": "x",
+                    "needs_verification": "y",
+                }
+            },
+        ):
+            with self.subTest(table=table):
+                self.assert_failure(
+                    "taxonomy_invalid", lambda: mapping_from_data(table)
+                )
+        bad = self.mapping.as_dict()
+        bad["status_lifecycle"]["legacy_aliases"]["active"] = ["ready for review"]
+        self.assert_failure("taxonomy_invalid", lambda: mapping_from_data(bad))
+        self.assertEqual(self.runner.writes(), [])
 
-    def test_drift_between_remove_and_add_stops(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-
-        def add_race(instance: StatefulRunner, read_count: int) -> None:
-            if read_count == 5:
-                instance.labels.append("race")
-
-        runner.issue_read_hook = add_race
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence=self.evidence,
-                pr_identity=self.pr_identity,
+    def test_native_issue_and_comment_ids_are_positive(self):
+        for identity in (True, 0, -1, "1?x", "../1"):
+            with self.subTest(identity=identity):
+                self.assert_failure(
+                    "identity_invalid", lambda: GhStatusAdapter("owner/repo", identity)
+                )
+        for identity in (False, 0, -1, "10"):
+            self.assert_failure(
+                "identity_invalid",
+                lambda: self.reconcile(comment_body=None, comment_id=identity),
             )
-        self.assertEqual(context.exception.code, "concurrent_status_drift")
-        self.assertEqual(len([command for command in runner.commands if command[-1].endswith("/labels")]), 0)
+        self.assertEqual(self.runner.calls, [])
 
-    def test_stale_read_concurrent_write_before_mutation(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-
-        def add_stale_write(instance: StatefulRunner, read_count: int) -> None:
-            if read_count == 2:
-                instance.labels.append("race")
-
-        runner.issue_read_hook = add_stale_write
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence=self.evidence,
-                pr_identity=self.pr_identity,
-            )
-        self.assertEqual(context.exception.code, "concurrent_status_drift")
+    def test_one_ordinary_comment_needs_no_pr_record_or_marker(self):
+        result = self.reconcile()
+        self.assertEqual(result["kind"], "success")
+        self.assertEqual(result["evidence"]["body"], self.body)
+        self.assertEqual(result["evidence"]["id"], 10)
+        self.assertEqual(self.runner.labels, {"bug", "ready for review"})
+        self.assertEqual(len(self.runner.comment_posts()), 1)
         self.assertFalse(
-            any(
-                "--method" in command and any("/labels" in token for token in command)
-                for command in runner.commands
+            any("comments?" in arg for args in self.runner.calls for arg in args)
+        )
+
+    def test_selected_existing_id_is_reused_without_post(self):
+        selected = self.runner.add_comment(self.body)
+        self.runner.add_comment(self.body)
+        result = self.reconcile(comment_body=None, comment_id=selected["id"])
+        self.assertEqual(result["evidence"]["id"], selected["id"])
+        self.assertEqual(self.runner.comment_posts(), [])
+
+    def test_other_comments_and_identical_prose_do_not_gate_labels(self):
+        self.runner.add_comment(self.body)
+        self.runner.add_comment("unrelated discussion")
+
+        def concurrent_comment(runner):
+            if runner.comment_reads == 2:
+                runner.add_comment(self.body)
+
+        self.runner.on_comment_read = concurrent_comment
+        self.assertEqual(self.reconcile()["kind"], "success")
+        self.assertEqual(len(self.runner.comment_posts()), 1)
+
+    def test_foreign_issue_comment_is_not_evidence(self):
+        foreign = self.runner.add_comment(self.body, issue=720)
+        self.assert_failure(
+            "evidence_readback_mismatch",
+            lambda: self.reconcile(comment_body=None, comment_id=foreign["id"]),
+        )
+        self.assertEqual(self.runner.writes(), [])
+
+    def test_empty_or_ambiguous_evidence_is_rejected_before_transport(self):
+        for options in (
+            {"comment_body": None},
+            {"comment_body": " "},
+            {"comment_id": 10},
+        ):
+            self.assert_failure("evidence_missing", lambda: self.reconcile(**options))
+        self.assertEqual(self.runner.calls, [])
+
+    def test_uncertain_post_is_not_retried_or_rolled_back(self):
+        self.runner.lose_post_response = True
+        self.assert_failure("mutation_partial", self.reconcile)
+        self.assertEqual(len(self.runner.comment_posts()), 1)
+        self.assertEqual(len(self.runner.writes()), 1)
+        self.assertEqual(len(self.runner.comments), 1)
+        self.assertEqual(self.runner.labels, {"bug", "in progress"})
+
+    def test_missing_created_comment_blocks_label_writes(self):
+        self.runner.hide_comment = True
+        self.assert_failure("readback_unavailable", self.reconcile)
+        self.assertEqual(len(self.runner.writes()), 1)
+        self.assertEqual(self.runner.labels, {"bug", "in progress"})
+
+    def test_concurrent_selected_comment_edit_is_not_success(self):
+        def edit(runner):
+            if runner.comment_reads == 2:
+                runner.comments[10]["body"] = "changed by another writer"
+
+        self.runner.on_comment_read = edit
+        self.assert_failure("evidence_readback_mismatch", self.reconcile)
+        self.assertEqual(len(self.runner.comment_posts()), 1)
+
+    def test_three_states_preserve_unrelated_labels(self):
+        for changes, expected in (
+            ({"handoff_ready": False}, {"in progress"}),
+            ({}, {"ready for review"}),
+            (
+                {"verification_unavailable": True},
+                {"ready for review", "need verification"},
+            ),
+        ):
+            with self.subTest(changes=changes):
+                runner = StatefulRunner()
+                result = reconcile_status(
+                    GhStatusAdapter("owner/repo", 719, runner=runner),
+                    mapping=self.mapping,
+                    facts={**self.facts, **changes},
+                    comment_body="対象変更の説明。実機検証は接続がなく未実施。既存実行ownerへ引継ぎ。",
+                )
+                self.assertEqual(result["kind"], "success")
+                self.assertEqual(runner.labels, {"bug", *expected})
+
+    def test_failures_remain_active_not_external_verification(self):
+        for field in ("implementation_failure", "validation_failed"):
+            self.assertEqual(
+                classify_lifecycle(
+                    {**self.facts, field: True, "verification_unavailable": True}
+                ),
+                "active",
+            )
+        self.assert_failure(
+            "lifecycle_facts_incomplete",
+            lambda: classify_lifecycle({**self.facts, "handoff_ready": "yes"}),
+        )
+
+    def test_plan_removes_only_undesired_managed_names(self):
+        desired = self.mapping.desired("review-ready-unverified")
+        operations = plan_operations(
+            ("bug", "working", "in progress"), desired, self.mapping
+        )
+        self.assertEqual(
+            operations,
+            (
+                ("remove", "in progress"),
+                ("remove", "working"),
+                ("add", "ready for review"),
+                ("add", "need verification"),
+            ),
+        )
+        self.assertTrue(
+            evaluate_final(("bug", *desired), desired, ("bug", "working"), self.mapping)
+        )
+        self.assertFalse(
+            evaluate_final(tuple(desired), desired, ("bug",), self.mapping)
+        )
+        self.assertFalse(
+            evaluate_final(
+                ("bug", "working", *desired), desired, ("bug",), self.mapping
             )
         )
 
-    def test_aba_limit_is_not_claimed_as_cas(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        runner.transient_aba_on_issue_read = True
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        result = lifecycle.reconcile_status(
-            adapter,
-            mapping=self.mapping,
-            facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-            evidence=self.evidence,
-            pr_identity=self.pr_identity,
-        )
-        self.assertEqual(result["kind"], "success")
-        self.assertNotIn("cas", json.dumps(result).lower())
+    def test_fresh_label_drift_stops_before_first_mutation(self):
+        def drift(runner):
+            if runner.issue_reads == 2:
+                runner.labels.add("other-owner")
 
-    def test_partial_failure_has_no_rollback(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        runner.fail_next_mutation = True
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence=self.evidence,
-                pr_identity=self.pr_identity,
-            )
-        failure = context.exception
-        self.assertEqual(failure.code, "mutation_partial")
+        self.runner.on_issue_read = drift
+        self.assert_failure("fresh_state_changed", self.reconcile)
+        self.assertEqual(len(self.runner.writes()), 1)
+        self.assertIn("other-owner", self.runner.labels)
+
+    def test_between_mutation_drift_keeps_completed_prefix(self):
+        def drift(runner):
+            if runner.issue_reads == 4:
+                runner.labels.add("other-owner")
+
+        self.runner.on_issue_read = drift
+        failure = self.assert_failure("fresh_state_changed", self.reconcile)
+        self.assertEqual(
+            failure.details["completed_prefix"],
+            [{"action": "remove", "label": "in progress"}],
+        )
+        self.assertEqual(self.runner.labels, {"bug", "other-owner"})
+
+    def test_unknown_label_write_is_not_retried(self):
+        self.runner.fail_label = True
+        failure = self.assert_failure("mutation_partial", self.reconcile)
+        self.assertEqual(failure.details["completed_prefix"], [])
         self.assertEqual(failure.details["rollback"], "not-attempted")
+        self.assertEqual(len(self.runner.writes()), 2)
 
-    def test_reconcile_final_predicate_and_api_commands(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        result = lifecycle.reconcile_status(
-            adapter,
-            mapping=self.mapping,
-            facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-            evidence=self.evidence,
-            pr_identity=self.pr_identity,
-        )
-        self.assertEqual(result["kind"], "success")
-        self.assertIn(
-            ("gh", "api", "--paginate", "--slurp", "repos/owner/repo/labels?per_page=100"),
-            runner.commands,
-        )
-        self.assertIn(
-            ("gh", "api", "--method", "DELETE", "repos/owner/repo/issues/719/labels/in%20progress"),
-            runner.commands,
-        )
-        self.assertIn(
-            ("gh", "api", "--method", "POST", "repos/owner/repo/issues/719/labels", "-f", "labels[]=ready for review"),
-            runner.commands,
+    def test_label_delete_uses_encoded_native_path_and_no_body(self):
+        self.runner.labels.add("status/old state")
+        self.adapter.remove_label("status/old state")
+        self.assertEqual(
+            self.runner.calls[-1],
+            [
+                "gh",
+                "api",
+                "--method",
+                "DELETE",
+                "repos/owner/repo/issues/719/labels/status%2Fold%20state",
+            ],
         )
 
-    def test_reconcile_status_with_fake_runner(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        result = lifecycle.reconcile_status(
-            adapter,
-            mapping=self.mapping,
-            facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-            evidence=self.evidence,
-            pr_identity=self.pr_identity,
-        )
-        self.assertEqual(result["lifecycle"], "review-ready")
-        self.assertEqual(set(runner.labels), {"bug", "ready for review"})
-        self.assertEqual(len(runner.comments), 1)
+    def test_readback_does_not_claim_to_detect_unobserved_aba(self):
+        def aba(runner):
+            if runner.issue_reads == 2:
+                runner.labels.add("temporary")
+                runner.labels.remove("temporary")
 
-    def test_retry_reuses_historical_payload_after_label_change(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        first = lifecycle.reconcile_status(
-            adapter,
-            mapping=self.mapping,
-            facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-            evidence=self.evidence,
-            pr_identity=self.pr_identity,
-        )
-        runner.commands = []
-        second = lifecycle.reconcile_status(
-            adapter,
-            mapping=self.mapping,
-            facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-            evidence=self.evidence,
-            pr_identity=self.pr_identity,
-        )
-        self.assertEqual(second["evidence"], first["evidence"])
-        self.assertEqual(len(runner.comments), 1)
-        self.assertFalse(any("--method" in command for command in runner.commands))
-
-    def test_duplicate_historical_evidence_stops_before_mutation(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        lifecycle.reconcile_status(
-            adapter,
-            mapping=self.mapping,
-            facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-            evidence=self.evidence,
-            pr_identity=self.pr_identity,
-        )
-        runner.comments.append({"id": 2, "body": runner.comments[0]["body"], "html_url": "https://example/comments/2"})
-        runner.commands = []
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence=self.evidence,
-                pr_identity=self.pr_identity,
-            )
-        self.assertEqual(context.exception.code, "evidence_duplicate")
-        self.assertFalse(any("--method" in command for command in runner.commands))
-
-    def test_final_same_marker_conflict_is_not_success(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        runner.inject_conflicting_comment_on_final_read = True
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence=self.evidence,
-                pr_identity=self.pr_identity,
-            )
-        self.assertEqual(context.exception.code, "evidence_conflict")
-
-    def test_stateful_drift_between_remove_and_add_stops(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-
-        def add_race(instance: StatefulRunner, read_count: int) -> None:
-            if read_count == 5:
-                instance.labels.append("race")
-
-        runner.issue_read_hook = add_race
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        with self.assertRaises(lifecycle.LifecycleFailure) as context:
-            lifecycle.reconcile_status(
-                adapter,
-                mapping=self.mapping,
-                facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-                evidence=self.evidence,
-                pr_identity=self.pr_identity,
-            )
-        self.assertEqual(context.exception.code, "concurrent_status_drift")
-        self.assertEqual(len([command for command in runner.commands if command[-1].endswith("/labels")]), 0)
-
-    def test_stateful_aba_boundary_never_claims_cas(self) -> None:
-        runner = StatefulRunner(["in progress", "bug"], list(self.mapping.canonical.values()))
-        runner.transient_aba_on_issue_read = True
-        adapter = lifecycle.GhStatusAdapter("owner/repo", 719, runner)
-        result = lifecycle.reconcile_status(
-            adapter,
-            mapping=self.mapping,
-            facts={"work_started": True, "handoff_ready": True, "validation_complete": True},
-            evidence=self.evidence,
-            pr_identity=self.pr_identity,
-        )
-        self.assertEqual(result["kind"], "success")
-        self.assertNotIn("cas", json.dumps(result).lower())
-
-    def test_final_predicate_and_three_states(self) -> None:
-        self.assertEqual(self.mapping.desired("active"), {"in progress"})
-        self.assertEqual(self.mapping.desired("review-ready"), {"ready for review"})
-        self.assertEqual(self.mapping.desired("review-ready-unverified"), {"ready for review", "need verification"})
-
-    def test_failure_output_names_owner_and_scope(self) -> None:
-        failure = lifecycle.LifecycleFailure("readback_mismatch", "bad", details={"observed": []})
-        report = failure.as_dict()
-        self.assertEqual(report["code_owner"], lifecycle.MODULE_OWNER)
-        self.assertEqual(report["responsibility_scope"], lifecycle.LIFECYCLE_SCOPE)
-        self.assertIn("code_owner", str(failure))
+        self.runner.on_issue_read = aba
+        self.assertEqual(self.reconcile()["kind"], "success")
 
 
 if __name__ == "__main__":

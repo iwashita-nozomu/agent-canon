@@ -2,16 +2,14 @@
 # @dependency-start
 # contract tool
 # responsibility Resolves AgentCanon runtime hook and eval archive paths without mutating repositories.
-# upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
-# downstream implementation ../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
-# downstream implementation ./generate_agent_improvement_guide.py reads mounted hook log archives
+# upstream design ../../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
+# downstream implementation ../../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
+# downstream implementation ../../../eval/producers/generate_agent_improvement_guide.py reads mounted hook log archives
 # downstream implementation ./export_codex_runtime_summary.py writes bounded Codex runtime summaries
-# downstream implementation ./eval_accumulation_check.py validates mounted hook log archives
+# downstream implementation ../../../eval/checkers/eval_accumulation_check.py validates mounted hook log archives
 # downstream implementation ./runtime_log_archive_git.py archives run-bundle agent reports
-# downstream implementation ./evaluate_skill_workflow_prompts.py writes accumulated eval reports through this resolver
-# downstream implementation ./evaluate_workflow_selection.py writes accumulated eval reports through this resolver
-# downstream implementation ./evaluate_report_quality.py writes accumulated eval reports through this resolver
-# downstream implementation ./evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver
+# downstream implementation ../../../eval/producers/evaluate_workflow_selection.py writes accumulated eval reports through this resolver
+# downstream implementation ../../../eval/producers/evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver
 # downstream implementation ./runtime_log_archive_git.py copies agent reports into this archive
 # @dependency-end
 """Resolve AgentCanon runtime log and eval archive paths."""
@@ -67,9 +65,11 @@ MAX_KEY_LENGTH = 80
 GIT_COMMIT_KEY_LENGTH = 12
 CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID")
 GIT_HEAD_TIMEOUT_SECONDS = 5
+# Depths are ``Path.parents`` indexes from the resolved marker file. The
+# archive module marker is depth 3: depth 2 resolves only to ``tools/``, not
+# the source checkout whose identity owns archive provenance.
 AGENT_CANON_ROOT_MARKERS = (
-    (Path("tools") / "runtime" / "archive" / "runtime_log_paths.py", 2),
-    (Path("eval") / "producers" / "evaluate_skill_workflow_prompts.py", 2),
+    (Path("tools") / "runtime" / "archive" / "runtime_log_paths.py", 3),
     (Path("eval") / "definitions" / "README.md", 2),
     (Path("documents") / "runtime-log-archive.md", 1),
 )
@@ -106,7 +106,9 @@ def runtime_boundary(
     return runtime_artifact_boundary(source_root, runtime_root, create=create)
 
 
-def hook_event_spool_root(active_root: Path, runtime_root: Path | str | None = None) -> Path:
+def hook_event_spool_root(
+    active_root: Path, runtime_root: Path | str | None = None
+) -> Path:
     """Return the O(1) repo-owned hook-event spool root."""
     override = os.environ.get(HOOK_EVENT_SPOOL_DIR_ENV, "").strip()
     if override:
@@ -131,7 +133,12 @@ def post_tooluse_spool_path(
     root: Path, hook_run_id: str, runtime_root: Path | str | None = None
 ) -> Path:
     """Return the O(1) default PostToolUse event path."""
-    return hook_event_spool_root(root, runtime_root) / "post-tool-use" / "hook" / f"{hook_run_id}.json"
+    return (
+        hook_event_spool_root(root, runtime_root)
+        / "post-tool-use"
+        / "hook"
+        / f"{hook_run_id}.json"
+    )
 
 
 def _log_environment_key(root: Path) -> str:
@@ -139,7 +146,12 @@ def _log_environment_key(root: Path) -> str:
     override = os.environ.get(LOG_ENV_ENV, "").strip()
     if override:
         return safe_slug(override)
-    for env_name in ("DEVCONTAINER_PROJECT_NAME", "COMPOSE_PROJECT_NAME", "CODESPACE_NAME", "HOSTNAME"):
+    for env_name in (
+        "DEVCONTAINER_PROJECT_NAME",
+        "COMPOSE_PROJECT_NAME",
+        "CODESPACE_NAME",
+        "HOSTNAME",
+    ):
         value = os.environ.get(env_name, "").strip()
         if value:
             return safe_slug(value)
@@ -241,7 +253,12 @@ def is_agent_canon_root(root: Path) -> bool:
 
 
 def marker_resolved_root(root: Path) -> Path | None:
-    """Return the real AgentCanon root behind a direct or symlinked runtime view."""
+    """Resolve a declared source marker to the checkout root for provenance.
+
+    Depth is measured from each resolved marker file, so internal paths such
+    as ``tools/runtime/archive`` resolve back to the source repo rather than
+    becoming the identity root themselves.
+    """
     for marker, depth in AGENT_CANON_ROOT_MARKERS:
         marker_path = root / marker
         if marker_path.is_file():
@@ -250,12 +267,14 @@ def marker_resolved_root(root: Path) -> Path | None:
 
 
 def agent_canon_root(root: Path) -> Path:
-    """Return the explicit AgentCanon source root for one invocation.
+    """Return the canonical source root used for archive provenance.
 
-    Parent repositories are intentionally source-free.  A caller running from
-    a parent must pass the external development clone as ``root`` (or resolve
-    it before calling this helper); no ``vendor/agent-canon`` discovery is
-    permitted.
+    A marker maps internal source paths back to the checkout before repo
+    identity is derived; without one, the caller's resolved path is retained.
+    Parent repositories are source-free, so their caller must pass the
+    external AgentCanon clone explicitly; no vendor search is performed. The
+    path contract is in
+    ``documents/runtime/runtime-log-archive.md#Reader map and paths``.
     """
     resolved = root.resolve()
     marker_root = marker_resolved_root(resolved)
@@ -271,11 +290,16 @@ def _log_archive_root(canon_root: Path, runtime_root: Path | str | None = None) 
             return runtime_boundary(canon_root, runtime_root).resolve(candidate)
         try:
             if candidate.is_symlink():
-                raise RuntimePathEscape(f"explicit archive root is a symlink: {candidate}")
+                raise RuntimePathEscape(
+                    f"explicit archive root is a symlink: {candidate}"
+                )
             resolved = candidate.resolve(strict=False)
             source = canon_root.expanduser().resolve()
             declared = os.environ.get(PRIVATE_LOG_ROOT_ENV, "").strip()
-            if not declared or Path(declared).expanduser().resolve(strict=False) != resolved:
+            if (
+                not declared
+                or Path(declared).expanduser().resolve(strict=False) != resolved
+            ):
                 raise RuntimePathEscape(
                     "absolute archive override must equal the declared private-log mount root"
                 )
@@ -283,11 +307,17 @@ def _log_archive_root(canon_root: Path, runtime_root: Path | str | None = None) 
             for part in candidate.parts[1:]:
                 current /= part
                 if current.is_symlink():
-                    raise RuntimePathEscape(f"explicit archive root has a symlink component: {current}")
+                    raise RuntimePathEscape(
+                        f"explicit archive root has a symlink component: {current}"
+                    )
         except OSError as exc:
-            raise RuntimePathEscape(f"explicit archive root is unavailable: {candidate}") from exc
+            raise RuntimePathEscape(
+                f"explicit archive root is unavailable: {candidate}"
+            ) from exc
         if resolved == source or source in resolved.parents:
-            raise RuntimePathEscape(f"explicit archive root is inside source: {resolved}")
+            raise RuntimePathEscape(
+                f"explicit archive root is inside source: {resolved}"
+            )
         return resolved
     mount = mounted_log_archive_root(canon_root, runtime_root)
     if mount.is_dir():
@@ -307,14 +337,22 @@ def hook_results_dir(
     active_root: Path, canon_root: Path, runtime_root: Path | str | None = None
 ) -> Path:
     """Return the hook JSONL result directory for one source repository."""
-    return _log_archive_root(canon_root, runtime_root) / "hook-runs" / repo_log_key(active_root)
+    return (
+        _log_archive_root(canon_root, runtime_root)
+        / "hook-runs"
+        / repo_log_key(active_root)
+    )
 
 
 def codex_runtime_summary_dir(
     active_root: Path, canon_root: Path, runtime_root: Path | str | None = None
 ) -> Path:
     """Return the Codex runtime summary root directory for one source repository."""
-    return _log_archive_root(canon_root, runtime_root) / "codex-runtime" / repo_log_key(active_root)
+    return (
+        _log_archive_root(canon_root, runtime_root)
+        / "codex-runtime"
+        / repo_log_key(active_root)
+    )
 
 
 def codex_runtime_chat_dir(
@@ -338,28 +376,39 @@ def codex_runtime_summary_path(
     runtime_root: Path | str | None = None,
 ) -> Path:
     """Return the per-chat Codex runtime summary JSONL path."""
-    return codex_runtime_chat_dir(active_root, canon_root, conversation_id, runtime_root) / codex_runtime_summary_file(canon_root)
+    return codex_runtime_chat_dir(
+        active_root, canon_root, conversation_id, runtime_root
+    ) / codex_runtime_summary_file(canon_root)
 
 
 def codex_runtime_index_path(
     active_root: Path, canon_root: Path, runtime_root: Path | str | None = None
 ) -> Path:
     """Return the cross-chat Codex runtime summary index path."""
-    return codex_runtime_summary_dir(active_root, canon_root, runtime_root) / CODEX_RUNTIME_INDEX_FILE
+    return (
+        codex_runtime_summary_dir(active_root, canon_root, runtime_root)
+        / CODEX_RUNTIME_INDEX_FILE
+    )
 
 
 def agent_report_archive_dir(
     active_root: Path, canon_root: Path, runtime_root: Path | str | None = None
 ) -> Path:
     """Return the archived reports/agents directory for one source repository."""
-    return _log_archive_root(canon_root, runtime_root) / "agent-reports" / repo_log_key(active_root)
+    return (
+        _log_archive_root(canon_root, runtime_root)
+        / "agent-reports"
+        / repo_log_key(active_root)
+    )
 
 
 def eval_results_dir(
     canon_root: Path, family: str, runtime_root: Path | str | None = None
 ) -> Path:
     """Return the active accumulated eval result directory for one family."""
-    return _log_archive_root(canon_root, runtime_root) / "eval-results" / safe_slug(family)
+    return (
+        _log_archive_root(canon_root, runtime_root) / "eval-results" / safe_slug(family)
+    )
 
 
 def eval_result_search_dirs(

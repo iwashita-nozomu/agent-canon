@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Builds machine-readable file-surface inventories for repo review.
-# downstream implementation ./review_backlog_scan.sh includes inventory reports
-# downstream implementation ../../tests/agent_tools/test_file_surface_inventory.py tests inventory
+# downstream implementation ../../repository/github/review_backlog_scan.sh includes inventory reports
+# downstream implementation ../../../tests/agent_tools/test_file_surface_inventory.py tests inventory
 # @dependency-end
 """Build JSON and Markdown file-surface inventories for repo review."""
 

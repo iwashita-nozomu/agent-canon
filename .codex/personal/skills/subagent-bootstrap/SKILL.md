@@ -1,8 +1,8 @@
 ---
 name: subagent-bootstrap
-description: "Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing."
+description: "Use when a selected route needs child delegation or durable coordination/resumption."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"d2fe1a931692353c4d1bfc4219926cc17258403e05c159b63a2e7518205ce50c"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1b7334c8ba44044cdf2f5faf0f255ebae4428507411d36b71591a55ebd318748"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/subagent-bootstrap.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [subagent-bootstrap](../../../../agents/skills/subagent-bootstrap.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill subagent-bootstrap --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

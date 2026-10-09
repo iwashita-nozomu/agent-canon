@@ -2,19 +2,19 @@
 # @dependency-start
 # contract tool
 # responsibility Runs source-owned repo dependency review and optional persisted graph preparation.
-# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned review authority and explicit graph boundary
-# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and review projections
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout requires dependency evidence
-# upstream design ../../templates/agents/closeout_gate.md closeout dependency evidence gate
-# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR dependency checklist
-# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR dependency checklist
-# upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
+# upstream design ../../../documents/design/source-owned-dependency-validation.md source-owned review authority and explicit graph boundary
+# upstream design ../../../documents/design/dependency-manifest-design.md dependency manifest DSL and review projections
+# upstream design ../../../agents/canonical/CODEX_WORKFLOW.md closeout requires dependency evidence
+# upstream design ../../../templates/agents/closeout_gate.md closeout dependency evidence gate
+# upstream design ../../../.github/PULL_REQUEST_TEMPLATE.md standalone PR dependency checklist
+# upstream design ../../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR dependency checklist
+# upstream design ../../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream implementation ./scan_dependency_headers.sh scans repo-wide manifest coverage
-# upstream implementation ./check_dependency_header_format.sh validates repo-wide manifest syntax
+# upstream implementation ../../validation/semantic/dependencies/check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates source-derived dependency relations
-# upstream implementation ./check_design_doc_claims.py validates design claims against dependency evidence
-# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh runs strict dependency review
-# downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
+# upstream implementation ../../validation/semantic/documents/check_design_doc_claims.py validates design claims against dependency evidence
+# downstream implementation ../../validation/ci/checks/check_agent_canon_pr.sh runs strict dependency review
+# downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
 # @dependency-end
 set -euo pipefail
 

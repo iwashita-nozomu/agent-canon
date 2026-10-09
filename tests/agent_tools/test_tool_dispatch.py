@@ -102,29 +102,6 @@ class ToolDispatchTest(unittest.TestCase):
                 ("--issue-url", "https://github.com/owner/repo/issues/1"),
             )
 
-    def test_issue_lookup_stays_on_host_github_route(self) -> None:
-        """Skill routing uses the host GitHub adapter for online Issue reads."""
-        catalog = yaml.safe_load(
-            (PROJECT_ROOT / "agents" / "skills" / "catalog.yaml").read_text(
-                encoding="utf-8"
-            )
-        )
-        entry = next(
-            item
-            for item in catalog["skill_families"]
-            if item["id"] == "issue-finding-report"
-        )
-        commands = entry["tool_commands"]["conditional"]
-        lookup_commands = [
-            command
-            for command in commands
-            if command.get("executable") == "gh"
-            and command.get("argv", [])[:2] == ["issue", "view"]
-        ]
-        self.assertEqual(len(lookup_commands), 1)
-        self.assertEqual(lookup_commands[0]["argv"][:2], ["issue", "view"])
-        self.assertNotEqual(lookup_commands[0].get("tool_id"), "issue-sync")
-
     def test_dashboard_uses_container_and_external_artifact_route(self) -> None:
         """The canonical dashboard route keeps source read-only and output external."""
         specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
