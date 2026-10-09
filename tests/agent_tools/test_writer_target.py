@@ -112,8 +112,16 @@ def test_shared_checkout_writer_targets_are_rejected_before_spawn() -> None:
     with pytest.raises(WriterTargetError, match="checkout_root_collision"):
         validate_writer_target_allocations(
             (
-                {"owner": "#927:worker", "write_capable": True, "writer_target": shared},
-                {"owner": "#928:publisher", "write_capable": True, "writer_target": shared},
+                {
+                    "owner": "#927:worker",
+                    "write_capable": True,
+                    "writer_target": shared,
+                },
+                {
+                    "owner": "#928:publisher",
+                    "write_capable": True,
+                    "writer_target": shared,
+                },
             )
         )
 
@@ -121,8 +129,16 @@ def test_shared_checkout_writer_targets_are_rejected_before_spawn() -> None:
 def test_distinct_topic_clones_and_readers_remain_admissible() -> None:
     admitted = validate_writer_target_allocations(
         (
-            {"owner": "#927:worker", "write_capable": True, "writer_target": target("/tmp/a")},
-            {"owner": "#928:publisher", "write_capable": True, "writer_target": target("/tmp/b")},
+            {
+                "owner": "#927:worker",
+                "write_capable": True,
+                "writer_target": target("/tmp/a"),
+            },
+            {
+                "owner": "#928:publisher",
+                "write_capable": True,
+                "writer_target": target("/tmp/b"),
+            },
             {"owner": "#929:reviewer", "write_capable": False, "writer_target": None},
         )
     )
@@ -134,16 +150,21 @@ def test_writer_target_is_required_for_writer_and_not_for_reader() -> None:
         validate_writer_target_allocations(
             ({"owner": "worker", "write_capable": True, "writer_target": None},)
         )
-    assert validate_writer_target_allocations(
-        ({"owner": "reader", "write_capable": False, "writer_target": None},)
-    ) == ()
+    assert (
+        validate_writer_target_allocations(
+            ({"owner": "reader", "write_capable": False, "writer_target": None},)
+        )
+        == ()
+    )
 
 
 def test_wave_materializer_rejects_colliding_writer_slots() -> None:
     waves = (
         (
             SubagentWaveSlot("implementer", "worker-1", "worker", True),
-            SubagentWaveSlot("integration_executor", "integration-1", "integration_executor", True),
+            SubagentWaveSlot(
+                "integration_executor", "integration-1", "integration_executor", True
+            ),
         ),
     )
     shared = target("/tmp/one")
@@ -159,10 +180,13 @@ def test_wave_materializer_rejects_colliding_writer_slots() -> None:
 
 def test_wave_materializer_allows_distinct_writer_slots() -> None:
     waves = ((SubagentWaveSlot("implementer", "worker-1", "worker", True),),)
-    assert validate_writer_handoff_waves(
-        waves,
-        {waves[0][0].executable_identity: target("/tmp/one")},
-    )[0].branch == "fix/942"
+    assert (
+        validate_writer_handoff_waves(
+            waves,
+            {waves[0][0].executable_identity: target("/tmp/one")},
+        )[0].branch
+        == "fix/942"
+    )
 
 
 def test_spawn_tool_call_validates_writer_target_before_materialization() -> None:
@@ -658,7 +682,12 @@ def test_writer_allows_scoped_git_output_and_preserves_tree_reads() -> None:
         )
         assert allowed.status == "allowed"
         assert allowed.mutation_paths == ("src/owned.py",)
-        for command in ("git diff HEAD", "git show HEAD", "git log HEAD", "git archive HEAD"):
+        for command in (
+            "git diff HEAD",
+            "git show HEAD",
+            "git log HEAD",
+            "git archive HEAD",
+        ):
             read = evaluate_mutation_authority(
                 {"tool_name": "Bash", "tool_input": {"command": command}},
                 report_dir=None,
@@ -732,7 +761,10 @@ def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> No
             environment=runtime_environment,
             hook_spool_root=root,
         )
-        assert missing_inputs.reason == "repository_topic_clone_preservation_inputs_missing"
+        assert (
+            missing_inputs.reason
+            == "repository_topic_clone_preservation_inputs_missing"
+        )
         finalized = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",
@@ -758,7 +790,10 @@ def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> No
             },
             hook_spool_root=root,
         )
-        assert ordinary.reason == "repository_topic_clone_lifecycle_requires_integration_executor"
+        assert (
+            ordinary.reason
+            == "repository_topic_clone_lifecycle_requires_integration_executor"
+        )
         for compound in (
             "touch README.md && " + command,
             command + " && rm README.md",
