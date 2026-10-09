@@ -178,10 +178,10 @@ run 前の pass / fail、合否、または experiment acceptance を数値性�
 dtype / device contract、workload で比較し、少なくとも次を一つの性能記録へ
 まとめます。
 
-\[
+$$
 T_{total} = T_{compile/JIT} + N_{iter} \times
 (T_{iter\_eval} + T_{linear\_solve} + T_{communication}) + T_{other}.
-\]
+$$
 
 `total_seconds` は summary であり、単独では component の帰属根拠になりません。
 total time だけでなく、residual / objective / KKT trajectory、iteration count、

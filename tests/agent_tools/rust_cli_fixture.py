@@ -13,8 +13,7 @@
 it cannot execute without an installed runtime and registered target.  These
 formatter tests exercise the Rust implementation contract itself, so they use
 the standalone binary built into a task-owned external target directory.  The
-source checkout remains read-only apart from the test inputs created by each
-test.
+source checkout remains read-only; test inputs live in temporary roots.
 """
 
 from __future__ import annotations
@@ -27,15 +26,20 @@ import tempfile
 from functools import lru_cache
 from pathlib import Path
 
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 @lru_cache(maxsize=1)
 def standalone_agent_canon() -> Path:
     """Build the Rust CLI once under an external, automatically cleaned target."""
-    workspace = PROJECT_ROOT / "workspace"
-    workspace.mkdir(parents=True, exist_ok=True)
-    build_root = Path(tempfile.mkdtemp(prefix="rust-cli-tests-", dir=workspace))
+    boundary = runtime_artifact_boundary(
+        PROJECT_ROOT, os.environ.get("AGENT_CANON_RUNTIME_ROOT"), create=True
+    )
+    build_root = Path(
+        tempfile.mkdtemp(prefix="rust-cli-tests-", dir=boundary.root)
+    )
     atexit.register(shutil.rmtree, build_root, ignore_errors=True)
 
     target_dir = build_root / "cargo-target"
