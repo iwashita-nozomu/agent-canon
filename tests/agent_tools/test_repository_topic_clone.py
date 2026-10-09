@@ -138,6 +138,7 @@ def init_remote(tmp_path: Path) -> tuple[Path, str]:
     )
     run_git(source, "remote", "add", "origin", str(remote))
     run_git(source, "push", "origin", "main")
+    run_git(remote, "symbolic-ref", "HEAD", "refs/heads/main")
     return remote, str(remote)
 
 
@@ -1036,7 +1037,7 @@ def test_prepare_refreshes_changed_owner_evidence_and_current_writer_scope(
     original_sha = run_git(
         prepared.clone,
         "config",
-        "--local",
+        "--worktree",
         "--get",
         f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
     )
@@ -1057,7 +1058,7 @@ def test_prepare_refreshes_changed_owner_evidence_and_current_writer_scope(
         run_git(
             continued.clone,
             "config",
-            "--local",
+            "--worktree",
             "--get",
             f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
         )
@@ -1099,7 +1100,7 @@ def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content
     original_sha = run_git(
         prepared.clone,
         "config",
-        "--local",
+        "--worktree",
         "--get",
         f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
     )
@@ -1117,7 +1118,7 @@ def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content
         run_git(
             continued.clone,
             "config",
-            "--local",
+            "--worktree",
             "--get",
             f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
         )
@@ -1157,14 +1158,14 @@ def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
     original_sha = run_git(
         prepared.clone,
         "config",
-        "--local",
+        "--worktree",
         "--get",
         f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
     )
     run_git(
         prepared.clone,
         "config",
-        "--local",
+        "--worktree",
         f"{rtc.MARKER_PREFIX}.topic",
         "foreign-topic",
     )
@@ -1177,7 +1178,7 @@ def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
         run_git(
             prepared.clone,
             "config",
-            "--local",
+            "--worktree",
             "--get",
             f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
         )
@@ -1187,7 +1188,7 @@ def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
         run_git(
             prepared.clone,
             "config",
-            "--local",
+            "--worktree",
             "--get",
             f"{rtc.MARKER_PREFIX}.topic",
         )
