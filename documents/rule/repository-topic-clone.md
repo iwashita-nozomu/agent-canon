@@ -88,6 +88,9 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
 - raw `git merge` / `git rebase` は writer route では使わず、integration executor が
   `repository_topic_clone.py merge-main`、`finalize-merge`、`resume-merge` を通す。
+  これは選択した integration workflow の owner route です。runtime は一般の
+  `git commit` を integration executor に限定しません。path-scoped commit admission や
+  role id は、実競合レビューや finalizer の parent/tree readback の証明にはなりません。
 - task owner の非空 `--owner-evidence` と computed path、remote、branch identity が一致
   する限り、canonical `prepare` と `merge-main` は operation-level の追加承認なしで
   実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
@@ -100,10 +103,12 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
 
 ### 競合の再開
 
-競合で停止した merge の再開・完了は `finalize-merge` またはその alias
-`resume-merge` だけが行います。両方とも保存された inventory と plan を current checkout に
-対して検証し、unmerged state、hunk identity、unaffected content の readback が通らなければ
-commit しません。`conflict_preservation.py validate` 単体は診断用です。
+競合で停止した merge は native Git の `MERGE_HEAD` と index に状態が残ります。
+integration executor は実際の unmerged paths を確認し、各競合をその source owner と
+レビューして解消します。`finalize-merge` は未解決 index を `git write-tree` が拒否する
+場合は commit せず、解決済み index の tree と `MERGE_HEAD` を親とする commit を read back
+します。競合後に `origin/main` が進んでも、停止中 merge の相手は保存された
+`MERGE_HEAD` です。別 inventory / plan は lifecycle の前提ではありません。
 操作構文は [CLI 参照の競合の再開](../tools/repository_topic_clone.md#競合の再開) を使います。
 
 ## クリーンアップ
