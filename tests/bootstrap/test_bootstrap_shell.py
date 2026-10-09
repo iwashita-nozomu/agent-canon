@@ -168,17 +168,17 @@ def test_shell_install_applies_only_canonical_context_defaults(tmp_path: Path) -
     project_config = repository / ".codex" / "config.toml"
     project_config.parent.mkdir(parents=True, exist_ok=True)
     project_config.write_text(
-        'model_context_window = 1050000\n'
-        'model_auto_compact_token_limit = 900000\n'
-        '[agents]\nmax_threads = 3\n',
+        "model_context_window = 1050000\n"
+        "model_auto_compact_token_limit = 900000\n"
+        "[agents]\nmax_threads = 3\n",
         encoding="utf-8",
     )
     global_config = home / ".codex" / "config.toml"
     global_config.parent.mkdir(parents=True)
     global_config.write_text(
-        'model_context_window = 1000000\n'
+        "model_context_window = 1000000\n"
         'approval_policy = "on-request"\n'
-        '[agents]\nmax_threads = 8\n',
+        "[agents]\nmax_threads = 8\n",
         encoding="utf-8",
     )
     state.mkdir(parents=True)
@@ -243,7 +243,10 @@ printf 'rc=%s\\n' "$?"
     )
     assert failure.returncode == 0, failure.stderr
     assert failure.stdout.strip() == "rc=2"
-    assert personal_config.read_text(encoding="utf-8") == 'approval_policy = "on-request"\n'
+    assert (
+        personal_config.read_text(encoding="utf-8")
+        == 'approval_policy = "on-request"\n'
+    )
     assert not list(personal_config.parent.glob(".config.toml.context.*"))
 
 
@@ -1498,31 +1501,31 @@ def test_concurrent_target_add_serializes_resident_replacement(
         'transaction="$tracker/$target_id"\n'
         'if [[ -n "$target_id" && "$1:$2" == "container:inspect" && ! -e "$transaction.active" ]]; then\n'
         '  exec 9>"$tracker/counter.lock"\n'
-        '  flock -x 9\n'
-        '  count=0\n'
+        "  flock -x 9\n"
+        "  count=0\n"
         '  [[ ! -f "$tracker/active.count" ]] || read -r count < "$tracker/active.count"\n'
-        '  count=$((count + 1))\n'
+        "  count=$((count + 1))\n"
         '  printf "%s\\n" "$count" > "$tracker/active.count"\n'
         '  if ((count > 1)); then : > "$tracker/overlap"; fi\n'
         '  : > "$transaction.active"\n'
-        '  flock -u 9\n'
-        '  exec 9>&-\n'
-        '  sleep 0.05\n'
-        'fi\n'
+        "  flock -u 9\n"
+        "  exec 9>&-\n"
+        "  sleep 0.05\n"
+        "fi\n"
         'if "$fake_docker" "$@"; then rc=0; else rc=$?; fi\n'
         'if [[ -n "$target_id" && "$1" == exec && "$*" == *"target add"* && $rc -eq 0 ]]; then\n'
         '  : > "$transaction.committed"\n'
-        'fi\n'
+        "fi\n"
         'if [[ -n "$target_id" && "$1:$2" == "container:inspect" && "$*" == *Mounts* && -e "$transaction.committed" && -e "$transaction.active" ]]; then\n'
         '  exec 9>"$tracker/counter.lock"\n'
-        '  flock -x 9\n'
+        "  flock -x 9\n"
         '  read -r count < "$tracker/active.count"\n'
-        '  count=$((count - 1))\n'
+        "  count=$((count - 1))\n"
         '  printf "%s\\n" "$count" > "$tracker/active.count"\n'
         '  rm -f -- "$transaction.active" "$transaction.committed"\n'
-        '  flock -u 9\n'
-        '  exec 9>&-\n'
-        'fi\n'
+        "  flock -u 9\n"
+        "  exec 9>&-\n"
+        "fi\n"
         'exit "$rc"\n',
         encoding="utf-8",
     )
@@ -1748,9 +1751,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
         },
     )
     assert dashboard_export.returncode == 0, dashboard_export.stderr
-    assert (
-        dashboard_target.read_text(encoding="utf-8") == "# dashboard\n"
-    )
+    assert dashboard_target.read_text(encoding="utf-8") == "# dashboard\n"
     assert dashboard_sentinel.read_text(encoding="utf-8") == "preserve me\n"
     bad_dashboard_stage = tmp_path / "bad-dashboard-stage"
     bad_dashboard_stage.mkdir()
@@ -2669,8 +2670,8 @@ def test_sync_uses_forced_main_checkout_without_candidate_admission() -> None:
     assert 'git -C "$install_root" checkout --force -B main FETCH_HEAD' in text
     assert '_agent_canon_advance_source "$install_root"' in text
     assert '_agent_canon_advance_source "$AGENT_CANON_REPOSITORY_ROOT"' in text
-    assert text.count('fetch origin main') == 1
-    assert text.count('checkout --force -B main FETCH_HEAD') == 1
+    assert text.count("fetch origin main") == 1
+    assert text.count("checkout --force -B main FETCH_HEAD") == 1
     assert "source-staging" not in text
     assert 'git clone --no-hardlinks "$install_root"' not in text
     assert 'git -C "$install_root" merge --ff-only' not in text
@@ -3492,10 +3493,10 @@ def test_container_exec_forwards_only_explicit_stdin(tmp_path: Path) -> None:
         "#!/usr/bin/env bash\n"
         "set -eu\n"
         'case "$1:$2" in\n'
-        '  image:inspect) printf \'%s\\n\' sha256:image ;;\n'
-        '  container:inspect) printf \'%s\\n\' container-id ;;\n'
-        '  exec:*)\n'
-        '    shift\n'
+        "  image:inspect) printf '%s\\n' sha256:image ;;\n"
+        "  container:inspect) printf '%s\\n' container-id ;;\n"
+        "  exec:*)\n"
+        "    shift\n"
         '    if [[ "${1:-}" == -i ]]; then\n'
         f"      printf '%s\\n' interactive >> {str(mode_log)!r}\n"
         "      shift\n"
@@ -3505,7 +3506,7 @@ def test_container_exec_forwards_only_explicit_stdin(tmp_path: Path) -> None:
         "    fi\n"
         "    printf 'native-output\\n'\n"
         "    ;;\n"
-        '  *) printf \'unexpected docker argv\\n\' >&2; exit 1 ;;\n'
+        "  *) printf 'unexpected docker argv\\n' >&2; exit 1 ;;\n"
         "esac\n",
         encoding="utf-8",
     )
@@ -3532,7 +3533,10 @@ _agent_canon_container_exec resident /bin/true
     )
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout == "native-output\nnative-output\n"
-    assert mode_log.read_text(encoding="utf-8").splitlines() == ["interactive", "default"]
+    assert mode_log.read_text(encoding="utf-8").splitlines() == [
+        "interactive",
+        "default",
+    ]
     assert input_capture.read_text(encoding="utf-8") == "personal-config-input\n"
 
 
@@ -4893,9 +4897,11 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
     receipt = json.loads(completed.stdout)
     assert receipt["runtime_root"] == str(control_runtime)
     assert (topic_runtime / "host-state" / "active-image.tsv").is_file()
-    assert (topic_runtime / "container-state" / "mounts.tsv").read_text(
-        encoding="utf-8"
-    ).startswith("target\tstale\t")
+    assert (
+        (topic_runtime / "container-state" / "mounts.tsv")
+        .read_text(encoding="utf-8")
+        .startswith("target\tstale\t")
+    )
 
 
 def test_symlinked_control_runtime_is_rejected_before_legacy_argument_mapping(
@@ -5092,7 +5098,10 @@ def test_sync_never_projects_links_from_staging() -> None:
     )[0]
     assert '_agent_canon_advance_source "$install_root"' in sync
     assert 'git -C "$install_root" fetch origin main' in source_transition
-    assert 'git -C "$install_root" checkout --force -B main FETCH_HEAD' in source_transition
+    assert (
+        'git -C "$install_root" checkout --force -B main FETCH_HEAD'
+        in source_transition
+    )
     assert "_agent_canon_source_sync_write success" in source_transition
     assert '_agent_canon_image ""' in sync
     assert "_agent_canon_replace_resident_locked" in sync

@@ -32,7 +32,9 @@ def _runtime(tmp_path: Path) -> tuple[BootstrapRuntime, DockerAdapter]:
     control = tmp_path / "control"
     control.mkdir()
     source = materialize_source_fixture(tmp_path)
-    return BootstrapRuntime(control, control / "runtime", repository_root=source, docker=docker), docker
+    return BootstrapRuntime(
+        control, control / "runtime", repository_root=source, docker=docker
+    ), docker
 
 
 def _fast_manifest(tmp_path: Path) -> Path:
@@ -56,7 +58,10 @@ def _local_manifest(tmp_path: Path, *, fast: bool = False) -> Path:
             ("idle_stop_seconds = 3600", "idle_stop_seconds = 1800"),
             ("health_start_period_seconds = 10", "health_start_period_seconds = 0.01"),
             ("health_timeout_seconds = 5", "health_timeout_seconds = 0.01"),
-            ("health_poll_interval_seconds = 0.2", "health_poll_interval_seconds = 0.005"),
+            (
+                "health_poll_interval_seconds = 0.2",
+                "health_poll_interval_seconds = 0.005",
+            ),
         ):
             text = text.replace(old, new)
     text = text.replace(
@@ -77,7 +82,9 @@ def test_bootstrap_defaults_runtime_to_repository_dot_runtime(tmp_path: Path) ->
         (ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
     )
     scheduler_source = ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
-    scheduler_target = repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target = (
+        repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    )
     scheduler_target.mkdir(parents=True)
     for template in scheduler_source.glob("*.in"):
         (scheduler_target / template.name).write_bytes(template.read_bytes())
@@ -102,7 +109,9 @@ def test_lifecycle_lock_cannot_be_bypassed_by_environment_marker(
     manager, _docker = _runtime(tmp_path)
     flock_calls: list[int] = []
     monkeypatch.setenv("AGENT_CANON_LOCK_HELD", "1")
-    monkeypatch.setattr(fcntl, "flock", lambda _fd, operation: flock_calls.append(operation))
+    monkeypatch.setattr(
+        fcntl, "flock", lambda _fd, operation: flock_calls.append(operation)
+    )
 
     with manager.locked():
         pass
@@ -119,7 +128,9 @@ def test_bootstrap_maps_only_the_exact_legacy_runtime_default(tmp_path: Path) ->
         (ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
     )
     scheduler_source = ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
-    scheduler_target = repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target = (
+        repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    )
     scheduler_target.mkdir(parents=True)
     for template in scheduler_source.glob("*.in"):
         (scheduler_target / template.name).write_bytes(template.read_bytes())
@@ -155,7 +166,9 @@ def test_update_runs_one_normal_build(tmp_path: Path) -> None:
     assert sum(command[1] == "build" for command in docker.commands) == builds + 1
 
 
-def test_health_failure_restores_old_runtime_and_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_health_failure_restores_old_runtime_and_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     manager, docker = _runtime(tmp_path)
     manager.install()
     manager.start()
@@ -201,28 +214,41 @@ def test_owned_image_filter_argv_and_failure_are_typed(
     manager.gc(dry_run=True)
     command = next(item for item in docker.commands if item[1:3] == ["image", "ls"])
     assert command.count("--filter") == 2
-    assert all(command[index + 1] != "--filter" for index, value in enumerate(command[:-1]) if value == "--filter")
+    assert all(
+        command[index + 1] != "--filter"
+        for index, value in enumerate(command[:-1])
+        if value == "--filter"
+    )
     monkeypatch.setenv("FAKE_DOCKER_FAIL_IMAGE_LS", "1")
     with pytest.raises(BootstrapError, match="docker_command_failed"):
         manager.gc(dry_run=True)
 
 
-def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path) -> None:
+def test_update_then_codex_prepare_reads_current_tracked_adapters(
+    tmp_path: Path,
+) -> None:
     manager, _docker = _runtime(tmp_path)
     source = manager.repository_root
     manager.install()
     manager.update()
     result = manager.codex_prepare()
-    manifest = json.loads((manager.paths.codex_home / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (manager.paths.codex_home / "manifest.json").read_text(encoding="utf-8")
+    )
     assert manifest["source_root"] == str(source)
     assert manifest["manifest_digest"] == manager.manifest_digest
     assert {entry["surface"] for entry in manifest["links"]} == {
-        "skills", "agents", "hooks", "config"
+        "skills",
+        "agents",
+        "hooks",
+        "config",
     }
     for entry in manifest["links"]:
         assert Path(entry["target"]).is_symlink()
         assert Path(entry["target"]).resolve() == Path(entry["source"]).resolve()
-    skill_links = [entry for entry in result["details"]["links"] if entry["surface"] == "skills"]
+    skill_links = [
+        entry for entry in result["details"]["links"] if entry["surface"] == "skills"
+    ]
     assert skill_links
     assert len(skill_links) == 1
     assert skill_links[0]["source"] == str(source / ".codex/personal/skills")
@@ -251,9 +277,10 @@ def test_codex_prepare_places_config_at_code_home_root(tmp_path: Path) -> None:
     manager.codex_prepare()
     config_link = manager.paths.codex_home / "config.toml"
     assert config_link.is_symlink()
-    assert config_link.resolve() == (
-        manager.repository_root / ".codex" / "config.toml"
-    ).resolve()
+    assert (
+        config_link.resolve()
+        == (manager.repository_root / ".codex" / "config.toml").resolve()
+    )
     assert not (manager.paths.codex_home / "config" / "config.toml").exists()
 
 
@@ -284,14 +311,18 @@ def test_non_owned_image_update_keeps_git_distributed_skills(tmp_path: Path) -> 
     manager, _docker = _runtime(tmp_path)
     manager.install()
     source = ROOT / ".codex/personal/skills"
-    before = {path: (path.read_bytes(), path.stat().st_ino, path.stat().st_mtime_ns)
-              for path in source.glob("*/SKILL.md")}
+    before = {
+        path: (path.read_bytes(), path.stat().st_ino, path.stat().st_mtime_ns)
+        for path in source.glob("*/SKILL.md")
+    }
     state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
     state["resources"]["image"]["owned"] = False
     manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
     assert manager.update()["code"] == "up_to_date"
-    assert before == {path: (path.read_bytes(), path.stat().st_ino, path.stat().st_mtime_ns)
-                      for path in source.glob("*/SKILL.md")}
+    assert before == {
+        path: (path.read_bytes(), path.stat().st_ino, path.stat().st_mtime_ns)
+        for path in source.glob("*/SKILL.md")
+    }
 
 
 def test_arbitrary_control_root_does_not_receive_global_codex_projection(
@@ -339,7 +370,11 @@ def test_codex_prepare_removes_only_exact_stale_managed_links(tmp_path: Path) ->
     payload["links"].extend(
         [
             {"target": str(stale_target), "source": str(stale_source), "managed": True},
-            {"target": str(foreign), "source": str(tmp_path / "other"), "managed": True},
+            {
+                "target": str(foreign),
+                "source": str(tmp_path / "other"),
+                "managed": True,
+            },
         ]
     )
     manifest.write_text(json.dumps(payload), encoding="utf-8")
@@ -359,11 +394,20 @@ def test_template_logical_command_routes_to_container_receipt(tmp_path: Path) ->
     assert "PYTHONPATH" not in command
     parsed = build_parser().parse_args(
         [
-            "--repository-root", str(ROOT),
-            "--control-parent-root", str(tmp_path / "control"),
-            "--runtime-root", str(tmp_path / "control/runtime"),
-            "template", "export", "--root", str(ROOT),
-            "--profile", "agent-artifacts", "--output", "bundle",
+            "--repository-root",
+            str(ROOT),
+            "--control-parent-root",
+            str(tmp_path / "control"),
+            "--runtime-root",
+            str(tmp_path / "control/runtime"),
+            "template",
+            "export",
+            "--root",
+            str(ROOT),
+            "--profile",
+            "agent-artifacts",
+            "--output",
+            "bundle",
         ]
     )
     assert not hasattr(parsed, "execution_plane")
