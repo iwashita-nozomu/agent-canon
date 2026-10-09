@@ -474,6 +474,11 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
                 "GIT_CONFIG_VALUE_0=/tmp/other/repo git commit -am update"
             ),
             (
+                "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.worktree "
+                "GIT_CONFIG_VALUE_0=/tmp/other/repo "
+                "bash -c 'git commit -am update'"
+            ),
+            (
                 "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.worktree "
                 "GIT_CONFIG_VALUE_0=/tmp/other/repo && git commit -am update"
             ),
@@ -497,6 +502,19 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
             )
             assert redirected.status == "blocked"
             assert redirected.reason == "writer_target_git_repository_redirect_forbidden"
+        (root / "README.md").write_text("unrelated unstaged input\n", encoding="utf-8")
+        message_named_all = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git commit -qm --all"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert message_named_all.status == "allowed"
+        assert message_named_all.mutation_paths == ("src/owned.py",)
         commit = evaluate_mutation_authority(
             {
                 "tool_name": "Bash",
