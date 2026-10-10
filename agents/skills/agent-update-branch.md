@@ -35,8 +35,6 @@ unchanged and returns to the user.
 
 - `knowledge-eval`: private knowledge/feedback, eval manifests, eval results,
   and skill prompt feedback only.
-- `canon-source`: standalone AgentCanon source and runtime updates; route these
-  changes to `$agent-canon-update` rather than mixing them into parent work.
 - `integration`: combines update branches before `main`; local merge ordering,
   conflict preservation, and integrated-head readback belong to `$integration`.
 
@@ -60,7 +58,7 @@ bash tools/repository/git/agent_update_branch.sh validate knowledge-eval
 bash tools/repository/git/agent_update_branch.sh push knowledge-eval <branch>
 ```
 
-## Canon-Source Lane
+## AgentCanon Source Updates
 
 Use the qualified standalone AgentCanon development checkout prepared by
 `repository-topic-clone` and keep the parent

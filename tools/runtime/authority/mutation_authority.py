@@ -1175,7 +1175,7 @@ def _repository_topic_clone_operation(command: str) -> str | None:
         if script_index is None or script_index + 1 >= len(arguments):
             continue
         operation = arguments[script_index + 1]
-        if operation not in {"merge-main", "resume-merge", "finalize-merge"}:
+        if operation not in {"merge-main", "finalize-merge"}:
             continue
         if len(segments) != 1:
             return "repository_topic_clone_compound"

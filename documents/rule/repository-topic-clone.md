@@ -91,7 +91,7 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
   決まった後に同じ identity を使って再prepareし、current `--allowed-path` を packet にします。
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
 - raw `git merge` / `git rebase` は writer route では使わず、integration executor が
-  `repository_topic_clone.py merge-main`、`finalize-merge`、`resume-merge` を通す。
+  `repository_topic_clone.py merge-main` と `finalize-merge` を通す。
   これは選択した integration workflow の owner route です。runtime は一般の
   `git commit` を integration executor に限定しません。path-scoped commit admission や
   role id は、実競合レビューや finalizer の parent/tree readback の証明にはなりません。

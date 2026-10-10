@@ -20,11 +20,6 @@ agent_canon_repo_root() {
   git -C "$source_root" rev-parse --show-toplevel
 }
 
-agent_canon_tools_root() {
-  local repository_root="$1"
-  printf '%s\n' "$repository_root/tools"
-}
-
 agent_canon_source_tools_root() {
   local repository_root="$1"
   if [ -d "$repository_root/tools" ] && [ -f "$repository_root/tools/bin/agent-canon" ]; then

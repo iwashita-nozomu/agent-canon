@@ -63,7 +63,6 @@ def create_parent(
     tmp_path: Path,
     remote: Path,
     *,
-    manifest_branch: str | None = None,
     manifest_url: str | None = None,
 ) -> Path:
     """Create a parent repository containing a .gitmodules entry for the dependency."""
@@ -82,8 +81,6 @@ def create_parent(
         "\tpath = vendor/dep",
         f"\turl = {manifest_url or remote}",
     ]
-    if manifest_branch is not None:
-        manifest.append(f"\tbranch = {manifest_branch}")
     (parent_source / ".gitmodules").write_text("\n".join(manifest), encoding="utf-8")
     (parent_source / "owner-evidence.md").write_text(
         "source edit required\n", encoding="utf-8"
