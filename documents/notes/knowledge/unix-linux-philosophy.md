@@ -17,14 +17,15 @@ Linux distribution の比較、ライセンス判断、全kernel subsystemの設
 
 以下の「資料の主張」は原著の要約、「適用判断」はAgentCanonへの設計上の翻訳である。
 一般原則の正本は [ソフトウェア工学原則](../../conventions/software-engineering-principles.md)、
-実装時の具体的判断は [Implementation decisions](../../../agents/canonical/ROOT_IMPLEMENTATION.md#composable-interfaces-and-explicit-mechanisms)。
-このnoteは必要な出典・反例を調べる時だけ読み、常時読込や全項目checklistにしない。
+実装時の具体的判断は [Implementation decisions](../../../agents/canonical/ROOT_IMPLEMENTATION.md#machine-facing-and-streaming-contracts)。
+このnoteは任意の出典・反例資料であり、独立した実装義務やvalidation gateを追加しない。
+必要な時だけ読み、常時読込や全項目checklistにしない。
 
 ## 一次資料と確認範囲
 
 | ID | 資料・確認した節 | この調査で使う根拠 |
 | --- | --- | --- |
-| S1 | McIlroy, Pinson, Tague, [UNIX Time-Sharing System: Foreword](https://danluu.com/mcilroy-unix/) (1978)、Style。原著のHTML転載 | 小さな責務、次のprogramへの出力、非対話的な合成、道具による反復労力の削減 |
+| S1 | McIlroy, Pinson, Tague, [UNIX Time-Sharing System: Foreword](https://onlinelibrary.wiley.com/doi/10.1002/j.1538-7305.1978.tb02135.x) (1978)、Style。本文は[HTML transcription](https://danluu.com/mcilroy-unix/)で確認 | 小さな責務、次のprogramへの出力、非対話的な合成、道具による反復労力の削減 |
 | S2 | Ritchie, [The Evolution of the Unix Time-sharing System](https://www.nokia.com/bell-labs/about/dennis-m-ritchie/hist.pdf)、Pipes (PDF印刷頁9–10) | 単独利用とpipelineで同じcommandを使うこと、記法と実装の改善 |
 | S3 | Pike, [Notes on Programming in C](https://www.lysator.liu.se/c/pikestyle.html) (1989)、Introduction / Comments / Complexity / Programming with data。原著のHTML転載 | 読みやすさ、データ表現、測定と複雑化の費用、規則の機械的適用への警告 |
 | S4 | Linux, [Coding style](https://docs.kernel.org/process/coding-style.html)、Functions / Centralized exiting / Commenting / Data structures / Function return values | 凝集した関数、理由と構造が分かる記述、解放と失敗経路、戻り値の意味 |
@@ -146,20 +147,19 @@ S9の単位は一つの論理変更であり、一つのfileではない。問�
 契約・結果・失敗へ向け、checklist、行数、style checkerの合格だけを品質の証明にしない。
 既存の指定formatterは使う一方、kernelのtab幅・C構文・投稿作法を全言語へ複製しない。
 
-## 既存規則との対応と、今回埋める不足
+## 既存規則との対応と限定的な追記
 
-| 判断対象 | 既存の正本 | 今回の具体化 |
+| 判断対象 | 既存の正本 | この調査の位置づけ |
 | --- | --- | --- |
-| 責務と再利用 | SEP-03/05/08、Simplest complete implementation | 単独/合成で同じ部品、caller方針と機構、表現による分岐削減 |
-| I/Oと観測 | SEP-01/13/14 | stdout/stderr、非対話入力、framing、status、部分結果 |
-| 状態と資源 | SEP-02/07/13 | EOF/backpressure/cancel、borrowed/owned、部分取得と解放 |
-| 互換性と削除 | SEP-09/10、Public API additions、RC-09 | 実際のworkflowと署名の差、内部変更と必要な移行 |
-| 規模と性能 | SEP-06の方式選定 | 根拠ある測定と解析の使い分け。新しい性能gateは不要 |
-| 報告とレビュー | SEP-11/14、既存Issue/PR owner | 再現可能な根拠と論理変更。文書修正と実挙動の実証を区別 |
+| 責務と再利用 | SEP-03/05/08、Simplest complete implementation | 既存正本の判断を参照する。新しい一般則は追加しない |
+| 入力、出力、失敗、資源 | SEP-01/02/07/13/14、Contract and valid domain、Reachable abnormal conditions | 既存契約を維持する。機械向けCLI/streamの境界だけを次行で具体化する |
+| 機械向けCLIとstream | [Machine-facing and streaming contracts](../../../agents/canonical/ROOT_IMPLEMENTATION.md#machine-facing-and-streaming-contracts) と実際のcaller契約 | 結果とdiagnosticの区別、framing/end-of-input、status、partial結果、streamのEOF/backpressure/cancelを必要な場合だけ扱う |
+| API互換性、移行、検証 | Public API additions、SEP-09/10/11、RC-09 | 既存のAPI、移行、検証ownerが引き続き正本。研究noteは別のgateを作らない |
 
-調査結果をgeneral policyへ再列挙せず、既存ROOT_IMPLEMENTATIONの重複した単純化段落を
-整理し、必要な境界判断へ接続する。source-free consumerの共通条件だけROOT_AGENTSへ
-短く保持する。新Skill、checker、schema、配布adapterや実行経路は不要である。
+機械向けCLIと実際のstream境界に関する上記の条件付き判断だけを、既存のsource-side
+implementation ownerへ接続する。その他の調査項目はSEPと既存ownerの根拠・適用限界を
+説明するもので、新しいsource-free consumer要件、skill、checker、schema、配布adapter、
+execution routeは作らない。
 
 ## 適用例と反例
 

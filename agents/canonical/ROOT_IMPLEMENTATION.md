@@ -11,6 +11,7 @@ upstream design ../../documents/design/api-surface-traversal-policy.md traversal
 upstream design ../../documents/conventions/software-engineering-principles.md maintained code-space objective, abstraction admission, and reuse feasibility decision owner
 upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 upstream design ../../documents/operations/notes-lifecycle.md failed verification recording and reuse
+upstream design ../../documents/notes/knowledge/unix-linux-philosophy.md optional primary-source rationale for machine-facing and streaming contract decisions
 @dependency-end
 -->
 
@@ -35,6 +36,23 @@ valid cases, or weaken guarantees to make implementation or proof easier. A chan
 internal precondition needs a derivation showing how every required input reaches
 it legally. A real conflict with explicit compatibility or authority needs the
 exact affected requirement and decision, not a blanket contract-preservation veto.
+
+## Machine-facing and streaming contracts
+
+When adding or changing a machine-facing command or stream boundary, derive its
+I/O contract from actual callers and protocols. Keep machine-readable results
+distinguishable from human diagnostics, normally by using stdout for results and
+stderr for diagnostics unless the owning interface defines another channel
+contract. Specify accepted input mode, record framing, end-of-input, exit status,
+and whether an emitted prefix is a valid partial result.
+
+For an actual streaming path, determine how its producer and consumer handle
+EOF, a slow or closed consumer, backpressure, and cancellation. Treat partial
+writes and early consumer exit according to that contract; do not present
+partial output as complete success or silently replace streaming with unbounded
+buffering. Apply these stream-specific decisions only when the selected path
+actually streams; reuse existing transport/runtime behavior and add no generic
+wrapper, buffer limit, or checker.
 
 ## Simplest complete implementation
 
