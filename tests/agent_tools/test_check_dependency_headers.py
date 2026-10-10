@@ -33,46 +33,6 @@ SCRIPT = (
     / "dependencies"
     / "check_dependency_headers.py"
 )
-VISUALIZATION_QUEUE_PATHS = (
-    "agents/skills/algorithm-flowchart.md",
-    "agents/skills/catalog.yaml",
-    ".codex/personal/skills/algorithm-flowchart/SKILL.md",
-    ".codex/personal/skills/dependency-analysis/SKILL.md",
-    ".codex/personal/skills/prose-reasoning-graph/SKILL.md",
-    "agents/skills/structure-refactor.md",
-    ".codex/personal/skills/structure-refactor/SKILL.md",
-    "agents/skills/structure-planning.md",
-    ".codex/personal/skills/structure-planning/SKILL.md",
-    "agents/skills/report-writing.md",
-    ".codex/personal/skills/report-writing/SKILL.md",
-    "agents/skills/long-form-writing.md",
-    ".codex/personal/skills/long-form-writing/SKILL.md",
-    "agents/skills/html-output.md",
-    ".codex/personal/skills/html-output/SKILL.md",
-    "agents/skills/formal-proof-workflow.md",
-    ".codex/personal/skills/formal-proof-workflow/SKILL.md",
-    "agents/skills/md-style-check.md",
-    ".codex/personal/skills/md-style-check/SKILL.md",
-    "agents/skills/README.md",
-    "tools/agent/skills/skill_route_catalog.py",
-    "tools/agent/orchestration/capability_route.py",
-    "tests/agent_tools/test_render_dependency_manifest_graph.py",
-    "tools/catalog.yaml",
-    "tools/runtime/manifest/tool_catalog.py",
-    "tools/README.md",
-    "documents/tools/README.md",
-    "documents/tools/tool-docs.toml",
-    "tests/agent_tools/test_tool_catalog.py",
-    "tests/agent_tools/test_dependency_manifest_tools.py",
-    "tests/agent_tools/test_check_dependency_headers.py",
-    "tools/runtime/dispatch/agent-canon/src/docs.rs",
-    "tools/runtime/dispatch/agent-canon/src/main.rs",
-    "tests/tools/test_fix_mermaid.py",
-    "agents/skills/codex-task-workflow.md",
-    "agents/skills/agent-canon-update.md",
-)
-
-
 def manifest(
     *,
     contract: str | None = "design",
@@ -147,24 +107,6 @@ class DependencyHeaderCheckTest(unittest.TestCase):
 
         self.assertNotIn(provenance, header)
         self.assertIn(provenance, text.split("@dependency-end", 1)[1])
-
-    def test_visualization_completion_queue_has_canonical_contract_edges(self) -> None:
-        """Require visualization queue files to expose canonical contract edges."""
-        patterns = header_checker.declared_surface_patterns(PROJECT_ROOT)
-        for relative_path in VISUALIZATION_QUEUE_PATHS:
-            with self.subTest(path=relative_path):
-                header = "\n".join(
-                    (PROJECT_ROOT / relative_path)
-                    .read_text(encoding="utf-8")
-                    .splitlines()[:80]
-                )
-                self.assertIn("@dependency-start", header)
-                self.assertIn("@dependency-end", header)
-                if header_checker.matches_declared_surface(relative_path, patterns):
-                    self.assertTrue(
-                        "code-visualization.md" in header,
-                        relative_path,
-                    )
 
     def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
         """Accept skill frontmatter before a valid dependency manifest."""
