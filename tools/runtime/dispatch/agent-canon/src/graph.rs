@@ -4094,7 +4094,10 @@ mod tests {
         )
         .expect("evidence target");
         fixture_git(&fixture.root, &["add", "src/source.md", "src/evidence.md"]);
-        fixture_git(&fixture.root, &["commit", "-qm", "reference context fixture"]);
+        fixture_git(
+            &fixture.root,
+            &["commit", "-qm", "reference context fixture"],
+        );
 
         let mut args = graph_args(&fixture.root);
         args.path = Some("src/source.md".to_string());
