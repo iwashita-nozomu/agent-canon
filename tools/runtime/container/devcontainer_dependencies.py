@@ -34,6 +34,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -42,7 +43,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (
@@ -75,10 +76,7 @@ except ImportError:  # direct script execution
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
-try:  # pragma: no cover - the branch depends on the interpreter image.
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - covered with a subprocess test.
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
 
 
 # This schema is intentionally neutral: dependency planning belongs to the
@@ -1070,6 +1068,15 @@ class CommandRunner(Protocol):
         env: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run one argv list without a shell."""
+        ...
+
+
+@runtime_checkable
+class ExecutableResolver(Protocol):
+    """Optional runner capability for resolving a virtual executable path."""
+
+    def resolve_executable(self, path: Path) -> Path | str:
+        """Return the executable path observed by the runner."""
         ...
 
 
@@ -3272,7 +3279,11 @@ class Installer:
         try:
             resolved = lexical.resolve(strict=True)
         except OSError as exc:
-            resolver = getattr(self.runner, "resolve_executable", None)
+            if not isinstance(self.runner, ExecutableResolver):
+                raise DependencyError(
+                    f"{record.id}: lexical executable target is missing: {lexical}"
+                ) from exc
+            resolver = self.runner.resolve_executable
             if not callable(resolver):
                 raise DependencyError(
                     f"{record.id}: lexical executable target is missing: {lexical}"
@@ -3398,7 +3409,12 @@ class Installer:
         expected = Path("/usr/local/bin") / Path(spec_path).name
         final_value = payload.get("binary_path")
         digest = payload.get("binary_sha256")
-        if final_value != str(expected) or not isinstance(digest, str) or not SHA256_RE.fullmatch(digest):
+        if (
+            not isinstance(final_value, str)
+            or final_value != str(expected)
+            or not isinstance(digest, str)
+            or not SHA256_RE.fullmatch(digest)
+        ):
             raise DependencyError(f"{record.id}: final binary receipt binding is malformed")
         final_binary = Path(final_value)
         if final_binary.is_symlink() or not final_binary.is_file() or not os.access(final_binary, os.X_OK):

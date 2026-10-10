@@ -264,9 +264,9 @@ def owner_receipt_closeout_consumer(
         if not owner_receipt_is_compatible(packet, candidate_digest=candidate_digest):
             failures.append(f"incompatible:{packet['primary_observation_ref']}")
             continue
-        owner_refs.add(str(packet["owner_ref"]))
-        receipt_refs.append(str(packet["primary_observation_ref"]))
-        declared_edges.update(str(edge) for edge in packet["downstream_edges"])
+        owner_refs.add(packet["owner_ref"])
+        receipt_refs.append(packet["primary_observation_ref"])
+        declared_edges.update(packet["downstream_edges"])
     failures.extend(
         f"missing_owner:{owner}"
         for owner in required_owner_refs
@@ -953,53 +953,45 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         return {"ready": False, "reason": "source_binding_incomplete"}
     if source_binding.get("run_id") != report_dir.name:
         return {"ready": False, "reason": "source_binding_run_id_mismatch"}
-    if not isinstance(source_binding.get("context_id"), str) or not source_binding.get(
-        "context_id"
-    ).strip():
+    context_id = source_binding.get("context_id")
+    if not isinstance(context_id, str) or not context_id.strip():
         return {"ready": False, "reason": "source_binding_context_id_missing"}
     nested_binding = source_binding.get("source_binding")
     if not isinstance(nested_binding, dict) or not nested_binding:
         return {"ready": False, "reason": "source_binding_reference_incomplete"}
-    if nested_binding.get("run_id") != source_binding.get("run_id"):
+    nested_run_id = nested_binding.get("run_id")
+    nested_context_id = nested_binding.get("context_id")
+    if nested_run_id != source_binding.get("run_id"):
         return {"ready": False, "reason": "nested_source_binding_run_id_mismatch"}
-    if nested_binding.get("context_id") != source_binding.get("context_id"):
+    if nested_context_id != context_id:
         return {"ready": False, "reason": "nested_source_binding_context_id_mismatch"}
-    if not isinstance(source_binding.get("source_refs"), list) or not source_binding.get(
-        "source_refs"
-    ):
+    source_refs = source_binding.get("source_refs")
+    if not isinstance(source_refs, list) or not source_refs:
         return {"ready": False, "reason": "source_refs_incomplete"}
     if any(
         not isinstance(source_ref, str) or not source_ref.strip()
-        for source_ref in source_binding["source_refs"]
+        for source_ref in source_refs
     ):
         return {"ready": False, "reason": "source_refs_item_invalid"}
-    if any(
-        not isinstance(nested_binding.get(field), str)
-        or not nested_binding.get(field).strip()
-        for field in ("run_id", "context_id")
-    ):
-        return {"ready": False, "reason": "nested_source_binding_incomplete"}
+    for nested_value in (nested_run_id, nested_context_id):
+        if not isinstance(nested_value, str) or not nested_value.strip():
+            return {"ready": False, "reason": "nested_source_binding_incomplete"}
     owner_evidence = artifact.get("owner_boundary_evidence")
-    if not isinstance(owner_evidence, list) or not owner_evidence or any(
-        not isinstance(item, dict)
-        or any(
-            not isinstance(item.get(field), str) or not item.get(field).strip()
-            for field in (
-                "owner",
-                "state_owner",
-                "api_owner",
-                "dependency_owner",
-            )
-        )
-        or not isinstance(item.get("evidence_refs"), list)
-        or not item.get("evidence_refs")
-        or any(
-            not isinstance(ref, str) or not ref.strip()
-            for ref in item.get("evidence_refs", [])
-        )
-        for item in owner_evidence
-    ):
+    if not isinstance(owner_evidence, list) or not owner_evidence:
         return {"ready": False, "reason": "typed_owner_boundary_incomplete"}
+    for item in owner_evidence:
+        if not isinstance(item, dict):
+            return {"ready": False, "reason": "typed_owner_boundary_incomplete"}
+        for field in ("owner", "state_owner", "api_owner", "dependency_owner"):
+            field_value = item.get(field)
+            if not isinstance(field_value, str) or not field_value.strip():
+                return {"ready": False, "reason": "typed_owner_boundary_incomplete"}
+        evidence_refs = item.get("evidence_refs")
+        if not isinstance(evidence_refs, list) or not evidence_refs:
+            return {"ready": False, "reason": "typed_owner_boundary_incomplete"}
+        for evidence_ref in evidence_refs:
+            if not isinstance(evidence_ref, str) or not evidence_ref.strip():
+                return {"ready": False, "reason": "typed_owner_boundary_incomplete"}
     projection_metadata = artifact.get("projection_metadata")
     if not isinstance(projection_metadata, dict):
         return {"ready": False, "reason": "projection_metadata_missing"}
@@ -1007,9 +999,8 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         f"{source_binding['run_id']}:{source_binding['context_id']}"
     ):
         return {"ready": False, "reason": "generated_artifact_identity_mismatch"}
-    if not isinstance(projection_metadata.get("ledger_snapshot_identity"), str) or not projection_metadata.get(
-        "ledger_snapshot_identity"
-    ).strip():
+    ledger_snapshot_identity = projection_metadata.get("ledger_snapshot_identity")
+    if not isinstance(ledger_snapshot_identity, str) or not ledger_snapshot_identity.strip():
         return {"ready": False, "reason": "ledger_snapshot_identity_missing"}
     if projection_metadata.get("source_refs") != source_binding.get("source_refs"):
         return {"ready": False, "reason": "projection_source_refs_mismatch"}
@@ -1073,10 +1064,13 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         for value in values:
             if isinstance(value, str) and value.strip():
                 continue
-            if isinstance(value, dict) and any(
-                isinstance(value.get(key), str) and value.get(key).strip()
-                for key in ("id", "ref", "identity")
-            ):
+            if isinstance(value, dict):
+                for key in ("id", "ref", "identity"):
+                    identifier = value.get(key)
+                    if isinstance(identifier, str) and identifier.strip():
+                        break
+                else:
+                    return {"ready": False, "reason": f"{field}_item_schema_invalid"}
                 continue
             return {"ready": False, "reason": f"{field}_item_schema_invalid"}
         if values:
@@ -1311,6 +1305,18 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
         }
     canonical_g6 = materialized["g6_gate"]
     token = materialized["close_agent_tool_call"]
+    if not isinstance(canonical_g6, dict):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:g6_not_owner_materialized",
+        }
+    if not isinstance(token, dict):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:token_evidence_mismatch",
+        }
     descendants_ref = materialized["descendants_closed_evidence_ref"]
     reservations_ref = materialized["reservations_released_evidence_ref"]
     if gate_values[5] != canonical_g6:
@@ -1335,13 +1341,36 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
             "reason": "close_agent:token_evidence_mismatch",
         }
     gates = [*source_gates, canonical_g6]
-    gate_refs = [gate["binding"]["evidence_ref"] for gate in gates]
+    gate_refs: list[str] = []
+    for gate in gates:
+        binding = gate.get("binding")
+        if not isinstance(binding, dict):
+            return {
+                "ready": False,
+                "applicable": True,
+                "reason": "close_agent:lifecycle_evidence_mismatch",
+            }
+        evidence_ref = binding.get("evidence_ref")
+        if not isinstance(evidence_ref, str):
+            return {
+                "ready": False,
+                "applicable": True,
+                "reason": "close_agent:lifecycle_evidence_mismatch",
+            }
+        gate_refs.append(evidence_ref)
+    token_id = token.get("token_id")
+    if not isinstance(token_id, str):
+        return {
+            "ready": False,
+            "applicable": True,
+            "reason": "close_agent:token_evidence_mismatch",
+        }
     return {
         "ready": True,
         "applicable": True,
         "reason": "pass",
         "gate_evidence_refs": gate_refs,
-        "close_agent_token_id": token["token_id"],
+        "close_agent_token_id": token_id,
     }
 
 

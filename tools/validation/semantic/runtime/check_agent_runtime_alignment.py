@@ -23,15 +23,11 @@ import json
 import os
 import re
 import subprocess
-import tempfile
 import sys
-from contextlib import contextmanager
-
-try:
-    import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python < 3.11 compatibility.
-    import tomli as tomllib  # type: ignore[no-redef]
+import tempfile
+import tomllib
 from collections.abc import Collection
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -414,15 +410,15 @@ def validate_project_config() -> None:
         + "; keep task policy in agents/task_catalog.yaml or generated team_manifest.yaml",
     )
     codex_agents = parse_codex_agents()
-    registry: dict[str, dict[str, object]] = {}
+    agent_registry: dict[str, dict[str, object]] = {}
     for key, value in agents.items():
         if isinstance(value, dict):
-            registry[key] = require_mapping(
+            agent_registry[key] = require_mapping(
                 cast(object, value),
                 f"agents.{key} registry entry must be a mapping",
             )
-    missing_registry = sorted(set(codex_agents) - set(registry))
-    extra_registry = sorted(set(registry) - set(codex_agents))
+    missing_registry = sorted(set(codex_agents) - set(agent_registry))
+    extra_registry = sorted(set(agent_registry) - set(codex_agents))
     ensure(
         not missing_registry,
         f"missing .codex/config.toml agent registry: {', '.join(missing_registry)}",
@@ -432,7 +428,7 @@ def validate_project_config() -> None:
         f"stale .codex/config.toml agent registry: {', '.join(extra_registry)}",
     )
     for role_id, agent_config in codex_agents.items():
-        registered = registry[role_id]
+        registered = agent_registry[role_id]
         ensure(
             registered.get("config_file") == f"agents/{agent_config['__file_name']}",
             f"{role_id} config_file must point at agents/{agent_config['__file_name']}",
@@ -517,8 +513,14 @@ def validate_project_hooks() -> None:
             group_map = require_mapping(group, f"{event} hook group must be a mapping")
             for hook in require_list(group_map.get("hooks", []), f"{event} hooks must be a list"):
                 hook_map = require_mapping(hook, f"{event} hook must be a mapping")
-                command = hook_map.get("command")
-                ensure(isinstance(command, str) and "hook_dispatcher.py" in command, f"{event} must invoke hook_dispatcher.py")
+                command = require_string(
+                    hook_map.get("command"),
+                    f"{event} must invoke hook_dispatcher.py",
+                )
+                ensure(
+                    "hook_dispatcher.py" in command,
+                    f"{event} must invoke hook_dispatcher.py",
+                )
                 ensure("$(" not in command and "git " not in command, f"{event} hook command must not shell out to Git")
 
     dispatcher = ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
@@ -532,22 +534,41 @@ def validate_project_hooks() -> None:
     contract = require_mapping(json.loads(result.stdout), "hook contract must be a mapping")
     ensure(contract.get("schema") == "agent-canon.hook-contract.v1", "hook contract schema must be exact")
     event_contracts = require_mapping(contract.get("events", {}), "hook contract events must be a mapping")
-    ensure(set(contract.get("active_events", [])) == {"UserPromptSubmit", "PreToolUse", "PostToolUse"}, "hook contract active events must be exact")
-    ensure(set(contract.get("inactive_events", [])) == {"Stop"}, "hook contract inactive events must expose legacy Stop")
+    active_events = require_string_list(
+        contract.get("active_events", []),
+        "hook contract active events must be exact",
+    )
+    ensure(set(active_events) == {"UserPromptSubmit", "PreToolUse", "PostToolUse"}, "hook contract active events must be exact")
+    inactive_events = require_string_list(
+        contract.get("inactive_events", []),
+        "hook contract inactive events must expose legacy Stop",
+    )
+    ensure(set(inactive_events) == {"Stop"}, "hook contract inactive events must expose legacy Stop")
     for event in ("UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"):
         event_contract = require_mapping(event_contracts.get(event), f"hook contract missing {event}")
         ensure(isinstance(event_contract.get("active"), bool), f"hook contract {event} active must be boolean")
         ensure(isinstance(event_contract.get("matchers"), list), f"hook contract {event} matchers must be a list")
-        ensure(isinstance(event_contract.get("failure"), str) and event_contract["failure"], f"hook contract {event} failure must be non-empty")
-        ensure(isinstance(event_contract.get("telemetry"), str) and event_contract["telemetry"], f"hook contract {event} telemetry must be non-empty")
-    post_tool_matchers = event_contracts["PostToolUse"].get("matchers")
-    ensure(
-        isinstance(post_tool_matchers, list)
-        and len(post_tool_matchers) == 1
-        and isinstance(post_tool_matchers[0], str),
+        failure = require_string(
+            event_contract.get("failure"),
+            f"hook contract {event} failure must be non-empty",
+        )
+        ensure(bool(failure), f"hook contract {event} failure must be non-empty")
+        telemetry = require_string(
+            event_contract.get("telemetry"),
+            f"hook contract {event} telemetry must be non-empty",
+        )
+        ensure(bool(telemetry), f"hook contract {event} telemetry must be non-empty")
+    post_tool_contract = require_mapping(
+        event_contracts.get("PostToolUse"),
+        "PostToolUse matcher contract must be a mapping",
+    )
+    post_tool_matchers = require_string_list(
+        post_tool_contract.get("matchers"),
         "PostToolUse matcher contract must expose one string matcher",
     )
-    matcher_tokens = set(post_tool_matchers[0].split("|")) if isinstance(post_tool_matchers, list) and post_tool_matchers and isinstance(post_tool_matchers[0], str) else set()
+    if len(post_tool_matchers) != 1:
+        raise RuntimeError("PostToolUse matcher contract must expose one string matcher")
+    matcher_tokens = set(post_tool_matchers[0].split("|"))
     ensure(
         set(COLLABORATION_OPERATIONS).issubset(matcher_tokens),
         "PostToolUse matcher must observe collaboration operations without implying capability",
@@ -561,12 +582,20 @@ def validate_project_hooks() -> None:
         child = require_string(route_map.get("filename"), "retired tombstone filename must be a string")
         retired_names.add(child)
         for field in ("owner", "command_or_skill", "profile_trigger", "decision_semantics", "artifact"):
-            ensure(isinstance(route_map.get(field), str) and route_map[field], f"retired tombstone {child} missing {field}")
+            field_value = require_string(
+                route_map.get(field),
+                f"retired tombstone {child} missing {field}",
+            )
+            ensure(bool(field_value), f"retired tombstone {child} missing {field}")
         validate_retired_command_or_skill(
             cast(str, route_map["command_or_skill"]),
             child,
         )
-    ensure(not set(contract.get("active_handlers", [])).intersection(retired_names), "active and retired hook sets must be disjoint")
+    active_handlers = require_string_list(
+        contract.get("active_handlers", []),
+        "active and retired hook sets must be disjoint",
+    )
+    ensure(not set(active_handlers).intersection(retired_names), "active and retired hook sets must be disjoint")
 
 
 def validate_generated_role_views() -> None:
@@ -611,7 +640,11 @@ def validate_generated_role_views() -> None:
         "generated role-view projection must contain every canonical role view",
     )
     ensure("sol_parent_high" in registry_ids, "registry must retain sol_parent_high")
-    ensure(raw.get("team", {}).get("parent_profile_id", "sol_parent_high") == "sol_parent_high", "team parent profile must be Sol")
+    team = require_mapping(raw.get("team", {}), "team config must be a mapping")
+    ensure(
+        team.get("parent_profile_id", "sol_parent_high") == "sol_parent_high",
+        "team parent profile must be Sol",
+    )
     for role_id, config_view in sorted(configs.items()):
         source = require_mapping(agent_views.get(role_id), f"agent_views.{role_id} must be a mapping")
         binding = bindings[role_id]
@@ -633,8 +666,16 @@ def validate_generated_role_views() -> None:
         ensure(profile_id in registry_ids, f"{role_id} profile is not in model profile registry")
         ensure(binding.get("profile_id") == profile_id, f"{role_id} profile binding diverges from agent view")
         ensure(binding.get("capsule_schema_id") == view.capsule_schema_id == source.get("capsule_schema_id"), f"{role_id} capsule schema diverges")
-        ensure(require_string(source.get("logical_role_id"), f"agent_views.{role_id}.logical_role_id must be a string"), "logical role id must be non-empty")
-        ensure(require_string(source.get("role_contract_ref"), f"agent_views.{role_id}.role_contract_ref must be a string"), "role contract ref must be non-empty")
+        logical_role_id = require_string(
+            source.get("logical_role_id"),
+            f"agent_views.{role_id}.logical_role_id must be a string",
+        )
+        ensure(bool(logical_role_id), "logical role id must be non-empty")
+        role_contract_ref = require_string(
+            source.get("role_contract_ref"),
+            f"agent_views.{role_id}.role_contract_ref must be a string",
+        )
+        ensure(bool(role_contract_ref), "role contract ref must be non-empty")
         ensure(tuple(require_string_list(binding.get("capabilities"), f"roles.{role_id}.capabilities")) == view.capabilities, f"{role_id} capabilities diverge")
         ensure(binding.get("projection_digest") == view.source_canonical_digest == source.get("projection_digest"), f"{role_id} projection digest diverges")
         ensure(binding.get("return_schema_id") == view.return_schema_id == source.get("return_schema_id"), f"{role_id} return schema diverges")

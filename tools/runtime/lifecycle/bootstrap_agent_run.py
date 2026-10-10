@@ -85,12 +85,19 @@ from tools.repository.workspace.workspace_scope import (
     resolve_report_root,
     resolve_repository_roots,
 )
-from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import (
+    RuntimeArtifactBoundary,
+    runtime_artifact_boundary,
+)
 from tools.runtime.authority.task_authority import (
     AUTHORITY_FILE_NAME,
     hash_baseline_bytes,
 )
-from tools.runtime.authority.writer_target import WriterTargetError, parse_writer_target
+from tools.runtime.authority.writer_target import (
+    WriterTarget,
+    WriterTargetError,
+    parse_writer_target,
+)
 from tools.runtime.lifecycle.workflow_monitor import append_monitoring
 from tools.runtime.manifest.manifest_rendering import (
     checkout_identity_policy_output_lines,
@@ -112,7 +119,10 @@ from tools.runtime.manifest.manifest_rendering import (
     user_facing_language_policy_output_lines,
     writer_target_policy_output_lines,
 )
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+from tools.runtime.source.agent_canon_source_root import (
+    RepositoryRoots,
+    resolve_agent_canon_source_root,
+)
 
 
 @dataclass(frozen=True)
@@ -135,7 +145,7 @@ class BootstrapRunContext:
     adversarial_required: bool = False
     math_intent_route: str | None = None
     issue_worker_candidate: Mapping[str, object] | None = None
-    repository_roots: object | None = None
+    repository_roots: RepositoryRoots | None = None
 
 
 @dataclass(frozen=True)
@@ -379,7 +389,7 @@ def resolve_bootstrap_context(
     config: TeamConfig,
     catalog: TaskCatalog,
     workspace_root: Path,
-    repository_roots: object | None = None,
+    repository_roots: RepositoryRoots | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> BootstrapRunContext:
     """Resolve workflow family, specialists, and report paths for one run."""
@@ -538,15 +548,16 @@ def emit_bootstrap_output(
     context: BootstrapRunContext,
     workspace_root: Path,
     runtime: BootstrapRuntime,
-    writer_targets: Mapping[str, object] | None = None,
+    writer_targets: Mapping[
+        str, WriterTarget | Mapping[str, object] | None
+    ]
+    | None = None,
 ) -> None:
     """Print the machine-readable bootstrap summary."""
     repository_roots = context.repository_roots
     if repository_roots is None:
         raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
-    source_root = getattr(repository_roots, "agentcanon_source_root", None)
-    if source_root is None:
-        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
+    source_root = repository_roots.agentcanon_source_root
     selected_skills = suggested_skills(
         args.task_id,
         context.workflow_family_id,
@@ -602,6 +613,8 @@ def emit_bootstrap_output(
         math_route_config = mathematical_intent_route_config(
             catalog, context.math_intent_route
         )
+        if math_route_config is None:
+            raise RuntimeError("mathematical_intent_route:catalog_record_missing")
         print(f"MATH_INTENT_ROUTE_ID={context.math_intent_route}")
         print(f"MATH_INTENT_REVIEWER={math_route_config.get('reviewer', 'unknown')}")
         print("MATH_INTENT_PACKET=present")
@@ -885,7 +898,7 @@ def _read_optional_bytes(path: Path) -> bytes | None:
 
 
 def _restore_runtime_file(
-    boundary: object,
+    boundary: RuntimeArtifactBoundary,
     path: Path,
     prior: bytes | None,
     purpose: str,
@@ -893,7 +906,7 @@ def _restore_runtime_file(
     """Restore one captured runtime file without touching source state."""
     del purpose
     if prior is not None:
-        boundary.atomic_write_bytes(path, prior)  # type: ignore[attr-defined]
+        boundary.atomic_write_bytes(path, prior)
         return
     if not path.exists():
         return
@@ -910,8 +923,11 @@ def publish_prepared_run(
     report_root = report_root.resolve(strict=False)
     configured_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip() or None
     runtime_base = configured_runtime or report_root.parent
+    source_root = spec.agentcanon_source_root
+    if source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     boundary = runtime_artifact_boundary(
-        spec.agentcanon_source_root,
+        source_root,
         runtime_base,
         create=True,
     )
@@ -1087,7 +1103,7 @@ def main(
         print(str(exc), flush=True)
         return 2
     try:
-        writer_targets: dict[str, object] = {}
+        writer_targets: dict[str, WriterTarget] = {}
         if args.writer_targets:
             parsed_targets = json.loads(args.writer_targets)
             if not isinstance(parsed_targets, dict):
@@ -1164,10 +1180,7 @@ def main(
                 workspace_root=workspace_root,
                 agentcanon_source_root=repository_roots.agentcanon_source_root,
             )
-            as_dict = getattr(dispatched, "as_dict", None)
-            if not callable(as_dict):
-                raise RuntimeError("issue_worker_dispatch:projection_missing")
-            issue_worker_dispatch = as_dict()
+            issue_worker_dispatch = dispatched.as_dict()
         except (RuntimeError, OSError) as exc:
             print(str(exc), flush=True)
             return 1

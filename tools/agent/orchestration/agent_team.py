@@ -68,9 +68,16 @@ else:
     )
 
 import json as _json
-from collections.abc import Mapping as _Mapping
+from collections.abc import Mapping as _Mapping, Sequence as _Sequence
 from dataclasses import dataclass as _dataclass
 from pathlib import Path as _Path
+from typing import TYPE_CHECKING as _TYPE_CHECKING
+
+if _TYPE_CHECKING:
+    from tools.repository.github.issue_worker_dispatch import (
+        IssueWorkerDispatch as _IssueWorkerDispatch,
+        PublisherSpawn as _PublisherSpawn,
+    )
 
 from tools.runtime.authority.task_authority import AUTHORITY_FILE_NAME as _AUTHORITY_FILE_NAME
 from tools.runtime.authority.task_authority import build_default_task_authority as _build_default_task_authority
@@ -250,10 +257,25 @@ else:
     )
 
 
-def dispatch_issue_worker(*args: object, **kwargs: object) -> object:
+def dispatch_issue_worker(
+    candidate: _Mapping[str, object],
+    objective: str,
+    spawn: _PublisherSpawn | None = None,
+    *,
+    workspace_root: _Path | str = ".",
+    agentcanon_source_root: _Path | str | None = None,
+    request_clause_ids: _Sequence[str] = (),
+) -> _IssueWorkerDispatch:
     """Expose the logical IssueWorker route through the AgentTeam facade."""
     from tools.repository.github.issue_worker_dispatch import dispatch_issue_worker as dispatch
-    return dispatch(*args, **kwargs)  # type: ignore[arg-type]
+    return dispatch(
+        candidate,
+        objective,
+        spawn,
+        workspace_root=workspace_root,
+        agentcanon_source_root=agentcanon_source_root,
+        request_clause_ids=request_clause_ids,
+    )
 
 del annotations
 

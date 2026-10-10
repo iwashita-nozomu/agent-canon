@@ -16,7 +16,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Literal, cast
+from typing import Literal, TypedDict, cast
 
 from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
 
@@ -623,6 +623,29 @@ OWNER_OBSERVATION_OUTCOMES = frozenset(
 OWNER_CORRESPONDENCE_STATES = frozenset(
     {"unmapped", "mapped", "observer_assigned", "verified", "unresolved", "refuted", "advisory"}
 )
+
+
+class OwnerGuaranteePacket(TypedDict):
+    """Closed normalized shape returned by the owner-guarantee parser."""
+
+    schema: str
+    owner_ref: str
+    candidate_digest: str
+    property_ref: str
+    mechanism_ref: str
+    mechanism_transition: str
+    mechanism_sufficiency: str
+    not_guaranteed: list[str]
+    failure_semantics: str
+    execution_plane: str
+    tool_input_locator: str
+    primary_observation_ref: str
+    observation_outcome: str
+    correspondence_state: str
+    invalidation_inputs: list[str]
+    downstream_edges: list[str]
+    source_snapshot: str
+    authority_ref: str
 OWNER_INVALIDATION_PACKET_SCHEMA = "agent-canon.owner-invalidation.v1"
 OWNER_INVALIDATION_PACKET_FIELDS = frozenset(
     {
@@ -667,7 +690,7 @@ def _packet_text_list(raw: Mapping[str, object], field: str, prefix: str, *, all
 def normalize_owner_guarantee_packet(
     raw_packet: object,
     field_prefix: str = "owner_guarantee",
-) -> dict[str, object]:
+) -> OwnerGuaranteePacket:
     """Normalize one owner-local guarantee/receipt packet.
 
     This validates packet shape and local correspondence state only.  It does
@@ -691,36 +714,43 @@ def normalize_owner_guarantee_packet(
     correspondence_state = _packet_text(raw_packet, "correspondence_state", field_prefix)
     if correspondence_state not in OWNER_CORRESPONDENCE_STATES:
         raise RuntimeError(f"{field_prefix}.correspondence_state:invalid")
-    normalized: dict[str, object] = {
+    normalized: OwnerGuaranteePacket = {
         "schema": schema,
-        **{
-            field: _packet_text(raw_packet, field, field_prefix)
-            for field in (
-                "owner_ref",
-                "candidate_digest",
-                "property_ref",
-                "mechanism_ref",
-                "mechanism_transition",
-                "mechanism_sufficiency",
-                "failure_semantics",
-                "execution_plane",
-                "tool_input_locator",
-                "primary_observation_ref",
-                "source_snapshot",
-                "authority_ref",
-            )
-        },
+        "owner_ref": _packet_text(raw_packet, "owner_ref", field_prefix),
+        "candidate_digest": _packet_text(raw_packet, "candidate_digest", field_prefix),
+        "property_ref": _packet_text(raw_packet, "property_ref", field_prefix),
+        "mechanism_ref": _packet_text(raw_packet, "mechanism_ref", field_prefix),
+        "mechanism_transition": _packet_text(
+            raw_packet, "mechanism_transition", field_prefix
+        ),
+        "mechanism_sufficiency": _packet_text(
+            raw_packet, "mechanism_sufficiency", field_prefix
+        ),
         "not_guaranteed": list(
             _packet_text_list(raw_packet, "not_guaranteed", field_prefix, allow_empty=False)
         ),
-        "invalidation_inputs": list(
-            _packet_text_list(raw_packet, "invalidation_inputs", field_prefix, allow_empty=False)
+        "failure_semantics": _packet_text(raw_packet, "failure_semantics", field_prefix),
+        "execution_plane": _packet_text(raw_packet, "execution_plane", field_prefix),
+        "tool_input_locator": _packet_text(
+            raw_packet, "tool_input_locator", field_prefix
         ),
-        "downstream_edges": list(
-            _packet_text_list(raw_packet, "downstream_edges", field_prefix, allow_empty=True)
+        "primary_observation_ref": _packet_text(
+            raw_packet, "primary_observation_ref", field_prefix
         ),
         "observation_outcome": observation_outcome,
         "correspondence_state": correspondence_state,
+        "invalidation_inputs": list(
+            _packet_text_list(
+                raw_packet, "invalidation_inputs", field_prefix, allow_empty=False
+            )
+        ),
+        "downstream_edges": list(
+            _packet_text_list(
+                raw_packet, "downstream_edges", field_prefix, allow_empty=True
+            )
+        ),
+        "source_snapshot": _packet_text(raw_packet, "source_snapshot", field_prefix),
+        "authority_ref": _packet_text(raw_packet, "authority_ref", field_prefix),
     }
     if "candidate_digest" not in normalized["invalidation_inputs"]:
         raise RuntimeError(f"{field_prefix}.invalidation_inputs:candidate_digest_missing")
