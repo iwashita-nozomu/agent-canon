@@ -5977,11 +5977,18 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         assert manifest["source_root"] == str(source_root)
         managed = manifest["links"]
         assert managed
-        codex_container_home = next(
-            line.partition("=")[2]
-            for line in ADAPTER.read_text(encoding="utf-8").splitlines()
-            if line.startswith("AGENT_CANON_CODEX_HOME_DESTINATION=")
-        )
+        shell_destinations = {}
+        for line in ADAPTER.read_text(encoding="utf-8").splitlines():
+            key, separator, value = line.partition("=")
+            if separator and key in {
+                "AGENT_CANON_CODEX_HOME_DESTINATION",
+                "AGENT_CANON_RUNTIME_DESTINATION",
+            }:
+                shell_destinations[key] = value
+        codex_container_home = shell_destinations[
+            "AGENT_CANON_CODEX_HOME_DESTINATION"
+        ]
+        container_runtime_root = shell_destinations["AGENT_CANON_RUNTIME_DESTINATION"]
         for entry in managed:
             target = codex_home / Path(entry["target"]).relative_to(
                 codex_container_home
@@ -6000,7 +6007,7 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
                 "test",
                 "!",
                 "-e",
-                "/var/lib/agent-canon/runtime/host-state/active-image.tsv",
+                f"{container_runtime_root}/host-state/active-image.tsv",
             ],
             check=False,
             capture_output=True,
