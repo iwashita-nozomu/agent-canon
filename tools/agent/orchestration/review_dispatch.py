@@ -11,6 +11,7 @@
 # upstream design ../../../agents/skills/pr-processing.md owns PR-head review handling.
 # upstream implementation ./team_config.py resolves task, role, and resume routing.
 # upstream implementation ./implementation_dispatch.py resolves agent type and dispatch routing.
+# upstream implementation ../../runtime/values.py refines decoded ledger and manifest containers.
 # upstream implementation ../../runtime/lifecycle/workflow_monitor.py produces write-result triggers and records review waves.
 # upstream implementation ../../repository/github/github_publish.py produces verified PR-head update triggers.
 # upstream implementation ../../runtime/artifacts/artifact_identity.py materializes review artifact byte identities.
@@ -43,6 +44,7 @@ from tools.runtime.artifacts.external_artifact_binding import (
 from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER
 from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot
 from tools.runtime.artifacts.report_artifact_checks import markdown_without_adjudicated_rejected_hypotheses
+from tools.runtime.values import is_object_list, is_string_object_dict
 
 REVIEW_CANDIDATE_SCHEMA = "agent-canon.review-candidate-event.v1"
 REVIEW_INTENT_SCHEMA = "agent-canon.terminal-resume-intent.v1"
@@ -265,14 +267,10 @@ def _record_id(prefix: str, payload: Mapping[str, object]) -> str:
 
 def _ledger_events(report_dir: Path) -> list[dict[str, object]]:
     """Return canonical events in snapshot order."""
-    snapshot = read_ledger_snapshot(
+    return read_ledger_snapshot(
         report_dir,
         f"w2-current-ledger:{report_dir.name}",
-    )
-    events = snapshot.get("events")
-    if not isinstance(events, list):
-        raise AutomaticReviewError("automatic_review:ledger_invalid")
-    return [event for event in events if isinstance(event, dict)]
+    )["events"]
 
 
 def _automatic_payloads(
@@ -299,26 +297,26 @@ def _canonical_writer_identity(report_dir: Path) -> dict[str, str]:
             "team_manifest.yaml",
         )
     raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, Mapping):
+    if not is_string_object_dict(raw):
         raise AutomaticReviewError("automatic_review:routing_packet_missing", "roles")
     roles = raw.get("roles")
-    if not isinstance(roles, list):
+    if not is_object_list(roles):
         raise AutomaticReviewError("automatic_review:routing_packet_missing", "roles")
     implementer = next(
         (
             role
             for role in roles
-            if isinstance(role, Mapping) and role.get("id") == "implementer"
+            if is_string_object_dict(role) and role.get("id") == "implementer"
         ),
         None,
     )
-    if not isinstance(implementer, Mapping):
+    if not is_string_object_dict(implementer):
         raise AutomaticReviewError(
             "automatic_review:structure_owner_missing",
             "implementer",
         )
     agent_types = implementer.get("codex_agents")
-    if not isinstance(agent_types, list) or not agent_types:
+    if not is_object_list(agent_types) or not agent_types:
         raise AutomaticReviewError(
             "automatic_review:routing_packet_missing",
             "implementer.codex_agents",

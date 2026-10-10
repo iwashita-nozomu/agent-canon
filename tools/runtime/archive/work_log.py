@@ -4,6 +4,7 @@
 # responsibility Provides run-local work log automation.
 # upstream design ../../../agents/canonical/CODEX_WORKFLOW.md runtime preflight logging rules
 # upstream design ../../../agents/canonical/ARTIFACT_PLACEMENT.md run bundle artifact placement contract
+# upstream implementation ../values.py refines decoded ledger containers
 # downstream implementation ../lifecycle/workflow_monitor.py projects semantic events into monitoring output
 # downstream implementation ../lifecycle/workflow_monitor.py projects semantic monitoring events here
 # downstream implementation ../artifacts/report_artifact_checks.py materializes the checked completion read model from this ledger
@@ -24,9 +25,15 @@ import tempfile
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypedDict
 
 from tools.repository.workspace.workspace_scope import resolve_report_root, resolve_runtime_artifact_path
+from tools.runtime.values import (
+    is_object_list,
+    is_object_list_or_tuple,
+    is_string_object_dict,
+    is_string_object_mapping,
+)
 LEDGER_SEMANTIC_KINDS = (
     "request_clause",
     "responsibility_unit",
@@ -41,6 +48,7 @@ LEDGER_SEMANTIC_KINDS = (
 NON_GROUPABLE_SEMANTIC_KINDS = frozenset(
     {"responsibility_unit", "decision", "failure", "deferral", "publication_state"}
 )
+MIN_GROUP_MEMBER_COUNT = 2
 MONITOR_PASSTHROUGH_FIELDS = frozenset(
     {
         "gate_evidence",
@@ -78,6 +86,15 @@ class MaterializerError(ValueError):
         self.code = code
         self.detail = detail
         super().__init__(code if not detail else f"{code}:{detail}")
+
+
+class LedgerSnapshot(TypedDict):
+    """Validated projection returned by the canonical ledger reader."""
+
+    snapshot_identity: str
+    events: list[dict[str, object]]
+    event_identities: list[str]
+    snapshot_digest: str
 
 
 def _runtime_path(path: Path, runtime_root: Path | str | None = None) -> Path:
@@ -507,7 +524,7 @@ def _required_ledger_text(event: Mapping[str, object], field: str) -> str:
 def _required_ledger_refs(event: Mapping[str, object], field: str) -> tuple[str, ...]:
     """Return non-empty evidence or artifact references."""
     value = event.get(field)
-    if not isinstance(value, (list, tuple)) or not value:
+    if not is_object_list_or_tuple(value) or not value:
         raise ValueError(f"ledger event requires non-empty {field}")
     refs = tuple(
         item.strip() for item in value if isinstance(item, str) and item.strip()
@@ -519,8 +536,6 @@ def _required_ledger_refs(event: Mapping[str, object], field: str) -> tuple[str,
 
 def _validate_ledger_event(event: Mapping[str, object], report_dir: Path) -> str:
     """Validate one append-only event and return its stable identity."""
-    if not isinstance(event, Mapping):
-        raise ValueError("ledger event must be an object")
     run_id = _required_ledger_text(event, "run_id")
     if run_id != report_dir.name:
         raise ValueError("ledger event run_id does not match report directory")
@@ -561,15 +576,23 @@ def _validate_ledger_event(event: Mapping[str, object], report_dir: Path) -> str
         if not isinstance(group_identity, str) or not group_identity.strip():
             raise ValueError("group ledger events require group_identity")
         members = event.get("member_clause_ids")
-        if not isinstance(members, (list, tuple)) or len(members) < 2:
+        if (
+            not is_object_list_or_tuple(members)
+            or len(members) < MIN_GROUP_MEMBER_COUNT
+        ):
             raise ValueError("group ledger events require member_clause_ids")
-        if any(not isinstance(member, str) or not member.strip() for member in members):
+        normalized_members = tuple(
+            member.strip()
+            for member in members
+            if isinstance(member, str) and member.strip()
+        )
+        if len(normalized_members) != len(members):
             raise ValueError("group member_clause_ids must be non-empty text")
-        if len(set(member.strip() for member in members)) != len(members):
+        if len(set(normalized_members)) != len(normalized_members):
             raise ValueError("group member_clause_ids must be unique")
     source_binding = event.get("source_binding")
     if source_binding is not None:
-        if not isinstance(source_binding, Mapping):
+        if not is_string_object_mapping(source_binding):
             raise ValueError("ledger event source_binding must be an object")
         binding_run_id = source_binding.get("run_id")
         binding_context_id = source_binding.get("context_id")
@@ -708,7 +731,7 @@ def read_ledger_snapshot(
     snapshot_identity: str,
     *,
     runtime_root: Path | str | None = None,
-) -> dict[str, object]:
+) -> LedgerSnapshot:
     """Reconstruct one immutable logical-ledger snapshot from the run log."""
     if not snapshot_identity.strip():
         raise ValueError("snapshot_identity must not be empty")
@@ -724,7 +747,7 @@ def read_ledger_snapshot(
             event = json.loads(line.removeprefix("- ledger_event="))
         except json.JSONDecodeError as exc:
             raise ValueError("malformed ledger event") from exc
-        if not isinstance(event, dict):
+        if not is_string_object_dict(event):
             raise ValueError("ledger event must be an object")
         identity = _validate_ledger_event(event, report_dir)
         if identity in identities:
@@ -737,10 +760,11 @@ def read_ledger_snapshot(
             str(event.get("event_id", event.get("sequence", ""))),
         )
     )
-    snapshot = {
+    snapshot: LedgerSnapshot = {
         "snapshot_identity": snapshot_identity.strip(),
         "events": events,
         "event_identities": sorted(identities),
+        "snapshot_digest": "",
     }
     snapshot["snapshot_digest"] = ledger_snapshot_digest(snapshot)
     return snapshot
@@ -749,7 +773,7 @@ def read_ledger_snapshot(
 def ledger_snapshot_digest(snapshot: Mapping[str, object]) -> str:
     """Return the stable digest for the canonical ledger event projection."""
     events = snapshot.get("events")
-    if not isinstance(events, list):
+    if not is_object_list(events):
         raise ValueError("ledger snapshot events must be a list")
     payload = json.dumps(events, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -816,6 +840,7 @@ def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
     workspace_root = Path(args.workspace_root).resolve()
+    report_dir: Path | None = None
     if args.report_dir and args.run_id:
         raise SystemExit("Provide at most one of --report-dir or --run-id.")
     if args.report_dir:

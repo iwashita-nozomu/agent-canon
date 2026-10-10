@@ -7,7 +7,9 @@
 # downstream implementation ../agent/orchestration/team_config.py narrows config values
 # downstream implementation ../agent/orchestration/implementation_dispatch.py narrows packet values
 # downstream implementation ../agent/orchestration/packets.py narrows packet values
+# downstream implementation ../agent/orchestration/review_dispatch.py narrows ledger and manifest values
 # downstream implementation ./manifest/manifest_rendering.py narrows rendering values
+# downstream implementation ./archive/work_log.py narrows ledger event values
 # downstream implementation ../agent/skills/skill_shim_materializer.py narrows YAML frontmatter values
 # downstream implementation ./lifecycle/bootstrap_agent_run.py narrows command payload values
 # downstream implementation ./lifecycle/task_close.py narrows lifecycle artifact values

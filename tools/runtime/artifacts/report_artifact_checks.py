@@ -409,10 +409,7 @@ def _validation_ledger_events(report_dir: Path) -> list[dict[str, object]]:
         report_dir,
         f"validation-materializer-ledger:{report_dir.name}",
     )
-    events = snapshot.get("events")
-    if not isinstance(events, list):
-        raise ValidationMaterializerError("validation_result:ledger_mismatch")
-    return [event for event in events if isinstance(event, dict)]
+    return snapshot["events"]
 
 
 def _current_validation_candidate(
