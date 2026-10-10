@@ -3,7 +3,6 @@
 # responsibility Maps canonical tools to same-named explanatory documents and owns their public/internal/compat/retired/example classification.
 # upstream design README.md tool documentation placement policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
-# upstream design visualization_contract.md canonical visualization contract/checker documentation
 # downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates one-to-one tool docs
 # downstream implementation ../../tests/agent_tools/test_tool_catalog.py validates visualization tool-doc registration
 # @dependency-end
@@ -126,14 +125,6 @@ tool = "tools/repository/github/wiki_publish.py"
 doc = "documents/tools/wiki_publish.md"
 language = "python"
 summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
-
-[[tool]]
-id = "visualization-contract"
-classification = "public"
-tool = "tools/validation/semantic/tools/visualization_contract.py"
-doc = "documents/tools/visualization_contract.md"
-language = "python"
-summary = "Typed visualization universe, ToolCall, projection coverage, and post-format readback checker documentation."
 
 [[tool]]
 id = "render-dependency-manifest-graph"

@@ -125,7 +125,8 @@ The selected checkout is the only scan scope. Default checks are all checks.
 
 Checks:
   inventory, stale, code-dependencies, dependency-review, oop,
-  static-any, hardcoded-numbers, log-helper, convention, semantic-index
+  basedpyright-explicit-any, ruff-magic-values, ruff-docstrings,
+  convention, semantic-index
 EOF
 }
 
@@ -232,9 +233,9 @@ if [[ ${#REQUESTED_CHECKS[@]} -eq 0 ]]; then
     code-dependencies
     dependency-review
     oop
-    static-any
-    hardcoded-numbers
-    log-helper
+    basedpyright-explicit-any
+    ruff-magic-values
+    ruff-docstrings
     convention
     semantic-index
   )
@@ -342,11 +343,17 @@ run_stale_search() {
 }
 
 run_scope_checks() {
-  local scope_name scope_root paths excludes
+  local scope_name scope_root paths excludes native_paths
   while IFS=$'\t' read -r scope_name scope_root; do
     [[ -n "$scope_name" && -n "$scope_root" ]] || continue
     paths=(python include src tools tests mcp)
     excludes=(--exclude reports --exclude legacy)
+    native_paths=()
+    for path in "${paths[@]}"; do
+      if [[ -e "$scope_root/$path" ]]; then
+        native_paths+=("$scope_root/$path")
+      fi
+    done
     if has_check code-dependencies; then
       record_command \
         "code-dependencies:${scope_name}" \
@@ -385,34 +392,31 @@ run_scope_checks() {
           "${excludes[@]}" \
           "${paths[@]}"
     fi
-    if has_check static-any; then
+    if has_check basedpyright-explicit-any; then
       record_command \
-        "static-any:${scope_name}" \
-        "$REPORT_DIR/static_any_${scope_name}.txt" \
-        python3 "$TOOL_DIR/validation/semantic/code/check_static_any.py" \
-          --root "$scope_root" \
-          --exclude reports \
-          "${paths[@]}"
+        "basedpyright-explicit-any:${scope_name}" \
+        "$REPORT_DIR/basedpyright_explicit_any_${scope_name}.txt" \
+        basedpyright \
+          --project "$TOOL_DIR/validation/code/config/basedpyright-explicit-any.json" \
+          "${native_paths[@]}"
     fi
-    if has_check hardcoded-numbers; then
+    if has_check ruff-magic-values; then
       record_command \
-        "hardcoded-numbers:${scope_name}" \
-        "$REPORT_DIR/hardcoded_numbers_${scope_name}.txt" \
-        python3 "$TOOL_DIR/validation/semantic/code/check_hardcoded_numbers.py" \
-          --root "$scope_root" \
-          --format text \
-          --no-fail-on-findings \
-          "${excludes[@]}" \
-          "${paths[@]}"
+        "ruff-magic-values:${scope_name}" \
+        "$REPORT_DIR/ruff_magic_values_${scope_name}.txt" \
+        ruff check \
+          --config "$TOOL_DIR/validation/code/config/ruff-magic-values.toml" \
+          --select PLR2004 \
+          "${native_paths[@]}"
     fi
-    if has_check log-helper; then
+    if has_check ruff-docstrings; then
       record_command \
-        "log-helper:${scope_name}" \
-        "$REPORT_DIR/log_helper_names_${scope_name}.txt" \
-        python3 "$TOOL_DIR/validation/semantic/logging/check_log_helper_names.py" \
-          --root "$scope_root" \
-          "${excludes[@]}" \
-          "${paths[@]}"
+        "ruff-docstrings:${scope_name}" \
+        "$REPORT_DIR/ruff_docstrings_${scope_name}.txt" \
+        ruff check \
+          --config "$TOOL_DIR/validation/code/config/ruff-docstrings.toml" \
+          --select D \
+          "${native_paths[@]}"
     fi
   done < <(scope_roots)
 }

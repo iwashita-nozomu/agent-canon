@@ -57,9 +57,13 @@ STATIC_GATE_UNITS = ("docs", "rust", "contracts", "eval", "workflow-container")
 def build_parser() -> argparse.ArgumentParser:
     """Create CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--path", action="append", default=[], help="Changed path. Repeatable.")
+    parser.add_argument(
+        "--path", action="append", default=[], help="Changed path. Repeatable."
+    )
     parser.add_argument("--paths-file", help="Newline-delimited changed paths.")
-    parser.add_argument("--format", choices=("text", "json", "github-output"), default="text")
+    parser.add_argument(
+        "--format", choices=("text", "json", "github-output"), default="text"
+    )
     parser.add_argument("--full-confidence", action="store_true")
     return parser
 
@@ -80,41 +84,79 @@ def normalize_paths(paths: list[str], paths_file: str | None) -> tuple[str, ...]
 def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
     """Classify paths into active profile checks without selecting a second route."""
     active: list[PathRisk] = []
-    if any(Path(path).suffix in DOC_SUFFIXES or path in DOC_CHECK_INPUTS for path in paths):
-        active.append(PathRisk("docs-only-or-docs-impact", "markdown_or_docs_checker_changed", (
-            "tools/bin/agent-canon docs check",
-        )))
+    if any(
+        Path(path).suffix in DOC_SUFFIXES or path in DOC_CHECK_INPUTS for path in paths
+    ):
+        active.append(
+            PathRisk(
+                "docs-only-or-docs-impact",
+                "markdown_or_docs_checker_changed",
+                ("tools/bin/agent-canon docs check",),
+            )
+        )
     if any(Path(path).suffix in PYTHON_SUFFIXES for path in paths):
-        active.append(PathRisk("python-tooling", "python_path_changed", (
-            "python3 -m ruff check <changed-python-paths>",
-            "PYTHONPATH=. python3 -m pyright <changed-python-paths>",
-            "python3 -m pytest -q <targeted-tests>",
-        )))
+        active.append(
+            PathRisk(
+                "python-tooling",
+                "python_path_changed",
+                (
+                    "ruff check <changed-python-paths>",
+                    "basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json <changed-python-paths>",
+                    "python3 -m pytest -q <targeted-tests>",
+                ),
+            )
+        )
     if any(path.startswith(CONTAINER_PREFIXES) for path in paths):
-        active.append(PathRisk("container-runtime", "container_runtime_surface_changed", (
-            "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
-            "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
-        )))
+        active.append(
+            PathRisk(
+                "container-runtime",
+                "container_runtime_surface_changed",
+                (
+                    "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
+                    "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
+                ),
+            )
+        )
     if any(path.startswith(GITHUB_PREFIXES) for path in paths):
-        active.append(PathRisk("github-automation", "github_surface_changed", (
-            "python3 tools/validation/ci/checks/check_github_workflows.py",
-        )))
+        active.append(
+            PathRisk(
+                "github-automation",
+                "github_surface_changed",
+                ("python3 tools/validation/ci/checks/check_github_workflows.py",),
+            )
+        )
     if any(path.startswith(EVAL_PREFIXES) for path in paths):
-        active.append(PathRisk("agent-eval", "eval_surface_changed", (
-            "python3 eval/producers/run_accumulated_agent_evals.py",
-        )))
+        active.append(
+            PathRisk(
+                "agent-eval",
+                "eval_surface_changed",
+                ("python3 eval/producers/run_accumulated_agent_evals.py",),
+            )
+        )
     if any(path.startswith(RUST_PREFIXES) for path in paths):
-        active.append(PathRisk("rust", "rust_surface_changed", (
-            "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml",
-        )))
+        active.append(
+            PathRisk(
+                "rust",
+                "rust_surface_changed",
+                (
+                    "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml",
+                ),
+            )
+        )
     if any(path in DEPENDENCY_PATHS for path in paths):
-        active.append(PathRisk("dependency", "dependency_owner_changed", (
-            "bash tools/analysis/dependencies/run_repo_dependency_review.sh",
-        )))
+        active.append(
+            PathRisk(
+                "dependency",
+                "dependency_owner_changed",
+                ("bash tools/analysis/dependencies/run_repo_dependency_review.sh",),
+            )
+        )
     return tuple(dict.fromkeys(active))
 
 
-def select_static_gate_units(paths: tuple[str, ...], *, full_confidence: bool = False) -> tuple[str, ...]:
+def select_static_gate_units(
+    paths: tuple[str, ...], *, full_confidence: bool = False
+) -> tuple[str, ...]:
     """Select the union of required units without losing unclassified paths."""
     if full_confidence or any(path in SELECTOR_BOUNDARY_PATHS for path in paths):
         return STATIC_GATE_UNITS
@@ -135,7 +177,9 @@ def select_static_gate_units(paths: tuple[str, ...], *, full_confidence: bool = 
     return tuple(selected)
 
 
-def render_text(paths: tuple[str, ...], risks: tuple[PathRisk, ...], units: tuple[str, ...]) -> str:
+def render_text(
+    paths: tuple[str, ...], risks: tuple[PathRisk, ...], units: tuple[str, ...]
+) -> str:
     """Render text output."""
     lines = [
         f"PATH_RISK_INPUT_COUNT={len(paths)}",
@@ -152,9 +196,11 @@ def render_text(paths: tuple[str, ...], risks: tuple[PathRisk, ...], units: tupl
 def render_github_output(paths: tuple[str, ...], units: tuple[str, ...]) -> str:
     """Render stable GitHub Actions outputs from canonical unit selection."""
     selected = set(units)
-    docs_paths = [] if any(path in DOC_CHECK_INPUTS for path in paths) else [
-        path for path in paths if Path(path).suffix in DOC_SUFFIXES
-    ]
+    docs_paths = (
+        []
+        if any(path in DOC_CHECK_INPUTS for path in paths)
+        else [path for path in paths if Path(path).suffix in DOC_SUFFIXES]
+    )
     lines = [
         "units=" + ",".join(units),
         f"input_count={len(paths)}",
@@ -173,7 +219,17 @@ def main() -> int:
     risks = classify(paths)
     units = select_static_gate_units(paths, full_confidence=args.full_confidence)
     if args.format == "json":
-        print(json.dumps({"paths": paths, "risks": [asdict(risk) for risk in risks], "units": units}, indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "paths": paths,
+                    "risks": [asdict(risk) for risk in risks],
+                    "units": units,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
     elif args.format == "github-output":
         print(render_github_output(paths, units), end="")
     else:

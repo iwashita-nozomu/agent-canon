@@ -3,7 +3,6 @@
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
-# upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
 # downstream implementation runtime/manifest/tool_catalog.py validates this catalog
 # downstream implementation validation/semantic/tools/tool_drift.py checks catalog drift contracts
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
@@ -394,28 +393,6 @@ entries:
     tests:
       - tests/agent_tools/test_surface_manifest.py
 
-  - id: visualization-contract
-    public: true
-    summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
-    path: tools/validation/semantic/tools/visualization_contract.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    audience: skill
-    placement: validation_checker
-    command: python3 tools/validation/semantic/tools/visualization_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/tools/visualization_contract.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/visualization_contract.md
-    tests:
-      - tests/agent_tools/test_visualization_contract.py
-
   - id: render-dependency-manifest-graph
     public: true
     summary: Renders dependency manifest graph TSV artifacts into repo-local Graph IR JSON with directory containment, Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.
@@ -733,27 +710,6 @@ entries:
       - documents/structure/repo-structure-contract.toml
     tests:
       - tests/agent_tools/test_repo_structure_contract.py
-
-  - id: import-responsibility
-    summary: Checks Python imports for unused aliases and responsibility-scope boundary violations.
-    path: tools/analysis/code/import_responsibility.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/analysis/code/import_responsibility.py
-    dispatch: {argv: ["python3", "tools/analysis/code/import_responsibility.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/design/responsibility-scope-management.md
-      - documents/conventions/coding-conventions-python.md
-      - responsibility-scope.toml
-    tests:
-      - tests/agent_tools/test_import_responsibility.py
 
   - id: github-publish
     public: true
@@ -1590,25 +1546,6 @@ entries:
     tests:
       - tests/tools/test_run_all_checks_script.py
 
-  - id: pydocstyle-review
-    summary: Runs explicit AgentCanon Docstring review with source-root-bound canonical D213 configuration.
-    path: tools/validation/semantic/code/pydocstyle_review.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
-    dispatch: {argv: ["tools/bin/agent-canon", "pydocstyle-review", "--target", "<repo-relative.py>"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - documents/conventions/DOCSTRING_GUIDE.md
-      - tools/validation/ci/guides/PRE_REVIEW_GUIDE.md
-      - agents/skills/python-review.md
-    tests:
-      - tests/agent_tools/test_pydocstyle_review.py
-
   - id: agent-canon-update-todos
     summary: Routes parent readback tasks after a standalone AgentCanon source merge.
     path: tools/agent/orchestration/agent_canon_update_todos.py
@@ -1832,42 +1769,6 @@ entries:
     tests: []
     test_exempt_reason: Registry contract is exercised through repo-wide CI smoke checks.
 
-  - id: check-hardcoded-numbers
-    summary: Rejects unexplained numeric literals in Python and C++ sources.
-    path: tools/validation/semantic/code/check_hardcoded_numbers.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/code/check_hardcoded_numbers.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_hardcoded_numbers.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/conventions/common/01_principles.md
-    tests:
-      - tests/agent_tools/test_check_hardcoded_numbers.py
-
-  - id: check-static-any
-    summary: Rejects explicit Python Any usage outside allowed boundaries.
-    path: tools/validation/semantic/code/check_static_any.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/code/check_static_any.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_static_any.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/conventions/python/04_type_annotations.md
-    tests:
-      - tests/agent_tools/test_check_static_any.py
-
   - id: check-solid-evidence
     summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
     path: tools/validation/semantic/code/check_solid_evidence.py
@@ -1886,24 +1787,6 @@ entries:
       - agents/skills/oop-readability-check.md
     tests:
       - tests/agent_tools/test_check_solid_evidence.py
-
-  - id: check-log-helper-names
-    summary: Checks logging helper functions use the required name prefix.
-    path: tools/validation/semantic/logging/check_log_helper_names.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/logging/check_log_helper_names.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/logging/check_log_helper_names.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/conventions/coding-conventions-logging.md
-    tests:
-      - tests/agent_tools/test_check_log_helper_names.py
 
   - id: check-run-log-contract
     summary: Checks that run-log summaries resolve from amp.Info and avoid direct writer surfaces.

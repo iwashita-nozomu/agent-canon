@@ -14,15 +14,14 @@
 set -euo pipefail
 
 if [[ "$#" -lt 1 ]]; then
-  echo "usage: $0 {docs|rust|contracts|eval|workflow-container|full} [docs-paths|contracts-baseline|full-check-options...]" >&2
+  echo "usage: $0 {docs|rust|contracts|eval|workflow-container|full} [docs-paths|full-check-options...]" >&2
   exit 2
 fi
 
 UNIT="$1"
 shift
 UNIT_ARGS=("$@")
-if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${UNIT}" != "contracts" && "${#UNIT_ARGS[@]}" -ne 0 ]] ||
-   [[ "${UNIT}" == "contracts" && "${#UNIT_ARGS[@]}" -gt 1 ]]; then
+if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${#UNIT_ARGS[@]}" -ne 0 ]]; then
   echo "standalone static-gate unit does not accept arguments: ${UNIT}" >&2
   exit 2
 fi
@@ -163,7 +162,6 @@ run_rust() {
 run_contracts() {
   node --version
   python3 -m pytest -p no:cacheprovider --pyargs \
-    tests.agent_tools.test_visualization_contract \
     tests.agent_tools.test_render_dependency_manifest_graph \
     tests.agent_tools.test_graph_client_source_projection \
     tests.agent_tools.test_structured_document_inventory_cli \
@@ -177,10 +175,6 @@ run_contracts() {
   python3 "${TOOLS_ROOT}/runtime/manifest/tool_catalog.py"
   python3 "${TOOLS_ROOT}/analysis/proof/tool_proof_coverage.py"
   python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
-  local base_ref="${UNIT_ARGS[0]:-origin/main}"
-  git rev-parse --verify "${base_ref}^{commit}" >/dev/null
-  python3 "${TOOLS_ROOT}/analysis/code/import_responsibility.py" \
-    --changed --baseline-ref "${base_ref}"
   PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \

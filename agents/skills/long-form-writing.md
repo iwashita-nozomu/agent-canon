@@ -7,7 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable document structure contract
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design formal-proof-workflow.md mathematical claim proof-obligation routing
-upstream design code-visualization.md sole public visualization owner and typed projection contract
+upstream design code-visualization.md visualization selection and native renderer delegation
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
@@ -31,6 +31,8 @@ answers and use `code-visualization` for its selected rendering. Route a
 mathematical or implementation-derived claim through `formal-proof-workflow`
 when that proof is part of the request; present its scope, assumptions,
 limitations, and validation evidence accurately.
+For the selected renderer, provide its native input and check the requested
+output.
 
 Review the reader path and completeness against the requested scope. Use
 `document_flow_reviewer` for a structural gap and add docs-completeness or

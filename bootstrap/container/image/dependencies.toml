@@ -59,6 +59,17 @@ provides = ["ruff"]
 failure_policy = "fail"
 
 [[records]]
+id = "basedpyright"
+package = "basedpyright"
+method = "pipx"
+version = "1.40.2"
+source = "https://pypi.org/simple"
+verification = { kind = "pipx-package", executable = "basedpyright", args = ["--version"], output_contains = "1.40.2" }
+deps = ["pipx"]
+provides = ["basedpyright"]
+failure_policy = "fail"
+
+[[records]]
 id = "pyright-language-server"
 package = "pyright"
 method = "npm-global"

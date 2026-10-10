@@ -44,7 +44,9 @@ class ToolProofCoverageTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("# Tool Proof Coverage", result.stdout)
-            self.assertIn("Lean theorem binding tool-catalog behavior spec", result.stdout)
+            self.assertIn(
+                "Lean theorem binding tool-catalog behavior spec", result.stdout
+            )
 
     def test_require_lean_verified_requires_explicit_selection(self) -> None:
         """Strict mode never recreates a universal proof backlog."""
@@ -75,16 +77,22 @@ class ToolProofCoverageTest(unittest.TestCase):
             self.assertNotIn("explicit-tool-selection-required", result.stdout)
             self.assertIn("performance-not-lean-verified", result.stdout)
             payload = json.loads(
-                self.run_checker(root, "--tool-id", "tool-catalog", "--format", "json").stdout
+                self.run_checker(
+                    root, "--tool-id", "tool-catalog", "--format", "json"
+                ).stdout
             )
             self.assertEqual(payload["selected_tool_ids"], ["tool-catalog"])
-            self.assertEqual([row["tool_id"] for row in payload["rows"]], ["tool-catalog"])
+            self.assertEqual(
+                [row["tool_id"] for row in payload["rows"]], ["tool-catalog"]
+            )
 
     def test_declared_lean_verified_rejects_sorry(self) -> None:
         """Lean-verified claims must not point at proof files with escape hatches."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            self.write_minimal_repo(root, proof_text="theorem ToolBehavior : True := by\n  sorry\n")
+            self.write_minimal_repo(
+                root, proof_text="theorem ToolBehavior : True := by\n  sorry\n"
+            )
 
             result = self.run_checker(root)
 
@@ -149,7 +157,9 @@ class ToolProofCoverageTest(unittest.TestCase):
         self.write_file(root, "README.md", self.manifest("Fixture root."))
         self.write_core_fixture_files(root, proof_text)
         self.write_fixture_docs(root)
-        self.write_file(root, "documents/tools/tool-docs.toml", self.tool_docs_manifest())
+        self.write_file(
+            root, "documents/tools/tool-docs.toml", self.tool_docs_manifest()
+        )
         self.write_file(
             root,
             "tools/validation/ci/runners/run_all_checks.sh",
@@ -209,9 +219,14 @@ class ToolProofCoverageTest(unittest.TestCase):
                 "",
                 'catalog_kind = "agent_canon_tool_docs"',
                 "version = 1",
+                (
+                    'classification_values = ["public", "internal", "compat", '
+                    '"retired", "example"]'
+                ),
                 "",
                 "[[tool]]",
                 'id = "tool-catalog"',
+                'classification = "internal"',
                 'tool = "tools/runtime/manifest/tool_catalog.py"',
                 'doc = "documents/tools/tool_catalog.md"',
                 "",

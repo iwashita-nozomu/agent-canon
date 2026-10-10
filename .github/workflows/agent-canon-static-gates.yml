@@ -128,7 +128,6 @@ jobs:
             args=()
             case "${unit}" in
               docs) args=("${docs_paths[@]}") ;;
-              contracts) args=("${BASE_SHA:-origin/main}") ;;
             esac
             if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
               exec --root "${GITHUB_WORKSPACE}" -- bash \

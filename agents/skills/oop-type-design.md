@@ -165,14 +165,13 @@ resource ownership, I/O, and boundary behavior remain delegated.
 Delegate compiler, language, OOP, schema, and dependency facts to their existing
 owners:
 
-- Python public annotations and Protocol shape: `pyright`; Python review owns the
-  changed-diff review.
+- Python public annotations, Protocol shape, and explicit `Any`: one
+  BasedPyright invocation; Python review owns the changed-diff review.
 - Python lint and formatting signals: `ruff`; it remains an existing static owner.
 - C/C++ build, headers, and ownership: `$cpp-review` and its project-native checks.
 - C++ target responsibility: `cpp-core` is the provider; individual test and experiment
   targets are consumers; root-anchored build/install paths and lifecycle-owned result paths
   are read back from [documents/design/cpp-build-layout.md](../../documents/design/cpp-build-layout.md).
-- Explicit `Any`: `python3 tools/validation/semantic/code/check_static_any.py --submodule-aware`.
 - OOP/SOLID signals: `$oop-readability-check`; keep its evidence with the owning review.
 - Existing dependency graph context: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review` when the declared relations materially affect the type boundary. Missing annotations do not block the design.
 - Schema or algorithm checks: existing checker only when the changed implementation

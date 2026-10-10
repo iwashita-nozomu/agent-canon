@@ -5,7 +5,6 @@
 # upstream design documents/structure/repo-structure-contract.toml separate path existence and kind contract
 # upstream design tools/catalog.yaml protecting tool ownership
 # downstream implementation tools/validation/semantic/responsibility/responsibility_scope.py validates this manifest
-# downstream implementation tools/analysis/code/import_responsibility.py checks import boundaries
 # downstream implementation tools/validation/semantic/tools/tool_drift.py checks scope/tool trace links
 # @dependency-end
 
@@ -29,85 +28,6 @@ class_values = [
   "tooling",
   "github_surface",
   "external_dependency",
-]
-
-[[import_rule]]
-source = "runtime-entrypoints"
-targets = [
-  "runtime-entrypoints",
-  "shared-tooling",
-  "shared-policy-documents",
-  "eval-and-hook-evidence",
-  "experiment-artifacts",
-]
-
-[[import_rule]]
-source = "eval-and-hook-evidence"
-targets = [
-  "eval-and-hook-evidence",
-  "shared-tooling",
-  "shared-policy-documents",
-  "shared-test-suite",
-]
-
-[[import_rule]]
-source = "shared-tooling"
-targets = [
-  "shared-tooling",
-  "shared-policy-documents",
-  "eval-and-hook-evidence",
-  "runtime-entrypoints",
-  "github-automation",
-  "shared-test-suite",
-  "experiment-artifacts",
-]
-
-[[import_rule]]
-source = "shared-test-suite"
-targets = [
-  "shared-test-suite",
-  "shared-tooling",
-  "shared-policy-documents",
-  "runtime-entrypoints",
-  "eval-and-hook-evidence",
-  "experiment-artifacts",
-]
-
-[[import_rule]]
-source = "shared-policy-documents"
-targets = [
-  "shared-policy-documents",
-  "shared-tooling",
-  "runtime-entrypoints",
-  "eval-and-hook-evidence",
-  "shared-test-suite",
-  "github-automation",
-  "experiment-artifacts",
-]
-
-[[import_rule]]
-source = "github-automation"
-targets = [
-  "github-automation",
-  "shared-tooling",
-  "shared-policy-documents",
-  "runtime-entrypoints",
-  "eval-and-hook-evidence",
-]
-
-[[import_rule]]
-source = "external-vendor"
-targets = [
-  "external-vendor",
-]
-
-[[import_rule]]
-source = "experiment-artifacts"
-targets = [
-  "experiment-artifacts",
-  "shared-tooling",
-  "shared-policy-documents",
-  "eval-and-hook-evidence",
 ]
 
 [[scope]]

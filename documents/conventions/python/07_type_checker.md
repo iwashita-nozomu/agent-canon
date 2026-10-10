@@ -7,24 +7,24 @@ responsibility Documents 型チェッカの活用 for this repository.
 
 # 型チェッカの活用
 
-この章は、pyright を中心とした型検査の運用方針を定めます。
+この章は、BasedPyright CLI による型検査の運用方針を定めます。
 
 ## 要約
 
-- cast ではなく pyright を優先します。
+- cast ではなく BasedPyright を優先します。
 - 型の境界は repo 内の共有契約層へ集約します。
 
 ## 規約
 
 - `pyright` の設定は `pyproject.toml` の `[tool.pyright]` を正本とします。
 - repo root の `pyrightconfig.json` は editor / tool 互換のための薄いラッパーに限り、`extends = "./pyproject.toml"` だけを持たせます。独自設定は足しません。
-- 既定の `pyright` 実行は repo root で行い、`pyproject.toml` に含めた対象だけを baseline として常時 clean に保ちます。
+- 既定の BasedPyright 実行は repo root で行い、`pyproject.toml` に含めた対象だけを baseline として常時 clean に保ちます。
 - 現在の baseline は `python/` と `tests/` 全体です。template 初期状態のように `tests/` だけが存在する段階でも、checked-in の Python ファイルを baseline として常時 clean に保ちます。
 - VSCode / Pylance で third-party import を解決するときは、workspace で選ばれた Python interpreter が使われます。repo 側では `.vscode/settings.json` の `python.defaultInterpreterPath` を基準にし、差分がある場合は `Python: Select Interpreter` で合わせます。
-- `tests/` を触った場合も、まず既定の `pyright` を通し、必要なら対象 path を明示して追加実行します。
-- 実験段階やテストで `pyright` エラーが残る場合は、黙って放置せず `task.md`、`reviews/`、または関連 note に未解消として残します。
-- cast 等のプログラマによる型安全性の確保は避け、pyright による型安全性の確保を優先します。
-- `pyright` とあわせて `python3 tools/validation/semantic/code/check_static_any.py` を通し、明示的な `typing.Any` を repo-wide に禁止します。
+- `tests/` を触った場合も、まず既定の BasedPyright を通し、必要なら対象 path を明示して追加実行します。
+- 実験段階やテストで BasedPyright のエラーが残る場合は、黙って放置せず `task.md`、`reviews/`、または関連 note に未解消として残します。
+- cast 等のプログラマによる型安全性の確保は避け、BasedPyright による型安全性の確保を優先します。
+- BasedPyright の一つの実行経路で型検査と `reportExplicitAny` を扱い、明示的な `typing.Any` を repo-wide に禁止します。
 - 型の境界は package root 付近の `protocols.py`、`typing.py`、または typed dataclass に集約し、単一の基準で整合を保ちます。
 - 契約 family を改名するときは、共有契約と domain 特化を同じ naming family で同時に更新します。
 - `OldProblem` のような旧命名と `StructuredProblem` のような新命名を併存させません。
@@ -38,10 +38,9 @@ responsibility Documents 型チェッカの活用 for this repository.
 
 ## 実行例
 
-- baseline 全体: `pyright`
-- 明示 `Any` 禁止: `python3 tools/validation/semantic/code/check_static_any.py`
-- テストを触ったとき: `pyright tests/<subdir-or-file>`
-- 特定モジュールだけを確認したいとき: `pyright python/<subdir-or-file>`
+- baseline 全体: `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json python tests`
+- テストを触ったとき: `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json tests/<subdir-or-file>`
+- 特定モジュールだけを確認したいとき: `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json python/<subdir-or-file>`
 
 ### 例外（最小限の ignore）
 

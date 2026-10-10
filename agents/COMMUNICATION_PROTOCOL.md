@@ -253,7 +253,6 @@ repo_structure_contract=<artifact path>
 responsibility_scope=<artifact path>
 file_surface_inventory=<artifact path>
 document_inventory=<artifact path|not_applicable>
-import_responsibility=<artifact path|not_applicable>
 selected_owner_summary=<short summary tied to request clauses>
 llm_visible_context=<selected excerpts or structured summary>
 local_tool_context=<complete JSON/Markdown/raw artifact paths>
@@ -267,12 +266,10 @@ python3 tools/validation/semantic/structure/repo_structure_contract.py --root <r
 python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json
 python3 tools/analysis/code/file_surface_inventory.py --root <root> --submodule-aware --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
 agent-canon structured-analysis document-inventory --root <root> > <run>/document_inventory.txt
-python3 tools/analysis/code/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json
 ```
 
 Run `document-inventory` when document, README, generated report, stale-doc,
-or reader-navigation surfaces are implicated. Run `import_responsibility.py`
-when import boundaries or package layout are implicated. In parent repos where
+or reader-navigation surfaces are implicated. In parent repos where
 the structure contract is not a root view, pass the qualified source-clone
 path, for example
 `--contract <agent-canon-source-clone>/documents/structure/repo-structure-contract.toml`.

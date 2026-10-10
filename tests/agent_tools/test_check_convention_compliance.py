@@ -41,9 +41,6 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
 path: tools/analysis/dependencies/scan_code_dependencies.sh
-path: tools/validation/semantic/code/check_hardcoded_numbers.py
-path: tools/validation/semantic/code/check_static_any.py
-path: tools/validation/semantic/logging/check_log_helper_names.py
 path: tools/validation/notebooks/notebook_quality.py
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
@@ -52,7 +49,6 @@ path: tools/validation/semantic/skills/check_skill_frontmatter.py
 path: tools/validation/semantic/convention/check_convention_compliance.py
 path: tools/runtime/manifest/tool_catalog.py
 path: tools/validation/semantic/tools/tool_drift.py
-path: tools/analysis/code/import_responsibility.py
 path: tools/validation/ci/checks/check_github_workflows.py
 """,
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
@@ -60,8 +56,8 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "tests/tools/test_bootstrap_container_contract.py": "# bootstrap_runtime\ndef test_bootstrap_container_contract(): pass\n",
     "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
     "documents/conventions/README.md": "conventions\n",
-    "documents/conventions/common/01_principles.md": "check_hardcoded_numbers.py\n",
-    "documents/rule/naming.md": "check_log_helper_names.py\n",
+    "documents/conventions/common/01_principles.md": "ruff-magic-values.toml\n",
+    "documents/rule/naming.md": "naming\n",
     "documents/conventions/common/03_comments.md": "comments\n",
     "documents/conventions/common/04_operators.md": "operators\n",
     "documents/conventions/common/05_docs.md": (
@@ -70,9 +66,9 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "necessary-and-sufficient condition non-contractual mathematical judgment\n"
     ),
     "documents/conventions/python/01_scope.md": "scope\n",
-    "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
+    "documents/conventions/python/04_type_annotations.md": "basedpyright-explicit-any.json\n",
     "documents/conventions/python/06_comments.md": "comments\n",
-    "documents/conventions/python/07_type_checker.md": "check_static_any.py\n",
+    "documents/conventions/python/07_type_checker.md": "basedpyright-explicit-any.json\n",
     "documents/conventions/python/09_file_roles.md": (
         "roles 読者順序 依存順序 公開契約 公開入口 内部補助関数 "
         "check_convention_compliance.py\n"
@@ -96,7 +92,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
     ),
     "documents/conventions/coding-conventions-reviews.md": "reviews\n",
     "documents/conventions/coding-conventions-experiments.md": "experiments\n",
-    "documents/conventions/coding-conventions-logging.md": "check_log_helper_names.py\n",
+    "documents/conventions/coding-conventions-logging.md": "JSONL log record contract\n",
     "documents/design/algorithm-implementation-boundary.md": "algorithm\n",
     "documents/conventions/object-oriented-design.md": "object-oriented design\n",
     "documents/experiments/experiment-registry.md": "experiment registry\n",
@@ -119,15 +115,15 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
         "caller chain canonical command\n"
     ),
-    "documents/design/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
+    "documents/design/responsibility-scope-management.md": "responsibility_scope.py\n",
     "documents/tools/README.md": (
-        "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
+        "tool_catalog.py tool_drift.py notebook_quality.py "
         "tool_rejection_preflight.py responsibility_scope responsibility-scope.toml "
         "protecting tools\n"
     ),
     "documents/notes/guardrails/engineering_avoidances.md": "implementation avoidances\n",
     "tools/README.md": (
-        "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
+        "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_runtime_profile_inventory.py tool_rejection_preflight.py "
         "responsibility_scope responsibility-scope.toml protecting tools\n"
     ),
@@ -273,8 +269,8 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "Evidence route:\n"
     ),
     "tools/validation/ci/runners/run_all_checks.sh": (
-        "check_static_any.py "
-        "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
+        "run_python_quality_checks.sh "
+        "check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py bootstrap_runtime.py check_runtime_profile_inventory.py\n"
