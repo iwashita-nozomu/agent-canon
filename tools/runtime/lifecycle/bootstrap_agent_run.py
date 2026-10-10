@@ -43,12 +43,12 @@ from tools.agent.orchestration.implementation_dispatch import (
 )
 from tools.agent.orchestration.packets import (
     ACTIVE_DESIGN_PACKET_SCHEMA,
-    ActiveDesignPacketConfig,
     MATHEMATICAL_INTENT_PACKET_SCHEMA,
+    ActiveDesignPacketConfig,
     MathematicalIntentPacket,
+    math_intent_route_id_from_context,
     mathematical_intent_route_config,
     mathematical_intent_route_for_task,
-    math_intent_route_id_from_context,
     normalize_mathematical_intent_packet,
     parse_active_design_packet_input,
     resolve_cross_cutting_document_packet,
