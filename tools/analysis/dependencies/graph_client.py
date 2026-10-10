@@ -6,7 +6,6 @@
 # upstream design ../../../documents/design/dependency-manifest-design.md tracked-source dependency semantics
 # upstream implementation ./source_dependency_graph.py derives dependency query and context without runtime state
 # upstream implementation ../../runtime/dispatch/agent-canon/src/graph.rs owns opt-in persisted graph build/status and non-dependency relations
-# downstream implementation ../../validation/semantic/documents/check_design_doc_claims.py consumes source-derived dependency context
 # downstream implementation ../../validation/semantic/tools/tool_drift.py consumes source-derived dependency facts
 # downstream implementation ../search/vector_search.py consumes source-derived dependency facts
 # @dependency-end
@@ -117,7 +116,9 @@ class GraphResponse:
         identity = cast(dict[str, object], raw)
         required = {"snapshot_commit", "source_path", "content_sha256"}
         if set(identity) != required:
-            raise GraphClientError("graph context source_identity fields are not canonical")
+            raise GraphClientError(
+                "graph context source_identity fields are not canonical"
+            )
         values = tuple(identity.get(field) for field in required)
         if any(not isinstance(value, str) or not value for value in values):
             raise GraphClientError("graph context source_identity has empty fields")
@@ -167,12 +168,16 @@ class GraphResponse:
             if fact.get("kind") != "dependency" or fact.get("inferred") is True:
                 continue
             if fact.get("inferred") is not False:
-                raise GraphClientError("explicit dependency fact inferred must be false")
+                raise GraphClientError(
+                    "explicit dependency fact inferred must be false"
+                )
             fact_id = _required_string(fact, "id", "graph fact")
             source_id = _required_string(fact, "from", fact_id)
             target_id = _required_string(fact, "to", fact_id)
             if source_id not in paths or target_id not in paths:
-                raise GraphClientError(f"graph fact {fact_id} endpoint is absent from nodes")
+                raise GraphClientError(
+                    f"graph fact {fact_id} endpoint is absent from nodes"
+                )
             detail = _required_mapping(
                 fact.get("dependency_detail"),
                 f"graph fact {fact_id}.dependency_detail",
@@ -308,7 +313,9 @@ class GraphClient:
             try:
                 projection = build_dependency_projection(self.root)
             except SourceDependencyError as error:
-                raise GraphClientError(f"source dependency projection failed: {error}") from error
+                raise GraphClientError(
+                    f"source dependency projection failed: {error}"
+                ) from error
             return GraphResponse(
                 schema="agent-canon.graph.query.v1",
                 command="query",
@@ -339,7 +346,9 @@ class GraphClient:
             try:
                 projection = build_context_projection(self.root, path)
             except SourceDependencyError as error:
-                raise GraphClientError(f"source dependency context failed: {error}") from error
+                raise GraphClientError(
+                    f"source dependency context failed: {error}"
+                ) from error
             return GraphResponse(
                 schema="agent-canon.graph.context.v1",
                 command="context",
