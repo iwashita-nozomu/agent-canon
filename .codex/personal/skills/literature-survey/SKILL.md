@@ -2,7 +2,7 @@
 name: literature-survey
 description: "Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5a7c57d8a9755195bca8e386a1a3c2355b5794257e56f64688b6f8d972cf2e62"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"b6dbbc96fffba25c1ec4d3ee9046598ca16159aba9ad80143b9cd913050a737e"} -->
 
 <!--
 @dependency-start
