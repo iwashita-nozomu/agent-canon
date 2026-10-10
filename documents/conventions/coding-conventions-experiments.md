@@ -10,8 +10,10 @@ upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed G
 -->
 
 
-この文書は、parent `experiments/` の managed run と、`cpp/experiments/` の native
-C++ experiment target を、build、run、result、report の責務に分けて扱います。
+この文書は、project-owned experiment topic と managed run の build、run、result、report
+責務を分けて扱います。Native C++ source/build manifest の path と graph は
+[cpp-build-layout.md](../design/cpp-build-layout.md) の selected profile に従い、この文書は固定
+`cpp/experiments/` directory や target 名を導入しません。
 研究の問い、数式、比較対象、逐次改造の記録方法は [agents/skills/research-workflow.md](../../agents/skills/research-workflow.md) を正本とします。
 準備、実装、静的チェック、実行、結果レポートの標準手順は [agents/skills/experiment-lifecycle.md](../../agents/skills/experiment-lifecycle.md) を参照してください。
 
@@ -36,14 +38,15 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 ## 2. ディレクトリ構成
 
 - managed experiment entrypoint は `experiments/<topic>/` に置きます。
-- native C++ experiment source と target wiring は `cpp/experiments/` に置きます。
+- native C++ experiment source と target wiring は selected CMake profile の project owner に従います。
 - topic ごとに `README.md`、`run.py`、`cases.py`、`config.yaml`、`visualization.py`、`result/` を基準にします。
 - `experiments/<topic>/README.md` は、その topic の実験内容、問い、比較対象、標準コマンド、設定正本、可視化 renderer、出力 schema、run_name 規則を持つ正本 entrypoint です。
 - 新規 topic は実験名を固定し、`python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualization.py`、`README.md` の順で編集します。
 - 可視化は `experiments/<topic>/visualization.py` の renderer に置きます。renderer は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
-- native target の project entrypoint は `cpp/CMakeLists.txt`、aggregate target は
-  `cpp-experiments`、individual target は `cpp-experiment-<name>` に固定します。
+- native target の project entrypoint、manifest location、target name は selected CMake profile と
+  project owner が決めます。CMake は build を所有し、run identity/config/result/report は managed
+  experiment lifecycle owner に残します。
 - managed run は exact `experiments/registry.toml` を必須 source membership として
   freeze します。registry 欠落を optional 扱いせず、別名 registry や live source
   command へ fallback しません。
@@ -51,8 +54,8 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 - run identity は `(topic, variant, run_name)` の ordered tuple とし、各 manifest は
   `agentcanon.experiment-run-identity/v2` の nested `identity` object を一つだけ持ちます。
 - 複数 run をまたぐ要約や知見は `documents/notes/experiments/` や `documents/notes/themes/` に置きます。
-- C++ native target の build は `cmake --build "$ROOT/build/cpp/<profile>" --target
-  cpp-experiments`、run は build 済み executable から lifecycle-owned result root へ行います。
+- C++ native target の build は project-owned CMake command から行い、run は build 済み executable
+  または選択された managed entrypoint から lifecycle-owned result root へ接続します。
 - server 上の formal run では `result/<run-id>/run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を残します。topic 固有の追加 stdout / stderr、tool log、diagnostic log は `result/<run-id>/logs/` に置きます。
 
 ## 3. 実行原則
