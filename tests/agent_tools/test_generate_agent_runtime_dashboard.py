@@ -37,16 +37,22 @@ from eval.producers.generate_agent_runtime_dashboard import (  # noqa: E402
     token_usage_next_action,
     tool_source_path_candidates,
 )
-from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import (
+    mounted_log_archive_root,
+    repo_log_key,
+)  # noqa: E402
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
 
 
 class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
-
     def setUp(self) -> None:
         self._runtime_temp = tempfile.TemporaryDirectory()
         self._previous_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+        self._previous_archive_dir = os.environ.pop(
+            "AGENT_CANON_HOOK_ARCHIVE_DIR", None
+        )
+        self._previous_log_root = os.environ.pop("AGENT_CANON_LOG_ROOT", None)
         self.runtime_root = Path(self._runtime_temp.name) / "runtime"
         self.runtime_root.mkdir()
         os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(self.runtime_root)
@@ -56,6 +62,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
         else:
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
+        if self._previous_archive_dir is not None:
+            os.environ["AGENT_CANON_HOOK_ARCHIVE_DIR"] = self._previous_archive_dir
+        if self._previous_log_root is not None:
+            os.environ["AGENT_CANON_LOG_ROOT"] = self._previous_log_root
         self._runtime_temp.cleanup()
 
     def test_dashboard_default_source_sync_path_is_nested_mount(self) -> None:
@@ -83,7 +93,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             (candidate,),
         )
 
-    def test_issue_worker_uses_checkout_readback_and_routes_flagless_candidate(self) -> None:
+    def test_issue_worker_uses_checkout_readback_and_routes_flagless_candidate(
+        self,
+    ) -> None:
         """The #938 checkout identity is the sole repository routing input."""
         with tempfile.TemporaryDirectory() as temp_dir:
             hook = Path(temp_dir) / "events.jsonl"
@@ -107,7 +119,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertTrue(handoffs[0].qualifies)
         self.assertEqual(handoffs[0].reason, "user-owned-candidate")
 
-    def test_issue_worker_does_not_use_authenticated_repository_log_fallback(self) -> None:
+    def test_issue_worker_does_not_use_authenticated_repository_log_fallback(
+        self,
+    ) -> None:
         """A self-claimed log field cannot replace checkout identity readback."""
         with tempfile.TemporaryDirectory() as temp_dir:
             hook = Path(temp_dir) / "events.jsonl"
@@ -149,7 +163,14 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def test_published_issue_receipt_feeds_refs_and_action_counts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published = (
+                mounted_log_archive_root(root)
+                / "feedback"
+                / "issue-packets"
+                / "published"
+                / "owner"
+                / "repo"
+            )
             published.mkdir(parents=True)
             (published / "42.json").write_text(
                 json.dumps(
@@ -178,7 +199,14 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def test_dashboard_ignores_noncanonical_receipt_path_or_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published = (
+                mounted_log_archive_root(root)
+                / "feedback"
+                / "issue-packets"
+                / "published"
+                / "owner"
+                / "repo"
+            )
             published.mkdir(parents=True)
             value = {
                 "repository": "owner/repo",
@@ -203,6 +231,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             receipts = read_issue_publication_receipts(root, self.runtime_root)
 
         self.assertEqual(receipts, ())
+
     """Verify dashboard output from accumulated runtime evidence."""
 
     def test_iter_entries_tolerates_disappeared_log_file(self) -> None:
@@ -281,7 +310,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """A selected token objective reports missing evidence and an action."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            report = self.runtime_root / "reports" / "agents" / "run" / "workflow_monitoring.md"
+            report = (
+                self.runtime_root
+                / "reports"
+                / "agents"
+                / "run"
+                / "workflow_monitoring.md"
+            )
             report.parent.mkdir(parents=True)
             report.write_text("token_reduction_objective=selected\n", encoding="utf-8")
 
@@ -304,9 +339,17 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """An explicit opt-out is truthful and does not invent a global gap."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            report = self.runtime_root / "reports" / "agents" / "run" / "workflow_monitoring.md"
+            report = (
+                self.runtime_root
+                / "reports"
+                / "agents"
+                / "run"
+                / "workflow_monitoring.md"
+            )
             report.parent.mkdir(parents=True)
-            report.write_text("token_efficiency_not_required reason=single-route\n", encoding="utf-8")
+            report.write_text(
+                "token_efficiency_not_required reason=single-route\n", encoding="utf-8"
+            )
 
             breakdown = TokenUsageBreakdownReader.read(root)
 
@@ -421,7 +464,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "code": "up_to_date",
                 },
             ):
-                source_sync.write_text(json.dumps(invalid_state) + "\n", encoding="utf-8")
+                source_sync.write_text(
+                    json.dumps(invalid_state) + "\n", encoding="utf-8"
+                )
                 rejected = dashboard_reader.collect()
                 self.assertIsNone(rejected.source_sync_state)
 
@@ -506,19 +551,15 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "## Machine Summary",
             "AGENT_RUNTIME_DASHBOARD_STATUS=pass",
             "## Priority Problems",
-            "| `skill` | `agent-orchestration` | `fail` | `1 failed eval report(s)` |",
             "## Priority Next Actions",
-            "`repair failed skill eval for agent-orchestration`",
             "## Selection Misses",
             "| `skill` | `md-style-check` | `0` | `1` | `1` | `100.0%` |",
             "## Evidence Drilldown",
             "### Hook Failure Drilldown",
-            "### Skill Eval Failure Drilldown",
             "### Selection Evidence Drilldown",
             "### Prompt Token Trend Drilldown",
             "### Token Consumption Drilldown",
             "### Wave And Subagent Execution Drilldown",
-            "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "| `rolling_window_observations` | `8` |",
             "| `prompt_chars_per_call_recent` | `27` |",
             "| `token_ratio_recent` | `0.500` |",
@@ -547,7 +588,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Verify glanceable problem component rows."""
         required = (
             "## Problem Components",
-            "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=6",
+            "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=4",
             "| `workflow` | `_unattributed_hook_entries` | `attention` | "
             "`6 hook entries lack workflow attribution` | "
             "`compact report Workflow Attribution Drilldown` | "
@@ -559,21 +600,14 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         for expected in required:
             self.assertIn(expected, dashboard)
-        self.assertIn(
-            "| `skill` | `agent-orchestration` | `fail` | `1 failed eval report(s)` | "
-            "`compact report Skill Eval Failure Drilldown skill=agent-orchestration` | "
-            "`repair failed skill eval for agent-orchestration` |",
-            dashboard,
-        )
 
     def assert_next_action_section(self, dashboard: str) -> None:
         """Verify concrete dashboard-generated next actions."""
         required = (
             "## Next Actions",
             "AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS=",
-            "AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS=5",
+            "AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS=3",
             "`materialize missing consulted source URLs`",
-            "`repair failed skill eval for agent-orchestration`",
             "`repair skill selection for md-style-check`",
             "`repair workflow attribution logging`",
         )
@@ -589,11 +623,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "flowchart LR",
             "## Action Map",
             "| hook evidence | `healthy` | `3` |",
-            "| report quality eval | `missing` | `0` |",
             "## Issue Routing",
             "missing-local-issue",
-            "## Skill Eval Failure Analysis",
-            "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "## Hook Workflow Attribution",
             "| `_none` | `0` |",
             "hook_entries_missing_workflow_attribution: `6`",
@@ -624,8 +655,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "### Selected Repo Tools",
             "| `agent-canon-cli` | `1` |",
             "## Markdown Docs Hook Signals",
-            "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS=1",
-            "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES=1",
             "AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS=2",
             "markdown_hook_signal_status: `present`",
             "| `agent-canon-cli` | `1` |",
@@ -664,12 +693,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "archive-agent-report --report-dir reports/agents/<run-id>",
             "AGENT_RUNTIME_DASHBOARD_HOOK_FILES=3",
             "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES=6",
-            "skill-workflow-prompt",
             "workflow-selection",
             "test-container",
             "environment-maintenance",
             "quality_gap",
-            "skill-eval-test-fail-agent-orchestration.md",
         )
         for expected in required:
             self.assertIn(expected, dashboard)
@@ -697,7 +724,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             dashboard = output.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={canon_root.resolve().as_posix()}", dashboard)
+        self.assertIn(
+            f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={canon_root.resolve().as_posix()}",
+            dashboard,
+        )
         self.assertIn("hook_jsonl_files: `3`", dashboard)
 
     def test_prompt_token_trend_uses_chronological_recent_window(self) -> None:
@@ -728,7 +758,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("| `prompt_chars_per_call_recent` | `10` |", compact_dashboard)
         self.assertIn("| `token_ratio_recent` | `0.100` |", compact_dashboard)
-        self.assertIn("| `candidate_tokens_per_comparison_recent` | `100` |", compact_dashboard)
+        self.assertIn(
+            "| `candidate_tokens_per_comparison_recent` | `100` |", compact_dashboard
+        )
         self.assertIn("| `joint_trend_status` | `ready` |", compact_dashboard)
 
     def test_recent_days_filters_hook_and_token_evidence(self) -> None:
@@ -801,7 +833,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS=1", compact_dashboard)
         self.assertIn("AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED=1", compact_dashboard)
         self.assertIn("| `blocked_events` | `1` |", compact_dashboard)
-        self.assertIn("| `skipped_roles` | `requirements_organizer=1, explorer=1` |", compact_dashboard)
+        self.assertIn(
+            "| `skipped_roles` | `requirements_organizer=1, explorer=1` |",
+            compact_dashboard,
+        )
 
     def test_api_out_exposes_log_repair_schema(self) -> None:
         """The dashboard API should expose routing repair fields without raw JSONL."""
@@ -850,29 +885,19 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertEqual(payload["unknown_event_count"], 1)
         self.assertEqual(sum(payload["unknown_events_by_file"].values()), 1)
         self.assertEqual(payload["status_by_hook_family"]["skill_usage"]["fail"], 1)
-        self.assertEqual(payload["failure_by_hook_family"]["skill_usage"]["schema-fixture"], 1)
+        self.assertEqual(
+            payload["failure_by_hook_family"]["skill_usage"]["schema-fixture"], 1
+        )
         self.assertEqual(payload["namespace_debt_by_hook_family"]["skill_usage"], 1)
         self.assertEqual(
-            payload["skip_by_hook_family"]["oop_readability_guard"]["no_changed_source_files"],
+            payload["skip_by_hook_family"]["oop_readability_guard"][
+                "no_changed_source_files"
+            ],
             1,
         )
         self.assertEqual(payload["oop_applicability"]["applicable_count"], 1)
         self.assertEqual(payload["oop_applicability"]["not_applicable_count"], 1)
         self.assertEqual(payload["oop_applicability"]["missing_reason_count"], 0)
-        self.assertTrue(
-            any(
-                problem["type"] == "skill"
-                and problem["component"] == "agent-orchestration"
-                and problem["status"] == "fail"
-                for problem in payload["priority_problems"]
-            )
-        )
-        self.assertTrue(
-            any(
-                action["action"] == "repair failed skill eval for agent-orchestration"
-                for action in payload["priority_next_actions"]
-            )
-        )
         self.assertIn(
             {
                 "responsibility": "skill",
@@ -885,14 +910,25 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             },
             payload["selection_misses"],
         )
-        self.assertIn("| `namespace_debt_by_hook_family` | `skill_usage=1` |", compact_dashboard)
+        self.assertIn(
+            "| `namespace_debt_by_hook_family` | `skill_usage=1` |", compact_dashboard
+        )
         self.assertIn("oop_applicability", compact_dashboard)
 
-    def test_api_and_compact_include_published_issue_refs_separate_from_candidates(self) -> None:
+    def test_api_and_compact_include_published_issue_refs_separate_from_candidates(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published = (
+                mounted_log_archive_root(root)
+                / "feedback"
+                / "issue-packets"
+                / "published"
+                / "owner"
+                / "repo"
+            )
             published.mkdir(parents=True)
             (published / "42.json").write_text(
                 json.dumps(
@@ -935,10 +971,14 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             compact = compact_output.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("https://github.com/owner/repo/issues/42", payload["github_issue_refs"])
+        self.assertIn(
+            "https://github.com/owner/repo/issues/42", payload["github_issue_refs"]
+        )
         self.assertEqual(payload["issue_publication_action_counts"], {"update": 1})
         self.assertEqual(payload["issue_worker"]["published_receipts"], 1)
-        self.assertEqual(payload["issue_worker"]["issue_publication_action_counts"], {"update": 1})
+        self.assertEqual(
+            payload["issue_worker"]["issue_publication_action_counts"], {"update": 1}
+        )
         self.assertIn("AGENT_RUNTIME_DASHBOARD_ISSUE_PUBLICATION_RECEIPTS=1", compact)
         self.assertIn("update=1", compact)
         self.assertIn("published_receipts", compact)
@@ -1134,7 +1174,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("| `skill` | `report-writing` |", dashboard)
 
-    def test_selection_metrics_ignore_legacy_unattributed_skill_candidates(self) -> None:
+    def test_selection_metrics_ignore_legacy_unattributed_skill_candidates(
+        self,
+    ) -> None:
         """Legacy candidate-only hook entries should not become skill misses."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1184,14 +1226,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         source = source_root or root
         archive = mounted_log_archive_root(root)
         hook_dir = archive / "hook-runs" / repo_log_key(source) / "test-container"
-        skill_dir = archive / "eval-results" / "skill-workflow-prompt"
         workflow_dir = archive / "eval-results" / "workflow-selection"
         evals_dir = root / "agents" / "evals"
         evals_dir.mkdir(parents=True)
         (evals_dir / "README.md").write_text("# Eval Fixture\n", encoding="utf-8")
-        self.create_fixture_dirs(root, hook_dir, skill_dir, workflow_dir)
+        self.create_fixture_dirs(root, hook_dir, workflow_dir)
         self.write_issue_knowledge_fixture(root)
-        self.write_eval_report_fixture(skill_dir, workflow_dir)
+        self.write_eval_report_fixture(workflow_dir)
         self.write_hook_fixture(hook_dir)
         self.write_workflow_monitor_fixture(root)
 
@@ -1199,14 +1240,14 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self,
         root: Path,
         hook_dir: Path,
-        skill_dir: Path,
         workflow_dir: Path,
     ) -> None:
         """Create fixture directories."""
-        for directory in (hook_dir, skill_dir, workflow_dir):
+        for directory in (hook_dir, workflow_dir):
             directory.mkdir(parents=True)
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
+
     def write_issue_knowledge_fixture(self, root: Path) -> None:
         """Write issue and private knowledge fixture files."""
         (root / "issues" / "open" / "AC-20260517-open.md").write_text(
@@ -1229,19 +1270,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
     def write_eval_report_fixture(
         self,
-        skill_dir: Path,
         workflow_dir: Path,
     ) -> None:
         """Write eval report fixture files."""
-        (skill_dir / "skill-eval-test-fail-agent-orchestration.md").write_text(
-            "- used_skills: `agent-orchestration`\nEVAL_STATUS=fail\n",
-            encoding="utf-8",
-        )
-        (skill_dir / "skill-eval-test-fail-md-style-check.md").write_text(
-            "- used_skills: `md-style-check`\nEVAL_STATUS=fail\n",
-            encoding="utf-8",
-        )
-        (workflow_dir / "workflow-selection-eval-20260517T010203040506Z-1234567890-pass.md").write_text(
+        (
+            workflow_dir
+            / "workflow-selection-eval-20260517T010203040506Z-1234567890-pass.md"
+        ).write_text(
             "WORKFLOW_SELECTION_EVAL_STATUS=pass\n",
             encoding="utf-8",
         )
@@ -1431,7 +1466,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 )
                 + "\n"
             )
-        workflow_report = self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        workflow_report = (
+            self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        )
         workflow_report.write_text(
             workflow_report.read_text(encoding="utf-8")
             + "- `2026-05-17 10:02 JST` workflow=Platform And Environment, "
@@ -1515,7 +1552,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 )
                 + "\n"
             )
-        with (hook_dir / "oop_readability_guard.jsonl").open("a", encoding="utf-8") as handle:
+        with (hook_dir / "oop_readability_guard.jsonl").open(
+            "a", encoding="utf-8"
+        ) as handle:
             handle.write(
                 json.dumps(
                     {
@@ -1534,7 +1573,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def write_workflow_monitor_fixture(self, root: Path) -> None:
         """Write token comparison fixture files."""
         self.write_wave_bundle_fixture(root)
-        workflow_report = self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        workflow_report = (
+            self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        )
         text = workflow_report.read_text(encoding="utf-8")
         workflow_report.write_text(
             text
@@ -1612,9 +1653,19 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
     def write_recent_filter_fixture(self, root: Path) -> None:
         """Write mixed old and recent evidence for recent-mode assertions."""
-        hook_dir = mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test-container"
+        hook_dir = (
+            mounted_log_archive_root(root)
+            / "hook-runs"
+            / repo_log_key(root)
+            / "test-container"
+        )
         hook_dir.mkdir(parents=True)
-        recent_timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        recent_timestamp = (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
         (hook_dir / "skill_usage.jsonl").write_text(
             json.dumps(
                 {
@@ -1661,8 +1712,15 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
     def write_out_of_order_trend_fixture(self, root: Path) -> None:
         """Write trend evidence where lexical and chronological order disagree."""
-        hook_dir = mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test-container"
-        (self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md").unlink()
+        hook_dir = (
+            mounted_log_archive_root(root)
+            / "hook-runs"
+            / repo_log_key(root)
+            / "test-container"
+        )
+        (
+            self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        ).unlink()
         new_entries = [
             self.prompt_entry(f"2026-05-{day:02d}T00:00:00Z", 10)
             for day in range(2, 10)
@@ -1708,7 +1766,9 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         ratio: float,
     ) -> None:
         """Write one token comparison report."""
-        report = self.runtime_root / "reports" / "agents" / name / "workflow_monitoring.md"
+        report = (
+            self.runtime_root / "reports" / "agents" / name / "workflow_monitoring.md"
+        )
         report.parent.mkdir(parents=True, exist_ok=True)
         report.write_text(
             f"timestamp={timestamp} baseline_total={baseline} "

@@ -27,15 +27,17 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
 ## 事前条件
 
 - `--url`、`--repo-name`、`--workspace-root`、`--topic`、`--branch`、
-  `--owner-evidence` が完全一致する状態。
+  `--owner-evidence` を指定します。`--owner-evidence` は非空ファイルを要求し、その digest は
+  lifecycle metadata として記録しますが、ファイル自体は操作 authority になりません。
 - `--workspace-root` は selected repository の Git toplevel と一致し、root の regular な
   tracked `.gitignore` が `workspace/` を repository-owned boundary として ignore する状態。
 - `prepare` と `merge-main` は workspace/topic directory を作る前に root、symlink、
   `.gitignore` ownership、ignore probe を検証し、検証 receipt を残した後だけ clone lifecycle
   に進みます。non-repository、nested root、missing/untracked `.gitignore`、global/info
   exclude のみの ignore は typed failure として既存 state を保持します。
-- marker が同一 topic/repo/branch/url/evidence で一致し、`git status` が clean かつ
-  detached/merge-conflict でないこと。
+- marker が同一 topic/repo/branch/url で一致すること。branch mutation、merge、cleanup は
+  `git status` が clean かつ detached / merge-conflict でないこと。既存 exact target の
+  metadata-only refresh は clone lifecycle の identity 検証 route に従います。
 - local/remote の branch 不在時のみ fresh 作成に進める。存在する branch は
   別 special route で拒否せず、generic operation に戻して再評価する。
 - `main`/`origin/main` の branch は source owner にはせず、branch 起点・merge ベースとしてのみ扱う。
@@ -49,7 +51,11 @@ repository の変更は `independent-clone` を使います。どちらも同じ
 hash や group 階層を path に追加しません。
 
 linked worktree は native Git の shared refs/config と per-worktree index を使います。
+新規worktreeの公開rootはanchorのアクセスmodeを引き継ぎます。準備中のscratchの
+private modeを公開checkoutへ固定し、設定済みtool residentの読取を妨げません。
 writer packet と task marker は各 worktree に属し、別 worktree の状態を共有・上書きしません。
+同じcheckoutを再prepareする明示的なallowed pathsは、その親packetの更新として反映します。
+省略時は既存のscopeを保持し、branch・remote・rootのidentity確認は継続します。
 independent clone も同じ path、marker、writer packet、branch identity の検証を通ります。
 
 mode の選択・作成は lifecycle command が行い、manual clone や手動 worktree 作成へ迂回しません。
@@ -57,13 +63,30 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
 ## clone ライフサイクル
 
 - `prepare` は必ず `workspace/<topic-slug>/<repo-name>` の computed path を返す。
-- 既存 clean checkout が exact identity と一致すれば local/remote named branch を再利用する。
-  computed path の occupant、URL、owner evidence、branch upstream が不一致なら typed
-  collision として状態を保持する。
+- 既存 canonical checkout が computed root、URL、repository、topic、checkout mode、named branch と一致すれば、
+  source/index を変更せず task marker と ignored writer packet のみを current request metadata に更新できます。
+  `--owner-evidence` digest は lifecycle metadata であり、現在の task/handoff authority の代替ではありません。
+  allowlist の明示更新時はその scope を反映し、省略時は検証済みの既存 scope を維持します。metadata 更新は
+  dirty status を clean と扱わず、未知の Git identity、packet の symlink/不整合、escaped path は引き続き hold します。
+- clean な既存 checkout が exact identity と一致すれば local/remote named branch を再利用する。
+  computed path の occupant、URL、repository、topic、checkout mode、branch が不一致なら typed
+  collision として状態を保持する。canonical marker と他の identity が一致する checkout は、
+  `prepare` / `merge-main` で `owner-evidence` の内容 digest を current file に更新できます。
+  更新前に existing writer-target packet を検証します。current `--allowed-path` があればその scope を
+  materialize し、省略時は既存 scope を引き継ぎます。owner-evidence の内容や digest は承認ではなく、
+  実行 authority は current task / handoff と exact checkout identity によります。canonical marker の欠落・不完全、
+  他 identity mismatch は引き続き hold します。
+  legacy module marker の互換性は従来どおり exact digest を要求します。
+- source/index に触れない既存 target metadata 更新は、`prepare` の通常の identity 検証前に行います。
+  この操作が更新するのは task marker、reserved packet 用の worktree `info/exclude` entry、および ignored writer packet
+  だけです。checkout、Git index、packet 以外の tracked / untracked / ignored worktree file を編集・移動・削除せず、
+  dirty state を clean と報告しません。dirty content の所有権を割り当てる操作でもありません。
+  新規 checkout、branch 変更、`merge-main` は従来どおり clean state を要求します。
 - requested branch が local/remote のどちらにも無い場合だけ、最新 `origin/main` から作る。
 - write-capable clone の `writer-target.json` は handoff の repeated `--allowed-path` を
-  materialize する。既存 packet の `allowed_paths` は検証して引き継ぎ、別の値で上書きしない。
-  新規 prepare に allowed path がない場合は packet を作らない。
+  materialize する。既存 packet は検証し、`--allowed-path` 省略時は既存 scope を引き継ぎます。
+  明示入力時の更新は current handoff scope のみ反映します。新規 prepare に allowed path がない場合は
+  packet を作りません。
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
 - raw `git merge` / `git rebase` は writer route では使わず、integration executor が
   `repository_topic_clone.py merge-main`、`finalize-merge`、`resume-merge` を通す。
@@ -92,12 +115,15 @@ commit しません。`conflict_preservation.py validate` 単体は診断用で�
   タスク全体の完了、PR merge、定期掃除まで先送りしません。具体的な次工程がない
   「また使うかもしれない」だけの保持はしません。失敗・中断した作業でも、必要な
   診断資料を保全し、安全条件を満たした clone は同じ扱いにします。
-- tool 起動前に task owner が exact path の所有と利用終了を確認します。別の agent、
+- tool 起動前に task owner が exact path の所有と利用終了を確認し、必要な内容を削除対象外へ保存・復元可能にします。別の agent、
   process、container mount、実行時の依存解決先が使用中、または所有・使用状態が不明なら
   保持します。未回収の変更、保持が必要な local-only refs/commits、stash、untracked/ignored
   成果物、submodule/annex content が削除対象内にしかない場合も保持し、必要な内容と
   復元方法を clone 外で確認してから再判定します。clean な `git status` や経過時間だけで
   削除可能とは判定しません。既存 tool の proof を、この利用・保全確認の代わりにしません。
+  CLI の status preflight は ignored file を列挙せず、linked worktree の local head は superproject の
+  commit/tree の保持だけを示します。どちらも ignored file、submodule の per-worktree Git metadata/object、
+  annex-only content の保存・復元可能性を証明しません。これらの保持判断は既存 task owner の前提条件です。
 - 削除後は exact path の不存在を確認し、linked-worktree では worktree list からの消失も
   確認します。既存 task/Issue の結果に削除 path と復元先、または保持 path・理由・解除条件を
   記録し、closeout では未解決の保持対象だけを引き継ぎます。新しい台帳は作りません。
@@ -106,16 +132,23 @@ commit しません。`conflict_preservation.py validate` 単体は診断用で�
 - `cleanup` は selected Git toplevel と computed clone identity を検証してから proof preflight
   を開始します。既存 clone の proof-gated removal は root `.gitignore` の後続 drift だけでは
   停止せず、ignore ownership の create preconditionと cleanup の exact-root gateを分離します。
+- linked-worktree cleanup は proof preflight 後、exact path に対して `git worktree remove --force` を一度実行します。
+  force は native worktree removal の一様な実行方法であり、dirty / untracked / unknown Git state を許可するものでは
+  ありません。これらは先行する identity/clean preflight で hold します。caller が上記の保持前提を満たさず
+  `--apply` を呼んだ場合、この command は Git の ignored / submodule-object 状態から内容を救出しません。
+  local branch は保持し、削除後に path の不存在と `git worktree list` からの消失を readback します。
 - marker は canonical `repository-topic-clone.*` namespace の全項目が一致する状態を優先します。
   canonical marker が完全に欠ける既存 dependency clone に限り、legacy
   `agent-canon.topic.*` の topic、role=`module`、module basename、normalized URL、branch、
   placement=`workspace-continuation`、owner-evidence SHA がすべて一致する場合だけ read-only
   compatibility として ready を認めます。partial/mismatch/unknown role・placement は typed
   hold とし、dry-run は Git config marker を書き換えません。
-- cleanup は上記の利用終了時、または closeout の残存確認時に canonical tool を呼び、request から計算した
-  exact clone path、owner evidence/marker、URL、branch、clean non-detached state を検証します。
-  linked-worktree は保持された local branch と共有 Git common objects の readback で復元可能性を
-  確認し、remote branch を要求しません。`independent-clone` は fetch した `origin/<branch>` の
+- cleanup は上記の利用終了・内容保全確認後、または closeout の残存確認時に canonical tool を呼び、request から計算した
+  exact clone path、owner evidence/marker digest、URL、branch、clean non-detached state を検証します。
+  `cleanup` は marker digest と current owner-evidence digest の exact match を引き続き要求します。
+  linked-worktree の `linked-superproject-head` evidence は保持された local branch と共有 Git common objects から
+  superproject の commit/tree を再取得できることだけを示し、remote branch を要求しません。ignored file や submodule
+  object の再取得保証ではありません。`independent-clone` は fetch した `origin/<branch>` の
   commit/tree と local `HEAD` の commit/tree が一致する external recoverability proof を要求します。
   通常の cleanup は publication packet を作らず、proof が一致しないものは削除しません。
 - candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを

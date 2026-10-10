@@ -565,7 +565,6 @@ tools/runtime/dispatch/agent-canon/src/main.rs
 rust graph / semantic / structured-analysis output resolvers
 documents/runtime/runtime-log-archive.md
 documents/runtime/runtime-profiles-and-check-matrix.md
-eval/definitions/skill_workflow_prompt_eval.toml
 ```
 
 削除はBootstrap parity完了後:

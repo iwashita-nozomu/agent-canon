@@ -23,7 +23,15 @@ from typing import FrozenSet, Mapping, TypeAlias
 
 from tools.agent.skills.skill_lane_detector import SkillLaneEvidence
 
-FrozenValue: TypeAlias = str | int | float | bool | None | tuple["FrozenValue", ...] | Mapping[str, "FrozenValue"]
+FrozenValue: TypeAlias = (
+    str
+    | int
+    | float
+    | bool
+    | None
+    | tuple["FrozenValue", ...]
+    | Mapping[str, "FrozenValue"]
+)
 FrozenMapping = Mapping[str, FrozenValue]
 
 SKILL_TOKEN_RE = re.compile(r"\$([A-Za-z0-9][A-Za-z0-9_-]*)")
@@ -438,8 +446,21 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "収束しない",
         "tolerance 緩和せず",
     ),
-    "comprehensive-development": ("comprehensive development", "repo-wide", "包括的", "500", "tooling rearchitecture"),
-    "environment-maintenance": ("docker", "devcontainer", "container", "github actions", "ci", "lockfile"),
+    "comprehensive-development": (
+        "comprehensive development",
+        "repo-wide",
+        "包括的",
+        "500",
+        "tooling rearchitecture",
+    ),
+    "environment-maintenance": (
+        "docker",
+        "devcontainer",
+        "container",
+        "github actions",
+        "ci",
+        "lockfile",
+    ),
     "large-delivery": (
         "large-delivery",
         "large refactor",
@@ -454,7 +475,14 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "responsibility-scope",
         "構造変更",
     ),
-    "platform-and-environment": ("docker", "devcontainer", "container", "github actions", "ci", "dependency upgrade"),
+    "platform-and-environment": (
+        "docker",
+        "devcontainer",
+        "container",
+        "github actions",
+        "ci",
+        "dependency upgrade",
+    ),
     "research-driven-change": (
         "research-driven-change",
         "research-backed",
@@ -484,8 +512,26 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "どのスキル",
         "which workflow",
     ),
-    "scoped-change": ("public behavior", "bounded behavior", "regression case", "cross-module", "bounded scope", "仕様解釈", "既存テスト"),
-    "owner-bounded-change": ("owner-bounded-change", "bounded fix", "bounded patch", "one-file", "単一 file", "typo", "flaky test", "責務境界が閉じた", "責務境界が閉じた修正"),
+    "scoped-change": (
+        "public behavior",
+        "bounded behavior",
+        "regression case",
+        "cross-module",
+        "bounded scope",
+        "仕様解釈",
+        "既存テスト",
+    ),
+    "owner-bounded-change": (
+        "owner-bounded-change",
+        "bounded fix",
+        "bounded patch",
+        "one-file",
+        "単一 file",
+        "typo",
+        "flaky test",
+        "責務境界が閉じた",
+        "責務境界が閉じた修正",
+    ),
 }
 TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
     "agent-canon-cli": (
@@ -501,9 +547,16 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
         "agent-canon pr",
     ),
     "audit_and_fix_links.py": ("audit_and_fix_links.py", "broken link", "リンク切れ"),
-    "evaluate_skill_workflow_prompts.py": ("evaluate_skill_workflow_prompts.py", "skill workflow eval", "prompt eval"),
-    "evaluate_workflow_selection.py": ("evaluate_workflow_selection.py", "workflow selection eval", "routing eval"),
-    "generate_agent_improvement_guide.py": ("improvement guide", "改善指南", "githubaction"),
+    "evaluate_workflow_selection.py": (
+        "evaluate_workflow_selection.py",
+        "workflow selection eval",
+        "routing eval",
+    ),
+    "generate_agent_improvement_guide.py": (
+        "improvement guide",
+        "改善指南",
+        "githubaction",
+    ),
     "generate_agent_runtime_dashboard.py": (
         "generate_agent_runtime_dashboard.py",
         "runtime dashboard",
@@ -511,14 +564,23 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
         "dashboard",
     ),
     "log_surface_inventory.py": ("ログ項目", "log surface", "hook log"),
-    "run_repo_dependency_review.sh": ("run_repo_dependency_review.sh", "dependency review", "dependency graph"),
+    "run_repo_dependency_review.sh": (
+        "run_repo_dependency_review.sh",
+        "dependency review",
+        "dependency graph",
+    ),
     "runtime_log_archive_git.py": (
         "runtime_log_archive_git.py",
         "agent report archive",
         "runbundle archive",
         "archive path",
     ),
-    "behavior_event_assembly.py": ("入力プロンプト", "prompt", "behavior event", "behavior_events"),
+    "behavior_event_assembly.py": (
+        "入力プロンプト",
+        "prompt",
+        "behavior event",
+        "behavior_events",
+    ),
     "tool_rejection_preflight.py": ("tool rejection", "preflight", "はじかれる"),
     "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
 }
@@ -534,7 +596,13 @@ SUBAGENT_TOOL_ACTIONS: dict[str, str] = {
 PROMPT_EXCERPT_LIMIT = 600
 PROMPT_FINGERPRINT_HEX_LENGTH = 16
 SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----.*?-----END [^-]+PRIVATE KEY-----", re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
+    (
+        re.compile(
+            r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----.*?-----END [^-]+PRIVATE KEY-----",
+            re.DOTALL,
+        ),
+        "[REDACTED_PRIVATE_KEY]",
+    ),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED_AWS_ACCESS_KEY]"),
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{30,}\b"), "[REDACTED_GITHUB_TOKEN]"),
     (re.compile(r"\bsk-[A-Za-z0-9_-]{32,}\b"), "[REDACTED_API_KEY]"),
@@ -611,7 +679,9 @@ def _strings(value: object) -> tuple[str, ...]:
 
 
 def _catalog_skill_ids(inputs: PromptClassifierInputs) -> frozenset[str]:
-    values = {value for value in _strings(inputs.catalog) if SKILL_ID_RE.fullmatch(value)}
+    values = {
+        value for value in _strings(inputs.catalog) if SKILL_ID_RE.fullmatch(value)
+    }
     return frozenset(values | set(DEFAULT_SKILLS))
 
 
@@ -643,8 +713,14 @@ def _keyword_matches(
     )
 
 
-def _simple_keyword_matches(mapping: Mapping[str, tuple[str, ...]], text: str) -> tuple[str, ...]:
-    return tuple(key for key, needles in mapping.items() if any(needle.casefold() in text for needle in needles))
+def _simple_keyword_matches(
+    mapping: Mapping[str, tuple[str, ...]], text: str
+) -> tuple[str, ...]:
+    return tuple(
+        key
+        for key, needles in mapping.items()
+        if any(needle.casefold() in text for needle in needles)
+    )
 
 
 def prompt_intake_signals(inputs: PromptClassifierInputs) -> PromptIntakeSignals:
@@ -654,19 +730,33 @@ def prompt_intake_signals(inputs: PromptClassifierInputs) -> PromptIntakeSignals
     fields = _field_values(prompt)
     known = _catalog_skill_ids(inputs)
     skills: list[str] = []
-    for value in _split_values(fields.get("skill", ()) + fields.get("skills", ()) + fields.get("skill_invocation", ())):
+    for value in _split_values(
+        fields.get("skill", ())
+        + fields.get("skills", ())
+        + fields.get("skill_invocation", ())
+    ):
         value = value.removeprefix("$")
         if _known_skill(value, known):
             skills.append(value)
     for value in SKILL_TOKEN_RE.findall(prompt):
         if _known_skill(value, known):
             skills.append(value)
-    selected_workflows = list(_split_values(fields.get("workflow", ()) + fields.get("workflow_family", ()) + fields.get("selected_workflow", ())))
-    selected_workflows = [value for value in selected_workflows if value and not value.startswith("$")]
+    selected_workflows = list(
+        _split_values(
+            fields.get("workflow", ())
+            + fields.get("workflow_family", ())
+            + fields.get("selected_workflow", ())
+        )
+    )
+    selected_workflows = [
+        value for value in selected_workflows if value and not value.startswith("$")
+    ]
     candidate_skills: list[str] = []
     reasons: list[str] = []
     for skill in DEFAULT_SKILLS:
-        if re.search(rf"(?<![A-Za-z0-9_-]){re.escape(skill)}(?![A-Za-z0-9_-])", lowered):
+        if re.search(
+            rf"(?<![A-Za-z0-9_-]){re.escape(skill)}(?![A-Za-z0-9_-])", lowered
+        ):
             skills.append(skill)
     for skill in _keyword_matches(SKILL_KEYWORDS, lowered):
         if skill not in skills:
@@ -681,17 +771,39 @@ def prompt_intake_signals(inputs: PromptClassifierInputs) -> PromptIntakeSignals
     for evidence in inputs.validation_repair_evidence:
         if evidence:
             reasons.append("validation_repair=" + evidence)
-    candidate_skills.extend(_split_values(fields.get("candidate_skill", ()) + fields.get("candidate_skills", ())))
-    candidate_workflows = list(_split_values(fields.get("candidate_workflow", ()) + fields.get("candidate_workflows", ())))
+    candidate_skills.extend(
+        _split_values(
+            fields.get("candidate_skill", ()) + fields.get("candidate_skills", ())
+        )
+    )
+    candidate_workflows = list(
+        _split_values(
+            fields.get("candidate_workflow", ()) + fields.get("candidate_workflows", ())
+        )
+    )
     candidate_workflows.extend(_simple_keyword_matches(WORKFLOW_KEYWORDS, lowered))
-    candidate_tools = list(_split_values(fields.get("candidate_tool", ()) + fields.get("candidate_tools", ()) + fields.get("tool", ())))
+    candidate_tools = list(
+        _split_values(
+            fields.get("candidate_tool", ())
+            + fields.get("candidate_tools", ())
+            + fields.get("tool", ())
+        )
+    )
     candidate_tools.extend(_simple_keyword_matches(TOOL_KEYWORDS, lowered))
-    feedback_labels = list(_split_values(fields.get("feedback", ()) + fields.get("feedback_label", ()) + fields.get("feedback_labels", ())))
+    feedback_labels = list(
+        _split_values(
+            fields.get("feedback", ())
+            + fields.get("feedback_label", ())
+            + fields.get("feedback_labels", ())
+        )
+    )
     feedback_action = next(iter(_split_values(fields.get("feedback_action", ()))), "")
     return PromptIntakeSignals(
         skills=tuple(dict.fromkeys(skills)),
         selected_workflows=tuple(dict.fromkeys(selected_workflows)),
-        candidate_skills=tuple(dict.fromkeys(item for item in candidate_skills if item not in skills)),
+        candidate_skills=tuple(
+            dict.fromkeys(item for item in candidate_skills if item not in skills)
+        ),
         candidate_skill_reasons=tuple(dict.fromkeys(reasons)),
         candidate_workflows=tuple(dict.fromkeys(candidate_workflows)),
         candidate_tools=tuple(dict.fromkeys(candidate_tools)),

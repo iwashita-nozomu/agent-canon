@@ -3,9 +3,10 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents Shared Skill Canon for this repository.
+responsibility Indexes public skills and owns AgentCanon-specific skill maintenance.
 upstream design ./catalog.yaml enumerates public skill families
 upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
+upstream design ../../documents/design/responsibility-cleanup.md skill maintenance delegation rationale
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public and official skill boundaries
 upstream design code-visualization.md sole public visualization owner and typed projection contract
@@ -92,7 +93,8 @@ GPU profile の admission semantics は [`gpu-execution`](gpu-execution.md) に�
 確認入口:
 - public skill の一覧と shim/doc/config の整合: `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
 - prompt からの skill 選択: `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json`
-- skill ごとの command packet: `python3 tools/agent/skills/skill_tool_commands.py show --skill <skill> --format text`
+- selected tools use their existing CLI/API/script entrypoints with native argv;
+  execution and validation remain owned by those entrypoints.
 - 依存辞書の静的検査: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
 - 依存辞書の静的検査（source tree を変更しない）: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
 - 通常の Mermaid/JSON 生成（外部 runtime artifact）: `python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>`
@@ -117,7 +119,7 @@ in the Codex host runtime.
 | Official System Skill | AgentCanon Route |
 | --- | --- |
 | `$openai-docs` | Current OpenAI / Codex product docs, model guidance, API reference, and Codex manual source route. |
-| `$skill-creator` | Skill creation, skill refactor, and skill instruction quality work after AgentCanon fixes the local owner surface. |
+| `$skill-creator` | Direct owner for general skill creation, refactoring, and instruction quality; AgentCanon source changes also use [Updating Skills](#updating-skills). |
 | `$skill-installer` | External skill installation and curated skill listing. |
 | `$imagegen` | Bitmap visual asset generation for HTML, reports, dashboards, or visual mockups. |
 | `$plugin-creator` | Codex plugin scaffold, manifest defaults, marketplace entries, and plugin reinstall flow. |
@@ -158,7 +160,7 @@ in the Codex host runtime.
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは [`dependency-analysis`](dependency-analysis.md) を使います。
 - 大規模 refactor では [`refactor-loop`](refactor-loop.md) を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に [`dependency-analysis`](dependency-analysis.md) の change-impact packet を正本入力にします。
 - directory 構造、directory README、root view、path mapping、responsibility-scope map を責務ベースで変えるときは [`structure-refactor`](structure-refactor.md) を追加し、recursive directory responsibility graph を先に作ります。
-- ユーザーが 1 件ずつ共同デバッグする進め方を明示した場合は [`user-guided-debugging`](user-guided-debugging.md) を使い、修正前の問題提示と修正後の次課題提示を固定します。
+- ユーザーが 1 件ずつの guided debugging を明示した場合は [`user-guided-debugging`](user-guided-debugging.md) を使い、編集前に問題を示して修正後に次課題を提示します。同じ作業で合意済みの完了・検証は継続し、ユーザーが選んだ停止・待機境界を尊重します。
 - C / C++ 差分では [`cpp-review`](cpp-review.md) を既定候補にします。
 - OOP readability tool の実行、表出力、結果解釈はいずれも [`oop-readability-check`](oop-readability-check.md) を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - tool、hook、eval、skill、experiment の結果を書き出すときは [`result-artifact-writeout`](result-artifact-writeout.md) を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
@@ -188,7 +190,57 @@ in the Codex host runtime.
 
 ## Updating Skills
 
-1. `agents/skills/<family>.md` を更新する
-1. `agents/skills/catalog.yaml` を更新する
-1. 既存の [保守者用 materializer](../../README.md#source-and-artifact-boundary) で adapter を更新し、正本と一緒に commit する。利用時には生成しない
-1. 必要なら [agents/canonical/CODEX_WORKFLOW.md](../canonical/CODEX_WORKFLOW.md) と [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) の routing を更新する
+一般的な skill の作成・改訂は、ホスト提供の `$skill-creator` に直接渡します。
+以下は AgentCanon source の登録・配布を変更する場合の追加手順です。repository-owned
+skill の通常保守には持ち込まず、read-only review は編集・生成の権限を増やしません。
+この分担を設計・見直しするときは
+[Skill Maintenance Delegation](../../documents/design/responsibility-cleanup.md#skill-maintenance-delegation)
+を読み、通常の保守では既に解決した担当と判断を再利用します。
+
+Start from the observed task outcome, requested trigger, and canonical owner.
+Identify only the catalog, dependency, caller, and distribution surfaces that
+can change. Use the host-provided `$skill-creator` for general authoring
+guidance: explain consequential constraints, generalize repeated failures
+beyond one example, and remove directions that do not improve a decision or
+outcome. Keep existing authority, safety, compatibility, and completion
+requirements with their owner. Record material design rationale in the existing
+design owner; a bounded wording change does not need a new design artifact.
+
+If the user or selected workflow needs fresh behavior evidence, use
+[empirical-prompt-tuning](empirical-prompt-tuning.md#workflow). Freeze its
+Scenario Packet before changing the tested behavior and follow the selected
+task-catalog and [Codex Subagents](../canonical/CODEX_SUBAGENTS.md) contracts
+for evaluator input and report. This route applies to explicit empirical
+evaluation, not every new or substantially revised Skill. A benchmark or
+improvement claim requires actual comparable measurements; otherwise report
+observed behavior and its limits without a benchmark claim.
+
+Keep the canonical doc, `catalog.yaml`, `skill-dependencies.yaml`, and only the
+affected callers, routes, and tool commands aligned. When retiring an entry,
+remove it from the same public surfaces and connect necessary callers to the
+remaining owner. Do not copy official skill bodies or add a wrapper Skill that
+only forwards to an existing capability.
+
+Format changed Markdown through [md-style-check](md-style-check.md). When a
+canonical change requires an adapter update, use the maintainer
+[materializer](../../README.md#source-and-artifact-boundary), read back the
+generated adapter, and include required output in the same commit. Do not
+generate adapters during runtime use. `.codex/config.toml` is host-wiring input,
+not a generated target or second inventory. Select alignment, dependency,
+invocation-graph, or behavior checks from the changed public surface; generate
+the graph through its existing materializer only when needed. Structural
+alignment and fresh behavior evaluation establish different claims. The existing
+[validation boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary)
+controls selected commands.
+
+関連手順を配線する変更では、callerの判断・操作の直前に成立条件、具体的なMarkdownリンク、
+復帰先を置き、[条件付き読込](task-routing.md#in-flight-skill-reads) に従います。
+変更したcallerで条件成立時の到達・復帰と、未成立時の非起動を確認します。
+正本整理は [document-canon-cleanup](document-canon-cleanup.md)、checkoutの不整合は
+[worktree-health](worktree-health.md)、ログからの判断は [agent-log-analysis](agent-log-analysis.md)、
+認可済みのログ修復は [runtime-log-repair](runtime-log-repair.md)、結果保存は
+[result-artifact-writeout](result-artifact-writeout.md) を必要になった時点で読み、元の保守へ戻ります。
+
+必要な実行環境・evaluatorが利用不能なら、未実施の検証と凍結packetをIssueに残し、
+可能なsource変更と [pr-processing](pr-processing.md) による公開を続けます。
+自己採点、別runtime、手書き生成物で成功を代用せず、既存ownerの次操作を引き継ぎます。

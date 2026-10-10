@@ -2,16 +2,16 @@
 # @dependency-start
 # contract tool
 # responsibility Provides task close agent workflow automation.
-# upstream implementation ./workspace_scope.py resolves report root defaults and write scope
-# upstream implementation ./tool_calls.py materializes close-agent ToolCalls
-# upstream implementation ./capacity_handshake.py owns lifecycle state, reservations, and postorder release
-# upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
+# upstream implementation ../../repository/workspace/workspace_scope.py resolves report root defaults and write scope
+# upstream implementation ../../agent/orchestration/tool_calls.py materializes close-agent ToolCalls
+# upstream implementation ../../agent/orchestration/capacity_handshake.py owns lifecycle state, reservations, and postorder release
+# upstream implementation ../artifacts/report_artifact_checks.py validates schedule and work log artifacts
 # upstream implementation ./update_lifecycle_contract.py owns gate, cleanup, handback, and terminal ToolCall identities.
-# upstream implementation ./packets.py owns owner-local receipt normalization and compatibility.
-# upstream design ../../templates/agents/closeout_gate.md defines closeout status contract
-# upstream design ../../templates/agents/agent_evaluation.md defines evaluation contract
-# upstream design ../../documents/design/request-intent-and-update-relation.md cleanup/readback receipt closeout projection
-# downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py tests closeout
+# upstream implementation ../../agent/orchestration/packets.py owns owner-local receipt normalization and compatibility.
+# upstream design ../../../templates/agents/closeout_gate.md defines closeout status contract
+# upstream design ../../../templates/agents/agent_evaluation.md defines evaluation contract
+# upstream design ../../../documents/design/request-intent-and-update-relation.md cleanup/readback receipt closeout projection
+# downstream implementation ../../../tests/agent_tools/test_bootstrap_and_close.py tests closeout
 # @dependency-end
 """Own the sole terminal predicate for user-facing run completion."""
 

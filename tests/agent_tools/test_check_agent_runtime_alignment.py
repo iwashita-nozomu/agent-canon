@@ -124,10 +124,6 @@ def test_missing_report_bundle_path_uses_existing_git_parent(tmp_path: Path) -> 
 class AgentRuntimeAlignmentTest(unittest.TestCase):
     """Verify that the runtime alignment checker passes on the checked-in canon."""
 
-    def test_parent_orchestration_contract_has_no_retired_direct_route(self) -> None:
-        """The alignment owner enforces child-only repository writes."""
-        runtime_alignment.validate_parent_orchestration_contract()
-
     def test_integration_and_publisher_roles_reuse_worker_explicitly(self) -> None:
         """Integration and publication are executable child mappings, not parent routes."""
         config = load_team_config()
@@ -165,9 +161,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
-        with tempfile.TemporaryDirectory(
-            prefix="agent-runtime-alignment-", dir=PROJECT_ROOT.parent
-        ) as runtime_root:
+        with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-") as runtime_root:
             environment = os.environ.copy()
             environment["AGENT_CANON_RUNTIME_ROOT"] = runtime_root
             result = subprocess.run(

@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Reads and transports repository-qualified GitHub Issue metadata through the private log.
-# upstream design ../../documents/runtime/private-feedback-knowledge.md private packet policy
-# upstream design ../../documents/operations/issue-label-taxonomy.toml GitHub lifecycle labels
-# downstream implementation ../../tests/agent_tools/test_issue_sync.py focused GitHub and packet tests
+# upstream design ../../../documents/runtime/private-feedback-knowledge.md private packet policy
+# upstream design ../../../documents/operations/issue-label-taxonomy.toml GitHub lifecycle labels
+# downstream implementation ../../../tests/agent_tools/test_issue_sync.py focused GitHub and packet tests
 # @dependency-end
 """Host-side GitHub Issue adapter with a private metadata-only offline route.
 

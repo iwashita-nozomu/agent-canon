@@ -56,7 +56,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("gate:solid_evidence_gate", result.stdout)
         self.assertIn("gate:style_checker_guard", result.stdout)
         self.assertIn("gate:dependency_review", result.stdout)
-        self.assertIn("gate:log_surface_inventory_guard", result.stdout)
+        self.assertNotIn("gate:log_surface_inventory_guard", result.stdout)
         self.assertIn("TOOL_REJECTION_PREDICTED_GATE=", result.stdout)
 
     def test_standalone_new_tool_source_routes_agentcanon_gates(self) -> None:
@@ -91,17 +91,11 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("agentcanon_new_tool_source_route", gates)
         self.assertIn("responsibility_scope", gates)
         self.assertIn("tool_catalog", gates)
-        self.assertIn("log_surface_inventory_guard", gates)
+        self.assertNotIn("log_surface_inventory_guard", gates)
         self.assertTrue(
             any(
                 "git status --short --branch" in command
                 for command in commands_by_gate["agentcanon_new_tool_source_route"]
-            )
-        )
-        self.assertTrue(
-            any(
-                "tools/runtime/archive/log_surface_inventory.py" in command
-                for command in commands_by_gate["log_surface_inventory_guard"]
             )
         )
         self.assertTrue(
@@ -265,7 +259,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         gates = {gate["gate"] for gate in payload["predicted_gates"]}
         self.assertNotIn("skill_mirror_sync", gates)
-        self.assertIn("log_surface_inventory_guard", gates)
+        self.assertNotIn("log_surface_inventory_guard", gates)
 
     def test_protocol_path_predicts_convention_gate(self) -> None:
         """Protocol docs should route to convention compliance checks."""

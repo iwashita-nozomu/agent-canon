@@ -2,18 +2,18 @@
 # @dependency-start
 # contract tool
 # responsibility Resolves and executes canonical completion-authority publication with expected-old CAS.
-# upstream design ../../agents/canonical/CODEX_COMPLETION.md owns active-W2 publication authority and route state.
-# upstream design ../../documents/operations/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy.
-# upstream design ../../agents/skills/integration.md owns main integration ordering.
-# upstream design ../../agents/skills/agent-canon-update.md owns AgentCanon PR publication policy.
-# upstream design ../../documents/contracts/ordered_integration_interface.json owns the sole ordered-integration interface path.
-# upstream implementation ./review_dispatch.py resolves current candidate identity only.
-# upstream implementation ./report_artifact_checks.py regenerates materializer-produced validation results.
-# upstream implementation ./artifact_identity.py provides canonical serialization and artifact readback.
-# upstream implementation ./packets.py owns owner-local receipt normalization and compatibility.
-# upstream implementation ./update_lifecycle_contract.py owns G1/G3/G5 verdict identity and lifecycle guards.
+# upstream design ../../../agents/canonical/CODEX_COMPLETION.md owns active-W2 publication authority and route state.
+# upstream design ../../../documents/operations/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy.
+# upstream design ../../../agents/skills/integration.md owns main integration ordering.
+# upstream design ../../../agents/skills/agent-canon-update.md owns AgentCanon PR publication policy.
+# upstream design ../../../documents/contracts/ordered_integration_interface.json owns the sole ordered-integration interface path.
+# upstream implementation ../../agent/orchestration/review_dispatch.py resolves current candidate identity only.
+# upstream implementation ../../runtime/artifacts/report_artifact_checks.py regenerates materializer-produced validation results.
+# upstream implementation ../../runtime/artifacts/artifact_identity.py provides canonical serialization and artifact readback.
+# upstream implementation ../../agent/orchestration/packets.py owns owner-local receipt normalization and compatibility.
+# upstream implementation ../../runtime/lifecycle/update_lifecycle_contract.py owns G1/G3/G5 verdict identity and lifecycle guards.
 # downstream implementation ./github_publish.py exposes verified remote and PR publication.
-# downstream implementation ../../tests/agent_tools/test_publication_integrator.py validates CAS, dirty-checkout, and race behavior.
+# downstream implementation ../../../tests/agent_tools/test_publication_integrator.py validates CAS, dirty-checkout, and race behavior.
 # @dependency-end
 """Publish the exact owner-receipted candidate through one expected-old-OID authority."""
 

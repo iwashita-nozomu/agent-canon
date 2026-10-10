@@ -17,13 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-try:
-    import yaml
-except ModuleNotFoundError:  # pragma: no cover - clean host before the tool image exists.
-    try:
-        from tools.runtime.container import stdlib_yaml as yaml
-    except ImportError:
-        import tools.runtime.container.stdlib_yaml as yaml  # type: ignore[no-redef]
+import yaml
 
 SKILL_CATALOG = Path("agents/skills/catalog.yaml")
 GENERATED_SKILL_PREFIX = ".codex/personal/skills/"

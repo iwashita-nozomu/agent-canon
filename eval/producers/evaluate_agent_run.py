@@ -5,8 +5,8 @@
 # upstream design ../../agents/skills/agent-learning.md behavior feedback
 # upstream design ../../templates/agents/agent_evaluation.md defines evaluation artifact shape
 # upstream design ../../templates/agents/workflow_monitoring.md monitoring evidence
-# upstream implementation ./report_artifact_checks.py validates schedule and work log completeness
-# upstream implementation ./runtime_artifacts.py owns external evaluation artifact writes
+# upstream implementation ../../tools/runtime/artifacts/report_artifact_checks.py validates schedule and work log completeness
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external evaluation artifact writes
 # downstream implementation ../../tests/agent_tools/test_evaluate_agent_run.py verifies scoring
 # @dependency-end
 """Evaluate one run bundle and write actionable agent feedback."""
@@ -33,7 +33,10 @@ if __package__ in (None, ""):
 
 from tools.repository.workspace.workspace_scope import resolve_report_root
 from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import (
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)
 from tools.runtime.artifacts.report_artifact_checks import (
     check_final_review_artifact,
     check_schedule_artifact,
@@ -53,15 +56,12 @@ PLANNED_WORK_AND_CHRONOLOGY_SCORE = 10
 WORKFLOW_MONITORING_SCORE = 12
 TOOL_WARNING_OBLIGATION_SCORE = 8
 ORCHESTRATION_INTAKE_SCORE = 12
-PROMPT_EVAL_ARTIFACT_SCORE = 8
 REVIEW_FEEDBACK_LOOP_SCORE = 10
 VALIDATION_AND_CLOSEOUT_SCORE = 12
 DEPENDENCY_AND_CANONICAL_SCORE = 10
 SELF_IMPROVEMENT_FEEDBACK_SCORE = 16
 SELF_IMPROVEMENT_FEEDBACK_PARTIAL_SCORE = 8
 MARKDOWN_COMMENT_PATTERN = re.compile(r"<!--.*?-->", flags=re.DOTALL)
-SKILL_INVOCATION_PATTERN = re.compile(r"\bskill_invocation=\$?([A-Za-z0-9_-]+)")
-EVAL_FIELD_PATTERN = re.compile(r"\b(EVAL_RUN_ID|EVAL_ACCUMULATED_REPORT|EVAL_USED_SKILLS)=([^\s]+)")
 REQUIRED_ARTIFACTS = (
     "user_request_contract.md",
     "schedule.md",
@@ -90,7 +90,9 @@ def validation_failure_taxonomy_values(field: str) -> frozenset[str]:
     data = cast(dict[str, object], raw_data)
     raw_response = data.get("validation_failure_response")
     if not isinstance(raw_response, dict):
-        raise ValueError("runtime profile inventory missing validation_failure_response")
+        raise ValueError(
+            "runtime profile inventory missing validation_failure_response"
+        )
     response = cast(dict[str, object], raw_response)
     raw_values = response.get(field)
     if not isinstance(raw_values, list) or not raw_values:
@@ -186,26 +188,41 @@ def child_execution_receipts_valid(report_dir: Path) -> bool:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return False
-    if not isinstance(value, dict) or value.get("schema") != CHILD_EXECUTION_RECEIPT_SCHEMA:
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != CHILD_EXECUTION_RECEIPT_SCHEMA
+    ):
         return False
     receipt_sha = value.get("receipt_sha256")
     if not isinstance(receipt_sha, str):
         return False
     unsigned = dict(value)
     unsigned.pop("receipt_sha256", None)
-    if hashlib.sha256(
-        json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
-    ).hexdigest() != receipt_sha:
+    if (
+        hashlib.sha256(
+            json.dumps(
+                unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+            ).encode()
+        ).hexdigest()
+        != receipt_sha
+    ):
         return False
     spawn = value.get("spawn")
     close = value.get("close")
     mutations = value.get("mutations")
-    if not isinstance(spawn, dict) or not isinstance(close, dict) or not isinstance(mutations, list) or not mutations:
+    if (
+        not isinstance(spawn, dict)
+        or not isinstance(close, dict)
+        or not isinstance(mutations, list)
+        or not mutations
+    ):
         return False
     actor_id = spawn.get("agent_id")
     role_id = spawn.get("role_id")
     scope_digest = spawn.get("scope_digest")
-    if not all(isinstance(item, str) and item for item in (actor_id, role_id, scope_digest)):
+    if not all(
+        isinstance(item, str) and item for item in (actor_id, role_id, scope_digest)
+    ):
         return False
     if close.get("agent_id") != actor_id or close.get("status") != "closed":
         return False
@@ -265,15 +282,6 @@ class RunEvidence:
     behavior_events_text: str
     behavior_events_raw_text: str
     tool_warnings_text: str
-
-
-@dataclass(frozen=True)
-class PromptEvalEvent:
-    """One accumulated prompt eval event recorded in workflow monitoring."""
-
-    eval_run_id: str
-    report_path: str
-    used_skills: tuple[str, ...]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -365,7 +373,9 @@ def load_behavior_manifest(path: Path) -> tuple[BehaviorCriterion, ...]:
     data = cast(dict[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
     raw_criteria = data.get("criteria")
     if not isinstance(raw_criteria, list) or not raw_criteria:
-        raise ValueError("behavior manifest must define at least one [[criteria]] entry")
+        raise ValueError(
+            "behavior manifest must define at least one [[criteria]] entry"
+        )
     criteria = cast(list[object], raw_criteria)
     return tuple(
         behavior_criterion_from_manifest_entry(index, entry)
@@ -487,7 +497,9 @@ def has_open_review_findings(*texts: str) -> bool:
         for line in cleaned.splitlines():
             if re.search(r"\b(no|none)\b.*\b(fix-now|required_change|open)\b", line):
                 continue
-            if "fix-now" in line and any(token in line for token in ("open", "pending")):
+            if "fix-now" in line and any(
+                token in line for token in ("open", "pending")
+            ):
                 return True
             if "required_change" in line and not any(
                 token in line for token in ("resolved", "applied", "fixed", "closed")
@@ -505,7 +517,9 @@ def criterion(
 ) -> CriterionResult:
     """Build one criterion result."""
     if passed:
-        return CriterionResult(name, max_score, max_score, "pass", "No action required.")
+        return CriterionResult(
+            name, max_score, max_score, "pass", "No action required."
+        )
     return CriterionResult(name, partial_score, max_score, "revise", feedback)
 
 
@@ -524,17 +538,13 @@ def read_run_evidence(report_dir: Path) -> RunEvidence:
     return RunEvidence(
         report_dir=report_dir,
         missing_artifacts=tuple(missing),
-        request_contract=parse_markdown_status(
-            report_dir / "user_request_contract.md"
-        ),
+        request_contract=parse_markdown_status(report_dir / "user_request_contract.md"),
         verification=parse_kv_lines(report_dir / "verification.txt"),
         closeout=parse_markdown_status(report_dir / "closeout_gate.md"),
         schedule_text=artifact_text(report_dir, "schedule.md"),
         work_log_text=artifact_text(report_dir, "work_log.md"),
         monitoring_text=monitoring_text,
-        monitoring_status=parse_markdown_status(
-            report_dir / "workflow_monitoring.md"
-        ),
+        monitoring_status=parse_markdown_status(report_dir / "workflow_monitoring.md"),
         retrospective_text=artifact_text(report_dir, "retrospective.md"),
         final_decision=markdown_decision(report_dir / "final_review.md"),
         change_review_text=artifact_text(report_dir, "change_review.md"),
@@ -604,7 +614,9 @@ def runtime_feedback_closure_complete(evidence: RunEvidence) -> bool:
     """Return whether observed runtime feedback was closed into an action route."""
     if not runtime_feedback_requires_improvement(evidence):
         return True
-    return improvement_decisions_complete(evidence) and improvement_decision_applied_or_recorded(evidence)
+    return improvement_decisions_complete(
+        evidence
+    ) and improvement_decision_applied_or_recorded(evidence)
 
 
 def token_fields(line: str) -> dict[str, str]:
@@ -643,9 +655,16 @@ def tool_warning_problems(evidence: RunEvidence) -> tuple[str, ...]:
         severity = fields.get("severity", "").lower()
         if warning_status in {"", "open", "pending", "observed", "unresolved"}:
             problems.append(f"tool warning remains open: {warning_id}")
-        if severity in {"fix-now", "s0", "s1", "blocker"} and warning_status != "resolved":
+        if (
+            severity in {"fix-now", "s0", "s1", "blocker"}
+            and warning_status != "resolved"
+        ):
             problems.append(f"fix-now tool warning must be resolved: {warning_id}")
-        if warning_status in {"resolved", "accepted_with_reason", "deferred_with_issue"}:
+        if warning_status in {
+            "resolved",
+            "accepted_with_reason",
+            "deferred_with_issue",
+        }:
             if not fields.get("evidence") and not fields.get("issue"):
                 problems.append(
                     f"closed tool warning lacks evidence or issue: {warning_id}"
@@ -664,8 +683,7 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
     behavior_events_text = evidence.behavior_events_text
     return (
         child_execution_receipts_valid(evidence.report_dir)
-        and
-        has_any(signals_text, ("skills=", "$agent-orchestration"))
+        and has_any(signals_text, ("skills=", "$agent-orchestration"))
         and has_any(
             behavior_events_text,
             ("skill_invocation=", "skill_invocation_not_required"),
@@ -704,7 +722,11 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
         )
         and has_any(
             signals_text,
-            ("validation_status=", "validation_complete: yes", "validation_not_required"),
+            (
+                "validation_status=",
+                "validation_complete: yes",
+                "validation_not_required",
+            ),
         )
         and has_any(
             signals_text,
@@ -715,13 +737,11 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
 
 def build_base_criteria(
     evidence: RunEvidence,
-    report_dir: Path,
-    workspace_root: Path,
 ) -> list[CriterionResult]:
     """Build non-manifest run evaluation criteria."""
     return [
         *build_artifact_and_traceability_criteria(evidence),
-        *build_workflow_execution_criteria(evidence, report_dir, workspace_root),
+        *build_workflow_execution_criteria(evidence),
         *build_review_and_closeout_criteria(evidence),
         build_self_improvement_feedback_criterion(evidence),
     ]
@@ -753,8 +773,6 @@ def build_artifact_and_traceability_criteria(
 
 def build_workflow_execution_criteria(
     evidence: RunEvidence,
-    report_dir: Path,
-    workspace_root: Path,
 ) -> list[CriterionResult]:
     """Build planned work, monitoring, and intake criteria."""
     schedule_blockers = check_schedule_artifact(evidence.schedule_text)
@@ -792,112 +810,7 @@ def build_workflow_execution_criteria(
             "or explicit opt-out, repo dependency intake, web research decision, "
             "review status, validation status, and drift risk before implementation.",
         ),
-        build_prompt_eval_artifact_criterion(evidence, report_dir, workspace_root),
     ]
-
-
-def build_prompt_eval_artifact_criterion(
-    evidence: RunEvidence,
-    report_dir: Path,
-    workspace_root: Path,
-) -> CriterionResult:
-    """Require skill-use prompt eval events to cite real matching reports."""
-    invoked_skills = extract_invoked_skills(evidence.behavior_events_raw_text)
-    if not invoked_skills:
-        return criterion(
-            "prompt_eval_artifact_integrity",
-            PROMPT_EVAL_ARTIFACT_SCORE,
-            True,
-            "No action required.",
-        )
-    events = extract_prompt_eval_events(evidence.behavior_events_raw_text)
-    problems: list[str] = []
-    covered_skills: set[str] = set()
-    if not events:
-        problems.append("accumulated prompt eval event missing")
-    for event in events:
-        report_path = resolve_eval_report_path(event.report_path, report_dir, workspace_root)
-        if report_path is None:
-            problems.append(f"accumulated prompt eval report missing: {event.report_path}")
-            continue
-        report_text = report_path.read_text(encoding="utf-8")
-        if event.eval_run_id and not report_contains_eval_run_id(report_text, event.eval_run_id):
-            problems.append(
-                f"accumulated prompt eval run-id mismatch: {event.eval_run_id} -> {event.report_path}"
-            )
-        covered_skills.update(event.used_skills)
-        covered_skills.update(extract_report_used_skills(report_text))
-    missing_skills = sorted(invoked_skills - covered_skills)
-    if missing_skills:
-        problems.append("missing accumulated prompt eval skills: " + ",".join(missing_skills))
-    return criterion(
-        "prompt_eval_artifact_integrity",
-        PROMPT_EVAL_ARTIFACT_SCORE,
-        not problems,
-        "; ".join(problems) if problems else "No action required.",
-    )
-
-
-def extract_invoked_skills(text: str) -> set[str]:
-    """Return skill ids observed as runtime invocations."""
-    if "skill_invocation_not_required" in text:
-        return set()
-    return {match.group(1).removeprefix("$") for match in SKILL_INVOCATION_PATTERN.finditer(text)}
-
-
-def extract_prompt_eval_events(text: str) -> tuple[PromptEvalEvent, ...]:
-    """Return accumulated prompt eval events recorded in behavior monitoring."""
-    events: list[PromptEvalEvent] = []
-    for line in text.splitlines():
-        if "evaluate_skill_workflow_prompts.py" not in line:
-            continue
-        fields = {match.group(1): match.group(2).strip("`'\"") for match in EVAL_FIELD_PATTERN.finditer(line)}
-        report_path = fields.get("EVAL_ACCUMULATED_REPORT", "")
-        if not report_path:
-            continue
-        used_skills = tuple(
-            skill.strip().removeprefix("$")
-            for skill in fields.get("EVAL_USED_SKILLS", "").split(",")
-            if skill.strip() and skill.strip() != "-"
-        )
-        events.append(
-            PromptEvalEvent(
-                eval_run_id=fields.get("EVAL_RUN_ID", ""),
-                report_path=report_path,
-                used_skills=used_skills,
-            )
-        )
-    return tuple(events)
-
-
-def resolve_eval_report_path(
-    report_text_path: str,
-    report_dir: Path,
-    workspace_root: Path,
-) -> Path | None:
-    """Resolve an accumulated eval report path from report-dir or workspace context."""
-    candidate = Path(report_text_path)
-    candidates = (candidate,) if candidate.is_absolute() else (report_dir / candidate, workspace_root / candidate)
-    for path in candidates:
-        if path.is_file():
-            return path
-    return None
-
-
-def report_contains_eval_run_id(report_text: str, eval_run_id: str) -> bool:
-    """Return whether one report contains the expected eval run id."""
-    return f"eval_run_id: `{eval_run_id}`" in report_text or f"EVAL_RUN_ID={eval_run_id}" in report_text
-
-
-def extract_report_used_skills(report_text: str) -> set[str]:
-    """Extract used skill ids from one accumulated prompt eval report."""
-    for line in report_text.splitlines():
-        if "used_skills:" not in line:
-            continue
-        _, _, value = line.partition("used_skills:")
-        value = value.strip().strip("`")
-        return {skill.strip().removeprefix("$") for skill in value.split(",") if skill.strip() and skill.strip() != "-"}
-    return set()
 
 
 def build_review_and_closeout_criteria(
@@ -978,7 +891,7 @@ def evaluate(
     """Evaluate one report directory."""
     evidence = read_run_evidence(report_dir)
     criteria = [
-        *build_base_criteria(evidence, report_dir, workspace_root),
+        *build_base_criteria(evidence),
         *evaluate_behavior_criteria(
             {
                 "behavior_events": evidence.behavior_events_text,
@@ -989,7 +902,9 @@ def evaluate(
         ),
     ]
     blockers = [item.feedback for item in criteria if item.status != "pass"]
-    blockers.extend(unresolved_checker_failure_blockers(evidence.behavior_events_raw_text))
+    blockers.extend(
+        unresolved_checker_failure_blockers(evidence.behavior_events_raw_text)
+    )
     return criteria, blockers
 
 
@@ -1067,7 +982,9 @@ def evaluate_behavior_criterion(
         return evaluate_token_efficiency_criterion(text, item)
     if item.name == "validation_failure_response_recorded":
         return evaluate_validation_failure_response_criterion(text, item)
-    missing_all = tuple(token for token in item.required_all if token.lower() not in text)
+    missing_all = tuple(
+        token for token in item.required_all if token.lower() not in text
+    )
     any_passed = not item.required_any or has_any(text, item.required_any)
     forbidden_hits = tuple(
         token for token in item.forbidden_any if token.lower() in text
@@ -1183,8 +1100,7 @@ def validation_failure_forbidden_violations(
 def validation_failure_fields_escalated(fields: dict[str, str]) -> bool:
     """Return whether one field packet escalates a design/user conflict."""
     return (
-        fields.get("cause_classification")
-        == VALIDATION_FAILURE_DESIGN_CONFLICT
+        fields.get("cause_classification") == VALIDATION_FAILURE_DESIGN_CONFLICT
         and fields.get("intent_preservation")
         == VALIDATION_FAILURE_ESCALATE_DESIGN_CONFLICT
         and bool(fields.get("evidence"))
@@ -1367,8 +1283,7 @@ def render_markdown_title_lines() -> list[str]:
         "",
         "<!--",
         "@dependency-start",
-        "upstream design ../../agents/skills/"
-        "agent-learning.md agent feedback skill",
+        "upstream design ../../agents/skills/agent-learning.md agent feedback skill",
         "upstream implementation ../../eval/producers/"
         "evaluate_agent_run.py generates this artifact",
         "@dependency-end",
@@ -1417,8 +1332,7 @@ def learning_capture_complete(criteria: list[CriterionResult]) -> str:
         "self_improvement_feedback_capture",
     }
     if any(
-        item.name in learning_criteria and item.status == "pass"
-        for item in criteria
+        item.name in learning_criteria and item.status == "pass" for item in criteria
     ):
         return "yes"
     return "no"
@@ -1480,7 +1394,11 @@ def main() -> int:
         )
         report_dir = report_dir.resolve()
     output_path = Path(args.output)
-    boundary = runtime_artifact_boundary(workspace_root, args.runtime_root) if args.write else None
+    boundary = (
+        runtime_artifact_boundary(workspace_root, args.runtime_root)
+        if args.write
+        else None
+    )
     if not output_path.is_absolute() and boundary is not None:
         output_path = boundary.resolve(output_path)
 

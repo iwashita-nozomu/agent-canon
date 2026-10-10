@@ -37,14 +37,13 @@ Dockerfile -> canonical image -> docker run <canonical-full-test-command> -> pas
 
 ## Route
 
-構造整理は以下を使い、再構築時の廃棄は[Rebuild cleanup](#rebuild-cleanup)へ進みます。
-
-1. `environment-maintenance`のExpected Structureとcanonical full test commandを固定します。
-1. `dependency-design`で全dependencyをDockerfile image targetまたは明示的runtime inputへ配置します。
-1. Feature、initialize/post-create/post-attach、runner setup、mounted installer等のalternate
-   environment constructionを削除します。
-1. Dev Container、Compose、CIを同じimage targetのbuild/runへ接続します。
-1. imageをbuildし、`docker run`からrepositoryの標準テスト一式を実行します。
+対象が alternate installer や lifecycle setup の削除なら、その実在する owner と
+affected consumers を確認し、変更した construction path の除去を read back します。
+dependency の配置が変わる場合だけ `dependency-design` を使い、image target や
+command を変える場合だけその consumer を `environment-maintenance` の同じ contract
+へ移行します。canonical image を置換・再構築する作業では、その image を build して
+`docker run` から repository 標準テストを実行し、廃棄は[Rebuild cleanup](#rebuild-cleanup)
+の exact-target route で完了します。
 
 ## Rebuild cleanup
 
@@ -69,6 +68,11 @@ Dockerfile -> canonical image -> docker run <canonical-full-test-command> -> pas
 
 ## Tool Commands
 
+Run only commands that prove the changed placement or image contract. The
+dependency validator applies when dependency placement changes; image build and
+full-test execution apply to an image replacement. Typed manifest validation
+applies only when that manifest remains a build input.
+
 ```bash
 bash tools/validation/dependencies/docker_dependency_validator.sh
 docker build -f <Dockerfile> --target <canonical-target> -t <image> .
@@ -79,10 +83,11 @@ typed manifestがDockerfile build inputとして残る場合だけ、そのvalid
 
 ## Completion
 
-- canonical Docker imageをbuildできる。
-- buildしたimageを`docker run`し、repositoryの標準テスト一式が追加setupなしで全て成功する。
-- Dev Container、Compose、CIにalternate dependency installerが残らない。
-- 再構築・置換では、旧環境と専用資源の削除・不在確認まで完了している。
+For an image replacement, the canonical image builds and its configured
+`docker run` test command passes without extra setup. For a narrower cleanup,
+read back the affected alternate construction paths and run the selected
+validation. Any rebuild or replacement also requires exact old-environment and
+exclusive-resource deletion and absence readback as described above.
 
 ## Boundary
 

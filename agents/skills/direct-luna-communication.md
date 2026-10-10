@@ -14,32 +14,44 @@ downstream implementation ../../tests/tools/test_direct_luna_topology.py validat
 
 ## Purpose
 
-Exchange one bounded, typed packet between the parent and a direct Luna subagent without sharing implicit raw history or creating a physical custom-agent alias per logical role.
+Exchange one bounded packet between the parent and a direct Luna subagent without sharing implicit raw history or creating a physical custom-agent alias per logical role.
 
 This Skill owns packet construction, runtime acknowledgement, and handback semantics. It does not choose the logical role, replace specialist Skills, grant authority, or provide a fallback model.
 
-The validator's admission guarantee is limited to packets built through this direct-Luna path. Other canonical runtime flows intentionally keep reuse context optional/advisory; this Skill does not provide runtime-wide admission. Broader runtime admission remains a separate #1033 scope.
+The validator checks the direct-Luna authority and runtime boundary. It does not prove the quality or completeness of a reuse investigation from a record's format, and it does not introduce admission requirements for other runtime routes.
 
 ## Inputs
 
 The parent supplies `logical_role_id`, one or more existing `skill_ids`, `reasoning_effort`, `authority`, bounded `allowed_paths` and `do_not_read`, `expected_output`, the parent-owned `validation_route`, bounded `objective` and `context`, and applicable `request_clause_ids`.
 
-A `workspace-write` packet also supplies one structured `reuse_survey`. The same survey may be supplied unchanged to a read-only worker/reviewer successor. An applicable survey records one decision per discovered candidate with `asset_path`, `asset_origin`, `capability`, `disposition` (`reuse|extend|restore|consolidate|replace|delete|reject`), `reason`, and non-empty `test_paths`. It also records the current-asset, Git-history/deleted-path, prior PR/Issue, and predecessor/design evidence needed by the selected `current` or `current_and_history` scope. An evidence dimension that is genuinely inapplicable is carried as a categorized `bounded_omission`; it is not silently absent.
+Use the existing `context` to carry the relevant source, design, or Issue references and the actual reuse decision: which existing capability fits, what gap remains, and why the selected change is necessary. Worker and reviewer use the same evidence. Do not transcribe it into a second `reuse_survey` schema or require a fixed disposition vocabulary, non-empty `test_paths`, every historical evidence dimension, or a `not_applicable` token.
 
-A bounded non-split edit with no reuse choice may use `scope=not_applicable`, but only with an explicit reason and no synthetic asset evidence. This is the only write-capable path that does not carry candidate decisions.
+A bounded edit needs the evidence relevant to that edit, not an exhaustive asset inventory. A real missing design or reuse decision is resolved with its owning source; a non-empty field alone is not proof that investigation happened. References are context, never read or write authorization.
 
 ## Procedure
 
-1. Before any file or worker slice, construct the single current asset universe. For code split/extraction or a missing suspected predecessor, extend that same universe with Git history/deleted paths, prior PR/Issues, predecessor tests, and relevant design documents.
-2. Assign every discovered candidate exactly one supported disposition and bind the reason and test paths. A completed universe with no candidates keeps `decisions` empty; it does not gain a synthetic `reject`. When actual candidates exist, a proposed new surface is admissible only when every candidate in the completed/bounded universe is explicitly `reject` with evidence.
-3. Build `direct_luna_handoff_packet_v1` with `tools/agent/orchestration/direct_luna_dispatch.py`. `workspace-write` fails closed on a missing/incomplete survey, duplicate candidate path, missing evidence dimension, write disposition outside `allowed_paths`, or asset/test path that crosses `do_not_read`.
-4. For a necessary launch under [Context-preserving continuation](#context-preserving-continuation), spawn direct `gpt-5.6-luna` with `fork_turns="none"` and the serialized packet. The serialized `reuse_survey` is the worker/reviewer prompt evidence; do not restate or independently reconstruct it.
-5. Read back the effective child model and reasoning effort before admitting work.
-6. If the override is rejected or unavailable, return `direct_luna_unavailable`.
-7. If effective metadata is hidden or differs from the request, return `direct_luna_unverified`.
-8. Never substitute Sol, Terra, Spark, or a legacy role alias after either blocker.
-9. Accept only the packet's expected output, evidence, blockers, and validation observations as the handback.
-10. Continue with the same active verified child, sending only the changed objective, findings, or scope within its authority. Use the continuation rules below when reuse is not possible. Do not use unverified native resume.
+When a direct Luna child is selected, reuse the current request, source context,
+and actual reuse decision. Investigate history or prior design only when a split,
+extraction, or suspected missing predecessor makes it relevant. Keep the selected
+capability and remaining gap in the existing context rather than building a
+second inventory.
+
+Build `direct_luna_handoff_packet_v1` with
+`tools/agent/orchestration/direct_luna_dispatch.py`. For `workspace-write`, the
+packet must carry explicit bounded `allowed_paths`; reject invalid authority,
+escaping paths, and overlap with `do_not_read`. Context cannot enlarge those
+permissions. If launch is needed, send the serialized packet to direct
+`gpt-6-luna` with `fork_turns="none"`, then read back the effective model and
+reasoning effort before admitting work. Return `direct_luna_unavailable` when
+the override is rejected or unavailable, and `direct_luna_unverified` when
+effective metadata is hidden or differs from the request. Do not substitute
+another model or a legacy role alias after either blocker.
+
+Use the packet's expected output, evidence, blockers, and validation observations
+as the handback. Continue with a compatible active child by sending only the
+changed objective, findings, or scope within its authority. A new child is for
+initial work, a child that actually ended or was lost, or independent review;
+unverified native resume is not a continuation route.
 
 ## Context-preserving continuation
 
@@ -61,13 +73,14 @@ to the same active authorized writer, not a newly spawned writer by default.
 
 ## Authority invariants
 
-Luna identity never grants write access. Read-only responsibilities remain read-only. `workspace-write` requires parent-assigned repository-relative paths, a valid structured `reuse_survey`, and no overlap with `do_not_read`. A rejected foreign candidate remains evidence only and never expands `allowed_paths`. PR creation, merge, close, base integration, and administrative overrides remain parent-owned.
+Luna identity never grants write access. Read-only responsibilities remain read-only. `workspace-write` requires parent-assigned repository-relative paths and no overlap with `do_not_read`. An evidence reference or reuse decision never expands `allowed_paths` or permits a forbidden read. PR creation, merge, close, base integration, and administrative overrides remain parent-owned.
 
-## Complexity invariant
+## Profile reuse
 
-Let `P` be the physical execution-profile set and `R_active` the active logical-role instances. Static runtime configuration is `O(|P|)` and communication is `O(|R_active|)`. Adding a logical role that reuses an existing Luna profile must not add another physical team member.
-
-For an applicable survey, let `A` be the finite discovered asset set and `D` the seven supported dispositions. Admission requires a total single-valued map `d: A -> D`; duplicate paths, unclassified candidates, or missing evidence make the map undefined and therefore block the write packet. Worker and reviewer packets serialize the same `reuse_survey`, so prompt projection adds no second decision state.
+Logical roles reuse the configured Luna execution profile. Adding a role does
+not create a physical alias or expand team capacity. A list of candidate labels
+does not prove that a capability fits the request; use the selected role and
+actual gap, with permissions remaining in the explicit authority fields.
 
 Model identity does not preserve context: fresh reviewer and writer instances each
 reconstruct their needed context, while compatible continuation reuses it and needs

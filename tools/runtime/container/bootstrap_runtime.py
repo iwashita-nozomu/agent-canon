@@ -2,9 +2,10 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Owns container-side TOML/JSON/state/tool/check/eval logic for the shared AgentCanon tool container without implicit source writes.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
-# downstream implementation ../../bootstrap.sh fixed host entrypoint
-# downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
+# upstream implementation ../source/agent_canon_source_root.py standalone source identity
+# downstream implementation ../../../bootstrap.sh fixed host entrypoint
+# downstream implementation ../../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 # @dependency-end
 """Container control plane for the AgentCanon tool runtime.
 
@@ -69,6 +70,7 @@ KNOWN_SUBDIRS = (
 )
 CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
+RUFF_CACHE_DESTINATION = "/var/lib/agent-canon/cache/ruff"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
@@ -95,6 +97,7 @@ TOOL_ENVIRONMENT_KEYS = frozenset(
         "TMPDIR",
         "RUST_BACKTRACE",
         "CARGO_TERM_COLOR",
+        "RUFF_CACHE_DIR",
         "AGENT_CANON_SOURCE_ROOT",
         "AGENT_CANON_ROOT",
         "AGENT_CANON_DISPATCH_ENTRY_ID",
@@ -199,7 +202,14 @@ def _redact_argv(argv: Sequence[str]) -> list[str]:
     """Redact credential-shaped argv values before receipt serialization."""
     redacted: list[str] = []
     hide_next = False
-    secret_names = ("token", "password", "secret", "api-key", "api_key", "authorization")
+    secret_names = (
+        "token",
+        "password",
+        "secret",
+        "api-key",
+        "api_key",
+        "authorization",
+    )
     for value in argv:
         lowered = value.lower()
         if hide_next:
@@ -243,15 +253,18 @@ def _validate_tool_plane_argv(
         if script.startswith(image_tool_root):
             return
     if root.resolve() == repository_root.resolve():
-        if executable == "python3" and len(argv) > 2 and argv[1:3] == ["-m", "pytest"]:
-            return
-        if executable == "cargo" and len(argv) > 1 and argv[1] in {
-            "build",
-            "clippy",
-            "fmt",
-            "test",
-        }:
-            return
+        return
+    from tools.runtime.source.agent_canon_source_root import (
+        SourceRootFailure,
+        resolve_agent_canon_source_root,
+    )
+
+    try:
+        resolve_agent_canon_source_root(root, source_root=root, canon_root=root)
+    except SourceRootFailure:
+        pass
+    else:
+        return
     raise BootstrapError(
         "tool_plane_command_rejected",
         "exec accepts AgentCanon tools only; project commands use the project execution environment",
@@ -294,9 +307,7 @@ def _source_snapshot(root: Path) -> dict[str, Any]:
     digest = hashlib.sha256()
     file_count = 0
     relative_paths = sorted(
-        Path(os.fsdecode(value))
-        for value in inventory.stdout.split(b"\0")
-        if value
+        Path(os.fsdecode(value)) for value in inventory.stdout.split(b"\0") if value
     )
     for relative_path in relative_paths:
         if relative_path.is_absolute() or ".." in relative_path.parts:
@@ -383,7 +394,9 @@ def _eval_producer_matrix(stdout: str) -> tuple[list[dict[str, Any]], dict[str, 
             metrics["overall"] = line.split("=", 1)[1]
     if matrix:
         metrics.setdefault("producer_count", len(matrix))
-        metrics.setdefault("failed_count", sum(item["status"] != "pass" for item in matrix))
+        metrics.setdefault(
+            "failed_count", sum(item["status"] != "pass" for item in matrix)
+        )
     return matrix, metrics
 
 
@@ -392,11 +405,15 @@ def _copy_external_files(source_root: Path, destination_root: Path) -> int:
     if not source_root.exists():
         return 0
     if source_root.is_symlink() or not source_root.is_dir():
-        raise BootstrapError("eval_exchange_invalid", f"invalid exchange path: {source_root}")
+        raise BootstrapError(
+            "eval_exchange_invalid", f"invalid exchange path: {source_root}"
+        )
     files: list[tuple[Path, Path, bytes]] = []
     for source in sorted(source_root.rglob("*")):
         if source.is_symlink():
-            raise BootstrapError("eval_exchange_symlink", f"exchange contains a symlink: {source}")
+            raise BootstrapError(
+                "eval_exchange_symlink", f"exchange contains a symlink: {source}"
+            )
         if not source.is_file():
             continue
         relative = source.relative_to(source_root)
@@ -405,8 +422,14 @@ def _copy_external_files(source_root: Path, destination_root: Path) -> int:
         files.append((source, target, payload))
     for _source, target, payload in files:
         if target.exists():
-            if target.is_symlink() or not target.is_file() or target.read_bytes() != payload:
-                raise BootstrapError("eval_spool_conflict", f"spool file differs: {target}")
+            if (
+                target.is_symlink()
+                or not target.is_file()
+                or target.read_bytes() != payload
+            ):
+                raise BootstrapError(
+                    "eval_spool_conflict", f"spool file differs: {target}"
+                )
     for _source, target, payload in files:
         if not target.exists():
             _atomic_bytes(target, payload)
@@ -420,7 +443,9 @@ def _validate_exported_tree(root: Path) -> int:
     count = 0
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
-            raise BootstrapError("eval_exchange_symlink", f"export contains a symlink: {path}")
+            raise BootstrapError(
+                "eval_exchange_symlink", f"export contains a symlink: {path}"
+            )
         if path.is_file():
             path.read_bytes()
             count += 1
@@ -439,8 +464,16 @@ def _embedding_response(
 ) -> dict[str, Any]:
     """Execute one allowlisted HTTPS embedding request on the Host."""
     required = {
-        "schema", "operation", "mode", "uid", "nonce", "deadline_ms",
-        "redirect_policy", "endpoint", "body", "request_digest",
+        "schema",
+        "operation",
+        "mode",
+        "uid",
+        "nonce",
+        "deadline_ms",
+        "redirect_policy",
+        "endpoint",
+        "body",
+        "request_digest",
     }
     if set(request) != required:
         raise BootstrapError("embedding_request_invalid", "request fields are invalid")
@@ -466,7 +499,9 @@ def _embedding_response(
     token = os.environ.get("OPENAI_API_KEY")
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    http_request = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
+    http_request = urllib.request.Request(
+        endpoint, data=body, headers=headers, method="POST"
+    )
     opener = urllib.request.build_opener(_NoRedirect)
     try:
         with opener.open(http_request, timeout=30) as response:
@@ -515,7 +550,9 @@ def _io_evidence(
         "stderr": (stderr, "stderr.log"),
     }
     evidence: dict[str, Any] = {}
-    total_bytes = sum(len(_redact_output(value).encode("utf-8")) for value in (stdout, stderr))
+    total_bytes = sum(
+        len(_redact_output(value).encode("utf-8")) for value in (stdout, stderr)
+    )
     if quota_bytes > 0 and total_bytes > quota_bytes:
         raise BootstrapError(
             "task_log_quota_exceeded",
@@ -596,9 +633,13 @@ def _existing_path_no_symlink(path: Path, *, field: str) -> Path:
         try:
             observed = os.lstat(current)
         except OSError as exc:
-            raise BootstrapError("path_missing", f"{field} does not exist: {path}") from exc
+            raise BootstrapError(
+                "path_missing", f"{field} does not exist: {path}"
+            ) from exc
         if stat.S_ISLNK(observed.st_mode):
-            raise BootstrapError("symlink_path_rejected", f"{field} contains a symlink: {current}")
+            raise BootstrapError(
+                "symlink_path_rejected", f"{field} contains a symlink: {current}"
+            )
     return _normalize_absolute_path(path)
 
 
@@ -968,7 +1009,9 @@ class DockerAdapter:
         self.run([self.executable, "pull", ref], environment=environment)
         record = self.inspect_image(ref)
         if record is None:
-            raise BootstrapError("docker_readback_invalid", "pulled image disappeared before inspect")
+            raise BootstrapError(
+                "docker_readback_invalid", "pulled image disappeared before inspect"
+            )
         return record
 
     @staticmethod
@@ -979,7 +1022,10 @@ class DockerAdapter:
         _required_string(record.get("Id"), "image.Id")
         config = record.get("Config")
         labels = config.get("Labels", {}) if isinstance(config, dict) else {}
-        if not isinstance(labels, dict) or labels.get("org.opencontainers.image.revision") != source_head:
+        if (
+            not isinstance(labels, dict)
+            or labels.get("org.opencontainers.image.revision") != source_head
+        ):
             raise BootstrapError(
                 "image_source_mismatch",
                 "registry image revision does not match staged source HEAD",
@@ -995,11 +1041,17 @@ class DockerAdapter:
             )
         repo_digests = record.get("RepoDigests", [])
         digest = next(
-            (value for value in repo_digests if isinstance(value, str) and "@sha256:" in value),
+            (
+                value
+                for value in repo_digests
+                if isinstance(value, str) and "@sha256:" in value
+            ),
             None,
         )
         if digest is None:
-            raise BootstrapError("image_digest_missing", "registry image has no RepoDigest")
+            raise BootstrapError(
+                "image_digest_missing", "registry image has no RepoDigest"
+            )
         return {
             "image_id": record["Id"],
             "image_repo_digest": digest,
@@ -1109,7 +1161,11 @@ class DockerAdapter:
             check=True,
         )
         return (
-            list(dict.fromkeys(line.strip() for line in result.stdout.splitlines() if line.strip()))
+            list(
+                dict.fromkeys(
+                    line.strip() for line in result.stdout.splitlines() if line.strip()
+                )
+            )
             if result.returncode == 0
             else []
         )
@@ -1231,7 +1287,9 @@ class DockerAdapter:
                 text=True,
             )
         except OSError as exc:
-            raise BootstrapError("runtime_unavailable", "Docker executable is unavailable") from exc
+            raise BootstrapError(
+                "runtime_unavailable", "Docker executable is unavailable"
+            ) from exc
         served: set[Path] = set()
         deadline = time.monotonic() + self.timeout
         while process.poll() is None:
@@ -1244,7 +1302,9 @@ class DockerAdapter:
                 try:
                     request = json.loads(request_path.read_text(encoding="utf-8"))
                     if not isinstance(request, dict):
-                        raise BootstrapError("embedding_request_invalid", "request is not an object")
+                        raise BootstrapError(
+                            "embedding_request_invalid", "request is not an object"
+                        )
                     response = _embedding_response(
                         request,
                         allowed_endpoints=embedding_allowed_endpoints or set(),
@@ -1275,7 +1335,9 @@ class DockerAdapter:
                         timeout=30,
                     )
                     if copied.returncode != 0:
-                        raise BootstrapError("embedding_response_copy_failed", "docker cp failed")
+                        raise BootstrapError(
+                            "embedding_response_copy_failed", "docker cp failed"
+                        )
                     host_response.unlink(missing_ok=True)
                 except (OSError, json.JSONDecodeError, BootstrapError):
                     # The Rust caller times out with its typed request identity;
@@ -1284,7 +1346,9 @@ class DockerAdapter:
             if time.monotonic() >= deadline:
                 process.kill()
                 process.communicate()
-                raise BootstrapError("docker_command_timeout", "container exec timed out")
+                raise BootstrapError(
+                    "docker_command_timeout", "container exec timed out"
+                )
             time.sleep(0.02)
         stdout, stderr = process.communicate()
         return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
@@ -1299,22 +1363,26 @@ class DockerAdapter:
     ) -> None:
         """Export one exact task subtree through Docker's UID normalization."""
         source_path = Path(source)
-        if (
-            not source.startswith("/var/lib/agent-canon/exchange/tasks/")
-            or ".." in source_path.parts
-        ):
+        exchange_tasks_prefix = f"{CONTAINER_RUNTIME_DESTINATION}/exchange/tasks/"
+        if not source.startswith(exchange_tasks_prefix) or ".." in source_path.parts:
             raise BootstrapError(
                 "docker_copy_rejected", f"unsafe container export: {source}"
             )
         if _container_control():
             source_local = Path(source)
             if source_local.is_symlink() or not source_local.exists():
-                raise BootstrapError("docker_copy_rejected", f"container export is missing: {source}")
+                raise BootstrapError(
+                    "docker_copy_rejected", f"container export is missing: {source}"
+                )
             destination_resolved = destination.resolve(strict=False)
             allowed_resolved = allowed_root.resolve()
-            if destination_resolved != allowed_resolved and allowed_resolved not in destination_resolved.parents:
+            if (
+                destination_resolved != allowed_resolved
+                and allowed_resolved not in destination_resolved.parents
+            ):
                 raise BootstrapError(
-                    "docker_copy_rejected", f"export destination escapes runtime: {destination}"
+                    "docker_copy_rejected",
+                    f"export destination escapes runtime: {destination}",
                 )
             if source_local.is_dir():
                 shutil.copytree(source_local, destination, dirs_exist_ok=False)
@@ -1324,9 +1392,13 @@ class DockerAdapter:
             return
         destination_resolved = destination.resolve(strict=False)
         allowed_resolved = allowed_root.resolve()
-        if destination_resolved != allowed_resolved and allowed_resolved not in destination_resolved.parents:
+        if (
+            destination_resolved != allowed_resolved
+            and allowed_resolved not in destination_resolved.parents
+        ):
             raise BootstrapError(
-                "docker_copy_rejected", f"export destination escapes runtime: {destination}"
+                "docker_copy_rejected",
+                f"export destination escapes runtime: {destination}",
             )
         _ensure_directory(destination)
         self.run(
@@ -1434,6 +1506,7 @@ class RuntimePaths:
     def docker_config(self) -> Path:
         """Return the temporary registry authentication directory."""
         return self.runtime_root / "docker-config"
+
 
 class BootstrapRuntime:
     """Persistent, lock-serialized lifecycle with one Docker container."""
@@ -1575,37 +1648,58 @@ class BootstrapRuntime:
             )
         try:
             state = json.loads(
-                _safe_read(legacy / STATE_FILE, field="legacy runtime state").decode("utf-8")
+                _safe_read(legacy / STATE_FILE, field="legacy runtime state").decode(
+                    "utf-8"
+                )
             )
             owner = json.loads(
-                _safe_read(legacy / OWNER_FILE, field="legacy runtime owner").decode("utf-8")
+                _safe_read(legacy / OWNER_FILE, field="legacy runtime owner").decode(
+                    "utf-8"
+                )
             )
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise BootstrapError(
-                "legacy_runtime_invalid", "legacy runtime state or owner is not valid JSON"
+                "legacy_runtime_invalid",
+                "legacy runtime state or owner is not valid JSON",
             ) from exc
         if not isinstance(state, dict) or state.get("schema") not in {
             SCHEMA_STATE,
             "agent-canon.bootstrap-state.v1",
         }:
-            raise BootstrapError("legacy_runtime_invalid", "legacy runtime state schema is unsupported")
-        if not isinstance(owner, dict) or owner.get("schema") != "agent-canon.bootstrap-owner.v1":
-            raise BootstrapError("legacy_runtime_invalid", "legacy runtime owner schema is unsupported")
+            raise BootstrapError(
+                "legacy_runtime_invalid", "legacy runtime state schema is unsupported"
+            )
+        if (
+            not isinstance(owner, dict)
+            or owner.get("schema") != "agent-canon.bootstrap-owner.v1"
+        ):
+            raise BootstrapError(
+                "legacy_runtime_invalid", "legacy runtime owner schema is unsupported"
+            )
         expected_root = legacy.resolve()
         for record, name in ((state, "state"), (owner, "owner")):
             if record.get("control_root_digest") != self.control_digest:
                 raise BootstrapError(
-                    "legacy_runtime_invalid", f"legacy runtime {name} belongs to another control root"
+                    "legacy_runtime_invalid",
+                    f"legacy runtime {name} belongs to another control root",
                 )
             recorded_source = record.get("repository_root")
-            if not recorded_source or Path(str(recorded_source)).resolve() != self.repository_root:
+            if (
+                not recorded_source
+                or Path(str(recorded_source)).resolve() != self.repository_root
+            ):
                 raise BootstrapError(
-                    "legacy_runtime_invalid", f"legacy runtime {name} belongs to another source root"
+                    "legacy_runtime_invalid",
+                    f"legacy runtime {name} belongs to another source root",
                 )
             recorded_runtime = record.get("runtime_root")
-            if not recorded_runtime or Path(str(recorded_runtime)).resolve() != expected_root:
+            if (
+                not recorded_runtime
+                or Path(str(recorded_runtime)).resolve() != expected_root
+            ):
                 raise BootstrapError(
-                    "legacy_runtime_invalid", f"legacy runtime {name} points at a different root"
+                    "legacy_runtime_invalid",
+                    f"legacy runtime {name} points at a different root",
                 )
         return state
 
@@ -1617,7 +1711,12 @@ class BootstrapRuntime:
             path = self.paths.runtime_root / name
             _ensure_directory(path)
             self._enforce_private_directory(path)
-        for path in (self.paths.spool, self.paths.archive, self.paths.cache, self.paths.codex_home):
+        for path in (
+            self.paths.spool,
+            self.paths.archive,
+            self.paths.cache,
+            self.paths.codex_home,
+        ):
             _ensure_directory(path)
             self._enforce_private_directory(path)
         exchange_mode = 0o700 if self._container_control() else 0o1777
@@ -1639,7 +1738,9 @@ class BootstrapRuntime:
                 )
         else:
             try:
-                os.chmod(self.paths.container_runtime, exchange_mode, follow_symlinks=False)
+                os.chmod(
+                    self.paths.container_runtime, exchange_mode, follow_symlinks=False
+                )
             except OSError as exc:
                 raise BootstrapError(
                     "exchange_directory_invalid",
@@ -1662,7 +1763,9 @@ class BootstrapRuntime:
             raise BootstrapError("symlink_path_rejected", "lifecycle lock is a symlink")
         private_log = self.private_log_root
         if private_log.exists() and private_log.is_symlink():
-            raise BootstrapError("symlink_path_rejected", "private log checkout is a symlink")
+            raise BootstrapError(
+                "symlink_path_rejected", "private log checkout is a symlink"
+            )
         if not private_log.exists():
             if self._container_control():
                 raise BootstrapError(
@@ -1672,7 +1775,9 @@ class BootstrapRuntime:
             try:
                 private_log.mkdir(mode=0o700)
             except OSError as exc:
-                raise BootstrapError("private_log_mount_invalid", "cannot create private log mount") from exc
+                raise BootstrapError(
+                    "private_log_mount_invalid", "cannot create private log mount"
+                ) from exc
         if not self._container_control():
             self._enforce_private_directory(private_log)
 
@@ -1849,12 +1954,15 @@ class BootstrapRuntime:
                 )
             self._verify_registry_mount(state, str(container["Id"]))
         if legacy.is_symlink() or not legacy.is_dir():
-            raise BootstrapError("legacy_runtime_invalid", f"legacy runtime changed: {legacy}")
+            raise BootstrapError(
+                "legacy_runtime_invalid", f"legacy runtime changed: {legacy}"
+            )
         self._read_legacy_runtime_state(legacy)
         shutil.rmtree(legacy)
         legacy_parent = legacy.parent
         if (
-            legacy_parent == self.paths.control_parent_root / "workspace" / "agent-canon-runtime"
+            legacy_parent
+            == self.paths.control_parent_root / "workspace" / "agent-canon-runtime"
             and legacy_parent.is_dir()
             and not legacy_parent.is_symlink()
             and not any(legacy_parent.iterdir())
@@ -1883,8 +1991,7 @@ class BootstrapRuntime:
         if self._container_control() and container_image:
             return container_image
         return (
-            f"agent-canon-tools:{self.control_digest[:16]}-"
-            f"{self.manifest_digest[:16]}"
+            f"agent-canon-tools:{self.control_digest[:16]}-{self.manifest_digest[:16]}"
         )
 
     def _labels(self) -> dict[str, str]:
@@ -1894,7 +2001,11 @@ class BootstrapRuntime:
         }
 
     def _resource_records(self) -> dict[str, Any]:
-        name = os.environ.get("AGENT_CANON_CONTAINER_NAME") if self._container_control() else None
+        name = (
+            os.environ.get("AGENT_CANON_CONTAINER_NAME")
+            if self._container_control()
+            else None
+        )
         if not name:
             name = str(self.manifest["container"]["name_template"]).replace(
                 "<effective-uid>", self.control_digest[:16]
@@ -1967,10 +2078,16 @@ class BootstrapRuntime:
             result["receipt_path"] = str(self._write_receipt(result))
         return result
 
-    def _image(self, state: dict[str, Any], *, force_build: bool = False) -> dict[str, Any]:
+    def _image(
+        self, state: dict[str, Any], *, force_build: bool = False
+    ) -> dict[str, Any]:
         image = self.docker.ensure_image(
             repository_root=self.repository_root,
-            dockerfile=self.repository_root / "bootstrap" / "container" / "image" / "Dockerfile",
+            dockerfile=self.repository_root
+            / "bootstrap"
+            / "container"
+            / "image"
+            / "Dockerfile",
             tag=self._image_tag(),
             labels=self._labels(),
             force_build=force_build,
@@ -2002,7 +2119,9 @@ class BootstrapRuntime:
     ) -> dict[str, Any]:
         """Adopt one already-pulled immutable image without invoking Docker build."""
         if state.get("state") == "uninstalled":
-            raise BootstrapError("not_installed", "install must complete before registry image adoption")
+            raise BootstrapError(
+                "not_installed", "install must complete before registry image adoption"
+            )
         stale = self._prune_stale_targets(state)
         if stale:
             self._write_mounts(state)
@@ -2056,9 +2175,13 @@ class BootstrapRuntime:
                         "image_ref": image_ref,
                         "image_id": image_id,
                         "source_head": source_head,
-                        "image_repo_digest": state["resources"]["image"].get("repo_digest"),
+                        "image_repo_digest": state["resources"]["image"].get(
+                            "repo_digest"
+                        ),
                         "image_os": state["resources"]["image"].get("os"),
-                        "image_architecture": state["resources"]["image"].get("architecture"),
+                        "image_architecture": state["resources"]["image"].get(
+                            "architecture"
+                        ),
                     },
                     state=state,
                 )
@@ -2090,14 +2213,22 @@ class BootstrapRuntime:
                     "runtime_unavailable" if recovery_error else exc.code,
                     before=before,
                     after=state["state"],
-                    details={"recovery_error": recovery_error.code if recovery_error else None},
+                    details={
+                        "recovery_error": recovery_error.code
+                        if recovery_error
+                        else None
+                    },
                     state=state,
                 )
             )
             raise BootstrapError(
                 "runtime_unavailable" if recovery_error else exc.code,
                 "registry image adoption failed" if recovery_error else exc.detail,
-                evidence={**exc.evidence, "receipt_path": receipt["receipt_path"], "recovered": recovery_error is None},
+                evidence={
+                    **exc.evidence,
+                    "receipt_path": receipt["receipt_path"],
+                    "recovered": recovery_error is None,
+                },
             ) from exc
 
     def update_registry_image(
@@ -2109,7 +2240,9 @@ class BootstrapRuntime:
         """Adopt an already-pulled registry image; this route never builds locally."""
         with self.locked():
             state = self._read_state()
-            result = self._adopt_registry_image_locked(state, image_ref, image_record, source_head)
+            result = self._adopt_registry_image_locked(
+                state, image_ref, image_record, source_head
+            )
         self.codex_prepare()
         return result
 
@@ -2125,9 +2258,7 @@ class BootstrapRuntime:
                 "mode": "explicit-target-write",
             },
             {
-                "source": str(
-                    self.private_log_root
-                ),
+                "source": str(self.private_log_root),
                 "destination": PRIVATE_LOG_DESTINATION,
                 "mode": "read-only",
             },
@@ -2169,7 +2300,8 @@ class BootstrapRuntime:
         resource = state.get("resources", {}).get(kind, {})
         if not isinstance(resource, dict) or resource.get("owned") is not True:
             raise BootstrapError(
-                "docker_readback_invalid", f"{kind} is not recorded as an owned resource"
+                "docker_readback_invalid",
+                f"{kind} is not recorded as an owned resource",
             )
         expected_id = resource.get("id")
         if not expected_id or record.get("Id") != expected_id:
@@ -2323,7 +2455,9 @@ class BootstrapRuntime:
             if self._container_control():
                 host_runtime = os.environ.get("AGENT_CANON_HOST_STATE_ROOT")
                 host_private_log = os.environ.get("AGENT_CANON_HOST_PRIVATE_LOG")
-                if host_runtime and normalized_source == str(Path(host_runtime).resolve()):
+                if host_runtime and normalized_source == str(
+                    Path(host_runtime).resolve()
+                ):
                     normalized_source = str(Path("/var/lib/agent-canon/runtime"))
                 elif host_runtime and normalized_source.startswith(
                     str(Path(host_runtime).resolve()) + "/"
@@ -2332,7 +2466,9 @@ class BootstrapRuntime:
                         str(Path(host_runtime).resolve()) + "/"
                     )
                     normalized_source = f"/var/lib/agent-canon/runtime/{relative}"
-                elif host_private_log and normalized_source == str(Path(host_private_log).resolve()):
+                elif host_private_log and normalized_source == str(
+                    Path(host_private_log).resolve()
+                ):
                     normalized_source = str(Path("/var/lib/agent-canon/private-log"))
             observed_mounts.add(
                 (normalized_source, str(mount.get("Destination")), mode)
@@ -2605,7 +2741,8 @@ class BootstrapRuntime:
                     image_record = self.docker.inspect_image(image_ref)
                     if image_record is None:
                         raise BootstrapError(
-                            "image_missing", f"registry image is not pulled: {image_ref}"
+                            "image_missing",
+                            f"registry image is not pulled: {image_ref}",
                         )
                     source_head = _source_snapshot(self.repository_root)["head"]
                     self.docker.validate_registry_image(
@@ -2723,7 +2860,9 @@ class BootstrapRuntime:
         except BootstrapError as exc:
             candidate_image = state.get("resources", {}).get("image", {})
             old_image = old_state.get("resources", {}).get("image", {})
-            candidate_image_id = candidate_image.get("id") if isinstance(candidate_image, dict) else None
+            candidate_image_id = (
+                candidate_image.get("id") if isinstance(candidate_image, dict) else None
+            )
             old_image_id = old_image.get("id") if isinstance(old_image, dict) else None
             if candidate_image_id and candidate_image_id != old_image_id:
                 inspected_image = self.docker.inspect_image(str(candidate_image_id))
@@ -2751,7 +2890,9 @@ class BootstrapRuntime:
                     before=before,
                     after=state["state"],
                     details={
-                        "recovery_error": recovery_error.code if recovery_error else None,
+                        "recovery_error": recovery_error.code
+                        if recovery_error
+                        else None,
                     },
                     state=state,
                 )
@@ -2760,12 +2901,20 @@ class BootstrapRuntime:
                 raise BootstrapError(
                     "runtime_unavailable",
                     "update failed and old runtime recovery failed",
-                    evidence={"cause": exc.code, "recovery": recovery_error.code, "receipt_path": receipt["receipt_path"]},
+                    evidence={
+                        "cause": exc.code,
+                        "recovery": recovery_error.code,
+                        "receipt_path": receipt["receipt_path"],
+                    },
                 ) from exc
             raise BootstrapError(
                 exc.code,
                 exc.detail,
-                evidence={**exc.evidence, "receipt_path": receipt["receipt_path"], "recovered": True},
+                evidence={
+                    **exc.evidence,
+                    "receipt_path": receipt["receipt_path"],
+                    "recovered": True,
+                },
             ) from exc
 
     def update(self, image_ref: str | None = None) -> dict[str, Any]:
@@ -2775,7 +2924,9 @@ class BootstrapRuntime:
             state = self._read_state()
             fresh_reset = self._legacy_runtime_pending_cleanup is not None
             if state.get("state") == "uninstalled" and not fresh_reset:
-                raise BootstrapError("not_installed", "install must complete before update")
+                raise BootstrapError(
+                    "not_installed", "install must complete before update"
+                )
             if state.get("state") == "uninstalled":
                 stale = self._prune_stale_targets(state)
                 if stale:
@@ -2816,7 +2967,9 @@ class BootstrapRuntime:
             if image_ref:
                 image_record = self.docker.inspect_image(image_ref)
                 if image_record is None:
-                    raise BootstrapError("image_missing", f"registry image is not pulled: {image_ref}")
+                    raise BootstrapError(
+                        "image_missing", f"registry image is not pulled: {image_ref}"
+                    )
                 source_head = _source_snapshot(self.repository_root)["head"]
                 self.docker.validate_registry_image(
                     image_record, source_head=source_head, image_ref=image_ref
@@ -3140,7 +3293,7 @@ class BootstrapRuntime:
                     "target_host_root_invalid",
                     "host target root must be an absolute path",
                 )
-            if any(character in host_root for character in "\x00\n\r\t\\\""):
+            if any(character in host_root for character in '\x00\n\r\t\\"'):
                 raise BootstrapError(
                     "target_host_root_invalid",
                     "host target root contains a forbidden character",
@@ -3184,21 +3337,38 @@ class BootstrapRuntime:
                     "explicit-target-write requires a typed capability",
                 )
             if set(mutation_capability) != {"allowed_paths", "purpose", "authority"}:
-                raise BootstrapError("mutation_capability_invalid", "capability fields are invalid")
+                raise BootstrapError(
+                    "mutation_capability_invalid", "capability fields are invalid"
+                )
             allowed = mutation_capability.get("allowed_paths")
             if not isinstance(allowed, list) or not allowed:
-                raise BootstrapError("mutation_capability_invalid", "allowed_paths is required")
+                raise BootstrapError(
+                    "mutation_capability_invalid", "allowed_paths is required"
+                )
             normalized: list[str] = []
             for value in allowed:
                 if not isinstance(value, str):
-                    raise BootstrapError("mutation_capability_invalid", "allowed path is not text")
+                    raise BootstrapError(
+                        "mutation_capability_invalid", "allowed path is not text"
+                    )
                 relative = Path(value)
-                if relative.is_absolute() or ".." in relative.parts or not relative.parts:
-                    raise BootstrapError("mutation_capability_invalid", f"unsafe allowed path: {value}")
-                _existing_path_no_symlink(canonical / relative, field="mutation allowed path")
+                if (
+                    relative.is_absolute()
+                    or ".." in relative.parts
+                    or not relative.parts
+                ):
+                    raise BootstrapError(
+                        "mutation_capability_invalid", f"unsafe allowed path: {value}"
+                    )
+                _existing_path_no_symlink(
+                    canonical / relative, field="mutation allowed path"
+                )
                 normalized.append(relative.as_posix())
             for field in ("purpose", "authority"):
-                if not isinstance(mutation_capability.get(field), str) or not mutation_capability[field].strip():
+                if (
+                    not isinstance(mutation_capability.get(field), str)
+                    or not mutation_capability[field].strip()
+                ):
                     raise BootstrapError("mutation_capability_invalid", field)
             record.update(
                 {
@@ -3208,7 +3378,10 @@ class BootstrapRuntime:
                 }
             )
         elif mutation_capability is not None:
-            raise BootstrapError("mutation_capability_unexpected", "read-only target cannot accept mutation capability")
+            raise BootstrapError(
+                "mutation_capability_unexpected",
+                "read-only target cannot accept mutation capability",
+            )
         return record
 
     def _prune_stale_targets(self, state: dict[str, Any]) -> list[str]:
@@ -3227,7 +3400,11 @@ class BootstrapRuntime:
         for digest, record in targets.items():
             if not isinstance(digest, str) or not isinstance(record, Mapping):
                 continue
-            source_value = record.get("root") if self._container_control() else record.get("host_root", record.get("root"))
+            source_value = (
+                record.get("root")
+                if self._container_control()
+                else record.get("host_root", record.get("root"))
+            )
             if not isinstance(source_value, str) or not source_value:
                 continue
             source = Path(source_value)
@@ -3299,14 +3476,21 @@ class BootstrapRuntime:
                 mode = record.get("mode")
                 if not isinstance(source, str) or not isinstance(mode, str):
                     continue
-                if any(char in source or char in str(digest) for char in ("\t", "\n", "\r")):
-                    raise BootstrapError("mount_manifest_invalid", "target mount contains a control character")
+                if any(
+                    char in source or char in str(digest) for char in ("\t", "\n", "\r")
+                ):
+                    raise BootstrapError(
+                        "mount_manifest_invalid",
+                        "target mount contains a control character",
+                    )
                 if mode != "read-only":
                     raise BootstrapError(
                         "mount_manifest_invalid",
                         "only read-only targets may be projected into the resident mount manifest",
                     )
-                lines.append(f"target\t{digest}\t{source}\t/targets/{digest}\tread-only")
+                lines.append(
+                    f"target\t{digest}\t{source}\t/targets/{digest}\tread-only"
+                )
         _atomic_bytes(
             path,
             ("\n".join(lines) + ("\n" if lines else "")).encode("utf-8"),
@@ -3361,7 +3545,10 @@ class BootstrapRuntime:
                                 "target_unchanged",
                                 before=before,
                                 after=before,
-                                details={"target": dict(existing_target), "changed": False},
+                                details={
+                                    "target": dict(existing_target),
+                                    "changed": False,
+                                },
                                 state=state,
                             )
                         )
@@ -3605,7 +3792,9 @@ class BootstrapRuntime:
     def _managed_links(self) -> list[dict[str, str]]:
         projection_root: Path | None = None
         if self._container_control():
-            raw_projection_root = os.environ.get("AGENT_CANON_HOST_INSTALL_ROOT", "").strip()
+            raw_projection_root = os.environ.get(
+                "AGENT_CANON_HOST_INSTALL_ROOT", ""
+            ).strip()
             if raw_projection_root:
                 if not raw_projection_root.startswith("/") or any(
                     character in raw_projection_root for character in "\x00\t\n\r"
@@ -3631,12 +3820,14 @@ class BootstrapRuntime:
         skills = self.repository_root / ".codex" / "personal" / "skills"
         if not skills.is_dir() or skills.is_symlink():
             raise BootstrapError("skill_source_missing", str(skills))
-        entries: list[dict[str, str]] = [{
-            "surface": "skills",
-            "source": str(projection_source(skills)),
-            "validation_source": str(skills),
-            "relative": "agent-canon",
-        }]
+        entries: list[dict[str, str]] = [
+            {
+                "surface": "skills",
+                "source": str(projection_source(skills)),
+                "validation_source": str(skills),
+                "relative": "agent-canon",
+            }
+        ]
         for surface, source in (
             ("agents", self.repository_root / ".codex" / "agents"),
             ("hooks", self.repository_root / ".codex" / "hooks"),
@@ -3698,22 +3889,34 @@ class BootstrapRuntime:
                 """Return the path Codex actually reads for one surface."""
                 if entry.get("surface") == "config":
                     return self.paths.codex_home / str(entry["relative"])
-                return self.paths.codex_home / str(entry["surface"]) / str(entry["relative"])
+                return (
+                    self.paths.codex_home
+                    / str(entry["surface"])
+                    / str(entry["relative"])
+                )
 
-            desired_targets = {
-                str(link_target(entry))
-                for entry in desired
-            }
+            desired_targets = {str(link_target(entry)) for entry in desired}
             previous_entries: list[Mapping[str, Any]] = []
             previous_manifest = self.paths.codex_home / "manifest.json"
             if previous_manifest.is_file() and not previous_manifest.is_symlink():
                 try:
-                    previous_payload = json.loads(previous_manifest.read_text(encoding="utf-8"))
+                    previous_payload = json.loads(
+                        previous_manifest.read_text(encoding="utf-8")
+                    )
                 except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-                    raise BootstrapError("codex_manifest_invalid", "runtime-local Codex manifest is invalid") from exc
-                raw_previous = previous_payload.get("links", []) if isinstance(previous_payload, dict) else []
+                    raise BootstrapError(
+                        "codex_manifest_invalid",
+                        "runtime-local Codex manifest is invalid",
+                    ) from exc
+                raw_previous = (
+                    previous_payload.get("links", [])
+                    if isinstance(previous_payload, dict)
+                    else []
+                )
                 if isinstance(raw_previous, list):
-                    previous_entries = [entry for entry in raw_previous if isinstance(entry, dict)]
+                    previous_entries = [
+                        entry for entry in raw_previous if isinstance(entry, dict)
+                    ]
             previous_sources = {
                 str(
                     Path(str(entry["target"]))
@@ -3777,7 +3980,9 @@ class BootstrapRuntime:
                 {
                     "schema": SCHEMA_SKILLS,
                     "source_root": str(
-                        os.environ.get("AGENT_CANON_HOST_INSTALL_ROOT", self.repository_root)
+                        os.environ.get(
+                            "AGENT_CANON_HOST_INSTALL_ROOT", self.repository_root
+                        )
                     ),
                     "manifest_digest": self.manifest_digest,
                     "stale_links_removed": stale_links,
@@ -3817,9 +4022,7 @@ class BootstrapRuntime:
         executable = os.environ.get("AGENT_CANON_CODEX", "codex")
         env = os.environ.copy()
         env["CODEX_HOME"] = str(self.paths.codex_home)
-        env["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(
-            self.paths.control_parent_root
-        )
+        env["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(self.paths.control_parent_root)
         env["AGENT_CANON_RUNTIME_ROOT"] = str(self.paths.runtime_root)
         env[CODEX_SESSION_ROOT_ENV] = str(session_root)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -3899,6 +4102,8 @@ class BootstrapRuntime:
                     "AGENT_CANON_HOOK_ARCHIVE_DIR": PRIVATE_LOG_DESTINATION,
                     "AGENT_CANON_LOG_ROOT": PRIVATE_LOG_DESTINATION,
                     "AGENT_CANON_RUNTIME_ROOT": CONTAINER_RUNTIME_DESTINATION,
+                    "TMPDIR": f"{CONTAINER_RUNTIME_DESTINATION}/tasks/{task_id}/tmp",
+                    "RUFF_CACHE_DIR": RUFF_CACHE_DESTINATION,
                 }
                 environment.update(extra_environment or {})
                 result = self.docker.exec_container(
@@ -3937,7 +4142,10 @@ class BootstrapRuntime:
                     outside = sorted(
                         path
                         for path in newly_changed
-                        if not any(path == item or path.startswith(item + "/") for item in allowed)
+                        if not any(
+                            path == item or path.startswith(item + "/")
+                            for item in allowed
+                        )
                     )
                     mutation_after = _source_snapshot(root)
                     details["mutation"] = {
@@ -4044,7 +4252,9 @@ class BootstrapRuntime:
                 specs, _schema = load_specs(self.repository_root)
                 spec = specs.get(catalog_id)
             except (OSError, ValueError, TypeError, KeyError) as exc:
-                raise BootstrapError("tool_catalog_invalid", "cannot resolve tool output capability") from exc
+                raise BootstrapError(
+                    "tool_catalog_invalid", "cannot resolve tool output capability"
+                ) from exc
             if spec is not None and spec.output_root == "external-runtime":
                 environment = {
                     "AGENT_CANON_OUTPUT_ROOT": f"{CONTAINER_RUNTIME_DESTINATION}/tool-output"
@@ -4064,19 +4274,21 @@ class BootstrapRuntime:
             extra_environment=environment,
         )
 
-    def template_export(
-        self, root: Path, profile: str, output: str
-    ) -> dict[str, Any]:
+    def template_export(self, root: Path, profile: str, output: str) -> dict[str, Any]:
         """Export a template profile through the resident tool-container catalog."""
         _slug(profile)
         relative = Path(output)
         if relative.is_absolute() or ".." in relative.parts or not relative.parts:
-            raise BootstrapError("template_output_invalid", "output must be runtime-relative")
+            raise BootstrapError(
+                "template_output_invalid", "output must be runtime-relative"
+            )
         target = self._target_record(root, "read-only")
         host_output = self.paths.runtime_root / "template-exports" / relative
         if host_output.exists() or host_output.is_symlink():
             raise BootstrapError("template_output_exists", str(host_output))
-        container_output = f"{CONTAINER_RUNTIME_DESTINATION}/template-exports/{relative.as_posix()}"
+        container_output = (
+            f"{CONTAINER_RUNTIME_DESTINATION}/template-exports/{relative.as_posix()}"
+        )
         return self.tool_run(
             "template-bundle",
             [
@@ -4101,8 +4313,12 @@ class BootstrapRuntime:
         spool = self.paths.spool / run_id
         if spool.exists():
             if spool.is_symlink():
-                raise BootstrapError("symlink_path_rejected", f"eval spool is a symlink: {spool}")
-            raise BootstrapError("eval_spool_exists", f"eval spool already exists: {run_id}")
+                raise BootstrapError(
+                    "symlink_path_rejected", f"eval spool is a symlink: {spool}"
+                )
+            raise BootstrapError(
+                "eval_spool_exists", f"eval spool already exists: {run_id}"
+            )
         task_id = f"eval-{run_id}"
         exchange_nonce = secrets.token_hex(16)
         exchange_tasks = self.paths.container_runtime / "tasks"
@@ -4150,9 +4366,13 @@ class BootstrapRuntime:
             target = self._target_record(source, "read-only")
             registered = state.get("targets", {}).get(target["digest"])
             if not isinstance(registered, dict):
-                raise BootstrapError("target_not_registered", "eval root is not registered")
+                raise BootstrapError(
+                    "target_not_registered", "eval root is not registered"
+                )
             if registered.get("mode") != "read-only":
-                raise BootstrapError("eval_target_not_read_only", "eval root is not mounted read-only")
+                raise BootstrapError(
+                    "eval_target_not_read_only", "eval root is not mounted read-only"
+                )
             self._admit_task_locked(state, task_id, target_root=source)
             task_path = self.paths.tasks / task_id
             try:
@@ -4178,7 +4398,7 @@ class BootstrapRuntime:
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
                 canon_root = TOOL_SOURCE_DESTINATION
-                container_runtime = "/var/lib/agent-canon/exchange"
+                container_runtime = f"{CONTAINER_RUNTIME_DESTINATION}/exchange"
                 exchange_runtime = (
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )
@@ -4195,8 +4415,6 @@ class BootstrapRuntime:
                     run_id,
                     "--log-dir",
                     f"{exchange_runtime}/tasks/{run_id}/logs",
-                    "--prompt-eval-manifest",
-                    f"{canon_root}/eval/definitions/skill_workflow_prompt_eval.toml",
                 ]
                 result = self.docker.exec_container(
                     str(container["id"]),
@@ -4230,7 +4448,9 @@ class BootstrapRuntime:
                 if not matrix:
                     collection["status"] = "failed"
                     collection["failure"] = "eval_producer_protocol"
-                elif result.returncode != 0 or any(item["status"] != "pass" for item in matrix):
+                elif result.returncode != 0 or any(
+                    item["status"] != "pass" for item in matrix
+                ):
                     collection["status"] = "failed"
                     collection["failure"] = "eval_producer_failed"
                 else:
@@ -4262,9 +4482,7 @@ class BootstrapRuntime:
                     "producer_logs": _validate_exported_tree(log_export),
                 }
                 exported_bytes = _dir_bytes(eval_export) + _dir_bytes(log_export)
-                state_quota = int(
-                    self.manifest["container"]["task_state_quota_bytes"]
-                )
+                state_quota = int(self.manifest["container"]["task_state_quota_bytes"])
                 if state_quota > 0 and exported_bytes > state_quota:
                     shutil.rmtree(eval_export, ignore_errors=True)
                     shutil.rmtree(log_export, ignore_errors=True)
@@ -4294,7 +4512,9 @@ class BootstrapRuntime:
                     "producer_matrix": matrix,
                     "io": io,
                 }
-                task_outcome = "completed" if collection["status"] == "collected" else "failed"
+                task_outcome = (
+                    "completed" if collection["status"] == "collected" else "failed"
+                )
                 if task_outcome != "completed":
                     raise BootstrapError(
                         str(collection.get("failure", "eval_failed")),
@@ -4303,13 +4523,17 @@ class BootstrapRuntime:
                             "spool": str(spool),
                             "collection": str(spool / "collection.json"),
                             "producer_matrix": matrix,
-                            "source_tree_unchanged": collection["source_tree_unchanged"],
+                            "source_tree_unchanged": collection[
+                                "source_tree_unchanged"
+                            ],
                             "exit": result.returncode,
                         },
                     )
                 if exchange.exists() and not exchange.is_symlink():
                     shutil.rmtree(exchange)
-                released = self._release_task_locked(state, task_id, outcome=task_outcome)
+                released = self._release_task_locked(
+                    state, task_id, outcome=task_outcome
+                )
                 return self._result(
                     self._receipt(
                         "eval_collect",
@@ -4331,7 +4555,9 @@ class BootstrapRuntime:
                 # source snapshot is still written when the runner returned.
                 if not (spool / "collection.json").exists():
                     collection["status"] = "failed"
-                    collection["failure"] = collection.get("failure", "eval_runtime_failed")
+                    collection["failure"] = collection.get(
+                        "failure", "eval_runtime_failed"
+                    )
                     collection["source_tree_unchanged"] = False
                     _atomic_json(spool / "collection.json", collection)
                 raise
@@ -4498,7 +4724,8 @@ class BootstrapRuntime:
                     idle_seconds
                     and idle_age >= idle_seconds
                     and not state.get("active_task_count", 0)
-                    and state.get("resources", {}).get("container", {}).get("state") == "running"
+                    and state.get("resources", {}).get("container", {}).get("state")
+                    == "running"
                 )
             current_image = state.get("resources", {}).get("image", {}).get("id")
             owned_images = (
@@ -4556,9 +4783,14 @@ class BootstrapRuntime:
                     details["deleted"].append("idle-container")
                 if cache_high_water and not state.get("active_task_count", 0):
                     cache_root = self.paths.cache
-                    for child in sorted(cache_root.iterdir()) if cache_root.is_dir() else ():
+                    for child in (
+                        sorted(cache_root.iterdir()) if cache_root.is_dir() else ()
+                    ):
                         if child.is_symlink():
-                            raise BootstrapError("symlink_path_rejected", f"cache path is a symlink: {child}")
+                            raise BootstrapError(
+                                "symlink_path_rejected",
+                                f"cache path is a symlink: {child}",
+                            )
                         if child.is_dir():
                             shutil.rmtree(child)
                         elif child.is_file():
@@ -4778,14 +5010,18 @@ def _container_materialize_rollback_plan(
     if not isinstance(rollback_id, str) or not isinstance(generations, Mapping):
         if plan.exists() or plan.is_symlink():
             if plan.is_symlink():
-                raise BootstrapError("rollback_plan_invalid", "rollback plan is a symlink")
+                raise BootstrapError(
+                    "rollback_plan_invalid", "rollback plan is a symlink"
+                )
             plan.unlink()
         return
     previous = generations.get(rollback_id)
     resources = state.get("resources", {})
     image = resources.get("image", {}) if isinstance(resources, Mapping) else {}
     if not isinstance(previous, Mapping):
-        raise BootstrapError("rollback_plan_invalid", "rollback generation is unavailable")
+        raise BootstrapError(
+            "rollback_plan_invalid", "rollback generation is unavailable"
+        )
     image_id = previous.get("image_id") or image.get("id")
     image_ref = previous.get("image_ref") or image.get("tag") or image_id
     if (
@@ -4795,20 +5031,30 @@ def _container_materialize_rollback_plan(
         or not image_ref
         or any(character in image_ref for character in "\x00\t\n\r")
     ):
-        raise BootstrapError("rollback_plan_invalid", "rollback image identity is incomplete")
+        raise BootstrapError(
+            "rollback_plan_invalid", "rollback image identity is incomplete"
+        )
     targets = previous.get("targets", state.get("targets", {}))
     if not isinstance(targets, Mapping):
-        raise BootstrapError("rollback_plan_invalid", "rollback target snapshot is invalid")
+        raise BootstrapError(
+            "rollback_plan_invalid", "rollback target snapshot is invalid"
+        )
     lines = [
         "schema\tagent-canon.rollback-plan.v1",
         f"image-id\t{image_id}",
         f"image-ref\t{image_ref}",
     ]
     for digest, record in sorted(targets.items()):
-        if not isinstance(digest, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", digest):
-            raise BootstrapError("rollback_plan_invalid", "rollback target digest is invalid")
+        if not isinstance(digest, str) or not re.fullmatch(
+            r"[A-Za-z0-9_.-]{1,128}", digest
+        ):
+            raise BootstrapError(
+                "rollback_plan_invalid", "rollback target digest is invalid"
+            )
         if not isinstance(record, Mapping):
-            raise BootstrapError("rollback_plan_invalid", "rollback target record is invalid")
+            raise BootstrapError(
+                "rollback_plan_invalid", "rollback target record is invalid"
+            )
         source = record.get("host_root")
         destination = record.get("root", f"/targets/{digest}")
         mode = record.get("mode")
@@ -4819,7 +5065,9 @@ def _container_materialize_rollback_plan(
             or destination != f"/targets/{digest}"
             or mode != "read-only"
         ):
-            raise BootstrapError("rollback_plan_invalid", "rollback target mount is invalid")
+            raise BootstrapError(
+                "rollback_plan_invalid", "rollback target mount is invalid"
+            )
         lines.append(f"mount\tmount\t{source}\t{destination}\ttrue")
     _atomic_bytes(
         plan,
@@ -4930,7 +5178,10 @@ def _container_source_identity(
             stable_source_repository_id,
         )
     except ImportError:  # pragma: no cover - direct container script execution
-        from tools.runtime.archive.log_repository_identity import normalize_remote, stable_source_repository_id
+        from tools.runtime.archive.log_repository_identity import (
+            normalize_remote,
+            stable_source_repository_id,
+        )
 
     try:
         normalized = normalize_remote(remote)
@@ -4984,7 +5235,11 @@ def _container_source_identity(
 def _request_string(request: Mapping[str, Any], key: str) -> str:
     """Read one non-empty request string without accepting control bytes."""
     value = request.get(key)
-    if not isinstance(value, str) or not value or any(char in value for char in "\x00\n\r"):
+    if (
+        not isinstance(value, str)
+        or not value
+        or any(char in value for char in "\x00\n\r")
+    ):
         raise BootstrapError("invalid_exec_request", f"request field is invalid: {key}")
     return value
 
@@ -4993,21 +5248,33 @@ def _container_target_for_request(
     runtime: BootstrapRuntime, request: Mapping[str, Any]
 ) -> tuple[Path, Path, Path, Path]:
     """Resolve a host request to its registered container target and roots."""
-    requested_target = Path(_request_string(request, "target_root")).resolve(strict=False)
+    requested_target = Path(_request_string(request, "target_root")).resolve(
+        strict=False
+    )
     source_root = Path(_request_string(request, "source_root")).resolve(strict=False)
     environment = request.get("environment")
     if not isinstance(environment, Mapping):
-        raise BootstrapError("invalid_exec_request", "request environment must be a mapping")
-    host_runtime = Path(_request_string(environment, "AGENT_CANON_RUNTIME_ROOT")).resolve(strict=False)
-    host_control = Path(_request_string(environment, "AGENT_CANON_CONTROL_PARENT_ROOT")).resolve(strict=False)
+        raise BootstrapError(
+            "invalid_exec_request", "request environment must be a mapping"
+        )
+    host_runtime = Path(
+        _request_string(environment, "AGENT_CANON_RUNTIME_ROOT")
+    ).resolve(strict=False)
+    host_control = Path(
+        _request_string(environment, "AGENT_CANON_CONTROL_PARENT_ROOT")
+    ).resolve(strict=False)
     digest = os.environ.get("AGENT_CANON_TARGET_DIGEST", "")
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", digest):
-        raise BootstrapError("invalid_exec_request", "registered target digest is missing")
+        raise BootstrapError(
+            "invalid_exec_request", "registered target digest is missing"
+        )
     state = runtime._read_state()
     targets = state.get("targets", {})
     target = targets.get(digest) if isinstance(targets, Mapping) else None
     if not isinstance(target, dict):
-        raise BootstrapError("target_not_registered", "request target is not registered")
+        raise BootstrapError(
+            "target_not_registered", "request target is not registered"
+        )
     host_root_value = target.get("host_root")
     container_root = target.get("root")
     if (
@@ -5017,7 +5284,9 @@ def _container_target_for_request(
         or container_root != f"/targets/{digest}"
         or requested_target != Path(host_root_value).resolve(strict=False)
     ):
-        raise BootstrapError("invalid_exec_request", "request target does not match its registered mount")
+        raise BootstrapError(
+            "invalid_exec_request", "request target does not match its registered mount"
+        )
     return source_root, host_runtime, host_control, Path(container_root)
 
 
@@ -5033,7 +5302,9 @@ def _map_request_path(
     """Map a validated host path into one of the fixed container mounts."""
     candidate = Path(value)
     if not candidate.is_absolute():
-        raise BootstrapError("invalid_exec_request", "path-valued environment must be absolute")
+        raise BootstrapError(
+            "invalid_exec_request", "path-valued environment must be absolute"
+        )
     resolved = candidate.resolve(strict=False)
     if resolved == source_root:
         return TOOL_SOURCE_DESTINATION
@@ -5063,30 +5334,63 @@ def _container_request_environment(
     """Validate and map the structured tool environment for Docker exec."""
     raw = request.get("environment")
     if not isinstance(raw, Mapping) or not all(isinstance(key, str) for key in raw):
-        raise BootstrapError("invalid_exec_request", "request environment must be a string-keyed mapping")
+        raise BootstrapError(
+            "invalid_exec_request", "request environment must be a string-keyed mapping"
+        )
     host_target_value = _request_string(request, "target_root")
     host_target = Path(host_target_value).resolve(strict=False)
     result: dict[str, str] = {}
     for key, value in raw.items():
-        if key not in TOOL_ENVIRONMENT_KEYS or not isinstance(value, str) or any(
-            char in value for char in "\x00\n\r"
+        if (
+            key not in TOOL_ENVIRONMENT_KEYS
+            or not isinstance(value, str)
+            or any(char in value for char in "\x00\n\r")
         ):
-            raise BootstrapError("invalid_exec_request", f"request environment key is not allowlisted: {key}")
+            raise BootstrapError(
+                "invalid_exec_request",
+                f"request environment key is not allowlisted: {key}",
+            )
         if key in TOOL_PATH_ENVIRONMENT_KEYS:
-            if key in {"AGENT_CANON_SOURCE_ROOT", "AGENT_CANON_ROOT"} and Path(value).resolve(strict=False) != source_root:
-                raise BootstrapError("invalid_exec_request", f"source path does not match request: {key}")
-            if key == "AGENT_CANON_RUNTIME_ROOT" and Path(value).resolve(strict=False) != host_runtime:
-                raise BootstrapError("invalid_exec_request", "runtime path does not match request")
-            if key == "AGENT_CANON_CONTROL_PARENT_ROOT" and Path(value).resolve(strict=False) != host_control:
-                raise BootstrapError("invalid_exec_request", "control path does not match request")
-            if key in {"AGENT_CANON_TARGET_ROOT", "AGENT_CANON_TASK_ROOT"} and Path(value).resolve(strict=False) != host_target:
-                raise BootstrapError("invalid_exec_request", f"target path does not match request: {key}")
+            if (
+                key in {"AGENT_CANON_SOURCE_ROOT", "AGENT_CANON_ROOT"}
+                and Path(value).resolve(strict=False) != source_root
+            ):
+                raise BootstrapError(
+                    "invalid_exec_request", f"source path does not match request: {key}"
+                )
+            if (
+                key == "AGENT_CANON_RUNTIME_ROOT"
+                and Path(value).resolve(strict=False) != host_runtime
+            ):
+                raise BootstrapError(
+                    "invalid_exec_request", "runtime path does not match request"
+                )
+            if (
+                key == "AGENT_CANON_CONTROL_PARENT_ROOT"
+                and Path(value).resolve(strict=False) != host_control
+            ):
+                raise BootstrapError(
+                    "invalid_exec_request", "control path does not match request"
+                )
+            if (
+                key in {"AGENT_CANON_TARGET_ROOT", "AGENT_CANON_TASK_ROOT"}
+                and Path(value).resolve(strict=False) != host_target
+            ):
+                raise BootstrapError(
+                    "invalid_exec_request", f"target path does not match request: {key}"
+                )
             if key == "AGENT_CANON_MOUNT_REGISTRY":
                 result[key] = REGISTRY_DESTINATION
                 continue
             if key in {"AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_LOG_ROOT"}:
-                if host_private_log is None or Path(value).resolve(strict=False) != host_private_log:
-                    raise BootstrapError("invalid_exec_request", f"archive path does not match private log mount: {key}")
+                if (
+                    host_private_log is None
+                    or Path(value).resolve(strict=False) != host_private_log
+                ):
+                    raise BootstrapError(
+                        "invalid_exec_request",
+                        f"archive path does not match private log mount: {key}",
+                    )
                 result[key] = PRIVATE_LOG_DESTINATION
                 continue
             result[key] = _map_request_path(
@@ -5103,11 +5407,16 @@ def _container_request_environment(
     output_env = raw.get("AGENT_CANON_OUTPUT_ROOT")
     if output is None:
         if output_env is not None:
-            raise BootstrapError("invalid_exec_request", "output environment is present without output_root")
+            raise BootstrapError(
+                "invalid_exec_request",
+                "output environment is present without output_root",
+            )
     elif not isinstance(output, str) or not output:
         raise BootstrapError("invalid_exec_request", "request output_root is invalid")
     elif output_env != output:
-        raise BootstrapError("invalid_exec_request", "output_root and output environment differ")
+        raise BootstrapError(
+            "invalid_exec_request", "output_root and output environment differ"
+        )
     return result
 
 
@@ -5127,7 +5436,9 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             if operation in {"install", "update"}:
                 runtime._prune_stale_targets(state)
             before = str(state.get("state"))
-            resources = state.setdefault("resources", _container_resource_state(runtime))
+            resources = state.setdefault(
+                "resources", _container_resource_state(runtime)
+            )
             resources.update(_container_resource_state(runtime))
             if operation == "install":
                 # A clean install reconstructs controller-owned lifecycle
@@ -5171,7 +5482,8 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                 if previous_image_id:
                     state["previous_image_id"] = previous_image_id
                     previous_generation = str(
-                        state.get("current_generation") or f"generation-{previous_image_id[7:19]}"
+                        state.get("current_generation")
+                        or f"generation-{previous_image_id[7:19]}"
                     )
                     current_generation = f"generation-{resources['image']['id'][7:19]}"
                     state.setdefault("generations", {})[previous_generation] = {
@@ -5228,19 +5540,27 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
         with runtime.locked():
             state = runtime._read_state()
             before = str(state.get("state"))
-            resources = state.setdefault("resources", _container_resource_state(runtime))
+            resources = state.setdefault(
+                "resources", _container_resource_state(runtime)
+            )
             image = resources.setdefault("image", {})
             restored_image_id = os.environ.get("AGENT_CANON_RESTORE_IMAGE_ID")
-            current_image_id = os.environ.get("AGENT_CANON_CURRENT_IMAGE_ID") or image.get("id")
+            current_image_id = os.environ.get(
+                "AGENT_CANON_CURRENT_IMAGE_ID"
+            ) or image.get("id")
             if not restored_image_id:
-                raise BootstrapError("rollback_image_missing", "host did not provide a rollback image ID")
+                raise BootstrapError(
+                    "rollback_image_missing", "host did not provide a rollback image ID"
+                )
             previous_targets = _container_previous_target_manifest(runtime)
             current_targets = json.loads(_json(state.get("targets", {})))
             candidate_image_id = str(image.get("id") or restored_image_id)
             image.update(
                 {
                     "id": restored_image_id,
-                    "tag": os.environ.get("AGENT_CANON_RESTORE_IMAGE_REF", restored_image_id),
+                    "tag": os.environ.get(
+                        "AGENT_CANON_RESTORE_IMAGE_REF", restored_image_id
+                    ),
                     "owned": True,
                     "state": "present",
                 }
@@ -5261,13 +5581,17 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             generations = state.setdefault("generations", {})
             generations[previous_generation] = {
                 "image_id": restored_image_id,
-                "image_ref": os.environ.get("AGENT_CANON_RESTORE_IMAGE_REF", restored_image_id),
+                "image_ref": os.environ.get(
+                    "AGENT_CANON_RESTORE_IMAGE_REF", restored_image_id
+                ),
                 "targets": previous_targets,
                 "state": "current",
             }
             generations[rollback_generation] = {
                 "image_id": current_image_id,
-                "image_ref": os.environ.get("AGENT_CANON_CURRENT_IMAGE_REF", current_image_id),
+                "image_ref": os.environ.get(
+                    "AGENT_CANON_CURRENT_IMAGE_REF", current_image_id
+                ),
                 "targets": current_targets,
                 "state": "rollback",
             }
@@ -5294,11 +5618,16 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
         with runtime.locked():
             state = runtime._read_state()
             before = str(state.get("state"))
-            resources = state.setdefault("resources", _container_resource_state(runtime))
+            resources = state.setdefault(
+                "resources", _container_resource_state(runtime)
+            )
             image = resources.setdefault("image", {})
             restored_image_id = os.environ.get("AGENT_CANON_RESTORE_IMAGE_ID")
             if not restored_image_id:
-                raise BootstrapError("restore_image_missing", "host did not provide the previous image ID")
+                raise BootstrapError(
+                    "restore_image_missing",
+                    "host did not provide the previous image ID",
+                )
             candidate_image_id = str(image.get("id") or restored_image_id)
             candidate_targets = json.loads(_json(state.get("targets", {})))
             restored_targets = _container_restore_target_manifest(runtime)
@@ -5439,7 +5768,9 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             )
             target_digest = host_digest or target["digest"]
             if target_digest not in targets:
-                raise BootstrapError("target_not_registered", "target root is not registered")
+                raise BootstrapError(
+                    "target_not_registered", "target root is not registered"
+                )
             del targets[target_digest]
             _container_target_generation(state, targets)
             runtime._write_mounts(state)
@@ -5464,17 +5795,36 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             try:
                 request = json.loads(args.request_json)
             except json.JSONDecodeError as exc:
-                raise BootstrapError("invalid_exec_request", "request is not JSON") from exc
+                raise BootstrapError(
+                    "invalid_exec_request", "request is not JSON"
+                ) from exc
             allowed = {
-                "schema", "tool_id", "argv", "child_args", "source_root", "cwd",
-                "cwd_policy", "target_root", "environment", "stdin", "stdout",
-                "stderr", "exit", "signal", "side_effect", "output_root",
+                "schema",
+                "tool_id",
+                "argv",
+                "child_args",
+                "source_root",
+                "cwd",
+                "cwd_policy",
+                "target_root",
+                "environment",
+                "stdin",
+                "stdout",
+                "stderr",
+                "exit",
+                "signal",
+                "side_effect",
+                "output_root",
                 "written_paths",
             }
             if not isinstance(request, dict) or set(request) - allowed:
-                raise BootstrapError("invalid_exec_request", "request fields are invalid")
+                raise BootstrapError(
+                    "invalid_exec_request", "request fields are invalid"
+                )
             if request.get("schema") != "agent-canon.tool-exec-request.v1":
-                raise BootstrapError("invalid_exec_request", "request schema is invalid")
+                raise BootstrapError(
+                    "invalid_exec_request", "request schema is invalid"
+                )
             tool_id = request.get("tool_id")
             child_args = request.get("child_args")
             descriptor_argv = request.get("argv")
@@ -5482,16 +5832,22 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                 not isinstance(tool_id, str)
                 or not SAFE_ID.fullmatch(tool_id)
                 or not isinstance(child_args, list)
-                or any(not isinstance(item, str) or "\x00" in item for item in child_args)
+                or any(
+                    not isinstance(item, str) or "\x00" in item for item in child_args
+                )
                 or not isinstance(descriptor_argv, list)
-                or any(not isinstance(item, str) or "\x00" in item for item in descriptor_argv)
+                or any(
+                    not isinstance(item, str) or "\x00" in item
+                    for item in descriptor_argv
+                )
             ):
                 raise BootstrapError("invalid_exec_request", "tool or argv is invalid")
-            if (
-                not isinstance(args.target_digest, str)
-                or args.target_digest != os.environ.get("AGENT_CANON_TARGET_DIGEST")
-            ):
-                raise BootstrapError("invalid_exec_request", "target digest handoff is invalid")
+            if not isinstance(
+                args.target_digest, str
+            ) or args.target_digest != os.environ.get("AGENT_CANON_TARGET_DIGEST"):
+                raise BootstrapError(
+                    "invalid_exec_request", "target digest handoff is invalid"
+                )
             source_root, host_runtime, host_control, container_target = (
                 _container_target_for_request(runtime, request)
             )
@@ -5502,7 +5858,9 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                 host_runtime=host_runtime,
                 host_control=host_control,
                 host_private_log=(
-                    Path(os.environ["AGENT_CANON_PRIVATE_LOG_ROOT"]).resolve(strict=False)
+                    Path(os.environ["AGENT_CANON_PRIVATE_LOG_ROOT"]).resolve(
+                        strict=False
+                    )
                     if os.environ.get("AGENT_CANON_PRIVATE_LOG_ROOT", "").strip()
                     else None
                 ),
@@ -5582,15 +5940,10 @@ def build_parser() -> argparse.ArgumentParser:
     target_sub = target.add_subparsers(dest="target_operation", required=True)
     add = target_sub.add_parser("add")
     add.add_argument("--root", required=True)
-    add.add_argument(
-        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
-    )
-    add.add_argument("--mutation-capability-json")
+    add.add_argument("--mode", choices=("read-only",), default="read-only")
     remove = target_sub.add_parser("remove")
     remove.add_argument("--root", required=True)
-    remove.add_argument(
-        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
-    )
+    remove.add_argument("--mode", choices=("read-only",), default="read-only")
     execute = sub.add_parser("exec")
     execute_group = execute.add_mutually_exclusive_group(required=True)
     execute_group.add_argument("--root")
@@ -5656,31 +6009,43 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "gc":
         return runtime.gc(dry_run=args.dry_run)
     if operation == "target" and args.target_operation == "add":
-        capability = None
-        if args.mutation_capability_json:
-            try:
-                capability = json.loads(args.mutation_capability_json)
-            except json.JSONDecodeError as exc:
-                raise BootstrapError("mutation_capability_invalid", "capability is not JSON") from exc
-        return runtime.target_add(
-            Path(args.root), args.mode, mutation_capability=capability
-        )
+        return runtime.target_add(Path(args.root), args.mode)
     if operation == "exec":
         if args.request_json:
             try:
                 request = json.loads(args.request_json)
             except json.JSONDecodeError as exc:
-                raise BootstrapError("invalid_exec_request", "request is not JSON") from exc
+                raise BootstrapError(
+                    "invalid_exec_request", "request is not JSON"
+                ) from exc
             allowed = {
-                "schema", "tool_id", "runtime", "argv", "child_args",
-                "source_root", "cwd", "cwd_policy", "target_root", "environment",
-                "stdin", "stdout", "stderr", "exit", "signal", "side_effect",
-                "output_root", "written_paths",
+                "schema",
+                "tool_id",
+                "runtime",
+                "argv",
+                "child_args",
+                "source_root",
+                "cwd",
+                "cwd_policy",
+                "target_root",
+                "environment",
+                "stdin",
+                "stdout",
+                "stderr",
+                "exit",
+                "signal",
+                "side_effect",
+                "output_root",
+                "written_paths",
             }
             if not isinstance(request, dict) or set(request) - allowed:
-                raise BootstrapError("invalid_exec_request", "request fields are invalid")
+                raise BootstrapError(
+                    "invalid_exec_request", "request fields are invalid"
+                )
             if request.get("schema") != "agent-canon.tool-exec-request.v1":
-                raise BootstrapError("invalid_exec_request", "request schema is invalid")
+                raise BootstrapError(
+                    "invalid_exec_request", "request schema is invalid"
+                )
             tool_id = request.get("tool_id")
             target_root = request.get("target_root")
             child_args = request.get("child_args")
@@ -5688,9 +6053,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 not isinstance(tool_id, str)
                 or not isinstance(target_root, str)
                 or not isinstance(child_args, list)
-                or any(not isinstance(item, str) or "\x00" in item for item in child_args)
+                or any(
+                    not isinstance(item, str) or "\x00" in item for item in child_args
+                )
             ):
-                raise BootstrapError("invalid_exec_request", "tool, target, or argv is invalid")
+                raise BootstrapError(
+                    "invalid_exec_request", "tool, target, or argv is invalid"
+                )
             return runtime.tool_run(tool_id, child_args, root=Path(target_root))
         command = list(args.command)
         command = command[1:] if command and command[0] == "--" else command
@@ -5706,9 +6075,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             root=Path(args.root) if args.root else None,
         )
     if operation == "template" and args.template_operation == "export":
-        return runtime.template_export(
-            Path(args.root), args.profile, args.output
-        )
+        return runtime.template_export(Path(args.root), args.profile, args.output)
     if operation == "codex":
         if args.codex_operation == "prepare":
             return runtime.codex_prepare()

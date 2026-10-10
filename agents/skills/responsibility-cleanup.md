@@ -3,7 +3,7 @@
 @dependency-start
 contract skill
 responsibility Routes responsibility-unit cleanup from structure observation through owner dispatch, integration, and re-review.
-upstream design ./README.md shared public skill canon
+upstream design ./README.md shared public skill canon and source maintenance
 upstream design ../../documents/design/responsibility-cleanup.md responsibility-unit cleanup contract
 upstream design ./structure-refactor.md structure-first ownership repair
 upstream design ./refactor-loop.md behavior-preserving refactor route
@@ -18,9 +18,10 @@ downstream implementation ../../.codex/config.toml host skill configuration
 
 ## Purpose
 
-責務単位 cleanup の入口です。`tree -a -J --noreport` を構造観測として使い、source/view/
-generated/project/personal の境界、dependency closure、replaceable responsibility、
-specialist dispatch、統合、再レビューを [`responsibility-cleanup`](../../documents/design/responsibility-cleanup.md)
+責務単位 cleanup の入口です。必要な範囲で `tree -a -J --noreport` または既存 scope
+evidence を使い、source/view/generated/project/personal の境界、dependency closure、
+replaceable responsibility、specialist dispatch、統合、再レビューを
+[`responsibility-cleanup`](../../documents/design/responsibility-cleanup.md)
 の RC-01..RC-08 に接続します。
 
 ## Use When
@@ -31,13 +32,16 @@ specialist dispatch、統合、再レビューを [`responsibility-cleanup`](../
 
 ## Route
 
-1. `tree -a -J --noreport` と既存 structure/scope checker で観測を作る。repo-wide な棚卸しを依頼された場合の観点は [project-review](../internal-routines/project-review.md) を参照する。局所 cleanup を全体監査へ拡張しない。
-2. 近接性や analyzer finding ではなく owner、dependency、公開契約、validation、rollback で unit を閉じる。write-capable handoff の validation command 境界は `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照する。
-3. environment は `environment-cleanup`、code は `code-cleanup`、skill は `skill-cleanup` に渡す。
-4. 文書、worktree、log は既存の `document-canon-cleanup`、`worktree-health`、`agent-log-analysis`、`runtime-log-repair`、`result-artifact-writeout` を再利用する。
-5. `agent-orchestration` と `task-routing` の order を保ち、統合後に `change-review` と owner readback を行う。
+1. Determine whether the request is local or repository-wide. Use `tree -a -J --noreport` and structure/scope checkers only when the relevant owner, boundary, or reverse relation is unresolved; a repo-wide inventory follows [project-review](../internal-routines/project-review.md).
+2. Close the affected unit by owner, dependency, public contract, selected validation, and rollback. Use the write-capable handoff boundary in `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` when a writer handoff is selected.
+3. Route only changed surfaces: environment cleanup to `environment-cleanup`, code cleanup to `code-cleanup`, and general skill authoring to the host `$skill-creator`. For AgentCanon registration or distribution changes, read [Updating Skills](README.md#updating-skills) before those operations.
+4. Reuse `document-canon-cleanup`, `worktree-health`, `agent-log-analysis`, `runtime-log-repair`, or `result-artifact-writeout` only when the selected unit includes those responsibilities.
+5. Preserve `agent-orchestration` and `task-routing` decisions. Integrate and run `change-review`/owner readback when the selected workflow requires them; these are not unconditional stages for every cleanup.
 
 ## Tool Commands
+
+Choose the command that resolves the selected owner or scope question; these
+are not a required batch:
 
 ```bash
 tree -a -J --noreport

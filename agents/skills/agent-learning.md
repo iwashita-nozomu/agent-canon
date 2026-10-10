@@ -3,9 +3,9 @@
 <!--
 @dependency-start
 contract skill
-responsibility Owns AgentCanon agent-side recurrence learning and routes private knowledge or feedback to the external log owner.
+responsibility Routes private knowledge and feedback to the external log owner and applies selected behavior-learning decisions.
 upstream design ../../documents/runtime/private-feedback-knowledge.md private log command and storage contract
-upstream design ../../documents/operations/notes-lifecycle.md failed verification record and topic reuse
+upstream design ../../documents/operations/notes-lifecycle.md public failed verification and topic reuse
 upstream implementation ../../tools/runtime/archive/private_feedback.py metadata-only private log adapter
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py runtime feedback evidence
 @dependency-end
@@ -13,134 +13,133 @@ downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py runt
 
 ## Reader Map
 
-- Purpose: agent-side recurrence、routing miss、skill gap、task retrospectiveを、外部
-  private `agent-canon-log` の knowledge / feedback ownerへ送る。
-- Use when: agent behaviorへのFB、失敗した検証の保存、既存の失敗知見の再利用、または
-  private FB・知見の記録依頼があるとき。
-- Boundary: raw chat、時系列 runtime observation、Issue、公開可能なfailure logは各ownerに置く。
-  恒久契約はcanonical ownerへ直接昇格する。
+Choose the record's owner before reading an operating procedure. The public
+catalog's private-knowledge/feedback and behavior-learning description is the
+activation boundary for this Skill.
 
-This skill owns behavior feedback, active-skill calibration, and behavior
-evaluation routing. Private knowledge is one route among those owners; it is
-not a second public canon and is never stored in the AgentCanon source tree.
+| Current need | Read next |
+| --- | --- |
+| Record or reuse a public repository-specific verification failure | [Notes Lifecycle](../../documents/operations/notes-lifecycle.md#failed-verification-record), or [Retrieve Before Deciding](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding); return to the current task |
+| Search, record, read back, or synchronize private knowledge / feedback | [Operating Route](#operating-route) |
+| Feedback requires a decision about agent behavior, active Skills, or recurrence | [Mandatory Behavior and Learning Contract](#mandatory-behavior-and-learning-contract), then the selected record operation |
+| Finish the selected recording or learning operation | [Closeout Decision](#closeout-decision) |
+
+Saving a public failure memo does not activate private capture, calibration, or
+behavior evaluation. A private knowledge lookup does not require a behavior-eval
+run. When one task genuinely needs both, preserve their distinct results and
+reuse existing records rather than capturing the same observation twice.
 
 ## Purpose
 
-privateへ記録する観測は、まず`k search`で既存topicを検索し、同じ問題なら同じtopicへ
-追記します。独立した問題解決知識を外部`agent-canon-log/knowledge/`に残し、安定した契約は
-対象のskill、workflow、AGENTS、またはcanonical documentへ直接反映します。
-公開可能な失敗検証は[Notes Lifecycle](../../documents/operations/notes-lifecycle.md)の
-既存topic memoへ接続します。
+Keep independent private problem-solving knowledge and feedback in authorized
+`agent-canon-log` topics. Stable rules belong to their canonical owner; private
+knowledge is neither a second public canon nor raw chat copied into the source tree.
+Public failed verification remains with the existing topic-note owner above.
 
 ## Use When
 
-- userが`agent-learning`または`$agent-learning`を明示した、またはFB・再利用する知見を
-  記録するよう求めた。
-- 検証で候補・設定・合成が失敗した、または採用・却下前に既存の失敗知見を参照する。
-- agent behavior、routing、skill invocation、review feedback、task retrospectiveに
-  次回の実行を変える再発防止判断がある。
-- 既存ownerに昇格済みでない、独立したprivate knowledgeまたはfeedbackがある。
-
-Stable user preferenceは対象の[AGENTS.md](../../AGENTS.md)またはcanonical ownerへ反映します。
-単発の観測はruntime log/evidence/Issue owner、再利用する検証結果はtopic recordが所有します。
+Use when private knowledge/feedback curation, an explicit private recording request,
+or evidence-backed agent behavior learning is active. Relevant causes include a
+routing miss, weak Skill invocation, reviewer feedback, or a task retrospective
+that changes a future execution decision. Public topic recording alone follows
+Notes Lifecycle directly.
 
 ## Core References
 
-- [documents/runtime/private-feedback-knowledge.md](../../documents/runtime/private-feedback-knowledge.md)
-- [documents/operations/notes-lifecycle.md](../../documents/operations/notes-lifecycle.md)
+- [Private log contract](../../documents/runtime/private-feedback-knowledge.md)
+- [Notes Lifecycle](../../documents/operations/notes-lifecycle.md)
 - `tools/runtime/archive/private_feedback.py`
 - `tools/runtime/lifecycle/workflow_monitor.py`
 - `eval/definitions/agent_behavior_eval.toml`
 
 ## Mandatory Behavior and Learning Contract
 
-- user preferenceとagent-side learningを分け、raw transcriptを貼らず、source、evidence、
-  scope、confidenceを持つ短いobservationに圧縮する。
-- `workflow_monitor.py` が所有する behavior-event の記録を使い、skill invocation、subagent
-  routing、tool gate、prompt eval、review feedback、subagent lifecycle、diff-check decision
-  を behavior evidence として扱う。この skill は event schema や append 処理を再定義しない。
-- user / reviewer / eval feedback は `workflow_monitor.py` の runtime-feedback route で記録し、
-  source、target、選択した action、観測内容を event owner の schema に従って構造化する。
-  この skill は target と action の判断を行うが、feedback event の field や status vocabulary
-  を再定義しない。
-- feedbackが利用中のskillの弱さ、浅さ、遅さ、routing miss、修正不足を示す場合は、active
-  skill setを最初の calibration 候補として owner と原因を確認する。変更する場合は対象、
-  変更内容、validation evidence を記録し、変更しない場合はその判断根拠を記録する。
-  単発観測は scoped guidance、example、private knowledge を優先し、hard rule は反復観測
-  または checker-backed invariant に限る。特定の decision token を必須の完了条件にしない。
-- private knowledgeへ記録した場合はその判断と根拠を残し、public skillへ自動昇格しない。
-  behavior eval は `eval/definitions/agent_behavior_eval.toml` とその
-  owner の評価結果を参照し、feedback action、calibration の判断、変更時の validation
-  evidence が追跡できる状態を保つ。
+Read this section when behavior feedback requires calibration or evaluation.
+Separate stable user preferences from observations; record source, evidence,
+scope, confidence, and the decision rather than a raw transcript. Stable preferences
+are explicit changes to the relevant AGENTS or canonical owner, not private canon.
+
+Use `workflow_monitor.py` for its existing behavior-event and runtime-feedback
+schemas. Skill invocation, subagent routing/lifecycle, tool gates, prompt evaluation,
+review feedback, and diff-check decisions retain their event owner. Select the
+affected Skill, prompt, workflow, evaluation, or knowledge owner from the evidence.
+The active Skill set is the first calibration candidate for an observed Skill gap;
+record the repair and its validation, or the evidence supporting unchanged behavior.
+A single observation normally becomes scoped guidance or an example; a hard rule
+requires a repeated observation or a checker-backed invariant.
+
+Use the evaluation owner and `agent_behavior_eval.toml` only for a selected behavior
+evaluation or a changed behavior contract that requires it. Preserve feedback action,
+calibration decision, selected validation, and unresolved handoff in the existing
+task record. Do not duplicate event fields, require a new decision token, or run
+all behavior evaluations to save an ordinary knowledge topic.
 
 ## Operating Route
 
-1. FBや失敗検証を観測したtask内で、目的・候補、source、再現条件、検証手順、期待と実際、
-   evidence、確定した結論を短く整理する。[Notes Lifecycle](../../documents/operations/notes-lifecycle.md)
-   のtopic recordを使い、観測と原因仮説を区別する。判断に必要な原因は同じtask内で調査・検証し、
-   結論と根拠を同じtopicへ追記する。
-2. private知識の保存・再利用では、同じcontextの正規実行口で
-   `agent-canon k search --query <failure-evidence>` を実行し、hitを`k read <topic>`で読む。
-   採用・却下前に既存topicの入力・版・設定・保証を現状と照合する。同じ前提の検証結果を
-   再利用し、判断を変え得る前提が変わったときはその点を検証して結論を更新する。
-   検索失敗・未実施を「既存topicなし」と扱わず、実際の失敗をCloseout Decisionへ接続する。
-3. 選んだownerの記録操作を実行する。user / reviewer / eval feedbackの構造化は上記の
-   runtime-feedback契約に従う。独立した修正用FBは `agent-canon f add <topic> --stdin`、
-   再利用可能な問題解決知識は `agent-canon k add <topic> --stdin` を使う。
-   既存captureを確認し、同じ観測をruntime-feedback、f、kへ重複登録しない。
-   失敗検証には再現手順、期待と実際、evidence locator、検証で確定した結論、再利用条件と
-   再検証が必要になる変更点を残す。後続の成功・反証は元のtopicへ接続する。
-4. stable ruleをownerへ昇格する場合は、許可されたcanonical owner変更とreadbackを行い、
-   private logへ規約を複製しない。既に反映済みなら、そのownerを根拠として再登録しない。
-5. 今回の記録のreceipt、`k/f status`、targeted readbackを照合する。受付やspool保存を
-   remoteへの同期完了と混同しない。同期が必要な場合だけ既存の `k/f sync` を実行し、
-   その結果を読み戻す。全体statusや別の記録の成功から今回の成功を推定しない。
-   記録・同期・確認の各結果はownerが返す既存identityに結び付け、新しいreceipt schemaを作らない。
+Use this section for authorized private knowledge/feedback operations. Commands are
+logical commands carried through the current context's
+[existing execution route](../canonical/CLI_ENTRYPOINTS.md#tool-commands).
 
-既存captureがなく、独立したFBの記録を選んだ場合の例:
+1. Identify the purpose/candidate, source revision, relevant conditions, expected
+   and observed result, reproducible command or inspection, evidence locator,
+   verified conclusion, and reuse/recheck conditions. Keep established cause distinct
+   from a failure observation. Resolve a cause needed for the current decision through
+   the owning investigation and add the result to the same topic.
+2. Before adopting or rejecting a candidate, use `agent-canon k search --query
+   <relevant-evidence>` and `k read <topic>` for relevant existing private knowledge.
+   Compare inputs, revisions, configuration, and guarantees. Reuse results under
+   unchanged premises; verify changed decision-relevant premises. Search failure or
+   an unperformed search is not evidence that no topic exists.
+3. Choose one existing capture. Independent feedback uses `agent-canon f add <topic>
+   --stdin`; reusable knowledge uses `agent-canon k add <topic> --stdin`. Use the
+   behavior owner's runtime-feedback operation for its structured events, without
+   duplicating the same observation into runtime-feedback, f, and k. Update an
+   existing topic for the same problem and link later correction or counterevidence.
+4. Read back this record and its operation receipt with `k/f status` and targeted
+   `k read` or the owner-supported feedback readback. A spool write is not remote
+   publication. When synchronization is needed, execute existing `k/f sync` and
+   verify that operation's result; a healthy global status or another record's
+   success does not prove this record arrived.
+5. An authorized stable-rule promotion updates the existing canonical owner and
+   reads back that change. It does not copy permanent policy into private knowledge
+   or automatically publish private text.
 
-```bash
-agent-canon k search --query "missing path owner resolution"
-printf '%s\n' "観測、判断根拠、対応結果、次回の適用条件と限界" | agent-canon f add path-owner --stdin
-agent-canon f status
-```
-
-未同期で正規経路が利用可能な場合だけ `agent-canon f sync` とstatusの再確認を行う。
-knowledgeを選ぶ場合は `k add` を使い、`k read <topic>` で対象を確認する。
-private本文は通常のreceipt、Issue、PR、dashboard、agent handoffへ転載せず、authorized locatorを使う。
+Keep the original receipt/record identities and the owner's retention/retry rules.
+Private content stays outside public Issues, PRs, dashboards, source files, and
+handoffs; use an authorized locator and a publishable finding instead.
 
 ## Evidence Boundary
 
-- raw runtime event、chat transcript、日時付き観測: runtime archive / evidence owner
-- actionable workflow defect: repository-qualified GitHub Issue
-- 公開可能なfailed verification: `documents/notes/failures/` のtopic record
-- reusable private knowledge / feedback: private `agent-canon-log`
-- repo-wide permanent rule: canonical documents / [AGENTS.md](../../AGENTS.md)
-- `documents/notes/knowledge/`: human-readable documentation。private情報はprivate logに保持する。
+| Evidence | Owner |
+| --- | --- |
+| Raw runtime event, transcript, chronology | runtime archive / evidence owner |
+| Actionable repository defect | repository-qualified GitHub Issue |
+| Public failed verification and reproduction | `documents/notes/failures/` topic record |
+| Reusable private knowledge or feedback | authorized private `agent-canon-log` topic |
+| Permanent shared rule | owning canonical document / AGENTS |
 
 ## Closeout Decision
 
-今回の観測を、既存private knowledgeの更新、新規private feedback、ownerへの明示変更、
-Issue/failure/evidence、またはno-opのいずれかに分類します。単なるchronologyや既にownerに
-ある内容をprivate logへ重複保存しません。behavior feedbackは `prompt_repair`、`eval_update`、
-`knowledge_record`、または `no_op` とimprovement decisionをcloseout evidenceに残します。
+Read back the exact record saved or reused in this task. Preserve the operation,
+result, evidence location, conclusion and reuse conditions, and distinguish saved,
+synchronized, and verified remote states. `no_op` requires evidence such as an
+already-saved identical observation; write failure is not a no-op.
 
-失敗した検証は、保存済みtopicの今回の内容を読み戻し、手順・結果・結論・再利用条件を
-確認します。今回の採用・却下を裏付ける検証と記録を接続し、独立した失敗知見には記録操作を
-実行します。報告は反映先と実行結果、保存・同期・readbackの確認範囲を示します。
-`no_op` は同じ検証結果が保存済み等の根拠がある場合に限り、書込み不能の代替にしません。
+For the selected behavior-learning branch, also resolve or explicitly hand off the
+feedback action (`prompt_repair`, `eval_update`, `knowledge_record`, or `no_op`),
+calibration decision, and any selected behavior-eval result. Other branches finish
+with their record/search result and do not inherit this evaluation obligation.
 
-実行口未検出、権限不足、検索・書込み・同期・readbackの失敗は、実際に確認した操作と結果、
-未実施／未確認の範囲、次のowner/actionを既存の作業記録に残します。保存済みspoolは既存ownerの
-保持・再試行規約に従い、未保存なら保存済みと報告しません。private本文を公開Issueやsource treeへ
-退避させず、別の会話へ移ることを正規経路の代替にしません。無関係なruntime修理やeval全体の
-再実行を記録依頼の前提にせず、記録できた結果と残るblockerを分けて引き継ぎます。
+An unavailable entrypoint or a failed search/write/sync/readback is recorded with the
+actual attempted operation, observed result, unperformed scope, and next owner/action.
+Keep saved spool with its owner. Do not claim unsaved content is saved or put private
+text in public source as a fallback. Unrelated runtime repairs, a new conversation,
+or a whole evaluation rerun are not prerequisites for independent recording work.
 
 ## Runtime Contract Clauses
 
-1. Use Whenに該当する指摘・記録依頼・失敗検証では、Operating Routeを同じtask内で実行する。
-2. behavior event、runtime feedback、feedback actionの記録先はexternal runtime / private log。
-3. 採用・却下の前に関連topicを検索し、検証結果の適用条件を照合して判断へ再利用する。
-4. prompt、workflow、eval、private knowledge、Issue、no-opの反映先、根拠、実行結果を明示する。
-5. closeout前に behavior-eval owner の評価結果を参照し、feedback action、calibration の
-   判断、変更時の validation evidence が解決または明示的に引き継がれていることを確認する。
+Use the matching Reader Map branch in the task that activates it. Preserve topic
+search before a private adoption/rejection decision and exact-record readback after
+writing. Public failure recording retains the Notes Lifecycle contract. Behavior
+calibration/evaluation applies only under its own condition, and each output reports
+the actual result and limitations through the existing task/Issue owner.

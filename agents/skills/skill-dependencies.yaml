@@ -8,6 +8,7 @@ version: 1
 # downstream design ../../agents/skills/agent-orchestration.md consumes canonical invocation order
 # downstream design ../../agents/skills/task-routing.md consumes canonical routing order
 # downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py validates cycle, reference, order, and graph contracts
+# downstream implementation ../../tests/agent_tools/test_point_of_use_skill_routes.py verifies conditional handoffs without prerequisite activation
 # @dependency-end
 skill_dependencies:
   agent-orchestration:
@@ -68,6 +69,7 @@ skill_dependencies:
     - task-routing
     - result-artifact-writeout
     - change-review
+    - integration
     successors: []
     order_constraints: []
     parallel_independent:
@@ -117,7 +119,8 @@ skill_dependencies:
   python-review:
     responsibility_group: review
     required_prerequisites: []
-    routing_candidates: []
+    routing_candidates:
+    - change-review
     successors: []
     order_constraints: []
     parallel_independent:
@@ -125,7 +128,8 @@ skill_dependencies:
   cpp-review:
     responsibility_group: review
     required_prerequisites: []
-    routing_candidates: []
+    routing_candidates:
+    - computational-optimization
     successors: []
     order_constraints: []
     parallel_independent:
@@ -791,7 +795,6 @@ skill_dependencies:
     - structure-refactor
     - environment-cleanup
     - code-cleanup
-    - skill-cleanup
     - document-canon-cleanup
     - worktree-health
     - agent-log-analysis
@@ -812,7 +815,6 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - code-cleanup
-    - skill-cleanup
   code-cleanup:
     responsibility_group: cleanup
     required_prerequisites:
@@ -827,26 +829,6 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - environment-cleanup
-    - skill-cleanup
-  skill-cleanup:
-    responsibility_group: cleanup
-    required_prerequisites:
-    - responsibility-cleanup
-    - agent-orchestration
-    routing_candidates:
-    - agent-orchestration
-    - task-routing
-    - document-canon-cleanup
-    - worktree-health
-    - agent-log-analysis
-    - runtime-log-repair
-    - result-artifact-writeout
-    - empirical-prompt-tuning
-    successors: []
-    order_constraints: []
-    parallel_independent:
-    - environment-cleanup
-    - code-cleanup
   empirical-prompt-tuning:
     responsibility_group: workflow
     required_prerequisites: []

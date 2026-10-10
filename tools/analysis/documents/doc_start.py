@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Provides doc start agent workflow automation.
-# upstream design ../README.md shared automation index
-# upstream design ../../agents/task_catalog.yaml document workflow specialist topology
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../agents/task_catalog.yaml document workflow specialist topology
 # @dependency-end
 
 """Start one document-writing run with machine-generated writing workflow and review hints."""

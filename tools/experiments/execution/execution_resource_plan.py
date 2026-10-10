@@ -2,19 +2,19 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the immutable ExecutionResourcePlan transaction, canonical GPU allocation, reusable GPU admission primitives, managed ExperimentRunner handoff, and completion coverage.
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 U-18 implementation frame and exact packet identity
-# upstream design ../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
-# upstream design ../../agents/skills/gpu-execution.md UUID GPU and readback contract
-# upstream design ../../documents/structure/repo-structure-contract.toml tree capability authority
-# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json validation failure taxonomy authority
-# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md validation failure reader projection
-# upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
+# upstream design ../../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 U-18 implementation frame and exact packet identity
+# upstream design ../../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
+# upstream design ../../../agents/skills/gpu-execution.md UUID GPU and readback contract
+# upstream design ../../../documents/structure/repo-structure-contract.toml tree capability authority
+# upstream design ../../../documents/runtime/runtime-profiles-and-check-matrix.json validation failure taxonomy authority
+# upstream design ../../../documents/runtime/runtime-profiles-and-check-matrix.md validation failure reader projection
+# upstream design ../../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
 # downstream implementation ./gpu_command_admission.py provider-independent direct GPU admission adapter
-# downstream implementation ../agent_tools/execution_resource_projection.py validates exact coarse PostToolUse projection constants
-# downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
-# downstream implementation ../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
-# downstream implementation ../../bootstrap/host/manifest.toml selects the shared tool runtime limits
+# downstream implementation ../../runtime/container/execution_resource_projection.py validates exact coarse PostToolUse projection constants
+# downstream implementation ../../analysis/proof/jit_canonical_ir.py GPU requests must route here or fail typed preflight
+# downstream implementation ../../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
+# downstream implementation ../../../bootstrap/host/manifest.toml selects the shared tool runtime limits
 # @dependency-end
 
 # Static consumer closure: run_managed_experiment.py is the managed-run

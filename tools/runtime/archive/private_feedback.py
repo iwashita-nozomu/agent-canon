@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Owns private feedback/knowledge production and the body-free request/read boundary; the host shell owns archive publication.
-# upstream design ../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
-# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs exposes the Rust CLI route
+# upstream design ../../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
+# downstream implementation ../dispatch/agent-canon/src/private_feedback.rs exposes the Rust CLI route
 # downstream implementation ../../../tests/agent_tools/test_private_feedback.py validates the bounded adapter
 # @dependency-end
 """Private feedback and reusable knowledge adapter.
