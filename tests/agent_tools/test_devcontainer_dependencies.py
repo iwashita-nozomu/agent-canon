@@ -4306,11 +4306,17 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("dependency_plan.py", dockerfile)
         self.assertIn("image-install --workspace /src", dockerfile)
         self.assertIn(
-            "CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo", dockerfile
+            "CARGO_HOME=/var/lib/agent-canon/cache/cargo", dockerfile
         )
         self.assertIn(
-            "PATH=/usr/local/share/agent-canon/toolchains/cargo/bin", dockerfile
+            "PATH=/var/lib/agent-canon/cache/bin:/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin",
+            dockerfile,
         )
+        self.assertIn(
+            "export CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo",
+            dockerfile,
+        )
+        self.assertIn('export PATH="$CARGO_HOME/bin:$PATH"', dockerfile)
         self.assertIn("--final-binary-dir /usr/local/bin", dockerfile)
         self.assertIn("rm -rf /var/lib/apt/lists/*", dockerfile)
         self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)
