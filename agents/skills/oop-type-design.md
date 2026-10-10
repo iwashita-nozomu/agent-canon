@@ -169,8 +169,8 @@ owners:
   BasedPyright invocation; Python review owns the changed-diff review.
 - Python lint and formatting signals: `ruff`; it remains an existing static owner.
 - C/C++ build, headers, and ownership: `$cpp-review` and its project-native checks.
-- C++ target responsibility: `cpp-core` is the provider; individual test and experiment
-  targets are consumers; root-anchored build/install paths and lifecycle-owned result paths
+- C++ target responsibility: the selected project production target is the provider; individual
+  test and experiment targets are consumers. Project-owned paths and lifecycle-owned result paths
   are read back from [documents/design/cpp-build-layout.md](../../documents/design/cpp-build-layout.md).
 - OOP/SOLID signals: `$oop-readability-check`; keep its evidence with the owning review.
 - Existing dependency graph context: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review` when the declared relations materially affect the type boundary. Missing annotations do not block the design.

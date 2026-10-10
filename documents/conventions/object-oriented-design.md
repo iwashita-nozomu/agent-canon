@@ -69,14 +69,13 @@ class、module、file、directory の形を機械的に要求しません。OOP 
 
 ### C++ target responsibility
 
-- `cpp-core` は production source/header と reusable target interface の owner です。
-- `cpp-test-<name>` と `cpp-experiment-<name>` は `cpp-core` を consume する consumer です。
-- `cpp-tests` と `cpp-experiments` は consumer grouping を表し、production state や
-  run/result publication を所有しません。
-- public header は `cpp/include/`、implementation は `cpp/src/`、CTest source は
-  `tests/cpp/`、native experiment source は `cpp/experiments/` に対応づけます。
-- target graph の dependency direction は consumer → provider (`test/experiment → cpp-core`)
-  とし、external effect、run config、result retention は既存 lifecycle owner に接続します。
+- Production target と reusable interface の名前/ownership は project CMake owner が選びます。
+- Test / experiment targets は selected profile 内で production provider を consume する consumer です。
+- Aggregate target がある場合、それは project-defined build grouping だけを表し、run/result publication を所有しません。
+- Public header、implementation、CTest source、native experiment source の paths は
+  [cpp-build-layout.md](../design/cpp-build-layout.md) が定める selected profile に対応づけます。
+- Target graph の dependency direction は consumer → provider とし、external effect、run config、
+  result retention は既存 lifecycle owner に接続します。
 
 ## SOLID との対応
 
@@ -221,12 +220,9 @@ python3 tools/validation/code/oop/python/readability.py python tools tests
 python3 tools/validation/code/oop/python/rule_inventory.py
 ```
 
-C++ surface では次を baseline として使います。
-
-```bash
-python3 tools/validation/code/oop/cpp/readability.py cpp/include cpp/src tests/cpp cpp/experiments
-python3 tools/validation/code/oop/cpp/rule_inventory.py
-```
+C++ surface では `tools/validation/code/oop/cpp/readability.py` に selected profile の native
+source/consumer paths を渡します。この command は選択された path を読むだけで、CMake profile
+は選択しません。Rule inventory は `python3 tools/validation/code/oop/cpp/rule_inventory.py` です。
 
 この tool は次の risk を検出します。
 
