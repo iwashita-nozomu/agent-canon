@@ -752,6 +752,25 @@ impl Drop for MarkdownlintOutputDirectory {
     }
 }
 
+fn opening_fence_info(line: &str) -> Option<(char, usize, &str)> {
+    let trimmed = line.trim_start();
+    let fence_char = trimmed.chars().next()?;
+    if !matches!(fence_char, '`' | '~') {
+        return None;
+    }
+    let fence_len = trimmed.chars().take_while(|ch| *ch == fence_char).count();
+    if fence_len < 3 {
+        return None;
+    }
+    Some((fence_char, fence_len, &trimmed[fence_len..]))
+}
+
+fn is_closing_fence(line: &str, fence_char: char, fence_len: usize) -> bool {
+    let trimmed = line.trim();
+    let count = trimmed.chars().take_while(|ch| *ch == fence_char).count();
+    count >= fence_len && trimmed[count..].trim().is_empty()
+}
+
 fn check_markdown_math(files: &[PathBuf]) -> Vec<Finding> {
     let mut findings = Vec::new();
     for path in files {
