@@ -18,7 +18,11 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from tools.repository.workspace.worktree_scope_lint import lint_scope
+from tools.repository.workspace.worktree_scope_lint import (
+    extract_named_value,
+    lint_scope,
+    parse_sections,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -107,33 +111,6 @@ def normalize_branch_name(branch_ref: str) -> str:
     return branch_ref
 
 
-def parse_sections(scope_file: Path) -> dict[str, list[str]]:
-    """Parse markdown headings into bullet-line lists."""
-    sections: dict[str, list[str]] = {}
-    current_section: str | None = None
-    for raw_line in scope_file.read_text(encoding="utf-8").splitlines():
-        line = raw_line.rstrip()
-        if line.startswith("## "):
-            current_section = line[3:].strip()
-            sections.setdefault(current_section, [])
-            continue
-        if current_section is None:
-            continue
-        stripped = line.strip()
-        if stripped.startswith("- "):
-            sections[current_section].append(stripped[2:].strip())
-    return sections
-
-
-def extract_named_value(entries: list[str], name: str) -> str:
-    """Extract one `Field: value` bullet."""
-    prefix = f"{name}:"
-    for entry in entries:
-        if entry.startswith(prefix):
-            return entry[len(prefix) :].strip()
-    return ""
-
-
 def resolve_action_log_path(workspace_root: Path, scope_file: Path) -> Path | None:
     """Return the action log path from WORKTREE_SCOPE.md when available."""
     sections = parse_sections(scope_file)
@@ -157,28 +134,6 @@ def resolve_action_log_path(workspace_root: Path, scope_file: Path) -> Path | No
     return (workspace_root / path).resolve()
 
 
-def resolve_user_request_contract_path(workspace_root: Path, scope_file: Path) -> Path | None:
-    """Return the user request contract path from WORKTREE_SCOPE.md when available."""
-    sections = parse_sections(scope_file)
-    for section_name in ("Working Notes During Execution", "Kickoff Status"):
-        raw_value = extract_named_value(
-            sections.get(section_name, []),
-            "User request contract path",
-        )
-        if not raw_value or "<" in raw_value or "<run-id>" in raw_value:
-            continue
-        token = raw_value.split("`")
-        candidate = token[1] if len(token) >= 3 else raw_value
-        path = Path(candidate)
-        if path.is_absolute():
-            return path
-        repo_guess = run_optional(["git", "rev-parse", "--show-toplevel"], cwd=workspace_root)
-        if repo_guess.returncode == 0:
-            return (Path(repo_guess.stdout.strip()).resolve() / path).resolve()
-        return (workspace_root / path).resolve()
-    return None
-
-
 def _log_action_entry(action_log_path: Path, entry: str) -> None:
     """Append one entry to the action log, creating a minimal file when missing."""
     action_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -188,11 +143,6 @@ def _log_action_entry(action_log_path: Path, entry: str) -> None:
         if action_log_path.stat().st_size > 0:
             handle.write("\n")
         handle.write(f"- {entry}\n")
-
-
-def append_action_log_entry(action_log_path: Path, entry: str) -> None:
-    """Append one entry to the action log."""
-    _log_action_entry(action_log_path, entry)
 
 
 def summarize_scope_presence(repo_root: Path) -> list[str]:
