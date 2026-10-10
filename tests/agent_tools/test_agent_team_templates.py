@@ -418,6 +418,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
             )
             self.assertEqual(run_test.returncode, 0, run_test.stdout + run_test.stderr)
             test_dir_parent = test_dir.parent
+            (test_dir / "main.cpp").unlink()
+            (test_dir / "CMakeLists.txt").unlink()
             test_dir.rmdir()
             test_dir_parent.rmdir()
 
