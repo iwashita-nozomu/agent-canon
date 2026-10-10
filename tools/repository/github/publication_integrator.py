@@ -10,6 +10,7 @@
 # upstream implementation ../../agent/orchestration/review_dispatch.py resolves current candidate identity only.
 # upstream implementation ../../runtime/artifacts/report_artifact_checks.py regenerates materializer-produced validation results.
 # upstream implementation ../../runtime/artifacts/artifact_identity.py provides canonical serialization and artifact readback.
+# upstream implementation ../../runtime/values.py refines nested candidate acceptance mappings.
 # upstream implementation ../../agent/orchestration/packets.py owns owner-local receipt normalization and compatibility.
 # upstream implementation ../../runtime/lifecycle/update_lifecycle_contract.py owns G1/G3/G5 verdict identity and lifecycle guards.
 # downstream implementation ./github_publish.py exposes verified remote and PR publication.
@@ -53,6 +54,7 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
     validate_publication_readback_receipt,
     validate_record_binding,
 )
+from tools.runtime.values import is_string_object_mapping
 from tools.agent.orchestration.packets import (
     normalize_owner_guarantee_packet,
     owner_receipt_is_compatible,
@@ -357,12 +359,10 @@ def observe_git_tree_delta(
 def _target_tuple(candidate: Mapping[str, object]) -> dict[str, object]:
     """Return the frozen target tuple from canonical candidate acceptance identity."""
     acceptance = candidate.get("acceptance_identity")
-    target = (
-        acceptance.get("publication_target")
-        if isinstance(acceptance, Mapping)
-        else None
-    )
-    if not isinstance(target, Mapping):
+    if not is_string_object_mapping(acceptance):
+        raise PublicationError("publication_authority:target_tuple_missing")
+    target = acceptance.get("publication_target")
+    if not is_string_object_mapping(target):
         raise PublicationError("publication_authority:target_tuple_missing")
     expected_keys = {
         "repository_id",
@@ -400,11 +400,9 @@ def _review_approval(workspace: Path) -> tuple[dict[str, object], dict[str, obje
     if review_eligibility.get("outcome") != "eligible":
         raise PublicationError("publication_eligibility:review_not_eligible")
     state = resolve_current_review_state(workspace)
-    candidate = state.get("candidate")
-    decision = state.get("decision")
-    if not isinstance(candidate, Mapping):
-        raise PublicationError("publication_authority:candidate_missing")
-    if not isinstance(decision, Mapping):
+    candidate = state["candidate"]
+    decision = state["decision"]
+    if decision is None:
         raise PublicationError("publication_eligibility:approve_missing")
     if decision.get("decision") != "APPROVE":
         raise PublicationError("publication_eligibility:decision_mismatch")
@@ -419,10 +417,7 @@ def _review_candidate(workspace: Path) -> dict[str, object]:
     if review_eligibility.get("outcome") != "eligible":
         raise PublicationError("publication_eligibility:review_not_eligible")
     state = resolve_current_review_state(workspace)
-    candidate = state.get("candidate")
-    if not isinstance(candidate, Mapping):
-        raise PublicationError("publication_authority:candidate_missing")
-    return dict(candidate)
+    return dict(state["candidate"])
 
 
 def _validation_provenance(workspace: Path) -> dict[str, object]:

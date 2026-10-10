@@ -11,6 +11,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from collections.abc import Mapping
 from pathlib import Path
 from unittest.mock import patch
 
@@ -45,7 +46,7 @@ def decision(name: str) -> dict[str, object]:
 class ReviewDispatchTest(unittest.TestCase):
     """Verify only the current candidate's explicit decision unlocks publication."""
 
-    def project(self, review_decision: dict[str, object]) -> dict[str, object]:
+    def project(self, review_decision: dict[str, object]) -> Mapping[str, object]:
         """Project a patched canonical state without caller identity overrides."""
         with (
             patch.object(
