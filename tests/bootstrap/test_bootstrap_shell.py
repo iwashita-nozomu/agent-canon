@@ -27,7 +27,7 @@ def test_host_entrypoint_has_no_python_fallback() -> None:
     assert "bootstrap_python_entrypoint" not in text
     assert "exec python3" not in text
     assert '"$AGENT_CANON_DOCKER_CMD" exec' in text
-    assert "AGENT_CANON_CONTAINER_CONTROL" in text
+    assert "--container-control" not in text
     assert "docker.sock" not in text
     assert "AGENT_CANON_CONTAINER_NETWORK" in text
     assert "docker-rpc" not in text
@@ -5591,7 +5591,6 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
         [
             "python3",
             str(ROOT / "tools/runtime/container/bootstrap_runtime.py"),
-            "--container-control",
             "--repository-root",
             str(ROOT),
             "--control-parent-root",
@@ -5607,7 +5606,6 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
             **os.environ,
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "AGENT_CANON_DOCKER": "missing-docker",
-            "AGENT_CANON_CONTAINER_CONTROL": "1",
         },
     )
     assert completed.returncode == 0, completed.stderr
@@ -5829,11 +5827,11 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     )[0]
     assert "runtime_log_archive_git" not in container_control
     assert "_host_private_feedback_sync" not in container_control
-    eval_sync = controller.split("    def eval_sync(", 1)[1].split(
-        "    def eval_sync_prepare(", 1
+    eval_sync_prepare = controller.split("    def eval_sync_prepare(", 1)[1].split(
+        "    def gc(", 1
     )[0]
-    assert "runtime_log_archive_git" not in eval_sync
-    assert "return self.eval_sync_prepare(run_id)" in eval_sync
+    assert "runtime_log_archive_git" not in eval_sync_prepare
+    assert '"host_archive_requested"' in eval_sync_prepare
 
 
 def test_forced_rollback_recovery_failure_retains_mounted_backup(
@@ -5925,7 +5923,10 @@ bootstrap_host_entrypoint "$1" \
 def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None:
     """Resident preparation leaves host-live links usable by host Codex."""
     control = tmp_path / "control"
-    runtime = control / "runtime"
+    # The shell runtime is the canonical control-root `.runtime`; the CLI flag
+    # remains parse-only.
+    runtime_request = control / "runtime"
+    effective_runtime = control / ".runtime"
     project = tmp_path / "project"
     target_a = tmp_path / "target-a"
     target_b = tmp_path / "target-b"
@@ -5950,7 +5951,7 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         "--control-parent-root",
         str(control),
         "--runtime-root",
-        str(runtime),
+        str(runtime_request),
     ]
     try:
         installed = subprocess.run(
@@ -5961,23 +5962,43 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
             env=environment,
         )
         assert installed.returncode == 0, installed.stderr
-        codex_home = runtime / "container-state" / "codex-home"
+        prepared = subprocess.run(
+            [*common, "codex", "prepare"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        assert prepared.returncode == 0, prepared.stderr
+        codex_home = effective_runtime / "container-state" / "codex-home"
         manifest = json.loads(
             (codex_home / "manifest.json").read_text(encoding="utf-8")
         )
         assert manifest["source_root"] == str(source_root)
         managed = manifest["links"]
         assert managed
+        shell_destinations = {}
+        for line in ADAPTER.read_text(encoding="utf-8").splitlines():
+            key, separator, value = line.partition("=")
+            if separator and key in {
+                "AGENT_CANON_CODEX_HOME_DESTINATION",
+                "AGENT_CANON_RUNTIME_DESTINATION",
+            }:
+                shell_destinations[key] = value
+        codex_container_home = shell_destinations[
+            "AGENT_CANON_CODEX_HOME_DESTINATION"
+        ]
+        container_runtime_root = shell_destinations["AGENT_CANON_RUNTIME_DESTINATION"]
         for entry in managed:
             target = codex_home / Path(entry["target"]).relative_to(
-                "/var/lib/agent-canon/runtime/codex-home"
+                codex_container_home
             )
             source = Path(entry["source"])
             assert target.is_symlink()
             assert source.exists()
             assert target.resolve() == source.resolve()
 
-        active_image = runtime / "host-state" / "active-image.tsv"
+        active_image = effective_runtime / "host-state" / "active-image.tsv"
         resident_host_state = subprocess.run(
             [
                 "docker",
@@ -5986,14 +6007,14 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
                 "test",
                 "!",
                 "-e",
-                "/var/lib/agent-canon/runtime/host-state/active-image.tsv",
+                f"{container_runtime_root}/host-state/active-image.tsv",
             ],
             check=False,
             capture_output=True,
             text=True,
         )
         assert resident_host_state.returncode == 0, resident_host_state.stderr
-        forged_state = runtime / "container-state" / "active-image.tsv"
+        forged_state = effective_runtime / "container-state" / "active-image.tsv"
         active_image.unlink()
         forged_state.write_text(
             "schema\tagent-canon.active-image.v1\n"
@@ -6079,7 +6100,9 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         ).stdout.strip()
         assert active_after["image-ref"] == actual_ref
         active_snapshot = active_image.read_bytes()
-        mounts_after_rollback = (runtime / "container-state" / "mounts.tsv").read_text(
+        mounts_after_rollback = (
+            effective_runtime / "container-state" / "mounts.tsv"
+        ).read_text(
             encoding="utf-8"
         )
         target_a_digest = hashlib.sha256(
@@ -6098,7 +6121,9 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
             env=environment,
         )
         assert toggled.returncode == 0, toggled.stderr
-        mounts_after_toggle = (runtime / "container-state" / "mounts.tsv").read_text(
+        mounts_after_toggle = (
+            effective_runtime / "container-state" / "mounts.tsv"
+        ).read_text(
             encoding="utf-8"
         )
         assert f"target\t{target_a_digest}\t" in mounts_after_toggle

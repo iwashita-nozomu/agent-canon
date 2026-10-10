@@ -18,11 +18,24 @@ from pathlib import Path
 import pytest
 import yaml
 
+import tools.runtime.container.bootstrap_runtime as bootstrap_runtime_module
 from tools.runtime.container.bootstrap_runtime import BootstrapError, BootstrapRuntime
 
 ROOT = Path(__file__).resolve().parents[2]
 ADAPTER = ROOT / "bootstrap/host/lifecycle/entrypoint.sh"
 SKILLS = Path(".codex/personal/skills")
+
+
+@pytest.fixture(autouse=True)
+def resident_private_log_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Provide the private-log mount required by resident controller calls."""
+    private_log = tmp_path / "private-log"
+    private_log.mkdir()
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
 
 
 def git(root: Path, *args: str) -> str:
@@ -43,11 +56,18 @@ def git(root: Path, *args: str) -> str:
 
 
 def install_links(home: Path, checkout: Path) -> subprocess.CompletedProcess[str]:
-    """Exercise the production host link owner without starting Docker."""
+    """Exercise skill links while leaving separately tested config merge alone."""
     state = home / "state"
     state.mkdir(exist_ok=True)
     return subprocess.run(
-        ["bash", "-c", 'source "$1"; _agent_canon_install_global_links', "--", str(ADAPTER)],
+        [
+            "bash",
+            "-c",
+            'source "$1"; _agent_canon_apply_context_defaults() { :; }; '
+            "_agent_canon_install_global_links",
+            "--",
+            str(ADAPTER),
+        ],
         capture_output=True,
         text=True,
         check=False,
