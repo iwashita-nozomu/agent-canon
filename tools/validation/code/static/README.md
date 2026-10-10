@@ -5,7 +5,7 @@ contract tool
 responsibility Documents language-organized static analysis tool entrypoints.
 upstream design ../../../README.md shared tool index
 downstream design python/README.md Python static analysis entrypoints
-downstream design cpp/README.md C and C++ static analysis entrypoints
+downstream design ../../../../documents/tools/oop/cpp/readability.md C++ OOP readability checker and documentation
 downstream design common/README.md cross-language static analysis entrypoints
 @dependency-end
 -->
@@ -18,7 +18,7 @@ static-analysis entrypoints.
 Use this split for routing:
 
 - [python/](python/README.md): Python type, logging, OOP/readability, Ruff, and BasedPyright checks.
-- [cpp/](cpp/README.md): C and C++ readability, include, and native boundary checks.
+- [C++ OOP readability](../../../../documents/tools/oop/cpp/readability.md): C and C++ object-oriented design/readability review signals.
 - [common/](common/README.md): cross-language dependency, native magic-value, and repo review scans.
 
 The integrated repo entrypoint is:
