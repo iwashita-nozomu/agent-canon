@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -339,10 +338,10 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertIn("Ownership:", rendered)
         self.assertNotIn("return None", rendered)
 
-    def test_cpp_code_template_materializes_paths_for_independent_local_consumers(
+    def test_cpp_code_template_materializes_independent_test_and_experiment_graphs(
         self,
     ) -> None:
-        """Rendered include/src files support separate consumer-local CMake graphs."""
+        """Rendered sources support independent test and experiment CMake graphs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_root = Path(tmp_dir)
             consumer_root = tmp_root / "consumer"
@@ -365,59 +364,111 @@ class AgentTeamTemplateTest(unittest.TestCase):
             # remains a separate valid project-owned layout.
             self.assertFalse((consumer_root / "CMakeLists.txt").exists())
 
-            for topic, sibling in (
-                ("topic_alpha", "topic_beta"),
-                ("topic_beta", "topic_alpha"),
-            ):
-                topic_dir = consumer_root / "experiments" / topic
-                topic_dir.mkdir(parents=True)
-                self.assertFalse((consumer_root / "experiments" / sibling).exists())
-                (topic_dir / "main.cpp").write_text(
-                    "#include <agent_canon_template/status.hpp>\n\n"
-                    "int main() {\n"
-                    "    return agent_canon_template::status() == "
-                    "agent_canon_template::Status::ready ? 0 : 1;\n"
-                    "}\n",
-                    encoding="utf-8",
-                )
-                (topic_dir / "CMakeLists.txt").write_text(
-                    "cmake_minimum_required(VERSION 3.16)\n"
-                    f"project({topic} LANGUAGES CXX)\n"
-                    "set(CMAKE_CXX_STANDARD 11)\n"
-                    "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
-                    "enable_testing()\n"
-                    'get_filename_component(CONSUMER_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)\n'
-                    f'add_executable({topic}_smoke main.cpp "${{CONSUMER_ROOT}}/src/status.cpp")\n'
-                    f'target_include_directories({topic}_smoke PRIVATE "${{CONSUMER_ROOT}}/include")\n'
-                    f"add_test(NAME {topic}_smoke COMMAND {topic}_smoke)\n",
-                    encoding="utf-8",
-                )
-                build_dir = tmp_root / "build" / topic
-                configure = subprocess.run(
-                    ["cmake", "-S", str(topic_dir), "-B", str(build_dir)],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertEqual(
-                    configure.returncode, 0, configure.stdout + configure.stderr
-                )
-                build = subprocess.run(
-                    ["cmake", "--build", str(build_dir), "--parallel", "1"],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
-                test = subprocess.run(
-                    ["ctest", "--output-on-failure"],
-                    cwd=build_dir,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertEqual(test.returncode, 0, test.stdout + test.stderr)
-                shutil.rmtree(topic_dir)
+            test_dir = consumer_root / "tests" / "cpp" / "status_consumer"
+            test_dir.mkdir(parents=True)
+            self.assertFalse((consumer_root / "experiments").exists())
+            consumer_main = (
+                "#include <agent_canon_template/status.hpp>\n\n"
+                "int main() {\n"
+                "    return agent_canon_template::status() == "
+                "agent_canon_template::Status::ready ? 0 : 1;\n"
+                "}\n"
+            )
+            (test_dir / "main.cpp").write_text(consumer_main, encoding="utf-8")
+            (test_dir / "CMakeLists.txt").write_text(
+                "cmake_minimum_required(VERSION 3.16)\n"
+                "project(status_consumer_test LANGUAGES CXX)\n"
+                "set(CMAKE_CXX_STANDARD 11)\n"
+                "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
+                "enable_testing()\n"
+                'get_filename_component(CONSUMER_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)\n'
+                'add_executable(status_consumer_smoke main.cpp "${CONSUMER_ROOT}/src/status.cpp")\n'
+                'target_include_directories(status_consumer_smoke PRIVATE "${CONSUMER_ROOT}/include")\n'
+                "add_test(NAME status_consumer_smoke COMMAND status_consumer_smoke)\n",
+                encoding="utf-8",
+            )
+            test_build_dir = tmp_root / "build" / "test-consumer"
+            configure_test = subprocess.run(
+                ["cmake", "-S", str(test_dir), "-B", str(test_build_dir)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                configure_test.returncode,
+                0,
+                configure_test.stdout + configure_test.stderr,
+            )
+            self.assertTrue((test_build_dir / "CTestTestfile.cmake").is_file())
+            build_test = subprocess.run(
+                ["cmake", "--build", str(test_build_dir), "--parallel", "1"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                build_test.returncode, 0, build_test.stdout + build_test.stderr
+            )
+            run_test = subprocess.run(
+                ["ctest", "--output-on-failure"],
+                cwd=test_build_dir,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(run_test.returncode, 0, run_test.stdout + run_test.stderr)
+            test_dir_parent = test_dir.parent
+            test_dir.rmdir()
+            test_dir_parent.rmdir()
+
+            experiment_dir = consumer_root / "experiments" / "status_experiment"
+            experiment_dir.mkdir(parents=True)
+            self.assertFalse((consumer_root / "tests" / "cpp").exists())
+            (experiment_dir / "main.cpp").write_text(
+                consumer_main, encoding="utf-8"
+            )
+            (experiment_dir / "CMakeLists.txt").write_text(
+                "cmake_minimum_required(VERSION 3.16)\n"
+                "project(status_experiment LANGUAGES CXX)\n"
+                "set(CMAKE_CXX_STANDARD 11)\n"
+                "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
+                'get_filename_component(CONSUMER_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)\n'
+                'add_executable(status_experiment main.cpp "${CONSUMER_ROOT}/src/status.cpp")\n'
+                'target_include_directories(status_experiment PRIVATE "${CONSUMER_ROOT}/include")\n',
+                encoding="utf-8",
+            )
+            experiment_build_dir = tmp_root / "build" / "experiment"
+            configure_experiment = subprocess.run(
+                [
+                    "cmake",
+                    "-S",
+                    str(experiment_dir),
+                    "-B",
+                    str(experiment_build_dir),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                configure_experiment.returncode,
+                0,
+                configure_experiment.stdout + configure_experiment.stderr,
+            )
+            self.assertFalse(
+                (experiment_build_dir / "CTestTestfile.cmake").exists()
+            )
+            build_experiment = subprocess.run(
+                ["cmake", "--build", str(experiment_build_dir), "--parallel", "1"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                build_experiment.returncode,
+                0,
+                build_experiment.stdout + build_experiment.stderr,
+            )
 
     def test_code_template_renderer_works_from_repo_root_package_route(self) -> None:
         """リポジトリ root の canonical package invocation が source を読み戻せます."""
