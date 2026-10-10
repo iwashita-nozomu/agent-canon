@@ -379,12 +379,48 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
             )
 
         assert return_code == 0
-        assert len(calls) == 1
+        manifest_path = report_root / run_id / "team_manifest.yaml"
+        manifest_payload = (
+            yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            if manifest_path.is_file()
+            else None
+        )
+        run_payload = (
+            manifest_payload.get("run")
+            if isinstance(manifest_payload, dict)
+            else None
+        )
+        dispatch_payload = (
+            run_payload.get("issue_worker_dispatch")
+            if isinstance(run_payload, dict)
+            else None
+        )
+        dispatch_status = (
+            dispatch_payload.get("status")
+            if isinstance(dispatch_payload, dict)
+            else None
+        )
+        handoff_payload = (
+            dispatch_payload.get("handoff")
+            if isinstance(dispatch_payload, dict)
+            else None
+        )
+        handoff_reason = (
+            handoff_payload.get("reason")
+            if isinstance(handoff_payload, dict)
+            else None
+        )
+        assert len(calls) == 1, (
+            "expected one publisher spawn; "
+            f"bootstrap_output={output.getvalue()!r}; "
+            f"dispatch_status={dispatch_status!r}; "
+            f"handoff_reason={handoff_reason!r}"
+        )
         assert calls[0][0] == "publisher"
         assert "ISSUE_WORKER_TOOL_CALL=" in output.getvalue()
         assert "RECOMMENDED_INITIAL_SUBAGENT_ROLES=publisher" in output.getvalue()
         manifest = yaml.safe_load(
-            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
+            manifest_path.read_text(encoding="utf-8")
         )
         run = manifest["run"]
         assert run["spawn_wave_recommendation"]["initial_wave_agent_types"] == [
