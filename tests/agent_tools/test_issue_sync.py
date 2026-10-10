@@ -454,7 +454,7 @@ def test_pending_packet_rejects_different_current_checkout(tmp_path: Path) -> No
     assert packet.exists()
 
 
-def test_github_adapter_mock_readback_is_host_only() -> None:
+def test_github_adapter_reuses_shared_github_command_transport() -> None:
     payload = json.dumps({
         "number": 882,
         "title": "Readback",
@@ -462,9 +462,11 @@ def test_github_adapter_mock_readback_is_host_only() -> None:
         "state": "OPEN",
         "url": "https://github.com/owner/repo/issues/882",
     })
-    result = __import__("subprocess").CompletedProcess([], 0, payload, "")
+    result = issue_sync.CommandResult(
+        args=("gh", "issue", "view"), returncode=0, stdout=payload, stderr=""
+    )
     client = issue_sync.GitHubIssueClient("owner/repo")
-    with patch.object(issue_sync.subprocess, "run", return_value=result) as run:
+    with patch.object(issue_sync, "subprocess_runner", return_value=result) as run:
         record = client.read(issue_sync.parse_issue_reference("owner/repo#882"))
     assert record.repository == "owner/repo"
     assert run.call_args.args[0][:3] == ["gh", "issue", "view"]
