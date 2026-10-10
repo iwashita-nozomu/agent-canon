@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -669,6 +672,28 @@ def _admit_process_owned_task(
     return record, lease_fd
 
 
+def _run_process_owned_worker_controller(
+    manager: BootstrapRuntime, task_id: str, target: Path, ready_file: Path
+) -> None:
+    """Spawn one resident worker that keeps its admitted process lease."""
+    os.environ["AGENT_CANON_CONTAINER_CONTROL"] = "1"
+    _, lease_fd = _admit_process_owned_task(manager, task_id, target)
+    try:
+        manager.docker.exec_container(
+            "resident",
+            cwd=str(target),
+            argv=[
+                "/bin/sh",
+                "-c",
+                'printf "%s\\n" "$$" > "$READY_FILE"; exec /bin/sleep 30',
+            ],
+            environment={"READY_FILE": str(ready_file)},
+            pass_fds=(lease_fd,),
+        )
+    finally:
+        os.close(lease_fd)
+
+
 def _ready_runtime_with_target(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> tuple[BootstrapRuntime, Path]:
@@ -710,6 +735,105 @@ def test_resident_exec_passes_process_lease_to_worker(
 
     assert result.returncode == 0
     assert observed["pass_fds"] == (lease_fd,)
+
+
+def test_process_lease_survives_controller_death_until_worker_exits(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """A live child keeps its lease after controller death until admission recovers."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    task_id = "exec-controller-death"
+    ready_file = tmp_path / "worker.pid"
+    controller = multiprocessing.get_context("fork").Process(
+        target=_run_process_owned_worker_controller,
+        args=(manager, task_id, target, ready_file),
+    )
+    worker_pid: int | None = None
+    next_task_admitted = False
+
+    def ready_worker_pid() -> int | None:
+        try:
+            value = ready_file.read_text(encoding="ascii").strip()
+        except OSError:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    controller.start()
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            worker_pid = ready_worker_pid()
+            if worker_pid is not None:
+                break
+            if not controller.is_alive():
+                break
+            time.sleep(0.01)
+        assert worker_pid is not None, "resident worker did not publish its PID"
+
+        controller_pid = controller.pid
+        assert controller_pid is not None
+        os.kill(controller_pid, signal.SIGKILL)
+        controller.join(timeout=5)
+        assert not controller.is_alive(), "controller did not exit after SIGKILL"
+        assert controller.exitcode == -signal.SIGKILL
+        os.kill(worker_pid, 0)
+
+        with pytest.raises(BootstrapError) as live_worker:
+            manager.admit_task("exec-next", target_root=target)
+        assert live_worker.value.code == "target_busy"
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert state["tasks"][task_id]["state"] == "active"
+        assert state["tasks"][task_id]["pinned"] is True
+
+        os.kill(worker_pid, signal.SIGTERM)
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                result = manager.admit_task("exec-next", target_root=target)
+            except BootstrapError as exc:
+                if exc.code != "target_busy" or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
+            else:
+                next_task_admitted = True
+                break
+
+        assert result["code"] == "task_reserved"
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert state["tasks"][task_id]["state"] == "cancelled"
+        assert state["tasks"][task_id]["outcome"] == "terminated"
+        assert state["tasks"][task_id]["pinned"] is False
+        assert state["tasks"]["exec-next"]["state"] == "active"
+    finally:
+        if worker_pid is None and controller.is_alive():
+            deadline = time.monotonic() + 1
+            while time.monotonic() < deadline:
+                worker_pid = ready_worker_pid()
+                if worker_pid is not None or not controller.is_alive():
+                    break
+                time.sleep(0.01)
+        if controller.is_alive():
+            controller_pid = controller.pid
+            if controller_pid is not None:
+                os.kill(controller_pid, signal.SIGKILL)
+            controller.join(timeout=5)
+        if worker_pid is not None:
+            try:
+                os.kill(worker_pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                lease_fd = manager._open_task_process_lease(task_id)
+                if lease_fd is not None:
+                    os.close(lease_fd)
+                    break
+                time.sleep(0.01)
+        if next_task_admitted:
+            manager.release_task("exec-next")
 
 
 def test_dead_process_task_lease_is_reconciled_before_next_admission(
