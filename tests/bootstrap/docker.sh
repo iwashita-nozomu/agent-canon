@@ -4,7 +4,7 @@
 # responsibility Runs live-projection, lean-proof, and full-check profiles in one disposable test image.
 # upstream implementation ./Dockerfile.live provides Python, Git, and Docker CLI
 # downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh owns the full-check body
-# downstream implementation tests/bootstrap/test_live_projection_authority.py validates live projection authority
+# downstream implementation ./test_live_projection_authority.py validates live projection authority
 # downstream design ./lean-proof-dependencies.toml pins the native proof toolchain
 # downstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs the selected proof profile dependencies
 # downstream implementation ../../tools/analysis/proof/lean_proof_env.py runs native Lean checks
