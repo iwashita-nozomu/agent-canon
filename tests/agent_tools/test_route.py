@@ -442,15 +442,16 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("benchmark_reviewer", waves["research_review"])
         self.assertNotIn("benchmark_reviewer", waves["final_review"])
 
-    def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(
-        self,
-    ) -> None:
-        """The route contract carries the math packet and refuses non-math scope drift."""
+    def test_math_scope_contract_is_owned_and_routed(self) -> None:
+        """The math owner defines packet fields and orchestration routes to it."""
         orchestration = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
         ).read_text(encoding="utf-8")
         optimization = (
             PROJECT_ROOT / "agents" / "skills" / "computational-optimization.md"
+        ).read_text(encoding="utf-8")
+        bootstrap = (
+            PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
         ).read_text(encoding="utf-8")
         for field in (
             "math_object",
@@ -484,7 +485,6 @@ class RouteToolTest(unittest.TestCase):
         ):
             with self.subTest(field=field):
                 self.assertIn(field, optimization)
-                self.assertIn(field, orchestration)
         for surface in (
             "architecture",
             "JIT",
@@ -494,10 +494,14 @@ class RouteToolTest(unittest.TestCase):
             "environment",
         ):
             with self.subTest(surface=surface):
-                self.assertIn(surface, orchestration)
                 self.assertIn(surface, optimization)
-        self.assertIn("math_packet_missing", orchestration)
-        self.assertIn("writer_target", orchestration)
+        self.assertIn(
+            "[computational-optimization](computational-optimization.md)",
+            orchestration,
+        )
+        self.assertIn("mathematical intent", orchestration)
+        self.assertIn("math_packet_missing", optimization)
+        self.assertIn("writer_target", bootstrap)
 
         team_config = json.loads(
             (PROJECT_ROOT / "agents" / "agents_config.json").read_text(encoding="utf-8")
