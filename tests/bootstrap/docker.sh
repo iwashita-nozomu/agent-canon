@@ -235,6 +235,7 @@ else
     --env "AGENT_CANON_CONTROL_PARENT_ROOT=${TEST_WORKAREA}/control"
     --env "AGENT_CANON_CHILD_PURPOSE=standalone-static-gate-unit"
     --env "AGENT_CANON_CLI_CMD=/usr/local/bin/agent-canon"
+    --env "CARGO_HOME=${TEST_WORKAREA}/runtime/cache/cargo-home"
     --env "HOME=${TEST_WORKAREA}/cache/home"
   )
   DOCKER_WORKDIR="${SOURCE_IMAGE}"
