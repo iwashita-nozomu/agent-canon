@@ -112,10 +112,7 @@ def _as_prompt_entry_tuple(value: object, field_name: str) -> tuple[str, ...]:
         return ()
     if not is_object_list(value):
         raise RuntimeError(f"{field_name} must be a list")
-    return tuple(
-        _render_prompt_entry(item, f"{field_name} entries")
-        for item in value
-    )
+    return tuple(_render_prompt_entry(item, f"{field_name} entries") for item in value)
 
 
 def _render_prompt_entry(value: object, field_name: str) -> str:
@@ -398,6 +395,7 @@ VALIDATION_FAILURE_TAXONOMY_SOURCE = (
 )
 
 RUNTIME_PROFILE_INVENTORY_PATH = ROOT / VALIDATION_FAILURE_TAXONOMY_SOURCE
+
 
 class ValidationFailureResponsePolicy(TypedDict):
     """Owner projection read from the validation-failure taxonomy."""
@@ -2264,9 +2262,7 @@ def manifest_context_policy_lines(
     packet_artifacts = active_design_packet_artifact_map(config, active_design_packet)
     for policy in config.context_policies:
         lines.append("  - roles:")
-        for role_name in as_string_tuple(
-            policy.get("roles"), "context_policies.roles"
-        ):
+        for role_name in as_string_tuple(policy.get("roles"), "context_policies.roles"):
             lines.append(f"      - {role_name}")
         mode = as_required_string(policy.get("mode"), "context_policies.mode")
         lines.append(f"    mode: {mode}")

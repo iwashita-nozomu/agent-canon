@@ -1248,9 +1248,7 @@ def normalize_active_design_packet_config(
                 raise RuntimeError(f"{clause_field}:field_unknown:" + ",".join(unknown))
             missing = sorted({"clause_id", "source_ref"}.difference(clause))
             raise RuntimeError(f"{clause_field}:field_missing:" + ",".join(missing))
-        clause_id = as_required_string(
-            clause["clause_id"], f"{clause_field}.clause_id"
-        )
+        clause_id = as_required_string(clause["clause_id"], f"{clause_field}.clause_id")
         source_ref = as_required_string(
             clause["source_ref"], f"{clause_field}.source_ref"
         )

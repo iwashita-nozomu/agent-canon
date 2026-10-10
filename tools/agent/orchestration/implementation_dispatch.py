@@ -202,16 +202,12 @@ def _capacity_family_record(
     roles = as_object_mapping(family.get("roles", {}), "workflow_family.roles")
     declared_roles = set(
         as_string_tuple(roles.get("always_on"), "workflow_family.roles.always_on")
-        + as_string_tuple(
-            roles.get("specialists"), "workflow_family.roles.specialists"
-        )
+        + as_string_tuple(roles.get("specialists"), "workflow_family.roles.specialists")
     )
     topology = as_object_mapping(
         family.get("role_topology", {}), "workflow_family.role_topology"
     )
-    waves = as_mapping_tuple(
-        topology.get("stage_waves"), "workflow_family.stage_waves"
-    )
+    waves = as_mapping_tuple(topology.get("stage_waves"), "workflow_family.stage_waves")
 
     def stage_roles(stage_class: str) -> tuple[str, ...]:
         selected: list[str] = []
@@ -223,9 +219,7 @@ def _capacity_family_record(
                 continue
             if wave.get("stage_class") != stage_class:
                 continue
-            for role_id in as_string_tuple(
-                wave.get("role_ids"), "stage_wave.role_ids"
-            ):
+            for role_id in as_string_tuple(wave.get("role_ids"), "stage_wave.role_ids"):
                 if role_id in declared_roles and role_id not in selected:
                     selected.append(role_id)
         return tuple(selected)

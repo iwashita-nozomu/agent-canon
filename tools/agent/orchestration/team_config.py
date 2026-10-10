@@ -24,7 +24,10 @@ import yaml
 
 from tools.runtime.values import is_object_list, is_string_object_dict
 
-from tools.agent.orchestration.route import implementation_handoff_required, load_skill_route_rules
+from tools.agent.orchestration.route import (
+    implementation_handoff_required,
+    load_skill_route_rules,
+)
 
 if TYPE_CHECKING:
     if __package__:
@@ -190,7 +193,9 @@ class RunBundleSpec:
     active_design_packet: ActiveDesignPacketConfig | None = None
     math_intent_route: str | None = None
     math_intent_packet: "MathematicalIntentPacket | None" = None
-    writer_targets: Mapping[str, WriterTarget] = field(default_factory=_empty_writer_targets)
+    writer_targets: Mapping[str, WriterTarget] = field(
+        default_factory=_empty_writer_targets
+    )
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
@@ -207,12 +212,8 @@ def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
         for role in as_mapping_tuple(raw.get("specialist_roles"), "specialist_roles")
     )
     handoffs = as_mapping_tuple(raw.get("handoffs"), "handoffs")
-    context_policies = as_mapping_tuple(
-        raw.get("context_policies"), "context_policies"
-    )
-    activation_rules = as_mapping_tuple(
-        raw.get("activation_rules"), "activation_rules"
-    )
+    context_policies = as_mapping_tuple(raw.get("context_policies"), "context_policies")
+    activation_rules = as_mapping_tuple(raw.get("activation_rules"), "activation_rules")
     quality_gates = as_string_tuple(raw.get("quality_gates"), "quality_gates")
     artifact_registry = as_object_mapping(raw.get("artifacts"), "artifacts")
     artifacts = {
@@ -478,11 +479,7 @@ def select_roles(
         all_roles = config.always_on_roles + config.specialist_roles
         if workflow_family_id == "skill_evaluation":
             return tuple(role for role in all_roles if role.id == "skill_evaluator")
-        return tuple(
-            role
-            for role in all_roles
-            if role.id != "skill_evaluator"
-        )
+        return tuple(role for role in all_roles if role.id != "skill_evaluator")
     always_on_roles = workflow_always_on_roles(config, catalog, workflow_family_id)
     selected_specialist_names = [
         role_id
@@ -501,7 +498,9 @@ def select_roles(
         and "publisher" not in selected_specialist_names
     ):
         selected_specialist_names.append("publisher")
-    enabled_roles = tuple(resolve_role(config, name) for name in selected_specialist_names)
+    enabled_roles = tuple(
+        resolve_role(config, name) for name in selected_specialist_names
+    )
     selected_roles = list(always_on_roles)
     selected_ids = {role.id for role in selected_roles}
     for role in enabled_roles:
@@ -563,9 +562,8 @@ def workflow_child_handoff_required(
     if child_handoff.get("activation") != "selected_typed_route":
         return False
     family = resolve_workflow_family(catalog, workflow_family_id)
-    if (
-        workflow_family_id == "issue_worker_publication"
-        and not isinstance(issue_worker_candidate, Mapping)
+    if workflow_family_id == "issue_worker_publication" and not isinstance(
+        issue_worker_candidate, Mapping
     ):
         return False
     roles = as_object_mapping(
