@@ -692,7 +692,7 @@ def append_ledger_event(
         runtime_root=runtime_root,
     )
     if not work_log_path.exists():
-        _log_run_work_entry(report_dir, "ledger-bootstrap")
+        _log_run_work_entry(report_dir, "ledger-bootstrap", runtime_root)
     lines = work_log_path.read_text(encoding="utf-8").splitlines()
     heading = "## Ledger Events"
     if heading not in lines:
@@ -801,9 +801,18 @@ def _resolve_active_report_dir(
     )
 
 
-def _log_run_work_entry(report_dir: Path, entry: str) -> Path:
+def _log_run_work_entry(
+    report_dir: Path,
+    entry: str,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Append one entry to the run-bundle work log."""
-    _parent_path(report_dir / "work_log.md", "work-log", create=True)
+    _parent_path(
+        report_dir / "work_log.md",
+        "work-log",
+        create=True,
+        runtime_root=runtime_root,
+    )
     work_log_path = report_dir / "work_log.md"
     if not work_log_path.exists():
         _parent_write(
@@ -825,6 +834,7 @@ def _log_run_work_entry(report_dir: Path, entry: str) -> Path:
                 ]
             ).encode("utf-8"),
             "work-log",
+            runtime_root,
         )
     existing = work_log_path.read_bytes()
     separator = b"\n" if existing else b""
@@ -832,6 +842,7 @@ def _log_run_work_entry(report_dir: Path, entry: str) -> Path:
         work_log_path,
         existing + separator + f"- {entry}\n".encode("utf-8"),
         "work-log",
+        runtime_root,
     )
     return work_log_path
 
@@ -920,7 +931,7 @@ def main() -> int:
         f"`{timestamp} | {args.kind} | {args.message}"
         f"{clause_suffix}{design_suffix}{ref_suffix}{next_suffix}`"
     )
-    work_log_path = _log_run_work_entry(report_dir, entry)
+    work_log_path = _log_run_work_entry(report_dir, entry, args.runtime_root)
     print(f"WORK_LOG={work_log_path}")
     print(entry)
     return 0
