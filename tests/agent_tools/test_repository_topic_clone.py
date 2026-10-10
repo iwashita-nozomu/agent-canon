@@ -2475,9 +2475,7 @@ def test_cleanup_rejects_legacy_namespace_with_only_retired_digest(
         "stale-from-older-marker",
     )
 
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError, match="legacy-marker-incomplete"
-    ):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-incomplete"):
         rtc.cleanup(request.request, apply=False)
 
 
