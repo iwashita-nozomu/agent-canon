@@ -20,8 +20,7 @@ DOCKER = os.environ.get("AGENT_CANON_DOCKER", "docker")
 pytestmark = pytest.mark.skipif(
     not LIVE_DOCKER,
     reason=(
-        "run tools/validation/ci/runners/"
-        "run_live_projection_authority_test.sh for the Docker-host route"
+        "run bash tests/bootstrap/docker.sh for the Docker-host route"
     ),
 )
 PROJECTIONS = ("mounts.toml", "mounts.tsv", "rollback-plan.tsv", "rollback-mounts.tsv")

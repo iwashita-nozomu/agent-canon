@@ -23,6 +23,7 @@
 !tests/
 !tests/bootstrap/
 !tests/bootstrap/conftest.py
+!tests/bootstrap/docker.sh
 !tests/bootstrap/test_live_projection_authority.py
 !agents/
 !agents/**

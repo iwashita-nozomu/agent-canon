@@ -2,15 +2,14 @@
 # @dependency-start
 # contract tool
 # responsibility Runs Issue #1370's live regression in its disposable Docker-host test image.
-# upstream implementation ../../../../tests/bootstrap/live-projection-test.pack.toml declares the Docker-host capability
-# upstream implementation ./run_in_repo_container.py owns pack image/run composition
-# downstream test ../../../../tests/bootstrap/test_live_projection_authority.py validates live projection authority
+# upstream implementation ./Dockerfile.live provides Python, Git, pytest, and Docker CLI
+# downstream test ./test_live_projection_authority.py validates live projection authority
 # @dependency-end
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-source "${SCRIPT_DIR}/../../../repository/support/repo_paths.sh"
+source "${SCRIPT_DIR}/../../tools/repository/support/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 
 RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
@@ -23,16 +22,15 @@ fi
 TEST_WORKAREA="$(mktemp -d "${RUNTIME_ROOT}/live-projection-1370.XXXXXX")"
 IMAGE_TAG="agent-canon-live-projection:${TEST_WORKAREA##*/}-$$"
 SOURCE_IMAGE="/opt/agent-canon/source"
-PACK="${WORKSPACE_ROOT}/tests/bootstrap/live-projection-test.pack.toml"
-DOCKERFILE="${WORKSPACE_ROOT}/tests/bootstrap/Dockerfile.live-projection-test"
 TEST_NODE="${SOURCE_IMAGE}/tests/bootstrap/test_live_projection_authority.py::test_topic_registration_anchor_status_remove_share_projection"
+IMAGE_BUILT=0
 
 cleanup() {
   local status=$?
   local cleanup_status=0
   trap - EXIT INT TERM
 
-  if ! docker image rm -- "${IMAGE_TAG}"; then
+  if [[ "${IMAGE_BUILT}" -eq 1 ]] && ! docker image rm -- "${IMAGE_TAG}"; then
     echo "failed to remove task-owned test image ${IMAGE_TAG}" >&2
     cleanup_status=1
   fi
@@ -49,19 +47,20 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# The workarea is both the container workspace and its host-visible scratch
-# root, so Docker bind sources created by pytest resolve to the same paths on
-# the host daemon. The source itself is copied into the disposable image.
-unset AGENT_CANON_OPTIONAL_MOUNTS
-python3 "${SCRIPT_DIR}/run_in_repo_container.py" \
-  --pack "${PACK}" \
-  --builder docker \
-  --dockerfile "${DOCKERFILE}" \
-  --context "${WORKSPACE_ROOT}" \
+docker build \
+  --file "${SCRIPT_DIR}/Dockerfile.live" \
   --tag "${IMAGE_TAG}" \
-  --workspace-root "${TEST_WORKAREA}" \
-  --container-workspace "${TEST_WORKAREA}" \
+  "${WORKSPACE_ROOT}"
+IMAGE_BUILT=1
+
+# The only runtime binds are the task workarea at its host-absolute path and
+# the Docker socket; pytest temp paths and nested target binds therefore share
+# the same path on the host daemon.
+docker run --rm \
+  --volume "${TEST_WORKAREA}:${TEST_WORKAREA}" \
+  --volume /var/run/docker.sock:/var/run/docker.sock \
   --workdir "${TEST_WORKAREA}" \
+  --env AGENT_CANON_LIVE_DOCKER=1 \
   --env "AGENT_CANON_RUNTIME_ROOT=${TEST_WORKAREA}/runtime" \
-  -- \
+  "${IMAGE_TAG}" \
   python3 -m pytest -vv "${TEST_NODE}"
