@@ -126,6 +126,7 @@ doc = "documents/tools/wiki_publish.md"
 language = "python"
 summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
 
+[[tool]]
 id = "render-dependency-manifest-graph"
 classification = "public"
 tool = "tools/analysis/dependencies/render_dependency_manifest_graph.py"
