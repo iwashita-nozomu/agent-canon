@@ -62,13 +62,20 @@ project's own Docker test runner.
 
 ## One command family
 
+The installer entrypoint comes from the installed runtime source root; the
+observed project/worktree is a separate read-only `--root <topic>` target. Use
+the latest installed/bootstrap absolute entrypoint for that runtime; a topic
+checkout's `./bootstrap.sh` is only for validating lifecycle-source changes and
+may be stale.
+
 Every command starts with the install root and explicit control root. The
 persistent runtime defaults to the control root's ignored `.runtime/`:
 
 ```bash
-BOOTSTRAP=./bootstrap.sh
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
 ROOT=<authorized-parent-root>
-COMMON=(--control-parent-root "$ROOT")
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
 ```
 
 `--control-parent-root` is the authorized parent repository root and selects
