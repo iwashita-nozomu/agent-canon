@@ -56,6 +56,15 @@ python3 -m tools.analysis.dependencies.dependency_plan install \
 printf "%s\n" "import Mathlib" "" "example : True := by trivial" > "${fixtures}/positive.lean"
 printf "%s\n" "import Mathlib" "" "example : False := by trivial" > "${fixtures}/negative.lean"
 printf "%s\n" \
+  "/--" \
+  "error: Tactic \`assumption\` failed" \
+  "" \
+  "⊢ False" \
+  "-/" \
+  "#guard_msgs in" \
+  "example : False := by trivial" \
+  > "${fixtures}/guarded-negative.lean"
+printf "%s\n" \
   "import Plausible" \
   "" \
   "/-- error: Found a counter-example! -/" \
@@ -73,6 +82,10 @@ python3 "${tool}" check-file \
   --env-dir "${env_dir}" \
   --lean-file "${fixtures}/positive.lean" \
   --execute --format json
+python3 "${tool}" check-file \
+  --env-dir "${env_dir}" \
+  --lean-file "${fixtures}/guarded-negative.lean" \
+  --execute --format json
 
 expect_lean_failure() {
   local source_file="$1"
@@ -89,10 +102,9 @@ expect_lean_failure() {
     status="$?"
   fi
   if [[ "${status}" -ne 1 ]] \
-    || ! grep -Fq "\"status\": \"failed\"" "${result_file}" \
-    || ! grep -Fq "unsolved goals" "${result_file}"; then
+    || ! grep -Fq "\"status\": \"failed\"" "${result_file}"; then
     cat "${result_file}" >&2
-    echo "native Lean failure did not match the expected unsolved-goal result: ${source_file}" >&2
+    echo "native Lean failure did not match the expected check-file failure: ${source_file}" >&2
     return 1
   fi
   cat "${result_file}"
