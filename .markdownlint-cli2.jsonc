@@ -1,0 +1,19 @@
+{
+  "config": {
+    "default": false,
+    "MD001": true,
+    "MD004": false,
+    "MD009": { "br_spaces": 0 },
+    "MD010": { "ignore_code_blocks": false },
+    "MD030": {
+      "ul_single": 1,
+      "ol_single": 1,
+      "ul_multi": 1,
+      "ol_multi": 1
+    },
+    "MD040": true
+  },
+  "modulePaths": ["/usr/local/lib/node_modules"],
+  "noBanner": true,
+  "noProgress": true
+}

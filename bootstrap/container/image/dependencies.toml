@@ -92,6 +92,28 @@ provides = ["bash-language-server"]
 failure_policy = "fail"
 
 [[records]]
+id = "markdownlint-cli2"
+package = "markdownlint-cli2"
+method = "npm-global"
+version = "0.17.2"
+source = "https://registry.npmjs.org/markdownlint-cli2"
+verification = { kind = "npm-package", executable = "markdownlint-cli2", args = ["--version"], output_contains = "markdownlint-cli2 v0.17.2" }
+deps = ["node"]
+provides = ["markdownlint-cli2"]
+failure_policy = "fail"
+
+[[records]]
+id = "markdownlint-cli2-formatter-json"
+package = "markdownlint-cli2-formatter-json"
+method = "npm-global"
+version = "0.0.8"
+source = "https://registry.npmjs.org/markdownlint-cli2-formatter-json"
+verification = { kind = "npm-package", executable = "markdownlint-cli2", args = ["--version"], output_contains = "markdownlint-cli2 v0.17.2" }
+deps = ["markdownlint-cli2"]
+provides = ["markdownlint-cli2-formatter-json"]
+failure_policy = "fail"
+
+[[records]]
 id = "jq"
 package = "jq"
 method = "apt-package"

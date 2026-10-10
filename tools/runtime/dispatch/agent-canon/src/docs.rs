@@ -13,6 +13,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+
+static MARKDOWNLINT_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 const DEFAULT_DOC_TARGETS: &[&str] = &[
     "README.md",
@@ -430,7 +434,7 @@ fn structured_findings_report(findings: &[Finding], root: &Path) -> String {
 fn collect_check_findings(root: &Path, raw_paths: &[String]) -> Vec<Finding> {
     let mut findings = Vec::new();
     let markdown_files = collect_markdown_files(root, raw_paths);
-    findings.extend(check_markdown_lint(&markdown_files));
+    findings.extend(check_markdown_lint(root, &markdown_files));
     findings.extend(check_markdown_math(&markdown_files));
     findings.extend(check_markdown_links(root, &markdown_files));
     findings.extend(check_bootstrap_docs(root));
@@ -545,8 +549,9 @@ fn skip_path(path: &Path) -> bool {
     })
 }
 
-fn check_markdown_lint(files: &[PathBuf]) -> Vec<Finding> {
+fn check_markdown_lint(root: &Path, files: &[PathBuf]) -> Vec<Finding> {
     let mut findings = Vec::new();
+    let mut readable_files = Vec::new();
     for path in files {
         let Ok(text) = fs::read_to_string(path) else {
             findings.push(Finding {
@@ -557,102 +562,17 @@ fn check_markdown_lint(files: &[PathBuf]) -> Vec<Finding> {
             });
             continue;
         };
-        findings.extend(check_heading_increment(path, &text));
-        findings.extend(check_trailing_spaces(path, &text));
-        findings.extend(check_hard_tabs(path, &text));
-        findings.extend(check_list_spacing(path, &text));
-        findings.extend(check_list_marker_consistency(path, &text));
-        findings.extend(check_fenced_code_language(path, &text));
+        // Markdownlint has no mode for the repository's per-depth marker rule:
+        // its `sublist` mode also requires nested levels to use different
+        // markers. Keep only that non-overlapping rule here.
+        findings.extend(check_list_marker_consistency_by_depth(path, &text));
+        readable_files.push(path.clone());
     }
+    findings.extend(check_markdownlint_cli(root, &readable_files));
     findings
 }
 
-fn check_heading_increment(path: &Path, text: &str) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    let mut previous = 0usize;
-    for (line_index, line) in text.lines().enumerate() {
-        let Some(level) = heading_level(line) else {
-            continue;
-        };
-        if previous != 0 && level > previous + 1 {
-            findings.push(Finding {
-                check: "markdown-lint",
-                path: Some(path.to_path_buf()),
-                line: Some(line_index + 1),
-                message: format!("MD001 header jump from H{previous} to H{level}"),
-            });
-        }
-        previous = level;
-    }
-    findings
-}
-
-fn heading_level(line: &str) -> Option<usize> {
-    let bytes = line.as_bytes();
-    let mut count = 0usize;
-    while count < bytes.len() && bytes[count] == b'#' {
-        count += 1;
-    }
-    if count > 0 && bytes.get(count) == Some(&b' ') {
-        Some(count)
-    } else {
-        None
-    }
-}
-
-fn check_trailing_spaces(path: &Path, text: &str) -> Vec<Finding> {
-    text.lines()
-        .enumerate()
-        .filter(|(_, line)| line.trim_end() != *line)
-        .map(|(index, _)| Finding {
-            check: "markdown-lint",
-            path: Some(path.to_path_buf()),
-            line: Some(index + 1),
-            message: "MD009 trailing spaces".to_string(),
-        })
-        .collect()
-}
-
-fn check_hard_tabs(path: &Path, text: &str) -> Vec<Finding> {
-    text.lines()
-        .enumerate()
-        .filter(|(_, line)| line.contains('\t'))
-        .map(|(index, _)| Finding {
-            check: "markdown-lint",
-            path: Some(path.to_path_buf()),
-            line: Some(index + 1),
-            message: "MD010 hard tab".to_string(),
-        })
-        .collect()
-}
-
-fn check_list_spacing(path: &Path, text: &str) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    for (line_index, line) in text.lines().enumerate() {
-        let trimmed = line.trim_start_matches(' ');
-        let indent = line.len() - trimmed.len();
-        let Some(marker_len) =
-            unordered_marker_len(trimmed).or_else(|| ordered_marker_len(trimmed))
-        else {
-            continue;
-        };
-        let after_marker = &trimmed[marker_len..];
-        let spaces = after_marker.chars().take_while(|ch| *ch == ' ').count();
-        if spaces != 1 && after_marker.chars().any(|ch| !ch.is_whitespace()) {
-            findings.push(Finding {
-                check: "markdown-lint",
-                path: Some(path.to_path_buf()),
-                line: Some(line_index + 1),
-                message: format!(
-                    "MD030 list marker spacing at indent {indent}: expected 1, got {spaces}"
-                ),
-            });
-        }
-    }
-    findings
-}
-
-fn check_list_marker_consistency(path: &Path, text: &str) -> Vec<Finding> {
+fn check_list_marker_consistency_by_depth(path: &Path, text: &str) -> Vec<Finding> {
     let mut markers: BTreeMap<usize, BTreeSet<char>> = BTreeMap::new();
     for line in text.lines() {
         let trimmed = line.trim_start_matches(' ');
@@ -685,57 +605,153 @@ fn unordered_marker(line: &str) -> Option<char> {
     }
 }
 
-fn unordered_marker_len(line: &str) -> Option<usize> {
-    unordered_marker(line).map(|marker| marker.len_utf8())
-}
-
-fn ordered_marker_len(line: &str) -> Option<usize> {
-    let mut dot_index = None;
-    for (index, ch) in line.char_indices() {
-        if ch == '.' {
-            dot_index = Some(index);
-            break;
-        }
-        if !ch.is_ascii_digit() {
-            return None;
-        }
+fn check_markdownlint_cli(root: &Path, files: &[PathBuf]) -> Vec<Finding> {
+    if files.is_empty() {
+        return Vec::new();
     }
-    let dot_index = dot_index?;
-    if dot_index == 0 {
-        return None;
-    }
-    if line.as_bytes().get(dot_index + 1) == Some(&b' ') {
-        Some(dot_index + 1)
-    } else {
-        None
+    match run_markdownlint_cli(root, files) {
+        Ok(findings) => findings,
+        Err(message) => vec![Finding {
+            check: "markdown-lint",
+            path: None,
+            line: None,
+            message,
+        }],
     }
 }
 
-fn check_fenced_code_language(path: &Path, text: &str) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    let mut fence: Option<(char, usize)> = None;
-    for (line_index, line) in text.lines().enumerate() {
-        let stripped = line.trim_end();
-        if let Some((fence_char, fence_len)) = fence {
-            if is_closing_fence(stripped, fence_char, fence_len) {
-                fence = None;
+fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> Result<Vec<Finding>, String> {
+    let config_path = root.join(".markdownlint-cli2.jsonc");
+    let config_text = fs::read_to_string(&config_path)
+        .map_err(|error| format!("cannot read {}: {error}", config_path.display()))?;
+    let mut config: Value = serde_json::from_str(&config_text)
+        .map_err(|error| format!("invalid {}: {error}", config_path.display()))?;
+    let config_object = config
+        .as_object_mut()
+        .ok_or_else(|| format!("{} must contain a JSON object", config_path.display()))?;
+
+    let output_directory = MarkdownlintOutputDirectory::create()
+        .map_err(|error| format!("cannot create markdownlint output directory: {error}"))?;
+    let results_name = "markdownlint-results.json";
+    config_object.insert(
+        "outputFormatters".to_string(),
+        serde_json::json!([["markdownlint-cli2-formatter-json", {"name": results_name}]]),
+    );
+    let command_config = output_directory.0.join(".markdownlint-cli2.jsonc");
+    fs::write(
+        &command_config,
+        serde_json::to_vec(&config)
+            .map_err(|error| format!("cannot serialize markdownlint config: {error}"))?,
+    )
+    .map_err(|error| format!("cannot write {}: {error}", command_config.display()))?;
+
+    let mut command = Command::new("markdownlint-cli2");
+    command
+        // The first-party JSON formatter resolves its relative `name` in the
+        // process working directory, so keep its result in this owned temp dir.
+        .current_dir(&output_directory.0)
+        .arg("--config")
+        .arg(&command_config)
+        .arg("--no-globs");
+    for path in files {
+        command.arg(format!(":{}", path.display()));
+    }
+    let output = command
+        .output()
+        .map_err(|error| format!("cannot run markdownlint-cli2: {error}"))?;
+    if !matches!(output.status.code(), Some(0 | 1)) {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(format!(
+            "markdownlint-cli2 failed with {}{}",
+            output.status,
+            if stderr.is_empty() {
+                String::new()
+            } else {
+                format!(": {stderr}")
             }
-            continue;
-        }
-        let Some((fence_char, fence_len, info)) = opening_fence_info(stripped) else {
-            continue;
-        };
-        if info.trim().is_empty() {
-            findings.push(Finding {
-                check: "markdown-lint",
-                path: Some(path.to_path_buf()),
-                line: Some(line_index + 1),
-                message: "MD040 fenced code block should specify language".to_string(),
-            });
-        }
-        fence = Some((fence_char, fence_len));
+        ));
     }
+
+    let result_path = output_directory.0.join(results_name);
+    let result_text = fs::read_to_string(&result_path)
+        .map_err(|error| format!("cannot read {}: {error}", result_path.display()))?;
+    parse_markdownlint_findings(root, &result_text)
+}
+
+fn parse_markdownlint_findings(root: &Path, text: &str) -> Result<Vec<Finding>, String> {
+    let result: Value = serde_json::from_str(text)
+        .map_err(|error| format!("markdownlint JSON output is invalid: {error}"))?;
+    let findings = result
+        .as_array()
+        .ok_or_else(|| "markdownlint JSON output must be an array".to_string())?;
     findings
+        .iter()
+        .map(|item| {
+            let object = item
+                .as_object()
+                .ok_or_else(|| "markdownlint JSON finding must be an object".to_string())?;
+            let file_name = object
+                .get("fileName")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "markdownlint finding is missing fileName".to_string())?;
+            let file_name = file_name.strip_prefix(':').unwrap_or(file_name);
+            let reported_path = PathBuf::from(file_name);
+            let path = if reported_path.is_absolute() {
+                reported_path
+            } else {
+                root.join(reported_path)
+            };
+            let rule = object
+                .get("ruleNames")
+                .and_then(Value::as_array)
+                .and_then(|rules| rules.first())
+                .and_then(Value::as_str)
+                .ok_or_else(|| "markdownlint finding is missing ruleNames".to_string())?;
+            let description = object
+                .get("ruleDescription")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "markdownlint finding is missing ruleDescription".to_string())?;
+            let line = object
+                .get("lineNumber")
+                .and_then(Value::as_u64)
+                .and_then(|line| usize::try_from(line).ok());
+            Ok(Finding {
+                check: "markdown-lint",
+                path: Some(path),
+                line,
+                message: format!("{rule} {description}"),
+            })
+        })
+        .collect()
+}
+
+struct MarkdownlintOutputDirectory(PathBuf);
+
+impl MarkdownlintOutputDirectory {
+    fn create() -> io::Result<Self> {
+        for _ in 0..32 {
+            let sequence = MARKDOWNLINT_TEMP_SEQUENCE.fetch_add(1, AtomicOrdering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "agent-canon-markdownlint-{}-{sequence}",
+                std::process::id()
+            ));
+            match fs::create_dir(&path) {
+                Ok(()) => return Ok(Self(path)),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error),
+            }
+        }
+        Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "could not allocate a unique markdownlint output directory",
+        ))
+    }
+}
+
+impl Drop for MarkdownlintOutputDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 
 fn opening_fence_info(line: &str) -> Option<(char, usize, &str)> {
@@ -2188,6 +2204,35 @@ mod tests {
         assert!(report.contains("location: docs/bad.md:3"));
         assert!(report.contains("Open only the reported location"));
         assert!(report.contains("DOCS_CHECK_REPORT_END"));
+    }
+
+    #[test]
+    fn maps_markdownlint_json_to_docs_findings() {
+        let root = PathBuf::from("/repo");
+        let findings = parse_markdownlint_findings(
+            &root,
+            r#"[{"fileName":":documents/example.md","lineNumber":4,"ruleNames":["MD001","heading-increment"],"ruleDescription":"Heading levels should only increment by one level at a time"}]"#,
+        )
+        .expect("formatter output should map to docs findings");
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].check, "markdown-lint");
+        assert_eq!(findings[0].path, Some(root.join("documents/example.md")));
+        assert_eq!(findings[0].line, Some(4));
+        assert_eq!(
+            findings[0].message,
+            "MD001 Heading levels should only increment by one level at a time"
+        );
+    }
+
+    #[test]
+    fn keeps_unordered_marker_consistency_scoped_to_each_depth() {
+        let path = Path::new("list.md");
+        assert!(check_list_marker_consistency_by_depth(path, "- parent\n  - child\n").is_empty());
+
+        let findings = check_list_marker_consistency_by_depth(path, "- first\n+ second\n");
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].message.contains("at depth 0"));
     }
 
     #[test]
