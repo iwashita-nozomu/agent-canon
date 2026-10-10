@@ -1,4 +1,4 @@
-"""Opt-in native Docker regression for Issue #1370's cross-checkout authority."""
+"""Docker-backed regression for Issue #1370's cross-checkout authority."""
 
 from __future__ import annotations
 
@@ -19,7 +19,10 @@ LIVE_DOCKER = os.environ.get("AGENT_CANON_LIVE_DOCKER") == "1"
 DOCKER = os.environ.get("AGENT_CANON_DOCKER", "docker")
 pytestmark = pytest.mark.skipif(
     not LIVE_DOCKER,
-    reason="set AGENT_CANON_LIVE_DOCKER=1 in the native Docker integration environment",
+    reason=(
+        "run tools/validation/ci/runners/"
+        "run_live_projection_authority_test.sh for the Docker-host route"
+    ),
 )
 PROJECTIONS = ("mounts.toml", "mounts.tsv", "rollback-plan.tsv", "rollback-mounts.tsv")
 
