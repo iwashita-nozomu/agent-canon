@@ -35,19 +35,17 @@ Python / C++ の実装変更では、裸の数値リテラルを機械的に検�
 それ以外の値は、名前付き定数、typed configuration、公開 API 引数、または明示的な行コメント許可へ移します。
 
 ```bash
-python3 tools/validation/semantic/code/check_hardcoded_numbers.py \
-  python include src \
-  --exclude vendor \
-  --exclude reports
+ruff check \
+  --config tools/validation/code/config/ruff-magic-values.toml \
+  --select PLR2004 python
 ```
 
-意図的な式や標準由来の定数は、行末に `# hardcoded-number-ok: <理由>` または C++ では
-`// hardcoded-number-ok: <理由>` を書き、なぜ名前付き定数にしないかを局所的に説明します。
+意図的な Python の式や標準由来の定数は、Ruff の行末抑制 `# noqa: PLR2004` を使い、
+C++ では clang-tidy の `// NOLINT(readability-magic-numbers)` を使って、なぜ名前付き定数にしないかを局所的に説明します。
 許可コメントは「後で直す」逃げ道ではなく、数式・標準・プロトコル上その場に置く方が読みやすい場合だけ使います。
 
-CI では changed source に対して同じ checker を走らせます。
-テスト fixture の期待値は production source と性質が違うため、既定 CI gate では `tests/` を除外します。
-ただし、テスト内でも tuning parameter、反復回数、閾値、shape などを複数箇所で使う場合は名前付き定数にします。
+CI では選択した Python source path（production と tests を含む）に対して Ruff の同じ設定を走らせます。
+テスト内でも tuning parameter、反復回数、閾値、shape などを複数箇所で使う場合は名前付き定数にします。
 
 ## 規約
 

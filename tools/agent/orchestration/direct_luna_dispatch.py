@@ -20,7 +20,7 @@ import json
 from pathlib import PurePosixPath
 from typing import Literal, Sequence
 
-LUNA_MODEL = "gpt-5.6-luna"
+LUNA_MODEL = "gpt-6-luna"
 PACKET_SCHEMA_ID = "direct_luna_handoff_packet_v1"
 EVIDENCE_SCHEMA_ID = "direct_luna_runtime_evidence_v1"
 FORK_TURNS = "none"

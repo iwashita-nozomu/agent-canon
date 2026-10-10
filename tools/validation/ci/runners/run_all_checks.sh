@@ -2,31 +2,21 @@
 # @dependency-start
 # contract tool
 # responsibility Runs all checks CI automation.
-# upstream design ../../../../documents/design/source-owned-dependency-validation.md source-owned PR receipt contract
-# upstream design ../../../../documents/design/dependency-manifest-design.md manifest DSL and explicit graph analysis projection
-# upstream implementation ../checks/check_agent_canon_pr.sh writes owner/root/PID/status-bound source receipts
-# upstream implementation ../receipts/pr_gate_receipt.py owns receipt parsing and binding validation
 # upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns external CI state and exact cleanup
-# upstream implementation ../../semantic/dependencies/check_dependency_headers.py validates changed-file dependency manifests
-# upstream implementation ../../semantic/dependencies/check_dependency_header_format.sh validates changed-file manifest syntax
-# upstream implementation ../../semantic/code/check_static_any.py rejects explicit Python Any usage
-# upstream implementation ../../semantic/logging/check_log_helper_names.py validates log helper naming
-# upstream implementation ../../../analysis/code/import_responsibility.py validates import ownership boundaries
+# upstream implementation ../checks/run_python_quality_checks.sh owns Python static quality checks
 # upstream implementation ../../notebooks/notebook_quality.py validates notebooks as readable runnable demos
 # upstream implementation ../../../bin/agent-canon invokes the canonical Rust algorithm contract checker
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
 # upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../../../runtime/manifest/tool_catalog.py validates structured tool catalog
 # upstream implementation ../../semantic/tools/tool_drift.py validates tool/convention trace contracts
-# upstream implementation ../../../agent/skills/skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ../../semantic/responsibility/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../../../../eval/checkers/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 # upstream implementation ../../semantic/skills/check_skill_frontmatter.py validates runtime skill YAML frontmatter
 # upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py validates workflow selection routing cases
-# upstream implementation ../../../../eval/producers/evaluate_report_quality.py validates report writing quality checklist cases
 # upstream implementation ../checks/check_github_workflows.py validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
 # upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback
@@ -37,9 +27,9 @@ set -euo pipefail
 # ═══════════════════════════════════════════════════════════════════════════
 # Full confidence CI entrypoint
 #
-# 用途: agent/runtime, dependency manifest, eval accumulation, Rust,
+# 用途: agent/runtime, eval accumulation, Rust,
 #       GitHub workflow, container config, documentation, experiment registry,
-#       pytest, pyright, and ruff checks を一括実行します。
+#       pytest, BasedPyright, and ruff checks を一括実行します。
 #       普段の変更では Makefile の check-matrix から対象 profile を選び、
 #       この script は full confidence gate として使います。
 #
@@ -47,7 +37,7 @@ set -euo pipefail
 #   bash tools/validation/ci/runners/run_all_checks.sh           # full confidence checks
 #   bash tools/validation/ci/runners/run_all_checks.sh --quick   # broad checks with ruff skipped
 #   bash tools/validation/ci/runners/run_all_checks.sh --quick --skip-docs --skip-github-workflows
-#                                               # PR gate reuse after those gates already ran
+#                                               # targeted CI reuse after those checks already ran
 #   bash tools/validation/ci/runners/run_all_checks.sh --skip-experiments
 #                                               # skip the optional experiment registry gate
 #
@@ -230,10 +220,6 @@ QUICK_MODE=0
 SKIP_DOCS=0
 SKIP_GITHUB_WORKFLOWS=0
 SKIP_EXPERIMENTS=0
-PR_GATE_RECEIPT=""
-PR_GATE_RECEIPT_VALID=0
-PR_GATE_DEPENDENCY_SOURCE_STATUS="not_applicable"
-PR_GATE_PARENT_PID="${PPID}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick)
@@ -252,60 +238,12 @@ while [[ $# -gt 0 ]]; do
       SKIP_EXPERIMENTS=1
       shift
       ;;
-    --pr-gate-receipt)
-      if [[ $# -lt 2 ]]; then
-        echo "Missing value for --pr-gate-receipt" >&2
-        exit 2
-      fi
-      PR_GATE_RECEIPT="$2"
-      shift 2
-      ;;
-    --pr-gate-parent-pid)
-      if [[ $# -lt 2 || ! "$2" =~ ^[1-9][0-9]*$ ]]; then
-        echo "Missing or invalid value for --pr-gate-parent-pid" >&2
-        exit 2
-      fi
-      PR_GATE_PARENT_PID="$2"
-      shift 2
-      ;;
     *)
       echo "Unknown option: $1" >&2
       exit 1
       ;;
   esac
 done
-
-validate_pr_gate_receipt() {
-  if [[ ! -f "${PR_GATE_RECEIPT}" ]]; then
-    echo "Invalid PR gate receipt: missing file" >&2
-    return 1
-  fi
-  local validated_status=""
-  if ! validated_status="$(python3 "${CANON_CI_ROOT}/../receipts/pr_gate_receipt.py" validate \
-    --receipt "${PR_GATE_RECEIPT}" \
-    --root "${WORKSPACE_ROOT}" \
-    --parent-pid "${PR_GATE_PARENT_PID}")"; then
-    echo "Invalid PR gate receipt: source-owned receipt validation failed" >&2
-    return 1
-  fi
-  case "${validated_status}" in
-    status=source) PR_GATE_DEPENDENCY_SOURCE_STATUS=source ;;
-    status=skipped) PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped ;;
-    *)
-      echo "Invalid PR gate receipt: validator returned unexpected status" >&2
-      return 1
-      ;;
-  esac
-  return 0
-}
-
-if [[ -n "${PR_GATE_RECEIPT}" ]]; then
-  if ! validate_pr_gate_receipt; then
-    exit 1
-  fi
-  PR_GATE_RECEIPT_VALID=1
-  echo "PR_GATE_RECEIPT=accepted dependency_source=${PR_GATE_DEPENDENCY_SOURCE_STATUS}"
-fi
 
 resolve_agent_canon_cli() {
   if [[ -n "${AGENT_CANON_CLI_CMD:-}" ]]; then
@@ -423,9 +361,7 @@ fi
 # 0. agent/runtime sync checks
 echo "0️⃣  agent/runtime sync checks を実行中..."
 CANON_GRAPH_READY=0
-if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
-  echo "⏭️ canonical graph build skipped: validated source receipt consumed"
-elif run_agent_canon graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
+if run_agent_canon graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
   CANON_GRAPH_READY=1
 else
   echo "❌ canonical graph build 失敗"
@@ -435,44 +371,6 @@ if "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/checkers/smoke_test_research_perspectiv
   echo "✅ research perspective pack smoke test 成功"
 else
   echo "❌ research perspective pack smoke test 失敗"
-  EXIT_CODE=1
-fi
-if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
-  echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_source_receipt_consumed"
-elif [ "$CANON_GRAPH_READY" -eq 1 ]; then
-  if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/dependencies/check_dependency_headers.py" --changed 2>&1; then
-    echo "✅ dependency header checks 成功"
-  else
-    echo "❌ dependency header checks 失敗"
-    EXIT_CODE=1
-  fi
-else
-  echo "⏭️ dependency header checks skipped: canonical graph build failed"
-fi
-if [ "$PR_GATE_RECEIPT_VALID" -eq 0 ]; then
-  if bash "${WORKSPACE_ROOT}/tools/validation/semantic/dependencies/check_dependency_header_format.sh" --changed 2>&1; then
-    echo "✅ dependency manifest format checks 成功"
-  else
-    echo "❌ dependency manifest format checks 失敗"
-    EXIT_CODE=1
-  fi
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/code/check_static_any.py" 2>&1; then
-  echo "✅ explicit Any static checks 成功"
-else
-  echo "❌ explicit Any static checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/logging/check_log_helper_names.py" --changed --exclude reports 2>&1; then
-  echo "✅ log helper naming checks 成功"
-else
-  echo "❌ log helper naming checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/analysis/code/import_responsibility.py" --changed 2>&1; then
-  echo "✅ import responsibility checks 成功"
-else
-  echo "❌ import responsibility checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/validation/notebook_quality.py" --all 2>&1; then
@@ -501,12 +399,6 @@ else
   echo "❌ runtime skill frontmatter checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/agent/skills/skill_tool_commands.py" check 2>&1; then
-  echo "✅ runtime skill tool command checks 成功"
-else
-  echo "❌ runtime skill tool command checks 失敗"
-  EXIT_CODE=1
-fi
 if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/runtime/manifest/tool_catalog.py" 2>&1; then
   echo "✅ tool catalog checks 成功"
 else
@@ -526,8 +418,6 @@ if [ "$CANON_GRAPH_READY" -eq 1 ]; then
     echo "❌ tool/convention drift checks 失敗"
     EXIT_CODE=1
   fi
-elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
-  echo "⏭️ tool/convention drift checks skipped: validated source receipt consumed"
 else
   echo "⏭️ tool/convention drift checks skipped: canonical graph build failed"
 fi

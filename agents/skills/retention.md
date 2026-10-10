@@ -15,17 +15,14 @@ downstream implementation ../../tools/experiments/artifacts/save_experiment_resu
 Use this Skill before mutating or archiving an existing collection of experiment results.
 It plans retention; it does not own experiment execution, artifact writing, archive serialization, publication, or report generation.
 
-## Decision model
+## Procedure
 
-For every selected source unit, record these independent decisions before mutation:
+各 source unit について、mutation または archive の前に順に決めます。
 
-1. source identity and content evidence;
-2. semantic classification and confidence;
-3. retention decision: `retain|archive|external|delete-after-use|defer`;
-4. physical representation: `compressed_archive|as_is|existing_external`;
-5. source-preservation condition;
-6. destination and provenance reference;
-7. verification and resume identity.
+1. source identity/content evidence と semantic classification。
+2. `retain|archive|external|delete-after-use|defer` の retention decision。
+3. `compressed_archive|as_is|existing_external` の representation、destination、provenance。
+4. source-preservation condition、verification、resume identity。
 
 Semantic classification and physical representation are orthogonal. Do not infer that canonical data must be kept as-is or that noncanonical data must be compressed.
 
@@ -39,4 +36,5 @@ Semantic classification and physical representation are orthogonal. Do not infer
 
 ## Handoff
 
-Return the decision records plus unresolved units. The existing experiment lifecycle remains the run-state owner, result-artifact-writeout remains the concrete artifact identity/checksum owner, and the annex/archive writer remains the deterministic serialization owner.
+decision records と unresolved units を返します。実行は `experiment-lifecycle`、artifact identity/checksum は
+`result-artifact-writeout`、annex/archive serialization は既存 writer に委譲します。

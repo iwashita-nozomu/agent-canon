@@ -3,7 +3,7 @@
 contract design
 responsibility Defines the approved Rust module-boundary target for the semantic-index CLI, cache, and report pipeline.
 upstream design README.md design index and evidence-ledger policy
-upstream design dependency-manifest-design.md dependency graph and claim-evidence contract
+upstream design dependency-manifest-design.md dependency-manifest graph semantics
 upstream design rust-agent-tool-migration.md Rust CLI ownership and migration order
 upstream design ../tools/semantic_index.md semantic-index command and generated-cache contract
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs crate-facing semantic-index entrypoint
@@ -21,7 +21,6 @@ downstream implementation ../../tools/repository/github/review_backlog_scan.sh s
 downstream implementation ../../tests/agent_tools/test_review_backlog_scan.py command/report behavior oracle
 downstream implementation ../../tests/agent_tools/test_tool_catalog.py command catalog oracle
 downstream implementation ../../tools/analysis/search/reporting/semantic_provider_html_report.py provider-report consumer
-downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py changed design claim checker
 downstream design README.md AgentCanon design reader index
 @dependency-end
 -->
@@ -80,7 +79,7 @@ flowchart TD
 | document unit | semantic-index の Rust module、CLI contract、SQLite/JSON schema、transaction boundary |
 | document split decision | `split:agent-team-module-boundaries.md` と分離。Python runtime と Rust CLI の owner/compiler/oracle が異なる |
 | invalid split boundaries | line count、token budget、chunking convenience、テスト件数、近い function |
-| validation gate | fresh graph、`agent-canon docs check`、changed design claim checker、`cargo fmt`/`cargo check`/behavior oracle |
+| validation gate | changed dependency/header checks、`agent-canon docs check`、direct source readback、`cargo fmt`/`cargo check`/behavior oracle |
 
 関数の行数やテストの行数は split 根拠にしません。module 間の data contract、
 依存方向、side effect、schema ownership、validation route が future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs` ごとに独立していることを `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`

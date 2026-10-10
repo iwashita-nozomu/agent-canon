@@ -91,9 +91,9 @@ change. A no-change or unselected route records its rationale as evidence.
 - 軽い検証では `make ci-quick` を使います。
 - agent runtime / skill / canon 変更では `make agent-checks` を先に見ます。
 - Python 差分を含む場合は、必要に応じて次を追加します。
-  - `python3 -m pyright`
+  - `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json <changed-python-paths>`
   - `python3 -m pytest tests/ -q --tb=short`
-  - `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`
+  - `ruff check python tests --select D,E,F,I,UP --ignore E501`
 - C / C++ 差分を含む場合は、project-native configure / build / test evidence を追加します。
   - CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`
   - CMake project なら `cmake --build "$ROOT/build/cpp/<profile>" --parallel`

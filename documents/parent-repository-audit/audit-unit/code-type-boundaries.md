@@ -34,7 +34,7 @@ judgement は同じ対象に対する補完 evidence として記録します。
 
 - language source と public API/type declarations
 - `documents/design/` の implementation trace
-- `check_static_any.py`、`check_hardcoded_numbers.py`
+- BasedPyright `reportExplicitAny`、Ruff `PLR2004`、および native clang-tidy
 - `oop_rule_inventory.py` と dependency graph
 - `oop-readability-check` の対象 report
 - reviewer が確認した責務境界、state ownership、helper boundary
@@ -42,7 +42,7 @@ judgement は同じ対象に対する補完 evidence として記録します。
 ## Repair Route
 
 owner skill は `oop-type-design`、mechanical evidence は `oop-readability-check`、language
-repair は `python-review` または `cpp-review`。tool は既存 static-any、hardcoded-number、
+repair は `python-review` または `cpp-review`。tool は既存 BasedPyright、Ruff、clang-tidy、
 dependency checker を使い、既存 option/adapter で足りない場合だけ design issue として
 戻します。
 

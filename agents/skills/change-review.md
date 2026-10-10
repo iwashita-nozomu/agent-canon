@@ -18,30 +18,23 @@ AgentCanon-specific source, generated-surface, and retirement boundaries.
 Do not repeat generic review instructions or require a second review solely
 because this skill was selected.
 
-## Repeated Responsibility Review
+## Procedure
 
-Follow reachable callers and effects, including unchanged superseded code.
-When paths overlap, start from the most recently incorporated implementation;
-compare semantics before consolidating. A missing-deletion finding identifies
-the retained owner, obsolete contribution, and necessary consumer migration.
-[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-owns that migration; restoring aliases or wrappers is not the default remedy.
-
-## Cause and Evidence
-
-Derive the repair from the demonstrated cause, not the symptom. Expand through
-callers, state/guards, downstream effects, and relevant sibling implementations
-only while they can change the owner, repair, or validation. A direct static
-proof is sufficient; no cause-receipt schema or fixed investigation checklist
-is required. Unreachable branches and checks already guaranteed upstream are
-removal candidates, not reasons to add speculative tests.
-
-Check that generated views follow their actual source and that changed consumers
-use the retained entrypoint. A test of retired wording is not a behavior contract;
-judge regressions against current required guarantees without weakening oracles.
-Select language, numerical, or document specialists only for unresolved risk in
-that domain. Reuse applicable validation instead of repeating it.
-
-Report concrete findings first, with location, reachable effect, and evidence.
-Keep uncertain causes explicit. Route durable unresolved work to the responsible
-repository's Issue; a local finding does not require an Issue or additional gate.
+1. Inspect the current diff against the changed contract and the most recently
+   incorporated owner. Read callers, state/guards, effects, and unchanged
+   superseded paths only while they can change the finding or validation. Before
+   accepting a review finding, identify why the current implementation exists and
+   what source evidence could refute the finding.
+2. For an overlap or missing-deletion finding, identify the retained owner,
+   obsolete contribution, and required consumer migration. RC-09 owns retirement;
+   an alias or wrapper is not the default repair.
+3. Derive findings from reachable effects and current guarantees, not symptoms or
+   reviewer wording. Treat a reviewer result as a hypothesis until source or a
+   direct static proof supports it. Unreachable branches and upstream-guaranteed
+   checks are deletion candidates, not speculative test triggers.
+4. Check generated views against their source and callers against the retained
+   entrypoint. Reuse applicable validation; select a language, numerical, or
+   document specialist only for unresolved risk in that changed surface.
+5. Report concrete findings with location, reachable effect, and evidence. Keep
+   uncertain causes explicit and route durable unresolved work to its owner; a
+   local finding alone creates no extra Issue or gate.

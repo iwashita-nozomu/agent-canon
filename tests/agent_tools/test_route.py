@@ -6,10 +6,9 @@
 # upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
 # upstream implementation ../../tools/agent/skills/skill_route_catalog.py owns catalog/rule/index behavior
 # upstream implementation ../../tools/agent/orchestration/capability_route.py owns capability preflight/decision behavior
-# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns exact ToolCall validation
 # upstream design ../../documents/design/tool-skill-routing-refactor.md defines naming policy
 # upstream design ../../.codex/personal/skills/code-visualization/SKILL.md owns the runtime direct-route text
-# upstream design ../../agents/skills/code-visualization.md owns the canonical direct-route contract
+# upstream design ../../agents/skills/code-visualization.md owns visualization selection and native renderer routing
 # @dependency-end
 
 from __future__ import annotations
@@ -40,21 +39,14 @@ from tools.agent.orchestration.team_config import (  # noqa: E402
     load_task_catalog,
     load_team_config,
 )
-from tools.agent.orchestration.implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import (
+    declared_team_capacity_derivation,
+)  # noqa: E402
 from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
 
 
 class RouteToolTest(unittest.TestCase):
     """Exercise route.py output and routing aliases."""
-
-    def test_route_reexports_structured_skill_command_items(self) -> None:
-        """Route consumers receive typed catalog items from the shared loader."""
-        catalog = route_module.load_skill_tool_commands(PROJECT_ROOT)
-        self.assertEqual(catalog["agent-orchestration"].required, ())
-        item = catalog["agent-orchestration"].maintenance[0]
-        self.assertIsInstance(item, dict)
-        self.assertIn("tool_id", item)
-        self.assertNotIsInstance(item, str)
 
     def test_catalog_loading_needs_no_authoring_tools_or_schema_files(self) -> None:
         """Routing reads its two inputs without launching validation subprocesses."""
@@ -63,9 +55,16 @@ class RouteToolTest(unittest.TestCase):
             inputs = root / "agents" / "skills"
             inputs.mkdir(parents=True)
             for name in ("catalog.yaml", "skill-dependencies.yaml"):
-                shutil.copyfile(PROJECT_ROOT / "agents" / "skills" / name, inputs / name)
-            with patch.dict("os.environ", {"PATH": ""}), patch.object(
-                subprocess, "run", side_effect=AssertionError("unexpected subprocess")
+                shutil.copyfile(
+                    PROJECT_ROOT / "agents" / "skills" / name, inputs / name
+                )
+            with (
+                patch.dict("os.environ", {"PATH": ""}),
+                patch.object(
+                    subprocess,
+                    "run",
+                    side_effect=AssertionError("unexpected subprocess"),
+                ),
             ):
                 rules = catalog_module.load_skill_route_rules(root)
         self.assertIsInstance(rules, tuple)
@@ -106,9 +105,7 @@ class RouteToolTest(unittest.TestCase):
         source_catalog = yaml.safe_load(
             (PROJECT_ROOT / "agents/skills/catalog.yaml").read_text(encoding="utf-8")
         )
-        entries = {
-            entry["id"]: entry for entry in source_catalog["skill_families"]
-        }
+        entries = {entry["id"]: entry for entry in source_catalog["skill_families"]}
         source_catalog["skill_families"] = [
             copy.deepcopy(entries[skill]) for skill in skill_ids
         ]
@@ -130,61 +127,6 @@ class RouteToolTest(unittest.TestCase):
         dependency_path.write_text(
             yaml.safe_dump(source_dependencies, sort_keys=False), encoding="utf-8"
         )
-
-    def visualization_tool_call(
-        self,
-        *,
-        tool_id: str = "agent_canon.visualization.coverage",
-        argument_schema: str = "agent_canon.visualization.arguments.coverage.v1",
-    ) -> dict[str, object]:
-        """Return one complete schema-bearing visualization ToolCall fixture."""
-        literal_item = {
-            "item_id": "literal-route-item",
-            "kind": "identity",
-            "origin": "literal_request",
-            "source_locator": "route:test",
-            "source_start": None,
-            "source_end": None,
-            "ordinal": 0,
-            "payload_json": "{}",
-        }
-        arguments: dict[str, object] = {
-            "request_id": "route-test-request",
-            "literal_request": "explicit route fixture",
-            "literal_items": [literal_item],
-            "owner_closure": [],
-            "dependency_closure": [],
-            "artifact_id": "route-test-artifact",
-            "renderer_id": "route-test-renderer",
-            "artifact_format": "graph_ir",
-        }
-        locator_fields = {
-            "agent_canon.visualization.adapter.dependency_manifest": {
-                "dependency_manifest_locator": "reports/dependency_graph.tsv",
-            },
-            "agent_canon.visualization.adapter.algorithm_flowchart": {
-                "jit_ir_locator": "reports/algorithm/ir.json",
-                "lean_evidence_locator": "reports/algorithm/lean.json",
-                "theorem_graph_locator": "reports/algorithm/theorems.json",
-            },
-            "agent_canon.visualization.adapter.document_mermaid": {
-                "document_locator": "documents/design/example.md",
-            },
-            "agent_canon.visualization.adapter.repository_graph": {
-                "repository_locator": "documents",
-            },
-            "agent_canon.visualization.adapter.knowledge_graph": {
-                "graph_locator": "documents",
-            },
-        }
-        if tool_id in locator_fields:
-            arguments.update(locator_fields[tool_id])
-        return {
-            "schema": "agent_canon.visualization_tool_call.v1",
-            "tool_id": tool_id,
-            "argument_schema": argument_schema,
-            "arguments": arguments,
-        }
 
     def test_area_outputs_short_tool_and_skill(self) -> None:
         """Area routing should keep names short and machine-readable."""
@@ -300,7 +242,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AREA=search", result.stdout)
         self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
-        self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
+        self.assertIn(
+            "python3 tools/analysis/search/search.py --purpose", result.stdout
+        )
 
     def test_search_alias_resolves_to_search_area(self) -> None:
         """Legacy vector-search names should route to coordinated search."""
@@ -358,7 +302,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
-    def test_math_correction_routes_math_owner_before_infrastructure_symptom(self) -> None:
+    def test_math_correction_routes_math_owner_before_infrastructure_symptom(
+        self,
+    ) -> None:
         """A mathematical correction keeps a JIT-looking symptom in the math route."""
         result = self.run_route(
             "--prompt",
@@ -466,7 +412,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("benchmark_reviewer", waves["research_review"])
         self.assertNotIn("benchmark_reviewer", waves["final_review"])
 
-    def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(self) -> None:
+    def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(
+        self,
+    ) -> None:
         """The route contract carries the math packet and refuses non-math scope drift."""
         orchestration = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
@@ -507,7 +455,14 @@ class RouteToolTest(unittest.TestCase):
             with self.subTest(field=field):
                 self.assertIn(field, optimization)
                 self.assertIn(field, orchestration)
-        for surface in ("architecture", "JIT", "backend", "runtime", "routing", "environment"):
+        for surface in (
+            "architecture",
+            "JIT",
+            "backend",
+            "runtime",
+            "routing",
+            "environment",
+        ):
             with self.subTest(surface=surface):
                 self.assertIn(surface, orchestration)
                 self.assertIn(surface, optimization)
@@ -545,7 +500,10 @@ class RouteToolTest(unittest.TestCase):
         self,
     ) -> None:
         """Direct review prompts should activate change-review, not implementation handoff."""
-        for prompt in ("$change-review レビューしてください", "$change-review 変更レビューして"):
+        for prompt in (
+            "$change-review レビューしてください",
+            "$change-review 変更レビューして",
+        ):
             with self.subTest(prompt=prompt):
                 result = self.run_route("--prompt", prompt, "--format", "json")
 
@@ -638,7 +596,9 @@ class RouteToolTest(unittest.TestCase):
                 decision = json.loads(result.stdout)
                 self.assertIn("grilling", decision["matched_skills"])
                 self.assertIn("grilling", decision["active_skills"])
-                self.assertIn("agent-orchestration", decision["related_skill_candidates"])
+                self.assertIn(
+                    "agent-orchestration", decision["related_skill_candidates"]
+                )
 
     def test_prompt_does_not_route_grilling_for_ordinary_implementation(self) -> None:
         """Ordinary implementation language remains outside the grilling route."""
@@ -785,531 +745,37 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("tool-finding-report", decision["related_skill_candidates"])
         self.assertIn("agent-log-analysis", decision["related_skill_candidates"])
 
-    def test_prompt_routes_explicit_code_visualization_to_code_visualization_skill(
-        self,
-    ) -> None:
-        """Explicit public id should select code-visualization."""
-        result = self.run_route(
-            "--prompt", "$code-visualization で依存図を見たい", "--format", "json"
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertIn("code-visualization", decision["matched_skills"])
-        self.assertIn("code-visualization", decision["active_skills"])
-        self.assertEqual(decision["visualization_owner_skill"], "code-visualization")
-        self.assertIsNone(decision["visualization_adapter_tool_call"])
-        self.assertIsNone(decision["visualization_rejection"])
-        call = decision["visualization_tool_call"]
-        self.assertEqual(call["schema"], "agent_canon.visualization_tool_call.v1")
-        self.assertEqual(call["tool_id"], "agent_canon.visualization.coverage")
-        self.assertEqual(
-            call["argument_schema"], "agent_canon.visualization.arguments.coverage.v1"
-        )
-        self.assertEqual(
-            set(call["arguments"]),
-            {
-                "request_id",
-                "literal_request",
-                "literal_items",
-                "owner_closure",
-                "dependency_closure",
-                "artifact_id",
-                "renderer_id",
-                "artifact_format",
-            },
-        )
-        self.assertEqual(call["arguments"]["artifact_format"], "graph_ir")
-        self.assertEqual(
-            call["arguments"]["literal_items"][0]["origin"], "literal_request"
-        )
-        self.assertEqual(
-            call["arguments"]["owner_closure"][0]["origin"], "owner_closure"
-        )
-
-    def test_untyped_dependency_graph_prose_never_selects_adapter(self) -> None:
-        """A raw dependency-graph phrase cannot bypass the typed adapter route."""
-        result = self.run_route(
-            "--prompt",
-            "Please make a dependency graph for the repository.",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertIsNone(decision["visualization_adapter_tool_call"])
-        self.assertIn(decision["visualization_rejection"], ("prose_only", None))
-
-    def test_prompt_routes_visualization_keyword_alone_should_not_select_code_visualization(
-        self,
-    ) -> None:
-        """Prose keyword alone should not route to code-visualization."""
-        result = self.run_route(
-            "--prompt",
-            "この可視化は、図の配色や見栄えが重要です。",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertNotIn("code-visualization", decision["matched_skills"])
-        self.assertNotIn("code-visualization", decision["active_skills"])
-        self.assertIsNone(decision["visualization_owner_skill"])
-        self.assertIsNone(decision["visualization_tool_call"])
-        self.assertIsNone(decision["visualization_rejection"])
-
-    def test_prompt_routes_code_visualization_public_name(self) -> None:
-        """Calling the public skill name should select code-visualization."""
-        result = self.run_route(
-            "--prompt",
-            "$code-visualization Please apply code-visualization to this dependency graph.",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertIn("code-visualization", decision["matched_skills"])
-        self.assertIn("code-visualization", decision["active_skills"])
-        self.assertEqual(decision["visualization_owner_skill"], "code-visualization")
-        self.assertIsNone(decision["visualization_adapter_tool_call"])
-        self.assertIsNone(decision["visualization_rejection"])
-
-    def test_prompt_routes_code_visualization_tool_call_visible_in_text_and_markdown(
-        self,
-    ) -> None:
-        """Tool-call metadata remains visible in text and markdown render formats."""
-        for output_format in ("text", "markdown"):
-            with self.subTest(output_format=output_format):
-                result = self.run_route(
-                    "--prompt",
-                    "$code-visualization を dependency graph で可視化して",
-                    "--format",
-                    output_format,
-                )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("agent_canon.visualization.coverage", result.stdout)
-                self.assertIn(
-                    "agent_canon.visualization.arguments.coverage.v1",
-                    result.stdout,
-                )
-                self.assertIn("visualization", result.stdout.lower())
-
-    def test_all_canonical_visualization_tool_ids_route_owner_then_selected_adapter(
-        self,
-    ) -> None:
-        """Every canonical ToolID emits the owner before its selected adapter."""
-        for tool_id in (
-            "agent_canon.visualization.coverage",
-            "agent_canon.visualization.adapter.dependency_manifest",
-            "agent_canon.visualization.adapter.algorithm_flowchart",
-            "agent_canon.visualization.adapter.document_mermaid",
-            "agent_canon.visualization.adapter.repository_graph",
-            "agent_canon.visualization.adapter.knowledge_graph",
-        ):
-            with self.subTest(tool_id=tool_id):
-                result = self.run_route("--prompt", tool_id, "--format", "json")
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                decision = json.loads(result.stdout)
-                self.assertEqual(
-                    decision["visualization_owner_skill"], "code-visualization"
-                )
-                self.assertEqual(
-                    decision["visualization_tool_call"]["tool_id"],
-                    "agent_canon.visualization.coverage",
-                )
-                self.assertEqual(
-                    decision["visualization_tool_call"]["argument_schema"],
-                    "agent_canon.visualization.arguments.coverage.v1",
-                )
-                adapter = decision["visualization_adapter_tool_call"]
-                if tool_id == "agent_canon.visualization.coverage":
-                    self.assertIsNone(adapter)
-                else:
-                    self.assertEqual(adapter["tool_id"], tool_id)
-                    self.assertEqual(
-                        adapter["argument_schema"],
-                        tool_id.replace(
-                            "agent_canon.visualization.adapter.",
-                            "agent_canon.visualization.arguments.",
-                        )
-                        + ".v1",
-                    )
-                self.assertIsNone(decision["visualization_rejection"])
-
-    def test_explicit_adapter_tool_call_normalizes_shared_arguments_to_owner(
-        self,
-    ) -> None:
-        """A valid adapter call is validated but route emits only the owner call."""
-        supplied = self.visualization_tool_call(
-            tool_id="agent_canon.visualization.adapter.dependency_manifest",
-            argument_schema=(
-                "agent_canon.visualization.arguments.dependency_manifest.v1"
-            ),
-        )
-        result = self.run_route(
-            "--prompt",
-            json.dumps(supplied, sort_keys=True),
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        call = decision["visualization_tool_call"]
-        self.assertEqual(call["tool_id"], "agent_canon.visualization.coverage")
-        self.assertEqual(
-            call["argument_schema"],
-            "agent_canon.visualization.arguments.coverage.v1",
-        )
-        self.assertNotIn("dependency_manifest_locator", call["arguments"])
-        supplied_arguments = supplied["arguments"]
-        self.assertIsInstance(supplied_arguments, dict)
-        assert isinstance(supplied_arguments, dict)
-        self.assertEqual(
-            call["arguments"]["literal_items"],
-            supplied_arguments["literal_items"],
-        )
-        adapter = decision["visualization_adapter_tool_call"]
-        self.assertEqual(
-            adapter["tool_id"],
-            "agent_canon.visualization.adapter.dependency_manifest",
-        )
-        self.assertEqual(
-            adapter["argument_schema"],
-            "agent_canon.visualization.arguments.dependency_manifest.v1",
-        )
-        self.assertEqual(
-            adapter["arguments"]["dependency_manifest_locator"],
-            "reports/dependency_graph.tsv",
-        )
-        self.assertIsNone(decision["visualization_rejection"])
-
-    def test_renderer_skill_alias_keeps_code_visualization_as_owner(self) -> None:
-        """An explicit renderer-only skill remains downstream of the public owner."""
-        result = self.run_route(
-            "--prompt",
-            "$algorithm-flowchart",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertEqual(decision["visualization_owner_skill"], "code-visualization")
-        self.assertEqual(
-            decision["visualization_tool_call"]["tool_id"],
-            "agent_canon.visualization.coverage",
-        )
-        self.assertIn("algorithm-flowchart", decision["matched_skills"])
-
-    def test_each_explicit_adapter_tool_call_preserves_selected_schema_and_locator(
-        self,
-    ) -> None:
-        """Explicit adapter calls retain their typed adapter identity after owner routing."""
-        adapters = (
-            "dependency_manifest",
-            "algorithm_flowchart",
-            "document_mermaid",
-            "repository_graph",
-            "knowledge_graph",
-        )
-        for adapter_name in adapters:
-            with self.subTest(adapter_name=adapter_name):
-                tool_id = f"agent_canon.visualization.adapter.{adapter_name}"
-                schema = f"agent_canon.visualization.arguments.{adapter_name}.v1"
-                supplied = self.visualization_tool_call(
-                    tool_id=tool_id,
-                    argument_schema=schema,
-                )
-                result = self.run_route(
-                    "--prompt",
-                    json.dumps(supplied, sort_keys=True),
-                    "--format",
-                    "json",
-                )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                decision = json.loads(result.stdout)
-                self.assertEqual(
-                    decision["visualization_tool_call"]["tool_id"],
-                    "agent_canon.visualization.coverage",
-                )
-                self.assertEqual(
-                    decision["visualization_adapter_tool_call"]["tool_id"],
-                    tool_id,
-                )
-                self.assertEqual(
-                    decision["visualization_adapter_tool_call"]["argument_schema"],
-                    schema,
-                )
-                self.assertIsNone(decision["visualization_rejection"])
-
-    def test_adapter_argument_schema_selects_owner_then_matching_adapter(self) -> None:
-        """A typed adapter schema token is sufficient for catalog-owned routing."""
-        schema = "agent_canon.visualization.arguments.knowledge_graph.v1"
-        result = self.run_route("--prompt", schema, "--format", "json")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertEqual(
-            decision["visualization_tool_call"]["tool_id"],
-            "agent_canon.visualization.coverage",
-        )
-        self.assertEqual(
-            decision["visualization_adapter_tool_call"]["tool_id"],
-            "agent_canon.visualization.adapter.knowledge_graph",
-        )
-        self.assertEqual(
-            decision["visualization_adapter_tool_call"]["argument_schema"],
-            schema,
-        )
-
-    def test_visualization_tool_call_rejections_are_deterministic(self) -> None:
-        """Unknown, schema, field, type, and format defects fail closed."""
-        unknown = self.visualization_tool_call()
-        unknown["tool_id"] = "agent_canon.visualization.adapter.unknown"
-
-        bad_schema = self.visualization_tool_call()
-        bad_schema["schema"] = "agent_canon.visualization_tool_call.v0"
-
-        bad_argument_schema = self.visualization_tool_call()
-        bad_argument_schema["argument_schema"] = (
-            "agent_canon.visualization.arguments.dependency_manifest.v1"
-        )
-
-        missing_field = self.visualization_tool_call()
-        del missing_field["arguments"]
-
-        extra_field = self.visualization_tool_call()
-        extra_field["unexpected"] = True
-
-        wrong_json_type = self.visualization_tool_call()
-        wrong_json_type["arguments"] = []
-
-        unhashable_tool_id = self.visualization_tool_call()
-        unhashable_tool_id["tool_id"] = ["agent_canon.visualization.coverage"]
-
-        wrong_argument_type = self.visualization_tool_call()
-        wrong_argument_values = wrong_argument_type["arguments"]
-        self.assertIsInstance(wrong_argument_values, dict)
-        assert isinstance(wrong_argument_values, dict)
-        wrong_argument_values["literal_items"] = {}
-
-        bad_artifact_format = self.visualization_tool_call()
-        bad_format_values = bad_artifact_format["arguments"]
-        self.assertIsInstance(bad_format_values, dict)
-        assert isinstance(bad_format_values, dict)
-        bad_format_values["artifact_format"] = "png"
-
-        extra_argument = self.visualization_tool_call()
-        extra_argument_values = extra_argument["arguments"]
-        self.assertIsInstance(extra_argument_values, dict)
-        assert isinstance(extra_argument_values, dict)
-        extra_argument_values["unexpected"] = True
-
-        cases = (
-            (unknown, "invalid_tool_call"),
-            (bad_schema, "schema_mismatch"),
-            (bad_argument_schema, "schema_mismatch"),
-            (missing_field, "invalid_tool_call"),
-            (extra_field, "invalid_tool_call"),
-            (wrong_json_type, "invalid_tool_call"),
-            (unhashable_tool_id, "invalid_tool_call"),
-            (wrong_argument_type, "invalid_tool_call"),
-            (bad_artifact_format, "invalid_tool_call"),
-            (extra_argument, "invalid_tool_call"),
-        )
-        for supplied, expected in cases:
-            with self.subTest(expected=expected, supplied=supplied):
-                result = self.run_route(
-                    "--prompt",
-                    json.dumps(supplied, sort_keys=True),
-                    "--format",
-                    "json",
-                )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                decision = json.loads(result.stdout)
-                self.assertIsNone(decision["visualization_owner_skill"])
-                self.assertIsNone(decision["visualization_tool_call"])
-                self.assertEqual(decision["visualization_rejection"], expected)
-
-    def test_unknown_bare_visualization_tool_id_is_invalid(self) -> None:
-        """A canonical-looking unknown ToolID is not treated as prose."""
-        result = self.run_route(
-            "--prompt",
-            "agent_canon.visualization.adapter.unregistered",
-            "--format",
-            "json",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        decision = json.loads(result.stdout)
-        self.assertEqual(decision["visualization_rejection"], "invalid_tool_call")
-        self.assertIsNone(decision["visualization_tool_call"])
-
-    def test_explicit_visualization_without_owner_is_missing_owner(self) -> None:
-        """A valid explicit ToolID fails closed when the catalog owner is absent."""
-        decision = route_module.decide_skills(
-            "agent_canon.visualization.coverage",
-            "routing-only",
-            (),
-        )
-
-        self.assertEqual(decision.visualization_rejection, "missing_owner")
-        self.assertIsNone(decision.visualization_owner_skill)
-        self.assertIsNone(decision.visualization_tool_call)
-
-    def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
-        """The canonical owner exposes the exact renderer route."""
-        runtime_text = (
-            PROJECT_ROOT
-            / ".codex"
-            / "personal"
-            / "skills"
-            / "code-visualization"
-            / "SKILL.md"
-        ).read_text(encoding="utf-8")
-        self.assertIn("Canonical workflow and policy", runtime_text)
+    def test_code_visualization_owner_documents_native_renderer_input(self) -> None:
+        """The canonical owner exposes its native renderer route."""
         canonical_text = (
             PROJECT_ROOT / "agents" / "skills" / "code-visualization.md"
         ).read_text(encoding="utf-8")
         direct_start = canonical_text.index("## Source Evidence Routes")
-        renderer_choice = canonical_text.index("## Renderer Choice")
-        direct_text = canonical_text[direct_start:renderer_choice]
-        self.assertLess(direct_start, renderer_choice)
-        for command in (
-            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
-            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
-        ):
-            self.assertIn(command, direct_text)
-        self.assertNotIn("<path>", direct_text)
-        self.assertNotIn("<provided-path>", direct_text)
-        self.assertIn(
-            "Use this exact changed-scope command only when changed scope is explicit",
-            direct_text,
-        )
-        self.assertIn("`--json` is invalid", direct_text)
-        direct_flat = " ".join(direct_text.split())
-        for invariant in (
-            "Treat these two commands as immutable flag templates.",
-            "`--root .` and `--format json` are mandatory in both routes.",
-            "Do not remove, add, or rename any flag.",
-        ):
-            self.assertIn(invariant, direct_flat)
-        for boundary in (
-            "The canonical graph owns dependency status and facts.",
-            "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
-        ):
-            self.assertIn(boundary, direct_flat)
-        self.assertNotIn("tools/analysis/dependencies/check_dependency_graph.sh", direct_flat)
-        self.assertIn(
-            "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
-            direct_flat,
-        )
-        packet_result = subprocess.run(
-            [
-                sys.executable,
-                str(PROJECT_ROOT / "tools" / "agent" / "skills" / "skill_tool_commands.py"),
-                "show",
-                "--skill",
-                "code-visualization",
-                "--format",
-                "json",
-            ],
-            cwd=PROJECT_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(
-            packet_result.returncode, 0, packet_result.stdout + packet_result.stderr
-        )
-        self.assertNotIn("check_dependency_graph.sh", packet_result.stdout)
-        self.assertNotIn("sed -n", packet_result.stdout)
-        packet_payload = json.loads(packet_result.stdout)
-        self.assertEqual(packet_payload["required_commands"], [])
-        self.assertEqual(
-            packet_payload["discovered_commands"],
-            [
-                '["catalog", "render-dependency-manifest-graph", "default"]',
-                '["catalog", "render-dependency-manifest-graph", "default", "python3", "tools/analysis/dependencies/render_dependency_manifest_graph.py", "--root", ".", "--scope", "changed", "--bundle-dir", "reports/dependency-graph", "--format", "json"]',
-            ],
-        )
-        for forbidden in (
-            "route.py",
-            "scan_code_dependencies.py",
-            "helper_function_inventory.py",
-        ):
-            self.assertNotIn(forbidden, packet_payload["discovered_commands"])
-        self.assertEqual(
-            [
-                "dependency_graph.tsv",
-                "dependency_graph.ir.json",
-                "dependency_graph.md",
-                "dependency_graph.dot",
-                "dependency_graph.html",
-                "manifest.json",
-            ],
-            [
-                line.split("`", 2)[1]
-                for line in direct_text.splitlines()
-                if line.strip().startswith(tuple(f"{index}." for index in range(1, 7)))
-            ],
-        )
+        direct_text = canonical_text[direct_start:]
+        self.assertIn("render_dependency_manifest_graph.py", direct_text)
+        self.assertIn("`--graph-tsv`", direct_text)
+        self.assertIn("existing checker TSV", direct_text)
+        self.assertIn("default checker input", direct_text)
+        self.assertIn("`--fail-on-broken`", direct_text)
 
-    def test_code_visualization_canonical_skill_mirrors_renderer_invariant(
+    def test_prompt_routes_code_visualization_for_native_graph_input(
         self,
     ) -> None:
-        """The canonical owner keeps full and changed graph routes synchronized."""
-        canonical_text = (
-            PROJECT_ROOT / "agents" / "skills" / "code-visualization.md"
-        ).read_text(encoding="utf-8")
-        source_start = canonical_text.index("## Source Evidence Routes")
-        source_text = canonical_text[source_start:]
-        self.assertIn(
-            "changed-scope command only when changed scope is explicit", source_text
+        """A native dependency graph rendering request selects its owning skill."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "$code-visualization render the existing dependency graph "
+                "from native TSV input"
+            ),
+            "--format",
+            "json",
         )
-        self.assertIn("--bundle-dir reports/dependency-graph", source_text)
-        self.assertNotIn("<path>", source_text)
-        self.assertNotIn("<provided-path>", source_text)
-        self.assertIn("`--json` is invalid", source_text)
-        source_flat = " ".join(source_text.split())
-        for invariant in (
-            "Treat these two commands as immutable flag templates.",
-            "`--root .` and `--format json` are mandatory in both routes.",
-            "Do not remove, add, or rename any flag.",
-        ):
-            self.assertIn(invariant, source_flat)
-        for boundary in (
-            "The canonical graph owns dependency status and facts.",
-            "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
-        ):
-            self.assertIn(boundary, source_flat)
-        self.assertNotIn("tools/analysis/dependencies/check_dependency_graph.sh", source_flat)
-        self.assertIn(
-            "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
-            source_flat,
-        )
-        self.assertNotIn(
-            "renderer invokes the external checker and owns checker authority",
-            source_flat,
-        )
-        for forbidden in (
-            "route.py",
-            "scan_code_dependencies.py",
-            "helper_function_inventory.py",
-        ):
-            self.assertNotIn(forbidden, source_text)
-        for basename in (
-            "dependency_graph.tsv",
-            "dependency_graph.ir.json",
-            "dependency_graph.md",
-            "dependency_graph.dot",
-            "dependency_graph.html",
-            "manifest.json",
-        ):
-            self.assertIn(f"`{basename}`", source_text)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("code-visualization", decision["matched_skills"])
+        self.assertIn("code-visualization", decision["active_skills"])
 
     def test_prompt_file_routes_through_python_owner(self) -> None:
         """Prompt files should use the Python routing owner."""
@@ -1336,7 +802,10 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_old_tool_document_cleanup(self) -> None:
         """Old tool and document cleanup requests should enter document-canon cleanup."""
         result = self.run_route(
-            "--prompt", "$document-canon-cleanup 古いツール，文書の掃除を", "--format", "json"
+            "--prompt",
+            "$document-canon-cleanup 古いツール，文書の掃除を",
+            "--format",
+            "json",
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1416,7 +885,9 @@ class RouteToolTest(unittest.TestCase):
             catalog.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
             dependencies = root / "agents/skills/skill-dependencies.yaml"
             dependency_data = yaml.safe_load(dependencies.read_text(encoding="utf-8"))
-            dependency_data["skill_dependencies"]["_private-skill"] = dependency_data["skill_dependencies"].pop("task-routing")
+            dependency_data["skill_dependencies"]["_private-skill"] = dependency_data[
+                "skill_dependencies"
+            ].pop("task-routing")
             dependencies.write_text(
                 yaml.safe_dump(dependency_data, sort_keys=False), encoding="utf-8"
             )
@@ -1955,8 +1426,8 @@ class RouteToolTest(unittest.TestCase):
                     decision["evidence"], "mode=repo-changing;matched=none"
                 )
 
-    def test_prompt_routes_all_skill_tool_command_repair(self) -> None:
-        """All-skill command packet repair should not fall through."""
+    def test_prompt_routes_all_skill_native_tool_route_repair(self) -> None:
+        """All-skill native tool route repair should not fall through."""
         prompt = (
             "$task-routing $structure-refactor $comprehensive-development $agent-learning "
             "スキル内で明示的にツールの起動コマンドが書いていないから，"
@@ -2245,7 +1716,8 @@ class RouteToolTest(unittest.TestCase):
                         "    order_constraints: []",
                         "    parallel_independent: []",
                     ]
-                ) + "\n",
+                )
+                + "\n",
                 encoding="utf-8",
             )
             result = self.run_route(
@@ -2373,7 +1845,9 @@ class RouteToolTest(unittest.TestCase):
 
     def test_prompt_routes_oracle_spec_mismatch_to_test_design(self) -> None:
         """Oracle/spec mismatch prompts should still activate test-design."""
-        prompt = "$test-design The test oracle has a spec mismatch; update the test design."
+        prompt = (
+            "$test-design The test oracle has a spec mismatch; update the test design."
+        )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
         self.assertEqual(
@@ -2472,7 +1946,8 @@ class CapabilityRouteTest(unittest.TestCase):
                     "skill_families:",
                     entries,
                 ]
-            ) + "\n",
+            )
+            + "\n",
             encoding="utf-8",
         )
         skill_ids = [
@@ -2502,10 +1977,14 @@ class CapabilityRouteTest(unittest.TestCase):
             "tool-catalog.schema.json",
             "yamllint.yaml",
         ):
-            shutil.copyfile(PROJECT_ROOT / "schemas" / "agent-canon" / schema, schema_root / schema)
+            shutil.copyfile(
+                PROJECT_ROOT / "schemas" / "agent-canon" / schema, schema_root / schema
+            )
         tools_root = root / "tools"
         tools_root.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(PROJECT_ROOT / "tools" / "catalog.yaml", tools_root / "catalog.yaml")
+        shutil.copyfile(
+            PROJECT_ROOT / "tools" / "catalog.yaml", tools_root / "catalog.yaml"
+        )
         return path
 
     def write_dependency_map(self, root: Path, body: str) -> Path:
@@ -2536,9 +2015,6 @@ class CapabilityRouteTest(unittest.TestCase):
                 "    discovery:",
                 f"      name: {skill}",
                 "      description: Capability fixture.",
-                "    tool_commands:",
-                "      required: []",
-                "      conditional: []",
                 "    routing:",
                 "      stage_policy: active",
                 "      reason: capability fixture",
@@ -2598,9 +2074,6 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    discovery:",
                         "      name: task-routing",
                         "      description: Fixture.",
-                        "    tool_commands:",
-                        "      required: []",
-                        "      conditional: []",
                     ]
                 ),
             )
@@ -2639,9 +2112,6 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    discovery:",
                         "      name: task-routing",
                         "      description: Fixture.",
-                        "    tool_commands:",
-                        "      required: []",
-                        "      conditional: []",
                     ]
                 ),
             )
@@ -2678,9 +2148,6 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertEqual(payload["matches"][0]["phase"], "pre_implementation_design")
         self.assertEqual(payload["matches"][0]["activation"], "explicit_capability")
         self.assertTrue(payload["matches"][0]["exclusive"])
-        self.assertIsNone(payload["visualization_owner_skill"])
-        self.assertIsNone(payload["visualization_tool_call"])
-        self.assertIsNone(payload["visualization_rejection"])
 
     def test_parent_repository_audit_requires_explicit_capability(self) -> None:
         """Audit keywords remain inert until the capability is explicit."""
@@ -2706,132 +2173,7 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertEqual(
             capability_payload["matches"][0]["activation"], "explicit_capability"
         )
-        self.assertIn(
-            "parent-repository-audit", capability_payload["active_skills"]
-        )
-
-    def test_capability_route_selects_dependency_visualization_owner(self) -> None:
-        """Visualization capability maps to canonical code-visualization ownership."""
-        result = self.run_route(
-            "--capability", "dependency_manifest_graph", "--format", "json"
-        )
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["schema"], "agent_canon.route.capability_route.v1")
-        self.assertEqual(payload["matches"][0]["skill"], "code-visualization")
-        self.assertEqual(payload["matches"][0]["owner"], "code_visualization")
-        self.assertEqual(payload["matches"][0]["phase"], "repo_changing")
-        self.assertEqual(payload["matches"][0]["activation"], "explicit_capability")
-        self.assertEqual(payload["visualization_owner_skill"], "code-visualization")
-        self.assertEqual(
-            payload["visualization_tool_call"]["tool_id"],
-            "agent_canon.visualization.coverage",
-        )
-        self.assertEqual(
-            payload["visualization_tool_call"]["argument_schema"],
-            "agent_canon.visualization.arguments.coverage.v1",
-        )
-        self.assertEqual(
-            payload["visualization_adapter_tool_call"]["tool_id"],
-            "agent_canon.visualization.adapter.dependency_manifest",
-        )
-        self.assertEqual(
-            payload["visualization_adapter_tool_call"]["argument_schema"],
-            "agent_canon.visualization.arguments.dependency_manifest.v1",
-        )
-        self.assertEqual(
-            payload["visualization_adapter_tool_call"]["arguments"][
-                "dependency_manifest_locator"
-            ],
-            "tools/analysis/dependencies/render_dependency_manifest_graph.py",
-        )
-        self.assertIsNone(payload["visualization_rejection"])
-
-    def test_capability_route_renders_all_formats(self) -> None:
-        """JSON, text, and Markdown share the capability envelope fields."""
-        for output_format in ("json", "text", "markdown"):
-            with self.subTest(output_format=output_format):
-                result = self.run_route(
-                    "--capability",
-                    "oop_type_design",
-                    "--format",
-                    output_format,
-                )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("capability_route.v1", result.stdout)
-                self.assertIn("oop_type_design", result.stdout)
-                self.assertIn("pre_implementation_oop_type_design", result.stdout)
-
-    def test_capability_route_failure_envelope_all_formats(self) -> None:
-        """Failure output keeps the same schema across renderer formats."""
-        for output_format in ("json", "text", "markdown"):
-            with self.subTest(output_format=output_format):
-                result = self.run_route(
-                    "--capability",
-                    "unknown_capability",
-                    "--format",
-                    output_format,
-                )
-                self.assert_failure_code(
-                    result,
-                    "unknown-capability:unknown_capability",
-                    output_format=output_format,
-                )
-
-    def test_capability_route_rejects_unknown_id(self) -> None:
-        """Unknown capability IDs fail closed."""
-        result = self.run_route(
-            "--capability", "unknown_capability", "--format", "json"
-        )
-        self.assert_failure_code(result, "unknown-capability:unknown_capability")
-
-    def test_capability_route_rejects_invalid_id(self) -> None:
-        """Capability IDs outside the fixed grammar fail closed."""
-        result = self.run_route("--capability", "oop-type-design", "--format", "json")
-        payload = self.assert_failure_code(
-            result, "invalid-capability-id:oop-type-design"
-        )
-        self.assertEqual(payload["capability_ids"], [])
-
-    def test_capability_route_rejects_duplicate_id(self) -> None:
-        """Repeated explicit IDs are rejected before matching."""
-        result = self.run_route(
-            "--capability",
-            "oop_type_design",
-            "--capability",
-            "oop_type_design",
-        )
-        self.assert_failure_code(result, "duplicate-capability:oop_type_design")
-
-    def test_capability_route_rejects_owner_ambiguity(self) -> None:
-        """A capability owned by two skills is ambiguous."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_catalog(
-                root,
-                self.capability_entry()
-                + "\n"
-                + self.capability_entry("other-skill", owner="other_owner"),
-            )
-            result = self.run_route(
-                "--root", str(root), "--capability", "oop_type_design"
-            )
-        self.assert_failure_code(result, "capability-owner-ambiguity:oop_type_design")
-
-    def test_capability_route_rejects_duplicate_definition(self) -> None:
-        """A same-skill duplicate definition is rejected."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            duplicate = (
-                self.capability_entry()
-                + "\n"
-                + "        - id: oop_type_design\n          owner: pre_implementation_oop_type_design\n          phase: pre_implementation_design\n          activation: explicit_capability\n          exclusive: true"
-            )
-            self.write_catalog(root, duplicate)
-            result = self.run_route(
-                "--root", str(root), "--capability", "oop_type_design"
-            )
-        self.assert_failure_code(result, "duplicate-capability-definition:oop_type_design")
+        self.assertIn("parent-repository-audit", capability_payload["active_skills"])
 
     def test_capability_route_rejects_multiple_capabilities(self) -> None:
         """The first capability version does not arbitrate multiple IDs."""

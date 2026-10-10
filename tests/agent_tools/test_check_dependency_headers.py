@@ -6,7 +6,6 @@
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
 # upstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py changed-file checks
-# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py canonical visualization contract dependency target
 # downstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh runs this source regression
 # @dependency-end
 
@@ -21,47 +20,18 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.validation.semantic.dependencies import check_dependency_headers as header_checker
+from tools.validation.semantic.dependencies import (
+    check_dependency_headers as header_checker,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_headers.py"
-VISUALIZATION_QUEUE_PATHS = (
-    "agents/skills/algorithm-flowchart.md",
-    "agents/skills/catalog.yaml",
-    ".codex/personal/skills/algorithm-flowchart/SKILL.md",
-    ".codex/personal/skills/dependency-analysis/SKILL.md",
-    ".codex/personal/skills/prose-reasoning-graph/SKILL.md",
-    "agents/skills/structure-refactor.md",
-    ".codex/personal/skills/structure-refactor/SKILL.md",
-    "agents/skills/structure-planning.md",
-    ".codex/personal/skills/structure-planning/SKILL.md",
-    "agents/skills/report-writing.md",
-    ".codex/personal/skills/report-writing/SKILL.md",
-    "agents/skills/long-form-writing.md",
-    ".codex/personal/skills/long-form-writing/SKILL.md",
-    "agents/skills/html-output.md",
-    ".codex/personal/skills/html-output/SKILL.md",
-    "agents/skills/formal-proof-workflow.md",
-    ".codex/personal/skills/formal-proof-workflow/SKILL.md",
-    "agents/skills/md-style-check.md",
-    ".codex/personal/skills/md-style-check/SKILL.md",
-    "agents/skills/README.md",
-    "tools/agent/skills/skill_route_catalog.py",
-    "tools/agent/orchestration/capability_route.py",
-    "tests/agent_tools/test_render_dependency_manifest_graph.py",
-    "tools/catalog.yaml",
-    "tools/runtime/manifest/tool_catalog.py",
-    "tools/README.md",
-    "documents/tools/README.md",
-    "documents/tools/tool-docs.toml",
-    "tests/agent_tools/test_tool_catalog.py",
-    "tests/agent_tools/test_dependency_manifest_tools.py",
-    "tests/agent_tools/test_check_dependency_headers.py",
-    "tools/runtime/dispatch/agent-canon/src/docs.rs",
-    "tools/runtime/dispatch/agent-canon/src/main.rs",
-    "tests/tools/test_fix_mermaid.py",
-    "agents/skills/codex-task-workflow.md",
-    "agents/skills/agent-canon-update.md",
+SCRIPT = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "dependencies"
+    / "check_dependency_headers.py"
 )
 
 
@@ -86,7 +56,9 @@ def manifest(
     return "\n".join(lines)
 
 
-def run_cli(root: Path, *paths: str, allow_frontmatter: bool = False) -> subprocess.CompletedProcess[str]:
+def run_cli(
+    root: Path, *paths: str, allow_frontmatter: bool = False
+) -> subprocess.CompletedProcess[str]:
     """Run the production CLI against one explicit repository root."""
     command = [sys.executable, str(SCRIPT), "--root", str(root)]
     if allow_frontmatter:
@@ -107,10 +79,9 @@ def write_contract_registry(root: Path, declaration: str) -> None:
     registry.parent.mkdir(parents=True, exist_ok=True)
     registry.write_text(
         'schema = "agent_canon.dependency_contract_kinds.v1"\n'
-        'allowed_kinds = [\n'
+        "allowed_kinds = [\n"
         '  "tool",\n'
-        ']\n'
-        + declaration,
+        "]\n" + declaration,
         encoding="utf-8",
     )
 
@@ -138,26 +109,6 @@ class DependencyHeaderCheckTest(unittest.TestCase):
 
         self.assertNotIn(provenance, header)
         self.assertIn(provenance, text.split("@dependency-end", 1)[1])
-
-    def test_visualization_completion_queue_has_canonical_contract_edges(self) -> None:
-        """Require visualization queue files to expose canonical contract edges."""
-        patterns = header_checker.declared_surface_patterns(PROJECT_ROOT)
-        for relative_path in VISUALIZATION_QUEUE_PATHS:
-            with self.subTest(path=relative_path):
-                header = "\n".join(
-                    (PROJECT_ROOT / relative_path)
-                    .read_text(encoding="utf-8")
-                    .splitlines()[:80]
-                )
-                self.assertIn("@dependency-start", header)
-                self.assertIn("@dependency-end", header)
-                if header_checker.matches_declared_surface(relative_path, patterns):
-                    self.assertTrue(
-                        "code-visualization.md" in header
-                        or "visualization_contract.py" in header
-                        or "visualization_contract.md" in header,
-                        relative_path,
-                    )
 
     def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
         """Accept skill frontmatter before a valid dependency manifest."""
@@ -213,7 +164,9 @@ class DependencyHeaderCheckTest(unittest.TestCase):
         """Reject a checkable source file without a dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / "tool.py").write_text('"""Missing dependency header."""\n', encoding="utf-8")
+            (root / "tool.py").write_text(
+                '"""Missing dependency header."""\n', encoding="utf-8"
+            )
 
             result = run_cli(root, "tool.py")
 
@@ -324,7 +277,9 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
                 'header_surfaces = ["scoped.py"]\n',
             )
             scoped = root / "scoped.py"
-            scoped.write_text("# scoped\n" + manifest(contract="tool"), encoding="utf-8")
+            scoped.write_text(
+                "# scoped\n" + manifest(contract="tool"), encoding="utf-8"
+            )
 
             result, output = self.run_main(
                 root,
@@ -381,7 +336,10 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             "header_surfaces = [\n",
             "header_surfaces = []\n",
         ):
-            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(declaration=declaration),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 root = Path(tmp_dir)
                 (root / ".git").mkdir()
                 write_contract_registry(root, declaration)

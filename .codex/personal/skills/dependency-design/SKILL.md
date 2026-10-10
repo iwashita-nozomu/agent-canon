@@ -2,7 +2,7 @@
 name: dependency-design
 description: "Define and validate the typed declarative devcontainer dependency design packet before changing mounted developer or agent tools, manifests, bootstrap, or dependency installation order."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"aefdca60104aac60ee299ed4d4c7f949c43a55fcf4251715ef6173e8b361c66f"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"c277e6e9c8f674364f77c2af6cf83b06950204d91cb72ec84db1da1674ae713c"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/dependency-design.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [dependency-design](../../../../agents/skills/dependency-design.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill dependency-design --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

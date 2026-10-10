@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Publishes GitHub branches and pull requests through a gh-verified remote route.
-# upstream design ../../ROOT_AGENTS.md defines PR mutation authority and non-blocking publish policy.
-# upstream design ../../agents/skills/pr-processing.md defines the GitHub PR workflow.
-# upstream design ../../documents/agent-canon/agent-canon-github-remote.md defines canonical GitHub remote policy.
-# upstream implementation ./update_lifecycle_contract.py owns immutable PR topology and gate identity.
-# downstream design ../../documents/tools/github_publish.md documents the public tool contract.
-# downstream implementation ../../tests/agent_tools/test_github_publish.py validates command construction.
+# upstream design ../../../ROOT_AGENTS.md defines PR mutation authority and non-blocking publish policy.
+# upstream design ../../../agents/skills/pr-processing.md defines the GitHub PR workflow.
+# upstream design ../../../documents/agent-canon/agent-canon-github-remote.md defines canonical GitHub remote policy.
+# upstream implementation ../../runtime/lifecycle/update_lifecycle_contract.py owns immutable PR topology and gate identity.
+# downstream design ../../../documents/tools/github_publish.md documents the public tool contract.
+# downstream implementation ../../../tests/agent_tools/test_github_publish.py validates command construction.
 # @dependency-end
 """Publish GitHub branches and pull requests with explicit gh-backed evidence."""
 
@@ -65,10 +65,6 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
 
 MAX_ERROR_CHARS = 4000
 REMOTE_SCP_RE = re.compile(r"^[^@]+@[^:]+:(?P<slug>[^/]+/[^/]+?)(?:\.git)?/?$")
-GITHUB_PUBLICATION_PACKET_SCHEMA = "agent-canon.github-publication-packet.v1"
-ACTIVE_PACKET_MATERIALIZATION_SCHEMA = (
-    "waterfall.active_design_packet_materialization.v1"
-)
 
 
 def _write_publication_summary(path: Path, payload: bytes) -> None:
@@ -77,7 +73,9 @@ def _write_publication_summary(path: Path, payload: bytes) -> None:
     if configured:
         parent = Path(configured).resolve(strict=True)
         attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="github-publication-staging")
+            ParentRootAttestationRequest(
+                cwd=parent, explicit_root=parent, purpose="github-publication-staging"
+            )
         )
         ParentRootSideEffectBoundary().write_parent_owned_file(
             attestation, path, payload, "github-publication-staging"
@@ -97,117 +95,6 @@ class CommandResult:
     returncode: int
     stdout: str
     stderr: str
-
-
-@dataclass(frozen=True, init=False)
-class GithubPublicationAuthority:
-    """Opaque sealed publication packet consumed by GitHub mutations."""
-
-    _packet_bytes: bytes
-    _seal: str
-
-    @classmethod
-    def from_packet(
-        cls, packet: Mapping[str, object]
-    ) -> "GithubPublicationAuthority":
-        """Seal one fully validated publication packet."""
-        checked = validate_github_publication_packet(packet)
-        payload = canonical_json_bytes(checked)
-        instance = object.__new__(cls)
-        object.__setattr__(instance, "_packet_bytes", payload)
-        object.__setattr__(instance, "_seal", hashlib.sha256(payload).hexdigest())
-        return instance
-
-    def consume(self) -> dict[str, object]:
-        """Verify the opaque seal before exposing owner-validated evidence."""
-        try:
-            payload = self._packet_bytes
-            seal = self._seal
-        except AttributeError as exc:
-            raise UserVisibleFailure(
-                message="GitHub publication authority was not owner-materialized",
-                next_action="materialize_the_canonical_github_publication_packet",
-            ) from exc
-        if hashlib.sha256(payload).hexdigest() != seal:
-            raise UserVisibleFailure(
-                message="GitHub publication authority seal is invalid",
-                next_action="materialize_a_successor_publication_packet",
-            )
-        decoded = json.loads(payload)
-        if not isinstance(decoded, dict):
-            raise UserVisibleFailure(
-                message="GitHub publication authority payload is invalid",
-                next_action="materialize_the_canonical_github_publication_packet",
-            )
-        return cast(dict[str, object], decoded)
-
-
-@dataclass(frozen=True, init=False)
-class GithubPostPublicationChecksAuthority:
-    """Opaque publication packet plus passing same-binding G5 evidence."""
-
-    _payload_bytes: bytes
-    _seal: str
-
-    @classmethod
-    def from_publication(
-        cls,
-        publication_authority: GithubPublicationAuthority,
-        g5_gate: Mapping[str, object],
-    ) -> "GithubPostPublicationChecksAuthority":
-        """Seal a post-publication checks variant after validating G5."""
-        packet = publication_authority.consume()
-        lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
-        checked_g5 = validate_gate_verdict(g5_gate)
-        if checked_g5["gate_id"] != "G5" or checked_g5["verdict"] != "pass":
-            raise UserVisibleFailure(
-                message="publication readback evidence is not a passing G5 verdict",
-                next_action="read_back_the_exact_remote_publication_identity",
-            )
-        if binding_identity(lifecycle["binding"]) != binding_identity(
-            checked_g5["binding"]
-        ):
-            raise UserVisibleFailure(
-                message="G5 evidence does not bind the selected PR lifecycle",
-                next_action="create_a_successor_lifecycle_for_the_changed_identity",
-            )
-        payload = canonical_json_bytes(
-            {"publication_packet": packet, "g5_gate": checked_g5}
-        )
-        instance = object.__new__(cls)
-        object.__setattr__(instance, "_payload_bytes", payload)
-        object.__setattr__(instance, "_seal", hashlib.sha256(payload).hexdigest())
-        return instance
-
-    def consume(self) -> tuple[dict[str, object], dict[str, object]]:
-        """Verify and return the sealed publication packet and G5 receipt."""
-        try:
-            payload = self._payload_bytes
-            seal = self._seal
-        except AttributeError as exc:
-            raise UserVisibleFailure(
-                message="post-publication checks authority was not owner-materialized",
-                next_action="materialize_passing_same_binding_G5_evidence",
-            ) from exc
-        if hashlib.sha256(payload).hexdigest() != seal:
-            raise UserVisibleFailure(
-                message="post-publication checks authority seal is invalid",
-                next_action="materialize_passing_same_binding_G5_evidence",
-            )
-        decoded = json.loads(payload)
-        if not isinstance(decoded, dict):
-            raise UserVisibleFailure(
-                message="post-publication checks authority payload is invalid",
-                next_action="materialize_passing_same_binding_G5_evidence",
-            )
-        packet = decoded.get("publication_packet")
-        gate = decoded.get("g5_gate")
-        if not isinstance(packet, dict) or not isinstance(gate, dict):
-            raise UserVisibleFailure(
-                message="post-publication checks authority fields are invalid",
-                next_action="materialize_passing_same_binding_G5_evidence",
-            )
-        return packet, gate
 
 
 @dataclass(frozen=True)
@@ -270,12 +157,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_publish_arguments(publish_pr)
     add_pr_arguments(publish_pr)
-    publish_pr.add_argument("--allow-main", action="store_true", help="Allow pushing main.")
+    publish_pr.add_argument(
+        "--allow-main", action="store_true", help="Allow pushing main."
+    )
 
     checks = subparsers.add_parser("checks", help="Show GitHub PR checks.")
     add_publish_arguments(checks)
-    checks.add_argument("--pr", help="PR number, URL, or branch. Defaults to current branch.")
-    checks.add_argument("--watch", action="store_true", help="Watch checks until completion.")
+    checks.add_argument(
+        "--pr", help="PR number, URL, or branch. Defaults to current branch."
+    )
+    checks.add_argument(
+        "--watch", action="store_true", help="Watch checks until completion."
+    )
     return parser
 
 
@@ -287,8 +180,12 @@ def add_publish_arguments(parser: argparse.ArgumentParser) -> None:
         help="The current user task that authorizes this publish operation.",
     )
     parser.add_argument("--repo", help="GitHub repository in owner/name form.")
-    parser.add_argument("--remote", default="origin", help="Git remote to verify. Defaults to origin.")
-    parser.add_argument("--branch", help="Branch to publish. Defaults to the current branch.")
+    parser.add_argument(
+        "--remote", default="origin", help="Git remote to verify. Defaults to origin."
+    )
+    parser.add_argument(
+        "--branch", help="Branch to publish. Defaults to the current branch."
+    )
     parser.add_argument(
         "--summary-out",
         help="Optional JSON summary path. Stdout remains a compact key/value report.",
@@ -299,8 +196,12 @@ def add_pr_arguments(parser: argparse.ArgumentParser) -> None:
     """Add pull-request creation/update arguments."""
     parser.add_argument("--base", default="main", help="Base branch. Defaults to main.")
     parser.add_argument("--title", required=True, help="Pull request title.")
-    parser.add_argument("--body-file", required=True, help="Path to a Markdown PR body file.")
-    parser.add_argument("--draft", action="store_true", help="Create the PR as a draft.")
+    parser.add_argument(
+        "--body-file", required=True, help="Path to a Markdown PR body file."
+    )
+    parser.add_argument(
+        "--draft", action="store_true", help="Create the PR as a draft."
+    )
     parser.add_argument(
         "--update-existing",
         action="store_true",
@@ -487,8 +388,13 @@ def verify_remote(
     if remote_slug != name_with_owner:
         head_metadata = gh_head_repo_metadata(runner, remote_slug)
         parent = head_metadata.get("parent")
-        parent_name = parent.get("nameWithOwner") if isinstance(parent, Mapping) else None
-        if head_metadata.get("nameWithOwner") != remote_slug or parent_name != name_with_owner:
+        parent_name = (
+            parent.get("nameWithOwner") if isinstance(parent, Mapping) else None
+        )
+        if (
+            head_metadata.get("nameWithOwner") != remote_slug
+            or parent_name != name_with_owner
+        ):
             raise UserVisibleFailure(
                 message=(
                     f"remote {remote!r} points at {remote_slug}, which is not a "
@@ -517,9 +423,10 @@ def verify_remote(
         "permission_state": permission_state,
         "authority_source": "gh repo view viewerPermission",
     }
-    permission_evidence_id = "evidence:" + hashlib.sha256(
-        canonical_json_bytes(permission_evidence)
-    ).hexdigest()
+    permission_evidence_id = (
+        "evidence:"
+        + hashlib.sha256(canonical_json_bytes(permission_evidence)).hexdigest()
+    )
     actor_id, actor_display_name = gh_authenticated_actor(runner)
     return RemoteVerification(
         repo=name_with_owner,
@@ -652,7 +559,10 @@ def pull_request_readback(
                 next_action="reject_publication_readback_and_retry_exact_PR_identity",
             )
         merge_tree = merge_identity.get("tree_sha")
-        if not isinstance(merge_tree, str) or re.fullmatch(r"[0-9a-f]{40}", merge_tree) is None:
+        if (
+            not isinstance(merge_tree, str)
+            or re.fullmatch(r"[0-9a-f]{40}", merge_tree) is None
+        ):
             raise UserVisibleFailure(
                 message="merge commit tree identity is incomplete",
                 next_action="read_back_the_exact_publication_merge_tree",
@@ -717,10 +627,7 @@ def lifecycle_with_pr_readback(
             message="pull request base identity changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
         )
-    if (
-        remote_state != "MERGED"
-        and readback.get("baseRefOid") != base["commit_sha"]
-    ):
+    if remote_state != "MERGED" and readback.get("baseRefOid") != base["commit_sha"]:
         raise UserVisibleFailure(
             message="pull request base commit changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
@@ -888,7 +795,7 @@ def _local_git_identity(runner: Runner) -> dict[str, str]:
     except CommandFailure as exc:
         raise UserVisibleFailure(
             message="local branch/ref cannot be read as a named branch",
-            next_action="checkout_the_sealed_lifecycle_branch_before_publication",
+            next_action="checkout_the_selected_named_branch_before_publication",
         ) from exc
     commit_sha = _git_object_id(
         runner,
@@ -908,30 +815,30 @@ def _local_git_identity(runner: Runner) -> dict[str, str]:
     }
 
 
-def _sealed_head_identity(
+def _verified_head_identity(
     lifecycle: Mapping[str, object],
     branch: str,
 ) -> tuple[str, str, str]:
-    """Return the exact branch/ref/commit/tree frozen by the lifecycle packet."""
+    """Return the exact branch/ref/commit/tree in the validated lifecycle."""
     head = lifecycle.get("head_identity")
     if not isinstance(head, Mapping):
         raise UserVisibleFailure(
-            message="sealed lifecycle packet does not contain head identity",
+            message="verified lifecycle does not contain head identity",
             next_action="materialize_a_successor_lifecycle_with_exact_head_identity",
         )
     expected_ref = f"refs/heads/{branch}"
-    packet_ref = head.get("ref")
+    lifecycle_ref = head.get("ref")
     candidate_sha = head.get("commit_sha")
     tree_sha = head.get("tree_sha")
     if (
-        packet_ref != expected_ref
+        lifecycle_ref != expected_ref
         or not isinstance(candidate_sha, str)
         or re.fullmatch(r"[0-9a-f]{40}", candidate_sha) is None
         or not isinstance(tree_sha, str)
         or re.fullmatch(r"[0-9a-f]{40}", tree_sha) is None
     ):
         raise UserVisibleFailure(
-            message="sealed lifecycle head identity differs from the selected branch",
+            message="verified lifecycle head identity differs from the selected branch",
             next_action="materialize_a_successor_lifecycle_with_exact_head_identity",
         )
     return expected_ref, candidate_sha, tree_sha
@@ -965,7 +872,7 @@ def _remote_head_readback(
     if remote_sha != expected_sha:
         raise UserVisibleFailure(
             message=(
-                "remote branch readback SHA differs from the sealed local candidate: "
+                "remote branch readback SHA differs from the local candidate: "
                 f"expected {expected_sha}, received {remote_sha}"
             ),
             next_action="reject_remote_publication_and_preserve_the_local_identity",
@@ -1299,15 +1206,11 @@ def _validate_pr_identity_inputs(
     source_main_rebind_receipt: Mapping[str, object],
 ) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     """Validate and deep-clone the immutable G3 input records once."""
-    checked_rebind = validate_source_main_rebind_receipt(
-        source_main_rebind_receipt
-    )
+    checked_rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
     checked_cas = validate_candidate_cas_rebind_transition(
         checked_rebind, candidate_cas_receipt
     )
-    checked_lifecycle = validate_candidate_cas_pr_transition(
-        checked_cas, lifecycle
-    )
+    checked_lifecycle = validate_candidate_cas_pr_transition(checked_cas, lifecycle)
     return checked_lifecycle, checked_cas, checked_rebind
 
 
@@ -1384,7 +1287,7 @@ def require_pr_identity_gate(
     upstream_gate_verdicts: Sequence[Mapping[str, object]],
     gate_verdict: Mapping[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
-    """Consume, without recomputing, one exact G3 publication authority."""
+    """Consume the previously validated G3 identity and permission verdict."""
     checked, _cas, _rebind, _upstream, gate = _require_pr_identity_gate_bundle(
         lifecycle,
         candidate_cas_receipt,
@@ -1446,175 +1349,9 @@ def _require_pr_identity_gate_bundle(
     return checked, cas, _rebind, checked_upstream, checked_gate
 
 
-def materialize_github_publication_packet(
-    *,
-    lifecycle: Mapping[str, object],
-    candidate_cas_receipt: Mapping[str, object],
-    source_main_rebind_receipt: Mapping[str, object],
-    upstream_gate_verdicts: Sequence[Mapping[str, object]],
-    predecessor_graph_materialization: Mapping[str, object] | None = None,
+def base_summary(
+    args: argparse.Namespace, verification: RemoteVerification, branch: str
 ) -> dict[str, object]:
-    """Materialize the sole machine packet consumed by GitHub mutations."""
-    checked_lifecycle, checked_cas, checked_rebind, upstream, gate = (
-        _materialize_pr_identity_gate_bundle(
-            lifecycle,
-            candidate_cas_receipt,
-            source_main_rebind_receipt,
-            upstream_gate_verdicts,
-        )
-    )
-    packet = {
-        "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
-        "pull_request_lifecycle": checked_lifecycle,
-        "candidate_cas_receipt": checked_cas,
-        "source_main_rebind_receipt": checked_rebind,
-        "upstream_gate_verdicts": list(upstream),
-        "g3_gate": gate,
-    }
-    if predecessor_graph_materialization is not None:
-        packet["predecessor_graph_materialization"] = (
-            validate_predecessor_graph_materialization(
-                predecessor_graph_materialization,
-                expected_source_oid=str(
-                    cast(Mapping[str, object], checked_rebind["new_base_identity"])[
-                        "commit_sha"
-                    ]
-                ),
-            )
-        )
-    return packet
-
-
-def validate_predecessor_graph_materialization(
-    value: Mapping[str, object],
-    *,
-    expected_source_oid: str | None = None,
-) -> dict[str, object]:
-    """Validate one graph/active-packet predecessor identity carried by G3."""
-    required = {
-        "schema",
-        "packet_sha256",
-        "predecessor_source_oid",
-        "source_results",
-        "dependency_results",
-    }
-    if set(value) != required:
-        raise UserVisibleFailure(
-            message="predecessor graph materialization fields are invalid",
-            next_action="materialize_the_closed_active_packet_predecessor_projection",
-        )
-    if value.get("schema") != ACTIVE_PACKET_MATERIALIZATION_SCHEMA:
-        raise UserVisibleFailure(
-            message="predecessor graph materialization schema is invalid",
-            next_action="materialize_the_closed_active_packet_predecessor_projection",
-        )
-    packet_sha = value.get("packet_sha256")
-    predecessor_oid = value.get("predecessor_source_oid")
-    if not isinstance(packet_sha, str) or re.fullmatch(r"[0-9a-f]{64}", packet_sha) is None:
-        raise UserVisibleFailure(
-            message="predecessor graph packet identity is invalid",
-            next_action="materialize_the_closed_active_packet_predecessor_projection",
-        )
-    if not isinstance(predecessor_oid, str) or re.fullmatch(r"[0-9a-f]{40}", predecessor_oid) is None:
-        raise UserVisibleFailure(
-            message="predecessor graph source identity is invalid",
-            next_action="materialize_the_closed_active_packet_predecessor_projection",
-        )
-    if expected_source_oid is not None and predecessor_oid != expected_source_oid:
-        raise UserVisibleFailure(
-            message="predecessor graph source identity does not match the CAS base",
-            next_action="materialize_a_successor_for_the_changed_predecessor_identity",
-        )
-    for field in ("source_results", "dependency_results"):
-        entries = value.get(field)
-        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)) or not entries:
-            raise UserVisibleFailure(
-                message=f"predecessor graph {field} are invalid",
-                next_action="materialize_the_closed_active_packet_predecessor_projection",
-            )
-        seen: set[str] = set()
-        for item in entries:
-            if not isinstance(item, Mapping) or not isinstance(item.get("declared_ref"), str):
-                raise UserVisibleFailure(
-                    message=f"predecessor graph {field} item is invalid",
-                    next_action="materialize_the_closed_active_packet_predecessor_projection",
-                )
-            declared_ref = str(item["declared_ref"])
-            if declared_ref in seen:
-                raise UserVisibleFailure(
-                    message=f"predecessor graph {field} has duplicate references",
-                    next_action="materialize_the_closed_active_packet_predecessor_projection",
-                )
-            seen.add(declared_ref)
-    return dict(value)
-
-
-def validate_github_publication_packet(value: object) -> dict[str, object]:
-    """Validate one immutable publication packet without rebuilding evidence."""
-    allowed_fields = {
-        "schema",
-        "pull_request_lifecycle",
-        "candidate_cas_receipt",
-        "source_main_rebind_receipt",
-        "upstream_gate_verdicts",
-        "g3_gate",
-    }
-    if not isinstance(value, Mapping) or set(value).difference(
-        allowed_fields | {"predecessor_graph_materialization"}
-    ) or not allowed_fields.issubset(set(value)):
-        raise UserVisibleFailure(
-            message="GitHub publication packet fields are invalid",
-            next_action="materialize_the_canonical_github_publication_packet",
-        )
-    if value.get("schema") != GITHUB_PUBLICATION_PACKET_SCHEMA:
-        raise UserVisibleFailure(
-            message="GitHub publication packet schema is invalid",
-            next_action="materialize_the_canonical_github_publication_packet",
-        )
-    upstream_value = value["upstream_gate_verdicts"]
-    if not isinstance(upstream_value, Sequence) or isinstance(
-        upstream_value, (str, bytes)
-    ):
-        raise UserVisibleFailure(
-            message="GitHub publication predecessor gates are invalid",
-            next_action="materialize_G1_and_G2_for_the_exact_candidate",
-        )
-    (
-        checked_lifecycle,
-        checked_cas,
-        checked_rebind,
-        checked_upstream,
-        checked_gate,
-    ) = _require_pr_identity_gate_bundle(
-        cast(Mapping[str, object], value["pull_request_lifecycle"]),
-        cast(Mapping[str, object], value["candidate_cas_receipt"]),
-        cast(Mapping[str, object], value["source_main_rebind_receipt"]),
-        cast(Sequence[Mapping[str, object]], upstream_value),
-        cast(Mapping[str, object], value["g3_gate"]),
-    )
-    result = {
-        "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
-        "pull_request_lifecycle": checked_lifecycle,
-        "candidate_cas_receipt": checked_cas,
-        "source_main_rebind_receipt": checked_rebind,
-        "upstream_gate_verdicts": list(checked_upstream),
-        "g3_gate": checked_gate,
-    }
-    if "predecessor_graph_materialization" in value:
-        result["predecessor_graph_materialization"] = (
-            validate_predecessor_graph_materialization(
-                cast(Mapping[str, object], value["predecessor_graph_materialization"]),
-                expected_source_oid=str(
-                    cast(Mapping[str, object], checked_rebind["new_base_identity"])[
-                        "commit_sha"
-                    ]
-                ),
-            )
-        )
-    return result
-
-
-def base_summary(args: argparse.Namespace, verification: RemoteVerification, branch: str) -> dict[str, object]:
     """Return common summary fields."""
     return {
         "user_task": args.user_task,
@@ -1629,48 +1366,24 @@ def base_summary(args: argparse.Namespace, verification: RemoteVerification, bra
     }
 
 
-def consume_publication_authority(
-    authority: GithubPublicationAuthority,
-) -> tuple[dict[str, object], dict[str, object]]:
-    """Consume one opaque owner-materialized mutation authority."""
-    if type(authority) is not GithubPublicationAuthority:
-        raise UserVisibleFailure(
-            message="GitHub mutation requires an opaque publication authority",
-            next_action="materialize_the_canonical_github_publication_packet",
-        )
-    packet = authority.consume()
-    lifecycle = packet.get("pull_request_lifecycle")
-    gate = packet.get("g3_gate")
-    if not isinstance(lifecycle, dict) or not isinstance(gate, dict):
-        raise UserVisibleFailure(
-            message="GitHub publication authority fields are invalid",
-            next_action="materialize_the_canonical_github_publication_packet",
-        )
-    return lifecycle, gate
-
-
 def perform_push(
     args: argparse.Namespace,
     runner: Runner,
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority | None = None,
     lifecycle: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """Transport one local branch with optional packet or direct lifecycle evidence."""
+    """Transport one local branch with optional validated lifecycle evidence."""
     if branch == "main" and not getattr(args, "allow_main", False):
         raise UserVisibleFailure(
             message="refusing to push main without --allow-main",
-            next_action="publish_a_topic_branch_or_pass_--allow-main_with_explicit_authority",
+            next_action="publish_a_topic_branch_or_pass_--allow-main_with_explicit_user_authority",
         )
-    gate: dict[str, object] | None = None
     expected_ref = f"refs/heads/{branch}"
-    sealed_candidate_sha: str | None = None
-    sealed_candidate_tree_sha: str | None = None
-    if authority is not None:
-        lifecycle, gate = consume_publication_authority(authority)
-    elif lifecycle is not None:
+    candidate_sha_from_lifecycle: str | None = None
+    candidate_tree_from_lifecycle: str | None = None
+    if lifecycle is not None:
         lifecycle = validate_pull_request_lifecycle(lifecycle)
     if lifecycle is not None:
         if lifecycle["state"] not in {
@@ -1683,9 +1396,11 @@ def perform_push(
                 message=f"PR lifecycle state does not permit push: {lifecycle['state']}",
                 next_action="resolve_permission_remote_or_successor_state_before_push",
             )
-        expected_ref, sealed_candidate_sha, sealed_candidate_tree_sha = _sealed_head_identity(
-            lifecycle, branch
-        )
+        (
+            expected_ref,
+            candidate_sha_from_lifecycle,
+            candidate_tree_from_lifecycle,
+        ) = _verified_head_identity(lifecycle, branch)
     dirty = worktree_dirty(runner)
     local_before = _local_git_identity(runner)
     if local_before["branch"] != branch:
@@ -1694,14 +1409,13 @@ def perform_push(
             next_action="checkout_the_selected_named_branch_before_publication",
         )
     if lifecycle is not None and (
-        local_before["commit_sha"] != sealed_candidate_sha
-        or local_before["tree_sha"] != sealed_candidate_tree_sha
+        local_before["commit_sha"] != candidate_sha_from_lifecycle
+        or local_before["tree_sha"] != candidate_tree_from_lifecycle
     ):
-        lifecycle_label = "sealed" if authority is not None else "verified"
         raise UserVisibleFailure(
             message=(
                 "local branch/ref/commit/tree differs from the "
-                f"{lifecycle_label} lifecycle head identity"
+                "verified lifecycle head identity"
             ),
             next_action="materialize_a_successor_lifecycle_for_the_current_local_commit",
         )
@@ -1734,9 +1448,7 @@ def perform_push(
         {
             "action": "push",
             "publication_boundary": (
-                "sealed_publication"
-                if authority is not None
-                else "verified_lifecycle"
+                "verified_lifecycle"
                 if lifecycle is not None
                 else "branch_transport_only"
             ),
@@ -1755,8 +1467,6 @@ def perform_push(
     )
     if lifecycle is not None:
         summary["pull_request_lifecycle"] = lifecycle
-    if gate is not None:
-        summary["g3_gate"] = gate
     return summary
 
 
@@ -1766,19 +1476,15 @@ def perform_pr(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority | None = None,
     lifecycle: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Create or update a pull request for the verified branch."""
     body_file = require_body_file(args.body_file)
-    gate: dict[str, object] | None = None
-    if authority is not None:
-        lifecycle, gate = consume_publication_authority(authority)
-    elif lifecycle is not None:
+    if lifecycle is not None:
         lifecycle = validate_pull_request_lifecycle(lifecycle)
     else:
         raise UserVisibleFailure(
-            message="PR mutation requires a verified direct lifecycle or sealed packet",
+            message="PR mutation requires a verified direct lifecycle",
             next_action="derive_the_local_candidate_and_verified_base_lifecycle",
         )
     if lifecycle["state"] not in {
@@ -1828,8 +1534,6 @@ def perform_pr(
                     "pull_request_lifecycle": lifecycle,
                 }
             )
-            if gate is not None:
-                summary["g3_gate"] = gate
             return summary
         readback = pull_request_readback(
             runner,
@@ -1847,8 +1551,6 @@ def perform_pr(
                 "pull_request_lifecycle": lifecycle,
             }
         )
-        if gate is not None:
-            summary["g3_gate"] = gate
         return summary
 
     command = [
@@ -1889,8 +1591,6 @@ def perform_pr(
             "pull_request_lifecycle": lifecycle,
         }
     )
-    if gate is not None:
-        summary["g3_gate"] = gate
     return summary
 
 
@@ -1899,21 +1599,8 @@ def perform_checks(
     runner: Runner,
     verification: RemoteVerification,
     branch: str,
-    *,
-    authority: GithubPublicationAuthority | GithubPostPublicationChecksAuthority | None = None,
 ) -> dict[str, object]:
     """Show pull-request checks through gh."""
-    checked_g5: dict[str, object] | None = None
-    lifecycle: dict[str, object] | None = None
-    gate: dict[str, object] | None = None
-    if type(authority) is GithubPostPublicationChecksAuthority:
-        packet, checked_g5 = authority.consume()
-        lifecycle = cast(dict[str, object], packet["pull_request_lifecycle"])
-        gate = cast(dict[str, object], packet["g3_gate"])
-    elif authority is not None:
-        lifecycle, gate = consume_publication_authority(
-            cast(GithubPublicationAuthority, authority)
-        )
     pr_selector = args.pr or branch
     command = ["gh", "pr", "checks", pr_selector, "--repo", verification.repo]
     if args.watch:
@@ -1936,12 +1623,6 @@ def perform_checks(
             "checks_stdout": result.stdout.strip(),
         }
     )
-    if lifecycle is not None:
-        summary["pull_request_lifecycle"] = lifecycle
-    if gate is not None:
-        summary["g3_gate"] = gate
-    if checked_g5 is not None:
-        summary["g5_gate"] = checked_g5
     if result.returncode == 8:
         summary["next_action"] = "wait_for_github_checks_or_rerun_with_--watch"
     return summary
@@ -2018,9 +1699,7 @@ def command_failure_message(exc: CommandFailure) -> str:
     """Return a bounded command failure message."""
     command = " ".join(exc.result.args)
     detail = "\n".join(
-        part.strip()
-        for part in (exc.result.stderr, exc.result.stdout)
-        if part.strip()
+        part.strip() for part in (exc.result.stderr, exc.result.stdout) if part.strip()
     )
     if detail:
         detail = detail[:MAX_ERROR_CHARS]
@@ -2031,39 +1710,13 @@ def command_failure_message(exc: CommandFailure) -> str:
 def run(
     args: argparse.Namespace,
     runner: Runner = subprocess_runner,
-    *,
-    publication_packet: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Run the selected publish action."""
     os.chdir(args.root)
     branch = selected_branch(runner, args.branch)
     verification = verify_remote(runner, repo=args.repo, remote=args.remote)
-    authority: GithubPublicationAuthority | None = None
     lifecycle: dict[str, object] | None = None
-    if publication_packet is not None:
-        authority = GithubPublicationAuthority.from_packet(publication_packet)
-        packet = authority.consume()
-        lifecycle = cast(Mapping[str, object], packet["pull_request_lifecycle"])
-        remote_identity = cast(Mapping[str, object], lifecycle["remote_identity"])
-        base_identity = cast(Mapping[str, object], lifecycle["base_identity"])
-        permission = cast(Mapping[str, object], lifecycle["permission_identity"])
-        expected_head_repo = verification.head_repo or verification.remote_slug
-        if (
-            f"{remote_identity['repo_owner']}/{remote_identity['repo_name']}"
-            != expected_head_repo
-            or remote_identity["remote_name"] != verification.remote
-            or remote_identity["ref"] != f"refs/heads/{branch}"
-            or f"{base_identity['repo_owner']}/{base_identity['repo_name']}"
-            != verification.repo
-            or permission["actor_id"] != verification.actor_id
-            or permission["permission_evidence_id"]
-            != verification.permission_evidence_id
-        ):
-            raise UserVisibleFailure(
-                message="publication packet differs from verified immutable GitHub topology",
-                next_action="materialize_a_successor_publication_packet",
-            )
-    elif args.action in {"pr", "publish-pr"}:
+    if args.action in {"pr", "publish-pr"}:
         lifecycle = build_pull_request_lifecycle(
             args,
             runner,
@@ -2076,7 +1729,6 @@ def run(
             runner,
             verification,
             branch,
-            authority=authority,
             lifecycle=lifecycle,
         )
     if args.action == "pr":
@@ -2085,7 +1737,6 @@ def run(
             runner,
             verification,
             branch,
-            authority=authority,
             lifecycle=lifecycle,
         )
     if args.action == "publish-pr":
@@ -2094,7 +1745,6 @@ def run(
             runner,
             verification,
             branch,
-            authority=authority,
             lifecycle=lifecycle,
         )
         pr_summary = perform_pr(
@@ -2102,7 +1752,6 @@ def run(
             runner,
             verification,
             branch,
-            authority=authority,
             lifecycle=lifecycle,
         )
         summary = dict(pr_summary)
@@ -2115,7 +1764,6 @@ def run(
             runner,
             verification,
             branch,
-            authority=authority,
         )
     raise UserVisibleFailure(
         message=f"unknown action: {args.action}",
@@ -2144,7 +1792,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(summary, sort_keys=True))
         return 1
     except UserVisibleFailure as exc:
-        summary = failure_summary(args, message=exc.message, next_action=exc.next_action)
+        summary = failure_summary(
+            args, message=exc.message, next_action=exc.next_action
+        )
         if args is not None:
             emit_summary(args, summary)
         else:

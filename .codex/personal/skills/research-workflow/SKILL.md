@@ -2,7 +2,7 @@
 name: research-workflow
 description: "Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"a62a3034d3fdaba38a55c73de4b77159414fa57686c47b4237082c2932d24a43"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f0b4e5663ef7d1c33988accbfdf6343f0932cf8a1ae93c7256cefd857ef1de8c"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/research-workflow.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [research-workflow](../../../../agents/skills/research-workflow.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill research-workflow --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

@@ -5,7 +5,6 @@
 # upstream design documents/structure/repo-structure-contract.toml separate path existence and kind contract
 # upstream design tools/catalog.yaml protecting tool ownership
 # downstream implementation tools/validation/semantic/responsibility/responsibility_scope.py validates this manifest
-# downstream implementation tools/analysis/code/import_responsibility.py checks import boundaries
 # downstream implementation tools/validation/semantic/tools/tool_drift.py checks scope/tool trace links
 # @dependency-end
 
@@ -31,107 +30,17 @@ class_values = [
   "external_dependency",
 ]
 
-[[import_rule]]
-source = "runtime-entrypoints"
-targets = [
-  "runtime-entrypoints",
-  "shared-tooling",
-  "shared-policy-documents",
-  "eval-and-hook-evidence",
-  "operational-issue-state",
-  "experiment-artifacts",
-]
-
-[[import_rule]]
-source = "operational-issue-state"
-targets = [
-  "operational-issue-state",
-  "shared-tooling",
-  "shared-policy-documents",
-]
-
-[[import_rule]]
-source = "eval-and-hook-evidence"
-targets = [
-  "eval-and-hook-evidence",
-  "shared-tooling",
-  "shared-policy-documents",
-  "shared-test-suite",
-]
-
-[[import_rule]]
-source = "shared-tooling"
-targets = [
-  "shared-tooling",
-  "shared-policy-documents",
-  "operational-issue-state",
-  "eval-and-hook-evidence",
-  "runtime-entrypoints",
-  "github-automation",
-  "shared-test-suite",
-  "experiment-artifacts",
-]
-
-[[import_rule]]
-source = "shared-test-suite"
-targets = [
-  "shared-test-suite",
-  "shared-tooling",
-  "shared-policy-documents",
-  "runtime-entrypoints",
-  "operational-issue-state",
-  "eval-and-hook-evidence",
-  "experiment-artifacts",
-]
-
-[[import_rule]]
-source = "shared-policy-documents"
-targets = [
-  "shared-policy-documents",
-  "shared-tooling",
-  "runtime-entrypoints",
-  "operational-issue-state",
-  "eval-and-hook-evidence",
-  "shared-test-suite",
-  "github-automation",
-  "experiment-artifacts",
-]
-
-[[import_rule]]
-source = "github-automation"
-targets = [
-  "github-automation",
-  "shared-tooling",
-  "shared-policy-documents",
-  "runtime-entrypoints",
-  "eval-and-hook-evidence",
-]
-
-[[import_rule]]
-source = "external-vendor"
-targets = [
-  "external-vendor",
-]
-
-[[import_rule]]
-source = "experiment-artifacts"
-targets = [
-  "experiment-artifacts",
-  "shared-tooling",
-  "shared-policy-documents",
-  "eval-and-hook-evidence",
-]
-
 [[scope]]
 id = "runtime-entrypoints"
 owner = "agent-canon"
 class = "shared_runtime"
-description = "Canonical AgentCanon runtime entrypoints, adapters, profiles, and shared source templates."
+description = "Canonical AgentCanon runtime entrypoints, adapters, profiles, editor settings, and shared source templates."
 paths = [
   "AGENTS.md",
   "ROOT_AGENTS.md",
   ".agents/**",
   ".codex/**",
+  ".obsidian/**",
   ".vscode/**",
   "agent-canon-environment.toml",
   "agents/**",
@@ -182,12 +91,15 @@ issues = []
 id = "shared-tooling"
 owner = "agent-canon"
 class = "tooling"
-description = "Shared tool implementations, tool catalog, and compiled tooling."
+description = "Shared tool implementations, catalog schemas and validation configuration, and compiled tooling."
 paths = [
   "tools/**",
+  "schemas/agent-canon/**",
 ]
 exclude_paths = [
   "eval/**",
+  "tools/runtime/archive/runtime_log_archive_git.py",
+  "tools/runtime/archive/runtime_log_paths.py",
 ]
 protecting_tools = [
   "tools/validation/semantic/responsibility/responsibility_scope.py",
@@ -205,6 +117,9 @@ paths = [
 ]
 exclude_paths = [
   "eval/**",
+  "tests/agent_tools/test_eval_accumulation_check.py",
+  "tests/agent_tools/test_runtime_log_archive_git.py",
+  "tests/agent_tools/test_runtime_log_paths.py",
 ]
 protecting_tools = [
   "tools/validation/semantic/responsibility/responsibility_scope.py",
@@ -242,7 +157,6 @@ exclude_paths = [
 ]
 protecting_tools = [
   "tools/validation/semantic/dependencies/check_dependency_headers.py",
-  "tools/validation/semantic/documents/check_design_doc_claims.py",
   "tools/validation/semantic/responsibility/responsibility_scope.py",
 ]
 issues = []

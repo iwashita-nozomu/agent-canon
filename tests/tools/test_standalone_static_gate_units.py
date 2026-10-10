@@ -272,8 +272,11 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(
         CALLS=str(calls),
     )
     assert result.returncode == 1, result.stderr
-    assert len(calls.read_text().splitlines()) == 3
-    assert ".sh contracts fixed-base" in calls.read_text()
+    called = calls.read_text().splitlines()
+    assert len(called) == 3
+    assert any(
+        line.endswith("run_standalone_static_gate_unit.sh contracts") for line in called
+    )
     assert summary.read_text().splitlines() == [
         "unit=docs status=fail exit=7",
         "unit=contracts status=pass",
@@ -285,6 +288,18 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(
     assert all("native stderr" in path.read_text() for path in receipts)
     assert "receipt for" in result.stdout
     assert "base=fixed-base" in (evidence / "source-identity.txt").read_text()
+
+
+def test_contracts_unit_rejects_retired_baseline_argument() -> None:
+    result = subprocess.run(
+        ["bash", str(RUNNER), "contracts", "origin/main"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "does not accept arguments: contracts" in result.stderr
 
 
 @pytest.mark.parametrize("paths", [[], ["has space.md"], ["deleted.md"]])
@@ -327,7 +342,6 @@ def test_contract_collection_and_source_toolchain_owners() -> None:
     assert "python3 -m unittest" not in body
     assert "tests.tools.test_standalone_static_gate_source_runtime_contract" in body
     assert "tests/agent_tools/test_dependency_*.py" in body
-    assert 'local base_ref="${UNIT_ARGS[0]:-origin/main}"' in body
     assert "RUNTIME_ROOT=/usr/local/share/agent-canon/runtime" not in text
     assert "export RUSTUP_HOME=" not in text
     assert "export CARGO_HOME=" not in text
@@ -536,6 +550,8 @@ def test_capture_exports_only_the_bootstrap_validated_container(
         AGENT_CANON_CANDIDATE_SOURCE=str(source),
         AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
         RUNNER_TEMP=str(tmp_path),
+        SELECTED_UNITS="docs",
+        EVAL_UNIT_STATUS="not-selected",
         PATH=f"{bin_dir}:{os.environ['PATH']}",
         CALLS=str(calls),
         STATUS_JSON=json.dumps(native_status),

@@ -2,7 +2,7 @@
 name: computational-optimization
 description: "Use when designing, implementing, reviewing, or diagnosing numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, or optimization benchmarks; fixes the mathematical and validation contract before code or experiment changes."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"645d5b2c908a218ccd7af8c98e3ce824bdd344685780f85f81e7e2f92c7693bb"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"b8823120aef82f1715d88be659166b0210cb5d24953d2e98af187da4a18acffe"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/computational-optimization.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [computational-optimization](../../../../agents/skills/computational-optimization.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill computational-optimization --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

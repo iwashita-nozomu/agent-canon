@@ -2,7 +2,7 @@
 name: change-review
 description: "Use for code review, doc review, or AI-generated diff review when you need findings-first output focused on bugs, regressions, missing tests, and broken assumptions."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"9a05dccc3445a4b23a1fa2ea17ebb1523f1384cdd75732c68fb94e3b806d129b"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1e7de7392ba7cd84abdf0bc00e64d830fc1f2dca8f342fb5cc9b31d6b42a7cfb"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/change-review.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [change-review](../../../../agents/skills/change-review.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill change-review --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

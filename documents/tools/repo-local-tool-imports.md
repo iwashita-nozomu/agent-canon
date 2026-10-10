@@ -109,6 +109,6 @@ canon now keeps the single Rust algorithm-contract checker and runs it from
 `tools/validation/ci/runners/run_all_checks.sh` when a repo has a `python/` tree.
 
 The jax_solver_util local diff that excluded `python/jax_util`,
-`python/tests`, and several tool families from `check_static_any.py` was not
-promoted because it is repo-specific and weakens the shared explicit-`Any`
-policy.
+`python/tests`, and several tool families from the explicit-`Any` gate was not
+promoted because it is repo-specific and weakens the shared BasedPyright
+`reportExplicitAny` policy.

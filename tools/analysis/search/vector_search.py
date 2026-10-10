@@ -2,13 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Searches AgentCanon text surfaces and expands dependency-aware context.
-# upstream design ../../tools/README.md shared tool index
-# upstream design ../../documents/tools/README.md operator guide for shared tools
-# upstream design ../../documents/tools/lsp_code_analysis.md bounded LSP discovery contract
-# upstream implementation ./graph_client.py provides verified manifest dependency facts
-# upstream implementation ./tool_path_policy.py defines retired legacy path policy
-# downstream implementation ./lsp_code_analysis.py consumes shared LSP discovery and language mapping
-# downstream implementation ../../tests/agent_tools/test_vector_search.py regression tests
+# upstream design ../../README.md shared tool index
+# upstream design ../../../documents/tools/README.md operator guide for shared tools
+# upstream design ../../../documents/tools/lsp_code_analysis.md bounded LSP discovery contract
+# upstream implementation ../dependencies/graph_client.py provides verified manifest dependency facts
+# upstream implementation ../../runtime/authority/tool_path_policy.py defines retired legacy path policy
+# downstream implementation ../code/lsp_code_analysis.py consumes shared LSP discovery and language mapping
+# downstream implementation ../../../tests/agent_tools/test_vector_search.py regression tests
 # @dependency-end
 """Search repo text surfaces with a lightweight TF-IDF vector model."""
 

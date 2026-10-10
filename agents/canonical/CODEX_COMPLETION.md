@@ -50,10 +50,12 @@ become completion prerequisites.
 
 ## Bounded delivery
 
-For `bounded_fast_path`, finish `route -> execute -> verify_close` using the existing
-task/Issue or structured handoff. Record the exact diff, selected checks and review,
-current-main integration, authorized PR/publication readback, and task-owned cleanup
-that the request requires. Decide commit and push under
+For `bounded_fast_path`, use the existing task/Issue or structured handoff to
+carry the requested work and applicable completion evidence. Record the exact
+diff and selected checks; include an activated review only when one was selected.
+If the request includes base integration or publication, carry its current-base
+and authorized remote readback. Clean up only task-owned resources created by
+the selected operations. Decide commit and push under
 [delivery ownership](ROOT_DELIVERY.md#commit-and-push-decisions).
 
 The selected results are the evidence. This route creates no coordination run
@@ -181,10 +183,11 @@ route. A partial test pass, checkpoint, commit, draft PR, status label, or writt
 remaining-work list is progress, not a reason to return control to the user.
 Recording a gap does not discharge it or require another request to continue.
 
-A child return establishes only its assigned unit and evidence. The parent verifies
-that unit, integrates it, and continues remaining required work; it does not turn
-child completion or a blocked child into overall completion. Delegate or repair
-through the already authorized route, retaining user-guided parent ownership.
+For a selected child route, a child return establishes only its assigned unit and
+evidence. The parent verifies that unit, integrates it, and continues remaining
+required work; it does not turn child completion or a blocked child into overall
+completion. Delegate or repair through the already authorized route, retaining
+user-guided parent ownership. A bounded route has no child return to interpret.
 The user's explicit step boundary defines that step's deliverable; do not expand
 it to the entire project or wait for unrelated work.
 
@@ -208,12 +211,11 @@ Issue. Review-only/no-change work retains its result and source-backed rationale
 
 ## Coordination closeout
 
-For the selected coordination run, pass its existing verification, active request
-contract, CompletionCoverage, selected validation/static/dependency results,
-review disposition, chosen commit/push outcomes, shared-canon synchronization,
-and follow-up decisions to `task_close.py`. Keep source/config/schema/fixtures/
-documentation/tool entrypoints needed by the runnable commit together under
-[Branch Scope](../../documents/operations/BRANCH_SCOPE.md).
+For the selected coordination run, pass the existing run evidence through its
+closeout owner. `task_close.py` remains the sole coordination terminal predicate;
+this owner does not restate its artifact fields or create another checklist.
+Keep source/config/schema/fixtures/documentation/tool entrypoints needed by the
+runnable commit together under [Branch Scope](../../documents/operations/BRANCH_SCOPE.md).
 
 For selected commit/push operations, record `commit_created` and `push_completed`
 as `yes`; unselected operations use the schema's `not_applicable` with the reason.

@@ -2,7 +2,7 @@
 name: structure-planning
 description: "Use when a report, experiment plan, Eval output, presentation storyboard, PPT/deck plan, document, paper, HTML view, or refactor needs a structure contract before prose, rendering, interpretation, follow-up runs, or edits."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"299848f25c1ee854a0fe537163997913aa76f84a21da26cc48ea7030e5128c43"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"6a0ebf7b7ca2db0f367fed83cbc6bb3dbbc91f3f173aa6858bdd610eb2ac0378"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/structure-planning.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [structure-planning](../../../../agents/skills/structure-planning.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill structure-planning --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

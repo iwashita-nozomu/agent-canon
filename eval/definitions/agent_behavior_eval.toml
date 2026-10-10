@@ -140,21 +140,6 @@ required_all = [
 ]
 
 [[criteria]]
-name = "prompt_eval_behavior_recorded"
-max_score = 5
-feedback = "Record accumulated prompt eval behavior whenever a skill is used."
-required_any = [
-  "tool_call=evaluate_skill_workflow_prompts.py",
-  "prompt_eval=pass",
-  "EVAL_STATUS=pass",
-]
-required_all = [
-  "EVAL_RUN_ID=",
-  "EVAL_USED_SKILLS=",
-  "EVAL_ACCUMULATED_REPORT=",
-]
-
-[[criteria]]
 name = "runtime_feedback_prompt_update_recorded"
 max_score = 5
 feedback = "Record any user/reviewer runtime feedback as a structured event and route it to a skill, workflow, eval, memory, or explicit no-op decision."

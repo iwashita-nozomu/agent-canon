@@ -1,8 +1,8 @@
 ---
 name: codex-task-workflow
-description: "Use when Codex needs a context-independent execution path for a repository task, from intake and workflow selection through artifact placement, implementation, validation, and closeout."
+description: "Use for repository-changing execution after workflow and owners are selected."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"0f6bda6eb2e7c566a819164c9d76c3838ca5bb9f555a197c5a0110b625536e26"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"6a470f10aec5c6765265b96b0fa1da5c2c56d135ba4712b4d93b236db35c383c"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/codex-task-workflow.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [codex-task-workflow](../../../../agents/skills/codex-task-workflow.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill codex-task-workflow --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

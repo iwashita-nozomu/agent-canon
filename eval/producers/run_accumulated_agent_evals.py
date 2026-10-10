@@ -8,11 +8,9 @@
 # upstream design ../../documents/tools/README.md user-facing tool index
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ./evaluate_codex_agent_roles.py writes Codex agent role eval reports
-# upstream implementation ./evaluate_skill_workflow_prompts.py writes skill and workflow prompt eval reports
 # upstream implementation ./evaluate_workflow_selection.py writes workflow selection eval reports
-# upstream implementation ./evaluate_report_quality.py writes report quality eval reports
-# downstream implementation ../ci/check_agent_canon_pr.sh runs producers before accumulation validation
-# downstream implementation ../ci/run_all_checks.sh runs producers before accumulation validation
+# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh runs producers before accumulation validation
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs producers before accumulation validation
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs producers before accumulation validation
 # downstream implementation ../../tests/agent_tools/test_run_accumulated_agent_evals.py validates command construction and log writeout
 # @dependency-end
@@ -32,7 +30,6 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
 from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
     RuntimeArtifactBoundary,
     RuntimeArtifactError,
@@ -41,7 +38,6 @@ from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
 )
 
 DEFAULT_RUN_ID = "agent-canon-accumulated-eval"
-DEFAULT_PROMPT_EVAL_MANIFEST = Path(eval_manifest_path("skill_workflow_prompt_eval.toml"))
 
 
 @dataclass(frozen=True)
@@ -85,29 +81,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run bundle or CI gate id recorded inside accumulated reports.",
     )
     parser.add_argument(
-        "--skill-used",
-        action="append",
-        default=[],
-        help="Skill id to record in the skill/workflow prompt eval. Repeat as needed.",
-    )
-    parser.add_argument(
-        "--report-dir",
-        type=Path,
-        help="Optional reports/agents/<run-id> directory for workflow monitoring append.",
-    )
-    parser.add_argument(
         "--log-dir",
         type=Path,
         help=(
             "Directory for captured producer stdout/stderr. Defaults to "
             "reports/agent-eval-runs/<run-id>."
         ),
-    )
-    parser.add_argument(
-        "--prompt-eval-manifest",
-        type=Path,
-        default=DEFAULT_PROMPT_EVAL_MANIFEST,
-        help="Skill/workflow prompt eval manifest.",
     )
     return parser
 
@@ -135,41 +114,24 @@ def resolve_log_dir(
     return boundary.resolve(Path("tasks") / safe_slug(run_id) / "logs")
 
 
-def resolve_path(root: Path, value: Path) -> Path:
-    """Resolve one CLI path against the selected repository root."""
-    return resolve_eval_manifest(root, value)
-
-
 def build_producers(
     *,
     root: Path,
     run_id: str,
-    skill_used: Sequence[str],
-    report_dir: Path | None,
-    prompt_eval_manifest: Path,
     python_bin: str,
     runtime_root: Path | str | None = None,
 ) -> tuple[EvalProducer, ...]:
-    """Build all accumulated eval producer commands."""
+    """Build role/workflow argv with explicit runtime result paths.
+
+    This collector owns the producer set and routes each report to
+    ``<runtime>/eval-results/<family>``. The calling CI runner owns the mounted
+    archive reader/capture root; this builder does not select that location or
+    validate archive completeness. Collection flow:
+    ``agents/skills/agent-eval-accumulation.md#Required Flow``.
+    """
     canon = script_root()
     boundary = runtime_artifact_boundary(root, runtime_root)
     eval_root = boundary.resolve(Path("eval-results"))
-    prompt_command: list[str] = [
-        python_bin,
-        str(canon / "eval" / "producers" / "evaluate_skill_workflow_prompts.py"),
-        "--root",
-        str(root),
-        "--manifest",
-        str(prompt_eval_manifest),
-        "--accumulate",
-        "--run-id",
-        run_id,
-    ]
-    for skill in skill_used:
-        prompt_command.extend(["--skill-used", skill])
-    if report_dir is not None:
-        prompt_command.extend(["--report-dir", str(boundary.resolve(report_dir))])
-    prompt_command.extend(["--results-dir", str(eval_root / "skill-workflow-prompt")])
     runtime_option = ("--runtime-root", str(boundary.root))
     return (
         EvalProducer(
@@ -187,7 +149,6 @@ def build_producers(
                 *runtime_option,
             ),
         ),
-        EvalProducer("skill-workflow-prompt", tuple((*prompt_command, *runtime_option))),
         EvalProducer(
             "workflow-selection",
             (
@@ -200,19 +161,6 @@ def build_producers(
                 run_id,
                 "--results-dir",
                 str(eval_root / "workflow-selection"),
-                *runtime_option,
-            ),
-        ),
-        EvalProducer(
-            "report-quality",
-            (
-                python_bin,
-                str(canon / "eval" / "producers" / "evaluate_report_quality.py"),
-                "--root",
-                str(root),
-                "--accumulate",
-                "--results-dir",
-                str(eval_root / "report-quality"),
                 *runtime_option,
             ),
         ),
@@ -247,7 +195,12 @@ def run_producers(
     runtime_root: Path | str | None = None,
     runner: Runner = subprocess_runner,
 ) -> tuple[EvalProducerResult, ...]:
-    """Run producers and capture their outputs."""
+    """Run supplied producer argv and persist stdout/stderr beneath ``log_dir``.
+
+    The runtime boundary supplies the child environment and authorizes these
+    writes; returned records give the caller each exit code and capture path.
+    This step does not read or validate the accumulated archive.
+    """
     boundary = runtime_artifact_boundary(root, runtime_root)
     log_dir = boundary.resolve(log_dir)
     child_env = root_capability_environment(
@@ -269,8 +222,12 @@ def run_producers(
         else:
             completed = runner(producer.command, root)
         prefix = f"{index:02d}-{safe_slug(producer.name)}"
-        stdout_log = write_text(boundary, log_dir / f"{prefix}.stdout.txt", completed.stdout)
-        stderr_log = write_text(boundary, log_dir / f"{prefix}.stderr.txt", completed.stderr)
+        stdout_log = write_text(
+            boundary, log_dir / f"{prefix}.stdout.txt", completed.stdout
+        )
+        stderr_log = write_text(
+            boundary, log_dir / f"{prefix}.stderr.txt", completed.stderr
+        )
         results.append(
             EvalProducerResult(
                 producer=producer,
@@ -317,16 +274,11 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> int:
     runtime_root = args.runtime_root
     boundary = runtime_artifact_boundary(root, runtime_root)
     boundary.ensure_directory("eval-results")
-    report_dir = boundary.resolve(args.report_dir) if args.report_dir else None
-    prompt_eval_manifest = resolve_path(root, args.prompt_eval_manifest)
     log_dir = resolve_log_dir(root, args.log_dir, str(args.run_id), runtime_root)
     boundary.ensure_directory(log_dir.relative_to(boundary.root))
     producers = build_producers(
         root=root,
         run_id=str(args.run_id),
-        skill_used=tuple(str(skill) for skill in args.skill_used),
-        report_dir=report_dir,
-        prompt_eval_manifest=prompt_eval_manifest,
         python_bin=sys.executable,
         runtime_root=runtime_root,
     )
@@ -351,5 +303,8 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except RuntimeArtifactError as exc:
-        print(f"run_accumulated_agent_evals.py: runtime_root_required: {exc}", file=sys.stderr)
+        print(
+            f"run_accumulated_agent_evals.py: runtime_root_required: {exc}",
+            file=sys.stderr,
+        )
         raise SystemExit(2) from exc

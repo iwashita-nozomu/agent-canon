@@ -73,7 +73,7 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "AGENT_CANON_RUNTIME_UID" not in text
     assert "AGENT_CANON_RUNTIME_GID" not in text
     assert "USER agentcanon" not in text
-    assert "ENTRYPOINT [\"/usr/local/bin/agent-canon-container-entrypoint\"]" in text
+    assert 'ENTRYPOINT ["/usr/local/bin/agent-canon-container-entrypoint"]' in text
     assert 'CMD ["resident"]' in text
     assert "rootless" not in text.lower()
     digests = re.findall(r"@sha256:([0-9a-f]{64})(?:\s|$)", text, re.MULTILINE)
@@ -119,21 +119,30 @@ def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
 
 def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    image_digest = "sha256:" + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest()
-    runtime_digest = "sha256:" + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest()
+    image_digest = (
+        "sha256:" + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest()
+    )
+    runtime_digest = (
+        "sha256:" + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest()
+    )
     assert tool_dispatch.CONTAINER_MARKER == b"agent-canon-tool-container/v1\n"
     assert tool_dispatch.RUNTIME_MARKER == b"agent-canon-runtime/v1\n"
     assert "printf 'agent-canon-tool-container/v1\\n'" in text
     assert "printf 'agent-canon-runtime/v1\\n'" in text
     assert "chmod 0444" in text
     assert "AGENT_CANON_IMAGE_ROOT=/usr/local/share/agent-canon" in text
-    assert "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies" in text
+    assert (
+        "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies"
+        in text
+    )
     assert "AGENT_CANON_RUNTIME_TOOLS_ROOT=/opt/agent-canon/source" in text
     assert f"AGENT_CANON_IMAGE_MARKER_DIGEST={image_digest}" in text
     assert f"AGENT_CANON_RUNTIME_MARKER_DIGEST={runtime_digest}" in text
 
 
-def test_dispatcher_marker_fixture_accepts_root_owned_read_only_files(tmp_path: Path) -> None:
+def test_dispatcher_marker_fixture_accepts_root_owned_read_only_files(
+    tmp_path: Path,
+) -> None:
     image_root = tmp_path / "image"
     runtime_root = image_root / "runtime"
     image_root.mkdir()
@@ -144,12 +153,18 @@ def test_dispatcher_marker_fixture_accepts_root_owned_read_only_files(tmp_path: 
     runtime_marker.write_bytes(tool_dispatch.RUNTIME_MARKER)
     image_marker.chmod(0o444)
     runtime_marker.chmod(0o444)
-    assert tool_dispatch._immutable_file(
-        image_marker, tool_dispatch.CONTAINER_MARKER, field="image"
-    ) == hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest()
-    assert tool_dispatch._immutable_file(
-        runtime_marker, tool_dispatch.RUNTIME_MARKER, field="runtime"
-    ) == hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest()
+    assert (
+        tool_dispatch._immutable_file(
+            image_marker, tool_dispatch.CONTAINER_MARKER, field="image"
+        )
+        == hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest()
+    )
+    assert (
+        tool_dispatch._immutable_file(
+            runtime_marker, tool_dispatch.RUNTIME_MARKER, field="runtime"
+        )
+        == hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest()
+    )
 
 
 def test_dockerfile_declares_run_side_contract_and_healthcheck() -> None:
@@ -208,7 +223,10 @@ def test_entrypoint_is_executable_and_has_strict_health_dispatch() -> None:
     assert "health|--healthcheck)" in text
     assert '[[ "${uid}" == "0" ]]' not in text
     assert 'exec /usr/local/bin/agent-canon-tool "$@"' in text
-    assert 'usage: $0 health | resident | compile | tool run <catalog-id> -- [args...]' in text
+    assert (
+        "usage: $0 health | resident | compile | tool run <catalog-id> -- [args...]"
+        in text
+    )
     assert 'exec "$@"' not in text
     assert "sleep infinity" in text
     assert "resident)" in text
@@ -261,6 +279,8 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "pipx",
         "check-jsonschema",
         "yamllint",
+        "ruff",
+        "basedpyright",
         "pyright-language-server",
         "bash-language-server",
         "jq",
@@ -278,7 +298,9 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "rust-toolchain",
     }
     assert all("project" not in str(record).lower() for record in records)
-    clangd = next(record for record in records if record["id"] == "clangd-language-server")
+    clangd = next(
+        record for record in records if record["id"] == "clangd-language-server"
+    )
     assert clangd["method"] == "apt-package"
     assert clangd["package"] == "clangd-18"
     assert clangd["source"] == "ubuntu:24.04"

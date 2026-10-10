@@ -62,22 +62,34 @@ project's own Docker test runner.
 
 ## One command family
 
+The installer entrypoint comes from the installed runtime source root; the
+observed project/worktree is a separate read-only `--root <topic>` target. Use
+the latest installed/bootstrap absolute entrypoint for that runtime; a topic
+checkout's `./bootstrap.sh` is only for validating lifecycle-source changes and
+may be stale.
+
 Every command starts with the install root and explicit control root. The
-persistent runtime defaults to the install root's ignored `.runtime/`:
+persistent runtime defaults to the control root's ignored `.runtime/`:
 
 ```bash
-BOOTSTRAP=./bootstrap.sh
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
 ROOT=<authorized-parent-root>
-COMMON=(--control-parent-root "$ROOT")
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
 ```
 
-`--control-parent-root` is the authorized parent repository root. It authorizes
-access but does not select storage. The effective runtime is always the
-bootstrap-owned `<install-root>/.runtime/`; the private log checkout is its
+`--control-parent-root` is the authorized parent repository root and selects
+the shared runtime authority. The effective runtime is always the
+bootstrap-owned `<control-root>/.runtime/`; the private log checkout is the
 sibling `<install-root-parent>/agent-canon-log`. Both are ignored or external
 to the source checkout as appropriate. Eval, report, SQLite, log, and analysis output
 remains under its declared external artifact root. There is no implicit
 `$HOME`, `$HOME/.cache`, or `$HOME/.local` fallback.
+
+When a resident is already active for the same control root, another source
+checkout reuses that control-root runtime and the resident's named state volume.
+This is a cross-checkout readback of one resident, not a source-checkout
+runtime selection or a registry-bind fallback.
 
 The command family is:
 
@@ -103,11 +115,11 @@ The command family is:
 
 The invocation cwd is informational only; it is not used to select runtime
 state and no cwd warning is emitted. The flow is `cwd -> bootstrap.sh ->
-install root -> control root -> <install-root>/.runtime/ -> resident
+install root -> control root -> <control-root>/.runtime/ -> resident
 container`. `install` creates the verified image and resident, `update`
 reconciles the current checkout in that resident, and `sync` pulls `origin
 main`, then updates the image and resident. `status` reads back the active
-image and resident health from `.runtime/`. `gc --dry-run` follows the
+image and resident health from `<control-root>/.runtime/`. `gc --dry-run` follows the
 same identity and ownership reads without preparing or changing `.runtime/`;
 `gc` performs the exact owned Docker cleanup under the replacement lock and
 includes the resident controller's state/cache/lease GC receipt.
@@ -219,8 +231,11 @@ no daemon, webhook listener, cron route, or `loginctl enable-linger` is added.
 Git-tracked `.codex/personal/skills` distribution, while `~/.codex/agents/<role>.toml`
 to the tracked role file, and `~/.codex/config.toml` to the ignored personal
 source under the AgentCanon checkout. An existing regular Codex config is moved
-byte-for-byte (including mode) before linking; update preserves it and uninstall
-restores a regular file. Foreign entries and foreign symlinks are preserved or
+byte-for-byte (including mode) before linking; install/update apply the canonical
+`model_context_window = 1050000` and
+`model_auto_compact_token_limit = 900000` defaults while preserving other
+personal TOML settings, and uninstall restores a regular file.
+Foreign entries and foreign symlinks are preserved or
 reported as collisions. Project hooks and user authentication, session,
 history, cache, plugins, rules, MCP, and TUI/trust settings are outside this
 projection. `codex prepare` remains the separate runtime-local isolated home
@@ -324,6 +339,13 @@ Network or archive failure retains the spool and a failure receipt for retry;
 it does not dirty AgentCanon source. Successful publication is complete only
 after non-force push and remote ref/tree/blob readback. A local bare remote is
 the focused end-to-end test fixture for this sequence.
+
+The existing host scheduler's `sync` route also drains pending hook events,
+eval runs with explicit sync requests, and private-feedback requests. These
+deliveries are attempted after the source-refresh phase even when that phase
+fails; failed publications retain their pending inputs for the next scheduled
+retry. Eval continues to use the root `spool/<run-id>`, while private feedback
+uses the separate resident `runtime/spool/private-feedback` path.
 
 The archive checkout is a runtime lease under the selected runtime root. It is
 not a submodule, vendor checkout, symlink, or required source-tree directory.

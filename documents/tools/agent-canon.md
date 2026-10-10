@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents the unified Rust docs formatter and checker.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check, format, fix-math, and fix-mermaid.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/config.rs implements the lifecycle-only TOML context projection
 downstream design ../../agents/skills/md-style-check.md routes Markdown style work to this tool.
 @dependency-end
 -->
@@ -13,6 +14,12 @@ downstream design ../../agents/skills/md-style-check.md routes Markdown style wo
 tooling. This page covers the command families that share the wrapper.
 `agent-canon docs` owns Markdown documentation formatting and adjacent checks.
 `agent-canon test-design` owns resilient test-design diagnostics.
+The host lifecycle invokes `codex-config` after native compilation to project
+the two managed context defaults into the personal Codex config. It passes the
+personal TOML through stdin and receives the format-preserving result through
+stdout, which the host writes to its same-directory temporary file before the
+atomic replacement. This helper does not create a separate host configuration
+route.
 Deterministic prompt-to-skill routing is owned by
 `python3 tools/agent/orchestration/route.py --prompt`.
 
@@ -39,6 +46,7 @@ tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs fix-math <paths...>
 tools/bin/agent-canon docs fix-mermaid <paths...>
 tools/bin/agent-canon test-design check <test-paths...>
+agent-canon codex-config --source-config <read-only-source-config>
 python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json
 ```
 

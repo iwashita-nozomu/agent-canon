@@ -230,10 +230,10 @@ normalization の意味、owner、evidence、validation を、次の短い struc
 
 | id | normalization meaning | owner | evidence | validation |
 | --- | --- | --- | --- | --- |
-| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | canonical dependency readback と design document source anchor | canonical CI/readback、`check_design_doc_claims.py`、native-path candidate |
-| DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | C++ projection record の adapter owner、target identity、header/source anchor | design claim checker と C++ adapter readback |
+| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | canonical dependency readback と design document source anchor | canonical CI/readback、prose/source-reference readback、native-path candidate |
+| DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | C++ projection record の adapter owner、target identity、header/source anchor | DIC source trace と C++ adapter readback |
 | DAL-03 | reviewer 選択は changed-surface evidence を existing language/docs candidates へ正規化し、OOP ownerだけを capability projection へ渡す | `tools/agent/orchestration/agent_team.py` + `agents/skills/catalog.yaml` | candidate list、OOP route packet、dependency order | `language_review_candidates`、`route.py`、orchestration check |
-| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | DIC path / section / clause / evidence trace | docs check、prose readback、design claim checker |
+| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | DIC path / section / clause / evidence trace | docs check と DIC source-trace readback |
 
 ## Language projection boundary
 
@@ -274,7 +274,7 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 
 ## Validation and review boundary
 
-- `pydocstyle` と Ruff D は、明示的な language-level Docstring review の存在・syntax・format signal を検証する。
+- Ruff D は、明示的な language-level Docstring review の存在・syntax・format signal を検証する。
 - `pyright` と C++ compiler/build は、annotation、signature、namespace、header、ABI の
   static fact を検証する。
 - OOP/readability checker は責務境界の signal を提供するが、clause の意味充足を判定しない。
@@ -286,18 +286,20 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 
 ### Explicit Docstring review boundary
 
-`pydocstyle` は compile/runtime/graph/header correctness の必要条件ではなく、
-shared PR/static gate では実行しません。明示的な Docstring review で、対象を限定して
-`tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>` を実行します。このtoolは
-source-root resolverが選ぶAgentCanon canonical D213 configを適用し、toolが無い場合または
-診断がある場合は明示 command が nonzero で終了します。
+Docstring review は compile/runtime/graph/header correctness の必要条件ではありません。明示的な
+Docstring review では、対象を限定して次の Ruff command を実行します。
+
+```bash
+ruff check \
+  --config tools/validation/code/config/ruff-docstrings.toml \
+  --select D <repo-relative.py>
+```
 
 AgentCanon の既定 review convention は source root 配下の
-`tools/validation/ci/config/pydocstyle.toml` で D213 を選択し、相反する D212 を無視します。D212 と D213
-を同時に要求しません。親固有のDocstring reviewは親ownerの別commandで実行し、AgentCanon
-canonical configのauthorityを置き換えません。
-PR の blocking predicate には pydocstyle を含めず、pydocstyle の missing/diagnostic を
-merge gateへ昇格しません。他の active profile が選択する compiler、runtime、graph、
+`tools/validation/code/config/ruff-docstrings.toml` で D213 を選択し、相反する D212 を無視します。
+D212 と D213 を同時に要求しません。親固有の Docstring review は親 owner の別 command で実行し、
+AgentCanon canonical config の authority を置き換えません。
+他の active profile が選択する compiler、runtime、graph、
 header、Rust、workflow、container、docs、registry、pytest、pyright などの owner gate は
 それぞれの正本に従います。
 

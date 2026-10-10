@@ -86,13 +86,6 @@ Mechanically regenerable report roots remain governed by `generated_artifact_gua
 Promote reusable findings to their document/notes owner with responsibility and
 reference evidence, not by retaining disposable output as a second canon.
 
-A canonical producer alone creates `predecessor_integration.<unit_id>.json` after the
-approved source unit is merged. `knowledge_graph` and
-`active_design_packet_materialization` archive the same complete bundle once; the
-successor uses its archive locator, artifact digests, complete-file manifest digest,
-and common integrated source OID. Do not handwrite placeholder predecessor records,
-reuse the reserved filename for a memo, or add an aggregate set file.
-
 ### `documents/`
 
 Place reusable repository-wide rules, development-environment operations, and durable

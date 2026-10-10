@@ -32,7 +32,6 @@ trace drift がない。
 - root と directory の [README.md](../../../README.md)、[documents/README.md](../../README.md)
 - `documents/design/` の target state と correspondence
 - `tools/docs/` と Markdown/math/Mermaid formatter
-- `check_design_doc_claims.py`
 - 変更後の link/readback と docs-check output
 
 ## Repair Route

@@ -11,91 +11,40 @@ downstream implementation ../../.codex/personal/skills/academic-writing/SKILL.md
 @dependency-end
 -->
 
-
-## Reader Map
-
-- Purpose: routes scholarly prose through notation, logic, and reader-flow
-  review before drafting or revising.
-- Use When: drafting or revising papers, thesis chapters, scholarly notes, or
-  academic documents outside a more specific paper-submission route.
-- Section path: Purpose, Use When, and Core References set scope; Mandatory
-  Checklist, Default Sequence, and Standard Command are the operational rules;
-  TeX Output Boundary and Boundary limit the surface.
-- Boundary: submission-paper ownership goes through `paper-writing` when that
-  more specific route applies.
-
 ## Purpose
 
-file / document responsibility が academic prose、scholarly note、thesis chapter、
-method note、symbol-dense claim-heavy explanation の文書を、既存の本文・根拠・構成メモから
-直接作成・改稿する skill です。claim、notation、logic を分離 review します。
-選択基準は長さではなく、文書責務と review gate です。
+学術 prose、scholarly note、thesis chapter、method note、記号密度の高い claim-heavy 文書を、既存本文・根拠・構成メモから作成/改稿します。
+paper-style manuscript は `paper-writing` を優先します。選択基準は長さではなく文書責務です。
 
 ## Use When
 
-- 学術論文や chapter を新規作成する
-- claim-heavy な survey、method note、appendix を書く
-- 記号、略語、technical term、仮定、根拠の接続が reader の理解を左右する
-- 一般の guide より、論理の欠落や定義順の破綻が問題になる
-- file responsibility の判定結果が、一般説明 prose や report ではなく academic prose adapter を要求している
+- notation、略語、仮定、technical term、evidence relation が reader の理解を左右する
+- 一般 guide/report より、定義順・logic gap・claim support の review が必要な scholarly prose を扱う
 
-## Core References
+## Procedure
 
-- [agents/skills/paper-writing.md](paper-writing.md) (paper-specific overlay)
-- [agents/skills/long-form-writing.md](long-form-writing.md) (general prose boundary)
-- [documents/conventions/REVIEW_PROCESS.md](../../documents/conventions/REVIEW_PROCESS.md)
-- [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md)
-- [agents/skills/literature-survey.md](literature-survey.md)
-- [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md)
+Start from the requested claim, audience, existing draft, and sources. Make the
+claim, evidence links, notation/assumptions, or section contract explicit to the
+extent the document needs them; reuse an existing note when it already captures
+that information.
 
-## Mandatory Checklist
+Resolve section, figure, or table ordering with `structure-planning` only when a
+real choice remains. Draft in a reader-friendly order and keep observations,
+interpretation, and limitations distinct where the document makes evidence-based
+claims. A graph or fixed handoff is not a prerequisite for ordinary drafting.
 
-- 既存の本文・根拠・見出し・短い構成メモから直接執筆する。graph 分析は
-  [任意の分析経路](prose-reasoning-graph.md#optional-analysis-boundary)であり、
-  graph/DSL、固定 handoff、全 sentence の順序、finding 件数ゼロ、本文との往復診断を
-  通常執筆の開始・完了条件にしない。主張と根拠の対応、引用、定義、構成は本文で確認する
+Choose review by the risk in the draft: reader flow for structural gaps,
+notation review for undefined or inconsistent symbols, and logic review for
+unsupported inferences. Add docs-completeness review when the requested scope
+spans required sections or linked documents. A PDF-ready or dense-math artifact
+may use the TeX route in an explicit environment; otherwise use the document
+owner's applicable check.
 
-- `claim contract` で central contribution、gap、reader、non-goal を先に固定する
-- section order、figure/table placement、claim/evidence layout が非自明な場合は `structure-planning` で構造 contract を先に固定する
-- claim flow、transition pair、logic-gap triage が非自明な場合は、`structure-planning` で `agent-canon semantic-index discourse-relations --profile academic-argument` を使う
-- 文書の責務は肯定形の academic prose contract に射影する。claim、definition、warrant、evidence relation、limitation、reviewer handoff を直接書く。否定形の boundary は Boundary / Limitation / Non-Goal slot に集約し、`ad hoc` label は責務名、evidence gap、verification route、prompt-defect classification のいずれかへ置き換える
-- `evidence map` で claim と support を section 単位で結ぶ
-- `notation ledger` を作り、symbol / term / abbreviation / unit / index を管理する
-- `paragraph claim map` を作り、各 paragraph の inferential role を固定する
-- Codex では、可能なら parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
-- runtime が `/agent` を提供する場合は inventory を確認し、使えない場合は `.codex/agents/*.toml` を見る
-- run bundle を先に作り、`notation_definition_reviewer` と `logic_gap_reviewer` を explicit に有効化する
-- paper-like draft では `citation_evidence_reviewer` も explicit に有効化する
-- draft 後に reverse outline を取る
-- `document_flow_reviewer` を必ず通す
-- 別 reviewer で notation review を必ず通す
-- 別 reviewer で logic-gap review を必ず通す
-- 別 reviewer で docs completeness review を必ず通す
-- empirical claim や report なら critical review、必要なら report review を追加する
-- 投稿論文や thesis chapter では `paper-writing` を優先 overlay とする
-- PDF-ready な学術文章、数式密度の高い draft、または図版を作るときは TeX output plan を作り、devcontainer の `latexmk` / pdfLaTeX / XeLaTeX / `dvisvgm` / `pdfcrop` toolchain を使う
-- TeX を使う既定配線はこの skill に限る。一般 README、workflow、guide、migration doc、通常 report は TeX へ自動遷移しない
+Use `tools/bin/agent-canon docs check` when that check is selected for the
+document. General README/workflow/guide/migration/report work does not need a
+TeX route.
 
-## Default Sequence
-
-1. `claim contract` を短く書く
-1. 必要なら `structure-planning` で first section / figure / table、source-to-structure map、section order、invalid interpretation を固定する
-1. paragraph order や discourse connective が論点なら discourse-relations JSONL を構造 evidence として添付する
-1. `evidence map` と `notation ledger` を作る
-1. `section contract` と `paragraph claim map` を作る
-1. PDF-ready draft、数式、図版が必要なら TeX output plan を固定する
-1. run bundle を作る
-1. reader order で draft する
-1. TeX output plan が active なら `.tex` source を作り、document は `latexmk -pdf`、図版は `latexmk -pdf` と `dvisvgm` / `pdfcrop` で検証する
-1. reverse outline を取る
-1. `document_flow_reviewer` を通す
-1. `notation_definition_reviewer` に [notation review](../internal-routines/notation-definition-review.md) を通す
-1. `logic_gap_reviewer` に [logic-gap review](../internal-routines/logic-gap-review.md) を通す
-1. 別 reviewer に docs completeness review を通す
-1. higher-order revision を終えてから line edit に入る
-1. `tools/bin/agent-canon docs check` で閉じる
-
-## Standard Command
+## Standard command
 
 ```bash
 python3 tools/analysis/documents/doc_start.py \
@@ -105,55 +54,13 @@ python3 tools/analysis/documents/doc_start.py \
   --workspace-root "$PWD"
 ```
 
-## TeX Output Boundary
+## Review outcomes
 
-- TeX は `$academic-writing` の既定出力 route です。PDF-ready な学術文章、数式密度の高い manuscript、TikZ / standalone 図版、または reviewer に渡す図表を作るときに使います。
-- TeX toolchain は実行対象 project の明示された環境で用意します。AgentCanon source は `.devcontainer` を提供せず、必要なときは親 project の Docker/test 環境または明示された host toolchain を使います。
-- 生成物は原則 run bundle や ignored output directory に置き、tracked tree には canonical `.tex` source と、ユーザーが要求した final artifact だけを残します。
-- TeX を一般の `$long-form-writing`、workflow guide、migration doc、ordinary report の既定 route にしません。それらはユーザーが明示した場合だけ TeX を使います。
+- `rewrite_required`: claim contract、logic chain、definition order の欠落
+- `notation_fix_required`: symbol、term、unit、index の未定義/不整合
+- `logic_fix_required`: support のない inference や飛躍
+- `approved`: reader flow、notation、logic、information completeness が揃う
 
 ## Boundary
 
-- 一般の README、workflow、migration 文書なら `long-form-writing` を使います
-- 文献調査自体が主タスクなら `literature-survey` を先に使います
-- experiment report の evidence traceability は report review を優先します
-
-## Review Outcomes
-
-- `rewrite_required`: claim contract、logic chain、または definition order が崩れている
-- `notation_fix_required`: 記号、略語、technical term、unit、または index に未定義や不整合がある
-- `logic_fix_required`: 支持されていない inference や飛躍がある
-- `approved`: reader flow、notation discipline、logic continuity、information completeness が揃っている
-
-## Evidence Basis
-
-このSkillの構成判断は、次の外部ガイドをrepo向けに要約したものです。
-
-- [Ten simple rules for structuring papers | PLOS Computational Biology](https://doi.org/10.1371/journal.pcbi.1005619)
-- [Creating a Roadmap | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/creating-a-roadmap.pdf)
-- [Flow in Scholarly Writing | Purdue OWL](https://owl.purdue.edu/owl/graduate_writing/documents/Flow-Handout.pdf)
-- [Reverse Outlining | John S. Knight Institute](https://knight.as.cornell.edu/reverse-outlining)
-- [Writing Tips | MIT OpenCourseWare](https://ocw.mit.edu/courses/8-06-quantum-physics-iii-spring-2016/e498e7c0d2db9e3846df12bfdac3e10e_MIT8_06S16_TermPaper.pdf)
-
-## Runtime Contract Clauses
-
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-
-1. Draft and revise directly from sources, existing text, headings, and brief structure notes. Graph analysis is optional under the [analysis boundary](prose-reasoning-graph.md#optional-analysis-boundary), not a writing prerequisite. Do not require a graph/DSL, fixed handoff, whole-document sentence order, zero graph findings, or a graph-to-prose round trip. Verify claims, citations, definitions, and reader flow in the document itself.
-
-1. Read [agents/skills/academic-writing.md](academic-writing.md).
-1. Select this as the writing skill when file/document responsibility is academic prose, scholarly note, thesis chapter, method note, or symbol-dense claim-heavy explanation; do not select it by length.
-1. Use `$structure-planning` before drafting when section order, figure/table placement, claim/evidence layout, first section, or invalid interpretations are nontrivial.
-1. When claim flow or discourse connectives matter, have `$structure-planning` use `agent-canon semantic-index discourse-relations --profile academic-argument`; keep TeX routing separate from discourse evidence.
-1. Project academic responsibilities into positive prose contracts: state each claim, definition, warrant, evidence relation, limitation, and reviewer handoff directly. Use negative boundary wording only inside an explicit Boundary, Limitation, or Non-Goal slot, and replace `ad hoc` labels with a named responsibility, evidence gap, verification route, or prompt-defect classification.
-1. In Codex, use `/plan` before planning when the runtime provides it, and use `/agent` to inspect available subagents when the runtime provides it.
-1. Fix a short `claim contract`: central contribution, gap, reader, and non-goal.
-1. Build an `evidence map`, `notation ledger`, and section contract before drafting prose.
-1. When the academic artifact needs PDF-ready output, dense math, or figures, create a TeX output plan and use the devcontainer TeX toolchain: `latexmk`, pdfLaTeX, XeLaTeX, `dvisvgm`, and `pdfcrop`.
-1. Bootstrap a run bundle and explicitly enable `notation_definition_reviewer` and `logic_gap_reviewer`.
-1. Draft in reader order and keep results, interpretation, and limitations separate.
-1. For TeX output, keep canonical `.tex` source and validate documents with `latexmk -pdf`; validate figure outputs with `latexmk -pdf` plus `dvisvgm` or `pdfcrop`.
-1. Take a reverse outline after drafting.
-1. Require `document_flow_reviewer`, a separate `notation_definition_reviewer`, a separate `logic_gap_reviewer`, and a separate reviewer using `docs-completeness-review`.
-1. Add `critical-review`, `report-review`, or `docs-consistency-review` when the document warrants them.
-1. Do not route general README, workflow, guide, migration, or ordinary report writing to TeX through this skill; TeX is default-wired only for Academic Writing.
+文献探索は `literature-survey`、paper-specific section/citation review は `paper-writing`、一般説明 prose は `long-form-writing` が所有します。

@@ -193,7 +193,11 @@ docker_fixture() {
 }
 AGENT_CANON_DOCKER=docker_fixture
 _agent_canon_validate_roots() { :; }
-_agent_canon_prepare_host_runtime() { AGENT_CANON_STATE_ROOT="$fixture/state"; }
+_agent_canon_select_existing_runtime() { :; }
+_agent_canon_prepare_host_runtime() {
+  AGENT_CANON_STATE_ROOT="$fixture/state"
+  mkdir -p "$AGENT_CANON_RUNTIME_ROOT/host-state"
+}
 _agent_canon_container_name() { printf 'resident\n'; }
 _agent_canon_classify_existing_container() { record classify; }
 _agent_canon_use_active_image() {
@@ -251,7 +255,7 @@ def test_remove_rejects_foreign_resident_before_teardown(tmp_path: Path) -> None
     """Remove must invoke the ownership gate even with retained active-image state."""
     target = tmp_path / "target"
     target.mkdir()
-    script = r'''
+    script = r"""
 source "$1"
 fixture=$2
 docker_fixture() {
@@ -260,7 +264,10 @@ docker_fixture() {
 }
 AGENT_CANON_DOCKER=docker_fixture
 _agent_canon_validate_roots() { :; }
-_agent_canon_prepare_host_runtime() { AGENT_CANON_STATE_ROOT="$fixture"; }
+_agent_canon_prepare_host_runtime() {
+  AGENT_CANON_STATE_ROOT="$fixture"
+  mkdir -p "$AGENT_CANON_RUNTIME_ROOT/host-state"
+}
 _agent_canon_classify_existing_container() {
   _agent_canon_json_error container_ownership_mismatch "foreign resident"
 }
@@ -274,7 +281,7 @@ _agent_canon_ensure_container() { return 19; }
 _agent_canon_restore_candidate_failure() { :; }
 bootstrap_host_entrypoint "$fixture" --control-parent-root "$fixture" \
   target remove --root "$fixture/target" --mode read-only
-'''
+"""
     result = subprocess.run(
         ["bash", "-c", script, "test", str(ADAPTER), str(tmp_path)],
         check=False,

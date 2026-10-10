@@ -57,7 +57,9 @@ def _tracked_snapshot() -> tuple[str, dict[str, str]]:
     return status, digests
 
 
-def test_producer_child_receives_typed_runtime_and_root_capabilities(tmp_path: Path) -> None:
+def test_producer_child_receives_typed_runtime_and_root_capabilities(
+    tmp_path: Path,
+) -> None:
     """Keep producer-definition and observed-target capabilities distinct."""
     source = tmp_path / "source"
     target = tmp_path / "target"
@@ -83,8 +85,14 @@ def test_producer_child_receives_typed_runtime_and_root_capabilities(tmp_path: P
     assert observed["AGENT_CANON_RUNTIME_ROOT"] == str(runtime.resolve())
     assert observed["AGENT_CANON_PARENT_ROOT"] == str(source.resolve())
     assert observed["AGENT_CANON_TARGET_ROOT"] == str(target.resolve())
-    assert json.loads(observed["AGENT_CANON_PARENT_ROOT_CAPABILITY"])["kind"] == "parent-root"
-    assert json.loads(observed["AGENT_CANON_TARGET_ROOT_CAPABILITY"])["kind"] == "target-root"
+    assert (
+        json.loads(observed["AGENT_CANON_PARENT_ROOT_CAPABILITY"])["kind"]
+        == "parent-root"
+    )
+    assert (
+        json.loads(observed["AGENT_CANON_TARGET_ROOT_CAPABILITY"])["kind"]
+        == "target-root"
+    )
 
 
 def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) -> None:
@@ -92,21 +100,13 @@ def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) 
     runtime = tmp_path / "runtime"
     runtime.mkdir()
     before_status, before_files = _tracked_snapshot()
+    environment = os.environ.copy()
+    environment.pop("AGENT_CANON_HOOK_ARCHIVE_DIR", None)
+    environment.pop("AGENT_CANON_LOG_ROOT", None)
+    environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
     commands = (
         (
-            "evaluate_report_quality.py",
-            "--accumulate",
-            "--runtime-root",
-            str(runtime),
-        ),
-        (
             "evaluate_workflow_selection.py",
-            "--accumulate",
-            "--runtime-root",
-            str(runtime),
-        ),
-        (
-            "evaluate_skill_workflow_prompts.py",
             "--accumulate",
             "--runtime-root",
             str(runtime),
@@ -120,11 +120,16 @@ def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) 
     )
     for command in commands:
         result = subprocess.run(
-            [sys.executable, str(ROOT / "eval" / "producers" / command[0]), *command[1:]],
+            [
+                sys.executable,
+                str(ROOT / "eval" / "producers" / command[0]),
+                *command[1:],
+            ],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
+            env=environment,
         )
         # A semantic eval may legitimately report status=fail while this test
         # verifies the execution plane and source immutability. Exit 2+ is an

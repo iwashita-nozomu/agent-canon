@@ -2,7 +2,7 @@
 name: oop-type-design
 description: "Use before implementation to define language-neutral OOP/type contracts, responsibility boundaries, and explicit capability-owned design packets."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"95717814ddd8a69045f3a0269bec8ec8cb78d6e019d5e0e7c5a7d03981c65b96"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f6a4f6080a2514c0c2699fd0b4389f0cfcd4088a6a7825a45a06105221e07f6a"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/oop-type-design.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [oop-type-design](../../../../agents/skills/oop-type-design.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill oop-type-design --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

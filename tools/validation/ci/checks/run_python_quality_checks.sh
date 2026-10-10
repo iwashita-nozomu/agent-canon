@@ -15,6 +15,10 @@ WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
 cd "${WORKSPACE_ROOT}"
 
+RUFF_DOCSTRING_CONFIG="${WORKSPACE_ROOT}/tools/validation/code/config/ruff-docstrings.toml"
+RUFF_MAGIC_VALUE_CONFIG="${WORKSPACE_ROOT}/tools/validation/code/config/ruff-magic-values.toml"
+BASEDPYRIGHT_CONFIG="${WORKSPACE_ROOT}/tools/validation/code/config/basedpyright-explicit-any.json"
+
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "$PYTHON_BIN" ]; then
   if command -v python3 >/dev/null 2>&1; then
@@ -121,11 +125,11 @@ else
 fi
 echo ""
 
-echo "4️⃣  pyright を実行中..."
-if "$PYTHON_BIN" -m pyright "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
-  echo "✅ pyright 成功"
+echo "4️⃣  BasedPyright type checks を実行中..."
+if basedpyright --project "${BASEDPYRIGHT_CONFIG}" "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
+  echo "✅ BasedPyright 成功"
 else
-  echo "❌ pyright 失敗"
+  echo "❌ BasedPyright 失敗"
   EXIT_CODE=1
 fi
 echo ""
@@ -136,16 +140,30 @@ elif [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
   echo "RUFF=skip"
   echo "AgentCanon Python source roots are absent in this checkout; skipping ruff"
 else
-  echo "6️⃣  ruff を実行中..."
+  echo "5️⃣  ruff を実行中..."
   echo "   - E,F: コード品質（エラー・警告）"
   echo "   - I: Import 順序チェック"
   echo "   - D: Docstring 検証"
   echo "   - UP: Python 最新構文チェック"
   echo ""
-  if "$PYTHON_BIN" -m ruff check "${PYTHON_SOURCE_PATHS[@]}" --select D,E,F,I,UP --ignore E501 2>&1; then
+  if ruff check \
+    --config "${RUFF_DOCSTRING_CONFIG}" \
+    "${PYTHON_SOURCE_PATHS[@]}" \
+    --select D,E,F,I,UP \
+    --ignore E501 2>&1; then
     echo "✅ ruff 成功"
   else
     echo "❌ ruff 失敗"
+    EXIT_CODE=1
+  fi
+  echo "   - PLR2004: Python magic-value 検証"
+  if ruff check \
+    --config "${RUFF_MAGIC_VALUE_CONFIG}" \
+    "${PYTHON_SOURCE_PATHS[@]}" \
+    --select PLR2004 2>&1; then
+    echo "✅ ruff magic-value checks 成功"
+  else
+    echo "❌ ruff magic-value checks 失敗"
     EXIT_CODE=1
   fi
 fi

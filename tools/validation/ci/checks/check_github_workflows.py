@@ -83,10 +83,10 @@ ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "finding=none at intake",
     "result=bundle_ready",
 )
-ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
-    "generate_agent_improvement_guide.py",
+ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = ("generate_agent_improvement_guide.py",)
+ROOT_IMPROVEMENT_GUIDE_WORKFLOW_TAG = (
+    "Standalone AgentCanon improvement guidance workflow"
 )
-ROOT_IMPROVEMENT_GUIDE_WORKFLOW_TAG = "Standalone AgentCanon improvement guidance workflow"
 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
     "workflow_dispatch:",
     "schedule:",
@@ -103,7 +103,6 @@ AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "tool_catalog.py",
     "tool_drift.py",
     "responsibility_scope.py",
-    "import_responsibility.py",
     "--baseline-ref",
     "run_accumulated_agent_evals.py",
     "eval_accumulation_check.py",
@@ -300,8 +299,7 @@ def effective_step_env(
     env.update(literal_env_values(context.job))
     env.update(literal_env_values(context.step))
     return {
-        name: resolve_literal_env_references(value, env)
-        for name, value in env.items()
+        name: resolve_literal_env_references(value, env) for name, value in env.items()
     }
 
 
@@ -436,14 +434,14 @@ def coordination_relay_findings(
     if "coordinate" not in jobs:
         findings.append(Finding("error", path, "coordination_job_missing"))
     if set(jobs) != {"coordinate"}:
-        findings.append(
-            Finding("error", path, f"coordination_job_count:{len(jobs)}")
-        )
+        findings.append(Finding("error", path, f"coordination_job_count:{len(jobs)}"))
     if "manager" in jobs:
         findings.append(Finding("error", path, "fixed_manager_relay_job:manager"))
     for relay_job in ("manager_reviewer", "manager_response"):
         if relay_job in jobs:
-            findings.append(Finding("error", path, f"fixed_manager_relay_job:{relay_job}"))
+            findings.append(
+                Finding("error", path, f"fixed_manager_relay_job:{relay_job}")
+            )
     for job_name, job in jobs.items():
         needs = job.get("needs")
         if isinstance(needs, str):
@@ -476,22 +474,28 @@ def coordination_relay_findings(
                     upload_count += 1
         if upload_count != 1:
             findings.append(
-                Finding("error", path, f"coordination_bundle_upload_count:{upload_count}")
+                Finding(
+                    "error", path, f"coordination_bundle_upload_count:{upload_count}"
+                )
             )
     return findings
 
 
-def improvement_guide_trigger_findings(
-    path: Path, workflow_text: str
-) -> list[Finding]:
+def improvement_guide_trigger_findings(path: Path, workflow_text: str) -> list[Finding]:
     """Keep improvement guidance bounded to selected paths and candidate runtime."""
     findings: list[Finding] = []
     if re.search(r"(?m)^  push:\s*$", workflow_text):
-        findings.append(Finding("error", path, "improvement_guide_push_trigger_forbidden"))
+        findings.append(
+            Finding("error", path, "improvement_guide_push_trigger_forbidden")
+        )
     if not re.search(r"(?ms)^  pull_request:\s*\n\s+paths:\s*\n", workflow_text):
-        findings.append(Finding("error", path, "improvement_guide_pull_request_paths_required"))
+        findings.append(
+            Finding("error", path, "improvement_guide_pull_request_paths_required")
+        )
     if not re.search(r"(?m)^  workflow_dispatch:\s*$", workflow_text):
-        findings.append(Finding("error", path, "improvement_guide_manual_dispatch_required"))
+        findings.append(
+            Finding("error", path, "improvement_guide_manual_dispatch_required")
+        )
 
     candidate_requirements = (
         (
@@ -512,11 +516,6 @@ def improvement_guide_trigger_findings(
             "improvement_guide_candidate_head_required",
         ),
         (
-            r'git clone --branch main --single-branch "\$\{candidate_bare\}" '
-            r'"\$\{candidate_source\}"',
-            "improvement_guide_candidate_clone_required",
-        ),
-        (
             r"AGENT_CANON_CANDIDATE_SOURCE=%s\\n.*\$\{GITHUB_ENV\}",
             "improvement_guide_candidate_export_required",
         ),
@@ -529,13 +528,24 @@ def improvement_guide_trigger_findings(
         if not re.search(pattern, workflow_text):
             findings.append(Finding("error", path, message))
     if "AGENT_CANON_RUNTIME_ROOT" in workflow_text:
-        findings.append(Finding("error", path, "improvement_guide_runtime_env_forbidden"))
-    if "AGENT_CANON_GUIDE_RUNTIME_ROOT" in workflow_text or ".runtime/container-state" in workflow_text:
-        findings.append(Finding("error", path, "improvement_guide_host_runtime_path_forbidden"))
+        findings.append(
+            Finding("error", path, "improvement_guide_runtime_env_forbidden")
+        )
+    if (
+        "AGENT_CANON_GUIDE_RUNTIME_ROOT" in workflow_text
+        or ".runtime/container-state" in workflow_text
+    ):
+        findings.append(
+            Finding("error", path, "improvement_guide_host_runtime_path_forbidden")
+        )
     if re.search(r"(?m)^\s*docker(?:\s|$)", workflow_text):
-        findings.append(Finding("error", path, "improvement_guide_direct_docker_forbidden"))
+        findings.append(
+            Finding("error", path, "improvement_guide_direct_docker_forbidden")
+        )
     if re.search(r"(?m)\bgit\s+[^\n]*\bpush\s+origin\b", workflow_text):
-        findings.append(Finding("error", path, "improvement_guide_origin_push_forbidden"))
+        findings.append(
+            Finding("error", path, "improvement_guide_origin_push_forbidden")
+        )
 
     guide = re.search(
         r"(?ms)^      - name: Generate improvement guide\s*\n"
@@ -543,21 +553,29 @@ def improvement_guide_trigger_findings(
         workflow_text,
     )
     if guide is None:
-        findings.append(Finding("error", path, "improvement_guide_generation_step_required"))
+        findings.append(
+            Finding("error", path, "improvement_guide_generation_step_required")
+        )
     else:
         guide_run = guide.group("run")
         if (
             'tool run --root "${GITHUB_WORKSPACE}" '
-            "generate-agent-improvement-guide --"
-            not in guide_run
+            "generate-agent-improvement-guide --" not in guide_run
         ):
-            findings.append(Finding("error", path, "improvement_guide_catalog_route_required"))
-        if "exec --root" in guide_run and "generate_agent_improvement_guide.py" in guide_run:
-            findings.append(Finding("error", path, "improvement_guide_internal_exec_forbidden"))
+            findings.append(
+                Finding("error", path, "improvement_guide_catalog_route_required")
+            )
+        if (
+            "exec --root" in guide_run
+            and "generate_agent_improvement_guide.py" in guide_run
+        ):
+            findings.append(
+                Finding("error", path, "improvement_guide_internal_exec_forbidden")
+            )
         if 'tool export guide --destination "${guide_dir}"' not in guide_run:
-            findings.append(Finding("error", path, "improvement_guide_export_route_required"))
-        if 'guide_dir="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide"' not in guide_run:
-            findings.append(Finding("error", path, "improvement_guide_host_destination_required"))
+            findings.append(
+                Finding("error", path, "improvement_guide_export_route_required")
+            )
 
     runtime = re.search(
         r"(?ms)^      - name: Start shared tool runtime\s*\n"
@@ -565,45 +583,70 @@ def improvement_guide_trigger_findings(
         workflow_text,
     )
     if runtime is None:
-        findings.append(Finding("error", path, "improvement_guide_runtime_step_required"))
+        findings.append(
+            Finding("error", path, "improvement_guide_runtime_step_required")
+        )
         return findings
 
     run = runtime.group("run")
     bootstrap_lines = [
-        line.strip()
-        for line in run.splitlines()
-        if "bootstrap.sh" in line
+        line.strip() for line in run.splitlines() if "bootstrap.sh" in line
     ]
     if not any(
         line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
         for line in bootstrap_lines
     ):
-        findings.append(Finding("error", path, "improvement_guide_candidate_source_required"))
+        findings.append(
+            Finding("error", path, "improvement_guide_candidate_source_required")
+        )
     if any(line.startswith("./bootstrap.sh") for line in bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_original_source_forbidden"))
+        findings.append(
+            Finding("error", path, "improvement_guide_original_source_forbidden")
+        )
     if not any(line.endswith(" install") for line in bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_pr_runtime_install_required"))
+        findings.append(
+            Finding("error", path, "improvement_guide_pr_runtime_install_required")
+        )
     if any(line.endswith(" update") for line in bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_pr_runtime_update_forbidden"))
+        findings.append(
+            Finding("error", path, "improvement_guide_pr_runtime_update_forbidden")
+        )
     if any("--runtime-root" in line for line in bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_runtime_override_forbidden"))
+        findings.append(
+            Finding("error", path, "improvement_guide_runtime_override_forbidden")
+        )
     if not any(line.endswith(" start") for line in bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_runtime_start_required"))
+        findings.append(
+            Finding("error", path, "improvement_guide_runtime_start_required")
+        )
     if not any(" target add " in line for line in bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_runtime_target_add_required"))
+        findings.append(
+            Finding("error", path, "improvement_guide_runtime_target_add_required")
+        )
 
     all_bootstrap_lines = [
         line.strip() for line in workflow_text.splitlines() if "bootstrap.sh" in line
     ]
     if any(line.startswith("./bootstrap.sh") for line in all_bootstrap_lines):
-        findings.append(Finding("error", path, "improvement_guide_cleanup_source_forbidden"))
+        findings.append(
+            Finding("error", path, "improvement_guide_cleanup_source_forbidden")
+        )
     if any(
         not line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
         for line in all_bootstrap_lines
     ):
-        findings.append(Finding("error", path, "improvement_guide_cleanup_candidate_source_required"))
-    if 'rm -rf -- "${AGENT_CANON_CANDIDATE_BARE:-}" "${AGENT_CANON_CANDIDATE_SOURCE:-}"' not in workflow_text:
-        findings.append(Finding("error", path, "improvement_guide_candidate_cleanup_required"))
+        findings.append(
+            Finding(
+                "error", path, "improvement_guide_cleanup_candidate_source_required"
+            )
+        )
+    if (
+        'rm -rf -- "${AGENT_CANON_CANDIDATE_BARE:-}" "${AGENT_CANON_CANDIDATE_SOURCE:-}"'
+        not in workflow_text
+    ):
+        findings.append(
+            Finding("error", path, "improvement_guide_candidate_cleanup_required")
+        )
     return findings
 
 
@@ -620,7 +663,9 @@ def coordination_summary_findings(path: Path, workflow_text: str) -> list[Findin
         "result=bundle_ready",
     ):
         if required not in workflow_text:
-            findings.append(Finding("error", path, f"coordination_summary_missing:{required}"))
+            findings.append(
+                Finding("error", path, f"coordination_summary_missing:{required}")
+            )
     role_validation_count = workflow_text.count("--role manager")
     if role_validation_count != 1:
         findings.append(
@@ -788,33 +833,6 @@ def check_github_support_surfaces(root: Path) -> list[Finding]:
     return []
 
 
-def check_pr_flow_docs(root: Path) -> list[Finding]:
-    """Check that the standalone source PR lane binds ownership and readback."""
-    workflow_path = root / "agents" / "skills" / "agent-canon-update.md"
-    return require_text(
-        workflow_path,
-        [
-            "standalone source repository",
-            "qualified development clone",
-            "repository-qualified Issue identity",
-            "source branch",
-            "PR",
-            "required review",
-            "CI",
-            "green",
-            "resulting",
-            "main readback",
-            "source status",
-            "content unchanged",
-            "transient resources",
-            "persistent shared runtime",
-            "submodule",
-            "vendor checkout",
-            "root projection",
-        ],
-    )
-
-
 def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     """Return all workflow and PR-surface findings."""
     workflows = workflow_paths(root)
@@ -824,7 +842,6 @@ def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     findings.extend(check_root_copy_headers(root))
     findings.extend(check_pr_templates(root))
     findings.extend(check_github_support_surfaces(root))
-    findings.extend(check_pr_flow_docs(root))
     return findings, workflows
 
 

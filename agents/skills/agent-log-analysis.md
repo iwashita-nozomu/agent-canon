@@ -55,31 +55,30 @@ structured summary を既定入力として分析する skill です。
 
 ## Required Flow
 
-1. 質問、読む repository / artifact、snapshot、期間、coverage を取得済みの
-   evidence から特定します。保存済み記録を現行 runtime の再現と扱いません。
-   読める snapshot の分析に `ensure`、`sync`、`check-clean`、最新版化、
-   foreign dirty の解消を要求しません。mutable な入力は観測時点と範囲を明示します。
-1. 既存の `agent-log-analysis-api.json` または
-   `agent-log-analysis-compact.md` などの structured summary を再利用します。
-   両形式の用意や再生成は不要です。必要な項目がない場合は
-   `dashboard_api_contract_gap` として不足を記録し、API 修理を待たず、既知の
-   path・期間・行範囲に限定した `tail`、focused parser、path 限定
-   `git grep -n`、connector の読取で調査を進めます。drilldown の理由と範囲を
-   明示し、無制限な raw JSONL 展開は行いません。
-1. 質問に必要な API field と、その snapshot での意味・coverage を確認します。
-   通常の観点は `unknown_event_count`、`status_by_hook_family`、
-   `failure_by_hook_family`、`skip_by_hook_family`、
-   `namespace_debt_by_hook_family`、`oop_applicability` です。欠落をゼロ・成功に
-   変換せず、証拠がない主張だけを unknown / 未検証にします。未選択の観点を
-   埋めるための一律 checklist や否定値の記録は作りません。
-1. eval family の missing / stale / fail は、既存の checker output や report の
-   snapshot とともに観測事項として扱います。必要なら Issue へ記録しますが、
-   観測だけで `agent-eval-accumulation`、producer 再実行、過去ログ移行へ
-   自動的に進みません。追加の検査・収集が必要な場合は次の節に従います。
-1. 観測、解釈、修正先、未確認仮説、調査範囲の制限を分けて報告します。
-   Issue 起票が依頼範囲なら、取得できた summary / checker output / bounded
-   excerpt と snapshot を `issue-finding-report` に渡します。分析と起票は
-   修理完了を待ちません。取得不能な入力はそのまま示し、証拠を作りません。
+分析の質問に照らして、利用できる repository/artifact、snapshot、期間、coverage
+を決めます。保存済み記録は観測時点の evidence であり、現行 runtime の再現では
+ありません。読める snapshot の分析に `ensure`、`sync`、`check-clean`、最新版化、
+foreign dirty の解消は不要です。
+
+既存の `agent-log-analysis-api.json`、`agent-log-analysis-compact.md`、または
+他の structured summary が答えを含むなら再利用します。必要な項目が欠けている
+場合は `dashboard_api_contract_gap` と記録し、API 修理を待たず、既知の path、
+期間、行範囲に絞った `tail`、focused parser、path 限定 `git grep -n`、connector
+読取で確認します。drilldown の理由と範囲を残し、raw JSONL を広く展開しません。
+
+その質問に関係する field と snapshot coverage を見ます。典型例には
+`unknown_event_count`、`status_by_hook_family`、`failure_by_hook_family`、
+`skip_by_hook_family`、`namespace_debt_by_hook_family`、`oop_applicability` が
+ありますが、毎回すべてを調べる必要はありません。欠落値を zero や成功に
+置き換えず、証拠がない主張だけを unknown / 未検証にします。
+
+Eval family の missing / stale / fail は checker output や report の snapshot
+とともに観測事項として扱います。観測だけでは producer 再実行、過去ログ移行、
+dashboard 修理を始めません。追加検査・収集がその主張に必要で選択されたときだけ
+次の節の route を使います。報告では観測、解釈、修正先、未確認仮説、調査範囲の
+制限を区別します。Issue 起票が範囲にある場合は、取得できた summary、checker
+output、bounded excerpt と snapshot を `issue-finding-report` に渡します。
+取得できない入力はそのまま示し、分析や起票を修理完了に結び付けません。
 
 ## Selected Acquisition And Repair
 
