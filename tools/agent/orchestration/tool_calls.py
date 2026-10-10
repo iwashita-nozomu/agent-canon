@@ -74,11 +74,17 @@ def build_issue_receipt_stage_command(
             continue
         if not Path(value).expanduser().is_absolute():
             raise ValueError(f"receipt staging {field} must be absolute")
-    if bootstrap == "./bootstrap.sh" and agentcanon_source_root != "<agentcanon-source-root>":
+    if (
+        bootstrap == "./bootstrap.sh"
+        and agentcanon_source_root != "<agentcanon-source-root>"
+    ):
         bootstrap = str(
             Path(agentcanon_source_root).expanduser().resolve() / "bootstrap.sh"
         )
-    if not Path(bootstrap).expanduser().is_absolute() and agentcanon_source_root != "<agentcanon-source-root>":
+    if (
+        not Path(bootstrap).expanduser().is_absolute()
+        and agentcanon_source_root != "<agentcanon-source-root>"
+    ):
         raise ValueError("receipt staging bootstrap must be absolute")
     state_value = state.strip().casefold()
     if (
@@ -265,7 +271,9 @@ def materialize_issue_worker_tool_call(
     if agentcanon_source_root != "<agentcanon-source-root>":
         source_path = Path(agentcanon_source_root).expanduser().resolve()
         if not source_path.is_absolute():
-            raise RuntimeError("issue_worker_tool_call:agentcanon_source_root_not_absolute")
+            raise RuntimeError(
+                "issue_worker_tool_call:agentcanon_source_root_not_absolute"
+            )
         agentcanon_source_root = str(source_path)
         bootstrap_path = source_path / "bootstrap.sh"
         if not bootstrap_path.is_file():
@@ -393,11 +401,18 @@ def materialize_subagent_spawn_tool_call(
         math_intent_route
         or (MATHEMATICAL_INTENT_ROUTE_ID if math_intent_packet is not None else None)
     )
+    separate_handoffs: tuple[Mapping[str, object], ...] = ()
     if selected_math_route is not None:
         if math_intent_packet is None:
             raise RuntimeError("math_packet_missing")
+        normalized_math_intent_packet = normalize_mathematical_intent_packet(
+            math_intent_packet
+        )
         normalized_math_packet = mathematical_intent_packet_mapping(
-            normalize_mathematical_intent_packet(math_intent_packet)
+            normalized_math_intent_packet
+        )
+        separate_handoffs = separate_nonmath_handoff_mapping(
+            normalized_math_intent_packet
         )
     elif math_intent_packet is not None:
         raise RuntimeError("math_packet_not_applicable")
@@ -432,9 +447,6 @@ def materialize_subagent_spawn_tool_call(
         }
         arguments["mathematical_intent_packet"] = normalized_math_packet
         argument_properties["mathematical_intent_packet"] = {"type": "object"}
-        separate_handoffs = separate_nonmath_handoff_mapping(
-            normalized_math_packet
-        )
         if separate_handoffs:
             arguments["separate_nonmath_handoffs"] = [
                 dict(item) for item in separate_handoffs
@@ -467,13 +479,13 @@ def materialize_subagent_spawn_tool_call(
 
 @dataclass(frozen=True)
 class CloseAgentLifecycleEvidence:
-    """Validated-input domain for G6 and terminal close materialization."""
+    """Raw lifecycle evidence passed to the close-agent owner validators."""
 
     gate_verdicts: Sequence[Mapping[str, object]]
     cleanup_proof: Mapping[str, object]
     durable_handback: Mapping[str, object]
-    descendant_close_receipts: Sequence[Mapping[str, object]]
-    reservation_release_receipts: Sequence[Mapping[str, object]]
+    descendant_close_receipts: Sequence[object]
+    reservation_release_receipts: Sequence[object]
 
 
 def materialize_close_agent_tool_call(
