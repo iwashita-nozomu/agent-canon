@@ -26,9 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ACTIONLINT_EXECUTABLE = Path("/usr/local/bin/actionlint")
-ACTIONLINT_CONFIG = (
-    Path(__file__).resolve().parents[1] / "config" / "actionlint.yaml"
-)
+ACTIONLINT_CONFIG = Path(__file__).resolve().parents[1] / "config" / "actionlint.yaml"
 SHELLCHECK_EXECUTABLE = Path("/usr/local/bin/shellcheck")
 ZIZMOR_EXECUTABLE = Path("/usr/local/bin/zizmor")
 
