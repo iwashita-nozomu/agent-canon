@@ -3,6 +3,7 @@
 # responsibility Defines the disposable test image for AgentCanon live and native
 # proof checks.
 # upstream implementation ./docker.sh selects and runs each test capability profile
+# upstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs the proof manifest
 # downstream design ./lean-proof-dependencies.toml pins the native Lean test toolchain
 # downstream test ./test_live_projection_authority.py exercises the shared host Docker daemon
 # downstream implementation ../../tools/analysis/proof/lean_proof_env.py owns native Lean behavior
@@ -28,7 +29,7 @@ RUN apt-get update \
 WORKDIR /opt/agent-canon/source
 COPY . /opt/agent-canon/source
 
-RUN python3 tools/runtime/container/devcontainer_dependencies.py image-install \
+RUN python3 -m tools.analysis.dependencies.dependency_plan image-install \
     --workspace /opt/agent-canon/source \
     --manifest tests/bootstrap/lean-proof-dependencies.toml \
     --format text
