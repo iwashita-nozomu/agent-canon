@@ -45,14 +45,9 @@ def native_results(monkeypatch: pytest.MonkeyPatch, *, fail_at: int = -1):
             (root / "lakefile.toml").write_text("native Lake package\n")
             (root / "lean-toolchain").write_text(f"{command[1][1:]}\n")
             (root / "lake-manifest.json").write_text(
-                '{"packages":[{"name":"mathlib","rev":"'
-                + MATHLIB_REVISION
-                + '"}]}'
+                '{"packages":[{"name":"mathlib","rev":"' + MATHLIB_REVISION + '"}]}'
             )
-        if (
-            command[0] == "lake"
-            and command[-3:] == ("env", "lean", "--version")
-        ):
+        if command[0] == "lake" and command[-3:] == ("env", "lean", "--version"):
             stdout = f"Lean {command[1][1:]}\n"
         elif (
             command[0] == "lake"
@@ -134,9 +129,7 @@ def test_existing_package_configuration_is_not_rewritten(
         config_name: b"project-owned dependency declaration\n",
         "lean-toolchain": b"project-selected-toolchain\n",
         "lake-manifest.json": (
-            '{"packages":[{"name":"mathlib","rev":"'
-            + MATHLIB_REVISION
-            + '"}]}\n'
+            '{"packages":[{"name":"mathlib","rev":"' + MATHLIB_REVISION + '"}]}\n'
         ).encode(),
     }
     for name, content in files.items():
@@ -296,7 +289,9 @@ def test_missing_check_file_argument_fails_before_writing(tmp_path: Path):
     assert not root.exists()
 
 
-def test_new_package_requires_an_explicit_selected_toolchain(tmp_path: Path, monkeypatch):
+def test_new_package_requires_an_explicit_selected_toolchain(
+    tmp_path: Path, monkeypatch
+):
     root = tmp_path / "absent"
     calls = native_results(monkeypatch)
     with pytest.raises(ValueError, match="Select an exact Lean toolchain"):

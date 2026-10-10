@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # @dependency-start
 # contract tool
 # responsibility Runs native Lake setup and Lean proof, interface, and counterexample checks without interpreting diagnostic text as success.
@@ -217,8 +216,10 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
     requested_toolchain = str(getattr(args, "lean_toolchain", "") or "").strip()
     requested_toolchain = requested_toolchain or None
 
-    if not configured and env_dir.exists() and any(
-        path.name != "lean-toolchain" for path in env_dir.iterdir()
+    if (
+        not configured
+        and env_dir.exists()
+        and any(path.name != "lean-toolchain" for path in env_dir.iterdir())
     ):
         raise ValueError(
             "Choose an empty directory, a toolchain-only directory, or an existing "
@@ -261,8 +262,7 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
     if lean_files:
         commands.append((*lake, "--keep-toolchain", "build"))
         commands.extend(
-            (*lake, "--keep-toolchain", "env", "lean", str(path))
-            for path in lean_files
+            (*lake, "--keep-toolchain", "env", "lean", str(path)) for path in lean_files
         )
 
     results: list[CommandResult] = []
@@ -308,8 +308,7 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
         (
             result.stdout.strip()
             for command, result in command_pairs
-            if command[-3:] == ("env", "lean", "--version")
-            and result.returncode == 0
+            if command[-3:] == ("env", "lean", "--version") and result.returncode == 0
         ),
         None,
     )
