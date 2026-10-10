@@ -23,18 +23,15 @@ clause は
 python3 tools/repository/workspace/repository_topic_clone.py prepare \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
-  --owner-evidence <evidence-file> \
   [--allowed-path <relative-path>]...
 
 python3 tools/repository/workspace/repository_topic_clone.py merge-main \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
-  --owner-evidence <evidence-file>
+  --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone>
 
 python3 tools/repository/workspace/repository_topic_clone.py cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --checkout-mode <linked-worktree|independent-clone> \
-  --owner-evidence <evidence-file> \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
@@ -43,7 +40,7 @@ python3 tools/repository/workspace/repository_topic_clone.py cleanup \
 `--checkout-mode` の選択は [Checkout mode](../rule/repository-topic-clone.md#checkout-mode) に従います。
 container 側に checkout-mode の別 flag はなく、exact target metadata から自動判定します。
 write-capable handoff の各 allowed path は repeated `--allowed-path <relative-path>` で渡します。
-exact identity の既存 checkout では、current owner evidence と明示 scope に応じて task marker、reserved packet の
+exact identity の既存 checkout では、明示 scope に応じて task marker、reserved packet の
 Git common-directory `info/exclude` entry、および ignored writer-target packet のみを更新できます。
 linked worktree ではその ignore entry は共有されますが、writer packet は各 worktree に属します。
 これは source や Git index を変更せず、dirty checkout を clean 扱い
@@ -75,7 +72,7 @@ commit parents を read back します。
 ```bash
 python3 tools/repository/workspace/repository_topic_clone.py finalize-merge \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
+  --topic <topic> --branch <task-branch> \
   --checkout-mode <linked-worktree|independent-clone>
 ```
 
