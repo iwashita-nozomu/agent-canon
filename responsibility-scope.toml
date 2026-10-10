@@ -138,6 +138,7 @@ paths = [
   ".editorconfig",
   ".gitattributes",
   ".gitignore",
+  ".markdownlint-cli2.jsonc",
   "CONTAINER_OPERATIONS.md",
   "LICENSE",
   "PHILOSOPHY.md",
