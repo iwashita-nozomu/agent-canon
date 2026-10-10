@@ -95,10 +95,17 @@ evidence.
 
 ## User Flow
 
-For project code, use the project repository's normal Docker/test runner. Use
-this runtime only for AgentCanon tools and lifecycle operations. For an ordinary
-tool request, reuse the source install and authorized control roots and invoke
-the catalog-qualified `tool run --root <project> <catalog-id> -- ...` directly.
+Resolve the task and project owner before selecting this skill. Use the project
+repository's normal Docker/test runner for project code, and use this runtime
+only for AgentCanon tools or lifecycle operations. The installer entrypoint
+comes from the installed runtime source root; pass the observed project or
+worktree separately as a read-only `--root <topic>` target. Use the latest
+installed/bootstrap absolute entrypoint; a topic checkout's `./bootstrap.sh`
+may be stale and is only for validating lifecycle-source changes.
+
+For an ordinary tool request, reuse the source install and authorized control
+roots, then invoke the catalog-qualified `tool run --root <project> <catalog-id>
+-- ...` directly.
 Carry the actual argv, cwd, input/output, exit/signal, written paths, execution
 plane, and owner from its result; success needs no route preflight.
 
@@ -129,13 +136,16 @@ update, and sync paths derive a new image reference.
 
 ## Command Shape
 
-The install root is the source input; the effective runtime is always the fixed
-bootstrap path `<control-parent-root>/.runtime`:
+Use the absolute installed AgentCanon source root as `INSTALL_ROOT`; the
+project or topic checkout is a separate `--root` target. The effective runtime
+is always the fixed bootstrap path `<control-parent-root>/.runtime`:
 
 ```bash
-bash bootstrap.sh \
-  --repository-root . \
-  --control-parent-root <authorized-parent-workspace> \
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
+ROOT=<authorized-parent-workspace>
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
+"$BOOTSTRAP" "${COMMON[@]}" \
   tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
