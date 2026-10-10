@@ -340,7 +340,7 @@ numbered policy rule は移行 receipt を経ずに保持しません。
 
 ~~~bash
 python3 tools/agent/skills/skill_shim_materializer.py check --root . --all
-python3 tools/agent/skills/skill_shim_materializer.py materialize --root . --all
+AGENT_CANON_PARENT_ROOT="$PWD" python3 tools/agent/skills/skill_shim_materializer.py materialize --root . --all
 python3 tools/agent/skills/skill_shim_materializer.py readback --root . --all
 ~~~
 

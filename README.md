@@ -116,7 +116,9 @@ updates, adds, and removes skills without runtime generation or copying.
 same distribution, not a per-file public skill registry. Maintainers edit the
 canonical `agents/skills/<skill>.md` and catalog, then use the existing
 `skill_shim_materializer.py materialize --root . --all` authoring command and
-commit its adapters with the source changes. Personal config remains ignored.
+commit its adapters with the source changes. Since materialization writes
+tracked files through the parent-root boundary, run it from the repository root
+with `AGENT_CANON_PARENT_ROOT="$PWD"`. Personal config remains ignored.
 
 An existing regular `~/.codex/config.toml` is migrated byte-for-byte to the
 ignored personal source before the link is created. Update preserves it;
