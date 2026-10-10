@@ -190,10 +190,10 @@ target = "runtime-root/codex-home/skills"
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 ```
 
-`tools/runtime/container/bootstrap_runtime.py` は container-side controller であり、Docker CLI/daemon の版、daemon
-mode、buildx、context、host architecture、rootless/rootful、UID/GID を事前
-検証しません。`DockerAdapter.run` の Docker command failure はその exit code と
-stderr を結果に残します。`bootstrap/container/image/Dockerfile` と
+`tools/runtime/container/bootstrap_runtime.py` は container-side controller であり、Docker を
+起動・検証しません。Docker CLI/daemon の版、daemon mode、buildx、context、host
+architecture、rootless/rootful、UID/GID の扱いと Docker command failure は Host shell
+adapter の責務です。`bootstrap/container/image/Dockerfile` と
 `bootstrap/container/lifecycle/entrypoint.sh` の container process identity と UID/GID
 mapping は Host/caller の責務であり、`tests/tools/test_bootstrap_container_contract.py`
 で契約化しています。AgentCanon は user 作成、`--user` 指定、UID/GID readback を行いません。
@@ -409,7 +409,7 @@ bootstrap が所有する正確な `<source>/.runtime` の `locks/` と `spool/`
 Bootstrap の `codex prepare` は global `$CODEX_HOME` を変更せず、明示 runtime
 root 内の `codex-home/` に skills、agents、hooks、config の verified
 manifest-managed link を作ります。resident は image 内の canonical source を
-検証しますが、container-control の host projection root を使って link target を
+検証しますが、resident controller の host projection root を使って link target を
 live AgentCanon checkout の `<install-root>/.codex/...` にします。従って host
 Codex が読む config は `CODEX_HOME/config.toml`、skills/agents はそれぞれの
 runtime-local surface から live checkout を参照します。加えて、control root に `$HOME` を明示した

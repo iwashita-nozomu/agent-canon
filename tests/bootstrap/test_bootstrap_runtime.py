@@ -1,8 +1,9 @@
-"""Bootstrap tests use a stateful fake Docker executable, never Docker itself."""
+"""Resident controller state, task, tool, and eval contracts."""
 
 from __future__ import annotations
 
 import json
+import fcntl
 import multiprocessing
 import os
 import signal
@@ -23,16 +24,25 @@ import tools.runtime.container.bootstrap_runtime as bootstrap_runtime_module  # 
 from tools.runtime.container.bootstrap_runtime import (  # noqa: E402
     BootstrapError,
     BootstrapRuntime,
-    DockerAdapter,
     RuntimePaths,
     _container_source_identity,
     _container_request_environment,
     build_parser,
     run,
-    sha256_bytes,
-    validate_roots,
 )
 from tools.runtime.archive.runtime_exchange_cleanup import clear_exchange  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def resident_private_log_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Give controller operations their explicitly mounted private-log surface."""
+    private_log = tmp_path / "private-log"
+    private_log.mkdir()
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
 
 
 @pytest.mark.parametrize(
@@ -88,7 +98,6 @@ def test_source_identity_operation_has_no_runtime_side_effects(tmp_path: Path) -
     """The internal identity operation needs neither state nor network access."""
     args = build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(REPOSITORY_ROOT),
             "--control-parent-root",
@@ -131,7 +140,7 @@ links = manager._managed_links()
 public = [entry for entry in links if entry["surface"] == "skills"]
 print(json.dumps({"sources": [entry["source"] for entry in public]}))
 """
-    environment = {**os.environ, "AGENT_CANON_CONTAINER_CONTROL": "1"}
+    environment = dict(os.environ)
     environment.pop("PYTHONPATH", None)
     completed = subprocess.run(
         [
@@ -212,24 +221,17 @@ def test_source_override_does_not_constrain_distinct_log_repository() -> None:
     assert log["normalized_remote"] != source_result["normalized_remote"]
 
 
-@pytest.fixture()
-def fake_docker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> DockerAdapter:
-    """Return a Docker argv adapter backed by the fake daemon executable."""
-    state = tmp_path / "docker-state.json"
-    monkeypatch.setenv("FAKE_DOCKER_STATE", str(state))
-    return DockerAdapter(str(Path(__file__).with_name("fake_docker.py")))
-
-
 def runtime(
-    tmp_path: Path, fake_docker: DockerAdapter, name: str = "runtime"
+    tmp_path: Path,
+    name: str = "runtime",
+    *,
+    repository_root: Path | None = None,
 ) -> BootstrapRuntime:
-    """Construct a runtime rooted inside the test-owned temporary directory."""
+    """Keep control state temporary while selecting the source tree explicitly."""
     control = tmp_path / "control"
     control.mkdir()
-    source = materialize_source_fixture(tmp_path)
-    return BootstrapRuntime(
-        control, control / name, repository_root=source, docker=fake_docker
-    )
+    source = repository_root or materialize_source_fixture(tmp_path)
+    return BootstrapRuntime(control, control / name, repository_root=source)
 
 
 def test_global_skill_projection_is_a_directory_link() -> None:
@@ -242,34 +244,35 @@ def test_global_skill_projection_is_a_directory_link() -> None:
     assert "_migrate_legacy_prompt_skill" not in adapter
 
 
-def test_explicit_runtime_root_is_parse_only(tmp_path: Path) -> None:
-    """Runtime state always belongs to the source checkout."""
-    control, source, supplied = (
-        tmp_path / "control",
-        tmp_path / "source",
-        tmp_path / "outside",
+def test_resident_state_lock_cannot_be_bypassed_by_environment_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The controller always acquires its state lock before mutation."""
+    manager = runtime(tmp_path)
+    flock_calls: list[int] = []
+    monkeypatch.setenv("AGENT_CANON_LOCK_HELD", "1")
+    monkeypatch.setattr(
+        bootstrap_runtime_module.fcntl,
+        "flock",
+        lambda _fd, operation: flock_calls.append(operation),
     )
-    control.mkdir()
-    source.mkdir()
-    supplied.mkdir()
-    observed_control, observed_runtime = validate_roots(
-        control, supplied / "runtime", source_root=source
-    )
-    assert observed_control == control
-    assert observed_runtime == source / ".runtime"
+
+    with manager.locked():
+        pass
+
+    assert flock_calls == [fcntl.LOCK_EX, fcntl.LOCK_UN]
+
+
 
 
 def test_runtime_paths_preserve_host_roots_and_fixed_container_destinations(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Resolve runtime-local host paths and resident fixed destinations without Docker."""
+    """Resolve the resident paths from its mounted runtime surfaces."""
     control = tmp_path / "control"
     runtime_root = control / "runtime"
     paths = RuntimePaths(control, runtime_root)
 
-    monkeypatch.delenv("AGENT_CANON_CONTAINER_CONTROL", raising=False)
-    assert paths.mounts == runtime_root / "mounts.toml"
-    assert paths.source_sync == runtime_root / "source-sync" / "source-sync.json"
     assert paths.codex_home == runtime_root / "codex-home"
     assert paths.spool == runtime_root / "spool"
     assert paths.archive == runtime_root / "archive"
@@ -283,380 +286,39 @@ def test_runtime_paths_preserve_host_roots_and_fixed_container_destinations(
         "ARCHIVE": tmp_path / "archive",
         "CACHE": tmp_path / "cache",
     }
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(exchange))
     for name, path in host_surfaces.items():
         monkeypatch.setenv(f"AGENT_CANON_HOST_{name}_ROOT", str(path))
 
-    assert paths.mounts == Path(bootstrap_runtime_module.REGISTRY_DESTINATION)
-    assert (
-        paths.source_sync
-        == Path(bootstrap_runtime_module.SOURCE_SYNC_DESTINATION) / "source-sync.json"
-    )
     assert paths.codex_home == host_surfaces["CODEX_HOME"]
     assert paths.spool == host_surfaces["SPOOL"]
     assert paths.archive == host_surfaces["ARCHIVE"]
     assert paths.cache == host_surfaces["CACHE"]
     assert paths.container_runtime == exchange
-    assert BootstrapRuntime._container_control() is True
 
 
-def test_default_source_runtime_rebuilds_without_copying_legacy_state(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Migrate the fixed legacy root and remove it only after new readback."""
-    repository = tmp_path / "repo"
-    (repository / "bootstrap" / "host").mkdir(parents=True)
-    (repository / "bootstrap" / "host" / "manifest.toml").write_bytes(
-        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
-    )
-    scheduler_source = (
-        REPOSITORY_ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
-    )
-    scheduler_target = (
-        repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
-    )
-    scheduler_target.mkdir(parents=True)
-    for template in scheduler_source.glob("*.in"):
-        (scheduler_target / template.name).write_bytes(template.read_bytes())
-    legacy = tmp_path / "workspace" / "agent-canon-runtime" / "host"
-    (legacy / "unknown.sqlite").parent.mkdir(parents=True)
-    (legacy / "unknown.sqlite").write_text("do not copy\n", encoding="utf-8")
-
-    manager = BootstrapRuntime(
-        tmp_path,
-        repository / ".runtime",
-        repository_root=repository,
-        docker=fake_docker,
-    )
-    legacy_state = manager._new_state()
-    legacy_state.update(
-        {
-            "runtime_root": str(legacy),
-            "repository_root": str(repository),
-            "state": "installed",
-            "resources": manager._resource_records(),
-        }
-    )
-    (legacy / "state.json").write_text(json.dumps(legacy_state), encoding="utf-8")
-    (legacy / "owner.json").write_text(
-        json.dumps(
-            {
-                "schema": "agent-canon.bootstrap-owner.v1",
-                "control_root_digest": manager.control_digest,
-                "control_parent_root": str(tmp_path),
-                "runtime_root": str(legacy),
-                "repository_root": str(repository),
-                "manifest_digest": manager.manifest_digest,
-            }
-        ),
-        encoding="utf-8",
-    )
-    with manager.locked():
-        manager._prepare_legacy_runtime_reset()
-        assert not (repository / ".runtime" / "unknown.sqlite").exists()
-        assert legacy.is_dir()
-        fresh = manager._new_state()
-        fresh["state"] = "installed"
-        fresh["resources"] = manager._resource_records()
-        manager._write_mounts(fresh)
-        manager._write_state(fresh)
-        manager._finalize_legacy_runtime_reset()
-    assert not legacy.exists()
-    assert not legacy.parent.exists()
 
 
-def test_explicit_runtime_argument_does_not_redirect_state(tmp_path: Path) -> None:
-    """The caller's runtime argument cannot move state outside the source root."""
-    control, source, supplied = (
-        tmp_path / "control",
-        tmp_path / "source",
-        tmp_path / "supplied",
-    )
-    control.mkdir()
-    source.mkdir()
-    supplied.mkdir()
-    observed_control, observed_runtime = validate_roots(
-        control, supplied / "runtime", source_root=source
-    )
-    assert observed_control == control
-    assert observed_runtime == source / ".runtime"
 
 
-def test_start_accepts_daemon_canonical_mount_readback(
-    tmp_path: Path,
-    fake_docker: DockerAdapter,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Match rootful Docker inspect output to the canonical admitted roots."""
-    control = tmp_path / "control"
-    nested = control / "nested"
-    nested.mkdir(parents=True)
-    monkeypatch.setenv("FAKE_DOCKER_CANONICALIZE_MOUNTS", "1")
-    fixture_source = materialize_source_fixture(tmp_path)
-    manager = BootstrapRuntime(
-        nested / "..",
-        nested / ".." / "runtime",
-        repository_root=fixture_source,
-        docker=fake_docker,
-    )
-
-    manager.install()
-
-    assert manager.start()["after_state"] == "ready"
 
 
-def test_install_tightens_preexisting_runtime_control_directories(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Receipts and task state never remain readable through a 0755 fixture."""
-    control = tmp_path / "control"
-    control.mkdir()
-    fixture_source = materialize_source_fixture(tmp_path)
-    runtime_root = fixture_source / ".runtime"
-    (runtime_root / "receipts").mkdir(parents=True)
-    runtime_root.chmod(0o755)
-    (runtime_root / "receipts").chmod(0o755)
-    manager = BootstrapRuntime(
-        control,
-        runtime_root,
-        repository_root=fixture_source,
-        docker=fake_docker,
-    )
-    manager.install()
-    assert manager.paths.runtime_root.stat().st_mode & 0o777 == 0o700
-    assert (manager.paths.runtime_root / "receipts").stat().st_mode & 0o777 == 0o700
 
 
-def test_install_start_status_readback_and_single_container(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Verify Docker argv and structural inspect readback for one container."""
-    manager = runtime(tmp_path, fake_docker)
-    installed = manager.install()
-    assert installed["code"] == "installed"
-    install_commands = list(fake_docker.commands)
-    started = manager.start()
-    assert started["after_state"] == "ready"
-    status = manager.status()["details"]
-    assert status["state"]["resources"]["container"]["state"] == "running"
-    assert status["docker_container"]["health"] == "healthy"
-    assert "Env" not in json.dumps(status)
-    assert len(json.dumps(status)) < 5000
-    install_receipt = json.loads(
-        Path(installed["receipt_path"]).read_text(encoding="utf-8")
-    )
-    assert install_receipt["resource_ids"]["image"]["id"] is not None
-    build = next(command for command in install_commands if command[1] == "build")
-    assert "--build-arg" not in build
-    assert not any(command[1:3] == ["container", "ls"] for command in install_commands)
-    create = next(command for command in fake_docker.commands if command[1] == "create")
-    assert create[create.index("--user") + 1] == f"{os.getuid()}:{os.getgid()}"
-    assert (
-        sum(
-            command[1:3] == ["container", "inspect"] for command in fake_docker.commands
-        )
-        >= 2
-    )
-    assert manager.paths.container_runtime.stat().st_mode & 0o7777 == 0o1777
-    mount_specs = [
-        create[index + 1] for index, item in enumerate(create) if item == "--mount"
-    ]
-    exchange = next(
-        spec for spec in mount_specs if "dst=/var/lib/agent-canon/runtime" in spec
-    )
-    registry = next(
-        spec
-        for spec in mount_specs
-        if "dst=/var/lib/agent-canon/mount-registry.toml" in spec
-    )
-    assert ",readonly" not in exchange
-    assert registry.endswith(",readonly")
-    assert str(manager.paths.state) not in exchange
 
 
-def test_preseeded_image_tag_is_adopted_without_overwrite_or_cleanup(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Protect an existing matching image tag from replacement and deletion."""
-    manager = runtime(tmp_path, fake_docker)
-    image_tag = manager._image_tag()
-    state_path = Path(os.environ["FAKE_DOCKER_STATE"])
-    state_path.write_text(
-        json.dumps(
-            {
-                "images": {
-                    image_tag: {
-                        "Id": "sha256:preseeded-image",
-                        "RepoTags": [image_tag],
-                        "Config": {"Labels": manager._labels()},
-                    }
-                },
-                "containers": {},
-                "next": 1,
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    installed = manager.install()
-    image = installed["resource_ids"]["image"]
-    assert image["id"] == "sha256:preseeded-image"
-    assert image["owned"] is False
-    assert not any(command[1] == "build" for command in fake_docker.commands)
-
-    manager.uninstall()
-    assert manager.docker.inspect_image(image_tag) is not None
-    assert not any(command[1:3] == ["image", "rm"] for command in fake_docker.commands)
 
 
-def test_health_polling_waits_for_starting_container(
-    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Poll a starting health state instead of failing immediately."""
-    monkeypatch.setenv("FAKE_DOCKER_HEALTH_POLLS", "2")
-    manager = runtime(tmp_path, fake_docker)
-    manager.install()
-    manager.start()
-    inspect_count_before_status = sum(
-        command[1:3] == ["container", "inspect"] for command in fake_docker.commands
-    )
-    # name lookup + post-create readback + three health polls + one final
-    # immutable readback; no immutable validation happens inside the polls.
-    assert inspect_count_before_status == 6
-    state = manager.status()["details"]["docker_container"]
-    assert state["health"] == "healthy"
 
 
-def test_health_final_readback_catches_security_drift_after_polling(
-    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Catch a resource drift once after health becomes healthy."""
-    monkeypatch.setenv("FAKE_DOCKER_DRIFT_ON_HEALTH", "network")
-    manager = runtime(tmp_path, fake_docker)
-    manager.install()
-    with pytest.raises(BootstrapError, match="docker_readback_invalid"):
-        manager.start()
-
-    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
-    container = state["resources"]["container"]
-    assert container["state"] == "quarantined"
-    assert container["id"]
-    assert manager.docker.inspect_container(container["id"]) is None
 
 
-def test_health_timeout_quarantines_and_removes_container(
-    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Stop and quarantine a container that never reaches healthy."""
-    monkeypatch.setenv("FAKE_DOCKER_HEALTH_POLLS", "1000")
-    manifest = tmp_path / "manifest.toml"
-    source = (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml").read_text(
-        encoding="utf-8"
-    )
-    source = source.replace(
-        "health_start_period_seconds = 10", "health_start_period_seconds = 0.03"
-    )
-    source = source.replace(
-        "health_timeout_seconds = 5", "health_timeout_seconds = 0.03"
-    )
-    source = source.replace(
-        "health_poll_interval_seconds = 0.2", "health_poll_interval_seconds = 0.01"
-    )
-    manifest.write_text(source, encoding="utf-8")
-    control = tmp_path / "control"
-    control.mkdir()
-    fixture_source = materialize_source_fixture(tmp_path)
-    manager = BootstrapRuntime(
-        control,
-        control / "runtime",
-        repository_root=fixture_source,
-        manifest_path=manifest,
-        docker=fake_docker,
-    )
-    manager.install()
-    with pytest.raises(BootstrapError, match="container_health_timeout"):
-        manager.start()
-    state = manager.status()["details"]["state"]
-    assert state["resources"]["container"]["state"] == "quarantined"
-    assert fake_docker.inspect_container(state["resources"]["container"]["id"]) is None
 
 
-def test_second_control_root_cannot_adopt_existing_runtime(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Refuse a state record owned by another explicit control root."""
-    control = tmp_path / "control"
-    control.mkdir()
-    fixture_source = materialize_source_fixture(tmp_path)
-    first = BootstrapRuntime(
-        control,
-        control / "runtime",
-        repository_root=fixture_source,
-        docker=fake_docker,
-    )
-    first.install()
-    second = BootstrapRuntime(
-        tmp_path,
-        control / "runtime",
-        repository_root=fixture_source,
-        docker=fake_docker,
-    )
-    with pytest.raises(BootstrapError, match="shared_runtime_owned_elsewhere"):
-        second.status()
 
 
-def test_start_refuses_foreign_named_container_without_adopting_or_cleaning(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Keep a same-name container owned by another control root untouched."""
-    first_control = tmp_path / "first-control"
-    first_control.mkdir()
-    fixture_source = materialize_source_fixture(tmp_path)
-    first = BootstrapRuntime(
-        first_control,
-        first_control / "runtime",
-        repository_root=fixture_source,
-        docker=fake_docker,
-    )
-    first.install()
-    first.start()
-
-    second_control = tmp_path / "second-control"
-    second_control.mkdir()
-    second_source = materialize_source_fixture(second_control)
-    second = BootstrapRuntime(
-        second_control,
-        second_control / "runtime",
-        repository_root=second_source,
-        docker=fake_docker,
-    )
-    second.install()
-    with pytest.raises(BootstrapError, match="shared_runtime_owned_elsewhere"):
-        second.start()
-
-    first.uninstall()
 
 
-def test_multi_target_registry_and_admission_race_guard(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Preserve multiple targets and close admission during updates."""
-    manager = runtime(tmp_path, fake_docker)
-    target_a = tmp_path / "a"
-    target_b = tmp_path / "b"
-    target_a.mkdir()
-    target_b.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(target_a)
-    manager.target_add(target_b)
-    state = manager.status()["details"]["state"]
-    assert len(state["target_digests"]) == 2
-    manager.admit_task("task-a", target_root=target_a)
-    with pytest.raises(BootstrapError, match="mount_update_blocked"):
-        manager.target_add(target_a)
-    manager.release_task("task-a")
 
 
 def _admit_process_owned_task(
@@ -677,22 +339,19 @@ def _run_process_owned_worker_controller(
     task_id: str,
     target: Path,
     ready_file: Path,
-    exchange_root: Path,
 ) -> None:
     """Spawn one resident worker that keeps its admitted process lease."""
-    os.environ["AGENT_CANON_CONTAINER_CONTROL"] = "1"
-    os.environ["AGENT_CANON_EXCHANGE_ROOT"] = str(exchange_root)
     _, lease_fd = _admit_process_owned_task(manager, task_id, target)
     try:
-        manager.docker.exec_container(
-            "resident",
-            cwd=str(target),
-            argv=[
+        bootstrap_runtime_module._run_resident_command(
+            [
                 "/bin/sh",
                 "-c",
                 'printf "%s\\n" "$$" > "$READY_FILE"; exec /bin/sleep 30',
             ],
+            cwd=str(target),
             environment={"READY_FILE": str(ready_file)},
+            timeout=60,
             pass_fds=(lease_fd,),
         )
     finally:
@@ -700,15 +359,32 @@ def _run_process_owned_worker_controller(
 
 
 def _ready_runtime_with_target(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path, *, repository_root: Path | None = None
 ) -> tuple[BootstrapRuntime, Path]:
-    """Build the minimum ready runtime state for task lease tests."""
-    manager = runtime(tmp_path, fake_docker)
+    """Build the minimum resident state for task lease tests."""
+    manager = runtime(tmp_path, repository_root=repository_root)
     target = tmp_path / "target"
     target.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(target)
+    manager._ensure_layout()
+    state = manager._new_state()
+    state.update(state="ready", generation_counter=1, current_generation="generation-0001")
+    target_record = manager._target_record(target, "read-only")
+    state["targets"] = {target_record["digest"]: target_record}
+    resources = manager._resource_records()
+    resources["image"].update(
+        {"id": "sha256:" + "a" * 64, "state": "present"}
+    )
+    resources["container"].update({"id": "resident", "state": "running"})
+    state["resources"] = resources
+    state["generations"]["generation-0001"] = {
+        "image_id": resources["image"]["id"],
+        "image_ref": resources["image"]["tag"],
+        "targets": dict(state["targets"]),
+        "state": "current",
+    }
+    manager._write_mounts(state)
+    manager._write_mount_manifest(state)
+    manager._write_state(state)
     return manager, target
 
 
@@ -724,13 +400,12 @@ def test_resident_exec_passes_process_lease_to_worker(
         observed["pass_fds"] = tuple(kwargs["pass_fds"])
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setattr(bootstrap_runtime_module.subprocess, "run", fake_run)
     try:
-        result = DockerAdapter().exec_container(
-            "resident",
+        result = bootstrap_runtime_module._run_resident_command(
+            ["worker"],
             cwd="/",
-            argv=["worker"],
+            timeout=5,
             pass_fds=(lease_fd,),
         )
     finally:
@@ -741,25 +416,15 @@ def test_resident_exec_passes_process_lease_to_worker(
 
 
 def test_process_lease_survives_controller_death_until_worker_exits(
-    tmp_path: Path,
-    fake_docker: DockerAdapter,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path
 ) -> None:
     """A live child keeps its lease after controller death until admission recovers."""
-    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
-    private_log = manager.private_log_root
-    # Container-control admission validates the fixed private-log mount first.
-    monkeypatch.setattr(
-        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
-    )
+    manager, target = _ready_runtime_with_target(tmp_path)
     task_id = "exec-controller-death"
     ready_file = tmp_path / "worker.pid"
-    exchange_root = manager.paths.runtime_root / "process-lease-exchange"
-    exchange_root.mkdir()
-    exchange_root.chmod(0o700)
     controller = multiprocessing.get_context("fork").Process(
         target=_run_process_owned_worker_controller,
-        args=(manager, task_id, target, ready_file, exchange_root),
+        args=(manager, task_id, target, ready_file),
     )
     worker_pid: int | None = None
     worker_stop_sent = False
@@ -857,10 +522,10 @@ def test_process_lease_survives_controller_death_until_worker_exits(
 
 
 def test_dead_process_task_lease_is_reconciled_before_next_admission(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path
 ) -> None:
     """An unlocked exec lease is released before it can keep its target busy."""
-    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    manager, target = _ready_runtime_with_target(tmp_path)
     record, lease_fd = _admit_process_owned_task(manager, "exec-old", target)
     os.close(lease_fd)
 
@@ -877,10 +542,10 @@ def test_dead_process_task_lease_is_reconciled_before_next_admission(
 
 
 def test_live_process_task_lease_and_manual_release_stay_protected(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path
 ) -> None:
     """A held worker lock blocks both admission and explicit task release."""
-    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    manager, target = _ready_runtime_with_target(tmp_path)
     record, lease_fd = _admit_process_owned_task(manager, "exec-live", target)
     try:
         with pytest.raises(BootstrapError, match="target_busy"):
@@ -896,10 +561,10 @@ def test_live_process_task_lease_and_manual_release_stay_protected(
 
 
 def test_manual_task_lease_remains_persistent_without_process_marker(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path
 ) -> None:
     """Caller-owned reservations remain pinned until their explicit release."""
-    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    manager, target = _ready_runtime_with_target(tmp_path)
     receipt = manager.admit_task("caller-lease", target_root=target)
 
     with pytest.raises(BootstrapError, match="target_busy"):
@@ -913,10 +578,10 @@ def test_manual_task_lease_remains_persistent_without_process_marker(
 
 
 def test_closed_admission_does_not_reconcile_process_task_lease(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path
 ) -> None:
     """Closed lifecycle states reject before reconciliation mutates task state."""
-    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    manager, target = _ready_runtime_with_target(tmp_path)
     record, lease_fd = _admit_process_owned_task(manager, "exec-old", target)
     os.close(lease_fd)
     with manager.locked():
@@ -932,172 +597,12 @@ def test_closed_admission_does_not_reconcile_process_task_lease(
     assert after["tasks"][record["id"]]["pinned"] is True
 
 
-def test_target_add_prunes_missing_target_and_is_idempotent(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Target convergence removes one stale row while retaining a valid sibling."""
-    manager = runtime(tmp_path, fake_docker)
-    stale = tmp_path / "stale"
-    valid = tmp_path / "valid"
-    stale.mkdir()
-    valid.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(stale)
-    manager.target_add(valid)
-
-    stale.rmdir()
-    converged = manager.target_add(valid)
-    assert converged["code"] == "generation_active"
-    state = manager.status()["details"]["state"]
-    valid_digest = sha256_bytes(str(valid.resolve()).encode("utf-8"))
-    assert state["target_digests"] == [valid_digest]
-    registry = manager.paths.mounts.read_text(encoding="utf-8")
-    assert f"[targets.{valid_digest}]" in registry
-    assert str(stale.resolve()) not in registry
-
-    repeated = manager.target_add(valid)
-    assert repeated["code"] == "target_unchanged"
-    assert repeated["details"]["changed"] is False
 
 
-def test_fresh_install_and_update_prune_retained_stale_targets(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Reinstalling an uninstalled runtime keeps valid targets only."""
-    manager = runtime(tmp_path, fake_docker)
-    stale = tmp_path / "stale"
-    valid = tmp_path / "valid"
-    stale.mkdir()
-    valid.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(stale)
-    manager.target_add(valid)
-    manager.uninstall()
-    stale.rmdir()
-
-    manager.install()
-    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
-    valid_digest = sha256_bytes(str(valid.resolve()).encode("utf-8"))
-    assert list(state["targets"]) == [valid_digest]
-    registry = manager.paths.mounts.read_text(encoding="utf-8")
-    assert f"[targets.{valid_digest}]" in registry
-    assert str(stale.resolve()) not in registry
-    manager.uninstall()
-
-    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
-    stale_digest = sha256_bytes(str(stale.resolve()).encode("utf-8"))
-    state["targets"][stale_digest] = {
-        "root": str(stale.resolve()),
-        "mode": "read-only",
-        "digest": stale_digest,
-    }
-    manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
-    manager._legacy_runtime_pending_cleanup = tmp_path / "legacy-runtime"
-    manager._finalize_legacy_runtime_reset = lambda: None  # type: ignore[method-assign]
-    assert manager.update()["code"] == "updated"
-    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
-    assert list(state["targets"]) == [valid_digest]
-    registry = manager.paths.mounts.read_text(encoding="utf-8")
-    assert f"[targets.{valid_digest}]" in registry
-    assert str(stale.resolve()) not in registry
 
 
-def test_candidate_registry_is_snapshotted_before_create_and_restored_on_failure(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Model file-bind inode capture for candidate and rollback containers."""
-    manager = runtime(tmp_path, fake_docker)
-    target_a, target_b = tmp_path / "a", tmp_path / "b"
-    target_a.mkdir()
-    target_b.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(target_a)
-    manager.target_add(target_b)
-    old_registry = manager.paths.mounts.read_bytes()
-    state_path = Path(os.environ["FAKE_DOCKER_STATE"])
-    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
-    container = next(iter(docker_state["containers"].values()))
-    assert container["MountSnapshots"][
-        "/var/lib/agent-canon/mount-registry.toml"
-    ] == manager.paths.mounts.read_text(encoding="utf-8")
-    with pytest.raises(BootstrapError, match="candidate_generation_unhealthy"):
-        manager.target_add(target_a, health_ok=False)
-    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
-    container = next(iter(docker_state["containers"].values()))
-    assert (
-        container["MountSnapshots"]["/var/lib/agent-canon/mount-registry.toml"].encode()
-        == old_registry
-    )
 
 
-def test_exec_and_tool_run_return_bounded_io_evidence_and_external_logs(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Preserve command output through redacted external logs and digests."""
-    manager = runtime(tmp_path, fake_docker)
-    target = tmp_path / "target"
-    target.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=target, check=True)
-    (target / "README.md").write_text("fixture\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md"], cwd=target, check=True)
-    subprocess.run(
-        [
-            "git",
-            "-c",
-            "user.name=Eval Fixture",
-            "-c",
-            "user.email=eval@example.invalid",
-            "commit",
-            "-qm",
-            "fixture",
-        ],
-        cwd=target,
-        check=True,
-    )
-    manager.install()
-    manager.start()
-    manager.target_add(target)
-    result = manager.exec(target, ["agent-canon", "--version"])
-    details = result["details"]
-    assert details["stdout_preview"] == "agent-canon 0.1.0\n"
-    assert details["stdout_bytes"] == len(Path(details["stdout_log"]).read_bytes())
-    assert details["stdout_digest"] == sha256_bytes(
-        Path(details["stdout_log"]).read_bytes()
-    )
-    assert details["stderr_bytes"] == 0
-    routed = manager.tool_run("route", ["--list"])
-    assert "route output" in routed["details"]["stdout_preview"]
-    assert routed["details"]["argv"][:3] == ["agent-canon-tool", "tool", "run"]
-    routed_external = manager.tool_run("template-bundle", ["export", "--help"])
-    assert routed_external["details"]["argv"][:3] == ["agent-canon-tool", "tool", "run"]
-    docker_exec = next(
-        command
-        for command in reversed(fake_docker.commands)
-        if command[1] == "exec" and "template-bundle" in command
-    )
-    output_env = next(
-        docker_exec[index + 1]
-        for index, value in enumerate(docker_exec)
-        if value == "--env"
-        and docker_exec[index + 1].startswith("AGENT_CANON_OUTPUT_ROOT=")
-    )
-    assert (
-        output_env == "AGENT_CANON_OUTPUT_ROOT=/var/lib/agent-canon/runtime/tool-output"
-    )
-    assert (
-        "AGENT_CANON_HOOK_ARCHIVE_DIR=/var/lib/agent-canon/private-log" in docker_exec
-    )
-    assert "AGENT_CANON_LOG_ROOT=/var/lib/agent-canon/private-log" in docker_exec
-    assert any(
-        value.startswith("TMPDIR=/var/lib/agent-canon/runtime/tasks/")
-        and value.endswith("/tmp")
-        for index, value in enumerate(docker_exec)
-        if index > 0 and docker_exec[index - 1] == "--env"
-    )
-    assert "RUFF_CACHE_DIR=/var/lib/agent-canon/cache/ruff" in docker_exec
 
 
 def test_container_control_maps_structured_tool_request_to_registered_mounts(
@@ -1119,7 +624,6 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     for path in (exchange, codex_home, spool, archive, cache):
         path.mkdir(parents=True)
         path.chmod(0o700)
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(exchange))
     monkeypatch.setenv("AGENT_CANON_HOST_CODEX_HOME_ROOT", str(codex_home))
     monkeypatch.setenv("AGENT_CANON_HOST_SPOOL_ROOT", str(spool))
@@ -1127,6 +631,13 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     monkeypatch.setenv("AGENT_CANON_HOST_CACHE_ROOT", str(cache))
     monkeypatch.setenv("AGENT_CANON_PRIVATE_LOG_ROOT", str(private_log))
     monkeypatch.setenv("AGENT_CANON_HOST_PRIVATE_LOG", str(private_log))
+    # The autouse fixture redirects filesystem checks; this oracle separately
+    # verifies the fixed path passed to a resident worker.
+    monkeypatch.setattr(
+        bootstrap_runtime_module,
+        "PRIVATE_LOG_DESTINATION",
+        "/var/lib/agent-canon/private-log",
+    )
     monkeypatch.setattr(
         BootstrapRuntime,
         "private_log_root",
@@ -1210,7 +721,6 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     monkeypatch.setattr(BootstrapRuntime, "tool_run", fake_tool_run)
     args = build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(REPOSITORY_ROOT),
             "--control-parent-root",
@@ -1253,7 +763,6 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
     target.mkdir()
     private_log = control / "private-log"
     private_log.mkdir()
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     # Preserve the resident mount precondition while testing the request filter.
     monkeypatch.setattr(
         bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
@@ -1304,7 +813,6 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
     }
     args = build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(REPOSITORY_ROOT),
             "--control-parent-root",
@@ -1324,10 +832,10 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
 
 
 def test_codex_launch_binds_session_root_to_runtime(
-    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Codex receives a session root below the bootstrap-owned runtime."""
-    manager = runtime(tmp_path, fake_docker)
+    manager = runtime(tmp_path)
     project = tmp_path / "project"
     project.mkdir()
     capture = tmp_path / "codex-env.json"
@@ -1345,8 +853,6 @@ def test_codex_launch_binds_session_root_to_runtime(
     executable.chmod(0o755)
     monkeypatch.setenv("AGENT_CANON_CODEX", str(executable))
     monkeypatch.setenv("CAPTURE", str(capture))
-    manager.install()
-
     manager.codex_launch(project)
 
     payload = json.loads(capture.read_text(encoding="utf-8"))
@@ -1393,15 +899,19 @@ def test_structured_tool_environment_rejects_private_log_self_claim(
 
 
 def test_exec_preserves_nonzero_command_exit_and_redacts_output(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Keep command exit status while storing only redacted stream evidence."""
-    manager = runtime(tmp_path, fake_docker)
-    target = tmp_path / "target"
-    target.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(target)
+    manager, target = _ready_runtime_with_target(tmp_path)
+    stderr = "terminal-diagnostic api_key=canary " + "x" * 700
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "resident")
+    monkeypatch.setattr(
+        bootstrap_runtime_module.subprocess,
+        "run",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(
+            argv, 7, stdout="", stderr=stderr
+        ),
+    )
     with pytest.raises(BootstrapError) as failure:
         manager.exec(target, ["agent-canon", "fail"])
     assert failure.value.code == "tool_failed"
@@ -1426,57 +936,21 @@ def test_exec_accepts_native_commands_for_standalone_source(argv: list[str]) -> 
 
 
 def test_exec_rejects_project_commands_before_container_admission(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path,
 ) -> None:
     """The shared tool plane cannot become a project test environment."""
-    manager = runtime(tmp_path, fake_docker)
+    manager = runtime(tmp_path)
     target = tmp_path / "project"
     target.mkdir()
-    # Rejection precedes lifecycle admission; an install is unrelated setup.
-    exec_count = sum(command[1] == "exec" for command in fake_docker.commands)
     with pytest.raises(BootstrapError) as failure:
         manager.exec(target, ["python3", "-m", "pytest"])
     assert failure.value.code == "tool_plane_command_rejected"
-    assert sum(command[1] == "exec" for command in fake_docker.commands) == exec_count
+    assert not manager.paths.state.exists()
+    assert not manager.paths.tasks.exists()
 
 
-def test_failed_candidate_is_quarantined_and_previous_generation_restored(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Quarantine an unhealthy candidate and keep the previous pointer."""
-    manager = runtime(tmp_path, fake_docker)
-    target_a = tmp_path / "a"
-    target_b = tmp_path / "b"
-    target_a.mkdir()
-    target_b.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(target_a)
-    before = manager.status()["details"]["state"]["current_generation"]
-    with pytest.raises(BootstrapError, match="candidate_generation_unhealthy"):
-        manager.target_add(target_b, health_ok=False)
-    state = manager.status()["details"]["state"]
-    assert state["current_generation"] == before
-    assert any(item["state"] == "quarantined" for item in state["generations"].values())
 
 
-def test_rollback_restarts_previous_verified_mount_generation(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Switch back to a verified generation with a fresh container."""
-    manager = runtime(tmp_path, fake_docker)
-    target_a, target_b = tmp_path / "a", tmp_path / "b"
-    target_a.mkdir()
-    target_b.mkdir()
-    manager.install()
-    manager.start()
-    manager.target_add(target_a)
-    manager.target_add(target_b)
-    current = manager.status()["details"]["state"]["current_generation"]
-    manager.rollback()
-    state = manager.status()["details"]["state"]
-    assert state["current_generation"] != current
-    assert state["generations"][state["current_generation"]]["state"] == "current"
 
 
 def test_container_rollback_restores_previous_targets_and_generation_state(
@@ -1488,7 +962,6 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     control.mkdir()
     private_log = control / "private-log"
     private_log.mkdir()
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setattr(
         bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
     )
@@ -1554,7 +1027,6 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     monkeypatch.setenv("AGENT_CANON_RESTORE_IMAGE_REF", previous_id)
     args = build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(REPOSITORY_ROOT),
             "--control-parent-root",
@@ -1587,7 +1059,6 @@ def test_container_restore_reads_mounted_target_backup(
     control.mkdir()
     private_log = control / "private-log"
     private_log.mkdir()
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setattr(
         bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
     )
@@ -1652,7 +1123,6 @@ def test_container_restore_reads_mounted_target_backup(
     )
     args = build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(REPOSITORY_ROOT),
             "--control-parent-root",
@@ -1683,7 +1153,6 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
     control.mkdir()
     private_log = control / "private-log"
     private_log.mkdir()
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setattr(
         bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
     )
@@ -1742,7 +1211,6 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
         monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
         return build_parser().parse_args(
             [
-                "--container-control",
                 "--repository-root",
                 str(REPOSITORY_ROOT),
                 "--control-parent-root",
@@ -1771,7 +1239,6 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
         monkeypatch.setenv("AGENT_CANON_CURRENT_IMAGE_REF", image_ref)
         return build_parser().parse_args(
             [
-                "--container-control",
                 "--repository-root",
                 str(REPOSITORY_ROOT),
                 "--control-parent-root",
@@ -1815,7 +1282,6 @@ def test_container_target_record_keeps_host_validation_outside_resident(
     manager = BootstrapRuntime(
         control, control / "runtime", repository_root=REPOSITORY_ROOT
     )
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     host_root = tmp_path / "host-source"
     calls: list[tuple[Path, str]] = []
 
@@ -1840,48 +1306,30 @@ def test_container_target_record_keeps_host_validation_outside_resident(
     assert calls == [(Path("/targets/target-digest"), "mounted target root")]
 
 
-def test_symlink_state_write_fails_closed(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
+def test_symlink_state_write_fails_closed(tmp_path: Path) -> None:
     """Refuse replacing a state symlink and preserve its outside target."""
-    manager = runtime(tmp_path, fake_docker)
-    manager.install()
+    manager = runtime(tmp_path)
+    manager._ensure_layout()
+    state = manager._new_state()
+    manager._write_state(state)
     manager.paths.state.unlink()
     outside = tmp_path / "outside"
     outside.write_text("keep", encoding="utf-8")
     manager.paths.state.symlink_to(outside)
     with pytest.raises(BootstrapError, match="symlink_path_rejected"):
-        manager.start()
+        manager._write_state(state)
     assert outside.read_text(encoding="utf-8") == "keep"
 
 
 def test_gc_high_water_keeps_current_rollback_and_unpublished_spool(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path
 ) -> None:
     """Expose LRU candidates without deleting protected unpublished state."""
-    manager = runtime(tmp_path, fake_docker)
-    target = tmp_path / "target"
-    target.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=target, check=True)
-    (target / "README.md").write_text("fixture\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md"], cwd=target, check=True)
-    subprocess.run(
-        [
-            "git",
-            "-c",
-            "user.name=Eval Fixture",
-            "-c",
-            "user.email=eval@example.invalid",
-            "commit",
-            "-qm",
-            "fixture",
-        ],
-        cwd=target,
-        check=True,
-    )
-    manager.install()
-    manager.start()
-    manager.target_add(target)
+    manager = runtime(tmp_path)
+    manager._ensure_layout()
+    state = manager._new_state()
+    state["state"] = "ready"
+    manager._write_state(state)
     manager.admit_task("task-a")
     manager.release_task("task-a")
     (manager.paths.runtime_root / "spool" / "pending").mkdir()
@@ -1905,7 +1353,6 @@ def test_container_control_gc_delegates_to_runtime_gc(
     monkeypatch.setattr(BootstrapRuntime, "gc", fake_gc)
     args = build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(REPOSITORY_ROOT),
             "--control-parent-root",
@@ -1920,15 +1367,14 @@ def test_container_control_gc_delegates_to_runtime_gc(
     assert calls == [True]
 
 
-def test_container_control_gc_skips_docker_and_cleans_local_state(
+def test_resident_gc_cleans_local_cache_without_host_resource_fields(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Resident GC works without Docker while retaining local cleanup."""
+    """Resident GC cleans the mounted cache without reporting Host resources."""
     control = tmp_path / "control"
     control.mkdir()
     cache = tmp_path / "host-cache"
     private_log = tmp_path / "private-log"
-    private_log.mkdir()
     manifest = tmp_path / "manifest.toml"
     manifest.write_text(
         (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml")
@@ -1936,19 +1382,16 @@ def test_container_control_gc_skips_docker_and_cleans_local_state(
         .replace("cache_quota_bytes = 4294967296", "cache_quota_bytes = 1"),
         encoding="utf-8",
     )
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(tmp_path / "exchange"))
     monkeypatch.setenv("AGENT_CANON_HOST_CACHE_ROOT", str(cache))
     monkeypatch.setattr(
         bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
     )
-    missing_docker = DockerAdapter(str(tmp_path / "missing-docker"))
     manager = BootstrapRuntime(
         control,
         control / "runtime",
         repository_root=REPOSITORY_ROOT,
         manifest_path=manifest,
-        docker=missing_docker,
     )
     state = manager._new_state()
     state["state"] = "ready"
@@ -1964,42 +1407,20 @@ def test_container_control_gc_skips_docker_and_cleans_local_state(
 
     preview = manager.gc(dry_run=True)
     assert preview["code"] == "gc_plan"
-    assert preview["details"]["idle_stop"] is False
-    assert preview["details"]["stale_images"] == []
+    assert "idle_stop" not in preview["details"]
+    assert "stale_images" not in preview["details"]
     assert cached.is_file()
-    assert missing_docker.commands == []
 
     completed = manager.gc()
     assert completed["code"] == "gc_complete"
     assert "cache:stale" in completed["details"]["deleted"]
     assert not cached.exists()
-    assert missing_docker.commands == []
 
 
-def test_non_container_gc_enumerates_owned_images(
-    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Host GC retains the Docker image-adapter path."""
-    manager = runtime(tmp_path, fake_docker)
-    state = manager._new_state()
-    state["state"] = "ready"
-    manager.paths.state.parent.mkdir(parents=True)
-    manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
-    calls: list[str] = []
-    monkeypatch.setattr(
-        fake_docker,
-        "owned_image_ids",
-        lambda digest: calls.append(digest) or [],
-    )
-
-    result = manager.gc(dry_run=True)
-
-    assert result["code"] == "gc_plan"
-    assert calls == [manager.control_digest]
 
 
 def test_gc_enforces_archive_quota_only_without_unpublished_spool(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path
 ) -> None:
     """Prune a reproducible archive cache, but never while a spool is pending."""
     manifest = tmp_path / "manifest.toml"
@@ -2019,9 +1440,8 @@ def test_gc_enforces_archive_quota_only_without_unpublished_spool(
         control / "runtime",
         repository_root=fixture_source,
         manifest_path=manifest,
-        docker=fake_docker,
     )
-    manager.install()
+    manager._ensure_layout()
     archive_cache = manager.paths.runtime_root / "archive" / "agent-canon-log"
     archive_cache.mkdir()
     (archive_cache / "cache").write_text("published", encoding="utf-8")
@@ -2040,43 +1460,6 @@ def test_gc_enforces_archive_quota_only_without_unpublished_spool(
     assert not archive_cache.exists()
 
 
-def test_uninstall_removes_only_owned_container_and_image(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Read back exact owned image removal during uninstall."""
-    manager = runtime(tmp_path, fake_docker)
-    manager.install()
-    manager.start()
-    manager.codex_prepare()
-    generated = manager.paths.container_runtime / "tmp" / "pytest-of-agentcanon"
-    generated.mkdir(parents=True)
-    (generated / "artifact").write_text("fixture", encoding="utf-8")
-    manager.uninstall()
-    state_file = manager.paths.state.read_text(encoding="utf-8")
-    assert json.loads(state_file)["state"] == "uninstalled"
-    assert any(
-        command[1:3] == ["image", "rm"]
-        for command in fake_docker.commands
-        if len(command) >= 3
-    )
-    # The fake image is removed by its digest; absence is read back by Docker.
-    assert manager.docker.inspect_image(manager._image_tag()) is None
-    assert not manager.paths.container_runtime.exists()
-    cleanup_index = next(
-        index
-        for index, command in enumerate(fake_docker.commands)
-        if command[-2:]
-        == [
-            "python3",
-            "/opt/agent-canon/source/tools/runtime/archive/runtime_exchange_cleanup.py",
-        ]
-    )
-    stop_index = next(
-        index
-        for index, command in enumerate(fake_docker.commands)
-        if len(command) > 1 and command[1] == "stop"
-    )
-    assert cleanup_index < stop_index
 
 
 def test_exchange_cleanup_unlinks_symlink_without_touching_target(
@@ -2122,45 +1505,6 @@ def test_exchange_cleanup_preserves_host_owned_entries_for_host_phase(
     assert not exchange.exists()
 
 
-def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
-    tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Source updates must not strand resources created by the prior generation."""
-    manager = runtime(tmp_path, fake_docker)
-    manager.install()
-    manager.start()
-    old_state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
-    persisted_state = dict(old_state)
-    persisted_state["repository_root"] = str(tmp_path / "old-agent-canon")
-    manager.paths.state.write_text(json.dumps(persisted_state), encoding="utf-8")
-
-    changed_manifest = tmp_path / "changed-manifest.toml"
-    changed_manifest.write_text(
-        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml")
-        .read_text(encoding="utf-8")
-        .replace("idle_stop_seconds = 3600", "idle_stop_seconds = 1800"),
-        encoding="utf-8",
-    )
-    fixture_source = materialize_source_fixture(tmp_path)
-    changed = BootstrapRuntime(
-        manager.paths.control_parent_root,
-        manager.paths.runtime_root,
-        repository_root=fixture_source,
-        manifest_path=changed_manifest,
-        docker=fake_docker,
-    )
-
-    status = changed.status()
-    assert status["details"]["manifest_drift"] is True
-    assert (
-        status["resource_ids"]["container"]["id"]
-        == old_state["resources"]["container"]["id"]
-    )
-    updated = changed.update()
-    rebound = json.loads(changed.paths.state.read_text(encoding="utf-8"))
-    assert updated["code"] == "updated"
-    assert rebound["manifest_digest"] == changed.manifest_digest
-    assert rebound["repository_root"] == str(fixture_source)
 
 
 def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
@@ -2227,8 +1571,8 @@ def test_source_sync_reader_uses_nested_directory_path() -> None:
         REPOSITORY_ROOT / "tools/runtime/container/bootstrap_runtime.py"
     ).read_text(encoding="utf-8")
     assert 'SOURCE_SYNC_DESTINATION = "/var/lib/agent-canon/source-sync"' in source
-    assert 'return self.runtime_root / "source-sync" / "source-sync.json"' in source
     assert 'return Path(SOURCE_SYNC_DESTINATION) / "source-sync.json"' in source
+    assert 'return self.runtime_root / "source-sync" / "source-sync.json"' not in source
 
 
 def test_container_control_uses_host_passed_state_volume(
@@ -2243,10 +1587,8 @@ def test_container_control_uses_host_passed_state_volume(
     control = tmp_path / "state-volume"
     control.mkdir()
     mounted_runtime = control / "runtime"
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     args = build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(repository),
             "--control-parent-root",
@@ -2272,7 +1614,6 @@ def test_reconciliation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     exchange.mkdir()
     exchange.chmod(0o700)
     private_log.mkdir()
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(exchange))
     monkeypatch.setenv("AGENT_CANON_CONTAINER_NAME", "agent-canon-test")
     monkeypatch.setenv("AGENT_CANON_IMAGE_ID", "sha256:" + "a" * 64)
@@ -2308,7 +1649,6 @@ def test_reconciliation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     plan.write_text("stale rollback plan\n", encoding="utf-8")
     args = build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(REPOSITORY_ROOT),
             "--control-parent-root",
@@ -2349,10 +1689,10 @@ def test_reconciliation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_eval_precondition_failure_creates_no_spool_or_exchange(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path
 ) -> None:
     """An unregistered eval target can be retried after registration."""
-    manager = runtime(tmp_path, fake_docker)
+    manager = runtime(tmp_path)
     target = tmp_path / "target"
     target.mkdir()
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=target, check=True)
@@ -2372,8 +1712,6 @@ def test_eval_precondition_failure_creates_no_spool_or_exchange(
         cwd=target,
         check=True,
     )
-    manager.install()
-    manager.start()
     with pytest.raises(BootstrapError) as failure:
         manager.eval_collect(target, "precondition")
     assert failure.value.code == "target_not_registered"
@@ -2383,149 +1721,29 @@ def test_eval_precondition_failure_creates_no_spool_or_exchange(
     ).exists()
 
 
-def test_top_level_entrypoint_reports_typed_docker_failure_without_fallback(
+def test_eval_collect_runs_existing_producers_and_prepares_sync_request(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Return runtime_unavailable instead of a host-tool fallback."""
-    control = tmp_path / "control"
-    control.mkdir()
-    monkeypatch.setenv("AGENT_CANON_DOCKER", str(tmp_path / "missing-docker"))
-    completed = subprocess.run(
-        [
-            str(REPOSITORY_ROOT / "bootstrap.sh"),
-            "--control-parent-root",
-            str(control),
-            "--runtime-root",
-            str(control / "runtime"),
-            "install",
-        ],
-        capture_output=True,
-        text=True,
+    """The resident executes both real producers and releases their task lease."""
+    container_runtime_root = tmp_path / "container-runtime"
+    exchange = container_runtime_root / "exchange"
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "TOOL_SOURCE_DESTINATION", str(REPOSITORY_ROOT)
     )
-    assert completed.returncode != 0
-    assert json.loads(completed.stderr)["code"] == "runtime_unavailable"
+    monkeypatch.setattr(
+        bootstrap_runtime_module,
+        "CONTAINER_RUNTIME_DESTINATION",
+        str(container_runtime_root),
+    )
+    monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(exchange))
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "resident-test")
 
-
-def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
-    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Collect a real producer matrix, prove source stability, and read back Git blobs."""
-    source = tmp_path / "source"
-    source.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
-    subprocess.run(
-        ["git", "-C", str(source), "config", "user.name", "Test"], check=True
+    manager, target = _ready_runtime_with_target(
+        tmp_path, repository_root=REPOSITORY_ROOT
     )
-    subprocess.run(
-        ["git", "-C", str(source), "config", "user.email", "test@example.invalid"],
-        check=True,
-    )
-    (source / "README.md").write_text("source fixture\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(source), "add", "README.md"], check=True)
-    subprocess.run(["git", "-C", str(source), "commit", "-qm", "fixture"], check=True)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(source),
-            "remote",
-            "add",
-            "origin",
-            "https://github.com/example/source.git",
-        ],
-        check=True,
-    )
-
-    seed = tmp_path / "archive-seed"
-    seed.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", "main", str(seed)], check=True)
-    subprocess.run(["git", "-C", str(seed), "config", "user.name", "Test"], check=True)
-    subprocess.run(
-        ["git", "-C", str(seed), "config", "user.email", "test@example.invalid"],
-        check=True,
-    )
-    (seed / "README.md").write_text("archive\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(seed), "add", "README.md"], check=True)
-    subprocess.run(["git", "-C", str(seed), "commit", "-qm", "seed"], check=True)
-    remote = tmp_path / "agent-canon-log.git"
-    subprocess.run(["git", "clone", "-q", "--bare", str(seed), str(remote)], check=True)
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text(
-        (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml")
-        .read_text(encoding="utf-8")
-        .replace(
-            'remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"',
-            f'remote = "{remote}"',
-        ),
-        encoding="utf-8",
-    )
-
-    (tmp_path / "control").mkdir()
-    fixture_source = materialize_source_fixture(tmp_path)
-    manager = BootstrapRuntime(
-        tmp_path / "control",
-        tmp_path / "control" / "runtime",
-        repository_root=fixture_source,
-        manifest_path=manifest,
-        docker=fake_docker,
-    )
-    manager.install()
-    manager.start()
-    manager.target_add(source)
-    before = (source / "README.md").read_bytes()
-    collected = manager.eval_collect(source, "eval-e2e")
-    collection = collected["details"]["collection"]
-    assert collection["status"] == "collected"
-    assert collection["source_tree_unchanged"] is True
-    assert sorted(producer["name"] for producer in collection["producer_matrix"]) == [
-        "codex-agent-role",
-        "workflow-selection",
-    ]
-    assert collection["tool_image_digest"] == "sha256:fake-image-1"
-    eval_command = next(
-        command
-        for command in fake_docker.commands
-        if "/opt/agent-canon/source/eval/producers/run_accumulated_agent_evals.py"
-        in command
-    )
-    assert eval_command[eval_command.index("--root") + 1] == ("/opt/agent-canon/source")
-    observed_target = eval_command[eval_command.index("--target-root") + 1]
-    assert observed_target.startswith("/targets/")
-    spool = manager.paths.runtime_root / "spool" / "eval-e2e"
-    assert (spool / "collection.json").is_file()
-    assert (source / "README.md").read_bytes() == before
-    monkeypatch.delenv("AGENT_CANON_TARGET_DIGEST", raising=False)
-    synced = manager.eval_sync("eval-e2e")
-    assert synced["code"] == "host_archive_requested"
-    assert synced["details"] == {
-        "execution_plane": "host_archive_adapter",
-        "run_id": "eval-e2e",
-        "status": "requested",
-    }
-    request = spool / "sync-request.tsv"
-    assert request.read_text(encoding="utf-8") == (
-        "schema\tagent-canon.eval-sync-request.v1\n"
-        "operation\tsync\n"
-        "execution-plane\tagentcanon_tool_container\n"
-        "run-id\teval-e2e\n"
-        "target-digest\t\n"
-        f"source-root\t{source}\n"
-    )
-    assert spool.is_dir()
-    assert not (manager.paths.runtime_root / "archive" / "agent-canon-log").exists()
-
-
-def test_eval_producer_failure_is_not_masked_by_missing_export(
-    tmp_path: Path,
-    fake_docker: DockerAdapter,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Preserve producer failure evidence before attempting Host export."""
-    source = tmp_path / "source-free-parent"
-    source.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=source, check=True)
-    (source / "README.md").write_text("source-free fixture\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=target, check=True)
+    (target / "README.md").write_text("eval fixture\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=target, check=True)
     subprocess.run(
         [
             "git",
@@ -2537,25 +1755,80 @@ def test_eval_producer_failure_is_not_masked_by_missing_export(
             "-qm",
             "fixture",
         ],
-        cwd=source,
+        cwd=target,
         check=True,
     )
-    manager = runtime(tmp_path, fake_docker)
-    manager.install()
-    manager.start()
-    manager.target_add(source)
-    monkeypatch.setenv("FAKE_EVAL_FAIL", "1")
+    state = manager._read_state()
+    target_digest = next(iter(state["targets"]))
+    container_target = f"/targets/{target_digest}"
+    monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", target_digest)
 
-    with pytest.raises(BootstrapError) as failure:
-        manager.eval_collect(source, "producer-failure")
+    resident_command = bootstrap_runtime_module._run_resident_command
 
-    assert failure.value.code == "eval_producer_failed"
-    spool = manager.paths.runtime_root / "spool" / "producer-failure"
-    collection = json.loads((spool / "collection.json").read_text(encoding="utf-8"))
-    assert collection["status"] == "failed"
-    assert collection["failure"] == "eval_producer_failed"
-    assert sorted(producer["name"] for producer in collection["producer_matrix"]) == [
-        "codex-agent-role",
-        "workflow-selection",
-    ]
+    def run_mounted_command(
+        argv: list[str],
+        *,
+        cwd: str,
+        environment: dict[str, str] | None = None,
+        timeout: int,
+        pass_fds: tuple[int, ...] = (),
+    ) -> subprocess.CompletedProcess[str]:
+        """Map only the resident's fixed target mount into this temp fixture."""
+        mapped_argv = [
+            str(target) if value == container_target else value for value in argv
+        ]
+        mapped_environment = dict(environment or {})
+        for key in (
+            "AGENT_CANON_TARGET_ROOT",
+            "AGENT_CANON_TASK_ROOT",
+            "GIT_CONFIG_VALUE_0",
+        ):
+            if mapped_environment.get(key) == container_target:
+                mapped_environment[key] = str(target)
+        return resident_command(
+            mapped_argv,
+            cwd=cwd,
+            environment=mapped_environment,
+            timeout=timeout,
+            pass_fds=pass_fds,
+        )
+
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "_run_resident_command", run_mounted_command
+    )
+    run_id = "resident-eval-success"
+    result = manager.eval_collect(target, run_id)
+
+    assert result["code"] == "eval_spooled"
+    collection = result["details"]["collection"]
+    assert collection["status"] == "collected"
+    assert collection["source_tree_unchanged"] is True
+    assert {
+        producer["name"]: producer["status"]
+        for producer in collection["producer_matrix"]
+    } == {
+        "codex-agent-role": "pass",
+        "workflow-selection": "pass",
+    }
+    spool = manager.paths.spool / run_id
+    assert (spool / "eval-results").is_dir()
     assert (spool / "producer-logs").is_dir()
+    assert collection["exported_files"]["eval_results"] > 0
+    assert collection["exported_files"]["producer_logs"] > 0
+    after_collection = manager._read_state()
+    task = after_collection["tasks"][f"eval-{run_id}"]
+    assert task["state"] == "completed"
+    assert task["outcome"] == "completed"
+    assert task["pinned"] is False
+    assert after_collection["active_task_count"] == 0
+
+    sync = manager.eval_sync_prepare(run_id)
+    assert sync["code"] == "host_archive_requested"
+    assert (spool / "sync-request.tsv").read_text(encoding="utf-8") == (
+        "schema\tagent-canon.eval-sync-request.v1\n"
+        "operation\tsync\n"
+        "execution-plane\tagentcanon_tool_container\n"
+        f"run-id\t{run_id}\n"
+        f"target-digest\t{target_digest}\n"
+        f"source-root\t{target}\n"
+    )

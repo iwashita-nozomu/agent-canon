@@ -302,7 +302,6 @@ def test_remove_checks_registration_before_mount_existence(
     control = tmp_path / "control"
     private_log = control / "private-log"
     private_log.mkdir(parents=True)
-    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setattr(runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
     manager = runtime_module.BootstrapRuntime(
         control, control / "runtime", repository_root=ROOT
@@ -351,7 +350,6 @@ def test_remove_checks_registration_before_mount_existence(
     monkeypatch.setattr(runtime_module, "_existing_no_symlink", missing_mount)
     args = runtime_module.build_parser().parse_args(
         [
-            "--container-control",
             "--repository-root",
             str(ROOT),
             "--control-parent-root",
