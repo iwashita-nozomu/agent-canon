@@ -131,14 +131,14 @@ cleanup hold を返します。plan detail は stage-0、remote、tracking、mat
 ```bash
 python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file> [--allowed-path <relative-path> ...]
+  [--allowed-path <relative-path> ...]
 ```
 
 manifest identity を generic request へ写像し、exact independent checkout/branch を再利用するか、
 不在 branch を最新 `origin/main` から作成します。`PrepareReceipt`、module path/URL readback、
 computed checkout path の一致が完了証拠です。
-owner evidence、manifest identity、computed path が一致する canonical prepare は
-operation-level の追加承認なしで実行できます。この扱いは repo-local topic workspace
+manifest identity、computed path が一致する canonical prepare は operation-level の追加承認なしで
+実行できます。この扱いは repo-local topic workspace
 の lifecycle command にだけ適用し、共有 checkout の protected raw Git route には継承
 されません。
 
@@ -147,7 +147,7 @@ operation-level の追加承認なしで実行できます。この扱いは rep
 ```bash
 python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> merge-main \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file> [--allowed-path <relative-path> ...]
+  [--allowed-path <relative-path> ...]
 ```
 
 generic owner が `fetch origin main` と通常の `git merge --no-edit origin/main` を実行し、
@@ -159,13 +159,13 @@ dirty state と conflict は破棄せず typed evidence として保持します
 ```bash
 python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file> [--allowed-path <relative-path> ...] \
+  [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
 
 通常の cleanup は manifest から解決した computed checkout を再計算し、selected Git toplevel、
-owner evidence/marker、URL、branch、clean non-detached state、および fetch した
+marker、URL、branch、clean non-detached state、および fetch した
 `origin/<branch>` の commit/tree と local `HEAD` の commit/tree の一致だけを検証します。
 publication packet を作らなくても dry-run/apply でき、unknown sibling は保持し、topic directory
 は空の場合だけ削除します。candidate CAS、PR lifecycle、publication readback は任意の追加
@@ -180,7 +180,7 @@ scope は repository structure、dependency edge、差し替え可能な責務�
 から形成します。`.gitignore`、単一 file、行数、diff 件数は owner や lifecycle route の
 authority ではありません。
 
-manifest、URL、owner evidence、branch、publication identity の不足や不一致は typed hold
+manifest、URL、branch、publication identity の不足や不一致は typed hold
 として状態を保持します。adapter 固有情報が無い場合は `topic-identity-required` を返し、
 caller は generic URL/repo identity を補って同じ requested operation を続けます。
 

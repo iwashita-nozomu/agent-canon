@@ -41,10 +41,10 @@ specialized precondition が成立しない場合は dependency decorator だけ
 要求した checkout/edit/update operation を generic owner へ戻します。manual clone や
 operation refusal は代替 route ではありません。
 
-`--owner-evidence` が非空で、`.gitmodules` identity と computed
+`.gitmodules` identity と computed
 `workspace/<topic-slug>/<module-basename>` が一致する場合、canonical `prepare` と
 `merge-main` は operation-level の追加承認を要求しません。reuse は `prepare` に含まれます。
-`status` は dependency adapter の read-only command で、owner-evidence を要求せず、
+`status` は dependency adapter の read-only command で、
 generic lifecycle または operation-level approval carve-out には含めません。ここで許可される
 のは canonical lifecycle tool が管理する repo-local independent checkout の作成・再利用・使用
 だけです。共有 checkout の raw `git checkout`、branch/worktree、reset/restore/clean/stash
@@ -65,7 +65,7 @@ topological order で進めます。未解決 edge / cycle は design / order is
 ```bash
 python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <path> --branch <branch> \
-  --owner-evidence <file> [--allowed-path <relative-path> ...]
+  [--allowed-path <relative-path> ...]
 ```
 
 通常の closeout cleanup は canonical lifecycle artifact を materialize せず、manifest から
@@ -76,7 +76,7 @@ python3 tools/repository/workspace/dependency_module_change.py --root <parent-ro
 ```bash
 python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <path> --branch <branch> \
-  --owner-evidence <file> [--allowed-path <relative-path> ...] \
+  [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```

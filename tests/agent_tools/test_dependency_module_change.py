@@ -82,17 +82,8 @@ def create_parent(
         f"\turl = {manifest_url or remote}",
     ]
     (parent_source / ".gitmodules").write_text("\n".join(manifest), encoding="utf-8")
-    (parent_source / "owner-evidence.md").write_text(
-        "source edit required\n", encoding="utf-8"
-    )
     (parent_source / ".gitignore").write_text("workspace/\n", encoding="utf-8")
-    run_git(
-        parent_source,
-        "add",
-        ".gitmodules",
-        ".gitignore",
-        "owner-evidence.md",
-    )
+    run_git(parent_source, "add", ".gitmodules", ".gitignore")
     subprocess.run(
         [
             "git",
@@ -121,9 +112,6 @@ def create_parent(
         capture_output=True,
     )
     (selected / ".gitmodules").write_text("\n".join(manifest), encoding="utf-8")
-    (selected / "owner-evidence.md").write_text(
-        "source edit required\n", encoding="utf-8"
-    )
     return selected
 
 
@@ -233,7 +221,6 @@ def prepare(
     *,
     branch: str = "feature/foo",
     topic: str = TOPIC,
-    owner_evidence: str = "owner-evidence.md",
 ) -> subprocess.CompletedProcess[str]:
     """Invoke prepare command with the current dependency module."""
     return invoke(
@@ -245,8 +232,6 @@ def prepare(
         "vendor/dep",
         "--branch",
         branch,
-        "--owner-evidence",
-        owner_evidence,
     )
 
 
@@ -343,8 +328,6 @@ def test_relative_module_url_and_merge_main_use_generic_lifecycle(
         "vendor/dep",
         "--branch",
         "feature/merge",
-        "--owner-evidence",
-        "owner-evidence.md",
     )
     assert merged.returncode == 0, merged.stderr
     assert "MERGE_INTEGRATED_SHA=" in merged.stdout
@@ -371,36 +354,11 @@ def test_cleanup_without_publication_packet_uses_computed_clone(
         "vendor/dep",
         "--branch",
         "feature/foo",
-        "--owner-evidence",
-        "owner-evidence.md",
         "--apply",
     )
     assert result.returncode == 0, result.stderr
     assert "action=removed" in result.stdout
     assert not clone.exists()
-
-
-def test_prepare_requires_owner_evidence_and_returns_typed_topic_identity_error(
-    tmp_path: Path,
-) -> None:
-    """Missing owner-evidence must fail with typed identity-required error."""
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-
-    missing = invoke(
-        parent,
-        "prepare",
-        "--topic",
-        TOPIC,
-        "--module",
-        "vendor/dep",
-        "--branch",
-        "feature/foo",
-        "--owner-evidence",
-        "missing.md",
-    )
-    assert missing.returncode == 2
-    assert "owner evidence must be a non-empty file" in missing.stderr
 
 
 @pytest.mark.parametrize("forbidden", ("path", "base", "merge", "cleanup"))
@@ -419,8 +377,6 @@ def test_prepare_rejects_hidden_cli_selector_aliases(
         "vendor/dep",
         "--branch",
         "feature/foo",
-        "--owner-evidence",
-        "owner-evidence.md",
         f"--{forbidden}",
         "x",
     )
@@ -441,8 +397,6 @@ def test_prepare_has_no_workspace_continuation_flag(tmp_path: Path) -> None:
         "vendor/dep",
         "--branch",
         "feature/foo",
-        "--owner-evidence",
-        "owner-evidence.md",
         "--placement",
         "workspace-continuation",
     )
