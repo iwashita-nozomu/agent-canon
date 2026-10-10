@@ -22,7 +22,8 @@ package・依存・toolchain の設定と更新は Lake の標準形式を正本
 
 ```bash
 python3 tools/analysis/proof/lean_proof_env.py init \
-  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" --execute --format json
+  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
+  --lean-toolchain "<selected exact toolchain>" --execute --format json
 python3 tools/analysis/proof/lean_proof_env.py all-smoke \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" --execute --format json
 python3 tools/analysis/proof/lean_proof_env.py check-file \
@@ -31,12 +32,14 @@ python3 tools/analysis/proof/lean_proof_env.py check-file \
 ```
 
 `--execute` を省略すると計画だけを返し、directory、設定、probe を書きません。
-`status=dry_run` は検査成功ではありません。既存の `--env-dir`、`--lean-file`、
-`--package-name`、`--format` と action 名は引き続き使用できます。
+`status=dry_run` は検査成功ではありません。新規 package では
+`--lean-toolchain` で exact toolchain を選びます。既存 package はその
+`lean-toolchain` 宣言を使い、明示 selector と食い違えば失敗します。既存の
+`--env-dir`、`--lean-file`、`--package-name`、`--format` と action 名は引き続き使用できます。
 
 | action | 実行する確認 |
 | --- | --- |
-| `init` | 必要な場合だけ標準 `lake init <package-name> math` と version readback |
+| `init` | 必要な場合だけ標準 `lake +<selected-toolchain> init <package-name> math` と native version readback |
 | `smoke` | Aesop、Mathlib、omega、linarith、grind、真の Plausible property |
 | `agent-smoke` | LeanSearchClient の import と公開型。外部検索サービスは呼ばない |
 | `counterexample-smoke` | Lean の `#guard_msgs` による期待した反例診断の確認 |
@@ -45,19 +48,23 @@ python3 tools/analysis/proof/lean_proof_env.py check-file \
 
 ## 所有権と更新
 
-空の directory または存在しない directory では Lake の `math` template が初期化を所有します。
-既存 `lakefile.lean` / `lakefile.toml` がある場合はその package を使い、Python は設定を上書きしません。
-Lake 設定のない非空 directory は拒否し、旧環境の削除や自動改造を行いません。
+空の directory では `--lean-toolchain` で選択した toolchain の標準 `math` template が
+初期化を所有します。`lean-toolchain` だけがある directory も標準初期化の入力として
+受け入れ、その宣言を選択値として使います。既存 `lakefile.lean` / `lakefile.toml` がある場合は
+その package を使い、Python は設定を上書きしません。Lake 設定のないその他の非空 directory は
+拒否し、旧環境の削除や自動改造を行いません。
 
-確認時は native version を取得し、`lake --keep-toolchain build` と
-`lake --keep-toolchain env lean <file>` を実行します。毎回の `lake update` は行いません。
+既存 package は `lean-toolchain` ファイル、または明示 selector が必要です。全 native command は
+`lake +<selected-toolchain>` で同じ選択を使います。確認時は Lake/Lean の native version を記録し、
+`lake --keep-toolchain build` と `lake --keep-toolchain env lean <file>` を実行します。
+毎回の `lake update` は行いません。
 依存未取得時に Lake が行う取得・build は、その package と runtime の既存契約に従います。
 依存を変更する必要がある場合は、project owner が標準の Lake 設定・manifest を更新します。
-初期化で Lake が選んだ toolchain と、既存 package が選んだ toolchain を混同しません。
+選択した `lean-toolchain` と、native manifest の `mathlib_revision` を結果から確認できます。
 
 手書き Lakefile、再export用 root module、独自の Lean/Mathlib default revision は撤去しました。
-旧 `--lean-toolchain`、`--mathlib-rev`、`--module-name`、`--force` は使いません。
-これらを別の設定 schema や無視する互換 flag へ置換せず、標準設定と選択済み runtime を使います。
+`--lean-toolchain` に固定 default はありません。`--mathlib-rev`、`--module-name`、`--force` は
+使いません。Lake の標準設定と exact toolchain 選択を使い、互換 flag や別設定 schema は設けません。
 
 Python が書くのは選択した smoke source だけです。同内容は再利用しますが、異なる既存内容や
 symlink は上書きしません。旧版が生成した probe と衝突した場合は、所有者がその probe の差分を
@@ -72,16 +79,19 @@ Lean の通常の検査失敗です。Python は stdout の部分文字列を見
 
 各 command の argv 表示、native stdout/stderr、終了コードを結果へ残し、最初の nonzero で
 後続 command を起動しません。外部 file のパスは1つの argv 要素として渡します。
-`lean_toolchain` は実在するファイルの読取値、`lake_manifest` は実在する native manifest の
-保存先です。実行前に要求した文字列や架空の revision を成功証拠として報告しません。
+`lean_toolchain` は実在する package file の読取値、`lake_version`、`lean_version` は成功した
+native version command の出力です。`lake_manifest` は実在する native manifest の保存先、
+`mathlib_revision` はその manifest にある Mathlib package の解決済み revision です。dry-run では
+選択値は表示commandの argv に残りますが、native readback として扱いません。
 
 `initialized`、`checked`、`failed`、`dry_run` を区別します。smoke 成功は個別定理の証明完了でも、
 LeanSearchClient の外部サービス疎通でもありません。期待反例の成功は反例検出機能の確認です。
 
 ## 検証
 
-既存 `tests/agent_tools/test_lean_proof_env.py` は process fake を用いて、native command、
-既存設定の保全、no-write dry run、初期化/build/Lean失敗時の停止、native終了コードの保持を確認します。
+既存 `tests/agent_tools/test_lean_proof_env.py` は process fake を用いて、exact toolchain 選択、
+toolchain-only bootstrap、native command、manifest/version readback、既存設定の保全、no-write dry run、
+初期化/build/Lean失敗時の停止、native終了コードの保持を確認します。
 これだけで実際の Lean/Mathlib/Plausible の互換性を検証したとは扱いません。
 
 正規 runtime では、同じ package で `all-smoke` と `check-file` を実行します。

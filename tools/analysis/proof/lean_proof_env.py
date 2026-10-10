@@ -45,7 +45,10 @@ class LeanProofEnvResult:
     command_results: tuple[CommandResult, ...]
     lean_file: str | None
     lean_toolchain: str | None
+    lake_version: str | None
+    lean_version: str | None
     lake_manifest: str | None
+    mathlib_revision: str | None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,6 +67,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--env-dir", required=True, help="Selected Lake package directory."
+    )
+    parser.add_argument(
+        "--lean-toolchain",
+        help="Exact Lean toolchain to select when the package has no declaration.",
     )
     parser.add_argument("--package-name", default=DEFAULT_PACKAGE_NAME)
     parser.add_argument("--lean-file", help="File to check for the check-file action.")
@@ -172,15 +179,64 @@ def run_command(parts: Sequence[str], cwd: Path) -> CommandResult:
     )
 
 
+def manifest_mathlib_revision(path: Path) -> str | None:
+    """Read the resolved Mathlib revision from Lake's native manifest."""
+    if not path.is_file():
+        return None
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(manifest, dict):
+        return None
+    packages = manifest.get("packages", [])
+    if not isinstance(packages, list):
+        return None
+    for package in packages:
+        if isinstance(package, dict) and package.get("name") == "mathlib":
+            revision = package.get("rev")
+            return revision if isinstance(revision, str) else None
+    return None
+
+
 def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
     """Initialize with Lake when needed, then run the selected native checks."""
     env_dir = Path(args.env_dir).resolve()
+    if args.action == "check-file" and not args.lean_file:
+        raise ValueError("--lean-file is required for check-file")
+
     configured = any(
         (env_dir / name).is_file() for name in ("lakefile.lean", "lakefile.toml")
     )
-    if not configured and env_dir.exists() and any(env_dir.iterdir()):
+    toolchain_file = env_dir / "lean-toolchain"
+    declared_toolchain = (
+        toolchain_file.read_text(encoding="utf-8").strip() or None
+        if toolchain_file.is_file()
+        else None
+    )
+    requested_toolchain = str(getattr(args, "lean_toolchain", "") or "").strip()
+    requested_toolchain = requested_toolchain or None
+
+    if not configured and env_dir.exists() and any(
+        path.name != "lean-toolchain" for path in env_dir.iterdir()
+    ):
         raise ValueError(
-            f"Choose an empty directory or an existing Lake package: {env_dir}"
+            "Choose an empty directory, a toolchain-only directory, or an existing "
+            f"Lake package: {env_dir}"
+        )
+    if (
+        declared_toolchain
+        and requested_toolchain
+        and declared_toolchain != requested_toolchain
+    ):
+        raise ValueError(
+            f"--lean-toolchain does not match the project declaration in {toolchain_file}"
+        )
+    selected_toolchain = requested_toolchain or declared_toolchain
+    if selected_toolchain is None:
+        raise ValueError(
+            "Select an exact Lean toolchain with --lean-toolchain or a "
+            "project lean-toolchain file."
         )
 
     probes: dict[Path, str] = {}
@@ -194,19 +250,18 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
         )
     lean_files = list(probes)
     if args.action == "check-file":
-        if not args.lean_file:
-            raise ValueError("--lean-file is required for check-file")
         lean_files.append(Path(args.lean_file).resolve())
 
+    lake = ("lake", f"+{selected_toolchain}")
     commands: list[tuple[str, ...]] = []
     if not configured:
-        commands.append(("lake", "init", str(args.package_name), "math"))
-    commands.append(("lake", "--version"))
-    commands.append(("lake", "--keep-toolchain", "env", "lean", "--version"))
+        commands.append((*lake, "init", str(args.package_name), "math"))
+    commands.append((*lake, "--version"))
+    commands.append((*lake, "--keep-toolchain", "env", "lean", "--version"))
     if lean_files:
-        commands.append(("lake", "--keep-toolchain", "build"))
+        commands.append((*lake, "--keep-toolchain", "build"))
         commands.extend(
-            ("lake", "--keep-toolchain", "env", "lean", str(path))
+            (*lake, "--keep-toolchain", "env", "lean", str(path))
             for path in lean_files
         )
 
@@ -229,8 +284,35 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
         else:
             status = "checked" if lean_files else "initialized"
 
-    toolchain = env_dir / "lean-toolchain"
     manifest = env_dir / "lake-manifest.json"
+    try:
+        toolchain_readback = (
+            toolchain_file.read_text(encoding="utf-8").strip()
+            if toolchain_file.is_file()
+            else None
+        )
+    except (OSError, UnicodeError):
+        toolchain_readback = None
+    command_pairs = tuple(zip(commands, results, strict=False))
+    lake_version = next(
+        (
+            result.stdout.strip()
+            for command, result in command_pairs
+            if command[-1:] == ("--version",)
+            and command[-2:-1] == (f"+{selected_toolchain}",)
+            and result.returncode == 0
+        ),
+        None,
+    )
+    lean_version = next(
+        (
+            result.stdout.strip()
+            for command, result in command_pairs
+            if command[-3:] == ("env", "lean", "--version")
+            and result.returncode == 0
+        ),
+        None,
+    )
     return LeanProofEnvResult(
         action=str(args.action),
         status=status,
@@ -240,10 +322,11 @@ def build_result(args: argparse.Namespace) -> LeanProofEnvResult:
         executed=bool(args.execute),
         command_results=tuple(results),
         lean_file=str(lean_files[-1]) if lean_files else None,
-        lean_toolchain=toolchain.read_text(encoding="utf-8").strip()
-        if toolchain.is_file()
-        else None,
+        lean_toolchain=toolchain_readback,
+        lake_version=lake_version,
+        lean_version=lean_version,
         lake_manifest=str(manifest) if manifest.is_file() else None,
+        mathlib_revision=manifest_mathlib_revision(manifest),
     )
 
 
@@ -255,6 +338,15 @@ def render_text(result: LeanProofEnvResult) -> str:
         f"LEAN_PROOF_ENV_DIR={result.env_dir}",
         f"LEAN_PROOF_ENV_EXECUTED={'yes' if result.executed else 'no'}",
     ]
+    for key, value in (
+        ("LEAN_PROOF_ENV_TOOLCHAIN", result.lean_toolchain),
+        ("LEAN_PROOF_ENV_LAKE_VERSION", result.lake_version),
+        ("LEAN_PROOF_ENV_LEAN_VERSION", result.lean_version),
+        ("LEAN_PROOF_ENV_LAKE_MANIFEST", result.lake_manifest),
+        ("LEAN_PROOF_ENV_MATHLIB_REVISION", result.mathlib_revision),
+    ):
+        if value is not None:
+            lines.append(f"{key}={value}")
     lines.extend(f"  {command}" for command in result.commands)
     for command in result.command_results:
         lines.append(
