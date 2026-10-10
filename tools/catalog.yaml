@@ -3,7 +3,6 @@
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
-# upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
 # downstream implementation runtime/manifest/tool_catalog.py validates this catalog
 # downstream implementation validation/semantic/tools/tool_drift.py checks catalog drift contracts
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
@@ -393,28 +392,6 @@ entries:
       - documents/runtime/shared-runtime-surfaces.toml
     tests:
       - tests/agent_tools/test_surface_manifest.py
-
-  - id: visualization-contract
-    public: true
-    summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
-    path: tools/validation/semantic/tools/visualization_contract.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    audience: skill
-    placement: validation_checker
-    command: python3 tools/validation/semantic/tools/visualization_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/tools/visualization_contract.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/visualization_contract.md
-    tests:
-      - tests/agent_tools/test_visualization_contract.py
 
   - id: render-dependency-manifest-graph
     public: true

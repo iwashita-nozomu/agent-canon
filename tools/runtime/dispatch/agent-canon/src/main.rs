@@ -4,7 +4,6 @@
 // contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream implementation ../../../../validation/semantic/tools/visualization_contract.py defines typed visualization coverage consumed by docs gates
 // downstream implementation docs.rs routes unified documentation formatting and checks
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands

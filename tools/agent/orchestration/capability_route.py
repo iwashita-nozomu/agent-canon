@@ -4,7 +4,6 @@
 # responsibility Owns capability raw-argv preflight and immutable route decisions.
 # upstream design ../../../agents/skills/oop-type-design.md approved OOP/type-design owner and module contract
 # upstream implementation ../skills/skill_route_catalog.py immutable catalog/index and decision-support API
-# upstream implementation ../../validation/semantic/tools/visualization_contract.py owns canonical schema-bearing visualization ToolCall construction
 # downstream implementation ./route.py public route composition and rendering
 # downstream implementation ../../../tests/agent_tools/test_route.py capability-owned route tests
 # @dependency-end
@@ -18,21 +17,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tools.agent.skills.skill_route_catalog import (
-    VISUALIZATION_OWNER_SKILL,
     CapabilityId,
     CapabilityIndex,
-    VisualizationOwnerSkill,
-    VisualizationRejection,
-    build_visualization_adapter_tool_call,
-    build_visualization_owner_tool_call,
     capability_id_from_raw,
     freeze_related_skill_mapping,
     ordered_unique,
     related_skill_candidates,
-    visualization_adapter_for_capability,
-    visualization_rejection_from_error,
 )
-from tools.validation.semantic.tools.visualization_contract import ToolCall, serialize_tool_call
 
 __all__ = (
     "FORMAT_VALUES",
@@ -107,10 +98,6 @@ class CapabilityRouteDecision:
     related_skill_candidates: tuple[str, ...]
     related_skills: Mapping[str, tuple[str, ...]]
     reasons: tuple[str, ...]
-    visualization_owner_skill: VisualizationOwnerSkill | None
-    visualization_tool_call: ToolCall | None
-    visualization_adapter_tool_call: ToolCall | None
-    visualization_rejection: VisualizationRejection | None
 
     def __post_init__(self) -> None:
         """Freeze the related-skill mapping after dataclass construction."""
@@ -409,10 +396,6 @@ def capability_failure_decision(
         related_skill_candidates=(),
         related_skills={},
         reasons=(),
-        visualization_owner_skill=None,
-        visualization_tool_call=None,
-        visualization_adapter_tool_call=None,
-        visualization_rejection=None,
     )
 
 
@@ -445,53 +428,12 @@ def decide_capabilities(
         f"capability={match.capability_id};owner={match.owner};phase={match.phase};"
         f"activation={match.activation}"
     )
-    rule = index.rules_by_skill.get(match.skill)
-    visualization_requested = match.skill == VISUALIZATION_OWNER_SKILL or (
-        rule is not None and rule.visualization_owner_skill is not None
-    )
-    visualization_owner_skill: VisualizationOwnerSkill | None = None
-    visualization_tool_call: ToolCall | None = None
-    visualization_adapter_tool_call: ToolCall | None = None
-    visualization_rejection: VisualizationRejection | None = None
-    if visualization_requested:
-        if (
-            rule is None
-            or rule.visualization_owner_skill != VISUALIZATION_OWNER_SKILL
-            or rule.visualization_tool_call is None
-        ):
-            visualization_rejection = "missing_owner"
-        elif (
-            rule.visualization_tool_call["tool_id"]
-            != "agent_canon.visualization.coverage"
-        ):
-            visualization_rejection = "missing_owner"
-        else:
-            visualization_owner_skill = VISUALIZATION_OWNER_SKILL
-            try:
-                serialize_tool_call(rule.visualization_tool_call)
-                visualization_tool_call = build_visualization_owner_tool_call(
-                    f"capability:{match.capability_id}",
-                    f"agents/skills/catalog.yaml#capability:{match.capability_id}",
-                )
-            except ValueError as exc:
-                visualization_rejection = visualization_rejection_from_error(exc)
-                visualization_owner_skill = None
-            adapter_tool_id = visualization_adapter_for_capability(match.capability_id)
-            if visualization_tool_call is not None and adapter_tool_id is not None:
-                visualization_adapter_tool_call = build_visualization_adapter_tool_call(
-                    visualization_tool_call,
-                    adapter_tool_id=adapter_tool_id,
-                )
     return CapabilityRouteDecision(
         schema=CAPABILITY_SCHEMA,
         route="capability-selection",
         mode=mode,
-        status="fail" if visualization_rejection is not None else "pass",
-        error_code=(
-            f"visualization-rejected:{visualization_rejection}"
-            if visualization_rejection is not None
-            else ""
-        ),
+        status="pass",
+        error_code="",
         capability_ids=tuple(capability_ids),
         matches=matches,
         skills=skills,
@@ -500,8 +442,4 @@ def decide_capabilities(
         related_skill_candidates=related_candidates,
         related_skills=related_by_source,
         reasons=(f"{match.skill}:{reason}",),
-        visualization_owner_skill=visualization_owner_skill,
-        visualization_tool_call=visualization_tool_call,
-        visualization_adapter_tool_call=visualization_adapter_tool_call,
-        visualization_rejection=visualization_rejection,
     )

@@ -633,10 +633,6 @@ skill_families:
       name: agent-update-branch
       description: "Use when private knowledge, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow."
   - id: report-writing
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.document_mermaid
-    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Draft reader-facing reports, experiment summaries, decision briefs, and presentation/PPT storyboards from evidence with explicit source packets, visual asset plans, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md
     shim: .codex/personal/skills/report-writing/SKILL.md
@@ -669,10 +665,6 @@ skill_families:
         - ["presentation", "narrative"]
         - ["ppt", "storyboard"]
   - id: prose-reasoning-graph
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.knowledge_graph
-    argument_schema: agent_canon.visualization.arguments.knowledge_graph.v1
     purpose: Convert prose into a SQLite-backed structure graph under an explicit external runtime, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets without source-tree or HOME cache fallback.
     canonical_doc: agents/skills/prose-reasoning-graph.md
     shim: .codex/personal/skills/prose-reasoning-graph/SKILL.md
@@ -693,10 +685,6 @@ skill_families:
         - ["rewrite", "packet"]
         - ["claim", "evidence", "graph"]
   - id: structure-planning
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.document_mermaid
-    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Build structure contracts for reports, experiments, presentations/PPT decks, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
     canonical_doc: agents/skills/structure-planning.md
     shim: .codex/personal/skills/structure-planning/SKILL.md
@@ -713,16 +701,12 @@ skill_families:
         - ["structure", "contract"]
         - ["根本", "設計", "構造"]
   - id: code-visualization
-    visualization_owner: code-visualization
-    visualization_role: owner
-    tool_id: agent_canon.visualization.coverage
-    argument_schema: agent_canon.visualization.arguments.coverage.v1
     purpose: Infer the context question and embedding context, then select the appropriate diagram type, source evidence, owner skill or tool, and renderer for code, repository, or document-embedded visualization.
     canonical_doc: agents/skills/code-visualization.md
     shim: .codex/personal/skills/code-visualization/SKILL.md
     discovery:
       name: code-visualization
-      description: "Sole public visualization owner for code, repository structure, runtime behavior, state, data movement, dependencies, types, proof state, interactive graphs, and document diagrams; builds the complete typed universe and coverage manifest before delegating renderer-only projection."
+      description: "Use when visualizing code, repository structure, runtime behavior, state, data movement, dependencies, types, proof status, or document diagrams; selects the source owner, useful view, and existing renderer."
     routing:
       stage_policy: active
       triggers:
@@ -740,10 +724,6 @@ skill_families:
           activation: explicit_capability
           exclusive: true
   - id: html-output
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.repository_graph
-    argument_schema: agent_canon.visualization.arguments.repository_graph.v1
     purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
     canonical_doc: agents/skills/html-output.md
     shim: .codex/personal/skills/html-output/SKILL.md
@@ -813,10 +793,6 @@ skill_families:
         - ["repair slice"]
         - ["抽象化", "リファクタ"]
   - id: structure-refactor
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.repository_graph
-    argument_schema: agent_canon.visualization.arguments.repository_graph.v1
     purpose: Refactor repository directory structure from recursive directory README responsibilities, dependency manifests, path mappings, and responsibility-scope validation.
     canonical_doc: agents/skills/structure-refactor.md
     shim: .codex/personal/skills/structure-refactor/SKILL.md
@@ -935,10 +911,6 @@ skill_families:
         - ["grill", "idea"]
         - ["グリル", "して"]
   - id: long-form-writing
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.document_mermaid
-    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Write general explanatory repository prose for README, workflow, guide, migration, and specification responsibilities from existing sources, text, and brief structure notes.
     canonical_doc: agents/skills/long-form-writing.md
     shim: .codex/personal/skills/long-form-writing/SKILL.md
@@ -974,10 +946,6 @@ skill_families:
       name: paper-writing
       description: "Use when drafting a submission paper, thesis chapter, or other paper-style manuscript that needs section contracts, citation-evidence review, notation review, and logic-gap review."
   - id: md-style-check
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.document_mermaid
-    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Check Markdown formatting, heading structure, and link hygiene; use the changed document's owner for substantive meaning and invoke structural skills only when their applicability conditions identify a genuine structural decision.
     canonical_doc: agents/skills/md-style-check.md
     shim: .codex/personal/skills/md-style-check/SKILL.md
@@ -1064,10 +1032,6 @@ skill_families:
         activation: explicit_capability
         exclusive: true
   - id: dependency-analysis
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.dependency_manifest
-    argument_schema: agent_canon.visualization.arguments.dependency_manifest.v1
     purpose: Run dependency manifest and code-dependency tools, then package change impact and repair-planning context for editing, review, or subagent handoff.
     canonical_doc: agents/skills/dependency-analysis.md
     shim: .codex/personal/skills/dependency-analysis/SKILL.md
@@ -1239,10 +1203,6 @@ skill_families:
       name: literature-survey
       description: "Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography."
   - id: formal-proof-workflow
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.algorithm_flowchart
-    argument_schema: agent_canon.visualization.arguments.algorithm_flowchart.v1
     purpose: Convert natural-language mathematical claims or JIT-canonical implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
     canonical_doc: agents/skills/formal-proof-workflow.md
     shim: .codex/personal/skills/formal-proof-workflow/SKILL.md
@@ -1274,10 +1234,6 @@ skill_families:
         - ["アルゴリズム", "証明"]
         - ["アルゴリズム", "テストから"]
   - id: algorithm-flowchart
-    visualization_owner: code-visualization
-    visualization_role: adapter
-    tool_id: agent_canon.visualization.adapter.algorithm_flowchart
-    argument_schema: agent_canon.visualization.arguments.algorithm_flowchart.v1
     purpose: Render JIT-canonical IR, generated Lean evidence modules, and theorem graph overlays into Mermaid block charts for algorithm/proof-state review.
     canonical_doc: agents/skills/algorithm-flowchart.md
     shim: .codex/personal/skills/algorithm-flowchart/SKILL.md

@@ -2,9 +2,9 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies the complete typed skill/tool invocation graph and its generated projections.
+# responsibility Verifies skill/dependency graph identities and its generated projections.
 # upstream design ../../documents/design/skill-tool-invocation-graph.md owns graph clauses SG-001..SG-015 and artifact readback
-# upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes identities, capabilities, edges, and Mermaid
+# upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes skill and capability identities, edges, and Mermaid
 # upstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py validates generated JSON/Mermaid equality and stale artifacts
 # downstream implementation ../../documents/runtime/skill-dependency-graph.json is the generated machine-readable graph projection
 # downstream implementation ../../documents/runtime/skill-dependency-graph.md is the generated Mermaid reader projection
@@ -18,6 +18,7 @@ import os
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
@@ -42,6 +43,7 @@ from tools.agent.skills.skill_dependency_map import (  # noqa: E402
     render_graph_mermaid,
     write_artifacts,
 )
+from tools.agent.skills.skill_route_catalog import SkillOrderConstraint
 
 
 class SkillToolInvocationGraphTests(unittest.TestCase):
@@ -183,8 +185,8 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                         source_mutation_capability=capability,
                     )
 
-    def test_complete_v2_universe_without_private_command_projection(self) -> None:
-        """The graph retains skill/capability identity without a command DSL."""
+    def test_graph_keeps_public_capability_and_dependency_identity(self) -> None:
+        """Catalog capabilities remain independent of renderer ToolCall identities."""
         graph = build_graph(PROJECT_ROOT)
         self.assertEqual(graph["schema"], "agent_canon.skill_tool_invocation_graph.v2")
         self.assertEqual(graph["skill_count"], len(graph["skills"]))
@@ -195,7 +197,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertEqual(len(correspondence["clause_ids"]), 15)
         self.assertEqual(len(correspondence["dic_clause_ids"]), 9)
         self.assertEqual(len(correspondence["implementation_target_paths"]), 11)
-        self.assertEqual(len(correspondence["adapter_pairs"]), 5)
+        self.assertNotIn("adapter_pairs", correspondence)
         self.assertEqual(
             set(graph["source_snapshot"]),
             {
@@ -203,15 +205,27 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
                 "dependencies_sha256",
                 "reader_index_sha256",
                 "route_packet_sha256",
-                "toolcall_packet_sha256",
                 "source_locators",
             },
+        )
+        self.assertNotIn("toolcalls", graph)
+        self.assertNotIn("coverage", graph)
+        self.assertNotIn("coverage_digest", graph)
+        self.assertNotIn("toolcall_packet_sha256", graph["source_snapshot"])
+        self.assertIn(
+            "capability:code-visualization:dependency_manifest_graph",
+            {item["ref"]["id"] for item in graph["capabilities"]},
+        )
+        self.assertNotIn(
+            "toolcall", {record["kind"] for record in graph["identity_records"]}
+        )
+        self.assertNotIn(
+            "coverage", {record["kind"] for record in graph["identity_records"]}
         )
         self.assertEqual(
             {edge["display_label"] for edge in graph["edges"]},
             {
                 "prerequisite",
-                "order",
                 "routing",
                 "parallel",
             },
@@ -222,17 +236,58 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertIn(
             "dependency-design", {item["display_label"] for item in graph["skills"]}
         )
-        edge_pairs = {
-            (edge["display_label"], edge["source_ref"]["id"], edge["target_ref"]["id"])
-            for edge in graph["edges"]
-        }
-        self.assertIn(
-            (
-                "order",
-                "toolcall:canonical-owner",
-                "toolcall:dependency-manifest-adapter",
+        self.assertNotIn("coverage_refs", graph["manifest"])
+        self.assertNotIn("coverage_ref", graph["readback"])
+
+    def test_graph_materializes_public_order_constraint(self) -> None:
+        """Explicit dependency-map order constraints produce ordered graph edges."""
+        before = "repo-onboarding"
+        after = "start-repository"
+        constraint = SkillOrderConstraint(
+            before=before,
+            after=after,
+            reason="test explicit order",
+        )
+        dependency_rules = dict(
+            skill_dependency_map.load_skill_dependency_map(PROJECT_ROOT)
+        )
+        dependency_rules[before] = replace(
+            dependency_rules[before], order_constraints=(constraint,)
+        )
+        route_rules = tuple(
+            replace(rule, order_constraints=(constraint,))
+            if rule.skill == before
+            else rule
+            for rule in skill_dependency_map.load_skill_route_rules(PROJECT_ROOT)
+        )
+
+        with (
+            mock.patch.object(
+                skill_dependency_map,
+                "load_skill_dependency_map",
+                return_value=dependency_rules,
             ),
-            edge_pairs,
+            mock.patch.object(
+                skill_dependency_map,
+                "load_skill_route_rules",
+                return_value=route_rules,
+            ),
+        ):
+            graph = build_graph(PROJECT_ROOT)
+
+        order_edges = [
+            (edge["source_ref"]["id"], edge["target_ref"]["id"])
+            for edge in graph["edges"]
+            if edge["display_label"] == "order"
+        ]
+        self.assertEqual(
+            order_edges,
+            [(f"skill:{before}", f"skill:{after}")],
+        )
+        invocation_order = [item["ref"]["id"] for item in graph["invocation_order"]]
+        self.assertLess(
+            invocation_order.index(f"skill:{before}"),
+            invocation_order.index(f"skill:{after}"),
         )
 
     def test_identity_payloads_are_unique_and_all_projections_are_refs(self) -> None:
@@ -260,7 +315,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             "commands",
             "tools",
             "capabilities",
-            "toolcalls",
         ):
             for item in graph[field]:
                 expected_keys = {"ref", "display_label"}
@@ -323,7 +377,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         self.assertNotIn('"source_root"', serialized)
 
     def test_mermaid_is_one_actual_readback_complete_block_without_base64(self) -> None:
-        """The rendered block carries graph/coverage refs and actual readback metadata."""
+        """The rendered block carries graph refs and actual source readback metadata."""
         graph = build_graph(PROJECT_ROOT)
         markdown = render_graph_mermaid(graph)
         self.assertEqual(markdown.count("```mermaid"), 1)
@@ -337,14 +391,8 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             markdown,
         )
         self.assertNotIn("base64", markdown.lower())
-        self.assertNotIn("coverage_marker", markdown)
+        self.assertNotIn("coverage_digest", markdown)
         self.assertEqual(readback_mermaid(graph, markdown)["status"], "pass")
-        self.assertEqual(
-            graph["coverage"]["source_counts"], graph["coverage"]["rendered_counts"]
-        )
-        self.assertEqual(
-            graph["coverage"]["source_counts"], graph["coverage"]["readback_counts"]
-        )
 
     def test_mermaid_syntax_removal_fails_even_when_comments_remain(self) -> None:
         """Actual node and edge statements, not comments, are the readback authority."""
