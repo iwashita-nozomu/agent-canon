@@ -19,7 +19,6 @@ import sys
 import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Literal
@@ -31,7 +30,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib
 
-from cases import CaseResult, CaseSpec, execute_case, registry_failure
+from cases import CaseResult, CaseSpec, execute_case, registry_failure, utc_now
 from visualization import (
     execute_visualization,
     write_visualization_not_requested_status,
@@ -890,19 +889,6 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
         provenance_path="provenance.toml",
         missing_fields=tuple(dict.fromkeys(missing)),
     )
-
-
-def utc_now() -> str:
-    """
-    Artifact provenance 用の RFC3339 UTC timestamp を返します.
-
-    Returns:
-        末尾に `Z` を持つ timezone-aware timestamp string。
-
-    Side effects:
-        system clock だけを読みます。
-    """
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def atomic_write_text(path: Path, content: str) -> None:
