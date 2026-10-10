@@ -49,10 +49,18 @@ def native_results(monkeypatch: pytest.MonkeyPatch, *, fail_at: int = -1):
                 + MATHLIB_REVISION
                 + '"}]}'
             )
-        if command[-1:] == ("--version",) and command[-2:-1]:
-            stdout = f"Lake {command[-2][1:]}\n"
-        elif command[-3:] == ("env", "lean", "--version"):
+        if (
+            command[0] == "lake"
+            and command[-3:] == ("env", "lean", "--version")
+        ):
             stdout = f"Lean {command[1][1:]}\n"
+        elif (
+            command[0] == "lake"
+            and command[-1:] == ("--version",)
+            and command[-2:-1]
+            and command[-2].startswith("+")
+        ):
+            stdout = f"Lake {command[-2][1:]}\n"
         else:
             stdout = "Found a counter-example!\n"
         return subprocess.CompletedProcess(
