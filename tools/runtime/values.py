@@ -10,6 +10,8 @@
 # downstream implementation ../agent/orchestration/review_dispatch.py narrows ledger and manifest values
 # downstream implementation ./manifest/manifest_rendering.py narrows rendering values
 # downstream implementation ./archive/work_log.py narrows ledger event values
+# downstream implementation ./artifacts/artifact_identity.py narrows canonical JSON maps
+# downstream implementation ./artifacts/external_artifact_binding.py narrows provider readback values
 # downstream implementation ../agent/skills/skill_shim_materializer.py narrows YAML frontmatter values
 # downstream implementation ./lifecycle/bootstrap_agent_run.py narrows command payload values
 # downstream implementation ./lifecycle/task_close.py narrows lifecycle artifact values
@@ -22,7 +24,8 @@ from collections.abc import Mapping
 from typing import TypeGuard
 
 
-def _is_object_mapping(value: object) -> TypeGuard[Mapping[object, object]]:
+def is_object_mapping(value: object) -> TypeGuard[Mapping[object, object]]:
+    """Return whether a decoded value is a mapping, preserving dynamic key types."""
     return isinstance(value, Mapping)
 
 
@@ -32,7 +35,7 @@ def _is_object_dict(value: object) -> TypeGuard[dict[object, object]]:
 
 def is_string_object_mapping(value: object) -> TypeGuard[Mapping[str, object]]:
     """Return whether a mapping has string keys and object values."""
-    return _is_object_mapping(value) and all(isinstance(key, str) for key in value)
+    return is_object_mapping(value) and all(isinstance(key, str) for key in value)
 
 
 def is_string_object_dict(value: object) -> TypeGuard[dict[str, object]]:

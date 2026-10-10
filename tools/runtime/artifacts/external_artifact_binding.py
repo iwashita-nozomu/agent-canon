@@ -4,6 +4,7 @@
 # responsibility Materializes typed external projection acknowledgements for canonical local review events.
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns external projection acknowledgement schemas.
 # upstream implementation ./artifact_identity.py provides canonical JSON and body hashing.
+# upstream implementation ../values.py refines decoded provider mappings and lists.
 # downstream implementation ../../agent/orchestration/review_dispatch.py binds Codex reviewer dispatch projections.
 # downstream implementation ../../repository/github/github_publish.py binds GitHub PR-head and review-state projections.
 # downstream implementation ../../repository/github/publication_integrator.py verifies current external projections before CAS.
@@ -17,6 +18,7 @@ import hashlib
 from collections.abc import Mapping
 
 from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes
+from tools.runtime.values import is_object_list, is_object_mapping
 
 ACK_SCHEMA = "agent-canon.external-projection-acknowledgement.v1"
 LOCAL_EVENT_SCHEMA = "agent-canon.terminal-resume-event.v3"
@@ -56,14 +58,14 @@ class ExternalProjectionError(ValueError):
 
 def _contains_forbidden_field(value: object) -> str | None:
     """Return the first forbidden receipt-byte field found recursively."""
-    if isinstance(value, Mapping):
+    if is_object_mapping(value):
         for key, item in value.items():
             if key in FORBIDDEN_RECEIPT_FIELDS:
                 return str(key)
             nested = _contains_forbidden_field(item)
             if nested is not None:
                 return nested
-    elif isinstance(value, list):
+    elif is_object_list(value):
         for item in value:
             nested = _contains_forbidden_field(item)
             if nested is not None:
