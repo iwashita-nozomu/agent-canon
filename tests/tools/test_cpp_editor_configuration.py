@@ -14,7 +14,6 @@ import json
 import unittest
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -44,9 +43,7 @@ class CppEditorConfigurationTest(unittest.TestCase):
         self.assertEqual(settings["C_Cpp.errorSquiggles"], "disabled")
 
         c_cpp = json.loads(
-            (PROJECT_ROOT / ".vscode/c_cpp_properties.json").read_text(
-                encoding="utf-8"
-            )
+            (PROJECT_ROOT / ".vscode/c_cpp_properties.json").read_text(encoding="utf-8")
         )
         self.assertEqual(c_cpp["configurations"], [])
         self.assertNotIn("includePath", json.dumps(c_cpp))
