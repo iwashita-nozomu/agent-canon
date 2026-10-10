@@ -409,20 +409,9 @@ def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
 
 def _json_capacity_record(
     record: capacity_handshake.DescendantLifecycleRecord,
-) -> dict[str, object]:
-    return {
-        "work_id": record.work_id,
-        "parent_work_id": record.parent_work_id,
-        "profile_id": record.profile_id,
-        "status": record.status.value,
-        "durable_result_evidence_ref": record.durable_result_evidence_ref,
-        "durable_handback": record.durable_handback,
-        "descendants_closed": record.descendants_closed,
-        "close_readback": record.close_readback,
-        "reserved_slots": record.reserved_slots,
-        "reserved_write_slots": record.reserved_write_slots,
-        "transition_generation": record.transition_generation,
-    }
+) -> capacity_handshake.DescendantLifecycleRecordProjection:
+    """Delegate the serialized record shape to its capacity owner."""
+    return capacity_handshake.descendant_record_projection(record)
 
 
 def _capacity_projection(

@@ -4,6 +4,7 @@
 # responsibility Owns the typed declarative dependency plan, merge, and image receipt installer.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap manifest and image lifecycle
 # upstream design ../../../CONTAINER_OPERATIONS.md shared tool-runtime and project execution boundary
+# upstream implementation ../values.py refines decoded dependency and receipt containers
 # upstream design ../../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
 # downstream environment ../../../bootstrap/container/image/dependencies.toml AgentCanon shared tool records
 # downstream implementation ../../../bootstrap/container/image/Dockerfile image installation and receipt verification
@@ -76,6 +77,10 @@ except ImportError:  # direct script execution
         RuntimeArtifactError,
     )
 
+from tools.runtime.values import (
+    is_object_list,
+    is_string_object_dict,
+)
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
@@ -931,7 +936,7 @@ def parse_python_extras(raw: str | Sequence[str]) -> tuple[str, ...]:
     extras: list[str] = []
     seen: set[str] = set()
     for value in values:
-        if not isinstance(value, str) or not value or value != value.strip():
+        if not value or value != value.strip():
             raise DependencyError(
                 "Python extras must be non-empty names without surrounding whitespace"
             )
@@ -953,23 +958,23 @@ def validate_project_extras(workspace: Path, extras: Sequence[str]) -> tuple[str
         raise DependencyError(f"project packaging manifest is missing: {pyproject}")
     try:
         with pyproject.open("rb") as stream:
-            document: dict[str, object] = tomllib.load(stream)
+            document: object = tomllib.load(stream)
     except (OSError, tomllib.TOMLDecodeError) as exc:
         raise DependencyError(
             f"cannot parse project packaging manifest: {pyproject}"
         ) from exc
+    if not is_string_object_dict(document):
+        raise DependencyError(f"project.optional-dependencies is missing: {pyproject}")
     project = document.get("project")
-    if not isinstance(project, dict):
+    if not is_string_object_dict(project):
         raise DependencyError(f"project.optional-dependencies is missing: {pyproject}")
-    project_mapping: dict[str, object] = project
-    optional = project_mapping.get("optional-dependencies")
-    if not isinstance(optional, dict):
+    optional = project.get("optional-dependencies")
+    if not is_string_object_dict(optional):
         raise DependencyError(f"project.optional-dependencies is missing: {pyproject}")
-    optional_dependencies: dict[str, object] = optional
     available = {
         canonicalize_name(name)
-        for name in optional_dependencies
-        if isinstance(name, str) and PYTHON_EXTRA_RE.fullmatch(name)
+        for name in optional
+        if PYTHON_EXTRA_RE.fullmatch(name)
     }
     missing = [
         extra for extra in validated if canonicalize_name(extra) not in available
@@ -1195,9 +1200,45 @@ class DependencyRecord:
 
     def payload(self) -> dict[str, object]:
         """Return a canonical JSON-compatible representation."""
-        return dataclasses.asdict(self) | {
+        return {
+            "id": self.id,
+            "package": self.package,
             "method": self.method.value,
+            "version": self.version,
+            "source": self.source,
             "verification": self.verification.payload(),
+            "deps": self.deps,
+            "provides": self.provides,
+            "failure_policy": self.failure_policy,
+            "platform": self.platform,
+            "platforms": self.platforms,
+            "key_fingerprint": self.key_fingerprint,
+            "key_url": self.key_url,
+            "repository_suite": self.repository_suite,
+            "repository_components": self.repository_components,
+            "repository_packages_sha256": self.repository_packages_sha256,
+            "repository_package_url": self.repository_package_url,
+            "repository_package_sha256": self.repository_package_sha256,
+            "repository_packages_sha256s": self.repository_packages_sha256s,
+            "repository_package_urls": self.repository_package_urls,
+            "repository_package_sha256s": self.repository_package_sha256s,
+            "checksum": self.checksum,
+            "checksums": self.checksums,
+            "asset": self.asset,
+            "assets": self.assets,
+            "archive_format": self.archive_format,
+            "extract": self.extract,
+            "destination": self.destination,
+            "executable_owner_packages": self.executable_owner_packages,
+            "repo": self.repo,
+            "commit": self.commit,
+            "source_identity": self.source_identity,
+            "source_tree_sha256": self.source_tree_sha256,
+            "cargo_lock_sha256": self.cargo_lock_sha256,
+            "locked": self.locked,
+            "browser": self.browser,
+            "browser_cache_path": self.browser_cache_path,
+            "components": self.components,
         }
 
     def fingerprint(self) -> str:
@@ -1347,11 +1388,10 @@ def _optional_string(value: object, field: str) -> str | None:
 def _string_list(
     value: object, field: str, *, allow_empty: bool = True
 ) -> tuple[str, ...]:
-    if not isinstance(value, list):
+    if not is_object_list(value):
         raise DependencyError(f"{field} must be an array of strings")
-    items: list[object] = value
     strings: list[str] = []
-    for item in items:
+    for item in value:
         if not isinstance(item, str):
             raise DependencyError(f"{field} must be an array of strings")
         strings.append(item)
@@ -1373,11 +1413,10 @@ def _bool(value: object, field: str) -> bool:
 
 def _argv_args(value: object, field: str) -> tuple[str, ...]:
     """Validate non-empty argv arguments without allowing control data."""
-    if not isinstance(value, list) or not value:
+    if not is_object_list(value) or not value:
         raise DependencyError(f"{field} must be a non-empty argv array")
-    items: list[object] = value
     result: list[str] = []
-    for item in items:
+    for item in value:
         if (
             not isinstance(item, str)
             or not item
@@ -1411,11 +1450,10 @@ def _checksums(value: object) -> tuple[tuple[str, str], ...]:
         if SHA256_RE.fullmatch(value) is None:
             raise DependencyError("checksum must be a 64-character SHA256")
         return (("default", value.lower()),)
-    if not isinstance(value, dict) or not value:
+    if not is_string_object_dict(value) or not value:
         raise DependencyError("checksum must be a SHA256 string or architecture map")
-    checksum_map: dict[str, object] = value
     result: list[tuple[str, str]] = []
-    for arch, checksum in checksum_map.items():
+    for arch, checksum in value.items():
         arch_name = _string(arch, "checksum architecture")
         checksum_value = _string(checksum, f"checksum[{arch_name}]")
         if SHA256_RE.fullmatch(checksum_value) is None:
@@ -1427,11 +1465,10 @@ def _checksums(value: object) -> tuple[tuple[str, str], ...]:
 
 
 def _string_map(value: object, field: str) -> tuple[tuple[str, str], ...]:
-    if not isinstance(value, dict) or not value:
+    if not is_string_object_dict(value) or not value:
         raise DependencyError(f"{field} must be a non-empty string map")
-    string_map: dict[str, object] = value
     result: list[tuple[str, str]] = []
-    for key, item in string_map.items():
+    for key, item in value.items():
         key_value = _string(key, f"{field} key")
         item_value = _string(item, f"{field}[{key_value}]")
         result.append((key_value, item_value))
@@ -1508,9 +1545,8 @@ VERIFICATION_KIND_BY_METHOD = {
 def _parse_verification(
     value: object, *, record_id: str, method: Method
 ) -> VerificationSpec:
-    if not isinstance(value, dict) or not value:
+    if not is_string_object_dict(value) or not value:
         raise DependencyError(f"{record_id}.verification must be a non-empty table")
-    verification: dict[str, object] = value
     allowed_by_kind: dict[VerificationKind, set[str]] = {
         VerificationKind.APT_PACKAGE: {
             "executable",
@@ -1546,9 +1582,9 @@ def _parse_verification(
             "executable_globs",
         },
     }
-    if "kind" not in verification:
+    if "kind" not in value:
         raise DependencyError(f"{record_id}.verification missing fields: kind")
-    kind_value = _string(verification["kind"], f"{record_id}.verification.kind")
+    kind_value = _string(value["kind"], f"{record_id}.verification.kind")
     try:
         kind = VerificationKind(kind_value)
     except ValueError as exc:
@@ -1561,38 +1597,36 @@ def _parse_verification(
             f"{record_id}.verification.kind {kind.value} is incompatible with "
             f"method {method.value}; expected {expected.value}"
         )
-    unsupported = sorted(set(verification) - {"kind"} - allowed_by_kind[kind])
+    unsupported = sorted(set(value) - {"kind"} - allowed_by_kind[kind])
     if unsupported:
         raise DependencyError(
             f"{record_id}.verification: unsupported fields: {', '.join(unsupported)}"
         )
     executable = _optional_string(
-        verification.get("executable"), f"{record_id}.verification.executable"
+        value.get("executable"), f"{record_id}.verification.executable"
     )
-    path = _optional_string(
-        verification.get("path"), f"{record_id}.verification.path"
-    )
+    path = _optional_string(value.get("path"), f"{record_id}.verification.path")
     output_contains = _optional_string(
-        verification.get("output_contains"),
+        value.get("output_contains"),
         f"{record_id}.verification.output_contains",
     )
     args = (
-        _argv_args(verification["args"], f"{record_id}.verification.args")
-        if "args" in verification
+        _argv_args(value["args"], f"{record_id}.verification.args")
+        if "args" in value
         else ()
     )
     executable_globs = (
         _string_list(
-            verification["executable_globs"],
+            value["executable_globs"],
             f"{record_id}.verification.executable_globs",
             allow_empty=False,
         )
-        if "executable_globs" in verification
+        if "executable_globs" in value
         else ()
     )
     if kind in {VerificationKind.APT_PACKAGE, VerificationKind.APT_REPOSITORY}:
         record_owned_fields = {"executable", "args", "output_contains"}
-        provided_record_owned_fields = record_owned_fields & verification.keys()
+        provided_record_owned_fields = record_owned_fields & value.keys()
         if provided_record_owned_fields not in (set(), record_owned_fields):
             raise DependencyError(
                 f"{record_id}.verification requires executable, args, and output_contains"
@@ -1623,7 +1657,7 @@ def _parse_verification(
             )
     elif kind is VerificationKind.RUST_TOOLCHAIN:
         record_owned_fields = {"executable", "args", "output_contains"}
-        provided_record_owned_fields = record_owned_fields & verification.keys()
+        provided_record_owned_fields = record_owned_fields & value.keys()
         if provided_record_owned_fields not in (set(), record_owned_fields):
             raise DependencyError(
                 f"{record_id}.verification requires executable, args, and output_contains"
@@ -2027,9 +2061,9 @@ def _validate_method_values(record: DependencyRecord) -> None:
 
 def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
     """Parse and validate one TOML record into the closed typed model."""
-    if not isinstance(raw, dict):
+    if not is_string_object_dict(raw):
         raise DependencyError(f"{path}: records[{index}] must be a table")
-    record_data: dict[str, object] = raw
+    record_data = raw
     allowed = {
         "id",
         "package",
@@ -2120,9 +2154,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         method=Method(method_value),
         version=_string(record_data["version"], f"{record_id}.version"),
         source=_string(record_data["source"], f"{record_id}.source"),
-        platform=_optional_string(
-            record_data.get("platform"), f"{record_id}.platform"
-        ),
+        platform=_optional_string(record_data.get("platform"), f"{record_id}.platform"),
         platforms=tuple(
             _string_list(record_data.get("platforms", []), f"{record_id}.platforms")
         ),
@@ -2139,9 +2171,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         key_fingerprint=_optional_string(
             record_data.get("key_fingerprint"), f"{record_id}.key_fingerprint"
         ),
-        key_url=_optional_string(
-            record_data.get("key_url"), f"{record_id}.key_url"
-        ),
+        key_url=_optional_string(record_data.get("key_url"), f"{record_id}.key_url"),
         repository_suite=(
             _optional_string(
                 record_data.get("repository_suite"),
@@ -2180,14 +2210,10 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         )
         if "repository_package_urls" in record_data
         else (),
-        repository_package_sha256s=_checksums(
-            record_data["repository_package_sha256s"]
-        )
+        repository_package_sha256s=_checksums(record_data["repository_package_sha256s"])
         if "repository_package_sha256s" in record_data
         else (),
-        checksum=_optional_string(
-            record_data.get("checksum"), f"{record_id}.checksum"
-        ),
+        checksum=_optional_string(record_data.get("checksum"), f"{record_id}.checksum"),
         checksums=(
             _checksums(record_data["checksums"]) if "checksums" in record_data else ()
         ),
@@ -2198,9 +2224,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         archive_format=_optional_string(
             record_data.get("archive_format"), f"{record_id}.archive_format"
         ),
-        extract=_optional_string(
-            record_data.get("extract"), f"{record_id}.extract"
-        ),
+        extract=_optional_string(record_data.get("extract"), f"{record_id}.extract"),
         destination=_optional_string(
             record_data.get("destination"), f"{record_id}.destination"
         ),
@@ -2225,9 +2249,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
             record_data.get("cargo_lock_sha256"), f"{record_id}.cargo_lock_sha256"
         ),
         locked=locked,
-        browser=_optional_string(
-            record_data.get("browser"), f"{record_id}.browser"
-        ),
+        browser=_optional_string(record_data.get("browser"), f"{record_id}.browser"),
         browser_cache_path=_optional_string(
             record_data.get("browser_cache_path"), f"{record_id}.browser_cache_path"
         ),
@@ -2309,11 +2331,13 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
     path = source.path
     try:
         with path.open("rb") as stream:
-            raw: dict[str, object] = tomllib.load(stream)
+            raw: object = tomllib.load(stream)
     except FileNotFoundError as exc:
         raise DependencyError(f"manifest not found: {path}") from exc
     except (tomllib.TOMLDecodeError, OSError) as exc:
         raise DependencyError(f"cannot parse manifest {path}: {exc}") from exc
+    if not is_string_object_dict(raw):
+        raise DependencyError(f"{path}: manifest must be a table")
     allowed_top_level = {
         "schema",
         "schema_version",
@@ -2329,11 +2353,11 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
         )
     container = raw.get("container")
     if container is not None:
-        if not isinstance(container, dict):
+        if not is_string_object_dict(container):
             raise DependencyError(
                 f"{path}: container must contain only platform, uid, and gid"
             )
-        container_data: dict[str, object] = container
+        container_data = container
         if set(container_data) - {"platform", "uid", "gid"}:
             raise DependencyError(
                 f"{path}: container must contain only platform, uid, and gid"
@@ -2347,14 +2371,13 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
                     f"{path}: container.{field} must be a positive integer"
                 )
     records = raw.get("records")
-    if not isinstance(records, list):
+    if not is_object_list(records):
         raise DependencyError(f"{path}: records must be an array of tables")
     if not records and source.role is not ManifestRole.PARENT_OVERLAY:
         raise DependencyError(f"{path}: records must be a non-empty array of tables")
-    record_items: list[object] = records
     parsed = tuple(
         parse_record(item, path=path, index=index)
-        for index, item in enumerate(record_items)
+        for index, item in enumerate(records)
     )
     ids = [record.id for record in parsed]
     if len(set(ids)) != len(ids):
@@ -2633,7 +2656,7 @@ def load_plan(
 
 
 def select_record_ids(
-    plan: DependencyPlan, requested: Sequence[str] | str | None = None
+    plan: DependencyPlan, requested: Sequence[object] | str | None = None
 ) -> tuple[str, ...]:
     """Return a deterministic record selection closed over its providers."""
     if requested is None:
@@ -2643,8 +2666,6 @@ def select_record_ids(
         raise DependencyError("--records must select at least one record")
     requested_ids: list[str] = []
     for raw_value in raw_values:
-        if not isinstance(raw_value, str):
-            raise DependencyError("--records values must be strings")
         for value in raw_value.split(","):
             record_id = value.strip()
             if not record_id:
@@ -3034,14 +3055,24 @@ def image_verify_plan(
         raise DependencyError(
             f"image-verify rebuild-required: unreadable plan: {exc}"
         ) from exc
-    if not isinstance(parsed, dict) or plan_path.is_symlink() or not plan_path.is_file():
+    if (
+        not is_string_object_dict(parsed)
+        or plan_path.is_symlink()
+        or not plan_path.is_file()
+    ):
         raise DependencyError("image-verify rebuild-required: image plan is malformed")
-    payload: dict[str, object] = parsed
-    requested = payload.get("order") if records is None else records
-    if requested is None or not isinstance(requested, (str, Sequence)):
-        raise DependencyError(
-            "image-verify rebuild-required: image selection is malformed"
-        )
+    payload = parsed
+    requested: Sequence[object] | str | None = records
+    if records is None:
+        stored_order = payload.get("order")
+        if isinstance(stored_order, str):
+            requested = stored_order
+        elif is_object_list(stored_order):
+            requested = stored_order
+        else:
+            raise DependencyError(
+                "image-verify rebuild-required: image selection is malformed"
+            )
     try:
         selected_ids = select_record_ids(plan, requested)
     except DependencyError as exc:
@@ -3072,11 +3103,11 @@ def image_verify_plan(
             raise DependencyError(
                 f"image-verify rebuild-required: unreadable receipt: {record_id}"
             ) from exc
-        if not isinstance(raw_receipt, dict):
+        if not is_string_object_dict(raw_receipt):
             raise DependencyError(
                 f"image-verify rebuild-required: receipt is malformed: {record_id}"
             )
-        receipt_payload: dict[str, object] = raw_receipt
+        receipt_payload = raw_receipt
         if receipt_payload.get("status") != "installed":
             raise DependencyError(
                 f"image-verify rebuild-required: receipt is not image-installed: {record_id}"
@@ -3516,10 +3547,6 @@ class Installer:
                 raise DependencyError(
                     f"{record.id}: dpkg ownership query failed for {owner_package}"
                 )
-            if not isinstance(result.stdout, str):
-                raise DependencyError(
-                    f"{record.id}: dpkg ownership query returned malformed output"
-                )
             owned.update(_parse_dpkg_owned_paths(result.stdout, record.id))
         if not owned:
             raise DependencyError(
@@ -3903,13 +3930,13 @@ class Installer:
             parsed: object = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError):
             return False
-        if not isinstance(parsed, dict):
+        if not is_string_object_dict(parsed):
             return False
-        payload: dict[str, object] = parsed
+        payload = parsed
         raw_bindings = payload.get("executable_bindings")
-        if not isinstance(raw_bindings, dict):
+        if not is_string_object_dict(raw_bindings):
             return False
-        bindings: dict[str, object] = raw_bindings
+        bindings = raw_bindings
         expected_bindings = set(
             _executable_binding_names(
                 record, image_owned=payload.get("status") == "installed"
@@ -3918,9 +3945,9 @@ class Installer:
         if set(bindings) != expected_bindings:
             return False
         for name, raw_binding in bindings.items():
-            if not isinstance(raw_binding, dict):
+            if not is_string_object_dict(raw_binding):
                 return False
-            binding: dict[str, object] = raw_binding
+            binding = raw_binding
             lexical_path = binding.get("lexical_path")
             absolute_path = binding.get("absolute_path")
             output = binding.get("verification_output")
@@ -4026,27 +4053,26 @@ class Installer:
         spec = record.verification
         bindings = payload.get("executable_bindings")
         expected_names = _executable_binding_names(record, image_owned=True)
-        if not isinstance(bindings, dict):
+        if not is_string_object_dict(bindings):
             raise DependencyError(
                 f"{record.id}: installed executable bindings are stale"
             )
-        binding_values: dict[str, object] = bindings
+        binding_values = bindings
         if set(binding_values) != set(expected_names):
             raise DependencyError(
                 f"{record.id}: installed executable bindings are stale"
             )
         for name in expected_names:
             raw_binding = binding_values[name]
-            if not isinstance(raw_binding, dict):
+            if not is_string_object_dict(raw_binding):
                 raise DependencyError(
                     f"{record.id}: installed executable binding is stale: {name}"
                 )
-            binding: dict[str, object] = raw_binding
             expected_path = _configured_executable_path(record, name, image_owned=True)
             if (
-                binding.get("provided") != name
-                or binding.get("lexical_path") != str(expected_path)
-                or binding.get("absolute_path") != str(expected_path)
+                raw_binding.get("provided") != name
+                or raw_binding.get("lexical_path") != str(expected_path)
+                or raw_binding.get("absolute_path") != str(expected_path)
             ):
                 raise DependencyError(
                     f"{record.id}: installed executable binding is stale: {name}"
@@ -4059,12 +4085,11 @@ class Installer:
             absolute = payload.get("binary_path")
         elif spec.executable is not None:
             raw_binding = binding_values.get(spec.executable)
-            if not isinstance(raw_binding, dict):
+            if not is_string_object_dict(raw_binding):
                 raise DependencyError(
                     f"{record.id}: installed executable binding is missing"
                 )
-            selected_binding: dict[str, object] = raw_binding
-            absolute = selected_binding.get("absolute_path")
+            absolute = raw_binding.get("absolute_path")
         else:
             return None
         if not isinstance(absolute, str) or not Path(absolute).is_absolute():
@@ -4093,14 +4118,13 @@ class Installer:
             parsed: object = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise DependencyError("executable receipt is unreadable") from exc
-        if not isinstance(parsed, dict):
+        if not is_string_object_dict(parsed):
             raise DependencyError("executable receipt bindings are malformed")
-        payload: dict[str, object] = parsed
+        payload = parsed
         raw_bindings = payload.get("executable_bindings")
-        if not isinstance(raw_bindings, dict):
+        if not is_string_object_dict(raw_bindings):
             raise DependencyError("executable receipt bindings are malformed")
-        bindings: dict[str, object] = raw_bindings
-        return bindings
+        return raw_bindings
 
     @staticmethod
     def _verification_output(
@@ -4121,10 +4145,9 @@ class Installer:
             parsed: object = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError):
             return None
-        if not isinstance(parsed, dict):
+        if not is_string_object_dict(parsed):
             return None
-        payload: dict[str, object] = parsed
-        value = payload.get("source_identity")
+        value = parsed.get("source_identity")
         return value if isinstance(value, str) else None
 
     def _write_receipt(
@@ -4143,7 +4166,7 @@ class Installer:
             and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY
         ):
             source_identity = record.source_identity
-        payload = {
+        payload: dict[str, object] = {
             "schema": "agent-canon.tool-dependency-receipt",
             "status": "installed" if self._image_owned else "pass",
             "owner": "image-installer",
@@ -4611,25 +4634,32 @@ class Installer:
                     f"{record.id}: binary source identity mismatch "
                     f"{source_identity}!={expected_source_identity}"
                 )
+        def verify_apt_package(
+            item: DependencyRecord, *, workspace: Path
+        ) -> None:
+            self._verify_apt_package(
+                item, workspace=workspace, strict_executable=strict_executables
+            )
+
+        def verify_apt_repository(
+            item: DependencyRecord, *, workspace: Path
+        ) -> None:
+            self._verify_apt_repository(
+                item,
+                workspace=workspace,
+                strict_executable=strict_executables,
+                allow_network=allow_network,
+            )
+
+        def verify_npm_package(item: DependencyRecord, *, workspace: Path) -> None:
+            self._verify_npm_package(
+                item, workspace=workspace, strict_executable=strict_executables
+            )
+
         verifiers: dict[VerificationKind, DependencyVerifier] = {
-            VerificationKind.APT_PACKAGE: lambda item, *, workspace: (
-                self._verify_apt_package(
-                    item, workspace=workspace, strict_executable=strict_executables
-                )
-            ),
-            VerificationKind.APT_REPOSITORY: lambda item, *, workspace: (
-                self._verify_apt_repository(
-                    item,
-                    workspace=workspace,
-                    strict_executable=strict_executables,
-                    allow_network=allow_network,
-                )
-            ),
-            VerificationKind.NPM_PACKAGE: lambda item, *, workspace: (
-                self._verify_npm_package(
-                    item, workspace=workspace, strict_executable=strict_executables
-                )
-            ),
+            VerificationKind.APT_PACKAGE: verify_apt_package,
+            VerificationKind.APT_REPOSITORY: verify_apt_repository,
+            VerificationKind.NPM_PACKAGE: verify_npm_package,
             VerificationKind.PIPX_PACKAGE: self._verify_pipx_package,
             VerificationKind.ABSOLUTE_EXECUTABLE: self._verify_absolute_executable,
             VerificationKind.RUST_TOOLCHAIN: self._verify_rust_toolchain,
@@ -4879,18 +4909,16 @@ class Installer:
         )
         try:
             parsed: object = json.loads(result.stdout)
-            if not isinstance(parsed, dict):
+            if not is_string_object_dict(parsed):
                 raise TypeError("npm output must be a mapping")
-            payload: dict[str, object] = parsed
+            payload = parsed
             raw_dependencies = payload["dependencies"]
-            if not isinstance(raw_dependencies, dict):
+            if not is_string_object_dict(raw_dependencies):
                 raise TypeError("npm dependencies must be a mapping")
-            dependencies: dict[str, object] = raw_dependencies
-            raw_package = dependencies[record.package]
-            if not isinstance(raw_package, dict):
+            raw_package = raw_dependencies[record.package]
+            if not is_string_object_dict(raw_package):
                 raise TypeError("npm package entry must be a mapping")
-            package: dict[str, object] = raw_package
-            observed = package["version"]
+            observed = raw_package["version"]
         except (KeyError, TypeError, json.JSONDecodeError) as exc:
             raise DependencyError(
                 f"{record.id}: npm global JSON is missing package"
@@ -5529,9 +5557,9 @@ def resolve_verified_executable(
         parsed: object = json.loads(receipt.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
         raise DependencyError(f"{record_id}: executable receipt is unreadable") from exc
-    if not isinstance(parsed, dict):
+    if not is_string_object_dict(parsed):
         raise DependencyError(f"{record_id}: executable receipt binding is stale")
-    payload: dict[str, object] = parsed
+    payload = parsed
     image_owned_receipt = payload.get("status") == "installed"
     if executable not in _executable_binding_names(
         record, image_owned=image_owned_receipt
@@ -5543,20 +5571,19 @@ def resolve_verified_executable(
     expected_bindings = set(
         _executable_binding_names(record, image_owned=image_owned_receipt)
     )
-    if not isinstance(raw_bindings, dict):
+    if not is_string_object_dict(raw_bindings):
         raise DependencyError(f"{record_id}: executable receipt binding is stale")
-    bindings: dict[str, object] = raw_bindings
+    bindings = raw_bindings
     if set(bindings) != expected_bindings:
         raise DependencyError(f"{record_id}: executable receipt binding is stale")
     validated_bindings: dict[str, dict[str, str]] = {}
     for name, raw_binding in bindings.items():
-        if not isinstance(raw_binding, dict):
+        if not is_string_object_dict(raw_binding):
             raise DependencyError(f"{record_id}: executable receipt binding is stale")
-        binding_data: dict[str, object] = raw_binding
-        provided = binding_data.get("provided")
-        lexical_path = binding_data.get("lexical_path")
-        absolute_path = binding_data.get("absolute_path")
-        verification_output = binding_data.get("verification_output")
+        provided = raw_binding.get("provided")
+        lexical_path = raw_binding.get("lexical_path")
+        absolute_path = raw_binding.get("absolute_path")
+        verification_output = raw_binding.get("verification_output")
         if (
             provided != name
             or not isinstance(lexical_path, str)
@@ -5700,6 +5727,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     exit_status = 0
     payload: dict[str, object]
+    boundary_findings: tuple[BoundaryFinding, ...] = ()
     try:
         if args.command not in {"image-install", "image-verify"} and args.records:
             raise DependencyError(
@@ -5713,11 +5741,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "boundary":
             workspace = Path(args.workspace).resolve()
             report = EnvironmentBoundaryModel(workspace, workspace).validate()
+            boundary_findings = report.findings
             payload = {
                 "status": report.status,
                 "checked": list(report.checked),
                 "findings": [
-                    dataclasses.asdict(finding) for finding in report.findings
+                    {
+                        "category": finding.category,
+                        "path": finding.path,
+                        "detail": finding.detail,
+                    }
+                    for finding in report.findings
                 ],
             }
             exit_status = 0 if not report.findings else 1
@@ -5813,11 +5847,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "image-verify":
             print("AGENT_CANON_IMAGE_VERIFY=pass")
         if args.command == "boundary":
-            for finding in payload.get("findings", []):
-                print(
-                    "AGENT_CANON_RUNTIME_BOUNDARY_FINDING="
-                    f"{finding['category']}:{finding['path']}:{finding['detail']}"
-                )
+            for finding in boundary_findings:
+                print(finding.render())
         if "sources" in payload:
             print("AGENT_CANON_TOOL_DEPENDENCY_SOURCES=" + ",".join(payload["sources"]))
         if "order" in payload:

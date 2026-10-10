@@ -2,6 +2,7 @@
 # contract tool
 # responsibility Bootstraps agent run artifacts for agent workflows.
 # upstream design ../../../README.md shared automation index
+# upstream implementation ../values.py refines decoded command payloads
 # @dependency-end
 
 """Bootstrap a persistent agent-team run directory."""
@@ -54,6 +55,7 @@ from tools.agent.orchestration.packets import (
     resolve_cross_cutting_document_packet,
     resolve_role_document_packet,
 )
+from tools.runtime.values import is_string_object_dict, is_string_object_mapping
 from tools.agent.orchestration.team_config import (
     AgentTypeSelection,
     Role,
@@ -366,7 +368,7 @@ def parse_issue_worker_candidate(value: str | None) -> Mapping[str, object] | No
         parsed = json.loads(value)
     except json.JSONDecodeError as exc:
         raise RuntimeError("issue_worker_candidate:invalid_json") from exc
-    if not isinstance(parsed, dict) or not parsed:
+    if not is_string_object_dict(parsed) or not parsed:
         raise RuntimeError("issue_worker_candidate:must_be_nonempty_object")
     return parsed
 
@@ -379,7 +381,7 @@ def parse_math_intent_packet_input(value: str | None) -> Mapping[str, object] | 
         parsed = json.loads(value)
     except json.JSONDecodeError as exc:
         raise RuntimeError("mathematical_intent_packet:invalid_json") from exc
-    if not isinstance(parsed, dict) or not parsed:
+    if not is_string_object_dict(parsed) or not parsed:
         raise RuntimeError("mathematical_intent_packet:must_be_nonempty_object")
     return parsed
 
@@ -650,13 +652,13 @@ def emit_bootstrap_output(
                 dispatch_status = runtime.issue_worker_dispatch.get("status", "unknown")
                 print(f"ISSUE_WORKER_DISPATCH_STATUS={dispatch_status}")
                 tool_call = runtime.issue_worker_dispatch.get("tool_call")
-                if isinstance(tool_call, Mapping):
+                if is_string_object_mapping(tool_call):
                     print(
                         "ISSUE_WORKER_TOOL_CALL="
                         + json.dumps(dict(tool_call), sort_keys=True)
                     )
                 spawn_tool_call = runtime.issue_worker_dispatch.get("spawn_tool_call")
-                if isinstance(spawn_tool_call, Mapping):
+                if is_string_object_mapping(spawn_tool_call):
                     print(
                         "ISSUE_WORKER_SPAWN_TOOL_CALL="
                         + json.dumps(dict(spawn_tool_call), sort_keys=True)
@@ -945,7 +947,7 @@ def publish_prepared_run(
         pointer_baseline: _read_optional_bytes(pointer_baseline),
         authority_baseline: _read_optional_bytes(authority_baseline),
     }
-    prior_children = (
+    prior_children: set[str] = (
         {child.name for child in report_root.iterdir()}
         if report_root.is_dir()
         else set()
@@ -1018,7 +1020,7 @@ def publish_prepared_run(
                     prior,
                     "bootstrap-publish-rollback",
                 )
-            observed_children = (
+            observed_children: set[str] = (
                 {child.name for child in report_root.iterdir()}
                 if report_root.is_dir()
                 else set()
@@ -1104,10 +1106,10 @@ def main(
         writer_targets: dict[str, WriterTarget] = {}
         if args.writer_targets:
             parsed_targets = json.loads(args.writer_targets)
-            if not isinstance(parsed_targets, dict):
+            if not is_string_object_dict(parsed_targets):
                 raise WriterTargetError("writer_targets:must_be_mapping")
             writer_targets = {
-                str(owner): parse_writer_target(target)
+                owner: parse_writer_target(target)
                 for owner, target in parsed_targets.items()
             }
     except (TypeError, json.JSONDecodeError, WriterTargetError) as exc:

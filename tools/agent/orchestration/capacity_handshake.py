@@ -4,6 +4,7 @@
 # responsibility Owns typed capacity derivation, spawn reservations, saturation queues, and descendant lifecycle CAS.
 # upstream implementation ../../../agents/capacity_policy.toml declares topology and projection policy
 # upstream implementation ../../../.codex/config.toml provides configured capacity loader readback
+# upstream implementation ../../runtime/values.py refines decoded lifecycle projections
 # downstream implementation ./implementation_dispatch.py consumes capacity and records successful spawns
 # downstream implementation ./implementation_route.py consumes availability for Spark routing
 # downstream implementation ../../runtime/lifecycle/task_close.py validates postorder close tokens and release state
@@ -20,7 +21,9 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import List, Mapping, Optional, Sequence, Tuple
+from typing import List, Mapping, Optional, Sequence, Tuple, TypedDict
+
+from tools.runtime.values import is_string_object_dict
 
 try:
     import tomllib
@@ -323,6 +326,84 @@ class DescendantLifecycleRecord:
     transition_generation: int = 0
     transition_history: list["LifecycleTransitionRecord"] = field(default_factory=list)
     shape_id: ShapeId = field(default_factory=lambda: _shape_id("descendant_lifecycle_record_v1"), init=False)
+
+
+class DescendantLifecycleRecordProjection(TypedDict):
+    """Wire projection owned by the descendant lifecycle record."""
+
+    work_id: str
+    parent_work_id: str | None
+    profile_id: str
+    status: str
+    durable_result_evidence_ref: str | None
+    durable_handback: bool
+    descendants_closed: bool
+    close_readback: bool
+    reserved_slots: int
+    reserved_write_slots: int
+    transition_generation: int
+
+
+def descendant_record_projection(
+    record: DescendantLifecycleRecord,
+) -> DescendantLifecycleRecordProjection:
+    """Serialize one typed lifecycle record through its owner projection."""
+    return {
+        "work_id": record.work_id,
+        "parent_work_id": record.parent_work_id,
+        "profile_id": record.profile_id,
+        "status": record.status.value,
+        "durable_result_evidence_ref": record.durable_result_evidence_ref,
+        "durable_handback": record.durable_handback,
+        "descendants_closed": record.descendants_closed,
+        "close_readback": record.close_readback,
+        "reserved_slots": record.reserved_slots,
+        "reserved_write_slots": record.reserved_write_slots,
+        "transition_generation": record.transition_generation,
+    }
+
+
+def _projection_integer(value: object) -> int:
+    """Normalize JSON integer-compatible values at the lifecycle wire owner."""
+    if not isinstance(value, (int, float, str)):
+        raise TypeError("capacity_ledger_record_invalid")
+    return int(value)
+
+
+def descendant_record_from_projection(
+    value: object,
+) -> DescendantLifecycleRecord:
+    """Rebuild one owner record from its serialized lifecycle projection."""
+    if not is_string_object_dict(value):
+        raise ValueError("capacity_ledger_record_invalid")
+    parent_work_id = value.get("parent_work_id")
+    evidence_ref = value.get("durable_result_evidence_ref")
+    if (parent_work_id is not None and not isinstance(parent_work_id, str)) or (
+        evidence_ref is not None and not isinstance(evidence_ref, str)
+    ):
+        raise ValueError("capacity_ledger_record_invalid")
+    raw_status = value.get("status")
+    try:
+        status = LifecycleStatus(str(raw_status))
+    except ValueError as exc:
+        raise ValueError(f"unknown lifecycle status: {raw_status}") from exc
+    return DescendantLifecycleRecord(
+        work_id=str(value.get("work_id", "")),
+        parent_work_id=parent_work_id,
+        profile_id=str(value.get("profile_id", "")),
+        status=status,
+        durable_result_evidence_ref=evidence_ref,
+        durable_handback=bool(value.get("durable_handback", False)),
+        descendants_closed=bool(value.get("descendants_closed", False)),
+        close_readback=bool(value.get("close_readback", False)),
+        reserved_slots=_projection_integer(value.get("reserved_slots", 1)),
+        reserved_write_slots=_projection_integer(
+            value.get("reserved_write_slots", 0)
+        ),
+        transition_generation=_projection_integer(
+            value.get("transition_generation", 0)
+        ),
+    )
 
 
 @dataclass(frozen=True)

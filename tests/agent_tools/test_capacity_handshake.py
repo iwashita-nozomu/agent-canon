@@ -16,11 +16,14 @@ from tools.agent.orchestration.capacity_handshake import (
     CapacityLedger,
     DeclaredFamilyCapacity,
     DeclaredTeamTopologyDerivation,
+    DescendantLifecycleRecord,
     DescendantTopologyReadback,
     LifecycleStatus,
     ReadyWorkItem,
     TopologyCapacityNode,
     TopologyCapacityWitness,
+    descendant_record_from_projection,
+    descendant_record_projection,
     load_startup_contract,
     main,
     make_session_snapshot,
@@ -89,6 +92,33 @@ def test_requested_capacity_is_direct_frontier_plus_nested_once() -> None:
     assert derivation.peak_family.direct_frontier_count == 20
     assert derivation.peak_family.nested_reservation_count == 6
     assert derivation.requested_max_threads() == 26
+
+
+def test_descendant_record_projection_roundtrips_owner_typed_fields() -> None:
+    record = DescendantLifecycleRecord(
+        work_id="worker-1",
+        parent_work_id="parent-1",
+        profile_id="worker",
+        status=LifecycleStatus.READBACK_VERIFIED,
+        durable_result_evidence_ref="runtime://result/worker-1",
+        durable_handback=True,
+        descendants_closed=True,
+        close_readback=True,
+        reserved_slots=3,
+        reserved_write_slots=1,
+        transition_generation=4,
+    )
+
+    projection = descendant_record_projection(record)
+
+    assert descendant_record_from_projection(projection) == record
+    integer_string_projection = {**projection, "reserved_slots": "3"}
+    assert descendant_record_from_projection(
+        integer_string_projection
+    ).reserved_slots == 3
+    malformed_projection = {**projection, "reserved_slots": "not-an-int"}
+    with pytest.raises(ValueError):
+        descendant_record_from_projection(malformed_projection)
 
 
 def test_snapshot_separates_requested_effective_available_and_write(tmp_path: Path) -> None:
