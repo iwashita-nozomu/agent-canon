@@ -1616,10 +1616,10 @@ fi' )
 
 _agent_canon_import_host_inputs() {
   _agent_canon_volume_copy import mount-registry \
-    "$AGENT_CANON_STATE_ROOT/mounts.toml"
+    "$AGENT_CANON_STATE_ROOT/mounts.toml" || return $?
   _agent_canon_volume_copy import host-mounts \
-    "$AGENT_CANON_STATE_ROOT/mounts.tsv"
-  _agent_canon_volume_copy import private-log "$AGENT_CANON_PRIVATE_LOG_ROOT"
+    "$AGENT_CANON_STATE_ROOT/mounts.tsv" || return $?
+  _agent_canon_volume_copy import private-log "$AGENT_CANON_PRIVATE_LOG_ROOT" || return $?
 }
 
 _agent_canon_publish_controller_projection() {
@@ -2700,7 +2700,7 @@ _agent_canon_ensure_container() {
     local validate_rc=$?
     ((validate_rc == 0)) || return "$validate_rc"
     if "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
-      _agent_canon_import_host_inputs
+      _agent_canon_import_host_inputs || return $?
     fi
   else
     local caller_user
@@ -4784,7 +4784,7 @@ bootstrap_host_entrypoint() {
       AGENT_CANON_PROJECT_ROOT="$codex_project" \
         "$codex_executable" --project-root "$codex_project" || codex_rc=$?
       ((codex_rc == 0)) || return "$codex_rc"
-      _agent_canon_volume_copy import codex-home "$AGENT_CANON_STATE_ROOT/codex-home"
+      _agent_canon_volume_copy import codex-home "$AGENT_CANON_STATE_ROOT/codex-home" || return $?
       _agent_canon_with_replacement_lock _agent_canon_private_feedback_sync \
         "$codex_container" || feedback_rc=$?
       return "$feedback_rc"
