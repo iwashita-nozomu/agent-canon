@@ -27,7 +27,7 @@ failure_policy = "fail"
 
 [[records]]
 id = "lean-toolchain"
-package = "leanprover/lean4"
+package = "lean"
 method = "lean-toolchain"
 version = "leanprover/lean4:v4.30.0"
 source = "https://github.com/leanprover/lean4"
