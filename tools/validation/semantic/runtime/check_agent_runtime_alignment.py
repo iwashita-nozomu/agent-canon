@@ -706,7 +706,7 @@ def validate_generated_role_views() -> None:
             projection="consumer-static",
         )
     }
-    role_view_issues = model_profile_registry._role_view_issues(
+    role_view_issues = model_profile_registry.role_view_issues(
         ROOT,
         projection="consumer-static",
     )

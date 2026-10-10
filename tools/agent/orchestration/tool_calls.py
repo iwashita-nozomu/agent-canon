@@ -467,13 +467,13 @@ def materialize_subagent_spawn_tool_call(
 
 @dataclass(frozen=True)
 class CloseAgentLifecycleEvidence:
-    """Validated-input domain for G6 and terminal close materialization."""
+    """Raw lifecycle evidence passed to the close-agent owner validators."""
 
     gate_verdicts: Sequence[Mapping[str, object]]
     cleanup_proof: Mapping[str, object]
     durable_handback: Mapping[str, object]
-    descendant_close_receipts: Sequence[Mapping[str, object]]
-    reservation_release_receipts: Sequence[Mapping[str, object]]
+    descendant_close_receipts: Sequence[object]
+    reservation_release_receipts: Sequence[object]
 
 
 def materialize_close_agent_tool_call(

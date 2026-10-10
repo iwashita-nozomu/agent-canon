@@ -926,7 +926,7 @@ class DependencyModelTests(unittest.TestCase):
                 )
                 self.assertEqual(payload["status"], "installed")
                 self.assertTrue(
-                    Installer._receipt_matches(
+                    Installer.receipt_matches(
                         image_root / "receipts" / f"{record_id}.json",
                         plan,
                         plan.by_id()[record_id],
@@ -989,7 +989,7 @@ class DependencyModelTests(unittest.TestCase):
             verify_runner = FakeRunner()
             installer = Installer(verify_runner)
             payload = json.loads(receipt.read_text(encoding="utf-8"))
-            installer._verify_installed_receipt(parsed, payload, workspace=root)
+            installer.verify_installed_receipt(parsed, payload, workspace=root)
             self.assertEqual(receipt.read_bytes(), before)
             self.assertIn(
                 ("/usr/local/bin/node-tool", "--version"), verify_runner.calls
@@ -1131,7 +1131,7 @@ class DependencyModelTests(unittest.TestCase):
                     DependencyError,
                     "installed executable is missing or not executable: pyright-langserver",
                 ):
-                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+                    installer.verify_installed_receipt(parsed, payload, workspace=root)
 
     def test_installed_receipt_rejects_non_executable_secondary_binding(self) -> None:
         """A non-executable secondary provider cannot satisfy an installed receipt."""
@@ -1168,7 +1168,7 @@ class DependencyModelTests(unittest.TestCase):
                     DependencyError,
                     "installed executable is missing or not executable: pyright-langserver",
                 ):
-                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+                    installer.verify_installed_receipt(parsed, payload, workspace=root)
 
     def test_installed_tool_receipts_probe_jq_tree_and_rustc_directly(self) -> None:
         """Manifest executable fields provide direct image verification for tools."""
@@ -1245,7 +1245,7 @@ class DependencyModelTests(unittest.TestCase):
                     with mock.patch.object(
                         installer, "_path_is_regular_executable", return_value=True
                     ):
-                        installer._verify_installed_receipt(
+                        installer.verify_installed_receipt(
                             item, payload, workspace=root
                         )
                 self.assertEqual(
@@ -1273,7 +1273,7 @@ class DependencyModelTests(unittest.TestCase):
             }
             with mock.patch.object(installer, "_capture") as capture:
                 self.assertIsNone(
-                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+                    installer.verify_installed_receipt(parsed, payload, workspace=root)
                 )
             capture.assert_not_called()
 
@@ -2331,10 +2331,10 @@ class DependencyModelTests(unittest.TestCase):
             payload = json.loads(receipt.read_text(encoding="utf-8"))
             self.assertEqual(payload["repository_packages"]["sha256"], rolling_sha)
             self.assertEqual(payload["repository_package"]["sha256"], immutable_sha)
-            self.assertTrue(installer._receipt_matches(receipt, plan, parsed))
+            self.assertTrue(installer.receipt_matches(receipt, plan, parsed))
             payload["repository_package"]["sha256"] = rolling_sha
             receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-            self.assertFalse(installer._receipt_matches(receipt, plan, parsed))
+            self.assertFalse(installer.receipt_matches(receipt, plan, parsed))
 
     def test_apt_executable_ownership_resolves_symlink_with_same_package(self) -> None:
         parsed = parse_record(
@@ -2710,7 +2710,7 @@ class DependencyModelTests(unittest.TestCase):
                 installer._parent_attestation = dependency_module._parent_attestation(
                     root, "test-receipt"
                 )
-                bindings = installer._executable_bindings(parsed, workspace=root)
+                bindings = installer.executable_bindings(parsed, workspace=root)
                 receipt = root / "receipts" / "pyright-language-server.json"
                 installer._write_receipt(
                     receipt, plan, parsed, executable_bindings=bindings
@@ -2721,7 +2721,7 @@ class DependencyModelTests(unittest.TestCase):
                     "agent-canon.executable-binding.structural.v1:npm-global:pyright-langserver",
                 )
                 self.assertFalse(marker.exists())
-                self.assertTrue(installer._receipt_matches(receipt, plan, parsed))
+                self.assertTrue(installer.receipt_matches(receipt, plan, parsed))
 
     def test_secondary_npm_binding_rejects_escape_and_missing_provider(self) -> None:
         """Secondary providers remain fail-closed on escape, missing, or non-exec path."""
@@ -2768,7 +2768,7 @@ class DependencyModelTests(unittest.TestCase):
                         DependencyError,
                         "(escapes its method-owned root|executable is missing|executable is not executable)",
                     ):
-                        Installer()._executable_bindings(parsed, workspace=root)
+                        Installer().executable_bindings(parsed, workspace=root)
 
     def test_rust_analyzer_binding_uses_cargo_home_not_path(self) -> None:
         """Rust executable bindings stay inside the pinned Cargo home."""

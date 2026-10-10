@@ -19,7 +19,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, Mapping, Sequence, TypedDict, cast
+from typing import ClassVar, Iterable, Mapping, Sequence, TypedDict, cast
 
 import tomllib
 
@@ -179,7 +179,8 @@ def _validated_string_list(value: object, field: str) -> list[str]:
     if not isinstance(value, list):
         raise ModelProfileRegistryError(f"{field}:must_be_string_list")
     result: list[str] = []
-    for item in cast(list[object], value):
+    items: list[object] = value
+    for item in items:
         if not isinstance(item, str) or not item:
             raise ModelProfileRegistryError(f"{field}:must_be_string_list")
         result.append(item)
@@ -187,7 +188,7 @@ def _validated_string_list(value: object, field: str) -> list[str]:
 
 
 def _static_projection(
-    clause: Mapping[str, Any],
+    clause: Mapping[str, object],
     *,
     clause_id: str,
     field: str,
@@ -257,17 +258,19 @@ def _closed_mapping(
     fields: set[str],
     required: set[str] | None = None,
     label: str,
-) -> Mapping[str, Any]:
+) -> dict[str, object]:
     if not isinstance(value, Mapping):
         raise ModelProfileRegistryError(f"{label}:must_be_mapping")
-    keys = set(value)
+    raw_mapping: Mapping[object, object] = value
+    keys: set[object] = set(raw_mapping)
     unknown = sorted(str(key) for key in keys - fields)
     if unknown:
         raise ModelProfileRegistryError(f"{label}:unknown_fields:{','.join(unknown)}")
-    missing = sorted((required or fields) - keys)
+    string_keys = {key for key in keys if isinstance(key, str)}
+    missing = sorted((required or fields) - string_keys)
     if missing:
         raise ModelProfileRegistryError(f"{label}:missing_fields:{','.join(missing)}")
-    return value
+    return {key: raw_mapping[key] for key in string_keys}
 
 
 def _text(value: object, field: str) -> str:
@@ -279,11 +282,15 @@ def _text(value: object, field: str) -> str:
 def _string_tuple(
     value: object, field: str, *, nonempty: bool = True
 ) -> tuple[str, ...]:
-    if not isinstance(value, list) or not all(
-        isinstance(item, str) and item for item in value
-    ):
+    if not isinstance(value, list):
         raise ModelProfileRegistryError(f"{field}:must_be_string_list")
-    result = tuple(value)
+    items: list[object] = value
+    result_values: list[str] = []
+    for item in items:
+        if not isinstance(item, str) or not item:
+            raise ModelProfileRegistryError(f"{field}:must_be_string_list")
+        result_values.append(item)
+    result = tuple(result_values)
     if nonempty and not result:
         raise ModelProfileRegistryError(f"{field}:must_be_nonempty")
     if len(set(result)) != len(result):
@@ -291,7 +298,7 @@ def _string_tuple(
     return result
 
 
-def _stable_digest(payload: Mapping[str, Any]) -> str:
+def _stable_digest(payload: Mapping[str, object]) -> str:
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -299,7 +306,7 @@ def _stable_digest(payload: Mapping[str, Any]) -> str:
 @dataclass(frozen=True)
 class ContextItem:
     key: str
-    value: Any
+    value: object
 
 
 @dataclass(frozen=True)
@@ -335,7 +342,8 @@ def validate_claim_evidence_result(value: object) -> ValidationResult:
                 )
             ]
         )
-    status = value.get("status")
+    result: Mapping[str, object] = value
+    status = result.get("status")
     if status not in {"pass", "revise", "escalate", "blocked"}:
         issues.append(
             ValidationIssue(
@@ -344,19 +352,21 @@ def validate_claim_evidence_result(value: object) -> ValidationResult:
                 "status",
             )
         )
-    claim = value.get("claim")
+    claim = result.get("claim")
     if not isinstance(claim, str) or not claim.strip():
         issues.append(
             ValidationIssue(
                 "return_contract.claim", "claim must be non-empty text", "claim"
             )
         )
-    evidence = value.get("evidence")
-    if (
-        not isinstance(evidence, list)
-        or not evidence
-        or not all(isinstance(item, str) and item.strip() for item in evidence)
-    ):
+    evidence = result.get("evidence")
+    valid_evidence = False
+    if isinstance(evidence, list):
+        evidence_items: list[object] = evidence
+        valid_evidence = bool(evidence_items) and all(
+            isinstance(item, str) and item.strip() for item in evidence_items
+        )
+    if not valid_evidence:
         issues.append(
             ValidationIssue(
                 "return_contract.evidence",
@@ -645,18 +655,16 @@ class ModelProfileRegistry:
         )
 
 
-def _read_toml_file(path: Path) -> Mapping[str, Any]:
+def _read_toml_file(path: Path) -> Mapping[str, object]:
     try:
         with path.open("rb") as handle:
-            value = tomllib.load(handle)
+            value: dict[str, object] = tomllib.load(handle)
     except (OSError, tomllib.TOMLDecodeError) as exc:
         raise ModelProfileRegistryError(f"registry_unreadable:{path}:{exc}") from exc
-    if not isinstance(value, Mapping):
-        raise ModelProfileRegistryError(f"registry:{path}:must_be_mapping")
     return value
 
 
-def _profile_digest_payload(item: Mapping[str, Any]) -> dict[str, Any]:
+def _profile_digest_payload(item: Mapping[str, object]) -> dict[str, object]:
     return {key: item[key] for key in sorted(_PROFILE_FIELDS - {"projection_digest"})}
 
 
@@ -735,21 +743,31 @@ def load_model_profile_registry(
         "isolated_worktree_mode": isolated_worktree_mode,
     }
     raw_bindings = data["role_profile_bindings"]
-    if not isinstance(raw_bindings, Mapping) or not raw_bindings:
+    if not isinstance(raw_bindings, Mapping):
+        raise ModelProfileRegistryError(
+            "role_profile_bindings:must_be_nonempty_mapping"
+        )
+    role_bindings: Mapping[str, object] = raw_bindings
+    if not role_bindings:
         raise ModelProfileRegistryError(
             "role_profile_bindings:must_be_nonempty_mapping"
         )
     bindings: dict[str, str] = {}
-    for role_id, profile_id in raw_bindings.items():
+    for role_id, profile_id in role_bindings.items():
         role = _text(role_id, "role_profile_bindings.role_id")
         bindings[role] = _text(profile_id, f"role_profile_bindings.{role}")
     raw_sandboxes = data["role_sandbox_bindings"]
-    if not isinstance(raw_sandboxes, Mapping) or set(raw_sandboxes) != set(bindings):
+    if not isinstance(raw_sandboxes, Mapping):
+        raise ModelProfileRegistryError(
+            "role_sandbox_bindings:must_exactly_match_role_bindings"
+        )
+    sandbox_bindings: Mapping[str, object] = raw_sandboxes
+    if set(sandbox_bindings) != set(bindings):
         raise ModelProfileRegistryError(
             "role_sandbox_bindings:must_exactly_match_role_bindings"
         )
     sandboxes: dict[str, str] = {}
-    for role_id, sandbox_value in raw_sandboxes.items():
+    for role_id, sandbox_value in sandbox_bindings.items():
         sandbox = _text(sandbox_value, f"role_sandbox_bindings.{role_id}")
         if sandbox not in {"read-only", "workspace-write"}:
             raise ModelProfileRegistryError(f"role_sandbox_bindings.{role_id}:invalid")
@@ -757,22 +775,24 @@ def load_model_profile_registry(
     raw_role_templates = data["role_instruction_templates"]
     if not isinstance(raw_role_templates, Mapping):
         raise ModelProfileRegistryError("role_instruction_templates:must_be_mapping")
-    unknown_role_templates = sorted(set(raw_role_templates) - set(bindings))
+    role_templates_raw: Mapping[str, object] = raw_role_templates
+    unknown_role_templates = sorted(set(role_templates_raw) - set(bindings))
     if unknown_role_templates:
         raise ModelProfileRegistryError(
             "role_instruction_templates:unknown_roles:"
             + ",".join(str(role_id) for role_id in unknown_role_templates)
         )
     role_templates: dict[str, tuple[RoleInstructionClause, ...]] = {}
-    for role_id, raw_clauses in raw_role_templates.items():
+    for role_id, raw_clauses in role_templates_raw.items():
         role = _text(role_id, "role_instruction_templates.role_id")
         if not isinstance(raw_clauses, list) or not raw_clauses:
             raise ModelProfileRegistryError(
                 f"role_instruction_templates.{role}:must_be_nonempty_list"
             )
-        clauses: list[RoleInstructionClause] = []
-        seen_clauses: set[str] = set()
-        for clause_index, raw_clause in enumerate(raw_clauses):
+        role_clauses_input: list[object] = raw_clauses
+        role_clauses: list[RoleInstructionClause] = []
+        seen_role_clauses: set[str] = set()
+        for clause_index, raw_clause in enumerate(role_clauses_input):
             clause = _closed_mapping(
                 raw_clause,
                 fields=_CLAUSE_FIELDS,
@@ -780,17 +800,17 @@ def load_model_profile_registry(
                 label=f"role_instruction_templates.{role}[{clause_index}]",
             )
             clause_id = _text(clause["id"], "role_instruction.id")
-            if clause_id in seen_clauses:
+            if clause_id in seen_role_clauses:
                 raise ModelProfileRegistryError(
                     f"role_instruction:{role}:{clause_id}:duplicate"
                 )
-            seen_clauses.add(clause_id)
+            seen_role_clauses.add(clause_id)
             priority = clause["priority"]
             if not isinstance(priority, int):
                 raise ModelProfileRegistryError(
                     f"role_instruction:{role}:{clause_id}:priority_must_be_int"
                 )
-            clauses.append(
+            role_clauses.append(
                 RoleInstructionClause(
                     clause_id,
                     _text(clause["text"], "role_instruction.text"),
@@ -803,13 +823,14 @@ def load_model_profile_registry(
                 )
             )
         role_templates[role] = tuple(
-            sorted(clauses, key=lambda value: (value.priority, value.clause_id))
+            sorted(role_clauses, key=lambda value: (value.priority, value.clause_id))
         )
     raw_standalone = data["standalone_role_metadata"]
     if not isinstance(raw_standalone, Mapping):
         raise ModelProfileRegistryError("standalone_role_metadata:must_be_mapping")
+    standalone_metadata: Mapping[str, object] = raw_standalone
     standalone: dict[str, tuple[str, str, str]] = {}
-    for role_id, raw_metadata in raw_standalone.items():
+    for role_id, raw_metadata in standalone_metadata.items():
         metadata = _closed_mapping(
             raw_metadata,
             fields={"logical_role_id", "role_contract_ref", "sandbox_mode"},
@@ -829,9 +850,10 @@ def load_model_profile_registry(
     raw_profiles = data["model_profiles"]
     if not isinstance(raw_profiles, list) or not raw_profiles:
         raise ModelProfileRegistryError("model_profiles:must_be_nonempty_list")
+    profiles_raw: list[object] = raw_profiles
     profiles: list[ModelProfile] = []
     profile_ids: set[str] = set()
-    for index, raw_item in enumerate(raw_profiles):
+    for index, raw_item in enumerate(profiles_raw):
         item = _closed_mapping(
             raw_item, fields=_PROFILE_FIELDS, label=f"model_profiles[{index}]"
         )
@@ -844,9 +866,10 @@ def load_model_profile_registry(
             raise ModelProfileRegistryError(
                 f"model_profile:{profile_id}:missing_role_instructions"
             )
-        clauses: list[RoleInstructionClause] = []
-        seen_clauses: set[str] = set()
-        for clause_index, raw_clause in enumerate(clauses_raw):
+        profile_clauses_input: list[object] = clauses_raw
+        profile_clauses: list[RoleInstructionClause] = []
+        seen_profile_clauses: set[str] = set()
+        for clause_index, raw_clause in enumerate(profile_clauses_input):
             clause = _closed_mapping(
                 raw_clause,
                 fields=_CLAUSE_FIELDS,
@@ -854,17 +877,17 @@ def load_model_profile_registry(
                 label=f"model_profile:{profile_id}.role_instructions[{clause_index}]",
             )
             clause_id = _text(clause["id"], "role_instruction.id")
-            if clause_id in seen_clauses:
+            if clause_id in seen_profile_clauses:
                 raise ModelProfileRegistryError(
                     f"role_instruction:{clause_id}:duplicate"
                 )
-            seen_clauses.add(clause_id)
+            seen_profile_clauses.add(clause_id)
             priority = clause["priority"]
             if not isinstance(priority, int):
                 raise ModelProfileRegistryError(
                     f"role_instruction:{clause_id}:priority_must_be_int"
                 )
-            clauses.append(
+            profile_clauses.append(
                 RoleInstructionClause(
                     clause_id,
                     _text(clause["text"], "role_instruction.text"),
@@ -907,7 +930,9 @@ def load_model_profile_registry(
                 f"model_profile:{profile_id}:close_target_mismatch"
             )
         sorted_clauses = tuple(
-            sorted(clauses, key=lambda value: (value.priority, value.clause_id))
+            sorted(
+                profile_clauses, key=lambda value: (value.priority, value.clause_id)
+            )
         )
         profiles.append(
             ModelProfile(
@@ -1077,14 +1102,9 @@ def materialize_tool_call_token(
     registry: ModelProfileRegistry,
 ) -> ToolCallToken:
     profile_obj = registry.by_profile(profile) if isinstance(profile, str) else profile
-    if not isinstance(profile_obj, ModelProfile):
-        raise StructuralDesignGap("tool_call_token_request.profile.type")
     if request.profile_id != profile_obj.id:
         raise ModelProfileRegistryError("tool_call_token_request:profile_mismatch")
-    if (
-        not isinstance(request.terminal_agent_id, str)
-        or not request.terminal_agent_id.strip()
-    ):
+    if not request.terminal_agent_id.strip():
         raise ModelProfileRegistryError("terminal_agent_id:must_be_nonempty")
     return ToolCallToken(
         tool_id=profile_obj.close_tool_id,
@@ -1134,40 +1154,50 @@ def materialize_route_packet(
 
 def _team_role_metadata(root: Path) -> dict[str, tuple[str, str, str]]:
     try:
-        raw = json.loads(
+        raw: object = json.loads(
             (root / "agents" / "agents_config.json").read_text(encoding="utf-8")
         )
     except (OSError, json.JSONDecodeError) as exc:
         raise ModelProfileRegistryError(f"agents_config:unreadable:{exc}") from exc
     if not isinstance(raw, dict):
         raise ModelProfileRegistryError("agents_config:must_be_mapping")
+    config: dict[str, object] = raw
     result: dict[str, tuple[str, str, str]] = {}
     for section in ("always_on_roles", "specialist_roles"):
-        entries = raw.get(section)
-        if not isinstance(entries, list):
+        raw_entries = config.get(section)
+        if not isinstance(raw_entries, list):
             raise ModelProfileRegistryError(f"agents_config:{section}:must_be_list")
+        entries: list[object] = raw_entries
         for index, entry in enumerate(entries):
             if not isinstance(entry, dict):
                 raise ModelProfileRegistryError(
                     f"agents_config:{section}[{index}]:must_be_mapping"
                 )
+            role_entry: dict[str, object] = entry
             logical_role = _text(
-                entry.get("id"), f"agents_config:{section}[{index}].id"
+                role_entry.get("id"), f"agents_config:{section}[{index}].id"
             )
-            agent_ids = entry.get("codex_agents")
-            if agent_ids is None:
+            raw_agent_ids = role_entry.get("codex_agents")
+            if raw_agent_ids is None:
                 continue
-            if not isinstance(agent_ids, list) or not all(
-                isinstance(value, str) and value for value in agent_ids
-            ):
+            if not isinstance(raw_agent_ids, list):
                 raise ModelProfileRegistryError(
                     f"agents_config:{section}[{index}].codex_agents:invalid"
                 )
-            write_policy = entry.get("write_policy")
-            if not isinstance(write_policy, dict):
+            agent_id_items: list[object] = raw_agent_ids
+            agent_ids: list[str] = []
+            for agent_id_item in agent_id_items:
+                if not isinstance(agent_id_item, str) or not agent_id_item:
+                    raise ModelProfileRegistryError(
+                        f"agents_config:{section}[{index}].codex_agents:invalid"
+                    )
+                agent_ids.append(agent_id_item)
+            raw_write_policy = role_entry.get("write_policy")
+            if not isinstance(raw_write_policy, dict):
                 raise ModelProfileRegistryError(
                     f"agents_config:{section}[{index}].write_policy:invalid"
                 )
+            write_policy: dict[str, object] = raw_write_policy
             mode = _text(
                 write_policy.get("mode"),
                 f"agents_config:{section}[{index}].write_policy.mode",
@@ -1204,12 +1234,15 @@ def _registered_role_descriptions(root: Path) -> dict[str, str]:
     agents = config.get("agents")
     if not isinstance(agents, Mapping):
         raise ModelProfileRegistryError("codex_config:agents_missing")
+    agent_entries: Mapping[str, object] = agents
     result: dict[str, str] = {}
-    for role_id, value in agents.items():
+    for role_id, value in agent_entries.items():
         if not isinstance(value, Mapping):
             continue
-        result[str(role_id)] = _text(
-            value.get("description"), f"codex_config.agents.{role_id}.description"
+        role_config: Mapping[str, object] = value
+        result[role_id] = _text(
+            role_config.get("description"),
+            f"codex_config.agents.{role_id}.description",
         )
     return result
 
@@ -1284,7 +1317,7 @@ def _render_instruction_clauses(
 def generate_role_views(
     registry: ModelProfileRegistry,
     root: os.PathLike[str] | str = ".",
-    target_state_contract: Mapping[str, Any] | TargetStateContract | None = None,
+    target_state_contract: Mapping[str, object] | TargetStateContract | None = None,
     projection: str = "live",
 ) -> tuple[GeneratedRoleView, ...]:
     projection = _validate_projection_mode(projection)
@@ -1483,9 +1516,10 @@ def write_role_views(
         registry, root_path, projection="consumer-static"
     )
     config_path = root_path / "agents" / "agents_config.json"
-    raw = json.loads(config_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
+    parsed: object = json.loads(config_path.read_text(encoding="utf-8"))
+    if not isinstance(parsed, dict):
         raise ModelProfileRegistryError("agents_config:must_be_mapping")
+    raw: dict[str, object] = parsed
     agent_views, roles = _projection_records(consumer_static_views)
     raw["generated_profile_projection"] = {
         "schema_id": "generated_role_profile_projection_v1",
@@ -1505,7 +1539,7 @@ def write_role_views(
 
 
 def validate_target_state_contract(
-    target_state_contract: Mapping[str, Any],
+    target_state_contract: Mapping[str, object],
     registry: ModelProfileRegistry,
 ) -> ValidationResult:
     issues: list[ValidationIssue] = []
@@ -1541,7 +1575,7 @@ def validate_target_state_contract(
 
 
 def materialize_contract_projection(
-    target_state_contract: Mapping[str, Any],
+    target_state_contract: Mapping[str, object],
     root: os.PathLike[str] | str = ".",
     projection: str = "live",
 ) -> ImplementationExecutionContract:
@@ -1563,9 +1597,10 @@ def materialize_contract_projection(
     )
 
 
-def _role_view_issues(
+def role_view_issues(
     root: Path, projection: str = "live"
 ) -> tuple[ValidationIssue, ...]:
+    """Return the canonical generated-role projection mismatches for a root."""
     projection = _validate_projection_mode(projection)
     registry = load_model_profile_registry(root)
     views = generate_role_views(registry, root, projection=projection)
@@ -1589,17 +1624,20 @@ def _role_view_issues(
             )
     config_path = root / "agents" / "agents_config.json"
     try:
-        raw = json.loads(config_path.read_text(encoding="utf-8"))
+        parsed: object = json.loads(config_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        raw = None
+        parsed = None
     expected_views, expected_roles = _projection_records(
         generate_role_views(registry, root, projection="consumer-static")
     )
-    if (
-        not isinstance(raw, dict)
-        or raw.get("agent_views") != expected_views
-        or raw.get("roles") != expected_roles
-    ):
+    config_matches = False
+    if isinstance(parsed, dict):
+        raw_config: dict[str, object] = parsed
+        config_matches = (
+            raw_config.get("agent_views") == expected_views
+            and raw_config.get("roles") == expected_roles
+        )
+    if not config_matches:
         issues.append(
             ValidationIssue(
                 "role_view.config_projection_drift",
@@ -1645,7 +1683,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             views = write_role_views(args.root, args.projection)
             print(f"MODEL_PROFILE_ROLE_VIEWS=generated:{len(views)}")
             return 0
-        issues = _role_view_issues(args.root, args.projection)
+        issues = role_view_issues(args.root, args.projection)
     except (ModelProfileRegistryError, OSError, ValueError) as exc:
         issues = (
             ValidationIssue(
