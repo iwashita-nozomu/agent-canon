@@ -212,9 +212,10 @@ acceptance trace だけを持ちます。
 ### C++ projection
 
 - adapter owner: [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md)
-- native-consumer join: [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) が派生 repo の C++ target
-  identity を選び、`cpp/include/<project>/...` または `cpp/src/...` の native source/header
-  surface とこの adapter projection を結びます。
+- native-consumer join: [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) の selected
+  profile が project target identity と public header/implementation path を決め、この adapter
+  projection をその実在する source/header anchor に結びます。`root-aggregate` profile の
+  production path は project root `include/` / `src/` です。
 - responsibility regions: public header の declaration / ownership boundary と、source
   implementation の algorithm / failure / native side effect boundary
 - acceptance trace: header/source anchor、Doxygen projection、native ownership/header
@@ -230,7 +231,7 @@ normalization の意味、owner、evidence、validation を、次の短い struc
 
 | id | normalization meaning | owner | evidence | validation |
 | --- | --- | --- | --- | --- |
-| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | canonical dependency readback と design document source anchor | canonical CI/readback、prose/source-reference readback、native-path candidate |
+| DAL-01 | C++ native consumer は build design が選ぶ profile と実在 source/header anchor に正規化する | [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | canonical dependency readback と design document source anchor | canonical CI/readback、prose/source-reference readback、native-path candidate |
 | DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | C++ projection record の adapter owner、target identity、header/source anchor | DIC source trace と C++ adapter readback |
 | DAL-03 | reviewer 選択は changed-surface evidence を existing language/docs candidates へ正規化し、OOP ownerだけを capability projection へ渡す | `tools/agent/orchestration/agent_team.py` + `agents/skills/catalog.yaml` | candidate list、OOP route packet、dependency order | `language_review_candidates`、`route.py`、orchestration check |
 | DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | DIC path / section / clause / evidence trace | docs check と DIC source-trace readback |
@@ -349,7 +350,7 @@ Completion は欄の充足率ではなく、次の forward/reverse correspondenc
 | DSC-02 | canonical skeleton | [documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton](DOCSTRING_GUIDE.md#canonical-template-skeleton) | [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md) | document-template record with section anchor |
 | DSC-03 | document-template responsibility region | this section | [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md) | authority/target/acceptance section trace |
 | DSC-04 | Python syntax/public surface | [documents/conventions/coding-conventions-python.md](coding-conventions-python.md) | `templates/experiments/_template/run.py`, `cases.py` | DIC path/section/clause/evidence readback for Python regions |
-| DSC-05 | C++ syntax/native boundary and build-design join | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | derived-repo `cpp/include/<project>/...` / `cpp/src/...` target identity | DIC path/section/clause/evidence readback with build-design anchor |
+| DSC-05 | C++ syntax/native boundary and build-design join | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | selected-profile native header/source target identity | DIC path/section/clause/evidence readback with build-design anchor |
 | DSC-06 | existing prose migration | this guide plus language convention owners | existing Python/C++ prose converted into projection consumers | duplicate semantic owner removed and DIC trace retained |
 | DSC-07 | reviewer routing | `agent_team.language_review_candidates` plus OOP capability owner | existing changed-path candidates and OOP route packet | language implementation/docs candidates; no keyword/new branch |
 | DSC-08 | positive completion | this section | implementation Docstring and review artifact | each current path has forward/reverse DIC trace; no per-function record |

@@ -59,9 +59,7 @@ def test_same_repository_candidate_materializes_publisher_tool_call(
         check=True,
     )
     (product_root / "README.md").write_text("product checkout\n", encoding="utf-8")
-    subprocess.run(
-        ["git", "add", "README.md"], cwd=product_root, check=True
-    )
+    subprocess.run(["git", "add", "README.md"], cwd=product_root, check=True)
     subprocess.run(
         [
             "git",
@@ -114,7 +112,10 @@ def test_same_repository_candidate_materializes_publisher_tool_call(
     assert result.tool_call is not None
     assert result.tool_call["tool_id"] == "issue-worker"
     assert result.tool_call["arguments"]["publisher_agent_id"] == "publisher-1"
-    assert result.tool_call["arguments"]["checkout_repository"] == "iwashita-nozomu/agent-canon"
+    assert (
+        result.tool_call["arguments"]["checkout_repository"]
+        == "iwashita-nozomu/agent-canon"
+    )
     assert result.tool_call["arguments"]["agentcanon_source_root"] == str(PROJECT_ROOT)
     assert result.tool_call["arguments"]["target_root"] == str(product_root)
     stage_command = result.tool_call["arguments"]["receipt_stage_command"]
@@ -172,13 +173,16 @@ def test_t15_without_explicit_candidate_has_no_initial_publisher() -> None:
     active_subagents, _ = workflow_spawn_budget(catalog, "issue_worker_publication")
 
     assert roles == ()
-    assert recommended_initial_subagent_wave(
-        roles,
-        active_subagents,
-        catalog,
-        agent_root=PROJECT_ROOT / ".codex" / "agents",
-        workflow_family_id="issue_worker_publication",
-    ) == ()
+    assert (
+        recommended_initial_subagent_wave(
+            roles,
+            active_subagents,
+            catalog,
+            agent_root=PROJECT_ROOT / ".codex" / "agents",
+            workflow_family_id="issue_worker_publication",
+        )
+        == ()
+    )
 
 
 def test_adversarial_cross_owner_selection_materializes_terra_wave() -> None:
@@ -342,6 +346,10 @@ def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> Non
 def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Exercise this self-contained source checkout instead of the image's
+    # mounted install-root override.
+    monkeypatch.delenv("AGENT_CANON_SOURCE_ROOT", raising=False)
+    monkeypatch.delenv("AGENT_CANON_ROOT", raising=False)
     calls: list[tuple[str, str]] = []
 
     def spawn(agent_type: str, prompt: str) -> str:
@@ -379,13 +387,43 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
             )
 
         assert return_code == 0
-        assert len(calls) == 1
+        manifest_path = report_root / run_id / "team_manifest.yaml"
+        manifest_payload = (
+            yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            if manifest_path.is_file()
+            else None
+        )
+        run_payload = (
+            manifest_payload.get("run") if isinstance(manifest_payload, dict) else None
+        )
+        dispatch_payload = (
+            run_payload.get("issue_worker_dispatch")
+            if isinstance(run_payload, dict)
+            else None
+        )
+        dispatch_status = (
+            dispatch_payload.get("status")
+            if isinstance(dispatch_payload, dict)
+            else None
+        )
+        handoff_payload = (
+            dispatch_payload.get("handoff")
+            if isinstance(dispatch_payload, dict)
+            else None
+        )
+        handoff_reason = (
+            handoff_payload.get("reason") if isinstance(handoff_payload, dict) else None
+        )
+        assert len(calls) == 1, (
+            "expected one publisher spawn; "
+            f"bootstrap_output={output.getvalue()!r}; "
+            f"dispatch_status={dispatch_status!r}; "
+            f"handoff_reason={handoff_reason!r}"
+        )
         assert calls[0][0] == "publisher"
         assert "ISSUE_WORKER_TOOL_CALL=" in output.getvalue()
         assert "RECOMMENDED_INITIAL_SUBAGENT_ROLES=publisher" in output.getvalue()
-        manifest = yaml.safe_load(
-            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
-        )
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
         run = manifest["run"]
         assert run["spawn_wave_recommendation"]["initial_wave_agent_types"] == [
             "worker"
@@ -625,7 +663,9 @@ def test_missing_target_root_routes_to_publisher_investigation(monkeypatch) -> N
             )
         return original_resolver(workspace)
 
-    monkeypatch.setattr(issue_worker_dispatch, "resolve_checkout_identity", resolve_target_identity)
+    monkeypatch.setattr(
+        issue_worker_dispatch, "resolve_checkout_identity", resolve_target_identity
+    )
     calls: list[str] = []
     result = issue_worker_dispatch.dispatch_issue_worker(
         _candidate(),

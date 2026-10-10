@@ -42,18 +42,18 @@ Complex low-level code or a compiler flag alone is not performance evidence.
 
 ## Use When
 
-Use when an active review requires native C/C++ evidence, including changes beneath
-`cpp/src/`, `cpp/include/`, `tests/cpp/`, `cpp/experiments/`, native build settings,
-public headers, ABI/FFI/CLI behavior, or C++ Docstring projection. CMake analysis
+Use when an active review requires native C/C++ evidence, including changes to the
+selected profile's production source/header paths, CMake manifests, native build
+settings, public headers, ABI/FFI/CLI behavior, or C++ Docstring projection. CMake analysis
 setup and explicit native performance/debugging requests use their matching rows.
 A `cpp_reviewer` candidate from changed-path routing is considered under the same
 claim/risk condition rather than automatically launched.
 
 ## Project-owned execution
 
-通常の configure / build / test / static analysis は、project-owned の規定経路を
-既定設定のまま実行します。`make run tests/cpp/nn` が入口なら、その command を先に
-実行し、失敗した場合だけ必要な経路診断を行います。Docker context / image、cgroup
+通常の configure / build / test / static analysis は、selected profile の
+project-owned 規定経路を既定設定のまま実行します。project owner が Make target などの
+入口を示す場合は、その既存 command を先に実行し、失敗した場合だけ必要な経路診断を行います。Docker context / image、cgroup
 version / driver、有限の memory / CPU / PIDs 上限の事前確認は行わず、未設定・
 未確認や cgroup v1 を理由に開始を止めません。
 
@@ -152,13 +152,12 @@ additional policy owners or a startup reading list:
 
 ## Target graph readback
 
-For the selected `cpp/CMakeLists.txt` project graph, read back its existing contract:
-`cpp/src`, `cpp/include`, `${ROOT}/tests/cpp`, and `cpp/experiments` share the configure
-graph; tests use explicit out-of-tree source/binary directories. `cpp-test-<name>` and
-`cpp-experiment-<name>` consume `cpp-core`, with `cpp-tests` / `cpp-experiments` grouping.
-The anchors are `$ROOT/cpp`, `$ROOT/build/cpp/<profile>`, and
-`$ROOT/.state/cpp-install/<profile>`. Run/result publication stays with experiment
-lifecycle. These project-specific paths do not replace another consumer's graph.
+For C++ path/build changes, read the selected profile from
+`documents/design/cpp-build-layout.md` and the consumer's existing CMake owner. Check
+its actual production source/header paths, configure entrypoint, target dependencies,
+binary directory, and test registration. `root-aggregate` and `consumer-local` are
+separate graph shapes; neither is a fallback for the other. Target names and output
+paths are project-owned. Run/result publication stays with experiment lifecycle.
 
 ## Docstring projection route
 

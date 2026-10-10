@@ -4,6 +4,7 @@
 # responsibility Owns typed capacity derivation, spawn reservations, saturation queues, and descendant lifecycle CAS.
 # upstream implementation ../../../agents/capacity_policy.toml declares topology and projection policy
 # upstream implementation ../../../.codex/config.toml provides configured capacity loader readback
+# upstream implementation ../../runtime/values.py refines decoded lifecycle projections
 # downstream implementation ./implementation_dispatch.py consumes capacity and records successful spawns
 # downstream implementation ./implementation_route.py consumes availability for Spark routing
 # downstream implementation ../../runtime/lifecycle/task_close.py validates postorder close tokens and release state
@@ -17,15 +18,19 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import List, Mapping, Optional, Sequence, Tuple
+from typing import List, Mapping, Optional, Sequence, Tuple, TypedDict
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib
+import tomllib
+
+if __package__ in (None, ""):
+    # Preserve the documented direct-file CLI's canonical package imports.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from tools.runtime.values import is_object_list, is_string_object_dict
 
 Ref = str
 Id = str
@@ -73,7 +78,9 @@ class CapacityPolicy:
     workflow_budget_derivation: str = "direct_frontier_plus_nested_reservations_once"
     write_slot_derivation: str = "max_pairwise_disjoint_write_frontier"
     source_ref: Ref = "agents/capacity_policy.toml"
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("capacity_policy_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("capacity_policy_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -131,7 +138,9 @@ class TopologyCapacityNode:
 
 @dataclass(frozen=True)
 class TopologyCapacityWitness:
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("topology_capacity_witness_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("topology_capacity_witness_v1"), init=False
+    )
     witness_version: int = 1
     target_state_contract_sha256: Sha256 = ""
     declared_team_topology_ref: Ref = "agents/task_catalog.yaml"
@@ -159,8 +168,13 @@ class TopologyCapacityWitness:
                 raise ValueError(f"topology_witness:self_predecessor:{node.node_id}")
             if any(predecessor not in node_ids for predecessor in node.predecessor_ids):
                 raise ValueError(f"topology_witness:unknown_predecessor:{node.node_id}")
-            if node.node_kind == "descendant" and node.descendant_parent_id not in node_ids:
-                raise ValueError(f"topology_witness:descendant_parent_missing:{node.node_id}")
+            if (
+                node.node_kind == "descendant"
+                and node.descendant_parent_id not in node_ids
+            ):
+                raise ValueError(
+                    f"topology_witness:descendant_parent_missing:{node.node_id}"
+                )
 
 
 @dataclass(frozen=True)
@@ -170,11 +184,17 @@ class MaxThreadsLoaderEvidence:
     raw_text: Optional[str] = None
     evidence_ref: Ref = ".codex/config.toml"
     message: Optional[str] = None
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("max_threads_loader_evidence_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("max_threads_loader_evidence_v1"), init=False
+    )
 
     @property
     def success(self) -> bool:
-        return self.loaded and isinstance(self.configured_max_threads, int) and self.configured_max_threads > 0
+        return (
+            self.loaded
+            and isinstance(self.configured_max_threads, int)
+            and self.configured_max_threads > 0
+        )
 
 
 @dataclass(frozen=True)
@@ -186,14 +206,18 @@ class RequestedCapacityLoaderEvidence:
     direct_frontier_count: int
     nested_reservation_count: int
     message: Optional[str] = None
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("requested_capacity_loader_evidence_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("requested_capacity_loader_evidence_v1"),
+        init=False,
+    )
 
     @property
     def success(self) -> bool:
         return bool(
             self.requested_total_capacity
             and self.derived_from_topology
-            and self.requested_total_capacity == self.direct_frontier_count + self.nested_reservation_count
+            and self.requested_total_capacity
+            == self.direct_frontier_count + self.nested_reservation_count
         )
 
 
@@ -205,7 +229,9 @@ class CapacityInputProvenance:
     loader_id: str
     readback_value: Optional[int]
     status: str
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("capacity_input_provenance_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("capacity_input_provenance_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -213,7 +239,9 @@ class CapacityInputEvidence:
     max_threads_loader: MaxThreadsLoaderEvidence
     requested_capacity_loader: RequestedCapacityLoaderEvidence
     provenance: tuple[CapacityInputProvenance, ...]
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("capacity_input_evidence_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("capacity_input_evidence_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -223,7 +251,9 @@ class SessionCapacityContract:
     capacity_policy: CapacityPolicy
     input_evidence: CapacityInputEvidence
     generation_active: bool = True
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("session_capacity_contract_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("session_capacity_contract_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -243,7 +273,9 @@ class CapacitySnapshot:
     currently_available_write_slots: Optional[int] = None
     workflow_dag_write_demand: int = 0
     input_provenance: tuple[CapacityInputProvenance, ...] = ()
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("capacity_snapshot_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("capacity_snapshot_v1"), init=False
+    )
 
     @property
     def requested_total_capacity(self) -> int:
@@ -255,7 +287,11 @@ class CapacitySnapshot:
 
     @property
     def effective_total_capacity(self) -> int:
-        values = [self.requested_capacity, self.configured_max_threads, self.workflow_total_demand]
+        values = [
+            self.requested_capacity,
+            self.configured_max_threads,
+            self.workflow_total_demand,
+        ]
         if self.workflow_dag_budget is not None:
             values.append(self.workflow_dag_budget)
         if self.platform_advertised_effective_cap is not None:
@@ -266,7 +302,10 @@ class CapacitySnapshot:
     def available_total_capacity(self) -> int:
         if self.currently_available_runtime_slots is None:
             return self.effective_total_capacity
-        return max(min(self.effective_total_capacity, self.currently_available_runtime_slots), 0)
+        return max(
+            min(self.effective_total_capacity, self.currently_available_runtime_slots),
+            0,
+        )
 
     @property
     def reserved_total_capacity(self) -> int:
@@ -290,7 +329,9 @@ class CapacitySnapshot:
     def available_write_capacity(self) -> int:
         if self.currently_available_write_slots is None:
             return self.effective_write_capacity
-        return max(min(self.effective_write_capacity, self.currently_available_write_slots), 0)
+        return max(
+            min(self.effective_write_capacity, self.currently_available_write_slots), 0
+        )
 
     @property
     def remaining_write_slots(self) -> int:
@@ -305,7 +346,9 @@ class CapacitySnapshot:
 class DescendantTopologyReadback:
     parent_work_id: Id
     descendants: Sequence["DescendantLifecycleRecord"] = ()
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("descendant_topology_readback_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("descendant_topology_readback_v1"), init=False
+    )
 
 
 @dataclass
@@ -322,7 +365,85 @@ class DescendantLifecycleRecord:
     reserved_write_slots: int = 0
     transition_generation: int = 0
     transition_history: list["LifecycleTransitionRecord"] = field(default_factory=list)
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("descendant_lifecycle_record_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("descendant_lifecycle_record_v1"), init=False
+    )
+
+
+class DescendantLifecycleRecordProjection(TypedDict):
+    """Wire projection owned by the descendant lifecycle record."""
+
+    work_id: str
+    parent_work_id: str | None
+    profile_id: str
+    status: str
+    durable_result_evidence_ref: str | None
+    durable_handback: bool
+    descendants_closed: bool
+    close_readback: bool
+    reserved_slots: int
+    reserved_write_slots: int
+    transition_generation: int
+
+
+def descendant_record_projection(
+    record: DescendantLifecycleRecord,
+) -> DescendantLifecycleRecordProjection:
+    """Serialize one typed lifecycle record through its owner projection."""
+    return {
+        "work_id": record.work_id,
+        "parent_work_id": record.parent_work_id,
+        "profile_id": record.profile_id,
+        "status": record.status.value,
+        "durable_result_evidence_ref": record.durable_result_evidence_ref,
+        "durable_handback": record.durable_handback,
+        "descendants_closed": record.descendants_closed,
+        "close_readback": record.close_readback,
+        "reserved_slots": record.reserved_slots,
+        "reserved_write_slots": record.reserved_write_slots,
+        "transition_generation": record.transition_generation,
+    }
+
+
+def _projection_integer(value: object) -> int:
+    """Normalize JSON integer-compatible values at the lifecycle wire owner."""
+    if not isinstance(value, (int, float, str)):
+        raise TypeError("capacity_ledger_record_invalid")
+    return int(value)
+
+
+def descendant_record_from_projection(
+    value: object,
+) -> DescendantLifecycleRecord:
+    """Rebuild one owner record from its serialized lifecycle projection."""
+    if not is_string_object_dict(value):
+        raise ValueError("capacity_ledger_record_invalid")
+    parent_work_id = value.get("parent_work_id")
+    evidence_ref = value.get("durable_result_evidence_ref")
+    if (parent_work_id is not None and not isinstance(parent_work_id, str)) or (
+        evidence_ref is not None and not isinstance(evidence_ref, str)
+    ):
+        raise ValueError("capacity_ledger_record_invalid")
+    raw_status = value.get("status")
+    try:
+        status = LifecycleStatus(str(raw_status))
+    except ValueError as exc:
+        raise ValueError(f"unknown lifecycle status: {raw_status}") from exc
+    return DescendantLifecycleRecord(
+        work_id=str(value.get("work_id", "")),
+        parent_work_id=parent_work_id,
+        profile_id=str(value.get("profile_id", "")),
+        status=status,
+        durable_result_evidence_ref=evidence_ref,
+        durable_handback=bool(value.get("durable_handback", False)),
+        descendants_closed=bool(value.get("descendants_closed", False)),
+        close_readback=bool(value.get("close_readback", False)),
+        reserved_slots=_projection_integer(value.get("reserved_slots", 1)),
+        reserved_write_slots=_projection_integer(value.get("reserved_write_slots", 0)),
+        transition_generation=_projection_integer(
+            value.get("transition_generation", 0)
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -333,7 +454,9 @@ class LifecycleTransitionRecord:
     expected_generation: int
     resulting_generation: int
     evidence_ref: Optional[Ref] = None
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("lifecycle_transition_record_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("lifecycle_transition_record_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -344,12 +467,16 @@ class ParentChildEdge:
 
 @dataclass
 class CapacityLedger:
-    topology: DescendantTopologyReadback = field(default_factory=lambda: DescendantTopologyReadback(parent_work_id=""))
+    topology: DescendantTopologyReadback = field(
+        default_factory=lambda: DescendantTopologyReadback(parent_work_id="")
+    )
     open_records: dict[Id, DescendantLifecycleRecord] = field(default_factory=dict)
     ready_queue: List["ReadyWorkItem"] = field(default_factory=list)
     reservations: dict[Id, ParentChildEdge] = field(default_factory=dict)
     transitions: list[LifecycleTransitionRecord] = field(default_factory=list)
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("capacity_ledger_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("capacity_ledger_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -358,7 +485,9 @@ class ThreadSaturationEvent:
     reason: str
     available_slots: int
     required_slots: int
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("thread_saturation_event_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("thread_saturation_event_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -366,7 +495,9 @@ class ModelCapacityEvent:
     work_id: Id
     model: str
     reason: str
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("model_capacity_event_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("model_capacity_event_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -410,7 +541,9 @@ class RestartRequiredEvidence:
 class LedgerWriteResult:
     write_success: bool
     errors: Tuple[str, ...] = ()
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("ledger_write_result_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("ledger_write_result_v1"), init=False
+    )
 
 
 @dataclass(frozen=True)
@@ -431,27 +564,42 @@ class CloseoutPacket:
     close_agent_calls: Sequence[CloseAgentCallRecord]
     failures: Sequence[LifecycleCloseoutFailure]
     status: str
-    shape_id: ShapeId = field(default_factory=lambda: _shape_id("closeout_packet_v1"), init=False)
+    shape_id: ShapeId = field(
+        default_factory=lambda: _shape_id("closeout_packet_v1"), init=False
+    )
 
 
 def capacity_from_topology_derivation(evidence: DeclaredTeamTopologyDerivation) -> int:
     return evidence.requested_max_threads()
 
 
-def load_max_threads_loader(path: str = ".codex/config.toml") -> MaxThreadsLoaderEvidence:
+def load_max_threads_loader(
+    path: str = ".codex/config.toml",
+) -> MaxThreadsLoaderEvidence:
     config_path = Path(path)
     try:
         raw = config_path.read_text(encoding="utf-8")
-        parsed = tomllib.loads(raw)
-        configured = parsed.get("agents", {}).get("max_threads")
+        parsed: object = tomllib.loads(raw)
+        if not is_string_object_dict(parsed):
+            raise AttributeError("configuration root must be a table")
+        agents = parsed.get("agents", {})
+        if not is_string_object_dict(agents):
+            raise AttributeError("agents configuration must be a table")
+        configured = agents.get("max_threads")
     except (OSError, tomllib.TOMLDecodeError, AttributeError) as exc:
-        return MaxThreadsLoaderEvidence(False, None, evidence_ref=path, message=f"unreadable_config:{exc}")
+        return MaxThreadsLoaderEvidence(
+            False, None, evidence_ref=path, message=f"unreadable_config:{exc}"
+        )
     if not isinstance(configured, int) or configured <= 0:
-        return MaxThreadsLoaderEvidence(False, None, raw, path, "configured_max_threads_not_positive_int")
+        return MaxThreadsLoaderEvidence(
+            False, None, raw, path, "configured_max_threads_not_positive_int"
+        )
     return MaxThreadsLoaderEvidence(True, configured, raw, path)
 
 
-def load_requested_capacity(evidence: DeclaredTeamTopologyDerivation) -> RequestedCapacityLoaderEvidence:
+def load_requested_capacity(
+    evidence: DeclaredTeamTopologyDerivation,
+) -> RequestedCapacityLoaderEvidence:
     peak = evidence.peak_family
     requested = peak.direct_frontier_count + peak.nested_reservation_count
     proof = {
@@ -486,9 +634,16 @@ def validate_topology_inputs(evidence: TopologyCapacityWitness) -> None:
     evidence.assert_legal_topology()
     if evidence.requested_total_capacity <= 0:
         raise ValueError("requested_total_capacity:must_be_positive")
-    if evidence.workflow_dag_peak_demand + evidence.nested_reservation_count != evidence.requested_total_capacity:
+    if (
+        evidence.workflow_dag_peak_demand + evidence.nested_reservation_count
+        != evidence.requested_total_capacity
+    ):
         raise ValueError("requested_total_capacity:must_equal_direct_plus_nested_once")
-    if evidence.derivation is not None and evidence.derivation.requested_max_threads() != evidence.requested_total_capacity:
+    if (
+        evidence.derivation is not None
+        and evidence.derivation.requested_max_threads()
+        != evidence.requested_total_capacity
+    ):
         raise ValueError("requested_total_capacity:derivation_mismatch")
 
 
@@ -503,7 +658,13 @@ def load_startup_contract(
     requested = load_requested_capacity(derivation)
     if not max_threads.success or not requested.success:
         raise RuntimeError(
-            str(RestartRequiredEvidence("capacity_loader_failed", max_threads.configured_max_threads, requested.requested_total_capacity))
+            str(
+                RestartRequiredEvidence(
+                    "capacity_loader_failed",
+                    max_threads.configured_max_threads,
+                    requested.requested_total_capacity,
+                )
+            )
         )
     provenance = (
         CapacityInputProvenance(
@@ -565,23 +726,66 @@ def make_session_snapshot(
     workflow_dag_budget: Optional[int] = None,
 ) -> CapacitySnapshot:
     requested = requested_capacity or contract.capacity_policy.requested_total_capacity
-    configured = configured_max_threads or contract.input_evidence.max_threads_loader.configured_max_threads
+    configured = (
+        configured_max_threads
+        or contract.input_evidence.max_threads_loader.configured_max_threads
+    )
     if configured is None or configured <= 0 or requested <= 0:
         raise ValueError("capacity_snapshot:requested_and_configured_required")
-    direct_demand = workflow_dag_demand if workflow_dag_demand is not None else requested - nested_capacity_reservation
+    direct_demand = (
+        workflow_dag_demand
+        if workflow_dag_demand is not None
+        else requested - nested_capacity_reservation
+    )
     if direct_demand < 0 or direct_demand + nested_capacity_reservation != requested:
         raise ValueError("capacity_snapshot:nested_reservation_must_be_counted_once")
     write_cap = write_scope_cap or requested
-    requested_write = requested_write_capacity if requested_write_capacity is not None else write_cap
-    write_demand = workflow_dag_write_demand if workflow_dag_write_demand is not None else requested_write
+    requested_write = (
+        requested_write_capacity if requested_write_capacity is not None else write_cap
+    )
+    write_demand = (
+        workflow_dag_write_demand
+        if workflow_dag_write_demand is not None
+        else requested_write
+    )
     budget = workflow_dag_budget if workflow_dag_budget is not None else requested
     provenance = contract.input_evidence.provenance + (
-        _provenance("platform_effective_total_capacity", platform_advertised_effective_cap, "runtime://platform/effective-total", "platform_capacity_loader_v1"),
-        _provenance("current_available_total_capacity", currently_available_runtime_slots, "runtime://current/available-total", "current_capacity_loader_v1"),
-        _provenance("workflow_dag_direct_demand", direct_demand, "agents/task_catalog.yaml", "workflow_dag_loader_v1"),
-        _provenance("nested_reservation_count", nested_capacity_reservation, "agents/task_catalog.yaml", "nested_reservation_loader_v1"),
-        _provenance("write_scope_cap", write_cap, "team_manifest.run.write_scopes", "write_scope_loader_v1"),
-        _provenance("current_available_write_capacity", currently_available_write_slots, "runtime://current/available-write", "current_write_capacity_loader_v1"),
+        _provenance(
+            "platform_effective_total_capacity",
+            platform_advertised_effective_cap,
+            "runtime://platform/effective-total",
+            "platform_capacity_loader_v1",
+        ),
+        _provenance(
+            "current_available_total_capacity",
+            currently_available_runtime_slots,
+            "runtime://current/available-total",
+            "current_capacity_loader_v1",
+        ),
+        _provenance(
+            "workflow_dag_direct_demand",
+            direct_demand,
+            "agents/task_catalog.yaml",
+            "workflow_dag_loader_v1",
+        ),
+        _provenance(
+            "nested_reservation_count",
+            nested_capacity_reservation,
+            "agents/task_catalog.yaml",
+            "nested_reservation_loader_v1",
+        ),
+        _provenance(
+            "write_scope_cap",
+            write_cap,
+            "team_manifest.run.write_scopes",
+            "write_scope_loader_v1",
+        ),
+        _provenance(
+            "current_available_write_capacity",
+            currently_available_write_slots,
+            "runtime://current/available-write",
+            "current_write_capacity_loader_v1",
+        ),
     )
     return CapacitySnapshot(
         contract=contract,
@@ -609,14 +813,20 @@ def queue_ready_work(item: ReadyWorkItem, queue: List[ReadyWorkItem]) -> QueueRe
 
 
 def _reserved_capacity(ledger: CapacityLedger) -> tuple[int, int]:
-    records = [ledger.open_records[work_id] for work_id in ledger.reservations if work_id in ledger.open_records]
+    records = [
+        ledger.open_records[work_id]
+        for work_id in ledger.reservations
+        if work_id in ledger.open_records
+    ]
     return (
         sum(record.reserved_slots for record in records),
         sum(record.reserved_write_slots for record in records),
     )
 
 
-def _can_grant(snapshot: CapacitySnapshot, ledger: CapacityLedger, item: ReadyWorkItem) -> bool:
+def _can_grant(
+    snapshot: CapacitySnapshot, ledger: CapacityLedger, item: ReadyWorkItem
+) -> bool:
     total_reserved, write_reserved = _reserved_capacity(ledger)
     return (
         snapshot.remaining_total_slots - total_reserved >= item.required_slots
@@ -633,11 +843,17 @@ def request_slot(
 ) -> ReservationResult:
     """Return spawn readiness without creating a reservation."""
     if model_capacity_denied:
-        event = ModelCapacityEvent(item.work_id, model_name or item.model, "model_service_overload")
+        event = ModelCapacityEvent(
+            item.work_id, model_name or item.model, "model_service_overload"
+        )
         queue_ready_work(item, ledger.ready_queue)
-        return ReservationResult("queued", item, 0, 0, (event,), "runtime://capacity/ready-queue")
+        return ReservationResult(
+            "queued", item, 0, 0, (event,), "runtime://capacity/ready-queue"
+        )
     if _can_grant(snapshot, ledger, item):
-        return ReservationResult("ready", item, item.required_slots, item.required_write_slots)
+        return ReservationResult(
+            "ready", item, item.required_slots, item.required_write_slots
+        )
     total_reserved, _ = _reserved_capacity(ledger)
     event = ThreadSaturationEvent(
         item.work_id,
@@ -646,7 +862,9 @@ def request_slot(
         item.required_slots,
     )
     queue_ready_work(item, ledger.ready_queue)
-    return ReservationResult("queued", item, 0, 0, (event,), "runtime://capacity/ready-queue")
+    return ReservationResult(
+        "queued", item, 0, 0, (event,), "runtime://capacity/ready-queue"
+    )
 
 
 def record_successful_spawn(
@@ -665,7 +883,9 @@ def record_successful_spawn(
         return readiness
     if not spawn_succeeded:
         queue_ready_work(item, ledger.ready_queue)
-        return ReservationResult("queued", item, 0, 0, queue_ref="runtime://capacity/ready-queue")
+        return ReservationResult(
+            "queued", item, 0, 0, queue_ref="runtime://capacity/ready-queue"
+        )
     parent = parent_work_id or ledger.topology.parent_work_id
     record = DescendantLifecycleRecord(
         work_id=item.work_id,
@@ -680,8 +900,12 @@ def record_successful_spawn(
         ledger.topology.parent_work_id,
         tuple((*ledger.topology.descendants, record)),
     )
-    ledger.ready_queue[:] = [queued for queued in ledger.ready_queue if queued.work_id != item.work_id]
-    return ReservationResult("granted", item, item.required_slots, item.required_write_slots)
+    ledger.ready_queue[:] = [
+        queued for queued in ledger.ready_queue if queued.work_id != item.work_id
+    ]
+    return ReservationResult(
+        "granted", item, item.required_slots, item.required_write_slots
+    )
 
 
 def record_lifecycle_transition(
@@ -696,11 +920,16 @@ def record_lifecycle_transition(
     current = ledger.open_records.get(item_id)
     if current is None:
         raise ValueError(f"lifecycle:unknown_record:{item_id}")
-    if current.status != expected_status or current.transition_generation != expected_generation:
+    if (
+        current.status != expected_status
+        or current.transition_generation != expected_generation
+    ):
         raise ValueError(f"lifecycle:compare_and_swap_failed:{item_id}")
     required_next = _NEXT_LIFECYCLE_STATUS.get(expected_status)
     if required_next != new_status:
-        raise ValueError(f"lifecycle:out_of_order:{expected_status.value}->{new_status.value}")
+        raise ValueError(
+            f"lifecycle:out_of_order:{expected_status.value}->{new_status.value}"
+        )
     if new_status == LifecycleStatus.DURABLE_RESULT_EVIDENCE and not evidence_ref:
         raise ValueError("lifecycle:durable_result_evidence_ref_required")
     if new_status == LifecycleStatus.DESCENDANTS_CLOSURE_VERIFIED:
@@ -709,10 +938,16 @@ def record_lifecycle_transition(
             for record in ledger.open_records.values()
             if record.parent_work_id == item_id
         ]
-        if any(child.status != LifecycleStatus.RESERVATION_RELEASED for child in children):
+        if any(
+            child.status != LifecycleStatus.RESERVATION_RELEASED for child in children
+        ):
             raise ValueError("lifecycle:descendants_not_closed_postorder")
     if new_status == LifecycleStatus.RESERVATION_RELEASED:
-        if not (current.durable_handback and current.descendants_closed and current.close_readback):
+        if not (
+            current.durable_handback
+            and current.descendants_closed
+            and current.close_readback
+        ):
             raise ValueError("lifecycle:release_preconditions_missing")
         if item_id not in ledger.reservations:
             raise ValueError("lifecycle:reservation_missing_before_release")
@@ -741,7 +976,9 @@ def record_lifecycle_transition(
     return current
 
 
-def _postorder_records(records: Sequence[DescendantLifecycleRecord]) -> tuple[DescendantLifecycleRecord, ...]:
+def _postorder_records(
+    records: Sequence[DescendantLifecycleRecord],
+) -> tuple[DescendantLifecycleRecord, ...]:
     by_parent: dict[str | None, list[DescendantLifecycleRecord]] = {}
     for record in records:
         by_parent.setdefault(record.parent_work_id, []).append(record)
@@ -752,7 +989,9 @@ def _postorder_records(records: Sequence[DescendantLifecycleRecord]) -> tuple[De
         if record.work_id in visiting:
             raise ValueError("lifecycle:descendant_cycle")
         visiting.add(record.work_id)
-        for child in sorted(by_parent.get(record.work_id, []), key=lambda value: value.work_id):
+        for child in sorted(
+            by_parent.get(record.work_id, []), key=lambda value: value.work_id
+        ):
             visit(child)
         visiting.remove(record.work_id)
         result.append(record)
@@ -775,22 +1014,38 @@ def materialize_closeout_packet(
     failures: list[LifecycleCloseoutFailure] = []
     calls: list[CloseAgentCallRecord] = []
     tokens = close_agent_tokens or {}
-    records = tuple(record for topology in descendants for record in topology.descendants)
+    records = tuple(
+        record for topology in descendants for record in topology.descendants
+    )
     provided_ids = {record.work_id for record in records}
     try:
         postorder = _postorder_records(records)
     except ValueError as exc:
-        return CloseoutPacket(parent_work_id, (), (LifecycleCloseoutFailure(parent_work_id, str(exc)),), "failed")
+        return CloseoutPacket(
+            parent_work_id,
+            (),
+            (LifecycleCloseoutFailure(parent_work_id, str(exc)),),
+            "failed",
+        )
     for known_id, record in ledger.open_records.items():
         if record.parent_work_id == parent_work_id and known_id not in provided_ids:
             failures.append(LifecycleCloseoutFailure(known_id, "unknown_descendant"))
     for record in postorder:
-        if record.status not in {LifecycleStatus.READBACK_VERIFIED, LifecycleStatus.RESERVATION_RELEASED}:
-            failures.append(LifecycleCloseoutFailure(record.work_id, "lifecycle_not_readback_verified"))
+        if record.status not in {
+            LifecycleStatus.READBACK_VERIFIED,
+            LifecycleStatus.RESERVATION_RELEASED,
+        }:
+            failures.append(
+                LifecycleCloseoutFailure(
+                    record.work_id, "lifecycle_not_readback_verified"
+                )
+            )
             continue
         token = tokens.get(record.work_id)
         if not isinstance(token, Mapping):
-            failures.append(LifecycleCloseoutFailure(record.work_id, "close_agent_token_missing"))
+            failures.append(
+                LifecycleCloseoutFailure(record.work_id, "close_agent_token_missing")
+            )
             continue
         calls.append(CloseAgentCallRecord(dict(token), record.work_id))
         if record.status == LifecycleStatus.READBACK_VERIFIED:
@@ -805,15 +1060,30 @@ def materialize_closeout_packet(
                 )
             except ValueError as exc:
                 failures.append(LifecycleCloseoutFailure(record.work_id, str(exc)))
-    return CloseoutPacket(parent_work_id, tuple(calls), tuple(failures), "closed" if not failures else "failed")
+    return CloseoutPacket(
+        parent_work_id,
+        tuple(calls),
+        tuple(failures),
+        "closed" if not failures else "failed",
+    )
 
 
-def queued_reclaim(snapshot: CapacitySnapshot, ledger: CapacityLedger, closed_work_id: Id) -> QueueResult:
+def queued_reclaim(
+    snapshot: CapacitySnapshot, ledger: CapacityLedger, closed_work_id: Id
+) -> QueueResult:
     record = ledger.open_records.get(closed_work_id)
     if record is None or record.status != LifecycleStatus.RESERVATION_RELEASED:
-        return QueueResult("unchanged", tuple(ledger.ready_queue), len(ledger.ready_queue))
-    ready = tuple(item for item in ledger.ready_queue if _can_grant(snapshot, ledger, item))
-    return QueueResult("capacity_available" if ready else "unchanged", tuple(ledger.ready_queue), len(ledger.ready_queue))
+        return QueueResult(
+            "unchanged", tuple(ledger.ready_queue), len(ledger.ready_queue)
+        )
+    ready = tuple(
+        item for item in ledger.ready_queue if _can_grant(snapshot, ledger, item)
+    )
+    return QueueResult(
+        "capacity_available" if ready else "unchanged",
+        tuple(ledger.ready_queue),
+        len(ledger.ready_queue),
+    )
 
 
 _CAPACITY_HANDSHAKE_CLI_SCHEMA_ID = "capacity_handshake_cli_v1"
@@ -828,21 +1098,29 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
-def _load_policy_topology_request(root: Path) -> tuple[Optional[int], str, dict[str, int]]:
+def _load_policy_topology_request(
+    root: Path,
+) -> tuple[Optional[int], str, dict[str, int]]:
     path = root / "agents" / "capacity_policy.toml"
     try:
         with path.open("rb") as handle:
-            policy = tomllib.load(handle)
+            policy: object = tomllib.load(handle)
     except FileNotFoundError:
         return None, "capacity_policy_missing", {}
     except tomllib.TOMLDecodeError:
         return None, "capacity_policy_malformed", {}
+    if not is_string_object_dict(policy):
+        return None, "capacity_policy_schema_invalid", {}
     if policy.get("policy_id") != "topology_derived_v1":
         return None, "capacity_policy_schema_invalid", {}
     topology = policy.get("topology_derivation")
     projection = policy.get("runtime_config_change_policy")
     manifest = policy.get("generated_manifest_policy")
-    if not isinstance(topology, dict) or not isinstance(projection, dict) or not isinstance(manifest, dict):
+    if (
+        not is_string_object_dict(topology)
+        or not is_string_object_dict(projection)
+        or not is_string_object_dict(manifest)
+    ):
         return None, "capacity_policy_schema_invalid", {}
     direct = topology.get("direct_frontier_count")
     nested = topology.get("nested_reservation_count")
@@ -857,9 +1135,13 @@ def _load_policy_topology_request(root: Path) -> tuple[Optional[int], str, dict[
     ):
         return None, "capacity_policy_topology_invalid", {}
     predicates = projection.get("required_predicates")
-    if not isinstance(predicates, list) or _TOPOLOGY_WITNESS_PREDICATE not in predicates:
+    if not is_object_list(predicates) or _TOPOLOGY_WITNESS_PREDICATE not in predicates:
         return None, "capacity_policy_schema_invalid", {}
-    return requested, "ok", {"direct_frontier_count": direct, "nested_reservation_count": nested}
+    return (
+        requested,
+        "ok",
+        {"direct_frontier_count": direct, "nested_reservation_count": nested},
+    )
 
 
 def _print_projection_failure(
@@ -882,7 +1164,9 @@ def _print_projection_failure(
                 "derived_requested_capacity": derived,
                 "configured_max_threads": configured,
                 "direct_frontier_count": (counts or {}).get("direct_frontier_count"),
-                "nested_reservation_count": (counts or {}).get("nested_reservation_count"),
+                "nested_reservation_count": (counts or {}).get(
+                    "nested_reservation_count"
+                ),
                 "policy_source_ref": str(root / "agents" / "capacity_policy.toml"),
                 "configured_source_ref": str(root / ".codex" / "config.toml"),
             },
@@ -911,24 +1195,58 @@ def main(argv: Sequence[str] | None = None) -> int:
     root = args.root.resolve()
     derived, status, counts = _load_policy_topology_request(root)
     if status != "ok" or derived is None:
-        _print_projection_failure(reason=status, root=root, expected=args.expected_max_threads, derived=derived, configured=None, counts=counts)
+        _print_projection_failure(
+            reason=status,
+            root=root,
+            expected=args.expected_max_threads,
+            derived=derived,
+            configured=None,
+            counts=counts,
+        )
         return 1
-    expected = args.expected_max_threads if args.expected_max_threads is not None else derived
+    expected = (
+        args.expected_max_threads if args.expected_max_threads is not None else derived
+    )
     if args.write_config_projection:
         try:
             _write_config_projection(root, derived)
         except (OSError, ValueError) as exc:
-            _print_projection_failure(reason=str(exc), root=root, expected=expected, derived=derived, configured=None, counts=counts)
+            _print_projection_failure(
+                reason=str(exc),
+                root=root,
+                expected=expected,
+                derived=derived,
+                configured=None,
+                counts=counts,
+            )
             return 1
     configured_evidence = load_max_threads_loader(str(root / ".codex" / "config.toml"))
     configured = configured_evidence.configured_max_threads
     if not configured_evidence.success:
-        _print_projection_failure(reason="max_threads_loader_unreadable", root=root, expected=expected, derived=derived, configured=configured, counts=counts)
+        _print_projection_failure(
+            reason="max_threads_loader_unreadable",
+            root=root,
+            expected=expected,
+            derived=derived,
+            configured=configured,
+            counts=counts,
+        )
         return 1
     if configured != derived or derived != expected:
-        _print_projection_failure(reason="capacity_config_projection_mismatch", root=root, expected=expected, derived=derived, configured=configured, counts=counts)
+        _print_projection_failure(
+            reason="capacity_config_projection_mismatch",
+            root=root,
+            expected=expected,
+            derived=derived,
+            configured=configured,
+            counts=counts,
+        )
         return 1
-    print("CAPACITY_CONFIG_PROJECTION=written" if args.write_config_projection else "CAPACITY_CONFIG_PROJECTION=pass")
+    print(
+        "CAPACITY_CONFIG_PROJECTION=written"
+        if args.write_config_projection
+        else "CAPACITY_CONFIG_PROJECTION=pass"
+    )
     return 0
 
 
