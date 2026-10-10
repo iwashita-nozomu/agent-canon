@@ -118,7 +118,8 @@ def test_native_zizmor_rejects_uploaded_checkout_credentials() -> None:
             "      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2\n"
             "        with:\n"
             "          name: checkout-git-config\n"
-            "          path: .git/config\n",
+            "          path: .\n"
+            "          include-hidden-files: true\n",
         )
         write_workflow(root, vulnerable_workflow)
         result = run_checker(root)
