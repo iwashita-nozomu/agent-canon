@@ -336,6 +336,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
 
             self.assertTrue((consumer_root / "include").is_dir())
             self.assertTrue((consumer_root / "src").is_dir())
+            # This fixture selects the consumer-local profile; root-aggregate
+            # remains a separate valid project-owned layout.
             self.assertFalse((consumer_root / "CMakeLists.txt").exists())
 
             for topic, sibling in (
