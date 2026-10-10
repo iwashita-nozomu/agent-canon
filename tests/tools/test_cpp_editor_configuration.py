@@ -34,6 +34,10 @@ class CppEditorConfigurationTest(unittest.TestCase):
             (PROJECT_ROOT / ".vscode/settings.json").read_text(encoding="utf-8")
         )
         self.assertNotIn("clangd.arguments", settings)
+        self.assertEqual(
+            settings["cmake.copyCompileCommands"],
+            "${workspaceFolder}/compile_commands.json",
+        )
         self.assertEqual(settings["clangd.path"], "clangd")
         self.assertEqual(settings["clang-format.executable"], "clang-format")
         self.assertEqual(

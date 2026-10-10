@@ -19,6 +19,7 @@
     "build": true,
     "logs": true
   },
+  "cmake.copyCompileCommands": "${workspaceFolder}/compile_commands.json",
   "clangd.path": "clangd",
   "clang-format.executable": "clang-format",
   "[c]": {

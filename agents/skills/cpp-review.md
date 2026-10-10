@@ -111,7 +111,9 @@ unit, and `run-clang-tidy.py -p <build-directory> <sources...>` for the selected
 checks. The build-directory argument locates the project's compile database; it does
 not select a runtime backend. Preserve the native tools' output and exit status; do not
 materialize an active compile-database symlink or enumerate extra include paths,
-compiler flags, or provider-specific diagnostics.
+compiler flags, or provider-specific diagnostics. Keep the project's native `.clang-tidy`
+discovery; pass `-config-file=<path>` directly only when the project owns a nonstandard
+configuration file.
 
 Trace public header/implementation and call-site correspondence, linkage/ABI,
 lifetime, ownership, move/copy, resource release, bounds, null, exception/error
