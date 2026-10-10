@@ -4,6 +4,8 @@
 # upstream design ../../templates/agents/README.md template partial contract
 # downstream implementation ../../tools/runtime/manifest/manifest_rendering.py renders templates and partials
 # downstream implementation ../../templates/code/python/docstring_template.py is the materializable code source
+# downstream implementation ../../templates/code/cpp/include/agent_canon_template/status.hpp C++ interface template
+# downstream implementation ../../templates/code/cpp/src/status.cpp C++ implementation template
 # downstream implementation ../../tools/agent/orchestration/agent_team.py owns facade orchestration
 # @dependency-end
 
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -312,6 +315,84 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertIn("Args:", rendered)
         self.assertIn("Ownership:", rendered)
         self.assertNotIn("return None", rendered)
+
+    def test_cpp_code_template_materializes_paths_for_independent_local_consumers(self) -> None:
+        """Rendered include/src files support separate consumer-local CMake graphs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            consumer_root = tmp_root / "consumer"
+            rendered_sources = {
+                "cpp/include/agent_canon_template/status.hpp": (
+                    "include/agent_canon_template/status.hpp"
+                ),
+                "cpp/src/status.cpp": "src/status.cpp",
+            }
+            for template_name, relative_path in rendered_sources.items():
+                rendered = render_code_template(template_name)
+                destination = consumer_root / relative_path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(rendered, encoding="utf-8")
+                self.assertEqual(destination.read_text(encoding="utf-8"), rendered)
+
+            self.assertTrue((consumer_root / "include").is_dir())
+            self.assertTrue((consumer_root / "src").is_dir())
+            self.assertFalse((consumer_root / "CMakeLists.txt").exists())
+
+            for topic, sibling in (
+                ("topic_alpha", "topic_beta"),
+                ("topic_beta", "topic_alpha"),
+            ):
+                topic_dir = consumer_root / "experiments" / topic
+                topic_dir.mkdir(parents=True)
+                self.assertFalse(
+                    (consumer_root / "experiments" / sibling).exists()
+                )
+                (topic_dir / "main.cpp").write_text(
+                    "#include <agent_canon_template/status.hpp>\n\n"
+                    "int main() {\n"
+                    "    return agent_canon_template::status() == "
+                    "agent_canon_template::Status::ready ? 0 : 1;\n"
+                    "}\n",
+                    encoding="utf-8",
+                )
+                (topic_dir / "CMakeLists.txt").write_text(
+                    "cmake_minimum_required(VERSION 3.16)\n"
+                    f"project({topic} LANGUAGES CXX)\n"
+                    "set(CMAKE_CXX_STANDARD 11)\n"
+                    "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
+                    "enable_testing()\n"
+                    "get_filename_component(CONSUMER_ROOT \"${CMAKE_CURRENT_LIST_DIR}/../..\" ABSOLUTE)\n"
+                    f"add_executable({topic}_smoke main.cpp \"${{CONSUMER_ROOT}}/src/status.cpp\")\n"
+                    f"target_include_directories({topic}_smoke PRIVATE \"${{CONSUMER_ROOT}}/include\")\n"
+                    f"add_test(NAME {topic}_smoke COMMAND {topic}_smoke)\n",
+                    encoding="utf-8",
+                )
+                build_dir = tmp_root / "build" / topic
+                configure = subprocess.run(
+                    ["cmake", "-S", str(topic_dir), "-B", str(build_dir)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(
+                    configure.returncode, 0, configure.stdout + configure.stderr
+                )
+                build = subprocess.run(
+                    ["cmake", "--build", str(build_dir)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+                test = subprocess.run(
+                    ["ctest", "--output-on-failure"],
+                    cwd=build_dir,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(test.returncode, 0, test.stdout + test.stderr)
+                shutil.rmtree(topic_dir)
 
     def test_code_template_renderer_works_from_repo_root_package_route(self) -> None:
         """リポジトリ root の canonical package invocation が source を読み戻せます."""
