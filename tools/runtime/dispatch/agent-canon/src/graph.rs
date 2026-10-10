@@ -4073,6 +4073,8 @@ mod tests {
     fn reference_edges_are_context_evidence_without_parent_authority() {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
+        fs::remove_file(fixture.root.join("reports/agents/.active_run"))
+            .expect("remove source-stale runtime pointer");
         fs::write(
             fixture.root.join("src/source.md"),
             concat!(
