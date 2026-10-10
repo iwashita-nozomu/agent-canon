@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -88,7 +87,6 @@ CANONICAL_MARKER_FIELDS = (
     "topic",
     "branch",
     "url",
-    "owner-evidence-sha256",
 )
 LEGACY_MARKER_FIELDS = (
     "topic",
@@ -97,7 +95,6 @@ LEGACY_MARKER_FIELDS = (
     "url",
     "branch",
     "placement",
-    "owner-evidence-sha256",
 )
 TOPIC_RE = re.compile(r"[^A-Za-z0-9]+")
 
@@ -224,7 +221,6 @@ class RepositoryTopicCloneRequest:
     workspace_root: Path
     topic: str
     branch: str
-    owner_evidence: Path
     checkout_mode: str
     allowed_paths: tuple[str, ...] = ()
     parent_attestation: _parent_boundary.ParentRootAttestationReceipt | None = None
@@ -351,25 +347,6 @@ def _normalise_branch(value: str) -> str:
             f"branch is not a valid named branch: {value!r}"
         )
     return value
-
-
-def _require_evidence(evidence: Path | str, root: Path) -> Path:
-    path = Path(evidence)
-    if not path.is_absolute():
-        path = root / path
-    if not path.is_file() or path.stat().st_size == 0:
-        raise RepositoryTopicCloneError(
-            f"owner evidence must be a non-empty file: {path}"
-        )
-    return path
-
-
-def _evidence_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _require_workspace_ignored(root: Path) -> None:
@@ -634,7 +611,7 @@ def _marker_namespace_present(path: Path, prefix: str, *, checkout_mode: str) ->
 
 
 def _legacy_marker_matches(
-    values: Mapping[str, str], request: RepositoryTopicCloneRequest, owner_sha: str
+    values: Mapping[str, str], request: RepositoryTopicCloneRequest
 ) -> bool:
     """Return whether the historical AgentCanon module marker is exact."""
     module = values["module"]
@@ -646,14 +623,12 @@ def _legacy_marker_matches(
         and values["url"] == _normalise_url(request.url)
         and values["branch"] == request.branch
         and values["placement"] == "workspace-continuation"
-        and values["owner-evidence-sha256"] == owner_sha
     )
 
 
 def _set_marker(
     path: Path,
     request: RepositoryTopicCloneRequest,
-    owner_sha: str,
     branch: str,
 ) -> None:
     for field, value in {
@@ -661,7 +636,6 @@ def _set_marker(
         "topic": topic_slug(request.topic),
         "branch": branch,
         "url": _normalise_url(request.url),
-        "owner-evidence-sha256": owner_sha,
     }.items():
         _run_git(
             path,
@@ -678,7 +652,6 @@ def _inspect(
     path: Path,
     request: RepositoryTopicCloneRequest,
     *,
-    owner_sha: str | None,
     require_clean: bool = True,
 ) -> CloneState:
     """Read computed-path Git identity and cross-check recorded lifecycle markers."""
@@ -743,8 +716,6 @@ def _inspect(
             return CloneState(path, "repository-mismatch")
         if canonical["topic"] != topic_slug(request.topic):
             return CloneState(path, "topic-mismatch")
-        if owner_sha is not None and canonical["owner-evidence-sha256"] != owner_sha:
-            return CloneState(path, "owner-evidence-mismatch")
         marker_branch = canonical["branch"]
     else:
         legacy = _marker_values(
@@ -758,9 +729,7 @@ def _inspect(
                 return CloneState(path, "repository-mismatch")
             if not all(legacy.values()):
                 return CloneState(path, "legacy-marker-incomplete")
-            if owner_sha is None or not _legacy_marker_matches(
-                legacy, request, owner_sha
-            ):
+            if not _legacy_marker_matches(legacy, request):
                 return CloneState(path, "legacy-marker-mismatch")
             marker_branch = legacy["branch"]
     try:
@@ -780,11 +749,10 @@ def _update_existing_prepare_metadata(
     request: RepositoryTopicCloneRequest,
     clone: Path,
     *,
-    owner_sha: str,
     parent_attestation: _parent_boundary.ParentRootAttestationReceipt,
 ) -> PrepareReceipt | None:
     """Refresh only canonical handoff metadata for an exact existing checkout."""
-    state = _inspect(clone, request, owner_sha=None, require_clean=False)
+    state = _inspect(clone, request, require_clean=False)
     if state.state != "ready":
         return None
 
@@ -837,13 +805,6 @@ def _update_existing_prepare_metadata(
     if packet_target is None and target is None:
         return None
 
-    marker = _marker_values(
-        clone,
-        MARKER_PREFIX,
-        CANONICAL_MARKER_FIELDS,
-        checkout_mode=request.checkout_mode,
-    )
-    marker_changed = marker["owner-evidence-sha256"] != owner_sha
     packet_changed = target is not None and (
         packet_target is None
         or packet_target.as_dict() != target.as_dict()
@@ -899,9 +860,6 @@ def _update_existing_prepare_metadata(
                 )
         if not request.allowed_paths:
             effective_request = replace(request, allowed_paths=target.allowed_paths)
-    if marker_changed:
-        _set_marker(clone, effective_request, owner_sha=owner_sha, branch=branch)
-
     candidate_sha = _run_git(clone, ["rev-parse", branch]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
     clone_identity = clone.stat()
@@ -1071,7 +1029,6 @@ def request(
     workspace_root: Path | str,
     topic: str,
     branch: str,
-    owner_evidence: Path | str,
     *,
     allowed_paths: Sequence[str] | None = None,
     policy: RepositoryPolicyCallback | None = None,
@@ -1085,7 +1042,6 @@ def request(
         workspace_root=repository_root,
         topic=topic,
         branch=_normalise_branch(branch),
-        owner_evidence=_require_evidence(owner_evidence, repository_root),
         allowed_paths=tuple(allowed_paths or ()),
         checkout_mode=_normalise_checkout_mode(checkout_mode),
     )
@@ -1096,7 +1052,6 @@ def request(
             workspace_root=request_state.workspace_root,
             topic=request_state.topic,
             branch=request_state.branch,
-            owner_evidence=request_state.owner_evidence,
             allowed_paths=request_state.allowed_paths,
             checkout_mode=request_state.checkout_mode,
             parent_attestation=_attest_parent(
@@ -1110,7 +1065,6 @@ def request(
         request_url = _normalise_url(request_state.url)
         if anchor_url != request_url:
             raise RepositoryTopicCloneError("prepare collision: anchor-origin-mismatch")
-    owner_sha = _evidence_sha256(request_state.owner_evidence)
     clone = computed_clone_path(request_state, create_topic=True)
     parent_attestation = request_state.parent_attestation
     if parent_attestation is None:
@@ -1120,7 +1074,6 @@ def request(
     metadata_receipt = _update_existing_prepare_metadata(
         request_state,
         clone,
-        owner_sha=owner_sha,
         parent_attestation=parent_attestation,
     )
     if metadata_receipt is not None:
@@ -1131,14 +1084,7 @@ def request(
                 receipt=metadata_receipt,
             )
         return metadata_receipt
-    state = _inspect(clone, request_state, owner_sha=owner_sha)
-    owner_evidence_refresh = False
-    if state.state == "owner-evidence-mismatch":
-        # Only an otherwise exact canonical checkout can refresh this fingerprint.
-        refreshed_state = _inspect(clone, request_state, owner_sha=None)
-        if refreshed_state.state == "ready":
-            state = refreshed_state
-            owner_evidence_refresh = True
+    state = _inspect(clone, request_state)
     if state.state == "absent":
         if request_state.checkout_mode == CHECKOUT_MODE_LINKED:
             branch_source = _prepare_linked_worktree(request_state, clone)
@@ -1206,7 +1152,6 @@ def request(
         "url-mismatch",
         "repository-mismatch",
         "topic-mismatch",
-        "owner-evidence-mismatch",
         "checkout-mode-mismatch",
         "actual-branch-mismatch",
         "branch-mismatch",
@@ -1230,24 +1175,9 @@ def request(
                 request_state,
                 allowed_paths=packet_target.allowed_paths,
             )
-    if (
-        owner_evidence_refresh
-        and packet_target is None
-        and not request_state.allowed_paths
-    ):
-        raise RepositoryTopicCloneError(
-            "prepare collision: owner-evidence-mismatch without a current writer target"
-        )
     candidate_sha = _run_git(clone, ["rev-parse", branch_name]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
     checkout_identity = resolve_checkout_identity(clone).as_dict()
-    if owner_evidence_refresh and packet_target is not None:
-        try:
-            validate_writer_target_identity(packet_target, checkout_identity)
-        except WriterTargetError as exc:
-            raise RepositoryTopicCloneError(
-                "prepare collision: current writer target identity mismatch"
-            ) from exc
     writer_target_packet: Path | None = None
     writer_target: WriterTarget | None = None
     if checkout_identity["remote"] != "unknown" and request_state.allowed_paths:
@@ -1260,7 +1190,7 @@ def request(
         validate_writer_target_identity(writer_target, checkout_identity)
     if writer_target is not None:
         _ensure_writer_target_packet_ignored(clone, parent_attestation)
-    _set_marker(clone, request_state, owner_sha=owner_sha, branch=branch_name)
+    _set_marker(clone, request_state, branch=branch_name)
     _run_git(
         clone,
         [
@@ -1278,7 +1208,7 @@ def request(
             )
         except WriterTargetError as exc:
             raise RepositoryTopicCloneError(str(exc)) from exc
-    final_state = _inspect(clone, request_state, owner_sha=owner_sha)
+    final_state = _inspect(clone, request_state)
     if final_state.state != "ready":
         raise RepositoryTopicCloneError(
             f"prepared clone not ready: {final_state.state}"
@@ -1307,12 +1237,7 @@ def merge_main(
     """Fetch and merge origin/main with --no-edit and strict ancestor proof."""
     existing_clone = computed_clone_path(request_state, create_topic=False)
     if existing_clone.exists():
-        current_owner_sha = _evidence_sha256(
-            _require_evidence(
-                request_state.owner_evidence, request_state.workspace_root
-            )
-        )
-        state = _inspect(existing_clone, request_state, owner_sha=current_owner_sha)
+        state = _inspect(existing_clone, request_state)
         if state.state == "dirty-worktree-index-or-untracked":
             raise RepositoryTopicCloneError(
                 "merge-main hold: dirty-worktree-index-or-untracked"
@@ -1323,7 +1248,6 @@ def merge_main(
         request_state.workspace_root,
         request_state.topic,
         request_state.branch,
-        request_state.owner_evidence,
         allowed_paths=request_state.allowed_paths or None,
         checkout_mode=request_state.checkout_mode,
         policy=None,
@@ -1602,10 +1526,7 @@ def cleanup(
     _repository_workspace_root(request_state.workspace_root, require_ignore=False)
     clone = computed_clone_path(request_state, create_topic=False)
     topic_root = clone.parent
-    owner_sha = _evidence_sha256(
-        _require_evidence(request_state.owner_evidence, request_state.workspace_root)
-    )
-    state = _inspect(clone, request_state, owner_sha=owner_sha)
+    state = _inspect(clone, request_state)
     if state.state != "ready":
         raise RepositoryTopicCloneError(f"cleanup hold: {state.state}")
 
@@ -1737,7 +1658,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument("--workspace-root", required=True)
     prepare.add_argument("--topic", required=True)
     prepare.add_argument("--branch", required=True)
-    prepare.add_argument("--owner-evidence", required=True)
     prepare.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
@@ -1757,7 +1677,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     merge.add_argument("--workspace-root", required=True)
     merge.add_argument("--topic", required=True)
     merge.add_argument("--branch", required=True)
-    merge.add_argument("--owner-evidence", required=True)
     merge.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
@@ -1773,7 +1692,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     finalize.add_argument("--workspace-root", required=True)
     finalize.add_argument("--topic", required=True)
     finalize.add_argument("--branch", required=True)
-    finalize.add_argument("--owner-evidence", required=True)
     finalize.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
@@ -1786,7 +1704,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     clean.add_argument("--workspace-root", required=True)
     clean.add_argument("--topic", required=True)
     clean.add_argument("--branch", required=True)
-    clean.add_argument("--owner-evidence", required=True)
     clean.add_argument(
         "--checkout-mode",
         choices=sorted(CHECKOUT_MODES),
@@ -1809,9 +1726,6 @@ def main(argv: list[str] | None = None) -> None:
         workspace_root=Path(args.workspace_root),
         topic=args.topic,
         branch=_normalise_branch(args.branch),
-        owner_evidence=_require_evidence(
-            args.owner_evidence, Path(args.workspace_root)
-        ),
         checkout_mode=args.checkout_mode,
     )
     try:
@@ -1822,7 +1736,6 @@ def main(argv: list[str] | None = None) -> None:
                 args.workspace_root,
                 args.topic,
                 args.branch,
-                args.owner_evidence,
                 allowed_paths=tuple(args.allowed_path) or None,
                 checkout_mode=args.checkout_mode,
             )

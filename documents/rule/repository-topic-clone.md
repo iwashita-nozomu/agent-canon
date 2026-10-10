@@ -26,9 +26,7 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
 
 ## 事前条件
 
-- `--url`、`--repo-name`、`--workspace-root`、`--topic`、`--branch`、
-  `--owner-evidence` を指定します。`--owner-evidence` は非空ファイルを要求し、その digest は
-  lifecycle metadata として記録しますが、ファイル自体は操作 authority になりません。
+- `--url`、`--repo-name`、`--workspace-root`、`--topic`、`--branch` を指定します。
 - `--workspace-root` は selected repository の Git toplevel と一致し、root の regular な
   tracked `.gitignore` が `workspace/` を repository-owned boundary として ignore する状態。
 - `prepare` と `merge-main` は workspace/topic directory を作る前に root、symlink、
@@ -70,8 +68,7 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
   checkout mode を確認し、`linked-worktree` は selected workspace と同じ Git common dir に登録されていることも
   検証します。canonical marker があれば repository/topic/URL/branch と facts の一致を要求し、partial/mismatch は
   hold します。marker がないこと自体は collision ではなく、current request が指定した exact path と Git facts が
-  一致すれば `prepare` が canonical marker を materialize できます。owner-evidence digest は marker がある場合の
-  lifecycle metadata であり、承認・identity・current task/handoff authority の代替ではありません。
+  一致すれば `prepare` が canonical marker を materialize できます。
 - clean な exact checkout は local/remote named branch を再利用します。existing writer-target packet があれば検証し、
   current `--allowed-path` があればその scope を materialize し、省略時は検証済み scope を引き継ぎます。
   packet/marker の metadata-only 更新は source/index を変更せず、dirty status を clean と扱いません。
@@ -95,13 +92,13 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
   これは選択した integration workflow の owner route です。runtime は一般の
   `git commit` を integration executor に限定しません。path-scoped commit admission や
   role id は、実競合レビューや finalizer の parent/tree readback の証明にはなりません。
-- task owner の非空 `--owner-evidence` と computed path、remote、branch identity が一致
-  する限り、canonical `prepare` と `merge-main` は operation-level の追加承認なしで
+- computed path、remote、branch identity が一致する限り、canonical `prepare` と `merge-main` は
+  operation-level の追加承認なしで
   実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
   にだけ適用し、共有 checkout の raw Git mutation authority を変更しません。
 
   `dependency_module_change.py status` は adapter-only の read command であり、generic
-  lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
+  lifecycle または operation-level approval carve-out には含めません。
 
 コマンドの引数と使用例は [CLI 参照の基本操作](../tools/repository_topic_clone.md#基本操作) を使います。
 
@@ -147,15 +144,13 @@ integration executor は実際の unmerged paths を確認し、各競合をそ�
 - marker は canonical `repository-topic-clone.*` namespace の全項目が一致する状態を優先します。
   canonical marker が完全に欠ける既存 dependency clone に限り、legacy
   `agent-canon.topic.*` の topic、role=`module`、module basename、normalized URL、branch、
-  placement=`workspace-continuation`、owner-evidence SHA がすべて一致する場合だけ read-only
+  placement=`workspace-continuation` がすべて一致する場合だけ read-only
   compatibility として ready を認めます。partial/mismatch/unknown role・placement は typed
   hold とし、dry-run は Git config marker を書き換えません。
 - cleanup は上記の利用終了・内容保全確認後、または closeout の残存確認時に canonical tool を呼び、request から計算した
   exact clone path、actual Git URL、branch、checkout mode、clean non-detached state を検証します。
-  canonical marker がある場合は identity と current owner-evidence digest の一致を要求し、marker の partial/mismatch は
-  hold します。marker がない場合も identity は current request と実際の Git facts から照合します。
-  owner-evidence digest は marker がある場合の
-  lifecycle consistency metadata であり、Git identity や whole-tree retention proof の代替ではありません。
+  canonical marker がある場合は identity の一致を要求し、marker の partial/mismatch は hold します。
+  marker がない場合も identity は current request と実際の Git facts から照合します。
   linked-worktree の `linked-superproject-head` evidence は保持された local branch と共有 Git common objects から
   superproject の commit/tree を再取得できることだけを示し、remote branch を要求しません。ignored file や submodule
   object の再取得保証ではありません。`independent-clone` は fetch した `origin/<branch>` の

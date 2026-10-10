@@ -67,8 +67,8 @@ AgentCanon の更新・再構築を要求しません。
 - 衝突時は current branch/worktree を維持し、status を保存して user の指示を待ちます。
 
 - `repository_topic_clone.py` と `dependency_module_change.py` の canonical
-  `prepare` / `merge-main` は、非空 owner evidence と computed
-  `workspace/<topic-slug>/<repo-name>` identity が揃う repo-local topic workspace に限り、
+  `prepare` / `merge-main` は、computed `workspace/<topic-slug>/<repo-name>` path と
+  Git identity が揃う repo-local topic workspace に限り、
   operation-level の追加承認なしで dispatch できます。reuse は `prepare` に含まれます。
   これは lifecycle tool が管理する path の作成・再利用・使用だけを対象とし、shared
   checkout の raw Git mutation や protected update wrapper の authority を免除しません。
