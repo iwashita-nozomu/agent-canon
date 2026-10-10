@@ -56,11 +56,18 @@ def git(root: Path, *args: str) -> str:
 
 
 def install_links(home: Path, checkout: Path) -> subprocess.CompletedProcess[str]:
-    """Exercise the production host link owner without starting Docker."""
+    """Exercise skill links while leaving separately tested config merge alone."""
     state = home / "state"
     state.mkdir(exist_ok=True)
     return subprocess.run(
-        ["bash", "-c", 'source "$1"; _agent_canon_install_global_links', "--", str(ADAPTER)],
+        [
+            "bash",
+            "-c",
+            'source "$1"; _agent_canon_apply_context_defaults() { :; }; '
+            "_agent_canon_install_global_links",
+            "--",
+            str(ADAPTER),
+        ],
         capture_output=True,
         text=True,
         check=False,

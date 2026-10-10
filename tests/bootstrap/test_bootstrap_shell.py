@@ -5827,11 +5827,11 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     )[0]
     assert "runtime_log_archive_git" not in container_control
     assert "_host_private_feedback_sync" not in container_control
-    eval_sync = controller.split("    def eval_sync(", 1)[1].split(
-        "    def eval_sync_prepare(", 1
+    eval_sync_prepare = controller.split("    def eval_sync_prepare(", 1)[1].split(
+        "    def gc(", 1
     )[0]
-    assert "runtime_log_archive_git" not in eval_sync
-    assert "return self.eval_sync_prepare(run_id)" in eval_sync
+    assert "runtime_log_archive_git" not in eval_sync_prepare
+    assert '"host_archive_requested"' in eval_sync_prepare
 
 
 def test_forced_rollback_recovery_failure_retains_mounted_backup(
