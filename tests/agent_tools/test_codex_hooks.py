@@ -33,6 +33,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
+
 from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
@@ -678,7 +679,7 @@ class CodexHooksTest(unittest.TestCase):
             "plan_path": f"reports/agents/{run_id}/runtime/execution_resource_plan.json",
             "projection": "post_tool_use",
             "run_id": run_id,
-            "schema_version": "execution-resource-plan/v1",
+            "schema_version": "execution-resource-plan-projection/v2",
         }
         projection_stdout = (
             json.dumps(projection, sort_keys=True, separators=(",", ":")) + "\n"
@@ -888,7 +889,7 @@ class CodexHooksTest(unittest.TestCase):
             "plan_path": "reports/agents/r5/runtime/execution_resource_plan.json",
             "projection": "post_tool_use",
             "run_id": "r5",
-            "schema_version": "execution-resource-plan/v1",
+            "schema_version": "execution-resource-plan-projection/v2",
         }
         projection_stdout = (
             json.dumps(valid_projection, sort_keys=True, separators=(",", ":")) + "\n"

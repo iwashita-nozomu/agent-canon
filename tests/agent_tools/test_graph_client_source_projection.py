@@ -88,23 +88,6 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
             self.assertGreaterEqual(len(response.dependency_facts), 4)
             self.assertFalse((root / ".agent-canon").exists())
 
-    def test_legacy_all_query_option_uses_the_same_source_projection(self) -> None:
-        """The current vector-search call shape remains source-direct."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.fixture(root)
-            client = GraphClient(root, executable=root / "missing-agent-canon")
-
-            response = client.query(
-                **{"all": True},
-                relation="dependency",
-                direction="both",
-                depth=0,
-            )
-
-            self.assertEqual(response.status, "fresh")
-            self.assertEqual(response.payload["projection"], "tracked-source")
-
     def test_context_is_source_bound_and_contains_declared_closure(self) -> None:
         """Context identity and closure are derived from current source bytes."""
         with tempfile.TemporaryDirectory() as tmp_dir:

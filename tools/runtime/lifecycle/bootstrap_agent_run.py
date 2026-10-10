@@ -796,7 +796,7 @@ def emit_bootstrap_output(
         + public_command_for_layout(
             "python3 tools/analysis/search/search.py "
             "--query-file <request-or-design-question.txt> "
-            "--providers text,semantic,vector,tool,header-deps,code-deps "
+            "--providers semantic "
             "--format json",
             public_layout,
         )

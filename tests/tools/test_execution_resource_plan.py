@@ -20,7 +20,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -53,7 +52,6 @@ from tools.experiments.execution.execution_resource_plan import (
     ResourceObservation,
     ResourceRequest,
     RunGpuAdmissionReceipt,
-    RuntimeIdentityReader,
     SourceFreezeOwner,
     TypedPreflightFailure,
     UUIDReservationStore,
@@ -67,9 +65,6 @@ from tools.experiments.execution.execution_resource_plan import (
     parse_nvidia_smi_list,
     parse_nvidia_smi_xml,
     plan_gpu_allocation,
-    read_shared_runtime_provision,
-    read_shared_runtime_readback,
-    write_runtime_receipt_atomic,
 )
 
 from tests.tools.resource_plan_test_evidence import (
@@ -78,209 +73,8 @@ from tests.tools.resource_plan_test_evidence import (
 )
 
 
-def _receipt_fingerprint(payload: dict[str, object], field_name: str) -> str:
-    """Mirror the receipt owner's canonical fingerprint preimage for fixtures."""
-    body = {key: value for key, value in payload.items() if key != field_name}
-    return hashlib.sha256(
-        json.dumps(
-            body,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=True,
-            allow_nan=False,
-        ).encode("utf-8")
-    ).hexdigest()
-
-
-@contextmanager
-def _runtime_umask():
-    """Match the receipt owner’s exact 0007 publication umask in fixtures."""
-    previous = os.umask(0o0007)
-    try:
-        yield
-    finally:
-        os.umask(previous)
-
-
 class ExecutionResourcePlanContractTest(unittest.TestCase):
     """Describe public resource-plan invariants without private-detail coupling."""
-
-    def test_runtime_receipts_accept_user_namespace_mapping_and_use_readback_identity(
-        self,
-    ) -> None:
-        """Host provenance and container readback may use distinct numeric mappings."""
-        with _runtime_umask(), tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "locks").mkdir()
-            provision_path = root / "provision.json"
-            readback_path = root / "readback.json"
-            provision_payload: dict[str, object] = {
-                "schema_version": "shared-runtime-provision/v1",
-                "runtime_route": "MANAGED_CONTAINER",
-                "host_uid": 4242,
-                "host_gid": 4243,
-                "host_supplementary_gids": [4243],
-                "host_umask": 0o0007,
-                "bind_source_path": "/host/runtime",
-                "bind_source_dev": 123,
-                "bind_source_ino": 456,
-                "provision_fingerprint": "",
-            }
-            provision_payload["provision_fingerprint"] = _receipt_fingerprint(
-                provision_payload, "provision_fingerprint"
-            )
-            readback_payload: dict[str, object] = {
-                "schema_version": "shared-runtime-readback/v1",
-                "runtime_route": "MANAGED_CONTAINER",
-                "container_uid": 5252,
-                "container_gid": 5253,
-                "container_supplementary_gids": [5253],
-                "container_umask": 0o0007,
-                "bind_target_path": "/container/runtime",
-                "bind_target_dev": 123,
-                "bind_target_ino": 456,
-                "namespace_inode": 789,
-                "mount_id": 12,
-                "mount_parent_id": 11,
-                "mount_root": "/",
-                "probe_fd_disposition": "closed",
-                "readback_fingerprint": "",
-            }
-            readback_payload["readback_fingerprint"] = _receipt_fingerprint(
-                readback_payload, "readback_fingerprint"
-            )
-            write_runtime_receipt_atomic(str(provision_path), provision_payload)
-            write_runtime_receipt_atomic(str(readback_path), readback_payload)
-
-            provision = read_shared_runtime_provision(str(provision_path))
-            readback = read_shared_runtime_readback(str(readback_path))
-            receipt = RuntimeIdentityReader().read(provision, readback)
-
-            self.assertEqual(receipt.uid, 5252)
-            self.assertEqual(receipt.gid, 5253)
-            self.assertEqual(receipt.supplementary_gids, (5253,))
-            self.assertEqual(receipt.umask, 0o0007)
-            self.assertEqual(provision.host_uid, 4242)
-            self.assertEqual(readback.container_uid, 5252)
-
-            for label, invalid_provision, invalid_readback in (
-                ("provision-negative-gid", replace(provision, host_gid=-1), readback),
-                (
-                    "provision-primary-group-shape",
-                    replace(provision, host_supplementary_gids=(4243, 4244)),
-                    readback,
-                ),
-                ("readback-negative-gid", provision, replace(readback, container_gid=-1)),
-                (
-                    "readback-primary-group-shape",
-                    provision,
-                    replace(readback, container_supplementary_gids=(5253, 5254)),
-                ),
-            ):
-                with self.subTest(receipt=label):
-                    with self.assertRaises(TypedPreflightFailure) as raised:
-                        RuntimeIdentityReader().read(
-                            invalid_provision,
-                            invalid_readback,
-                        )
-                    self.assertEqual(raised.exception.code, "runtime_identity_invalid")
-
-            with self.subTest(receipt="provision-primary-group"):
-                malformed_provision = dict(provision_payload)
-                malformed_provision["host_supplementary_gids"] = [4243, 4244]
-                malformed_provision["provision_fingerprint"] = _receipt_fingerprint(
-                    malformed_provision, "provision_fingerprint"
-                )
-                write_runtime_receipt_atomic(str(provision_path), malformed_provision)
-                with self.assertRaises(TypedPreflightFailure) as provision_raised:
-                    read_shared_runtime_provision(str(provision_path))
-                self.assertEqual(
-                    provision_raised.exception.code, "runtime_identity_invalid"
-                )
-
-            with self.subTest(receipt="readback-primary-group"):
-                malformed_readback = dict(readback_payload)
-                malformed_readback["container_supplementary_gids"] = [5253, 5254]
-                malformed_readback["readback_fingerprint"] = _receipt_fingerprint(
-                    malformed_readback, "readback_fingerprint"
-                )
-                write_runtime_receipt_atomic(str(readback_path), malformed_readback)
-                with self.assertRaises(TypedPreflightFailure) as readback_raised:
-                    read_shared_runtime_readback(str(readback_path))
-                self.assertEqual(
-                    readback_raised.exception.code, "runtime_identity_invalid"
-                )
-
-    def test_runtime_receipt_tampering_route_device_inode_and_fingerprint_fails_closed(
-        self,
-    ) -> None:
-        """Mapping-neutral receipts retain route, bind identity, and hash oracles."""
-        with _runtime_umask(), tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "locks").mkdir()
-            provision_path = root / "provision.json"
-            readback_path = root / "readback.json"
-            provision_payload: dict[str, object] = {
-                "schema_version": "shared-runtime-provision/v1",
-                "runtime_route": "MANAGED_CONTAINER",
-                "host_uid": 4242,
-                "host_gid": 4243,
-                "host_supplementary_gids": [4243],
-                "host_umask": 0o0007,
-                "bind_source_path": "/host/runtime",
-                "bind_source_dev": 123,
-                "bind_source_ino": 456,
-                "provision_fingerprint": "",
-            }
-            provision_payload["provision_fingerprint"] = _receipt_fingerprint(
-                provision_payload, "provision_fingerprint"
-            )
-            base_readback: dict[str, object] = {
-                "schema_version": "shared-runtime-readback/v1",
-                "runtime_route": "MANAGED_CONTAINER",
-                "container_uid": 5252,
-                "container_gid": 5253,
-                "container_supplementary_gids": [5253],
-                "container_umask": 0o0007,
-                "bind_target_path": "/container/runtime",
-                "bind_target_dev": 123,
-                "bind_target_ino": 456,
-                "namespace_inode": 789,
-                "mount_id": 12,
-                "mount_parent_id": 11,
-                "mount_root": "/",
-                "probe_fd_disposition": "closed",
-                "readback_fingerprint": "",
-            }
-            write_runtime_receipt_atomic(str(provision_path), provision_payload)
-
-            for field, value, expected_code in (
-                ("runtime_route", "HOST_DIRECT", "runtime_identity_mismatch"),
-                ("bind_target_dev", 999, "runtime_identity_mismatch"),
-                ("bind_target_ino", 999, "runtime_identity_mismatch"),
-            ):
-                with self.subTest(field=field):
-                    payload = dict(base_readback)
-                    payload[field] = value
-                    payload["readback_fingerprint"] = _receipt_fingerprint(
-                        payload, "readback_fingerprint"
-                    )
-                    write_runtime_receipt_atomic(str(readback_path), payload)
-                    provision = read_shared_runtime_provision(str(provision_path))
-                    readback = read_shared_runtime_readback(str(readback_path))
-                    with self.assertRaises(TypedPreflightFailure) as raised:
-                        RuntimeIdentityReader().read(provision, readback)
-                    self.assertEqual(raised.exception.code, expected_code)
-
-            tampered = dict(base_readback)
-            tampered["readback_fingerprint"] = "0" * 64
-            write_runtime_receipt_atomic(str(readback_path), tampered)
-            with self.assertRaises(TypedPreflightFailure) as raised:
-                read_shared_runtime_readback(str(readback_path))
-            self.assertEqual(
-                raised.exception.code,
-                "runtime_receipt_fingerprint_mismatch",
-            )
 
     def test_r5_terminal_coverage_projection_is_exact_and_hook_validated(self) -> None:
         """Terminal outcome, exactly-once coverage, and Hook bytes share one receipt."""
@@ -293,7 +87,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 disposition="explicit",
                 visible_uuids=(uuid,),
                 namespace_id="pid:[4026531836]",
-                provision_receipt_fingerprint="c" * 64,
+                runtime_identity_fingerprint="c" * 64,
                 fingerprint="d" * 64,
             )
             admission = RunGpuAdmissionReceipt(
@@ -315,7 +109,6 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 planned_chunk_ids=("chunk-1",),
                 admission=admission,
                 source_freeze=None,
-                runtime_identity=None,
                 runner_lifecycle=None,
                 primary_failure=None,
                 secondary_failures=(),
@@ -381,11 +174,25 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             projection = PostToolUseProjectionReducer().project(outcome, coverage)
             projection_payload = json.loads(projection)
             self.assertEqual(
+                projection_payload["schema_version"],
+                "execution-resource-plan-projection/v2",
+            )
+            self.assertEqual(
                 projection_payload["admission"]["guarantee"],
                 "run-level-opaque-uuid-admission",
             )
+            self.assertEqual(
+                projection_payload["admission"]["runtime_identity_fingerprint"],
+                "c" * 64,
+            )
+            self.assertNotIn(
+                "provision_receipt_fingerprint",
+                projection_payload["admission"],
+            )
             self.assertEqual(projection_payload["error"], None)
-            self.assertLessEqual(len(projection_payload["admission"]["namespace_id"]), 64)
+            self.assertLessEqual(
+                len(projection_payload["admission"]["namespace_id"]), 64
+            )
             hook = (
                 Path(__file__).resolve().parents[2]
                 / ".codex"
@@ -479,7 +286,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             disposition="explicit",
             visible_uuids=(mig_uuid,),
             namespace_id="pid:[4026531836]",
-            provision_receipt_fingerprint="a" * 64,
+            runtime_identity_fingerprint="a" * 64,
             fingerprint="b" * 64,
         )
         placement = LockPlacementEvidence(
@@ -550,7 +357,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             "snapshot": snapshot_variant,
         }.items():
             with self.subTest(owner=owner):
-                self.assertNotEqual(base.admission_fingerprint, variant.admission_fingerprint)
+                self.assertNotEqual(
+                    base.admission_fingerprint, variant.admission_fingerprint
+                )
         terminal_variant = replace(
             base,
             effective_environment={"CUDA_VISIBLE_DEVICES": physical_uuid},
@@ -560,7 +369,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             ),
             admission_fingerprint="",
         )
-        self.assertEqual(base.admission_fingerprint, terminal_variant.admission_fingerprint)
+        self.assertEqual(
+            base.admission_fingerprint, terminal_variant.admission_fingerprint
+        )
         assert base.effective_environment is not None
         with self.assertRaises(TypeError):
             base.effective_environment["CUDA_VISIBLE_DEVICES"] = physical_uuid  # type: ignore[index]
@@ -629,15 +440,21 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
 
     def _fixture_evidence(self, record_id: str) -> tuple[EvidenceFd, dict[str, object]]:
         """Open one manifest-named raw fixture and verify its captured hash."""
-        fixture_root = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "nvidia"
-        manifest = json.loads((fixture_root / "manifest.json").read_text(encoding="utf-8"))
+        fixture_root = (
+            Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "nvidia"
+        )
+        manifest = json.loads(
+            (fixture_root / "manifest.json").read_text(encoding="utf-8")
+        )
         record = next(item for item in manifest["records"] if item["id"] == record_id)
         path = fixture_root / record["raw_file"]
         descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
         try:
             metadata = os.fstat(descriptor)
             raw = os.pread(descriptor, metadata.st_size, 0)
-            self.assertEqual(metadata.st_size, record.get("byte_count", metadata.st_size))
+            self.assertEqual(
+                metadata.st_size, record.get("byte_count", metadata.st_size)
+            )
             self.assertEqual(hashlib.sha256(raw).hexdigest(), record["raw_sha256"])
             expected = dict(record["expected"])
             expected["parser"] = record["parser"]
@@ -676,10 +493,16 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             list_evidence=list_evidence,
             xml_evidence=xml_evidence,
         ).observe()
-        return inventory, parsed_xml.process_inventory_disposition, (list_evidence, xml_evidence)
+        return (
+            inventory,
+            parsed_xml.process_inventory_disposition,
+            (list_evidence, xml_evidence),
+        )
 
     @staticmethod
-    def _fixture_process(gpu_uuid: str, pid: int, kind: str = "other_gpu_context") -> ProcessIdentity:
+    def _fixture_process(
+        gpu_uuid: str, pid: int, kind: str = "other_gpu_context"
+    ) -> ProcessIdentity:
         return ProcessIdentity(
             pid=pid,
             process_start_identity=f"start-{pid}",
@@ -704,7 +527,12 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 driver_evidence=driver,
             ).observe()
             self.assertEqual(
-                (parsed_driver.major, parsed_driver.minor, parsed_driver.patch, parsed_driver.raw),
+                (
+                    parsed_driver.major,
+                    parsed_driver.minor,
+                    parsed_driver.patch,
+                    parsed_driver.raw,
+                ),
                 (
                     driver_expected["major"],
                     driver_expected["minor"],
@@ -712,10 +540,16 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                     driver_expected["raw"],
                 ),
             )
-            self.assertEqual(parsed_list.physical_uuids, tuple(list_expected["physical_uuids"]))
+            self.assertEqual(
+                parsed_list.physical_uuids, tuple(list_expected["physical_uuids"])
+            )
             self.assertEqual(parsed_list.mig_uuids, tuple(list_expected["mig_uuids"]))
-            self.assertEqual(parsed_xml.process_inventory_disposition, xml_expected["disposition"])
-            self.assertEqual(parsed_xml.processing_instructions, ("fixture nvidia-smi",))
+            self.assertEqual(
+                parsed_xml.process_inventory_disposition, xml_expected["disposition"]
+            )
+            self.assertEqual(
+                parsed_xml.processing_instructions, ("fixture nvidia-smi",)
+            )
             self.assertEqual(parsed_xml.comments, (" fixture topology ",))
             self.assertEqual(inventory.joins, parsed_list.joins)
             self.assertEqual(inventory.driver_version, parsed_driver)
@@ -761,24 +595,24 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
         evidence, expected = self._fixture_evidence("xml.valid.complete_empty")
         try:
             parsed = parse_nvidia_smi_xml(evidence)
-            self.assertEqual(parsed.process_inventory_disposition, expected["disposition"])
+            self.assertEqual(
+                parsed.process_inventory_disposition, expected["disposition"]
+            )
         finally:
             os.close(evidence.fd)
 
     def test_nvidia_fixture_xml_ignores_historical_accounting_processes(self) -> None:
         list_evidence, _ = self._fixture_evidence("list.valid.physical_mig")
-        xml_evidence, expected = self._fixture_evidence(
-            "xml.valid.accounted_processes"
-        )
+        xml_evidence, expected = self._fixture_evidence("xml.valid.accounted_processes")
         try:
             parsed = parse_nvidia_smi_xml(xml_evidence)
-            self.assertEqual(parsed.process_inventory_disposition, expected["disposition"])
+            self.assertEqual(
+                parsed.process_inventory_disposition, expected["disposition"]
+            )
             observation = NvidiaInventoryProbe(
                 list_evidence=list_evidence,
                 xml_evidence=xml_evidence,
-            ).observe_structured(
-                frozenset({"GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
-            )
+            ).observe_structured(frozenset({"GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}))
             self.assertEqual(observation.processes, ())
             self.assertEqual(
                 observation.process_inventory_visibility["units"][
@@ -841,7 +675,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             evidence = GpuProcessOccupancyProbe(
                 inventory=inventory,
                 namespace_inode=4026531836,
-                processes=(self._fixture_process(inventory.mig_uuids[0], 124, "graphics"),),
+                processes=(
+                    self._fixture_process(inventory.mig_uuids[0], 124, "graphics"),
+                ),
                 process_inventory_disposition=disposition,
             ).observe()
             self.assertEqual(
@@ -877,10 +713,16 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 GpuProcessOccupancyProbe(
                     inventory=inventory,
                     namespace_inode=4026531836,
-                    processes=(self._fixture_process("GPU-ffffffffffffffffffffffffffffffff", 125),),
+                    processes=(
+                        self._fixture_process(
+                            "GPU-ffffffffffffffffffffffffffffffff", 125
+                        ),
+                    ),
                     process_inventory_disposition=disposition,
                 ).observe()
-            self.assertEqual(raised.exception.code, "gpu_process_uuid_visibility_unproven")
+            self.assertEqual(
+                raised.exception.code, "gpu_process_uuid_visibility_unproven"
+            )
         finally:
             for descriptor in descriptors:
                 os.close(descriptor.fd)
@@ -920,7 +762,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                     ),
                     process_inventory_disposition=disposition,
                 ).observe()
-            self.assertEqual(raised_namespace.exception.code, "gpu_process_namespace_mismatch")
+            self.assertEqual(
+                raised_namespace.exception.code, "gpu_process_namespace_mismatch"
+            )
             with self.assertRaises(TypedPreflightFailure) as raised_pid:
                 GpuProcessOccupancyProbe(
                     inventory=inventory,
@@ -937,7 +781,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                     ),
                     process_inventory_disposition=disposition,
                 ).observe()
-            self.assertEqual(raised_pid.exception.code, "gpu_process_identity_ambiguous")
+            self.assertEqual(
+                raised_pid.exception.code, "gpu_process_identity_ambiguous"
+            )
         finally:
             for descriptor in descriptors:
                 os.close(descriptor.fd)
@@ -996,15 +842,21 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
         """Admission ancestry code is observational and cannot signal a process."""
         source = (
             Path(__file__).resolve().parents[2]
-            / "tools" / "experiments" / "execution" / "execution_resource_plan.py"
+            / "tools"
+            / "experiments"
+            / "execution"
+            / "execution_resource_plan.py"
         ).read_text(encoding="utf-8")
-        for forbidden in ("os.kill(", "os.killpg(", "signal.SIG", "[\"kill\""):
+        for forbidden in ("os.kill(", "os.killpg(", "signal.SIG", '["kill"'):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, source)
 
     def test_r5_pstree_absent_does_not_block_complete_proc_ancestry(self) -> None:
         """A complete proc chain remains authoritative when pstree is unavailable."""
-        def write_proc_record(root: Path, pid: int, parent_pid: int, starttime: str) -> None:
+
+        def write_proc_record(
+            root: Path, pid: int, parent_pid: int, starttime: str
+        ) -> None:
             process_dir = root / str(pid)
             (process_dir / "ns").mkdir(parents=True)
             (process_dir / "ns" / "pid").symlink_to("pid:[4026531836]")
@@ -1028,7 +880,10 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             write_proc_record(proc_root, 123, 2, "start-123")
             write_proc_record(proc_root, 2, 1, "start-2")
             write_proc_record(proc_root, 1, 0, "start-1")
-            with patch("tools.experiments.execution.execution_resource_plan.shutil.which", return_value=None):
+            with patch(
+                "tools.experiments.execution.execution_resource_plan.shutil.which",
+                return_value=None,
+            ):
                 evidence = ProcAncestryProbe(proc_root=proc_root).observe(123)
             self.assertFalse(evidence.pstree_available)
             self.assertEqual(tuple(item.pid for item in evidence.chain), (123, 2))
@@ -1071,7 +926,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             previous_umask = os.umask(0o0007)
             try:
                 tampered_path = Path(temporary) / f"gpu-{tampered}.lock"
-                tampered_path.write_text('{"schema_version":"tampered"}\n', encoding="utf-8")
+                tampered_path.write_text(
+                    '{"schema_version":"tampered"}\n', encoding="utf-8"
+                )
                 tampered_path.chmod(0o660)
                 with patch.object(
                     GpuReservationTransaction,
@@ -1092,7 +949,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             finally:
                 os.umask(previous_umask)
 
-    def test_gpu_reservation_infrastructure_failure_rolls_back_every_held_fd(self) -> None:
+    def test_gpu_reservation_infrastructure_failure_rolls_back_every_held_fd(
+        self,
+    ) -> None:
         """A later candidate infrastructure failure releases all earlier locks."""
         first = "GPU-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
         second = "GPU-ffffffffffffffffffffffffffffffff"
@@ -1116,7 +975,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             finally:
                 os.umask(previous_umask)
 
-    def test_gpu_reservation_post_open_stat_failure_closes_candidate_fd_once(self) -> None:
+    def test_gpu_reservation_post_open_stat_failure_closes_candidate_fd_once(
+        self,
+    ) -> None:
         """A post-open identity failure registers and closes its descriptor once."""
         candidate = "GPU-99999999999999999999999999999999"
         with tempfile.TemporaryDirectory() as temporary:
@@ -1227,11 +1088,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             receipt = owner.freeze(request)
             self.assertTrue(owner._owned_fds)
             manifest_path = Path(temporary) / "source_snapshot.json"
-            snapshot_path = (
-                Path(temporary)
-                / "source_snapshot"
-                / source_path
-            )
+            snapshot_path = Path(temporary) / "source_snapshot" / source_path
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["schema_version"], "source-snapshot/v2")
             self.assertEqual(
@@ -1248,7 +1105,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             owner.close()
             self.assertEqual(owner._owned_fds, [])
 
-    def test_source_path_set_includes_nonignored_untracked_topic_and_exact_registry(self) -> None:
+    def test_source_path_set_includes_nonignored_untracked_topic_and_exact_registry(
+        self,
+    ) -> None:
         """Source membership includes untracked topic files and only the canonical registry edge."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1267,7 +1126,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             source_paths = build_source_path_set(str(root), "topic", ())
             self.assertIn("experiments/registry.toml", source_paths)
             self.assertIn("experiments/topic/cases.py", source_paths)
-            self.assertNotIn("tools/experiments/experiments_registry.toml", source_paths)
+            self.assertNotIn(
+                "tools/experiments/experiments_registry.toml", source_paths
+            )
 
     def test_source_path_set_fails_closed_when_exact_registry_is_missing(self) -> None:
         """The fixed registry closure is required and has no alternate spelling."""
@@ -1293,7 +1154,9 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 "gpu_source_path_registry_missing",
             )
 
-    def test_source_freeze_failure_preserves_primary_and_typed_close_secondary(self) -> None:
+    def test_source_freeze_failure_preserves_primary_and_typed_close_secondary(
+        self,
+    ) -> None:
         """Failure cleanup keeps the primary and exposes one attempted close ambiguity."""
         source_root = Path(__file__).resolve().parents[2]
         request = GpuRunRequest(
@@ -1329,12 +1192,15 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                     raise OSError(5, "injected close ambiguity")
                 real_close(descriptor)
 
-            with patch(
-                "tools.experiments.execution.execution_resource_plan._read_git_identity",
-                side_effect=fail_identity,
-            ), patch(
-                "tools.experiments.execution.execution_resource_plan.os.close",
-                side_effect=close_once_with_ambiguity,
+            with (
+                patch(
+                    "tools.experiments.execution.execution_resource_plan._read_git_identity",
+                    side_effect=fail_identity,
+                ),
+                patch(
+                    "tools.experiments.execution.execution_resource_plan.os.close",
+                    side_effect=close_once_with_ambiguity,
+                ),
             ):
                 with self.assertRaises(TypedPreflightFailure) as raised:
                     owner.freeze(request)
@@ -1370,8 +1236,12 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 request.gpu_allocation_provenance,
             )
             self.assertEqual(len(allocation.selected_ids), request.gpu_requested_count)
-            self.assertTrue(set(allocation.selected_ids).issubset(allocation.eligible_ids))
-            self.assertEqual(tuple(allocation.selected_ids), tuple(sorted(allocation.selected_ids)))
+            self.assertTrue(
+                set(allocation.selected_ids).issubset(allocation.eligible_ids)
+            )
+            self.assertEqual(
+                tuple(allocation.selected_ids), tuple(sorted(allocation.selected_ids))
+            )
             self.assertEqual(allocation.lock_readback["selected_cardinality"], 1)
             self.assertEqual(
                 allocation.lock_readback["initial_observation"]["event"],

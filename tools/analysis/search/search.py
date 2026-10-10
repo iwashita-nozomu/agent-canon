@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Coordinates purpose-based search across text, deterministic semantic cards, tool catalog, dependency headers, and Python code facts.
-# upstream design ../../../documents/tools/search-coordination.md coordinated search provider contract
-# upstream implementation ./vector_search.py provides text surfaces, TF-IDF search, dependency headers, and Python code facts
-# upstream implementation ./search_index.py builds repo-local deterministic semantic cards
-# downstream implementation ../../../tests/agent_tools/test_search.py validates coordinated search providers
+# responsibility Routes explicit repository-search requests to native text, semantic-index, catalog, dependency, and LSP owners without cross-provider ranking.
+# upstream design ../../../documents/tools/search-coordination.md staged search owner contract
+# upstream implementation ../../runtime/dispatch/agent-canon/src/semantic_index/mod.rs owns semantic-index search
+# upstream implementation ../dependencies/graph_client.py owns source-derived dependency facts
+# upstream implementation ../code/lsp_code_analysis.py owns LSP code facts and bounded file discovery
+# upstream design ../../catalog.yaml owns structured tool metadata
+# downstream implementation ../../../tests/agent_tools/test_search.py validates provider routing and failure semantics
 # @dependency-end
-"""Coordinate AgentCanon search providers from one purpose string."""
+"""Route explicit AgentCanon search requests to their owning native providers."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
-from collections import defaultdict
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,123 +25,81 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from tools.analysis.code import lsp_code_analysis  # noqa: E402
-import tools.analysis.search.search_index as search_index  # noqa: E402
-import tools.analysis.search.vector_search as vector_search  # noqa: E402
+from tools.analysis.dependencies.graph_client import (  # noqa: E402
+    GraphClient,
+    GraphClientError,
+)
 
-DEFAULT_PROVIDERS = ("text", "semantic", "vector", "tool", "header-deps", "code-deps")
-DEFAULT_INDEX_DIR = search_index.DEFAULT_INDEX_DIR
 DEFAULT_TOP = 12
-PROVIDER_BONUS = 0.15
-PHRASE_MATCH_BONUS = 0.35
-HEADER_TARGET_SCORE_MULTIPLIER = 0.95
-JSON_SCORE_DECIMALS = 6
-SNIPPET_ELLIPSIS_CHARS = 3
-TEXT_EVIDENCE_LIMIT = 3
-SNIPPET_LIMIT = 180
-
-
-@dataclass(frozen=True)
-class QueryProfile:
-    """Normalized search purpose."""
-
-    raw: str
-    terms: frozenset[str]
-
-    def score_text(self, text: str) -> float:
-        """Score text by phrase and token overlap."""
-        normalized = text.lower()
-        tokens = frozenset(search_index.tokenize(text))
-        overlap = len(self.terms & tokens) / max(len(self.terms), 1)
-        phrase_bonus = PHRASE_MATCH_BONUS if self.raw.lower() in normalized else 0.0
-        return overlap + phrase_bonus
+PROVIDERS = frozenset({"text", "semantic", "tool", "header-deps", "code-deps"})
+SEMANTIC_INDEX_COMMAND = "agent-canon"
 
 
 @dataclass(frozen=True)
 class SearchRequest:
-    """Inputs for one coordinated search."""
+    """One provider-selected request and its original query source."""
 
     root: Path
-    query: QueryProfile
+    query: str
     providers: tuple[str, ...]
     surfaces: tuple[str, ...]
     excludes: tuple[str, ...]
-    index_dir: Path
+    query_file: Path | None
+    query_stdin: bool
+    regex: bool
+    word_regexp: bool
+    case_sensitive: bool
     top: int
-    refresh_index: bool
 
 
 @dataclass(frozen=True)
-class SearchCorpus:
-    """Loaded repository facts shared by providers."""
-
-    documents: tuple[vector_search.Document, ...]
-    tool_entries: Mapping[str, search_index.ToolEntry]
-    cards: tuple[search_index.SearchCard, ...]
-    dependency_edges: tuple[vector_search.DependencyEdge, ...]
-    python_symbols: tuple[vector_search.PythonSymbol, ...]
-    python_edges: tuple[vector_search.PythonCallEdge, ...]
-    lsp_report: lsp_code_analysis.CodeAnalysisReport | None = None
-
-
-@dataclass(frozen=True)
-class ProviderHit:
-    """One provider-specific search hit before aggregation."""
+class ProviderResult:
+    """One provider-native result; providers are never scored together."""
 
     provider: str
-    path: str
-    score: float
-    reason: str
-    evidence: str
+    status: str
+    exit_code: int
+    result: object
+    stderr: str = ""
 
     def as_json(self) -> Mapping[str, object]:
-        """Return a stable JSON mapping."""
+        """Return the provider result without normalizing its evidence."""
         return {
             "provider": self.provider,
-            "path": self.path,
-            "score": round(self.score, JSON_SCORE_DECIMALS),
-            "reason": self.reason,
-            "evidence": self.evidence,
-        }
-
-
-@dataclass(frozen=True)
-class Candidate:
-    """Aggregated search candidate."""
-
-    path: str
-    score: float
-    providers: tuple[str, ...]
-    reasons: tuple[str, ...]
-    evidence: tuple[ProviderHit, ...]
-
-    def as_json(self) -> Mapping[str, object]:
-        """Return a stable JSON mapping."""
-        return {
-            "path": self.path,
-            "score": round(self.score, JSON_SCORE_DECIMALS),
-            "providers": list(self.providers),
-            "reasons": list(self.reasons),
-            "evidence": [hit.as_json() for hit in self.evidence],
+            "status": self.status,
+            "exit_code": self.exit_code,
+            "result": self.result,
+            "stderr": self.stderr,
         }
 
 
 @dataclass(frozen=True)
 class SearchReport:
-    """Complete search result."""
+    """Separate, unranked outputs for the selected provider routes."""
 
     query: str
     providers: tuple[str, ...]
-    candidates: tuple[Candidate, ...]
-    provider_hits: tuple[ProviderHit, ...]
+    results: tuple[ProviderResult, ...]
+
+    @property
+    def status(self) -> str:
+        """Return failure only when a selected provider failed to execute."""
+        if any(result.status == "fail" for result in self.results):
+            return "fail"
+        return "pass"
+
+    @property
+    def exit_code(self) -> int:
+        """Return the aggregate process result without hiding provider failures."""
+        return 1 if self.status == "fail" else 0
 
     def as_json(self) -> Mapping[str, object]:
-        """Return a stable JSON mapping."""
+        """Return the separate provider results."""
         return {
-            "status": "pass",
+            "status": self.status,
             "query": self.query,
             "providers": list(self.providers),
-            "candidates": [candidate.as_json() for candidate in self.candidates],
-            "provider_hits": [hit.as_json() for hit in self.provider_hits],
+            "results": [result.as_json() for result in self.results],
         }
 
 
@@ -151,420 +111,302 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--query-file", type=Path, default=None)
     parser.add_argument("--query-stdin", action="store_true")
     parser.add_argument("--purpose", default="")
-    parser.add_argument("--providers", default=",".join(DEFAULT_PROVIDERS))
+    parser.add_argument(
+        "--providers",
+        default="text",
+        help=(
+            "Comma-separated explicit owners: text, semantic, tool, header-deps, "
+            "code-deps. Defaults to stateless Git text search only."
+        ),
+    )
     parser.add_argument("--surface", action="append", default=[])
     parser.add_argument("--exclude", action="append", default=[])
-    parser.add_argument("--index-dir", default=DEFAULT_INDEX_DIR)
+    parser.add_argument(
+        "--regex",
+        action="store_true",
+        help="Interpret Git-backed text/catalog patterns using Git extended regex.",
+    )
+    parser.add_argument(
+        "--word-regexp",
+        action="store_true",
+        help="Pass Git's native whole-word matching option to text/catalog search.",
+    )
+    parser.add_argument(
+        "--case-sensitive",
+        action="store_true",
+        help="Use Git's default case-sensitive matching instead of --ignore-case.",
+    )
     parser.add_argument("--top", type=int, default=DEFAULT_TOP)
-    parser.add_argument("--refresh-index", action="store_true")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
 
-def query_profile(query: str) -> QueryProfile:
-    """Normalize a user purpose into terms."""
-    terms = frozenset(token for token in search_index.tokenize(query) if len(token) > 1)
-    return QueryProfile(raw=query.strip(), terms=terms)
-
-
 def selected_providers(raw: str) -> tuple[str, ...]:
-    """Parse provider names."""
+    """Parse and validate the explicit provider selection."""
     names = tuple(dict.fromkeys(part.strip() for part in raw.split(",") if part.strip()))
-    return names or DEFAULT_PROVIDERS
+    if not names:
+        raise ValueError("providers-required")
+    unknown = tuple(name for name in names if name not in PROVIDERS)
+    if unknown:
+        raise ValueError(f"unknown-provider:{','.join(unknown)}")
+    return names
 
 
-def snippet(text: str, limit: int = SNIPPET_LIMIT) -> str:
-    """Return compact evidence text."""
-    normalized = " ".join(text.split())
-    if len(normalized) <= limit:
-        return normalized
-    return f"{normalized[: limit - SNIPPET_ELLIPSIS_CHARS]}..."
-
-
-def load_index_cards(request: SearchRequest) -> tuple[search_index.SearchCard, ...]:
-    """Load or build deterministic semantic search cards."""
-    card_file = request.index_dir / search_index.DEFAULT_CARD_FILE
-    if request.refresh_index:
-        cards = search_index.build_cards(
-            search_index.BuildOptions(
-                root=request.root,
-                surfaces=request.surfaces,
-                excludes=request.excludes,
-            )
-        )
-        report = search_index.BuildReport(
-            index_dir=request.index_dir,
-            card_file=card_file,
-            state_file=request.index_dir / search_index.DEFAULT_STATE_FILE,
-            cards=cards,
-        )
-        search_index.write_jsonl(report.card_file, cards)
-        search_index.write_state(report.state_file, report, request.root)
-        return cards
-    loaded_cards = search_index.load_cards(card_file)
-    if loaded_cards:
-        return loaded_cards
-    cards = search_index.build_cards(
-        search_index.BuildOptions(
-            root=request.root,
-            surfaces=request.surfaces,
-            excludes=request.excludes,
-        )
-    )
-    return cards
-
-
-def discover_lsp_files(
-    root: Path,
-    requested_files: Sequence[str],
-    excludes: Sequence[str],
-) -> tuple[Path, ...]:
-    """Delegate LSP discovery to the shared vector/search path policy."""
-    return vector_search.discover_lsp_files(root, requested_files, excludes)
-
-
-def load_corpus(request: SearchRequest) -> SearchCorpus:
-    """Load shared facts for providers."""
-    documents = tuple(
-        vector_search.read_documents(
-            request.root,
-            request.surfaces or vector_search.DEFAULT_SURFACES,
-            request.excludes,
-            set(vector_search.EXCLUDED_PARTS),
-        )
-    )
-    symbols = vector_search.read_python_symbols(documents)
-    lsp_report = None
-    if "code-deps" in request.providers:
-        analysis_files = discover_lsp_files(
-            request.root,
-            request.surfaces,
-            request.excludes,
-        )
-        if analysis_files:
-            candidate = lsp_code_analysis.analyze(request.root, analysis_files)
-            if candidate.status == "complete" and (
-                candidate.symbols
-                or candidate.relations
-                or candidate.lexical_candidates
-                or not symbols
-            ):
-                lsp_report = candidate
-    return SearchCorpus(
-        documents=documents,
-        tool_entries=search_index.load_tool_entries(request.root),
-        cards=load_index_cards(request),
-        dependency_edges=tuple(vector_search.parse_dependency_edges(request.root, documents)),
-        python_symbols=symbols,
-        python_edges=vector_search.build_python_call_edges(symbols),
-        lsp_report=lsp_report,
-    )
-
-
-ProviderFunction = Callable[[SearchRequest, SearchCorpus], tuple[ProviderHit, ...]]
-
-
-def text_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
-    """Return raw text search hits."""
-    hits: list[ProviderHit] = []
-    for document in corpus.documents:
-        score = request.query.score_text(f"{document.relative_path}\n{document.text}")
-        if score <= 0.0:
-            continue
-        hits.append(
-            ProviderHit(
-                provider="text",
-                path=document.relative_path,
-                score=score,
-                reason="text-token-overlap",
-                evidence=snippet(document.text),
-            )
-        )
-    return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
-
-
-def vector_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
-    """Return TF-IDF vector search hits."""
-    hits = vector_search.search(corpus.documents, request.query.raw, request.top)
-    return tuple(
-        ProviderHit(
-            provider="vector",
-            path=hit.relative_path,
-            score=hit.score,
-            reason="tfidf-vector",
-            evidence=hit.snippet,
-        )
-        for hit in hits
-    )
-
-
-def semantic_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
-    """Return deterministic semantic card hits."""
-    hits: list[ProviderHit] = []
-    for card in corpus.cards:
-        score = request.query.score_text(card.searchable_text())
-        if score <= 0.0:
-            continue
-        hits.append(
-            ProviderHit(
-                provider="semantic",
-                path=card.path,
-                score=score,
-                reason=f"semantic-card:{card.generated_by}",
-                evidence=snippet(card.summary or card.responsibility),
-            )
-        )
-    return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
-
-
-def tool_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
-    """Return structured tool-catalog hits."""
-    hits: list[ProviderHit] = []
-    for entry in corpus.tool_entries.values():
-        searchable = f"{entry.path}\n{entry.searchable_text()}"
-        score = request.query.score_text(searchable)
-        if score <= 0.0:
-            continue
-        hits.append(
-            ProviderHit(
-                provider="tool",
-                path=entry.path,
-                score=score,
-                reason=f"tool-catalog:{entry.tool_id}",
-                evidence=snippet(entry.summary),
-            )
-        )
-    return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
-
-
-def header_dependency_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
-    """Return dependency-header hits."""
-    hits: list[ProviderHit] = []
-    for edge in corpus.dependency_edges:
-        searchable = f"{edge.source} {edge.target} {edge.direction} {edge.kind} {edge.reason}"
-        score = request.query.score_text(searchable)
-        if score <= 0.0:
-            continue
-        evidence = f"{edge.source} {edge.direction} {edge.kind} {edge.target} {edge.reason}"
-        hits.append(
-            ProviderHit(
-                provider="header-deps",
-                path=edge.source,
-                score=score,
-                reason="declared-dependency-source",
-                evidence=snippet(evidence),
-            )
-        )
-        hits.append(
-            ProviderHit(
-                provider="header-deps",
-                path=edge.target,
-                    score=score * HEADER_TARGET_SCORE_MULTIPLIER,
-                reason="declared-dependency-target",
-                evidence=snippet(evidence),
-            )
-        )
-    return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
-
-
-def code_symbol_hits(
-    request: SearchRequest,
-    symbols: Sequence[vector_search.PythonSymbol],
-) -> tuple[ProviderHit, ...]:
-    """Return Python symbol hits."""
-    hits: list[ProviderHit] = []
-    for symbol in symbols:
-        searchable = f"{symbol.relative_path} {symbol.name} {symbol.qualname} {symbol.kind} {' '.join(symbol.calls)}"
-        score = request.query.score_text(searchable)
-        if score <= 0.0:
-            continue
-        hits.append(
-            ProviderHit(
-                provider="code-deps",
-                path=symbol.relative_path,
-                score=score,
-                reason=f"python-symbol:{symbol.qualname}",
-                evidence=snippet(searchable),
-            )
-        )
-    return tuple(hits)
-
-
-def code_edge_hits(
-    request: SearchRequest,
-    symbols: Sequence[vector_search.PythonSymbol],
-    edges: Sequence[vector_search.PythonCallEdge],
-) -> tuple[ProviderHit, ...]:
-    """Return Python call-edge hits."""
-    by_id = {symbol.symbol_id: symbol for symbol in symbols}
-    hits: list[ProviderHit] = []
-    for edge in edges:
-        caller = by_id[edge.caller]
-        callee = by_id[edge.callee]
-        searchable = f"{caller.relative_path} {caller.qualname} calls {callee.qualname} {edge.call_name}"
-        score = request.query.score_text(searchable)
-        if score <= 0.0:
-            continue
-        hits.append(
-            ProviderHit(
-                provider="code-deps",
-                path=caller.relative_path,
-                score=score,
-                reason="python-call-edge",
-                evidence=snippet(searchable),
-            )
-        )
-    return tuple(hits)
-
-
-def code_dependency_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
-    """Return code dependency hits."""
-    if corpus.lsp_report is not None:
-        hits: list[ProviderHit] = []
-        for symbol in corpus.lsp_report.symbols:
-            path = lsp_code_analysis._uri_path(request.root, symbol.uri)
-            searchable = f"{path} {symbol.name} {symbol.container or ''}"
-            score = request.query.score_text(searchable)
-            if score > 0.0:
-                hits.append(ProviderHit("code-deps", path, score, "lsp-symbol", snippet(searchable)))
-        for relation in corpus.lsp_report.relations:
-            searchable = f"{relation.source} {relation.orientation} {relation.target}"
-            score = request.query.score_text(searchable)
-            if score > 0.0:
-                hits.append(ProviderHit("code-deps", relation.source, score, f"lsp-{relation.orientation}", snippet(searchable)))
-        for candidate in corpus.lsp_report.lexical_candidates:
-            searchable = f"{candidate.source} {candidate.token} {candidate.target}"
-            score = request.query.score_text(searchable)
-            if score > 0.0:
-                hits.append(ProviderHit("code-deps", candidate.source, score, "lsp-lexical-candidate", snippet(searchable)))
-        return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
-    hits = (
-        *code_symbol_hits(request, corpus.python_symbols),
-        *code_edge_hits(request, corpus.python_symbols, corpus.python_edges),
-    )
-    return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
-
-
-def provider_registry() -> Mapping[str, ProviderFunction]:
-    """Return provider instances keyed by name."""
-    return {
-        "text": text_hits,
-        "vector": vector_hits,
-        "semantic": semantic_hits,
-        "tool": tool_hits,
-        "header-deps": header_dependency_hits,
-        "code-deps": code_dependency_hits,
-    }
-
-
-def provider_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
-    """Run selected providers."""
-    registry = provider_registry()
-    hits: list[ProviderHit] = []
-    for name in request.providers:
-        provider = registry.get(name)
-        if provider is None:
-            continue
-        hits.extend(provider(request, corpus))
-    return tuple(hits)
-
-
-def build_candidates(hits: Sequence[ProviderHit], top: int) -> tuple[Candidate, ...]:
-    """Aggregate provider hits into path candidates."""
-    grouped: dict[str, list[ProviderHit]] = defaultdict(list)
-    for hit in hits:
-        grouped[hit.path].append(hit)
-    candidates: list[Candidate] = []
-    for path, path_hits in grouped.items():
-        providers = tuple(dict.fromkeys(hit.provider for hit in path_hits))
-        reasons = tuple(dict.fromkeys(hit.reason for hit in path_hits))
-        score = sum(hit.score for hit in path_hits) + (len(providers) - 1) * PROVIDER_BONUS
-        candidates.append(
-            Candidate(
-                path=path,
-                score=score,
-                providers=providers,
-                reasons=reasons,
-                evidence=tuple(sorted(path_hits, key=lambda hit: (-hit.score, hit.provider))),
-            )
-        )
-    return tuple(sorted(candidates, key=lambda item: (-item.score, item.path))[:top])
-
-
-def query_text_from_args(args: argparse.Namespace) -> str:
-    """Resolve the query source while preserving purpose/query precedence."""
+def query_text_from_args(args: argparse.Namespace) -> tuple[str, Path | None, bool]:
+    """Resolve query text while preserving inline/file/stdin precedence."""
     if args.query_file is not None and bool(args.query_stdin):
         raise ValueError("query-file-and-query-stdin-are-mutually-exclusive")
-    inline_query = str(args.purpose or args.query).strip()
-    if inline_query:
-        return inline_query
+    inline_query = str(args.purpose or args.query)
+    if inline_query.strip():
+        return inline_query, None, False
     if args.query_file is not None:
+        query_file = Path(args.query_file).expanduser().resolve()
         try:
-            return args.query_file.read_text(encoding="utf-8").strip()
+            query = query_file.read_text(encoding="utf-8")
         except OSError as exc:
-            raise ValueError(f"query-file-read-failed:{args.query_file}") from exc
+            raise ValueError(f"query-file-read-failed:{query_file}") from exc
         except UnicodeDecodeError as exc:
-            raise ValueError(f"query-file-decode-failed:{args.query_file}") from exc
+            raise ValueError(f"query-file-decode-failed:{query_file}") from exc
+        if not query.strip():
+            raise ValueError("query-or-purpose-required")
+        return query, query_file, False
     if bool(args.query_stdin):
-        return sys.stdin.read().strip()
-    return ""
+        query = sys.stdin.read()
+        if not query.strip():
+            raise ValueError("query-or-purpose-required")
+        return query, None, True
+    raise ValueError("query-or-purpose-required")
 
 
 def build_request(args: argparse.Namespace) -> SearchRequest:
-    """Build a search request from CLI args."""
-    query = query_text_from_args(args)
-    if not query:
-        raise ValueError("query-or-purpose-required")
-    root = args.root.resolve()
+    """Build one request without enabling unselected search providers."""
+    query, query_file, query_stdin = query_text_from_args(args)
     return SearchRequest(
-        root=root,
-        query=query_profile(query),
+        root=args.root.resolve(),
+        query=query,
         providers=selected_providers(str(args.providers)),
-        surfaces=tuple(args.surface),
-        excludes=tuple(args.exclude),
-        index_dir=(root / str(args.index_dir)).resolve(),
+        surfaces=tuple(str(value) for value in args.surface),
+        excludes=tuple(str(value) for value in args.exclude),
+        query_file=query_file,
+        query_stdin=query_stdin,
+        regex=bool(args.regex),
+        word_regexp=bool(args.word_regexp),
+        case_sensitive=bool(args.case_sensitive),
         top=max(int(args.top), 1),
-        refresh_index=bool(args.refresh_index),
     )
 
 
+def git_search_argv(
+    request: SearchRequest, pathspecs: Sequence[str]
+) -> tuple[str, ...]:
+    """Build native Git grep argv for the original query source."""
+    argv = [
+        "git",
+        "grep",
+        "--untracked",
+        "--exclude-standard",
+        "--no-color",
+        "--full-name",
+        "--line-number",
+        "-I",
+        "--max-count",
+        str(request.top),
+    ]
+    if not request.case_sensitive:
+        argv.append("--ignore-case")
+    if request.regex:
+        argv.append("--extended-regexp")
+    else:
+        argv.append("--fixed-strings")
+    if request.word_regexp:
+        argv.append("--word-regexp")
+    if request.query_file is not None:
+        argv.extend(("-f", str(request.query_file)))
+    elif request.query_stdin:
+        argv.extend(("-f", "-"))
+    else:
+        argv.extend(("-e", request.query))
+    argv.append("--")
+    argv.extend(pathspecs)
+    argv.extend(f":(exclude){value}" for value in request.excludes)
+    return tuple(argv)
+
+
+def git_provider_result(
+    request: SearchRequest,
+    provider: str,
+    pathspecs: Sequence[str],
+) -> ProviderResult:
+    """Run Git's native pattern search and preserve its raw output/status."""
+    try:
+        completed = subprocess.run(
+            git_search_argv(request, pathspecs),
+            cwd=request.root,
+            check=False,
+            capture_output=True,
+            text=True,
+            input=request.query if request.query_stdin else None,
+        )
+    except OSError as exc:
+        return ProviderResult(provider, "fail", 127, "", str(exc))
+    if completed.returncode == 0:
+        status = "pass"
+    elif completed.returncode == 1:
+        status = "no_match"
+    else:
+        status = "fail"
+    return ProviderResult(
+        provider,
+        status,
+        completed.returncode,
+        completed.stdout,
+        completed.stderr,
+    )
+
+
+def run_text_provider(request: SearchRequest) -> ProviderResult:
+    """Search the selected paths or the current repository with Git."""
+    return git_provider_result(request, "text", request.surfaces)
+
+
+def run_tool_provider(request: SearchRequest) -> ProviderResult:
+    """Search the canonical tool catalog with Git's native pattern contract."""
+    return git_provider_result(request, "tool", ("tools/catalog.yaml",))
+
+
+def run_semantic_provider(request: SearchRequest) -> ProviderResult:
+    """Delegate ranked semantic search to the resident Rust semantic-index owner."""
+    argv = [
+        SEMANTIC_INDEX_COMMAND,
+        "semantic-index",
+        "search",
+        "--root",
+        str(request.root),
+        "--top-k",
+        str(request.top),
+        "--format",
+        "json",
+    ]
+    if request.query_file is not None:
+        argv.extend(("--query-file", str(request.query_file)))
+        query_stdin = None
+    elif request.query_stdin:
+        argv.append("--query-stdin")
+        query_stdin = request.query
+    else:
+        argv.extend(("--query", request.query))
+        query_stdin = None
+    try:
+        completed = subprocess.run(
+            argv,
+            cwd=request.root,
+            check=False,
+            capture_output=True,
+            text=True,
+            input=query_stdin,
+        )
+    except OSError as exc:
+        return ProviderResult("semantic", "fail", 127, "", str(exc))
+    status = "pass" if completed.returncode == 0 else "fail"
+    return ProviderResult(
+        "semantic",
+        status,
+        completed.returncode,
+        completed.stdout,
+        completed.stderr,
+    )
+
+
+def run_dependency_provider(request: SearchRequest) -> ProviderResult:
+    """Read source-bound dependency context for the selected paths."""
+    paths = request.surfaces or (request.query,)
+    try:
+        client = GraphClient(request.root)
+        contexts = [client.context(path).payload for path in paths]
+    except GraphClientError as exc:
+        return ProviderResult("header-deps", "fail", 1, [], str(exc))
+    return ProviderResult("header-deps", "pass", 0, contexts)
+
+
+def run_code_provider(request: SearchRequest) -> ProviderResult:
+    """Return exact-query LSP facts for selected or bounded default code surfaces."""
+    files = lsp_code_analysis.discover_lsp_files(
+        request.root,
+        request.surfaces,
+        request.excludes,
+    )
+    report = lsp_code_analysis.analyze(request.root, files)
+    status = "pass" if report.status == "complete" else "fail"
+    payload = report.as_json(request.root)
+    query = request.query.casefold()
+    for field in ("symbols", "relations", "lexical_candidates"):
+        values = payload.get(field)
+        if isinstance(values, list):
+            payload[field] = [
+                item
+                for item in values
+                if query in json.dumps(item, ensure_ascii=False).casefold()
+            ]
+    return ProviderResult(
+        "code-deps",
+        status,
+        0 if status == "pass" else 1,
+        payload,
+    )
+
+
+def run_provider(request: SearchRequest, provider: str) -> ProviderResult:
+    """Run exactly one selected owner and return its independent result."""
+    if provider == "text":
+        return run_text_provider(request)
+    if provider == "semantic":
+        return run_semantic_provider(request)
+    if provider == "tool":
+        return run_tool_provider(request)
+    if provider == "header-deps":
+        return run_dependency_provider(request)
+    if provider == "code-deps":
+        return run_code_provider(request)
+    raise ValueError(f"unknown-provider:{provider}")
+
+
 def run_search(request: SearchRequest) -> SearchReport:
-    """Run coordinated search."""
-    corpus = load_corpus(request)
-    hits = provider_hits(request, corpus)
+    """Run only requested providers and preserve their independent results."""
     return SearchReport(
-        query=request.query.raw,
+        query=request.query,
         providers=request.providers,
-        candidates=build_candidates(hits, request.top),
-        provider_hits=hits,
+        results=tuple(run_provider(request, provider) for provider in request.providers),
     )
 
 
 def print_text(report: SearchReport) -> None:
-    """Print stable machine-readable text output."""
-    print("AGENT_SEARCH=pass")
+    """Print provider-native output without score or candidate fusion."""
+    print(f"AGENT_SEARCH={report.status}")
     print(f"AGENT_SEARCH_QUERY={json.dumps(report.query, ensure_ascii=False)}")
     print(f"AGENT_SEARCH_PROVIDERS={','.join(report.providers)}")
-    print(f"AGENT_SEARCH_CANDIDATES={len(report.candidates)}")
-    for candidate in report.candidates:
+    for result in report.results:
         print(
-            "CANDIDATE="
-            f"{candidate.score:.6f}\t{candidate.path}\tproviders={','.join(candidate.providers)}"
+            f"PROVIDER_RESULT={result.provider}\tstatus={result.status}"
+            f"\texit_code={result.exit_code}"
         )
-        for hit in candidate.evidence[:TEXT_EVIDENCE_LIMIT]:
-            print(
-                "EVIDENCE="
-                f"{hit.provider}\t{hit.score:.6f}\t{hit.reason}\t{json.dumps(hit.evidence, ensure_ascii=False)}"
-            )
+        if isinstance(result.result, str):
+            if result.result:
+                sys.stdout.write(result.result)
+                if not result.result.endswith("\n"):
+                    sys.stdout.write("\n")
+        else:
+            print(json.dumps(result.result, ensure_ascii=False, indent=2))
+        if result.stderr:
+            print(result.stderr, file=sys.stderr, end="")
 
 
 def print_json(report: SearchReport) -> None:
-    """Print JSON output."""
+    """Print separate provider-native outputs as one transport envelope."""
     print(json.dumps(report.as_json(), ensure_ascii=False, indent=2))
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the coordinated search CLI."""
+    """Run the explicit search-provider router."""
     args = build_parser().parse_args(argv)
     try:
         request = build_request(args)
@@ -577,7 +419,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print_json(report)
     else:
         print_text(report)
-    return 0
+    return report.exit_code
 
 
 if __name__ == "__main__":

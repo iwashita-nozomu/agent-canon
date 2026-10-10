@@ -34,7 +34,6 @@ SOURCE_REGRESSION_MODULES = (
     "tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker",
     "tests.agent_tools.test_check_dependency_headers",
     "tests.agent_tools.test_tool_drift",
-    "tests.agent_tools.test_vector_search",
     "tests/agent_tools/test_dependency_*.py",
 )
 

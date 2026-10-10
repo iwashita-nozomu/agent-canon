@@ -58,7 +58,7 @@ push diagnostics は capability flag を仮定せず、短い quiet/drain 区間
 `--lexical-only` の場合だけ成功します。`--files` を省略した場合は自動検出し、
 `--files` を値なしで明示した場合は空選択として扱います。
 
-自動検出は search/vector と共有する bounded LSP surface (`tools`、`agents`、
+自動検出はこの LSP owner が管理する bounded source surface (`tools`、`agents`、
 `.agents`、`documents`、`.codex`、`mcp`、`python`、`src`、`include`、`tests`) に
 限定し、`workspace`、`vendor`、
 `reports`、build/cache、retired legacy path、symlink、root 外 path を除外します。
@@ -73,6 +73,8 @@ scanner の footer では対象ファイル数だけを報告します。
 
 ## Consumer boundary
 
-`search.py --providers code-deps` は server が使用可能な場合だけ一回限りの report
-を in-memory で読む。汎用検索、header dependency graph、manifest evidence は
-既存 provider のままで、LSP edge と manifest edge の意味を混同しません。
+`search.py --providers code-deps` は選択された場合だけこの owner に一回限りの
+analysis を依頼し、native LSP report を独立して返します。LSP failure は failure
+のまま返し、AST heuristic や別 provider への fallback は行いません。汎用 text
+search、header dependency graph、manifest evidence はそれぞれの owner を選択し、
+LSP edge と manifest edge の意味を混同しません。
