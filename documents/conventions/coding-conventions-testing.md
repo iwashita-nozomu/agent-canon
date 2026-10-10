@@ -74,22 +74,17 @@ downstream design ../../agents/skills/pr-processing.md consumes Issue-linked rep
 
 ### 2.1 C++ test ownership
 
-- derived project の C++ adapter/integration test source は `tests/cpp/` に置きます。
-- `cpp/CMakeLists.txt` は `${ROOT}/tests/cpp` を source directory、
-  `${CMAKE_CURRENT_BINARY_DIR}/tests/cpp` を binary directory として指定した
-  out-of-tree `add_subdirectory` で `cpp-test-<name>` executable、`cpp-tests` aggregate、
-  CTest registration を同じ configure graph へ接続します。
-- AgentCanon runtime/template tests は AgentCanon の `tests/`、cppdev の数値・数学・NN
-  oracle tests は cppdev の owning repository に置き、derived project の `tests/cpp/` に
-  複製しません。production subtree には test compatibility path を作成しません。
-- 各 individual test executable は `cpp-core` を consume します。`cpp-tests` は build
-  grouping を提供し、CTest が execution と failure output を所有します。
-- C++ test validation は同じ profile cache を使います。
-
-```bash
-cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests
-ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure
-```
+- C++ test source の path、CMake manifest、target 名は selected CMake profile が所有します。
+- `root-aggregate` profile では project root entrypoint が既存の test surface を project-owned
+  configure graph へ接続します。consumer が既に持つ path (例: `test/cpp/`) を別の universal
+  `tests/cpp/` path へ移しません。
+- `consumer-local` profile では、選択した `tests/cpp/<test-id>/CMakeLists.txt` がその test
+  consumer の configure/build/test route を所有し、無関係な consumer graph を要求しません。
+- AgentCanon runtime/template tests は AgentCanon の `tests/`、cppdev の数値・数学・NN oracle
+  tests は cppdev の owning repository に置き、derived project の C++ test surface へ複製しません。
+  production source tree に test compatibility path を作成しません。
+- Test executable、production provider target、CTest registration の名前は project-owned です。
+  C++ test validation は selected profile と同じ project build tree を使います。
 
 ### 2.2 Bug reproduction evidence
 
