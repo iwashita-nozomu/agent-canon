@@ -9,7 +9,6 @@
 # upstream implementation ./scan_dependency_headers.sh scans repo-wide manifest coverage
 # upstream implementation ../../validation/semantic/dependencies/check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates source-derived dependency relations
-# upstream implementation ../../validation/semantic/documents/check_design_doc_claims.py validates design claims against dependency evidence
 # downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
 # @dependency-end
 set -euo pipefail
@@ -79,14 +78,12 @@ LIST_CHANGED_DEPENDENCIES=0
 REPORT_DIR="${AGENT_RUN_REPORT_DIR:-}"
 GRAPH_TSV_OUTPUT=""
 SEARCH_HITS_FILE=""
-CHECK_DESIGN_DOC_CLAIMS=0
 ENSURE_GRAPH_ONLY=0
-declare -a DESIGN_DOC_CLAIM_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--ensure-graph] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--ensure-graph] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
@@ -103,10 +100,6 @@ With --cycle-report-only, dependency cycles stay visible but do not block the
 wrapper. Use this only with a durable source-derived graph report artifact.
 With --ensure-graph, the opt-in persisted graph status/build operation runs once
 and exits before source-owned dependency-header review.
-With --check-design-doc-claims, changed design documents are compared with
-dependency header evidence and implementation-backed claim tokens. Repeat
---design-doc-claim-path to check explicit design documents instead of changed
-scope.
 EOF
 }
 
@@ -156,15 +149,6 @@ while [[ $# -gt 0 ]]; do
       SEARCH_HITS_FILE="$2"
       shift 2
       ;;
-    --check-design-doc-claims)
-      CHECK_DESIGN_DOC_CLAIMS=1
-      shift
-      ;;
-    --design-doc-claim-path)
-      CHECK_DESIGN_DOC_CLAIMS=1
-      DESIGN_DOC_CLAIM_PATHS+=("$2")
-      shift 2
-      ;;
     -h|--help)
       usage
       exit 0
@@ -194,7 +178,6 @@ CANON_TOOLS_ROOT="$script_dir"
 SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/scan_dependency_headers.sh"
 CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/../../validation/semantic/dependencies/check_dependency_header_format.sh"
 CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/check_dependency_graph.sh"
-CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/../../validation/semantic/documents/check_design_doc_claims.py"
 # Persisted graph operations are repository-scoped; source review tools remain script-owned.
 if [[ -n "${AGENT_CANON_GRAPH_CLI:-}" ]]; then
   GRAPH_CLI="$(realpath -e "$AGENT_CANON_GRAPH_CLI")" || {
@@ -359,15 +342,6 @@ if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
   bash "${related_args[@]}" "${checkable_paths[@]}"
 fi
 
-if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
-  design_claim_args=("$CHECK_DESIGN_DOC_CLAIMS_TOOL" --root "$ROOT_DIR")
-  if [[ ${#DESIGN_DOC_CLAIM_PATHS[@]} -gt 0 ]]; then
-    design_claim_args+=("${DESIGN_DOC_CLAIM_PATHS[@]}")
-  else
-    design_claim_args+=(--changed)
-  fi
-  python3 "${design_claim_args[@]}"
-fi
 
 if [[ -n "$SEARCH_HITS_FILE" ]]; then
   edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --root "$ROOT_DIR" --search-hits-file "$SEARCH_HITS_FILE")
