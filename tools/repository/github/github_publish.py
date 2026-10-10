@@ -73,7 +73,9 @@ def _write_publication_summary(path: Path, payload: bytes) -> None:
     if configured:
         parent = Path(configured).resolve(strict=True)
         attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="github-publication-staging")
+            ParentRootAttestationRequest(
+                cwd=parent, explicit_root=parent, purpose="github-publication-staging"
+            )
         )
         ParentRootSideEffectBoundary().write_parent_owned_file(
             attestation, path, payload, "github-publication-staging"
@@ -155,12 +157,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_publish_arguments(publish_pr)
     add_pr_arguments(publish_pr)
-    publish_pr.add_argument("--allow-main", action="store_true", help="Allow pushing main.")
+    publish_pr.add_argument(
+        "--allow-main", action="store_true", help="Allow pushing main."
+    )
 
     checks = subparsers.add_parser("checks", help="Show GitHub PR checks.")
     add_publish_arguments(checks)
-    checks.add_argument("--pr", help="PR number, URL, or branch. Defaults to current branch.")
-    checks.add_argument("--watch", action="store_true", help="Watch checks until completion.")
+    checks.add_argument(
+        "--pr", help="PR number, URL, or branch. Defaults to current branch."
+    )
+    checks.add_argument(
+        "--watch", action="store_true", help="Watch checks until completion."
+    )
     return parser
 
 
@@ -172,8 +180,12 @@ def add_publish_arguments(parser: argparse.ArgumentParser) -> None:
         help="The current user task that authorizes this publish operation.",
     )
     parser.add_argument("--repo", help="GitHub repository in owner/name form.")
-    parser.add_argument("--remote", default="origin", help="Git remote to verify. Defaults to origin.")
-    parser.add_argument("--branch", help="Branch to publish. Defaults to the current branch.")
+    parser.add_argument(
+        "--remote", default="origin", help="Git remote to verify. Defaults to origin."
+    )
+    parser.add_argument(
+        "--branch", help="Branch to publish. Defaults to the current branch."
+    )
     parser.add_argument(
         "--summary-out",
         help="Optional JSON summary path. Stdout remains a compact key/value report.",
@@ -184,8 +196,12 @@ def add_pr_arguments(parser: argparse.ArgumentParser) -> None:
     """Add pull-request creation/update arguments."""
     parser.add_argument("--base", default="main", help="Base branch. Defaults to main.")
     parser.add_argument("--title", required=True, help="Pull request title.")
-    parser.add_argument("--body-file", required=True, help="Path to a Markdown PR body file.")
-    parser.add_argument("--draft", action="store_true", help="Create the PR as a draft.")
+    parser.add_argument(
+        "--body-file", required=True, help="Path to a Markdown PR body file."
+    )
+    parser.add_argument(
+        "--draft", action="store_true", help="Create the PR as a draft."
+    )
     parser.add_argument(
         "--update-existing",
         action="store_true",
@@ -372,8 +388,13 @@ def verify_remote(
     if remote_slug != name_with_owner:
         head_metadata = gh_head_repo_metadata(runner, remote_slug)
         parent = head_metadata.get("parent")
-        parent_name = parent.get("nameWithOwner") if isinstance(parent, Mapping) else None
-        if head_metadata.get("nameWithOwner") != remote_slug or parent_name != name_with_owner:
+        parent_name = (
+            parent.get("nameWithOwner") if isinstance(parent, Mapping) else None
+        )
+        if (
+            head_metadata.get("nameWithOwner") != remote_slug
+            or parent_name != name_with_owner
+        ):
             raise UserVisibleFailure(
                 message=(
                     f"remote {remote!r} points at {remote_slug}, which is not a "
@@ -402,9 +423,10 @@ def verify_remote(
         "permission_state": permission_state,
         "authority_source": "gh repo view viewerPermission",
     }
-    permission_evidence_id = "evidence:" + hashlib.sha256(
-        canonical_json_bytes(permission_evidence)
-    ).hexdigest()
+    permission_evidence_id = (
+        "evidence:"
+        + hashlib.sha256(canonical_json_bytes(permission_evidence)).hexdigest()
+    )
     actor_id, actor_display_name = gh_authenticated_actor(runner)
     return RemoteVerification(
         repo=name_with_owner,
@@ -537,7 +559,10 @@ def pull_request_readback(
                 next_action="reject_publication_readback_and_retry_exact_PR_identity",
             )
         merge_tree = merge_identity.get("tree_sha")
-        if not isinstance(merge_tree, str) or re.fullmatch(r"[0-9a-f]{40}", merge_tree) is None:
+        if (
+            not isinstance(merge_tree, str)
+            or re.fullmatch(r"[0-9a-f]{40}", merge_tree) is None
+        ):
             raise UserVisibleFailure(
                 message="merge commit tree identity is incomplete",
                 next_action="read_back_the_exact_publication_merge_tree",
@@ -602,10 +627,7 @@ def lifecycle_with_pr_readback(
             message="pull request base identity changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
         )
-    if (
-        remote_state != "MERGED"
-        and readback.get("baseRefOid") != base["commit_sha"]
-    ):
+    if remote_state != "MERGED" and readback.get("baseRefOid") != base["commit_sha"]:
         raise UserVisibleFailure(
             message="pull request base commit changed after publication",
             next_action="materialize_a_conflict_successor_lifecycle",
@@ -1184,15 +1206,11 @@ def _validate_pr_identity_inputs(
     source_main_rebind_receipt: Mapping[str, object],
 ) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     """Validate and deep-clone the immutable G3 input records once."""
-    checked_rebind = validate_source_main_rebind_receipt(
-        source_main_rebind_receipt
-    )
+    checked_rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
     checked_cas = validate_candidate_cas_rebind_transition(
         checked_rebind, candidate_cas_receipt
     )
-    checked_lifecycle = validate_candidate_cas_pr_transition(
-        checked_cas, lifecycle
-    )
+    checked_lifecycle = validate_candidate_cas_pr_transition(checked_cas, lifecycle)
     return checked_lifecycle, checked_cas, checked_rebind
 
 
@@ -1331,7 +1349,9 @@ def _require_pr_identity_gate_bundle(
     return checked, cas, _rebind, checked_upstream, checked_gate
 
 
-def base_summary(args: argparse.Namespace, verification: RemoteVerification, branch: str) -> dict[str, object]:
+def base_summary(
+    args: argparse.Namespace, verification: RemoteVerification, branch: str
+) -> dict[str, object]:
     """Return common summary fields."""
     return {
         "user_task": args.user_task,
@@ -1428,7 +1448,9 @@ def perform_push(
         {
             "action": "push",
             "publication_boundary": (
-                "verified_lifecycle" if lifecycle is not None else "branch_transport_only"
+                "verified_lifecycle"
+                if lifecycle is not None
+                else "branch_transport_only"
             ),
             "worktree_dirty": dirty,
             "command": command,
@@ -1677,9 +1699,7 @@ def command_failure_message(exc: CommandFailure) -> str:
     """Return a bounded command failure message."""
     command = " ".join(exc.result.args)
     detail = "\n".join(
-        part.strip()
-        for part in (exc.result.stderr, exc.result.stdout)
-        if part.strip()
+        part.strip() for part in (exc.result.stderr, exc.result.stdout) if part.strip()
     )
     if detail:
         detail = detail[:MAX_ERROR_CHARS]
@@ -1772,7 +1792,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(summary, sort_keys=True))
         return 1
     except UserVisibleFailure as exc:
-        summary = failure_summary(args, message=exc.message, next_action=exc.next_action)
+        summary = failure_summary(
+            args, message=exc.message, next_action=exc.next_action
+        )
         if args is not None:
             emit_summary(args, summary)
         else:
