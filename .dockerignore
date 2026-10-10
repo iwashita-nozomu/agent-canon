@@ -27,6 +27,9 @@
 !.codex/config.toml
 .codex/personal/
 .codex/personal/**
+!.codex/personal/
+!.codex/personal/skills/
+!.codex/personal/skills/**
 !bootstrap/
 !bootstrap.sh
 !bootstrap/container/

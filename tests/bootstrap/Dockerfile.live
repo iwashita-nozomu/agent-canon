@@ -40,6 +40,12 @@ RUN apt-get update \
 WORKDIR /opt/agent-canon/source
 COPY . /opt/agent-canon/source
 
+# Docker consumes .dockerignore as context metadata instead of copying it.
+# The task-owned context carries its exact committed bytes under tests/bootstrap.
+RUN cp /opt/agent-canon/source/tests/bootstrap/.agent-canon-dockerignore-input \
+      /opt/agent-canon/source/.dockerignore \
+    && rm /opt/agent-canon/source/tests/bootstrap/.agent-canon-dockerignore-input
+
 # The full-check profile uses the same typed providers as the shared image,
 # but installs only the tools required by run_all_checks. Its source snapshot
 # is Git-backed for the existing repository-root and graph checkers, then made
@@ -60,12 +66,13 @@ RUN if [ "${TEST_PROFILE}" = "full-checks" ]; then \
       python3 -m tools.analysis.dependencies.dependency_plan image-install \
         --workspace /opt/agent-canon/source \
         --manifest /opt/agent-canon/source/bootstrap/container/image/dependencies.toml \
-        --records ruff basedpyright shellcheck actionlint zizmor rust-toolchain python3-pytest \
+        --records ruff basedpyright check-jsonschema yamllint shellcheck actionlint zizmor rust-toolchain python3-pytest \
         --format text; \
       CARGO_TARGET_DIR=/tmp/agent-canon-test-cargo-target cargo build \
         --locked --release \
         --manifest-path /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/Cargo.toml; \
       install -m 0555 /tmp/agent-canon-test-cargo-target/release/agent-canon /usr/local/bin/agent-canon; \
+      rm -f /usr/local/bin/rustup-init; \
       git -C /opt/agent-canon/source init --quiet --initial-branch=main; \
       git -C /opt/agent-canon/source config user.name "AgentCanon test image"; \
       git -C /opt/agent-canon/source config user.email "agent-canon-test-image@example.invalid"; \

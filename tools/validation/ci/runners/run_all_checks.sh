@@ -373,7 +373,7 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/validation/notebook_quality.py" --all 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/validation/notebooks/notebook_quality.py" --all 2>&1; then
   echo "✅ notebook quality checks 成功"
 else
   echo "❌ notebook quality checks 失敗"

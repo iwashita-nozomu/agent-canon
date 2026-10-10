@@ -189,14 +189,27 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 IMAGE_TAG="agent-canon-test:${TEST_PROFILE}-${TEST_WORKAREA##*/}-$$"
 SOURCE_REVISION="$(git -C "${WORKSPACE_ROOT}" rev-parse HEAD)"
+BUILD_CONTEXT="${TEST_WORKAREA}/source"
+mkdir -p "${BUILD_CONTEXT}"
+# Export the committed candidate only, excluding local Git state and untracked
+# personal files while preserving the revision recorded on the image.
+git -C "${WORKSPACE_ROOT}" archive --format=tar "${SOURCE_REVISION}" \
+  | tar -xf - -C "${BUILD_CONTEXT}"
+cp "${BUILD_CONTEXT}/.dockerignore" \
+  "${BUILD_CONTEXT}/tests/bootstrap/.agent-canon-dockerignore-input"
 
 docker build \
   --build-arg "TEST_PROFILE=${TEST_PROFILE}" \
   --build-arg "SOURCE_REVISION=${SOURCE_REVISION}" \
-  --file "${SCRIPT_DIR}/Dockerfile.live" \
+  --file "${BUILD_CONTEXT}/tests/bootstrap/Dockerfile.live" \
   --tag "${IMAGE_TAG}" \
-  "${WORKSPACE_ROOT}"
+  "${BUILD_CONTEXT}"
 IMAGE_BUILT=1
+if ! rm -rf -- "${BUILD_CONTEXT}" || [[ -e "${BUILD_CONTEXT}" ]]; then
+  echo "failed to remove task-owned test build context ${BUILD_CONTEXT}" >&2
+  exit 1
+fi
+printf 'AGENT_CANON_TEST_BUILD_CONTEXT=removed\n'
 IMAGE_ID="$(docker image inspect --format '{{.Id}}' "${IMAGE_TAG}")"
 IMAGE_REVISION="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "${IMAGE_TAG}")"
 if [[ "${IMAGE_REVISION}" != "${SOURCE_REVISION}" ]]; then
@@ -228,6 +241,7 @@ else
   mkdir -p \
     "${TEST_WORKAREA}/control" \
     "${TEST_WORKAREA}/runtime" \
+    "${TEST_WORKAREA}/runtime/cache/ruff" \
     "${TEST_WORKAREA}/cache/home"
   DOCKER_RUN_ARGS+=(
     --read-only
@@ -236,6 +250,7 @@ else
     --env "AGENT_CANON_CHILD_PURPOSE=standalone-static-gate-unit"
     --env "AGENT_CANON_CLI_CMD=/usr/local/bin/agent-canon"
     --env "CARGO_HOME=${TEST_WORKAREA}/runtime/cache/cargo-home"
+    --env "RUFF_CACHE_DIR=${TEST_WORKAREA}/runtime/cache/ruff"
     --env "HOME=${TEST_WORKAREA}/cache/home"
   )
   DOCKER_WORKDIR="${SOURCE_IMAGE}"
