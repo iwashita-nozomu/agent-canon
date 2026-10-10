@@ -1,23 +1,34 @@
 # @dependency-start
 # contract environment
-# responsibility Defines the disposable Python/Git/Docker CLI image for Issue #1370's live test.
-# upstream implementation ./docker.sh builds and runs this image
+# responsibility Defines the disposable test image for AgentCanon live and native
+# proof checks.
+# upstream implementation ./docker.sh selects and runs each test capability profile
+# downstream design ./lean-proof-dependencies.toml pins the native Lean test toolchain
 # downstream test ./test_live_projection_authority.py exercises the shared host Docker daemon
+# downstream implementation ../../tools/analysis/proof/lean_proof_env.py owns native Lean behavior
 # @dependency-end
 
 FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    ELAN_HOME=/root/.elan \
+    PATH="/root/.elan/bin:${PATH}"
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         ca-certificates \
         docker.io \
         git \
+        python3-packaging \
         python3.12 \
         python3-pytest \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/agent-canon/source
 COPY . /opt/agent-canon/source
+
+RUN python3 tools/runtime/container/devcontainer_dependencies.py image-install \
+    --workspace /opt/agent-canon/source \
+    --manifest tests/bootstrap/lean-proof-dependencies.toml \
+    --format text

@@ -100,6 +100,22 @@ toolchain-only bootstrap、native command、manifest/version readback、既存�
 反例成功のログ文字列が含まれていても、別のエラーがある file を成功扱いしない回帰です。
 検証に使った source head、native version、native manifest、command と実結果を Issue/PR に残します。
 
+AgentCanon source の native regression には、既存の disposable test image を使う
+`bash tests/bootstrap/docker.sh lean-proof` を用います。これは build 時に exact
+Lean toolchain を image へ導入し、実行時は task-owned workarea だけを mount して
+`all-smoke` と `check-file` の成功・失敗例を同じ Lake package で確認します。
+この profile は Docker socket、host home、credential を mount せず、通常の proof
+作業用 runtime や共有 AgentCanon tool image を変更しません。
+
+```bash
+AGENT_CANON_RUNTIME_ROOT=<existing-external-runtime> \
+  bash tests/bootstrap/docker.sh lean-proof
+```
+
+この entrypoint は host Docker CLI を使い、image と workarea を task 終了時に
+削除します。これは source qualification route であり、通常の proof package を
+実行する runtime の選択や構築方法を変更するものではありません。
+
 ## 根拠
 
 - [Lake の package 作成と標準 CLI](https://lean-lang.org/doc/reference/latest/Build-Tools-and-Distribution/Lake/)
