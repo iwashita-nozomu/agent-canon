@@ -53,7 +53,13 @@ class FakeRunner:
         self.outputs: dict[tuple[str, ...], github_publish.CommandResult] = {}
         self.sequences: dict[tuple[str, ...], list[github_publish.CommandResult]] = {}
 
-    def add(self, command: Sequence[str], stdout: str = "", stderr: str = "", returncode: int = 0) -> None:
+    def add(
+        self,
+        command: Sequence[str],
+        stdout: str = "",
+        stderr: str = "",
+        returncode: int = 0,
+    ) -> None:
         """Register a command result."""
         key = tuple(command)
         self.outputs[key] = github_publish.CommandResult(
@@ -90,7 +96,9 @@ class FakeRunner:
             )
         return self.outputs[key]
 
-    def add_publication_identity(self, branch: str = "topic", base: str = "main") -> None:
+    def add_publication_identity(
+        self, branch: str = "topic", base: str = "main"
+    ) -> None:
         """Register the exact candidate and base identities used by one lifecycle."""
         self.add(["git", "rev-parse", branch], stdout=CANDIDATE_SHA + "\n")
         self.add(
@@ -168,9 +176,7 @@ class GithubPublishTest(unittest.TestCase):
     def publication_components(
         self,
         lifecycle: dict[str, object],
-    ) -> tuple[
-        dict[str, object], dict[str, object], list[dict[str, object]]
-    ]:
+    ) -> tuple[dict[str, object], dict[str, object], list[dict[str, object]]]:
         """Build exact reviewed-CAS and canonical G1/G2 fixtures."""
         binding = dict(lifecycle["binding"])
         head = lifecycle["head_identity"]
@@ -221,7 +227,11 @@ class GithubPublishTest(unittest.TestCase):
             invariant="source_correctness",
             output_digest="sha256:" + "b" * 64,
             owner=str(
-                PROJECT_ROOT / "tools" / "repository" / "github" / "publication_integrator.py"
+                PROJECT_ROOT
+                / "tools"
+                / "repository"
+                / "github"
+                / "publication_integrator.py"
             )
             + "#resolve_publication_eligibility",
             verdict="pass",
@@ -237,32 +247,6 @@ class GithubPublishTest(unittest.TestCase):
         )
         return rebind, cas, [g1, g2]
 
-    def publication_packet(
-        self,
-        args: argparse.Namespace,
-        runner: FakeRunner,
-    ) -> dict[str, object]:
-        """Materialize the sole packet accepted by a GitHub mutation."""
-        verification = github_publish.verify_remote(
-            runner,
-            repo=args.repo,
-            remote=args.remote,
-        )
-        branch = args.branch or "topic"
-        lifecycle = github_publish.build_pull_request_lifecycle(
-            args,
-            runner,
-            verification,
-            branch,
-        )
-        rebind, cas, upstream = self.publication_components(lifecycle)
-        return github_publish.materialize_github_publication_packet(
-            lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-        )
-
     def test_normalized_repo_slug_accepts_common_github_urls(self) -> None:
         """Remote URL parsing should support ssh, https, and owner/name."""
         self.assertEqual(
@@ -277,7 +261,9 @@ class GithubPublishTest(unittest.TestCase):
             github_publish.normalized_repo_slug("ssh://git@github.com/owner/repo.git"),
             "owner/repo",
         )
-        self.assertEqual(github_publish.normalized_repo_slug("owner/repo"), "owner/repo")
+        self.assertEqual(
+            github_publish.normalized_repo_slug("owner/repo"), "owner/repo"
+        )
 
     def test_push_requires_user_task_argument(self) -> None:
         """The CLI should not publish without a visible user task."""
@@ -286,14 +272,26 @@ class GithubPublishTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             parser.parse_args(["push"])
 
-    def test_verify_remote_rejects_repo_mismatch_when_verified_remote_required(self) -> None:
+    def test_verify_remote_rejects_repo_mismatch_when_verified_remote_required(
+        self,
+    ) -> None:
         """Mismatched gh repo and origin must fail instead of trying another push route."""
         runner = FakeRunner()
         runner.add(
-            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl,viewerPermission"],
+            [
+                "gh",
+                "repo",
+                "view",
+                "owner/repo",
+                "--json",
+                "nameWithOwner,url,sshUrl,viewerPermission",
+            ],
             stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
-        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:other/repo.git\n")
+        runner.add(
+            ["git", "remote", "get-url", "origin"],
+            stdout="git@github.com:other/repo.git\n",
+        )
         runner.add(
             [
                 "gh",
@@ -318,71 +316,12 @@ class GithubPublishTest(unittest.TestCase):
             "materialize_the_typed_multiple_remotes_or_contributor_lifecycle",
         )
 
-    def test_push_uses_sealed_sha_ref_and_exact_remote_readback(self) -> None:
-        """Push preserves the sealed local identity and reads back the exact SHA."""
+    def test_cli_push_uses_native_transport_and_exact_remote_readback(self) -> None:
+        """Standalone push reports the exact local and remote branch identity."""
         runner = FakeRunner()
-        runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
         runner.add(
-            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl,viewerPermission"],
-            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
+            ["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n"
         )
-        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
-        runner.add_verified_actor()
-        runner.add_publication_identity()
-        runner.add_local_identity()
-        runner.add(["git", "status", "--short", "--untracked-files=all"], stdout=" M file.py\n")
-        runner.add(
-            [
-                "git",
-                "push",
-                "-u",
-                "origin",
-                f"{CANDIDATE_SHA}:refs/heads/topic",
-            ],
-            stderr="pushed\n",
-        )
-        runner.add(
-            ["git", "ls-remote", "origin", "refs/heads/topic"],
-            stdout=f"{CANDIDATE_SHA}\trefs/heads/topic\n",
-        )
-        args = argparse.Namespace(
-            action="push",
-            root=".",
-            user_task="publish topic branch",
-            repo="owner/repo",
-            remote="origin",
-            branch=None,
-            allow_main=False,
-            summary_out=None,
-        )
-
-        packet = self.publication_packet(args, runner)
-        summary = github_publish.run(args, runner, publication_packet=packet)
-
-        self.assertEqual(summary["status"], "ok")
-        self.assertTrue(summary["worktree_dirty"])
-        self.assertEqual(summary["local_commit_sha"], CANDIDATE_SHA)
-        self.assertEqual(summary["local_tree_sha"], CANDIDATE_TREE)
-        self.assertEqual(summary["remote_readback_sha"], CANDIDATE_SHA)
-        self.assertIn(
-            (
-                "git",
-                "push",
-                "-u",
-                "origin",
-                f"{CANDIDATE_SHA}:refs/heads/topic",
-            ),
-            runner.commands,
-        )
-        self.assertIn(
-            ("git", "ls-remote", "origin", "refs/heads/topic"),
-            runner.commands,
-        )
-
-    def test_cli_push_is_transport_only_when_packet_file_is_absent(self) -> None:
-        """Standalone push uses transport identity without fake publication gates."""
-        runner = FakeRunner()
-        runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
         runner.add(
             [
                 "gh",
@@ -394,9 +333,15 @@ class GithubPublishTest(unittest.TestCase):
             ],
             stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
-        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add(
+            ["git", "remote", "get-url", "origin"],
+            stdout="git@github.com:owner/repo.git\n",
+        )
         runner.add_verified_actor()
-        runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
+        runner.add(
+            ["git", "status", "--short", "--untracked-files=all"],
+            stdout=" M file.py\n",
+        )
         runner.add_local_identity()
         runner.add(
             [
@@ -426,6 +371,7 @@ class GithubPublishTest(unittest.TestCase):
         summary = github_publish.run(args, runner)
 
         self.assertEqual(summary["status"], "ok")
+        self.assertTrue(summary["worktree_dirty"])
         self.assertEqual(summary["local_commit_sha"], CANDIDATE_SHA)
         self.assertEqual(summary["local_tree_sha"], CANDIDATE_TREE)
         self.assertEqual(summary["remote_readback_sha"], CANDIDATE_SHA)
@@ -487,10 +433,12 @@ class GithubPublishTest(unittest.TestCase):
         self.assertIn(tuple(push), runner.commands)
         self.assertNotIn("--force-with-lease", push)
 
-    def test_publish_pr_without_packet_reaches_body_validation(self) -> None:
-        """PR mutation derives its lifecycle without requiring a packet file."""
+    def test_publish_pr_checks_body_before_mutation(self) -> None:
+        """PR mutation derives its lifecycle and validates the body first."""
         runner = FakeRunner()
-        runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
+        runner.add(
+            ["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n"
+        )
         runner.add(
             [
                 "gh",
@@ -502,7 +450,10 @@ class GithubPublishTest(unittest.TestCase):
             ],
             stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
-        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add(
+            ["git", "remote", "get-url", "origin"],
+            stdout="git@github.com:owner/repo.git\n",
+        )
         runner.add_verified_actor()
         runner.add_publication_identity()
         args = argparse.Namespace(
@@ -530,20 +481,6 @@ class GithubPublishTest(unittest.TestCase):
     def test_push_rejects_local_candidate_mismatch_without_push_fallback(self) -> None:
         """A local HEAD/tree mismatch is typed and cannot trigger another route."""
         runner = FakeRunner()
-        runner.add(
-            [
-                "gh",
-                "repo",
-                "view",
-                "owner/repo",
-                "--json",
-                "nameWithOwner,url,sshUrl,viewerPermission",
-            ],
-            stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
-        )
-        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
-        runner.add_verified_actor()
-        runner.add_publication_identity()
         args = argparse.Namespace(
             action="push",
             root=".",
@@ -554,8 +491,7 @@ class GithubPublishTest(unittest.TestCase):
             allow_main=False,
             summary_out=None,
         )
-        packet = self.publication_packet(args, runner)
-        authority = github_publish.GithubPublicationAuthority.from_packet(packet)
+        lifecycle = self.lifecycle_fixture()
         runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
         runner.add_local_identity(commit_sha="e" * 40, tree_sha="f" * 40)
         verification = github_publish.RemoteVerification(
@@ -571,10 +507,10 @@ class GithubPublishTest(unittest.TestCase):
                 runner,
                 verification,
                 "topic",
-                authority=authority,
+                lifecycle=lifecycle,
             )
 
-        self.assertIn("differs from the sealed lifecycle", raised.exception.message)
+        self.assertIn("differs from the verified lifecycle", raised.exception.message)
         self.assertFalse(any(command[1] == "push" for command in runner.commands))
         self.assertFalse(any(command[1] == "ls-remote" for command in runner.commands))
 
@@ -583,15 +519,6 @@ class GithubPublishTest(unittest.TestCase):
         runner = FakeRunner()
         runner.add_local_identity()
         runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
-        lifecycle = self.lifecycle_fixture()
-        rebind, cas, upstream = self.publication_components(lifecycle)
-        packet = github_publish.materialize_github_publication_packet(
-            lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-        )
-        authority = github_publish.GithubPublicationAuthority.from_packet(packet)
         args = argparse.Namespace(
             action="push",
             root=".",
@@ -629,7 +556,6 @@ class GithubPublishTest(unittest.TestCase):
                 runner,
                 verification,
                 "topic",
-                authority=authority,
             )
 
         self.assertIn("readback SHA differs", raised.exception.message)
@@ -639,9 +565,8 @@ class GithubPublishTest(unittest.TestCase):
         )
 
     def test_push_rejects_branch_ref_mismatch_without_push(self) -> None:
-        """The selected branch must equal the sealed lifecycle ref."""
+        """The selected branch must equal the validated lifecycle ref."""
         runner = FakeRunner()
-        runner.add_publication_identity()
         args = argparse.Namespace(
             action="push",
             root=".",
@@ -653,14 +578,6 @@ class GithubPublishTest(unittest.TestCase):
             summary_out=None,
         )
         lifecycle = self.lifecycle_fixture()
-        rebind, cas, upstream = self.publication_components(lifecycle)
-        packet = github_publish.materialize_github_publication_packet(
-            lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-        )
-        authority = github_publish.GithubPublicationAuthority.from_packet(packet)
         verification = github_publish.RemoteVerification(
             repo="owner/repo",
             remote="origin",
@@ -674,25 +591,16 @@ class GithubPublishTest(unittest.TestCase):
                 runner,
                 verification,
                 "other",
-                authority=authority,
+                lifecycle=lifecycle,
             )
 
-        self.assertIn("sealed lifecycle head identity", raised.exception.message)
+        self.assertIn("verified lifecycle head identity", raised.exception.message)
         self.assertFalse(any(command[1] == "push" for command in runner.commands))
 
     def test_push_rejects_post_push_local_identity_change(self) -> None:
         """A local branch/HEAD/tree change across push is a typed failure."""
         runner = FakeRunner()
-        runner.add_publication_identity()
         lifecycle = self.lifecycle_fixture()
-        rebind, cas, upstream = self.publication_components(lifecycle)
-        packet = github_publish.materialize_github_publication_packet(
-            lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-        )
-        authority = github_publish.GithubPublicationAuthority.from_packet(packet)
         args = argparse.Namespace(
             action="push",
             root=".",
@@ -782,7 +690,7 @@ class GithubPublishTest(unittest.TestCase):
                 runner,
                 verification,
                 "topic",
-                authority=authority,
+                lifecycle=lifecycle,
             )
 
         self.assertIn("changed across the push", raised.exception.message)
@@ -793,12 +701,24 @@ class GithubPublishTest(unittest.TestCase):
             body = Path(temp_dir) / "body.md"
             body.write_text("body\n", encoding="utf-8")
             runner = FakeRunner()
-            runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
             runner.add(
-                ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl,viewerPermission"],
+                ["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n"
+            )
+            runner.add(
+                [
+                    "gh",
+                    "repo",
+                    "view",
+                    "owner/repo",
+                    "--json",
+                    "nameWithOwner,url,sshUrl,viewerPermission",
+                ],
                 stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
             )
-            runner.add(["git", "remote", "get-url", "origin"], stdout="https://github.com/owner/repo.git\n")
+            runner.add(
+                ["git", "remote", "get-url", "origin"],
+                stdout="https://github.com/owner/repo.git\n",
+            )
             runner.add_verified_actor()
             runner.add_publication_identity()
             runner.add(
@@ -875,13 +795,15 @@ class GithubPublishTest(unittest.TestCase):
         self.assertEqual(summary["pr_url"], "https://github.com/owner/repo/pull/1")
         self.assertNotIn("g3_gate", summary)
 
-    def test_pr_update_without_packet_uses_direct_lifecycle(self) -> None:
+    def test_pr_update_uses_direct_lifecycle(self) -> None:
         """PR update accepts exact local/base evidence without G1/G2/G3."""
         with tempfile.TemporaryDirectory() as temp_dir:
             body = Path(temp_dir) / "body.md"
             body.write_text("updated body\n", encoding="utf-8")
             runner = FakeRunner()
-            runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
+            runner.add(
+                ["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n"
+            )
             runner.add(
                 [
                     "gh",
@@ -893,7 +815,10 @@ class GithubPublishTest(unittest.TestCase):
                 ],
                 stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
             )
-            runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+            runner.add(
+                ["git", "remote", "get-url", "origin"],
+                stdout="git@github.com:owner/repo.git\n",
+            )
             runner.add_verified_actor()
             runner.add_publication_identity()
             runner.add(
@@ -966,13 +891,15 @@ class GithubPublishTest(unittest.TestCase):
         self.assertEqual(summary["action"], "pr-update")
         self.assertNotIn("g3_gate", summary)
 
-    def test_publish_pr_without_packet_pushes_and_creates_pr(self) -> None:
+    def test_publish_pr_pushes_and_creates_pr(self) -> None:
         """publish-pr derives lifecycle directly and performs one normal push."""
         with tempfile.TemporaryDirectory() as temp_dir:
             body = Path(temp_dir) / "body.md"
             body.write_text("body\n", encoding="utf-8")
             runner = FakeRunner()
-            runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
+            runner.add(
+                ["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n"
+            )
             runner.add(
                 [
                     "gh",
@@ -984,7 +911,10 @@ class GithubPublishTest(unittest.TestCase):
                 ],
                 stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
             )
-            runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+            runner.add(
+                ["git", "remote", "get-url", "origin"],
+                stdout="git@github.com:owner/repo.git\n",
+            )
             runner.add_verified_actor()
             runner.add_publication_identity()
             runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
@@ -1075,12 +1005,24 @@ class GithubPublishTest(unittest.TestCase):
     def test_checks_reports_pending_without_failure(self) -> None:
         """Pending GitHub checks should be a state, not a tool failure."""
         runner = FakeRunner()
-        runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
         runner.add(
-            ["gh", "repo", "view", "owner/repo", "--json", "nameWithOwner,url,sshUrl,viewerPermission"],
+            ["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n"
+        )
+        runner.add(
+            [
+                "gh",
+                "repo",
+                "view",
+                "owner/repo",
+                "--json",
+                "nameWithOwner,url,sshUrl,viewerPermission",
+            ],
             stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
         )
-        runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+        runner.add(
+            ["git", "remote", "get-url", "origin"],
+            stdout="git@github.com:owner/repo.git\n",
+        )
         runner.add_verified_actor()
         runner.add(
             ["gh", "pr", "checks", "1", "--repo", "owner/repo", "--watch=false"],
@@ -1102,88 +1044,11 @@ class GithubPublishTest(unittest.TestCase):
         summary = github_publish.run(args, runner)
 
         self.assertEqual(summary["status"], "pending")
-        self.assertEqual(summary["next_action"], "wait_for_github_checks_or_rerun_with_--watch")
+        self.assertEqual(
+            summary["next_action"], "wait_for_github_checks_or_rerun_with_--watch"
+        )
         self.assertNotIn("pull_request_lifecycle", summary)
         self.assertNotIn("g3_gate", summary)
-
-    def test_mutation_adapter_rejects_unsealed_publication_authority(self) -> None:
-        """Direct mutation calls cannot fabricate lifecycle or G3 authority."""
-        args = argparse.Namespace(allow_main=False, user_task="reject forged push")
-        verification = github_publish.RemoteVerification(
-            repo="owner/repo",
-            remote="origin",
-            remote_url="git@github.com:owner/repo.git",
-            remote_slug="owner/repo",
-        )
-        forged = github_publish.GithubPublicationAuthority()
-        runner = FakeRunner()
-
-        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
-            github_publish.perform_push(
-                args,
-                runner,
-                verification,
-                "topic",
-                authority=forged,
-            )
-
-        self.assertIn("owner-materialized", raised.exception.message)
-        self.assertEqual(runner.commands, [])
-
-    def test_post_publication_checks_consume_same_binding_g5(self) -> None:
-        """Post-publication checks retain a passing exact-identity G5 receipt."""
-        lifecycle = self.lifecycle_fixture()
-        rebind, cas, upstream = self.publication_components(lifecycle)
-        packet = github_publish.materialize_github_publication_packet(
-            lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-        )
-        publication = github_publish.GithubPublicationAuthority.from_packet(packet)
-        g3 = packet["g3_gate"]
-        assert isinstance(g3, dict)
-        g5 = materialize_gate_verdict(
-            binding=lifecycle["binding"],
-            gate_id="G5",
-            ordered_input_evidence_refs=[str(g3["binding"]["evidence_ref"])],
-            invariant="remote_publication_readback",
-            output_digest="sha256:" + "5" * 64,
-            owner=str(
-                PROJECT_ROOT / "tools" / "repository" / "github" / "publication_integrator.py"
-            )
-            + "#integrate_publication",
-            verdict="pass",
-        )
-        authority = github_publish.GithubPostPublicationChecksAuthority.from_publication(
-            publication, g5
-        )
-        runner = FakeRunner()
-        runner.add(
-            ["gh", "pr", "checks", "7", "--repo", "owner/repo", "--watch=false"],
-            stdout="all\tpass\t0\turl\t\n",
-        )
-        args = argparse.Namespace(
-            user_task="post-publication checks",
-            pr="7",
-            watch=False,
-        )
-        verification = github_publish.RemoteVerification(
-            repo="owner/repo",
-            remote="origin",
-            remote_url="git@github.com:owner/repo.git",
-            remote_slug="owner/repo",
-        )
-
-        result = github_publish.perform_checks(
-            args,
-            runner,
-            verification,
-            "topic",
-            authority=authority,
-        )
-
-        self.assertEqual(result["g5_gate"], g5)
 
     def test_unknown_push_permission_is_a_typed_refusal(self) -> None:
         """GitHub mutation cannot infer authority from repository topology."""
@@ -1200,7 +1065,7 @@ class GithubPublishTest(unittest.TestCase):
 
         self.assertIn("permission", raised.exception.message)
 
-    def test_publication_packet_rejects_cas_base_not_owned_by_rebind(self) -> None:
+    def test_pr_identity_gate_rejects_cas_base_not_owned_by_rebind(self) -> None:
         """G3 cannot accept a CAS base independent of SourceMainRebindReceipt."""
         lifecycle = self.lifecycle_fixture()
         rebind, cas, upstream = self.publication_components(lifecycle)
@@ -1213,52 +1078,14 @@ class GithubPublishTest(unittest.TestCase):
         moved_readback["commit_sha"] = "f" * 40
 
         with self.assertRaises(ValueError) as raised:
-            github_publish.materialize_github_publication_packet(
-                lifecycle=lifecycle,
-                candidate_cas_receipt=cas,
-                source_main_rebind_receipt=moved_rebind,
-                upstream_gate_verdicts=upstream,
+            github_publish.materialize_pr_identity_gate(
+                lifecycle,
+                cas,
+                moved_rebind,
+                upstream,
             )
 
         self.assertIn("rebind_cas_base_identity_mismatch", str(raised.exception))
-
-    def test_publication_packet_carries_predecessor_graph_materialization(self) -> None:
-        """G3 binds the predecessor graph projection to the CAS base identity."""
-        lifecycle = self.lifecycle_fixture()
-        rebind, cas, upstream = self.publication_components(lifecycle)
-        predecessor = {
-            "schema": "waterfall.active_design_packet_materialization.v1",
-            "packet_sha256": "e" * 64,
-            "predecessor_source_oid": BASE_SHA,
-            "source_results": [{"declared_ref": "repo:agents/TASK_WORKFLOWS.md"}],
-            "dependency_results": [{"declared_ref": "header:upstream:design:repo:a->repo:b"}],
-        }
-
-        packet = github_publish.materialize_github_publication_packet(
-            lifecycle=lifecycle,
-            candidate_cas_receipt=cas,
-            source_main_rebind_receipt=rebind,
-            upstream_gate_verdicts=upstream,
-            predecessor_graph_materialization=predecessor,
-        )
-
-        self.assertEqual(packet["predecessor_graph_materialization"], predecessor)
-        validated = github_publish.validate_github_publication_packet(packet)
-        self.assertEqual(
-            validated["predecessor_graph_materialization"],
-            predecessor,
-        )
-        mismatched = copy.deepcopy(predecessor)
-        mismatched["predecessor_source_oid"] = "f" * 40
-        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
-            github_publish.materialize_github_publication_packet(
-                lifecycle=lifecycle,
-                candidate_cas_receipt=cas,
-                source_main_rebind_receipt=rebind,
-                upstream_gate_verdicts=upstream,
-                predecessor_graph_materialization=mismatched,
-            )
-        self.assertIn("does not match the CAS base", raised.exception.message)
 
     def test_reviewable_state_requires_verified_permission(self) -> None:
         """Review/merge-authorizing states cannot retain false permission."""
@@ -1290,9 +1117,7 @@ class GithubPublishTest(unittest.TestCase):
                 "--jq",
                 "{commit_sha: .sha, tree_sha: .commit.tree.sha}",
             ],
-            stdout=(
-                f'{{"commit_sha":"{BASE_SHA}","tree_sha":"{BASE_TREE}"}}'
-            ),
+            stdout=(f'{{"commit_sha":"{BASE_SHA}","tree_sha":"{BASE_TREE}"}}'),
         )
         fork = github_publish.build_pull_request_lifecycle(
             args,
@@ -1345,10 +1170,10 @@ class GithubPublishTest(unittest.TestCase):
             validate_pull_request_lifecycle(value)
             for value in (user, fork, contributor)
         ]
-        self.assertEqual([item["kind"] for item in checked], ["user", "fork", "contributor"])
         self.assertEqual(
-            checked[2]["contributor_diff"], contributor_diff
+            [item["kind"] for item in checked], ["user", "fork", "contributor"]
         )
+        self.assertEqual(checked[2]["contributor_diff"], contributor_diff)
         self.assertEqual(
             [item["pr_essence"] for item in checked],
             [user["pr_essence"], user["pr_essence"], user["pr_essence"]],
@@ -1427,7 +1252,9 @@ class GithubPublishTest(unittest.TestCase):
         self.assertEqual(updated["pr_essence"], lifecycle["pr_essence"])
         self.assertEqual(updated["reviews"][0]["reviewer_id"], "external-reviewer")
 
-    def test_merged_publication_uses_authoritative_pr_and_merge_tree_readback(self) -> None:
+    def test_merged_publication_uses_authoritative_pr_and_merge_tree_readback(
+        self,
+    ) -> None:
         """Merged identity comes from gh PR/API readback, not caller merge fields."""
         lifecycle = self.lifecycle_fixture()
         _rebind, cas, _upstream = self.publication_components(lifecycle)
