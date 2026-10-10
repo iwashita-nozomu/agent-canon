@@ -1116,9 +1116,11 @@ def _load_policy_topology_request(
     topology = policy.get("topology_derivation")
     projection = policy.get("runtime_config_change_policy")
     manifest = policy.get("generated_manifest_policy")
-    if not is_string_object_dict(topology) or not is_string_object_dict(
-        projection
-    ) or not is_string_object_dict(manifest):
+    if (
+        not is_string_object_dict(topology)
+        or not is_string_object_dict(projection)
+        or not is_string_object_dict(manifest)
+    ):
         return None, "capacity_policy_schema_invalid", {}
     direct = topology.get("direct_frontier_count")
     nested = topology.get("nested_reservation_count")
@@ -1133,10 +1135,7 @@ def _load_policy_topology_request(
     ):
         return None, "capacity_policy_topology_invalid", {}
     predicates = projection.get("required_predicates")
-    if (
-        not is_object_list(predicates)
-        or _TOPOLOGY_WITNESS_PREDICATE not in predicates
-    ):
+    if not is_object_list(predicates) or _TOPOLOGY_WITNESS_PREDICATE not in predicates:
         return None, "capacity_policy_schema_invalid", {}
     return (
         requested,
