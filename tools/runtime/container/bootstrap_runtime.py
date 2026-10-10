@@ -4996,35 +4996,29 @@ class BootstrapRuntime:
                     )
                     self.docker.remove_image(image_id)
                     details["deleted"].append(f"image:{image_id}")
-            if not dry_run and high_water:
-                for key, _ in tasks:
-                    path = self.paths.tasks / key
-                    if path.is_symlink():
-                        raise BootstrapError(
-                            "symlink_path_rejected", f"task path is a symlink: {path}"
-                        )
-                    if path.is_dir():
-                        shutil.rmtree(path)
-                    state["tasks"].pop(key, None)
-                    details["deleted"].append(f"task:{key}")
-                for key, _ in generations:
-                    path = self.paths.generations / key
-                    if path.is_symlink():
-                        raise BootstrapError(
-                            "symlink_path_rejected",
-                            f"generation path is a symlink: {path}",
-                        )
-                    if path.is_dir():
-                        shutil.rmtree(path)
-                    state["generations"].pop(key, None)
-                    details["deleted"].append(f"generation:{key}")
-            if not dry_run and (
-                high_water
-                or cache_high_water
-                or archive_high_water
-                or idle_stop
-                or stale_images
-            ):
+                if high_water:
+                    for key, _ in tasks:
+                        path = self.paths.tasks / key
+                        if path.is_symlink():
+                            raise BootstrapError(
+                                "symlink_path_rejected",
+                                f"task path is a symlink: {path}",
+                            )
+                        if path.is_dir():
+                            shutil.rmtree(path)
+                        state["tasks"].pop(key, None)
+                        details["deleted"].append(f"task:{key}")
+                    for key, _ in generations:
+                        path = self.paths.generations / key
+                        if path.is_symlink():
+                            raise BootstrapError(
+                                "symlink_path_rejected",
+                                f"generation path is a symlink: {path}",
+                            )
+                        if path.is_dir():
+                            shutil.rmtree(path)
+                        state["generations"].pop(key, None)
+                        details["deleted"].append(f"generation:{key}")
                 self._write_state(state)
             return self._result(
                 self._receipt(
