@@ -19,7 +19,6 @@ env:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   prepare:
@@ -28,7 +27,7 @@ jobs:
       image: ${{ steps.environment.outputs.image }}
       exists: ${{ steps.remote.outputs.exists }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -65,13 +64,16 @@ jobs:
             runs_on: ubuntu-24.04-arm
             platform: linux/arm64
     runs-on: ${{ matrix.runs_on }}
+    permissions:
+      contents: read
+      packages: write
     env:
       ARCH: ${{ matrix.arch }}
       PLATFORM: ${{ matrix.platform }}
       IMAGE: ${{ needs.prepare.outputs.image }}
       BUILDER: agent-canon-environment-${{ github.run_id }}-${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -116,6 +118,8 @@ jobs:
     if: always()
     name: runtime-image
     runs-on: ubuntu-24.04
+    permissions:
+      packages: write
     env:
       IMAGE: ${{ needs.prepare.outputs.image }}
     steps:
