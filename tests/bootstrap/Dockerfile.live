@@ -16,6 +16,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         ca-certificates \
+        curl \
         docker.io \
         git \
         python3-packaging \

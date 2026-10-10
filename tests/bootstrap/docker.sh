@@ -181,6 +181,31 @@ else
   DOCKER_COMMAND=(bash -euo pipefail -c "${LEAN_PROOF_COMMAND}")
 fi
 
+# Clear root-owned task files before the host removes the empty workarea directory.
+DOCKER_COMMAND=(
+  bash -euo pipefail -c '
+cleanup_workarea() {
+  local status=$?
+  local workarea="${AGENT_CANON_RUNTIME_ROOT%/runtime}"
+  local entry
+  trap - EXIT INT TERM
+  shopt -s dotglob nullglob
+  for entry in "${workarea}"/*; do
+    if ! rm -rf -- "${entry}"; then
+      echo "failed to remove task-owned container workarea entry ${entry}" >&2
+      status=1
+    fi
+  done
+  exit "${status}"
+}
+trap cleanup_workarea EXIT
+trap "exit 130" INT
+trap "exit 143" TERM
+"$@"
+' --
+  "${DOCKER_COMMAND[@]}"
+)
+
 docker run "${DOCKER_RUN_ARGS[@]}" \
   --workdir "${DOCKER_WORKDIR}" \
   "${IMAGE_TAG}" \
