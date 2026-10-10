@@ -988,9 +988,9 @@ def codex_runtime_agent_int(key: str, *, root: Path = ROOT) -> int:
     parsed: object = tomllib.loads(config_path.read_text(encoding="utf-8"))
     data = as_object_mapping(parsed, ".codex/config.toml")
     agents = data.get("agents")
-    if not isinstance(agents, dict):
-        raise RuntimeError("missing [agents] section in .codex/config.toml")
     if not is_string_object_dict(agents):
+        if not isinstance(agents, dict):
+            raise RuntimeError("missing [agents] section in .codex/config.toml")
         raise RuntimeError(".codex/config.toml agents must be a mapping")
     value = agents.get(key)
     if not isinstance(value, int) or value < 1:

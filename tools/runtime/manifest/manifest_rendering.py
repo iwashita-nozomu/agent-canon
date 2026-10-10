@@ -75,7 +75,6 @@ from tools.agent.orchestration.team_config import (
     SubagentWaveSlot,
     TeamConfig,
     as_mapping_tuple,
-    as_object_mapping,
     as_optional_string,
     as_required_string,
     as_string_tuple,
@@ -123,19 +122,19 @@ def _render_prompt_entry(value: object, field_name: str) -> str:
     """Render one prompt entry after validating supported YAML shapes."""
     if isinstance(value, str):
         return value
-    if isinstance(value, dict):
-        if not is_string_object_dict(value):
+    if not is_string_object_dict(value):
+        if isinstance(value, dict):
             raise RuntimeError(f"{field_name} must be a mapping")
-        mapping = dict(value)
-        if not mapping:
-            raise RuntimeError(f"{field_name} mapping entries must not be empty")
-        rendered: dict[str, str] = {}
-        for key, item in mapping.items():
-            if not isinstance(item, str):
-                raise RuntimeError(f"{field_name} mapping values must be strings")
-            rendered[key] = item
-        return str(rendered)
-    raise RuntimeError(f"{field_name} entries must be strings or mappings")
+        raise RuntimeError(f"{field_name} entries must be strings or mappings")
+    mapping = dict(value)
+    if not mapping:
+        raise RuntimeError(f"{field_name} mapping entries must not be empty")
+    rendered: dict[str, str] = {}
+    for key, item in mapping.items():
+        if not isinstance(item, str):
+            raise RuntimeError(f"{field_name} mapping values must be strings")
+        rendered[key] = item
+    return str(rendered)
 
 
 TEMPLATE_ROOT = ROOT / "templates" / "agents"
@@ -2310,15 +2309,13 @@ def render_role_topology(
 ) -> list[str]:
     """Render workflow role-family and same-role instance policy."""
     topology = workflow_family.get("role_topology")
-    if not isinstance(topology, dict):
-        return []
     if not is_string_object_dict(topology):
+        if not isinstance(topology, dict):
+            return []
         raise RuntimeError("role_topology must be a mapping")
     lines = [f"{indent}role_topology:"]
     role_families = topology.get("role_families")
-    if isinstance(role_families, dict):
-        if not is_string_object_dict(role_families):
-            raise RuntimeError("role_topology.role_families must be a mapping")
+    if is_string_object_dict(role_families):
         lines.append(f"{indent}  role_families:")
         for family_name, agent_types in role_families.items():
             lines.append(f"{indent}    {family_name}:")
@@ -2335,12 +2332,10 @@ def render_role_topology(
                     "role_topology.role_families entries must be strings or lists "
                     f"of strings: {family_name}"
                 )
+    elif isinstance(role_families, dict):
+        raise RuntimeError("role_topology.role_families must be a mapping")
     same_role_instances = topology.get("same_role_parallel_instances")
-    if isinstance(same_role_instances, dict):
-        if not is_string_object_dict(same_role_instances):
-            raise RuntimeError(
-                "role_topology.same_role_parallel_instances must be a mapping"
-            )
+    if is_string_object_dict(same_role_instances):
         lines.append(f"{indent}  same_role_parallel_instances:")
         for key, value in same_role_instances.items():
             if isinstance(value, bool):
@@ -2353,6 +2348,10 @@ def render_role_topology(
                     f"strings or booleans: {key}"
                 )
             lines.append(f"{indent}    {key}: {rendered_value}")
+    elif isinstance(same_role_instances, dict):
+        raise RuntimeError(
+            "role_topology.same_role_parallel_instances must be a mapping"
+        )
     stage_waves = topology.get("stage_waves")
     if is_object_list(stage_waves):
         lines.append(f"{indent}  stage_waves:")
@@ -2381,9 +2380,9 @@ def render_subagent_prompt_packet(
 ) -> list[str]:
     """Render workflow-specific subagent prompt instructions for the manifest."""
     prompt = workflow_family.get("subagent_prompt")
-    if not isinstance(prompt, dict):
-        return []
     if not is_string_object_dict(prompt):
+        if not isinstance(prompt, dict):
+            return []
         raise RuntimeError("subagent_prompt must be a mapping")
     lines = [f"{indent}subagent_prompt_packet:"]
     purpose = as_optional_string(prompt.get("purpose"), "subagent_prompt.purpose")

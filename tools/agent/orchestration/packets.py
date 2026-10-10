@@ -413,7 +413,7 @@ def normalize_mathematical_intent_packet(
     if set(allowed_paths) != expected_paths:
         extra = sorted(set(allowed_paths).difference(expected_paths))
         missing_paths = sorted(expected_paths.difference(allowed_paths))
-        details = []
+        details: list[str] = []
         if extra:
             details.append("extra=" + ",".join(extra))
         if missing_paths:

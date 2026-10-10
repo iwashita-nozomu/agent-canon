@@ -142,7 +142,7 @@ class TeamConfig:
     artifacts: dict[str, str]
 
 
-def _empty_writer_targets() -> dict[str, WriterTarget | Mapping[str, object] | None]:
+def _empty_writer_targets() -> dict[str, WriterTarget]:
     """Provide the empty value at the typed writer-target boundary."""
     return {}
 
@@ -190,9 +190,7 @@ class RunBundleSpec:
     active_design_packet: ActiveDesignPacketConfig | None = None
     math_intent_route: str | None = None
     math_intent_packet: "MathematicalIntentPacket | None" = None
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] = field(
-        default_factory=_empty_writer_targets
-    )
+    writer_targets: Mapping[str, WriterTarget] = field(default_factory=_empty_writer_targets)
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
@@ -422,7 +420,7 @@ def default_specialists_for_task(
     """Return task-default specialist ids including default review packs."""
     task = resolve_task_spec(catalog, task_id)
     family = resolve_workflow_family(catalog, str(task["family"]))
-    family_roles = family.get("roles", {})
+    family_roles: object = family.get("roles", {})
     if not is_string_object_dict(family_roles):
         raise RuntimeError(
             f"workflow family roles must be a mapping for {family['id']}"
@@ -529,10 +527,10 @@ def workflow_always_on_roles(
     if catalog is None or not workflow_family_id:
         return config.always_on_roles
     family = resolve_workflow_family(catalog, workflow_family_id)
-    family_roles = family.get("roles", {})
-    if not isinstance(family_roles, dict):
-        return config.always_on_roles
+    family_roles: object = family.get("roles", {})
     if not is_string_object_dict(family_roles):
+        if not isinstance(family_roles, dict):
+            return config.always_on_roles
         raise RuntimeError(
             f"workflow_families[{workflow_family_id}].roles must be a mapping"
         )
