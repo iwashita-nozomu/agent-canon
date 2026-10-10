@@ -22,7 +22,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import cast
+from typing import NotRequired, TypedDict, cast
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -73,6 +73,18 @@ RETIRED_ROUTE_FIELDS = {
     "owner",
     "profile_trigger",
 }
+
+
+class PromptClassifierCase(TypedDict):
+    """Type the optional expectations in the prompt-routing fixture table."""
+
+    name: str
+    prompt: str
+    required_candidates: NotRequired[set[str]]
+    selected: NotRequired[set[str]]
+    required_workflows: NotRequired[set[str]]
+    forbidden_candidates: NotRequired[set[str]]
+    reason_fragment: NotRequired[str]
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -1026,7 +1038,7 @@ class CodexHooksTest(unittest.TestCase):
 
     def test_prompt_intake_signals_keeps_evaluator_classification_pure(self) -> None:
         """Prompt routing remains observable without JSONL or runtime-hook side effects."""
-        cases = (
+        cases: tuple[PromptClassifierCase, ...] = (
             {
                 "name": "validation-repair",
                 "prompt": "failed validation; do not delete tests or weaken oracle before repairing the failing contract",
@@ -1066,7 +1078,7 @@ class CodexHooksTest(unittest.TestCase):
             with self.subTest(case=case["name"]):
                 signals = prompt_intake_signals(
                     PromptClassifierInputs(
-                        prompt=cast(str, case["prompt"]),
+                        prompt=case["prompt"],
                         repo_root=PROJECT_ROOT,
                         catalog={},
                         routing_rules={},
@@ -1074,22 +1086,20 @@ class CodexHooksTest(unittest.TestCase):
                 )
                 candidates = set(signals.candidate_skills)
                 selected = set(signals.skills)
-                self.assertTrue(
-                    cast("set[str]", case.get("required_candidates", set()))
-                    <= candidates
-                )
-                self.assertTrue(
-                    cast("set[str]", case.get("selected", set())) <= selected
-                )
-                self.assertTrue(
-                    cast("set[str]", case.get("required_workflows", set()))
-                    <= set(signals.candidate_workflows)
-                )
-                self.assertTrue(
-                    cast(
-                        "set[str]", case.get("forbidden_candidates", set())
-                    ).isdisjoint(candidates)
-                )
+                required_candidates = case.get("required_candidates")
+                if required_candidates is not None:
+                    self.assertTrue(required_candidates <= candidates)
+                selected_expectations = case.get("selected")
+                if selected_expectations is not None:
+                    self.assertTrue(selected_expectations <= selected)
+                required_workflows = case.get("required_workflows")
+                if required_workflows is not None:
+                    self.assertTrue(
+                        required_workflows <= set(signals.candidate_workflows)
+                    )
+                forbidden_candidates = case.get("forbidden_candidates")
+                if forbidden_candidates is not None:
+                    self.assertTrue(forbidden_candidates.isdisjoint(candidates))
                 reason_fragment = case.get("reason_fragment")
                 if reason_fragment is not None:
                     self.assertTrue(
@@ -1143,7 +1153,8 @@ class CodexHooksTest(unittest.TestCase):
             f"env {destructive} git reset HEAD",
         ):
             payload = self._run_shared_checkout_guard(command)
-            self.assertIsNotNone(payload)
+            if payload is None:
+                raise AssertionError("destructive command was not blocked")
             self.assertEqual(
                 payload.get("mutation_authority"), "blocked_authority_required"
             )
@@ -1308,7 +1319,8 @@ class CodexHooksTest(unittest.TestCase):
                     "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
                     "AGENT_CANON_BRANCH_WORKTREE_REASON=requested " + command
                 )
-                self.assertIsNotNone(payload)
+                if payload is None:
+                    raise AssertionError("branch mutation was not blocked")
                 self.assertEqual(payload.get("decision"), "block")
 
     def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(
@@ -1343,8 +1355,16 @@ def test_hook_report_requires_parent_capability() -> None:
     """Report projection stays disabled until the parent capability is present."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         target = Path(tmp_dir) / "report"
+        target.mkdir()
+        state = hook_dispatcher.HookRootState(
+            Path(tmp_dir), False, hook_dispatcher.HookRootStatus.OVERRIDE
+        )
         with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
-            assert hook_dispatcher._parent_bound_report(target, "hook-report") is None
+            with mock.patch.dict(
+                os.environ,
+                {hook_dispatcher.WORKFLOW_MONITOR_REPORT_DIR_ENV: str(target)},
+            ):
+                assert hook_dispatcher.resolve_report_target(state) is None
 
 
 if __name__ == "__main__":

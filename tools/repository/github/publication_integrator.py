@@ -29,22 +29,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
-try:
-    from tools.repository.workspace.parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
-except ImportError:
-    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
+from tools.repository.workspace.parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 
 from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes
 from tools.agent.orchestration.review_dispatch import (

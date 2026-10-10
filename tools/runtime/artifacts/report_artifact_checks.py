@@ -1267,7 +1267,7 @@ def _source_binding_errors(binding: object) -> list[str]:
 def _mapping_text_list(value: object) -> TypeGuard[list[str]]:
     """Return whether a value is a non-empty list of non-empty text."""
     return (
-        isinstance(value, list)
+        is_object_list(value)
         and bool(value)
         and all(isinstance(item, str) and item.strip() for item in value)
     )
@@ -2112,7 +2112,7 @@ def check_completion_coverage(
         if is_string_object_mapping(event) and event.get("event_id")
     }
     if semantic_event_items:
-        if len(events_by_id) != len(semantic_events):
+        if len(events_by_id) != len(semantic_event_items):
             errors["redundant"].append("semantic_event_identity")
         for event in semantic_event_items:
             if not is_string_object_mapping(event):
@@ -2290,13 +2290,16 @@ def check_completion_coverage(
         ):
             errors["empty"].append(f"resource_mapping:{clause_id}:source_clause")
         if clause_id == "W2-19":
-            if not is_string_object_mapping(certificate) or not is_object_list(
+            gpu_semantics = (
                 certificate.get("gpu_semantics")
-            ):
+                if is_string_object_mapping(certificate)
+                else None
+            )
+            if not is_object_list(gpu_semantics):
                 errors["empty"].append("resource_mapping:W2-19:gpu_semantics")
             elif [
                 item.get("item")
-                for item in certificate.get("gpu_semantics", [])
+                for item in gpu_semantics
                 if is_string_object_mapping(item)
             ] != list(GPU_CERTIFICATE_SEQUENCE):
                 errors["empty"].append("resource_mapping:W2-19:ordered_gpu_semantics")
@@ -2313,9 +2316,10 @@ def check_completion_coverage(
         if not is_string_object_mapping(response):
             errors["empty"].append("failure_response")
             continue
+        taxonomy_refs = response.get("taxonomy_refs")
         if (
-            tuple(response.get("taxonomy_refs", ()))
-            != COMPLETION_COVERAGE_TAXONOMY_REFS
+            not is_object_list_or_tuple(taxonomy_refs)
+            or tuple(taxonomy_refs) != COMPLETION_COVERAGE_TAXONOMY_REFS
         ):
             errors["empty"].append("failure_response:taxonomy_refs")
         try:
@@ -2991,7 +2995,7 @@ def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> lis
     """
     if not report_dir.resolve().is_relative_to(workspace.resolve()):
         return []
-    report_paths = {}
+    report_paths: dict[str, str] = {}
     for path in _git_report_paths(
         workspace,
         ("--others", "--exclude-standard"),

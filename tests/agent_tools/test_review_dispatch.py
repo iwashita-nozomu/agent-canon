@@ -48,6 +48,12 @@ class ReviewDispatchTest(unittest.TestCase):
 
     def project(self, review_decision: dict[str, object]) -> Mapping[str, object]:
         """Project a patched canonical state without caller identity overrides."""
+
+        def automatic_payloads(
+            _report_dir: Path, kind: str | None = None
+        ) -> list[dict[str, object]]:
+            return [review_decision] if kind == "decision" else []
+
         with (
             patch.object(
                 review_dispatch, "_active_report_dir", return_value=PROJECT_ROOT
@@ -58,9 +64,7 @@ class ReviewDispatchTest(unittest.TestCase):
             patch.object(
                 review_dispatch,
                 "_automatic_payloads",
-                side_effect=lambda _report_dir, kind=None: (
-                    [review_decision] if kind == "decision" else []
-                ),
+                side_effect=automatic_payloads,
             ),
         ):
             return review_dispatch.resolve_current_review_state(PROJECT_ROOT)
@@ -163,7 +167,7 @@ class ReviewDispatchTest(unittest.TestCase):
             "candidate_commit": "a" * 40,
             "candidate_tree": "b" * 40,
         }
-        frame = {
+        frame: dict[str, object] = {
             "review_role_id": "change_reviewer",
             "candidate_id": "candidate-1",
             "review_frame_id": "frame-1",
@@ -174,7 +178,7 @@ class ReviewDispatchTest(unittest.TestCase):
             "review_frame_body_sha256": "frame-hash",
             "event_order_index": 1,
         }
-        resume_event = {
+        resume_event: dict[str, object] = {
             "review_frame_id": "frame-1",
             "observed_result": {"nested_runtime_agent_id": "reviewer-1"},
         }
@@ -191,6 +195,13 @@ class ReviewDispatchTest(unittest.TestCase):
                     if kind == "resume_event":
                         return [resume_event]
                     return [frame, resume_event]
+
+                def append_automatic_event(
+                    _path: Path,
+                    payload: Mapping[str, object],
+                    _outcome: str,
+                ) -> None:
+                    captured.append(dict(payload))
 
                 with (
                     patch.object(review_dispatch, "_active_report_dir", return_value=report_dir),
@@ -215,7 +226,7 @@ class ReviewDispatchTest(unittest.TestCase):
                     patch.object(
                         review_dispatch,
                         "_append_automatic_event",
-                        side_effect=lambda _path, payload, outcome: captured.append(payload),
+                        side_effect=append_automatic_event,
                     ),
                 ):
                     review_dispatch.record_current_review_decision(report_dir)
