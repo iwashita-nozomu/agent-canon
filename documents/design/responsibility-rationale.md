@@ -4,6 +4,10 @@
 contract design
 responsibility Canonical rationale and activation boundaries for reusable AgentCanon skills, gates, workflows, diagnostics, and durable issue publication.
 upstream design README.md design canon index
+upstream design ../conventions/software-engineering-principles.md shared engineering decision precedence
+upstream design ../../PHILOSOPHY.md shared design principles
+downstream design ../../agents/skills/README.md skill authoring and review entry
+downstream design ../../agents/canonical/skills.md official skill authoring route
 downstream design ../../agents/skills/structure-planning.md consumes structure and visualization activation rationale
 downstream design ../../agents/skills/report-writing.md consumes report semantics and finding-closure rationale
 downstream design ../../agents/skills/test-design.md consumes regression-test admission rationale
@@ -21,6 +25,28 @@ downstream design ../../agents/skills/task-routing.md consumes routing-state rat
 This document is the canonical owner for why a reusable AgentCanon mechanism exists and for the narrow condition under which that responsibility should activate. It deliberately does not own one-off simplification decisions: an Issue or PR may explain why a mechanism is reduced for a particular change, while this document keeps the long-lived safety or correctness reason for the responsibility that remains.
 
 The common rule is reachability: a responsibility is selected only when the changed or requested behavior can reach the failure mode that responsibility prevents. Absence of selection is not itself an artifact, receipt, or validation result.
+
+## Skill procedure derivation
+
+When a skill procedure has a material, non-obvious operation order, branch
+condition, or completion check, record in the existing owning design the relevant
+principle, requirement, or assumption and why it supports that choice. Link the
+affected procedure section to that rationale; one decision may cover several
+steps. Shared principles remain in
+[PHILOSOPHY](../../PHILOSOPHY.md) and
+[engineering principles](../conventions/software-engineering-principles.md); do
+not copy them into individual skills.
+
+Use actual specifications and evidence when they support the choice. Distinguish
+reasoned derivation, static confirmation, and observed behavior, and leave unknown
+assumptions explicit. Do not invent historical intent, alternatives, or test
+results. Review that the linked rationale supports the changed procedure; link
+existence alone is not evidence.
+
+Update the rationale and affected procedure together when a relevant premise or
+guarantee changes. Routine wording edits and self-evident steps need no additional
+rationale. Ordinary skill use follows operative instructions and does not require
+reading design history.
 
 ## Validation selection and remote execution
 

@@ -71,6 +71,12 @@ Naming carries the visibility boundary:
 - Workflow-only routines live in `../internal-routines/` as Markdown routines
   rather than Codex skill shims.
 
+For an AgentCanon change that alters a consequential procedure choice, use
+[Updating Skills](../skills/README.md#updating-skills) to locate its existing
+design rationale before revising the step. Carry the relevant owner into any
+`$skill-creator` delegation. Routine skill use follows operative instructions
+without reading design history.
+
 ## Official System Skill Delegation
 
 Host-provided Codex skills remain outside the AgentCanon public catalog. The
@@ -79,7 +85,7 @@ local registry routes to these names and records repo-specific evidence.
 | Official System Skill | Owner Boundary |
 | --- | --- |
 | `$openai-docs` | OpenAI / Codex current product source route. |
-| `$skill-creator` | General Codex skill authoring and refactor guidance. |
+| `$skill-creator` | General skill authoring and refactor guidance with the selected [local authoring contract](../skills/README.md#updating-skills). |
 | `$skill-installer` | Curated and external skill installation. |
 | `$imagegen` | Generated bitmap assets. |
 | `$plugin-creator` | Codex plugin scaffolding and marketplace metadata. |
