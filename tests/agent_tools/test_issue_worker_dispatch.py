@@ -342,6 +342,10 @@ def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> Non
 def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Exercise this self-contained source checkout instead of the image's
+    # mounted install-root override.
+    monkeypatch.delenv("AGENT_CANON_SOURCE_ROOT", raising=False)
+    monkeypatch.delenv("AGENT_CANON_ROOT", raising=False)
     calls: list[tuple[str, str]] = []
 
     def spawn(agent_type: str, prompt: str) -> str:
