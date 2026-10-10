@@ -1,13 +1,5 @@
 {
   "version": "2.0.0",
-  "inputs": [
-    {
-      "id": "cppBuildDirectory",
-      "type": "promptString",
-      "description": "CMake build directory containing compile_commands.json",
-      "default": "build/cpp/dev"
-    }
-  ],
   "tasks": [
     {
       "label": "AgentCanon: Docs Check",
@@ -31,23 +23,25 @@
       "problemMatcher": []
     },
     {
-      "label": "C++: Select Compile Database",
-      "type": "shell",
-      "command": "python3 \"${workspaceFolder}/static_analysis/cpp/static_analysis.py\" select-db --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\"",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
       "label": "C++: clangd Check",
-      "type": "shell",
-      "command": "python3 \"${workspaceFolder}/static_analysis/cpp/static_analysis.py\" clangd-check --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\" --source \"${file}\"",
+      "type": "process",
+      "command": "clangd",
+      "args": [
+        "--check=${file}",
+        "--compile-commands-dir=${command:cmake.buildDirectory}"
+      ],
       "group": "test",
       "problemMatcher": []
     },
     {
       "label": "C++: clang-tidy",
-      "type": "shell",
-      "command": "python3 \"${workspaceFolder}/static_analysis/cpp/static_analysis.py\" clang-tidy --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\" --source \"${file}\"",
+      "type": "process",
+      "command": "run-clang-tidy.py",
+      "args": [
+        "-p",
+        "${command:cmake.buildDirectory}",
+        "${file}"
+      ],
       "group": "test",
       "problemMatcher": []
     }
