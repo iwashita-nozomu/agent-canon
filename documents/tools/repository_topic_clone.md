@@ -44,7 +44,9 @@ python3 tools/repository/workspace/repository_topic_clone.py cleanup \
 container 側に checkout-mode の別 flag はなく、exact target metadata から自動判定します。
 write-capable handoff の各 allowed path は repeated `--allowed-path <relative-path>` で渡します。
 exact identity の既存 checkout では、current owner evidence と明示 scope に応じて task marker、reserved packet の
-worktree `info/exclude` entry、および ignored writer-target packet のみを更新できます。これは source や Git index を変更せず、dirty checkout を clean 扱い
+Git common-directory `info/exclude` entry、および ignored writer-target packet のみを更新できます。
+linked worktree ではその ignore entry は共有されますが、writer packet は各 worktree に属します。
+これは source や Git index を変更せず、dirty checkout を clean 扱い
 しません。merge / cleanup の clean-state 条件も変更しません。dirty 状態を保った場合は prepare の出力に
 `REQUEST_CHECKOUT_STATUS=dirty-preserved` を含めます。
 
@@ -64,45 +66,21 @@ adapter の `status` と `projected_clone_path` は directory を作らない re
 ## 競合の再開
 
 再開・commit の条件は [規約の競合の再開](../rule/repository-topic-clone.md#競合の再開) を参照します。
-以下は inventory の場所、plan の入力、診断と再開のコマンドです。
-
-`merge-main` が競合した場合は、解消や片側 checkout を実行せず、prepared checkout 内の
-`.agent-canon/conflict-preservation.json` に base/ours/theirs の immutable blob
-reference、staged/unmerged state、各 hunk、unaffected user/unknown content を保存して
-停止します。integration executor は disposition、owner、cause、expected mechanism、exact
-edit delta、rationale を含む plan を作り、次の checker で readback を確認します。
+`merge-main` が競合した場合、native Git の merge state と index stages をその checkout に
+残して停止します。integration executor は実際の unmerged paths を確認して source owner と
+競合をレビュー・解消します。`finalize-merge` は unresolved index なら native
+`git write-tree` が失敗するため commit せず、解決済み index tree と `MERGE_HEAD` に基づく
+commit parents を read back します。
 
 ```bash
-python3 tools/repository/git/conflict_preservation.py capture \
-  --repo-root <clone> --base <merge-base> --ours <head> --theirs <origin-main> \
-  --output <clone>/.agent-canon/conflict-preservation.json
-python3 tools/repository/git/conflict_preservation.py validate \
-  --inventory <clone>/.agent-canon/conflict-preservation.json \
-  --plan <preservation-plan.json> --repo-root <clone>
-python3 tools/repository/git/conflict_preservation.py validate-rework \
-  --packet <rework-preservation.json>
-
 python3 tools/repository/workspace/repository_topic_clone.py finalize-merge \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
-  [--inventory <inventory.json> --plan <preservation-plan.json>]
+  --checkout-mode <linked-worktree|independent-clone>
 
 # `resume-merge` is an alias for `finalize-merge`.
 ```
 
-`keep`、`replace`、`manual` のいずれも path ごとの根拠が必要です。whole-file checkout、
-reset、reclone、overwrite、regeneration は inventory と reconstruction map がなければ
-拒否され、clean な `conflict_paths=empty` だけでは成功になりません。
-
-保持条件は plan の各 path にある `unaffected_content` への明示的な指定だけです。
-ただし、過去の stage に gitlink (`160000`) があり、解消後も gitlink が残る場合は、
-`expected_gitlink` による mode/OID の readback を必須とします。`unaffected_content: []` は
-解消後の index にその path が存在しない実際の削除（または absent stage）に限って保持条件を
-空にできます。通常ファイル・gitlink の削除は妨げませんが、削除済みであることは解消後の
-Git index/tree の差分で確認します。承認済み削除は既存の `manual` disposition、`rationale`、
-`expected_edit_delta` に記録します。新しい delete disposition、absence schema、削除専用の
-判定は追加しません。
-
-保持を明示した `expected_blob`、`hunk_identity`、`expected_gitlink` の消失・不一致は引き続き
-拒否します。plan の identity と inventory の path coverage、未解決 index の検出も維持します。
-この意味は単独の `validate` と、それを呼ぶ `finalize-merge` / `resume-merge` で共通です。
+`finalize-merge` は native Git index の未解決 entry を拒否し、resolved index tree と
+`MERGE_HEAD` を親とする commit を確認します。必要な競合判断は integration owner が実際の
+競合をレビューして行い、独自planや別checkerは要求しません。
