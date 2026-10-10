@@ -592,7 +592,7 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertIn("absolute path", result.stderr)
 
     def test_scan_failure_writes_failed_atomic_report_without_footer(self) -> None:
-        """Missing verified manifest executable fails without lexical downgrade."""
+        """An explicitly missing LSP executable fails without lexical downgrade."""
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp)
             root = workspace / "source"
@@ -602,8 +602,23 @@ class LspCodeAnalysisTest(unittest.TestCase):
             source = root / "main.py"
             source.write_text("import missing\n", encoding="utf-8")
             report_path = runtime / "analysis.json"
+            missing_server = runtime / "missing-pyright-langserver"
             result = subprocess.run(
-                [sys.executable, str(TOOL), "scan-legacy", "--root", str(root), "--files", "main.py", "--runtime-root", str(runtime), "--analysis-json", str(report_path)],
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "scan-legacy",
+                    "--root",
+                    str(root),
+                    "--files",
+                    "main.py",
+                    "--server",
+                    f"python={missing_server}",
+                    "--runtime-root",
+                    str(runtime),
+                    "--analysis-json",
+                    str(report_path),
+                ],
                 check=False,
                 capture_output=True,
                 text=True,

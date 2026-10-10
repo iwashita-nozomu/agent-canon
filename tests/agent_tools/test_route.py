@@ -45,6 +45,20 @@ from tools.agent.orchestration.implementation_dispatch import (
 from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
 
 
+def _route_environment(
+    args: tuple[str, ...], *, cwd_is_local_root: bool = False
+) -> dict[str, str]:
+    """Isolate local-root fixtures from the runtime's installed-source override."""
+    environment = os.environ.copy()
+    has_local_root = cwd_is_local_root or any(
+        arg == "--root" or arg.startswith("--root=") for arg in args
+    )
+    if has_local_root:
+        environment.pop("AGENT_CANON_SOURCE_ROOT", None)
+        environment.pop("AGENT_CANON_ROOT", None)
+    return environment
+
+
 class RouteToolTest(unittest.TestCase):
     """Exercise route.py output and routing aliases."""
 
@@ -77,6 +91,7 @@ class RouteToolTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
             cwd=PROJECT_ROOT,
+            env=_route_environment(args),
             check=False,
             capture_output=True,
             text=True,
@@ -91,6 +106,7 @@ class RouteToolTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
             cwd=str(cwd),
+            env=_route_environment(args, cwd_is_local_root=True),
             check=False,
             capture_output=True,
             text=True,
@@ -201,21 +217,35 @@ class RouteToolTest(unittest.TestCase):
 
     def test_source_root_resolution_utils_cover_shapes(self) -> None:
         """Unit tests cover direct source-root resolution edge cases."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
-            standalone = root / "agents" / "skills" / "catalog.yaml"
-            standalone.parent.mkdir(parents=True, exist_ok=True)
-            standalone.write_text("version: 1\nskill_families:\n", encoding="utf-8")
-            resolution = agent_canon_source_root.resolve_agent_canon_source_root(root)
-            self.assertEqual(resolution.layout, "standalone")
-            self.assertEqual(resolution.source_root, root.resolve())
-            self.assertEqual(resolution.current_repository_root, root.resolve())
+        with patch.dict(
+            "os.environ",
+            {"AGENT_CANON_SOURCE_ROOT": "", "AGENT_CANON_ROOT": ""},
+        ):
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+                standalone = root / "agents" / "skills" / "catalog.yaml"
+                standalone.parent.mkdir(parents=True, exist_ok=True)
+                standalone.write_text(
+                    "version: 1\nskill_families:\n", encoding="utf-8"
+                )
+                resolution = agent_canon_source_root.resolve_agent_canon_source_root(
+                    root
+                )
+                self.assertEqual(resolution.layout, "standalone")
+                self.assertEqual(resolution.source_root, root.resolve())
+                self.assertEqual(resolution.current_repository_root, root.resolve())
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            with self.assertRaises(agent_canon_source_root.SourceRootFailure) as exc:
-                agent_canon_source_root.resolve_agent_canon_source_root(Path(tmp_dir))
-            self.assertEqual(exc.exception.code, "agent_canon_source_root_missing")
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                with self.assertRaises(
+                    agent_canon_source_root.SourceRootFailure
+                ) as exc:
+                    agent_canon_source_root.resolve_agent_canon_source_root(
+                        Path(tmp_dir)
+                    )
+                self.assertEqual(
+                    exc.exception.code, "agent_canon_source_root_missing"
+                )
 
     def test_long_proposed_tool_name_resolves_to_short_area(self) -> None:
         """Long candidate-list tool names should become aliases."""
@@ -1912,6 +1942,7 @@ class CapabilityRouteTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
             cwd=PROJECT_ROOT,
+            env=_route_environment(args),
             check=False,
             capture_output=True,
             text=True,
