@@ -6,6 +6,7 @@
 # upstream design ../../documents/structured-analysis/code-analysis.md LSP 3.17 protocol contract and evidence policy
 # upstream design ../../documents/tools/lsp_code_analysis.md tests for tool-owned implementation evidence
 # upstream implementation ../../tools/analysis/code/lsp_code_analysis.py code-analysis protocol implementation
+# upstream implementation ../../tools/runtime/authority/tool_path_policy.py retired path filter used by bounded discovery
 # @dependency-end
 
 from __future__ import annotations
@@ -293,6 +294,99 @@ def write_stderr_flood_server(root: Path) -> Path:
 class LspCodeAnalysisTest(unittest.TestCase):
     """Exercise deterministic facts and typed failures."""
 
+    def test_discovery_keeps_code_suffixes_and_boundaries(self) -> None:
+        """LSP discovery includes C++/Rust while retaining source-path safety."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "src"
+            (source / "excluded").mkdir(parents=True)
+            (source / ".git" / "objects").mkdir(parents=True)
+            (root / "other").mkdir()
+            (source / "main.py").write_text("def main():\n    pass\n", encoding="utf-8")
+            (source / "main.cpp").write_text("int main() { return 0; }\n", encoding="utf-8")
+            (source / "header.hxx").write_text("int main();\n", encoding="utf-8")
+            (source / "main.rs").write_text("mod helper;\n", encoding="utf-8")
+            (source / "excluded" / "skip.rs").write_text("mod skip;\n", encoding="utf-8")
+            (source / ".git" / "objects" / "leak.rs").write_text("mod leak;\n", encoding="utf-8")
+            (root / "other" / "outside.cpp").write_text("int outside;\n", encoding="utf-8")
+            (source / "link.rs").symlink_to(root / "other" / "outside.cpp")
+
+            discovered = lsp.discover_lsp_files(
+                root,
+                ("src", "src/main.cpp", "src"),
+                ("excluded",),
+            )
+
+            self.assertEqual(
+                [path.relative_to(root).as_posix() for path in discovered],
+                ["src/header.hxx", "src/main.cpp", "src/main.py", "src/main.rs"],
+            )
+
+    def test_default_discovery_is_bounded_and_skips_symlinks(self) -> None:
+        """Default discovery excludes workspace artifacts and symlinked files."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            for relative in (
+                "python/app.py",
+                "src/app.cpp",
+                "include/app.hpp",
+                "tests/test_app.py",
+                "tools/app.py",
+                "tools/legacy-helper/leak.py",
+                "workspace/leak.py",
+                "vendor/leak.py",
+                "reports/leak.py",
+                "build/leak.py",
+                ".venv/leak.py",
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x = 1\n", encoding="utf-8")
+            (root / "src" / "linked.py").symlink_to(root / "python" / "app.py")
+
+            discovered = lsp.discover_lsp_files(root, (), ())
+
+            self.assertEqual(
+                [path.relative_to(root).as_posix() for path in discovered],
+                [
+                    "include/app.hpp",
+                    "python/app.py",
+                    "src/app.cpp",
+                    "tests/test_app.py",
+                    "tools/app.py",
+                ],
+            )
+
+    def test_discovery_rejects_explicit_file_beneath_symlink_ancestor(self) -> None:
+        """Explicit discovery does not traverse a symlinked directory."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            real = root / "real"
+            real.mkdir()
+            (real / "main.py").write_text("x = 1\n", encoding="utf-8")
+            (root / "linked").symlink_to(real, target_is_directory=True)
+
+            discovered = lsp.discover_lsp_files(root, ("linked/main.py",), ())
+
+            self.assertEqual(discovered, ())
+
+    def test_discovery_missing_prefix_cannot_hide_symlink_ancestor(self) -> None:
+        """A nonexistent prefix followed by ``..`` cannot bypass symlink checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            real = root / "real"
+            real.mkdir()
+            (real / "main.py").write_text("x = 1\n", encoding="utf-8")
+            (root / "linked").symlink_to(real, target_is_directory=True)
+
+            discovered = lsp.discover_lsp_files(
+                root,
+                ("missing/../linked/main.py",),
+                (),
+            )
+
+            self.assertEqual(discovered, ())
+
     def test_manifest_language_mapping_uses_shared_record_ids(self) -> None:
         """C-family languages share the exact clangd manifest record."""
         self.assertEqual(lsp.LANGUAGE_RECORDS["cpp"], "clangd-language-server")
@@ -498,7 +592,7 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertIn("absolute path", result.stderr)
 
     def test_scan_failure_writes_failed_atomic_report_without_footer(self) -> None:
-        """Missing verified manifest executable fails without lexical downgrade."""
+        """An explicitly missing LSP executable fails without lexical downgrade."""
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp)
             root = workspace / "source"
@@ -508,8 +602,23 @@ class LspCodeAnalysisTest(unittest.TestCase):
             source = root / "main.py"
             source.write_text("import missing\n", encoding="utf-8")
             report_path = runtime / "analysis.json"
+            missing_server = runtime / "missing-pyright-langserver"
             result = subprocess.run(
-                [sys.executable, str(TOOL), "scan-legacy", "--root", str(root), "--files", "main.py", "--runtime-root", str(runtime), "--analysis-json", str(report_path)],
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "scan-legacy",
+                    "--root",
+                    str(root),
+                    "--files",
+                    "main.py",
+                    "--server",
+                    f"python={missing_server}",
+                    "--runtime-root",
+                    str(runtime),
+                    "--analysis-json",
+                    str(report_path),
+                ],
                 check=False,
                 capture_output=True,
                 text=True,

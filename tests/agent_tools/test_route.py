@@ -13,8 +13,9 @@
 
 from __future__ import annotations
 
-import json
 import copy
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -43,6 +44,20 @@ from tools.agent.orchestration.implementation_dispatch import (
     declared_team_capacity_derivation,
 )  # noqa: E402
 from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
+
+
+def _route_environment(
+    args: tuple[str, ...], *, cwd_is_local_root: bool = False
+) -> dict[str, str]:
+    """Isolate local-root fixtures from the runtime's installed-source override."""
+    environment = os.environ.copy()
+    has_local_root = cwd_is_local_root or any(
+        arg == "--root" or arg.startswith("--root=") for arg in args
+    )
+    if has_local_root:
+        environment.pop("AGENT_CANON_SOURCE_ROOT", None)
+        environment.pop("AGENT_CANON_ROOT", None)
+    return environment
 
 
 class RouteToolTest(unittest.TestCase):
@@ -77,6 +92,7 @@ class RouteToolTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
             cwd=PROJECT_ROOT,
+            env=_route_environment(args),
             check=False,
             capture_output=True,
             text=True,
@@ -91,6 +107,7 @@ class RouteToolTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
             cwd=str(cwd),
+            env=_route_environment(args, cwd_is_local_root=True),
             check=False,
             capture_output=True,
             text=True,
@@ -201,21 +218,31 @@ class RouteToolTest(unittest.TestCase):
 
     def test_source_root_resolution_utils_cover_shapes(self) -> None:
         """Unit tests cover direct source-root resolution edge cases."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
-            standalone = root / "agents" / "skills" / "catalog.yaml"
-            standalone.parent.mkdir(parents=True, exist_ok=True)
-            standalone.write_text("version: 1\nskill_families:\n", encoding="utf-8")
-            resolution = agent_canon_source_root.resolve_agent_canon_source_root(root)
-            self.assertEqual(resolution.layout, "standalone")
-            self.assertEqual(resolution.source_root, root.resolve())
-            self.assertEqual(resolution.current_repository_root, root.resolve())
+        with patch.dict(
+            "os.environ",
+            {"AGENT_CANON_SOURCE_ROOT": "", "AGENT_CANON_ROOT": ""},
+        ):
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
+                standalone = root / "agents" / "skills" / "catalog.yaml"
+                standalone.parent.mkdir(parents=True, exist_ok=True)
+                standalone.write_text("version: 1\nskill_families:\n", encoding="utf-8")
+                resolution = agent_canon_source_root.resolve_agent_canon_source_root(
+                    root
+                )
+                self.assertEqual(resolution.layout, "standalone")
+                self.assertEqual(resolution.source_root, root.resolve())
+                self.assertEqual(resolution.current_repository_root, root.resolve())
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            with self.assertRaises(agent_canon_source_root.SourceRootFailure) as exc:
-                agent_canon_source_root.resolve_agent_canon_source_root(Path(tmp_dir))
-            self.assertEqual(exc.exception.code, "agent_canon_source_root_missing")
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                with self.assertRaises(
+                    agent_canon_source_root.SourceRootFailure
+                ) as exc:
+                    agent_canon_source_root.resolve_agent_canon_source_root(
+                        Path(tmp_dir)
+                    )
+                self.assertEqual(exc.exception.code, "agent_canon_source_root_missing")
 
     def test_long_proposed_tool_name_resolves_to_short_area(self) -> None:
         """Long candidate-list tool names should become aliases."""
@@ -235,19 +262,19 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=runtime", result.stdout)
         self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
 
-    def test_search_area_exposes_coordinated_search_tools(self) -> None:
-        """Search routing should expose the purpose-based search entrypoint."""
+    def test_search_area_exposes_native_text_and_explicit_semantic_routes(self) -> None:
+        """Search routing should select text or semantic owners explicitly."""
         result = self.run_route("--area", "search", "--risk", "focused")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AREA=search", result.stdout)
-        self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
-        self.assertIn(
-            "python3 tools/analysis/search/search.py --purpose", result.stdout
-        )
+        self.assertIn("NEXT_ACTION=select_search_provider", result.stdout)
+        self.assertIn("--providers text --regex", result.stdout)
+        self.assertIn("--providers semantic", result.stdout)
+        self.assertNotIn("--refresh-index", result.stdout)
 
     def test_search_alias_resolves_to_search_area(self) -> None:
-        """Legacy vector-search names should route to coordinated search."""
+        """Legacy vector-search names should route to the retained search entrypoint."""
         result = self.run_route("--name", "vector_search.py")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -412,15 +439,16 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("benchmark_reviewer", waves["research_review"])
         self.assertNotIn("benchmark_reviewer", waves["final_review"])
 
-    def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(
-        self,
-    ) -> None:
-        """The route contract carries the math packet and refuses non-math scope drift."""
+    def test_math_scope_contract_is_owned_and_routed(self) -> None:
+        """The math owner defines packet fields and orchestration routes to it."""
         orchestration = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
         ).read_text(encoding="utf-8")
         optimization = (
             PROJECT_ROOT / "agents" / "skills" / "computational-optimization.md"
+        ).read_text(encoding="utf-8")
+        bootstrap = (
+            PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
         ).read_text(encoding="utf-8")
         for field in (
             "math_object",
@@ -454,7 +482,6 @@ class RouteToolTest(unittest.TestCase):
         ):
             with self.subTest(field=field):
                 self.assertIn(field, optimization)
-                self.assertIn(field, orchestration)
         for surface in (
             "architecture",
             "JIT",
@@ -464,10 +491,14 @@ class RouteToolTest(unittest.TestCase):
             "environment",
         ):
             with self.subTest(surface=surface):
-                self.assertIn(surface, orchestration)
                 self.assertIn(surface, optimization)
-        self.assertIn("math_packet_missing", orchestration)
-        self.assertIn("writer_target", orchestration)
+        self.assertIn(
+            "[computational-optimization](computational-optimization.md)",
+            orchestration,
+        )
+        self.assertIn("mathematical intent", orchestration)
+        self.assertIn("math_packet_missing", optimization)
+        self.assertIn("writer_target", bootstrap)
 
         team_config = json.loads(
             (PROJECT_ROOT / "agents" / "agents_config.json").read_text(encoding="utf-8")
@@ -484,7 +515,7 @@ class RouteToolTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(reviewer_view["model"], "gpt-5.6-luna")
+        self.assertEqual(reviewer_view["model"], "gpt-6-luna")
         self.assertEqual(reviewer_view["model_reasoning_effort"], "high")
 
     def test_conditional_math_reviewer_enters_capacity_only_when_active(self) -> None:
@@ -1912,6 +1943,7 @@ class CapabilityRouteTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(ROUTE), *args],
             cwd=PROJECT_ROOT,
+            env=_route_environment(args),
             check=False,
             capture_output=True,
             text=True,
