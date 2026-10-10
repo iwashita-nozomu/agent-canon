@@ -29,7 +29,6 @@ from tools.runtime.container.bootstrap_runtime import (  # noqa: E402
     _container_request_environment,
     build_parser,
     run,
-    sha256_bytes,
 )
 from tools.runtime.archive.runtime_exchange_cleanup import clear_exchange  # noqa: E402
 
