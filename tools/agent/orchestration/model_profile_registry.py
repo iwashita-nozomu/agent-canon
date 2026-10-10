@@ -73,7 +73,13 @@ _PROFILE_FIELDS = {
     "close_tool_target_binding",
     "role_instructions",
 }
-_CLAUSE_FIELDS = {"id", "text", "priority", "consumer_static_text", "static_obligations"}
+_CLAUSE_FIELDS = {
+    "id",
+    "text",
+    "priority",
+    "consumer_static_text",
+    "static_obligations",
+}
 
 # These are exact, case-normalized producer prefixes.  The static projection
 # uses the same boundary as the exporter and consumer checker, while keeping
@@ -118,7 +124,9 @@ STATIC_OBLIGATION_TABLE: tuple[StaticObligation, ...] = (
         fragment="return branch/head/check evidence or the role result and stop",
     ),
 )
-_STATIC_OBLIGATIONS_BY_ID = {item.obligation_id: item for item in STATIC_OBLIGATION_TABLE}
+_STATIC_OBLIGATIONS_BY_ID = {
+    item.obligation_id: item for item in STATIC_OBLIGATION_TABLE
+}
 REQUIRED_STATIC_OBLIGATION_SETS: Mapping[str, frozenset[str]] = {
     "python_solid_boundary": frozenset({"validation_owner", "parent_assignment"}),
     "luna_impl": frozenset(
@@ -268,8 +276,12 @@ def _text(value: object, field: str) -> str:
     return value
 
 
-def _string_tuple(value: object, field: str, *, nonempty: bool = True) -> tuple[str, ...]:
-    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+def _string_tuple(
+    value: object, field: str, *, nonempty: bool = True
+) -> tuple[str, ...]:
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in value
+    ):
         raise ModelProfileRegistryError(f"{field}:must_be_string_list")
     result = tuple(value)
     if nonempty and not result:
@@ -317,7 +329,11 @@ def validate_claim_evidence_result(value: object) -> ValidationResult:
     issues: list[ValidationIssue] = []
     if not isinstance(value, Mapping):
         return ValidationResult.fail(
-            [ValidationIssue("return_contract.type", "claim/evidence result must be a mapping")]
+            [
+                ValidationIssue(
+                    "return_contract.type", "claim/evidence result must be a mapping"
+                )
+            ]
         )
     status = value.get("status")
     if status not in {"pass", "revise", "escalate", "blocked"}:
@@ -330,7 +346,11 @@ def validate_claim_evidence_result(value: object) -> ValidationResult:
         )
     claim = value.get("claim")
     if not isinstance(claim, str) or not claim.strip():
-        issues.append(ValidationIssue("return_contract.claim", "claim must be non-empty text", "claim"))
+        issues.append(
+            ValidationIssue(
+                "return_contract.claim", "claim must be non-empty text", "claim"
+            )
+        )
     evidence = value.get("evidence")
     if (
         not isinstance(evidence, list)
@@ -344,8 +364,10 @@ def validate_claim_evidence_result(value: object) -> ValidationResult:
                 "evidence",
             )
         )
-    return ValidationResult.fail(issues) if issues else ValidationResult(
-        COMMON_RETURN_SCHEMA_ID, True, ()
+    return (
+        ValidationResult.fail(issues)
+        if issues
+        else ValidationResult(COMMON_RETURN_SCHEMA_ID, True, ())
     )
 
 
@@ -557,7 +579,9 @@ class ModelProfileRegistry:
     writer_isolation_policy: WriterIsolationPolicy
 
     def by_profile(self, profile_id: str) -> ModelProfile:
-        matches = [profile for profile in self.model_profiles if profile.id == profile_id]
+        matches = [
+            profile for profile in self.model_profiles if profile.id == profile_id
+        ]
         if len(matches) != 1:
             raise ModelProfileRegistryError(f"model_profile:{profile_id}:not_found")
         return matches[0]
@@ -566,7 +590,9 @@ class ModelProfileRegistry:
         try:
             profile_id = self.role_profile_bindings[role_id]
         except KeyError as exc:
-            raise ModelProfileRegistryError(f"role_profile:{role_id}:not_found") from exc
+            raise ModelProfileRegistryError(
+                f"role_profile:{role_id}:not_found"
+            ) from exc
         return self.by_profile(profile_id)
 
     def instruction_clauses_for_role(
@@ -585,7 +611,9 @@ class ModelProfileRegistry:
         clause_ids = [clause.clause_id for clause in clauses]
         if len(clause_ids) != len(set(clause_ids)):
             raise ModelProfileRegistryError(f"role_instruction:{role_id}:duplicate")
-        return tuple(sorted(clauses, key=lambda value: (value.priority, value.clause_id)))
+        return tuple(
+            sorted(clauses, key=lambda value: (value.priority, value.clause_id))
+        )
 
     def projection_digest_for_role(self, role_id: str, profile_id: str) -> str:
         """Bind both live and consumer-static views to one canonical clause digest."""
@@ -629,10 +657,7 @@ def _read_toml_file(path: Path) -> Mapping[str, Any]:
 
 
 def _profile_digest_payload(item: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        key: item[key]
-        for key in sorted(_PROFILE_FIELDS - {"projection_digest"})
-    }
+    return {key: item[key] for key in sorted(_PROFILE_FIELDS - {"projection_digest"})}
 
 
 def load_model_profile_registry(
@@ -711,14 +736,18 @@ def load_model_profile_registry(
     }
     raw_bindings = data["role_profile_bindings"]
     if not isinstance(raw_bindings, Mapping) or not raw_bindings:
-        raise ModelProfileRegistryError("role_profile_bindings:must_be_nonempty_mapping")
+        raise ModelProfileRegistryError(
+            "role_profile_bindings:must_be_nonempty_mapping"
+        )
     bindings: dict[str, str] = {}
     for role_id, profile_id in raw_bindings.items():
         role = _text(role_id, "role_profile_bindings.role_id")
         bindings[role] = _text(profile_id, f"role_profile_bindings.{role}")
     raw_sandboxes = data["role_sandbox_bindings"]
     if not isinstance(raw_sandboxes, Mapping) or set(raw_sandboxes) != set(bindings):
-        raise ModelProfileRegistryError("role_sandbox_bindings:must_exactly_match_role_bindings")
+        raise ModelProfileRegistryError(
+            "role_sandbox_bindings:must_exactly_match_role_bindings"
+        )
     sandboxes: dict[str, str] = {}
     for role_id, sandbox_value in raw_sandboxes.items():
         sandbox = _text(sandbox_value, f"role_sandbox_bindings.{role_id}")
@@ -787,8 +816,13 @@ def load_model_profile_registry(
             label=f"standalone_role_metadata.{role_id}",
         )
         standalone[_text(role_id, "standalone_role_metadata.role_id")] = (
-            _text(metadata["logical_role_id"], "standalone_role_metadata.logical_role_id"),
-            _text(metadata["role_contract_ref"], "standalone_role_metadata.role_contract_ref"),
+            _text(
+                metadata["logical_role_id"], "standalone_role_metadata.logical_role_id"
+            ),
+            _text(
+                metadata["role_contract_ref"],
+                "standalone_role_metadata.role_contract_ref",
+            ),
             _text(metadata["sandbox_mode"], "standalone_role_metadata.sandbox_mode"),
         )
 
@@ -798,14 +832,18 @@ def load_model_profile_registry(
     profiles: list[ModelProfile] = []
     profile_ids: set[str] = set()
     for index, raw_item in enumerate(raw_profiles):
-        item = _closed_mapping(raw_item, fields=_PROFILE_FIELDS, label=f"model_profiles[{index}]")
+        item = _closed_mapping(
+            raw_item, fields=_PROFILE_FIELDS, label=f"model_profiles[{index}]"
+        )
         profile_id = _text(item["id"], f"model_profiles[{index}].id")
         if profile_id in profile_ids:
             raise ModelProfileRegistryError(f"model_profile:{profile_id}:duplicate")
         profile_ids.add(profile_id)
         clauses_raw = item["role_instructions"]
         if not isinstance(clauses_raw, list) or not clauses_raw:
-            raise ModelProfileRegistryError(f"model_profile:{profile_id}:missing_role_instructions")
+            raise ModelProfileRegistryError(
+                f"model_profile:{profile_id}:missing_role_instructions"
+            )
         clauses: list[RoleInstructionClause] = []
         seen_clauses: set[str] = set()
         for clause_index, raw_clause in enumerate(clauses_raw):
@@ -817,11 +855,15 @@ def load_model_profile_registry(
             )
             clause_id = _text(clause["id"], "role_instruction.id")
             if clause_id in seen_clauses:
-                raise ModelProfileRegistryError(f"role_instruction:{clause_id}:duplicate")
+                raise ModelProfileRegistryError(
+                    f"role_instruction:{clause_id}:duplicate"
+                )
             seen_clauses.add(clause_id)
             priority = clause["priority"]
             if not isinstance(priority, int):
-                raise ModelProfileRegistryError(f"role_instruction:{clause_id}:priority_must_be_int")
+                raise ModelProfileRegistryError(
+                    f"role_instruction:{clause_id}:priority_must_be_int"
+                )
             clauses.append(
                 RoleInstructionClause(
                     clause_id,
@@ -834,63 +876,114 @@ def load_model_profile_registry(
                     ),
                 )
             )
-        allowed = _string_tuple(item["allowed_context"], f"{profile_id}.allowed_context")
-        forbidden = _string_tuple(item["forbidden_context"], f"{profile_id}.forbidden_context")
+        allowed = _string_tuple(
+            item["allowed_context"], f"{profile_id}.allowed_context"
+        )
+        forbidden = _string_tuple(
+            item["forbidden_context"], f"{profile_id}.forbidden_context"
+        )
         if set(allowed) & set(forbidden):
-            raise ModelProfileRegistryError(f"model_profile:{profile_id}:context_overlap")
+            raise ModelProfileRegistryError(
+                f"model_profile:{profile_id}:context_overlap"
+            )
         required_context = _string_tuple(
             item["prompt_capsule_required_context"],
             f"{profile_id}.prompt_capsule_required_context",
         )
         if not set(required_context).issubset(allowed):
-            raise ModelProfileRegistryError(f"model_profile:{profile_id}:required_context_not_allowed")
+            raise ModelProfileRegistryError(
+                f"model_profile:{profile_id}:required_context_not_allowed"
+            )
         if item["projection_digest"] != "computed_sha256_v1":
-            raise ModelProfileRegistryError(f"model_profile:{profile_id}:projection_digest_policy_invalid")
+            raise ModelProfileRegistryError(
+                f"model_profile:{profile_id}:projection_digest_policy_invalid"
+            )
         digest = _stable_digest(_profile_digest_payload(item))
-        target = _text(item["close_tool_target_binding"], f"{profile_id}.close_tool_target_binding")
+        target = _text(
+            item["close_tool_target_binding"], f"{profile_id}.close_tool_target_binding"
+        )
         if target != "terminal_agent_id":
-            raise ModelProfileRegistryError(f"model_profile:{profile_id}:close_target_mismatch")
-        sorted_clauses = tuple(sorted(clauses, key=lambda value: (value.priority, value.clause_id)))
+            raise ModelProfileRegistryError(
+                f"model_profile:{profile_id}:close_target_mismatch"
+            )
+        sorted_clauses = tuple(
+            sorted(clauses, key=lambda value: (value.priority, value.clause_id))
+        )
         profiles.append(
             ModelProfile(
                 id=profile_id,
                 model_alias=_text(item["model_alias"], f"{profile_id}.model_alias"),
                 model=_text(item["model"], f"{profile_id}.model"),
-                reasoning_effort=_text(item["reasoning_effort"], f"{profile_id}.reasoning_effort"),
+                reasoning_effort=_text(
+                    item["reasoning_effort"], f"{profile_id}.reasoning_effort"
+                ),
                 owner=_text(item["owner"], f"{profile_id}.owner"),
-                capabilities=_string_tuple(item["capabilities"], f"{profile_id}.capabilities"),
+                capabilities=_string_tuple(
+                    item["capabilities"], f"{profile_id}.capabilities"
+                ),
                 allowed_context=allowed,
                 forbidden_context=forbidden,
-                return_schema_id=_text(item["return_schema_id"], f"{profile_id}.return_schema_id"),
-                checkpoint_policy=_text(item["checkpoint_policy"], f"{profile_id}.checkpoint_policy"),
-                continuation_policy=_text(item["continuation_policy"], f"{profile_id}.continuation_policy"),
+                return_schema_id=_text(
+                    item["return_schema_id"], f"{profile_id}.return_schema_id"
+                ),
+                checkpoint_policy=_text(
+                    item["checkpoint_policy"], f"{profile_id}.checkpoint_policy"
+                ),
+                continuation_policy=_text(
+                    item["continuation_policy"], f"{profile_id}.continuation_policy"
+                ),
                 projection_digest=digest,
-                role_template=_text(item["role_template"], f"{profile_id}.role_template"),
+                role_template=_text(
+                    item["role_template"], f"{profile_id}.role_template"
+                ),
                 prompt_capsule_schema=PromptCapsuleSchema(
-                    schema_id=_text(item["prompt_capsule_schema_id"], f"{profile_id}.prompt_capsule_schema_id"),
+                    schema_id=_text(
+                        item["prompt_capsule_schema_id"],
+                        f"{profile_id}.prompt_capsule_schema_id",
+                    ),
                     profile_id=profile_id,
-                    template=_text(item["prompt_capsule_template"], f"{profile_id}.prompt_capsule_template"),
+                    template=_text(
+                        item["prompt_capsule_template"],
+                        f"{profile_id}.prompt_capsule_template",
+                    ),
                     required_context=required_context,
                 ),
                 role_instruction_template=RoleInstructionTemplate(
                     profile_id=profile_id,
                     clauses=sorted_clauses,
-                    template_text=_text(item["role_template"], f"{profile_id}.role_template"),
+                    template_text=_text(
+                        item["role_template"], f"{profile_id}.role_template"
+                    ),
                 ),
                 tool_argument_schema=ToolArgumentSchema(
-                    schema_id=_text(item["close_tool_argument_schema_id"], f"{profile_id}.close_tool_argument_schema_id"),
+                    schema_id=_text(
+                        item["close_tool_argument_schema_id"],
+                        f"{profile_id}.close_tool_argument_schema_id",
+                    ),
                     target=target,
                     properties=(target,),
                 ),
-                tool_argument_schema_id=_text(item["close_tool_argument_schema_id"], f"{profile_id}.close_tool_argument_schema_id"),
-                tool_failure_schema_id=_text(item["close_tool_failure_schema_id"], f"{profile_id}.close_tool_failure_schema_id"),
-                close_skill_id=_text(item["close_skill_id"], f"{profile_id}.close_skill_id"),
-                close_tool_id=_text(item["close_tool_id"], f"{profile_id}.close_tool_id"),
+                tool_argument_schema_id=_text(
+                    item["close_tool_argument_schema_id"],
+                    f"{profile_id}.close_tool_argument_schema_id",
+                ),
+                tool_failure_schema_id=_text(
+                    item["close_tool_failure_schema_id"],
+                    f"{profile_id}.close_tool_failure_schema_id",
+                ),
+                close_skill_id=_text(
+                    item["close_skill_id"], f"{profile_id}.close_skill_id"
+                ),
+                close_tool_id=_text(
+                    item["close_tool_id"], f"{profile_id}.close_tool_id"
+                ),
             )
         )
     unknown_profiles = sorted(set(bindings.values()) - profile_ids)
     if unknown_profiles:
-        raise ModelProfileRegistryError(f"role_profile_bindings:unknown_profiles:{','.join(unknown_profiles)}")
+        raise ModelProfileRegistryError(
+            f"role_profile_bindings:unknown_profiles:{','.join(unknown_profiles)}"
+        )
     registry = ModelProfileRegistry(
         schema_id=SCHEMA_IDS["registry"],
         registry_id=_text(data["registry_id"], "registry_id"),
@@ -932,7 +1025,9 @@ def materialize_prompt_capsule(
     if unknown:
         raise ModelProfileRegistryError(f"prompt_context:unknown:{','.join(unknown)}")
     if forbidden:
-        raise ModelProfileRegistryError(f"prompt_context:forbidden:{','.join(forbidden)}")
+        raise ModelProfileRegistryError(
+            f"prompt_context:forbidden:{','.join(forbidden)}"
+        )
     if missing:
         raise ModelProfileRegistryError(f"prompt_context:missing:{','.join(missing)}")
     role_clauses = registry.instruction_clauses_for_role(
@@ -986,7 +1081,10 @@ def materialize_tool_call_token(
         raise StructuralDesignGap("tool_call_token_request.profile.type")
     if request.profile_id != profile_obj.id:
         raise ModelProfileRegistryError("tool_call_token_request:profile_mismatch")
-    if not isinstance(request.terminal_agent_id, str) or not request.terminal_agent_id.strip():
+    if (
+        not isinstance(request.terminal_agent_id, str)
+        or not request.terminal_agent_id.strip()
+    ):
         raise ModelProfileRegistryError("terminal_agent_id:must_be_nonempty")
     return ToolCallToken(
         tool_id=profile_obj.close_tool_id,
@@ -1004,7 +1102,9 @@ def materialize_route_packet(
 ) -> MaterializedRoutePacket:
     registry = load_model_profile_registry(root)
     prompt = materialize_prompt_capsule(
-        PromptMaterializationRequest(profile_id, role_id, tuple(context or ()), objective),
+        PromptMaterializationRequest(
+            profile_id, role_id, tuple(context or ()), objective
+        ),
         registry,
     )
     token = materialize_tool_call_token(
@@ -1034,7 +1134,9 @@ def materialize_route_packet(
 
 def _team_role_metadata(root: Path) -> dict[str, tuple[str, str, str]]:
     try:
-        raw = json.loads((root / "agents" / "agents_config.json").read_text(encoding="utf-8"))
+        raw = json.loads(
+            (root / "agents" / "agents_config.json").read_text(encoding="utf-8")
+        )
     except (OSError, json.JSONDecodeError) as exc:
         raise ModelProfileRegistryError(f"agents_config:unreadable:{exc}") from exc
     if not isinstance(raw, dict):
@@ -1046,17 +1148,30 @@ def _team_role_metadata(root: Path) -> dict[str, tuple[str, str, str]]:
             raise ModelProfileRegistryError(f"agents_config:{section}:must_be_list")
         for index, entry in enumerate(entries):
             if not isinstance(entry, dict):
-                raise ModelProfileRegistryError(f"agents_config:{section}[{index}]:must_be_mapping")
-            logical_role = _text(entry.get("id"), f"agents_config:{section}[{index}].id")
+                raise ModelProfileRegistryError(
+                    f"agents_config:{section}[{index}]:must_be_mapping"
+                )
+            logical_role = _text(
+                entry.get("id"), f"agents_config:{section}[{index}].id"
+            )
             agent_ids = entry.get("codex_agents")
             if agent_ids is None:
                 continue
-            if not isinstance(agent_ids, list) or not all(isinstance(value, str) and value for value in agent_ids):
-                raise ModelProfileRegistryError(f"agents_config:{section}[{index}].codex_agents:invalid")
+            if not isinstance(agent_ids, list) or not all(
+                isinstance(value, str) and value for value in agent_ids
+            ):
+                raise ModelProfileRegistryError(
+                    f"agents_config:{section}[{index}].codex_agents:invalid"
+                )
             write_policy = entry.get("write_policy")
             if not isinstance(write_policy, dict):
-                raise ModelProfileRegistryError(f"agents_config:{section}[{index}].write_policy:invalid")
-            mode = _text(write_policy.get("mode"), f"agents_config:{section}[{index}].write_policy.mode")
+                raise ModelProfileRegistryError(
+                    f"agents_config:{section}[{index}].write_policy:invalid"
+                )
+            mode = _text(
+                write_policy.get("mode"),
+                f"agents_config:{section}[{index}].write_policy.mode",
+            )
             sandbox = "read-only" if mode == "read_only" else "workspace-write"
             for agent_id in agent_ids:
                 if agent_id in result:
@@ -1067,7 +1182,12 @@ def _team_role_metadata(root: Path) -> dict[str, tuple[str, str, str]]:
                         )
                     result[agent_id] = (
                         "+".join((*prior_roles.split("+"), logical_role)),
-                        "+".join((*prior_refs.split("+"), f"agents/agents_config.json#/{section}/{index}")),
+                        "+".join(
+                            (
+                                *prior_refs.split("+"),
+                                f"agents/agents_config.json#/{section}/{index}",
+                            )
+                        ),
                         sandbox,
                     )
                     continue
@@ -1088,7 +1208,9 @@ def _registered_role_descriptions(root: Path) -> dict[str, str]:
     for role_id, value in agents.items():
         if not isinstance(value, Mapping):
             continue
-        result[str(role_id)] = _text(value.get("description"), f"codex_config.agents.{role_id}.description")
+        result[str(role_id)] = _text(
+            value.get("description"), f"codex_config.agents.{role_id}.description"
+        )
     return result
 
 
@@ -1101,7 +1223,9 @@ def _codex_context_settings(root: Path) -> tuple[int | None, int | None]:
             values.append(None)
             continue
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            raise ModelProfileRegistryError(f"codex_config:{key}:must_be_positive_integer")
+            raise ModelProfileRegistryError(
+                f"codex_config:{key}:must_be_positive_integer"
+            )
         values.append(value)
     return values[0], values[1]
 
@@ -1142,7 +1266,9 @@ def compose_consumer_static_clause(
         _STATIC_OBLIGATIONS_BY_ID[obligation_id].fragment
         for obligation_id in projection.static_obligations
     )
-    return " ".join((projection.consumer_static_text, *selected)), projection.static_obligations
+    return " ".join(
+        (projection.consumer_static_text, *selected)
+    ), projection.static_obligations
 
 
 def _render_instruction_clauses(
@@ -1165,7 +1291,9 @@ def generate_role_views(
     root_path = Path(root)
     metadata = _team_role_metadata(root_path)
     if set(metadata) & set(registry.standalone_role_metadata):
-        raise ModelProfileRegistryError("role_projection:standalone_metadata_overlaps_team_binding")
+        raise ModelProfileRegistryError(
+            "role_projection:standalone_metadata_overlaps_team_binding"
+        )
     metadata.update(registry.standalone_role_metadata)
     if set(metadata) != set(registry.role_sandbox_bindings):
         raise ModelProfileRegistryError("role_projection:sandbox_binding_set_mismatch")
@@ -1178,12 +1306,19 @@ def generate_role_views(
         root_path
     )
     expected_roles = set(metadata) | set(descriptions)
-    if set(metadata) != set(descriptions) or set(registry.role_profile_bindings) != expected_roles:
-        raise ModelProfileRegistryError("role_projection:binding_registration_set_mismatch")
+    if (
+        set(metadata) != set(descriptions)
+        or set(registry.role_profile_bindings) != expected_roles
+    ):
+        raise ModelProfileRegistryError(
+            "role_projection:binding_registration_set_mismatch"
+        )
     if isinstance(target_state_contract, Mapping):
         explicit = target_state_contract.get("supported_role_profiles")
         if explicit is not None and explicit != registry.role_profile_bindings:
-            raise ModelProfileRegistryError("target_state_contract:role_profile_binding_mismatch")
+            raise ModelProfileRegistryError(
+                "target_state_contract:role_profile_binding_mismatch"
+            )
     views: list[GeneratedRoleView] = []
     for role_id in sorted(expected_roles):
         profile = registry.profile_for_role(role_id)
@@ -1284,7 +1419,9 @@ def _render_role_view(view: GeneratedRoleView, projection: str = "live") -> str:
     )
 
 
-def _projection_records(views: Sequence[GeneratedRoleView]) -> tuple[dict[str, object], list[dict[str, object]]]:
+def _projection_records(
+    views: Sequence[GeneratedRoleView],
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     agent_views: dict[str, object] = {}
     roles: list[dict[str, object]] = []
     for view in views:
@@ -1361,7 +1498,9 @@ def write_role_views(
     }
     raw["agent_views"] = agent_views
     raw["roles"] = roles
-    config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    config_path.write_text(
+        json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     return views
 
 
@@ -1370,17 +1509,34 @@ def validate_target_state_contract(
     registry: ModelProfileRegistry,
 ) -> ValidationResult:
     issues: list[ValidationIssue] = []
-    for field in ("contract_id", "unit_id", "owner", "exact_owner", "profiles", "configured_supported_profiles"):
+    for field in (
+        "contract_id",
+        "unit_id",
+        "owner",
+        "exact_owner",
+        "profiles",
+        "configured_supported_profiles",
+    ):
         if field not in target_state_contract:
             issues.append(ValidationIssue("missing_field", f"{field}:missing", field))
     profiles = target_state_contract.get("configured_supported_profiles")
     if not isinstance(profiles, list):
-        issues.append(ValidationIssue("profiles", "configured_supported_profiles:must_be_list", "profiles"))
+        issues.append(
+            ValidationIssue(
+                "profiles", "configured_supported_profiles:must_be_list", "profiles"
+            )
+        )
     else:
         known = {profile.id for profile in registry.model_profiles}
         for profile_id in profiles:
             if not isinstance(profile_id, str) or profile_id not in known:
-                issues.append(ValidationIssue("unknown_profile", f"configured_profile:{profile_id}:not_in_registry", "profiles"))
+                issues.append(
+                    ValidationIssue(
+                        "unknown_profile",
+                        f"configured_profile:{profile_id}:not_in_registry",
+                        "profiles",
+                    )
+                )
     return ValidationResult.fail(issues) if issues else ValidationResult.ok()
 
 
@@ -1393,7 +1549,9 @@ def materialize_contract_projection(
     result = validate_target_state_contract(target_state_contract, registry)
     if not result.valid:
         raise ModelProfileRegistryError("target_state_contract_validation_failed")
-    contract_id = _text(target_state_contract.get("contract_id"), "target_state_contract.contract_id")
+    contract_id = _text(
+        target_state_contract.get("contract_id"), "target_state_contract.contract_id"
+    )
     return ImplementationExecutionContract(
         contract_id=contract_id,
         generated_views=generate_role_views(
@@ -1405,7 +1563,9 @@ def materialize_contract_projection(
     )
 
 
-def _role_view_issues(root: Path, projection: str = "live") -> tuple[ValidationIssue, ...]:
+def _role_view_issues(
+    root: Path, projection: str = "live"
+) -> tuple[ValidationIssue, ...]:
     projection = _validate_projection_mode(projection)
     registry = load_model_profile_registry(root)
     views = generate_role_views(registry, root, projection=projection)
@@ -1420,7 +1580,13 @@ def _role_view_issues(root: Path, projection: str = "live") -> tuple[ValidationI
         except OSError:
             actual = b""
         if actual != expected:
-            issues.append(ValidationIssue("role_view.content_drift", "generated role projection differs", path.relative_to(root).as_posix()))
+            issues.append(
+                ValidationIssue(
+                    "role_view.content_drift",
+                    "generated role projection differs",
+                    path.relative_to(root).as_posix(),
+                )
+            )
     config_path = root / "agents" / "agents_config.json"
     try:
         raw = json.loads(config_path.read_text(encoding="utf-8"))
@@ -1429,8 +1595,18 @@ def _role_view_issues(root: Path, projection: str = "live") -> tuple[ValidationI
     expected_views, expected_roles = _projection_records(
         generate_role_views(registry, root, projection="consumer-static")
     )
-    if not isinstance(raw, dict) or raw.get("agent_views") != expected_views or raw.get("roles") != expected_roles:
-        issues.append(ValidationIssue("role_view.config_projection_drift", "agents_config generated projection differs", "agents/agents_config.json"))
+    if (
+        not isinstance(raw, dict)
+        or raw.get("agent_views") != expected_views
+        or raw.get("roles") != expected_roles
+    ):
+        issues.append(
+            ValidationIssue(
+                "role_view.config_projection_drift",
+                "agents_config generated projection differs",
+                "agents/agents_config.json",
+            )
+        )
     return tuple(sorted(issues, key=lambda item: (item.location or "", item.code)))
 
 
@@ -1471,7 +1647,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         issues = _role_view_issues(args.root, args.projection)
     except (ModelProfileRegistryError, OSError, ValueError) as exc:
-        issues = (ValidationIssue("role_view.schema_drift", str(exc), "agents/model_profiles.toml"),)
+        issues = (
+            ValidationIssue(
+                "role_view.schema_drift", str(exc), "agents/model_profiles.toml"
+            ),
+        )
     if issues:
         for issue in issues:
             _print_role_view_issue(issue)

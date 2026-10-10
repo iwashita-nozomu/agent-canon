@@ -2517,7 +2517,9 @@ class DependencyModelTests(unittest.TestCase):
                 target.write_text("#!/usr/bin/env true\n", encoding="utf-8")
                 target.chmod(0o755)
             (bin_dir / "pyright").symlink_to(target_v1)
-            manifest = workspace / "bootstrap" / "container" / "image" / "dependencies.toml"
+            manifest = (
+                workspace / "bootstrap" / "container" / "image" / "dependencies.toml"
+            )
             write_manifest(
                 manifest,
                 [
