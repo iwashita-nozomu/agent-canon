@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Inventories Python helper symbols with deterministic static role analysis.
-# upstream design ../../documents/tools/README.md AgentCanon tool entrypoint policy
-# upstream design ../../documents/conventions/coding-conventions-python.md helper and role naming policy
-# downstream implementation ../../tests/agent_tools/test_helper_function_inventory.py tests inventory behavior
+# upstream design ../../../documents/tools/README.md AgentCanon tool entrypoint policy
+# upstream design ../../../documents/conventions/coding-conventions-python.md helper and role naming policy
+# downstream implementation ../../../tests/agent_tools/test_helper_function_inventory.py tests inventory behavior
 # @dependency-end
 """Inventory Python helper functions/classes and infer their static roles."""
 

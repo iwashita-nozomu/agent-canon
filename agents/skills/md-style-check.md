@@ -25,25 +25,17 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter 
 
 ## Procedure
 
-1. Identify the changed Markdown owner and select its existing formatter/check
-   route. Project documentation uses its project route; AgentCanon examples apply
-   only when the AgentCanon owner selects them.
-2. Read the selected command's help when options are needed, then run the chosen
-   format/check command through the existing tool owner. A Markdown edit alone
-   does not require an AgentCanon checker.
-3. If the report identifies a path, read that path and nearby lines. Repair only
-   the reported formatting, link, heading, math, or Mermaid property; route
-   semantic or cross-document issues to the document owner.
-4. Use the selected formatter/fixer for math or Mermaid when available. Keep
-   display-math delimiters on standalone lines, inline-math delimiters in prose,
-   and literal commands/paths in code spans; do not add formatter-specific
-   conventions beyond the repository's existing docs rules.
-5. Rerun the same owner's required check after a formatter/fixer edit, reusing an
-   adjacent result already produced by that command. Do not repeat a check or
-   widen to full review when it cannot change the selected property.
-6. Inspect the final diff for broken links, heading drift, table/code readability,
-   and preservation of document meaning. A formatter pass is not evidence that
-   content is correct.
+Identify the changed Markdown owner and use its existing formatter/check route.
+Read command help when an option is needed; a Markdown edit alone does not imply
+an AgentCanon checker. If a check reports a path, inspect the relevant text and
+repair that formatting, link, heading, math, or Mermaid issue. Route semantic or
+cross-document findings to the content owner.
+
+Use the selected math/Mermaid formatter when available. Preserve existing
+delimiter and literal-command conventions. After a formatter/fixer edit, rerun
+the same required check when it can establish the corrected property, reusing a
+nearby result from that command. Inspect the final change for readability and
+meaning: formatting success alone does not establish content correctness.
 
 ## Boundary
 

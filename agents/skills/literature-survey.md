@@ -43,54 +43,33 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 
 ## Mandatory Checklist
 
-- web search、PDF download、citation lookup の前に、同じ topic / source / claim が
-  既存の `references/`、`documents/notes/`、`documents/`、topic report にあるかを確認します。
-- 既存 source note がある場合は、それを更新または引用し、同じ source の並行 truth
-  surface を作りません。
-- primary source、survey、benchmark comparison を優先します
-- peer-reviewed、preprint、vendor doc、blog を区別して記録します
-- 支持資料だけでなく、限定条件や反証候補も集めます
-- query、探索日、採用理由、除外理由を残します
-- answer / report / design で使った source は、`references/`、`documents/notes/`、
-  `reports/agents/<run-id>/source_packet.md` などの tracked artifact に残します。
-- durable source record には URL / DOI、access date、使った claim、limitation、
-  download artifact の有無と保存場所を入れます。
-- browser context、download cache、一時 PDF、chat 上の要約だけを source record として
-  扱いません。
-- task に近い problem setting、data regime、hardware regime を区別します
-- source から直接言えることと、自分の解釈を分けます
-- 最終的に使う主張ごとに source を辿れるようにします
-- prose graph handoff がある場合は、unsupported claim や citation/evidence gap を query pack と source adoption/exclusion decision の入力にします
+- 外部検索、PDF取得、citation lookup の前に、同じ source / claim が既存の
+  `references/`、`documents/notes/`、`documents/`、topic report にないか確認します。
+  既存 note がある場合は更新または参照し、並行する正本を増やしません。
+- 選択した資料では source type（peer-reviewed paper、preprint、vendor doc、blog など）と
+  関連性を確かめます。claim の位置づけに影響する
+  制限・反証資料も探し、source の直接の記述と自分の解釈を分けます。
+- 回答、report、design に使う source は tracked note / packet に残し、URL / DOI、
+  access date、利用した claim、limitation、保存 artifact の場所を記録します。
+  query、探索日、採否理由は、探索範囲や除外判断を再現するのに
+  必要な場合に残します。
+- `prose-reasoning-graph` handoff がある場合は、その unsupported-claim や
+  citation/evidence gaps を検索・採否判断の候補として使います。
 
 ## Canonical Flow
 
-1. 問いを 1 文で固定する
-1. inclusion / exclusion を決める
-1. query pack を作る
-1. 既存 `references/`、`documents/notes/`、`documents/`、topic report を topic keyword、
-   source title、DOI / URL で確認する
-1. survey、代表論文、比較論文、公式資料を優先して集める
-1. 支持資料と反証候補を分ける
-1. 各 source について、setting、claim、limitations、使える点を短く抜く
-1. baseline、metric、failure mode、artifact policy に効く source を抜き出す
-1. `Known`、`Contested`、`Open` に整理する
-1. 使った source と採用/除外理由を `references/`、`documents/notes/`、または run-local
-   `source_packet.md` に残す
+問いと必要な範囲を決め、既存 source record を調べてから検索します。資料の
+信頼性・problem/data/hardware setting・主張への適用可能性を比較し、採用する claim と
+それを弱める条件を区別します。必要なら `Known` / `Contested` / `Open` に整理し、
+使った source を追跡できる形で記録します。query pack、除外一覧、全 source の要約は、
+検索規模や依頼に必要な場合だけ作ります。
 
 ## Deliverable Shape
 
-- `Question`
-- `Scope`
-- `Search Log`
-- `Existing Reference Sweep`
-- `Primary Sources`
-- `Contrary Or Narrowing Sources`
-- `Adopted Source Claims`
-- `Excluded Sources`
-- `Known`
-- `Contested`
-- `Open`
-- `Implications For Implementation Or Experiment`
+選んだ source と結論を読める最小の形で示します。`Question`、`Scope`、
+`Adopted Source Claims`、`Known` / `Contested` / `Open` などは有用な例であり、
+使っていない資料区分や主張のために空欄を作りません。検索・除外の詳細は、採否判断に
+影響する場合だけ添えます。
 
 ## Boundary
 
@@ -104,12 +83,7 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read [agents/skills/literature-survey.md](literature-survey.md).
-1. Read [agents/workflows/workflow-references.md](../workflows/workflow-references.md) only when the task needs the
-   repository-wide external-rule bibliography; it is not an execution procedure.
-1. Fix the question, scope, and exclusion criteria before searching.
-1. Before web search, PDF download, or citation lookup, inspect existing `references/`, `documents/notes/`, `documents/`, and topic reports for the same source or claim. Reuse or update the existing source note instead of creating a parallel truth surface.
-1. Prefer primary sources, surveys, benchmark comparison papers, and official docs over tertiary summaries.
-1. Record contrary or scope-limiting evidence, not only supporting sources.
-1. If a prose graph handoff is present, use unsupported-claim and citation/evidence-gap diagnostics to seed query terms, source adoption decisions, and source exclusion checks.
-1. If a source is used, downloaded, quoted, or cited in the answer/report, leave a durable tracked reference note or source packet with URL/DOI, access date, claim used, limitation, and artifact location; do not rely on transient browser context as the only record.
+1. Read this owner. Consult [agents/workflows/workflow-references.md](../workflows/workflow-references.md) only when a repo-wide external-rule bibliography is needed.
+1. Before external lookup, reuse or update any existing record for the source or claim. Select the search scope and source mix from the question; prefer primary and official sources when available, and seek contrary or scope-limiting evidence when it could change the conclusion.
+1. If a source informs the answer or artifact, leave a durable record with its identity, URL/DOI, access date, claim used, limitation, and artifact location. Keep search logs and exclusion reasons when they are needed to explain a consequential selection.
+1. Use prose-graph findings as search candidates when a handoff supplies them; they do not themselves establish a citation gap.

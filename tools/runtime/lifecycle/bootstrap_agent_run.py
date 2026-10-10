@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Bootstraps agent run artifacts for agent workflows.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Bootstrap a persistent agent-team run directory."""
@@ -110,6 +110,11 @@ from tools.agent.orchestration.agent_team import (
     PreparedRunBundle,
     dispatch_issue_worker,
     prepare_run_bundle,
+)
+from tools.agent.orchestration.workflow_context import (
+    StoreResult,
+    context_from_workflows,
+    store_workflow_context,
 )
 
 from tools.repository.workspace.workspace_scope import (
@@ -464,7 +469,9 @@ def resolve_bootstrap_context(
         args.task_id,
         workflow_family_id,
         args.task,
-        source_root=(repository_roots.agentcanon_source_root if repository_roots else None),
+        source_root=(
+            repository_roots.agentcanon_source_root if repository_roots else None
+        ),
         issue_worker_candidate=issue_worker_candidate,
     )
     math_route = mathematical_intent_route_for_task(
@@ -629,8 +636,7 @@ def emit_bootstrap_output(
         print(f"WORKFLOW_ACTIVE_SPAWN_BUDGET={context.workflow_active_spawn_budget}")
         print(f"WORKFLOW_MAX_WRITE_SUBAGENTS={context.workflow_max_write_subagents}")
         print(
-            "ADVERSARIAL_REQUIRED="
-            + ("yes" if context.adversarial_required else "no")
+            "ADVERSARIAL_REQUIRED=" + ("yes" if context.adversarial_required else "no")
         )
         print("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no")
         print("DYNAMIC_SUBAGENT_EXPANSION=allowed")
@@ -789,8 +795,7 @@ def emit_bootstrap_output(
         print(line)
     if not args.no_language_review_candidates:
         print(
-            "LANGUAGE_REVIEW_CANDIDATES="
-            f"{','.join(context.language_review_candidates)}"
+            f"LANGUAGE_REVIEW_CANDIDATES={','.join(context.language_review_candidates)}"
         )
     print(
         "IMPLEMENTATION_CODEX_AGENTS="
@@ -802,8 +807,7 @@ def emit_bootstrap_output(
     print("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending")
     print(
         "IMPLEMENTATION_SURFACE_ROUTE_COMMAND="
-        +
-        public_command_for_layout(
+        + public_command_for_layout(
             "python3 tools/analysis/search/search.py "
             "--query-file <request-or-design-question.txt> "
             "--providers text,semantic,vector,tool,header-deps,code-deps "
@@ -815,8 +819,7 @@ def emit_bootstrap_output(
     print("PRE_EDIT_REJECTION_PREDICTION_STATUS=optional_diagnostic")
     print(
         "PRE_EDIT_REJECTION_COMMAND="
-        +
-        public_command_for_layout(
+        + public_command_for_layout(
             "python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>",
             public_layout,
         )
@@ -831,8 +834,7 @@ def emit_bootstrap_output(
     )
     print(
         "AGENT_REPORT_ARCHIVE_RUN_COMMAND="
-        +
-        public_command_for_layout(
+        + public_command_for_layout(
             f"python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir {context.report_dir}",
             public_layout,
         )
@@ -943,7 +945,11 @@ def publish_prepared_run(
         pointer_baseline: _read_optional_bytes(pointer_baseline),
         authority_baseline: _read_optional_bytes(authority_baseline),
     }
-    prior_children = {child.name for child in report_root.iterdir()} if report_root.is_dir() else set()
+    prior_children = (
+        {child.name for child in report_root.iterdir()}
+        if report_root.is_dir()
+        else set()
+    )
     stage_dir: Path | None = None
     moved = False
     try:
@@ -966,7 +972,9 @@ def publish_prepared_run(
         moved = True
         pointer_bytes = (str(final_run.resolve()) + "\n").encode("utf-8")
         boundary.atomic_write_bytes(pointer, pointer_bytes)
-        boundary.atomic_write_bytes(pointer_baseline, hash_baseline_bytes(pointer_bytes))
+        boundary.atomic_write_bytes(
+            pointer_baseline, hash_baseline_bytes(pointer_bytes)
+        )
         authority_path = final_run / AUTHORITY_FILE_NAME
         if authority_path.is_file():
             boundary.atomic_write_bytes(
@@ -989,8 +997,10 @@ def publish_prepared_run(
             raise RuntimeError("bootstrap_pointer_readback_failed")
         if pointer_baseline.read_bytes() != hash_baseline_bytes(pointer_bytes):
             raise RuntimeError("bootstrap_pointer_baseline_readback_failed")
-        if authority_path.is_file() and authority_baseline.read_bytes() != hash_baseline_bytes(
-            authority_path.read_bytes()
+        if (
+            authority_path.is_file()
+            and authority_baseline.read_bytes()
+            != hash_baseline_bytes(authority_path.read_bytes())
         ):
             raise RuntimeError("bootstrap_authority_baseline_readback_failed")
         return prepared.created_files
@@ -1008,7 +1018,11 @@ def publish_prepared_run(
                     prior,
                     "bootstrap-publish-rollback",
                 )
-            observed_children = {child.name for child in report_root.iterdir()} if report_root.is_dir() else set()
+            observed_children = (
+                {child.name for child in report_root.iterdir()}
+                if report_root.is_dir()
+                else set()
+            )
             if observed_children != prior_children:
                 raise RuntimeError(
                     f"child_delta:{sorted(observed_children ^ prior_children)}"
@@ -1069,7 +1083,9 @@ def main(
     except (RuntimeError, OSError) as exc:
         print(str(exc), flush=True)
         return 1
-    args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args(argv)
+    args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args(
+        argv
+    )
     try:
         issue_worker_candidate = parse_issue_worker_candidate(
             args.issue_worker_candidate
@@ -1177,34 +1193,34 @@ def main(
         issue_worker_candidate=context.issue_worker_candidate,
     )
     run_spec = RunBundleSpec(
-            config=config,
-            report_dir=context.report_dir,
-            run_id=context.run_id,
-            task=args.task,
-            owner=args.owner,
-            created_at_iso=context.created_at_iso,
-            roles=roles,
-            workspace_root=workspace_root,
-            agentcanon_source_root=repository_roots.agentcanon_source_root,
-            report_root=repository_roots.report_root,
-            repository_roots=repository_roots,
-            active_design_packet=explicit_active_design_packet,
-            workflow_family_id=context.workflow_family_id or "",
-            issue_worker_candidate=context.issue_worker_candidate,
-            issue_worker_dispatch=issue_worker_dispatch,
-            manual_specialists=context.manual_specialists,
-            task_default_specialists=context.task_default_specialists,
-            language_review_candidates=context.language_review_candidates,
-            default_review_packs_enabled=False,
-            default_review_pack_ids=context.default_review_pack_ids,
-            selected_skills=selected_skills,
-            task_catalog=catalog,
-            task_id=args.task_id,
-            math_intent_route=context.math_intent_route,
-            math_intent_packet=math_intent_packet,
-            agent_type_selections=agent_type_selections,
-            writer_targets=writer_targets,
-        )
+        config=config,
+        report_dir=context.report_dir,
+        run_id=context.run_id,
+        task=args.task,
+        owner=args.owner,
+        created_at_iso=context.created_at_iso,
+        roles=roles,
+        workspace_root=workspace_root,
+        agentcanon_source_root=repository_roots.agentcanon_source_root,
+        report_root=repository_roots.report_root,
+        repository_roots=repository_roots,
+        active_design_packet=explicit_active_design_packet,
+        workflow_family_id=context.workflow_family_id or "",
+        issue_worker_candidate=context.issue_worker_candidate,
+        issue_worker_dispatch=issue_worker_dispatch,
+        manual_specialists=context.manual_specialists,
+        task_default_specialists=context.task_default_specialists,
+        language_review_candidates=context.language_review_candidates,
+        default_review_packs_enabled=False,
+        default_review_pack_ids=context.default_review_pack_ids,
+        selected_skills=selected_skills,
+        task_catalog=catalog,
+        task_id=args.task_id,
+        math_intent_route=context.math_intent_route,
+        math_intent_packet=math_intent_packet,
+        agent_type_selections=agent_type_selections,
+        writer_targets=writer_targets,
+    )
     try:
         prepared = prepare_run_bundle(run_spec)
         active_design_packet = prepared.active_design_packet
@@ -1213,32 +1229,51 @@ def main(
         return 1
     active_pointer = context.report_root / ".active_run"
     review_roles = selected_review_roles(roles)
+    workflow_context_result: StoreResult | None = None
+
+    def post_move() -> None:
+        nonlocal workflow_context_result
+        if context.workflow_family_id is not None:
+            workflow_context_result = store_workflow_context(
+                context.report_dir / "skill_usage_context.json",
+                context_from_workflows(
+                    (context.workflow_family_id,), "bootstrap_agent_run.task_id"
+                ),
+            )
+        record_bootstrap_monitoring(
+            context,
+            roles,
+            selected_skills,
+            review_roles,
+            args.task,
+            repository_roots.agentcanon_source_root,
+        )
+
+    try:
+        publish_prepared_run(
+            run_spec,
+            prepared,
+            context.report_root,
+            post_move=post_move,
+        )
+    except (RuntimeError, OSError) as exc:
+        print(str(exc), flush=True)
+        return 1
+    created_files = prepared.created_files
+    if (
+        workflow_context_result is not None
+        and workflow_context_result.status == "stored"
+    ):
+        created_files = (*created_files, "skill_usage_context.json")
     runtime = BootstrapRuntime(
         roles=roles,
-        created_files=prepared.created_files,
+        created_files=created_files,
         active_pointer=active_pointer,
         agent_type_selections=agent_type_selections,
         active_design_packet=active_design_packet,
         math_intent_packet=math_intent_packet,
         issue_worker_dispatch=issue_worker_dispatch,
     )
-    try:
-        publish_prepared_run(
-            run_spec,
-            prepared,
-            context.report_root,
-            post_move=lambda: record_bootstrap_monitoring(
-                context,
-                roles,
-                selected_skills,
-                review_roles,
-                args.task,
-                repository_roots.agentcanon_source_root,
-            ),
-        )
-    except (RuntimeError, OSError) as exc:
-        print(str(exc), flush=True)
-        return 1
     emit_bootstrap_output(
         args=args,
         config=config,

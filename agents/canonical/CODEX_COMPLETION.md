@@ -50,10 +50,12 @@ become completion prerequisites.
 
 ## Bounded delivery
 
-For `bounded_fast_path`, finish `route -> execute -> verify_close` using the existing
-task/Issue or structured handoff. Record the exact diff, selected checks and review,
-current-main integration, authorized PR/publication readback, and task-owned cleanup
-that the request requires. Decide commit and push under
+For `bounded_fast_path`, use the existing task/Issue or structured handoff to
+carry the requested work and applicable completion evidence. Record the exact
+diff and selected checks; include an activated review only when one was selected.
+If the request includes base integration or publication, carry its current-base
+and authorized remote readback. Clean up only task-owned resources created by
+the selected operations. Decide commit and push under
 [delivery ownership](ROOT_DELIVERY.md#commit-and-push-decisions).
 
 The selected results are the evidence. This route creates no coordination run

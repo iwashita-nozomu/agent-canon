@@ -9,7 +9,6 @@ upstream design ../../responsibility-scope.toml machine-readable repo-local owne
 downstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
 upstream design ../../tools/catalog.yaml structured tool ownership
 downstream implementation ../../tools/validation/semantic/responsibility/responsibility_scope.py validates total single ownership
-downstream implementation ../../tools/analysis/code/import_responsibility.py validates local import ownership
 downstream implementation ../../tools/runtime/authority/task_authority.py owns protected external dependency authority
 downstream implementation ../../tools/validation/semantic/tools/tool_drift.py validates scope/tool trace links
 @dependency-end
@@ -23,7 +22,7 @@ own the responsibility map for template-derived repositories.
 ## Reader Map
 
 - Owns responsibility-scope owner classes, the total single-owner invariant,
-  import boundaries, tool contracts, issue/GitHub sync, and eval evidence.
+  tool contracts, issue/GitHub sync, and eval evidence.
 - Main path: Ownership Relation, Owner Classes, Tool Contract, Issue And GitHub
   Sync, and Eval Evidence.
 - Read this before changing responsibility-scope tooling, owner labels, or
@@ -65,12 +64,6 @@ Each scope declares:
 - `github_issues`: repository-qualified GitHub Issue URLs/numbers that currently
   drive or explain the scope.
 
-Each `[[import_rule]]` declares which local Python scope imports are allowed:
-
-- `source`: the responsibility scope of the importing file.
-- `targets`: responsibility scopes that the source scope may import when the
-  import resolves to a local repository file.
-
 ## Owner Classes
 
 - `agent-canon`: shared runtime, policy, tooling, memory, eval, and Issue routing
@@ -90,9 +83,8 @@ Each `[[import_rule]]` declares which local Python scope imports are allowed:
 `tools/validation/semantic/responsibility/responsibility_scope.py` validates the manifest. It scans the
 tracked path set once and fails when a tracked path has no owning scope or more
 than one owning scope after exclusions, a scope names a missing or uncataloged
-protecting tool, a GitHub Issue identity is malformed, or an `[[import_rule]]`
-points at an unknown scope. It does not require every glob to match and it does
-not check required path existence or kind.
+protecting tool, or a GitHub Issue identity is malformed. It does not require
+every glob to match and it does not check required path existence or kind.
 
 Use it before adding a new checker, hook, skill, workflow, issue family, or
 tracked top-level path:
@@ -101,17 +93,9 @@ tracked top-level path:
 python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .
 ```
 
-`tools/analysis/code/import_responsibility.py` uses the same manifest for code
-imports. It parses Python AST, flags unused imported aliases and wildcard
-imports, resolves local imports to files when possible, and rejects source-scope
-to target-scope crossings that are not present in `[[import_rule]]`. Because
-tracked paths have exactly one owning scope, import resolution consumes the same
-canonical relation instead of choosing among competing owner maps.
-
-```bash
-python3 tools/analysis/code/import_responsibility.py --root .
-python3 tools/analysis/code/import_responsibility.py --root . --changed
-```
+Ruff owns unused and wildcard-import diagnostics in the selected Python quality
+route. The responsibility-scope manifest remains a path-ownership relation and
+does not encode Python module dependencies.
 
 `tools/runtime/authority/task_authority.py` owns direct rewrite authority for vendored
 or installed library implementation files. External code changes must be a

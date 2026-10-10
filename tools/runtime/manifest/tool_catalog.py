@@ -2,15 +2,14 @@
 # @dependency-start
 # contract tool
 # responsibility Validates the structured AgentCanon tool catalog.
-# upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
-# upstream design ../../tools/README.md shared tool family ownership
-# upstream design ../../documents/tools/README.md root-facing tool entrypoint policy
-# upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
-# upstream implementation ./visualization_contract.py canonical typed visualization contract/checker
-# upstream design ../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
-# upstream implementation ./tool_path_policy.py defines retired legacy path policy
-# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs catalog validation
-# downstream implementation ../../tests/agent_tools/test_tool_catalog.py tests validator
+# upstream design ../../catalog.yaml structured AgentCanon tool catalog
+# upstream design ../../README.md shared tool family ownership
+# upstream design ../../../documents/tools/README.md root-facing tool entrypoint policy
+# upstream design ../../../documents/tools/tool-docs.toml one-to-one tool documentation map
+# upstream design ../../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
+# upstream implementation ../authority/tool_path_policy.py defines retired legacy path policy
+# downstream implementation ../../validation/ci/runners/run_all_checks.sh runs catalog validation
+# downstream implementation ../../../tests/agent_tools/test_tool_catalog.py tests validator
 # @dependency-end
 """Validate the structured AgentCanon tool catalog."""
 
@@ -66,9 +65,6 @@ CATALOG_DOCS = (
     TOOL_DOCS_PATH,
     "documents/tools/repo-local-tool-imports.md",
 )
-VISUALIZATION_CONTRACT_ID = "visualization-contract"
-VISUALIZATION_CONTRACT_PATH = "tools/validation/semantic/tools/visualization_contract.py"
-VISUALIZATION_CONTRACT_DOC = "documents/tools/visualization_contract.md"
 
 
 @dataclass(frozen=True)
@@ -160,7 +156,9 @@ def build_parser() -> argparse.ArgumentParser:
     """Create the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="Repository root. Defaults to cwd.")
-    parser.add_argument("--format", choices=("text", "json", "markdown"), default="text")
+    parser.add_argument(
+        "--format", choices=("text", "json", "markdown"), default="text"
+    )
     return parser
 
 
@@ -260,7 +258,9 @@ def entry_summary(entry: Mapping[str, object]) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-def catalog_row(entry: Mapping[str, object], family_defaults: Mapping[str, object]) -> CatalogRow:
+def catalog_row(
+    entry: Mapping[str, object], family_defaults: Mapping[str, object]
+) -> CatalogRow:
     """Convert one entry mapping into a report row."""
     wiring = as_mapping(entry.get("default_wiring")) or {}
     entry_id = entry.get("id")
@@ -330,7 +330,9 @@ def check_entry(
     elif placement not in placements:
         findings.append(Finding("entry", path, "invalid-placement"))
     if status == "compatibility_wrapper" and placement != "compatibility_wrapper":
-        findings.append(Finding("entry", path, "compatibility-wrapper-placement-required"))
+        findings.append(
+            Finding("entry", path, "compatibility-wrapper-placement-required")
+        )
     if not entry_summary(entry):
         findings.append(Finding("entry", path, "missing-summary"))
     if not target.exists():
@@ -386,14 +388,20 @@ def check_default_wiring(
     default_text = read_existing_text(root, ENTRY_WIRING_SOURCES)
     for path in sorted(referenced_tool_paths(root)):
         if path not in catalog_paths:
-            findings.append(Finding("default_wiring", path, "uncataloged-tool-reference"))
+            findings.append(
+                Finding("default_wiring", path, "uncataloged-tool-reference")
+            )
     for entry in entries:
         path = entry_path(entry)
         wiring = as_mapping(entry.get("default_wiring")) or {}
-        if not (bool_from_mapping(wiring, "ci") or bool_from_mapping(wiring, "pr_check")):
+        if not (
+            bool_from_mapping(wiring, "ci") or bool_from_mapping(wiring, "pr_check")
+        ):
             continue
         if path not in default_text and Path(path).name not in default_text:
-            findings.append(Finding("default_wiring", path, "wired-entry-not-referenced"))
+            findings.append(
+                Finding("default_wiring", path, "wired-entry-not-referenced")
+            )
     return findings
 
 
@@ -424,7 +432,9 @@ def load_tool_docs(root: Path) -> tuple[list[Mapping[str, object]], list[Finding
         return [], [Finding("tool_docs", TOOL_DOCS_PATH, "invalid-catalog-kind")]
     classifications = raw.get("classification_values")
     if set(string_list(classifications)) != TOOL_CLASSIFICATIONS:
-        findings.append(Finding("tool_docs", TOOL_DOCS_PATH, "invalid-classification-values"))
+        findings.append(
+            Finding("tool_docs", TOOL_DOCS_PATH, "invalid-classification-values")
+        )
     entries_raw = raw.get("tool")
     if not isinstance(entries_raw, list):
         findings.append(Finding("tool_docs", TOOL_DOCS_PATH, "missing-tool-list"))
@@ -434,7 +444,9 @@ def load_tool_docs(root: Path) -> tuple[list[Mapping[str, object]], list[Finding
     for entry in entries:
         mapping = as_mapping(entry)
         if mapping is None:
-            findings.append(Finding("tool_docs", TOOL_DOCS_PATH, "tool-entry-not-mapping"))
+            findings.append(
+                Finding("tool_docs", TOOL_DOCS_PATH, "tool-entry-not-mapping")
+            )
             continue
         result.append(mapping)
     return result, findings
@@ -460,10 +472,19 @@ def check_tool_docs_manifest(
         tool = doc_entry.get("tool")
         doc = doc_entry.get("doc")
         classification = doc_entry.get("classification")
-        if not isinstance(entry_id, str) or not isinstance(tool, str) or not isinstance(doc, str):
-            findings.append(Finding("tool_docs", TOOL_DOCS_PATH, "missing-id-tool-or-doc"))
+        if (
+            not isinstance(entry_id, str)
+            or not isinstance(tool, str)
+            or not isinstance(doc, str)
+        ):
+            findings.append(
+                Finding("tool_docs", TOOL_DOCS_PATH, "missing-id-tool-or-doc")
+            )
             continue
-        if not isinstance(classification, str) or classification not in TOOL_CLASSIFICATIONS:
+        if (
+            not isinstance(classification, str)
+            or classification not in TOOL_CLASSIFICATIONS
+        ):
             findings.append(Finding("tool_docs", tool, "invalid-classification"))
         elif classification == "public":
             documented_public_ids.add(entry_id)
@@ -476,7 +497,9 @@ def check_tool_docs_manifest(
         seen_docs.add(doc)
         catalog_entry = catalog_by_id.get(entry_id)
         if catalog_entry is None:
-            findings.append(Finding("tool_docs", tool, f"missing-catalog-id:{entry_id}"))
+            findings.append(
+                Finding("tool_docs", tool, f"missing-catalog-id:{entry_id}")
+            )
             continue
         if catalog_entry.get("path") != tool:
             findings.append(Finding("tool_docs", tool, "catalog-path-mismatch"))
@@ -530,70 +553,6 @@ def tool_doc_name_matches(tool: str, doc: str) -> bool:
     return tool_path.stem == doc_stem
 
 
-def check_visualization_contract_entry(
-    root: Path,
-    entries: Sequence[Mapping[str, object]],
-    family_defaults: Mapping[str, Mapping[str, object]],
-) -> list[Finding]:
-    """Require exactly one canonical skill-facing visualization contract tool."""
-    findings: list[Finding] = []
-    candidates = [
-        entry
-        for entry in entries
-        if entry.get("id") == VISUALIZATION_CONTRACT_ID
-        or entry.get("path") == VISUALIZATION_CONTRACT_PATH
-    ]
-    if not candidates and not resolve_repo_path(root, VISUALIZATION_CONTRACT_PATH).exists():
-        return findings
-    if len(candidates) != 1:
-        return [
-            Finding(
-                "visualization_contract",
-                CATALOG_PATH,
-                f"expected-one-canonical-entry:found-{len(candidates)}",
-            )
-        ]
-    entry = candidates[0]
-    family = entry.get("family")
-    defaults = family_defaults.get(family, {}) if isinstance(family, str) else {}
-    if entry.get("id") != VISUALIZATION_CONTRACT_ID:
-        findings.append(
-            Finding("visualization_contract", VISUALIZATION_CONTRACT_PATH, "invalid-id")
-        )
-    if entry.get("path") != VISUALIZATION_CONTRACT_PATH:
-        findings.append(
-            Finding("visualization_contract", VISUALIZATION_CONTRACT_PATH, "invalid-path")
-        )
-    if entry.get("status") != "canonical":
-        findings.append(
-            Finding("visualization_contract", VISUALIZATION_CONTRACT_PATH, "must-be-canonical")
-        )
-    if inherited_string(entry, defaults, "audience") != "skill":
-        findings.append(
-            Finding("visualization_contract", VISUALIZATION_CONTRACT_PATH, "audience-must-be-skill")
-        )
-    if inherited_string(entry, defaults, "placement") not in {
-        "support_library",
-        "validation_checker",
-    }:
-        findings.append(
-            Finding(
-                "visualization_contract",
-                VISUALIZATION_CONTRACT_PATH,
-                "invalid-placement",
-            )
-        )
-    if VISUALIZATION_CONTRACT_DOC not in string_list(entry.get("docs")):
-        findings.append(
-            Finding(
-                "visualization_contract",
-                VISUALIZATION_CONTRACT_PATH,
-                "missing-canonical-doc",
-            )
-        )
-    return findings
-
-
 def validate_catalog(root: Path) -> CatalogReport:
     """Run catalog validation."""
     root = root.resolve()
@@ -603,8 +562,7 @@ def validate_catalog(root: Path) -> CatalogReport:
 
     families_map = as_mapping(data.get("families")) or {}
     family_defaults = {
-        name: as_mapping(raw_family) or {}
-        for name, raw_family in families_map.items()
+        name: as_mapping(raw_family) or {} for name, raw_family in families_map.items()
     }
     families = set(families_map)
     statuses = allowed_values(data, "status_values")
@@ -650,7 +608,9 @@ def validate_catalog(root: Path) -> CatalogReport:
     for index, raw_entry in enumerate(entries_raw, start=1):
         entry = as_mapping(raw_entry)
         if entry is None:
-            findings.append(Finding("entry", CATALOG_PATH, f"entry-{index}-not-mapping"))
+            findings.append(
+                Finding("entry", CATALOG_PATH, f"entry-{index}-not-mapping")
+            )
             continue
         entries.append(entry)
         family = entry.get("family")
@@ -666,13 +626,14 @@ def validate_catalog(root: Path) -> CatalogReport:
             findings.append(Finding("entry", path, "duplicate-path"))
         paths.add(path)
         findings.extend(
-            check_entry(root, entry, families, statuses, roles, audiences, placements, defaults)
+            check_entry(
+                root, entry, families, statuses, roles, audiences, placements, defaults
+            )
         )
 
     findings.extend(check_default_wiring(root, entries))
     findings.extend(check_catalog_docs(root))
     findings.extend(check_tool_docs_manifest(root, entries))
-    findings.extend(check_visualization_contract_entry(root, entries, family_defaults))
     sorted_findings = sorted(
         findings,
         key=lambda finding: (finding.check, finding.path, finding.detail),
@@ -781,7 +742,9 @@ def rust_tokens(text: str) -> tuple[RustToken, ...]:
     return tuple(tokens)
 
 
-def token_sequence_matches(tokens: tuple[RustToken, ...], values: tuple[str, ...]) -> tuple[int, ...]:
+def token_sequence_matches(
+    tokens: tuple[RustToken, ...], values: tuple[str, ...]
+) -> tuple[int, ...]:
     """Return every exact token-sequence start."""
     return tuple(
         index
@@ -790,7 +753,9 @@ def token_sequence_matches(tokens: tuple[RustToken, ...], values: tuple[str, ...
     )
 
 
-def token_span(path: str, tokens: tuple[RustToken, ...], start: int, length: int) -> PublicSourceSpan:
+def token_span(
+    path: str, tokens: tuple[RustToken, ...], start: int, length: int
+) -> PublicSourceSpan:
     """Return the span covering one exact token sequence."""
     first = tokens[start]
     last = tokens[start + length - 1]
@@ -876,19 +841,58 @@ def extract_public_surface(root: Path) -> PublicSurfaceReport:
         main_tokens = rust_tokens(texts[main_path])
         graph_tokens = rust_tokens(texts[graph_path])
     except ValueError as error:
-        findings.append(Finding("public_surface", "rust-dispatch", f"rust_dispatch_invalid:{error}"))
+        findings.append(
+            Finding("public_surface", "rust-dispatch", f"rust_dispatch_invalid:{error}")
+        )
         return PublicSurfaceReport(PUBLIC_SURFACE_PRODUCER_VERSION, (), tuple(findings))
 
     mod_sequence = ("mod", "graph", ";")
     main_sequence = (
-        "if", "args", ".", "len", "(", ")", ">=", "2", "&&", "args", "[", "1", "]",
-        "==", '"graph"', "{", "std", "::", "process", "::", "exit", "(", "graph", "::", "run",
-        "(", "&", "args", "[", "2", "..", "]", ")", ")", ";", "}",
+        "if",
+        "args",
+        ".",
+        "len",
+        "(",
+        ")",
+        ">=",
+        "2",
+        "&&",
+        "args",
+        "[",
+        "1",
+        "]",
+        "==",
+        '"graph"',
+        "{",
+        "std",
+        "::",
+        "process",
+        "::",
+        "exit",
+        "(",
+        "graph",
+        "::",
+        "run",
+        "(",
+        "&",
+        "args",
+        "[",
+        "2",
+        "..",
+        "]",
+        ")",
+        ")",
+        ";",
+        "}",
     )
     mod_matches = token_sequence_matches(main_tokens, mod_sequence)
     main_matches = token_sequence_matches(main_tokens, main_sequence)
     if len(mod_matches) != 1 or len(main_matches) != 1:
-        detail = "rust_dispatch_ambiguous" if len(mod_matches) > 1 or len(main_matches) > 1 else "rust_dispatch_invalid"
+        detail = (
+            "rust_dispatch_ambiguous"
+            if len(mod_matches) > 1 or len(main_matches) > 1
+            else "rust_dispatch_invalid"
+        )
         findings.append(Finding("public_surface", main_path, detail))
         return PublicSurfaceReport(PUBLIC_SURFACE_PRODUCER_VERSION, (), tuple(findings))
     main_span = token_span(main_path, main_tokens, main_matches[0], len(main_sequence))
@@ -912,8 +916,14 @@ def extract_public_surface(root: Path) -> PublicSurfaceReport:
         matches = token_sequence_matches(graph_tokens, sequence)
         doc_span = text_phrase_span(cli_path, texts[cli_path], f"graph {operation}")
         if len(matches) != 1 or doc_span is None:
-            detail = "rust_dispatch_ambiguous" if len(matches) > 1 else "rust_dispatch_invalid"
-            findings.append(Finding("public_surface", graph_path, f"{detail}:{operation}"))
+            detail = (
+                "rust_dispatch_ambiguous"
+                if len(matches) > 1
+                else "rust_dispatch_invalid"
+            )
+            findings.append(
+                Finding("public_surface", graph_path, f"{detail}:{operation}")
+            )
             continue
         rows.append(
             PublicSurfaceRow(
@@ -921,8 +931,19 @@ def extract_public_surface(root: Path) -> PublicSurfaceReport:
                 kind="cli",
                 path=graph_path,
                 selector=f"graph {operation}",
-                source_span=token_span(graph_path, graph_tokens, matches[0], len(sequence)),
-                secondary_spans=tuple(sorted((main_span, doc_span), key=lambda item: (item.path, item.start_line, item.start_column))),
+                source_span=token_span(
+                    graph_path, graph_tokens, matches[0], len(sequence)
+                ),
+                secondary_spans=tuple(
+                    sorted(
+                        (main_span, doc_span),
+                        key=lambda item: (
+                            item.path,
+                            item.start_line,
+                            item.start_column,
+                        ),
+                    )
+                ),
             )
         )
 
@@ -942,11 +963,17 @@ def extract_public_surface(root: Path) -> PublicSurfaceReport:
             identifier = cast(str, entry["id"])
             span = tool_spans.get(identifier)
             if span is None:
-                findings.append(Finding("public_surface", tool_path, f"span-missing:{identifier}"))
+                findings.append(
+                    Finding("public_surface", tool_path, f"span-missing:{identifier}")
+                )
                 continue
             command = entry.get("command")
             selector = command if isinstance(command, str) else identifier
-            rows.append(PublicSurfaceRow(f"tool:{identifier}", "tool", span.path, selector, span, ()))
+            rows.append(
+                PublicSurfaceRow(
+                    f"tool:{identifier}", "tool", span.path, selector, span, ()
+                )
+            )
     if skill_path in texts:
         raw_skills = yaml.safe_load(texts[skill_path])
         skill_mapping = as_mapping(raw_skills) or {}
@@ -959,14 +986,33 @@ def extract_public_surface(root: Path) -> PublicSurfaceReport:
             identifier = cast(str, entry["id"])
             span = skill_spans.get(identifier)
             if span is None:
-                findings.append(Finding("public_surface", skill_path, f"span-missing:{identifier}"))
+                findings.append(
+                    Finding("public_surface", skill_path, f"span-missing:{identifier}")
+                )
                 continue
-            rows.append(PublicSurfaceRow(f"skill:{identifier}", "skill", span.path, identifier, span, ()))
-    rows.sort(key=lambda row: (row.kind, row.surface_id, row.source_span.path, row.source_span.start_line))
+            rows.append(
+                PublicSurfaceRow(
+                    f"skill:{identifier}", "skill", span.path, identifier, span, ()
+                )
+            )
+    rows.sort(
+        key=lambda row: (
+            row.kind,
+            row.surface_id,
+            row.source_span.path,
+            row.source_span.start_line,
+        )
+    )
     seen: set[str] = set()
     for row in rows:
         if row.surface_id in seen:
-            findings.append(Finding("public_surface", row.source_span.path, f"surface-id-duplicate:{row.surface_id}"))
+            findings.append(
+                Finding(
+                    "public_surface",
+                    row.source_span.path,
+                    f"surface-id-duplicate:{row.surface_id}",
+                )
+            )
         seen.add(row.surface_id)
     return PublicSurfaceReport(
         PUBLIC_SURFACE_PRODUCER_VERSION,
@@ -975,7 +1021,9 @@ def extract_public_surface(root: Path) -> PublicSurfaceReport:
     )
 
 
-def render_json(report: CatalogReport, public: PublicSurfaceReport | None = None) -> str:
+def render_json(
+    report: CatalogReport, public: PublicSurfaceReport | None = None
+) -> str:
     """Render JSON output."""
     catalog = {
         "status": "pass" if not report.findings else "fail",
@@ -1038,11 +1086,14 @@ def render_markdown(report: CatalogReport) -> str:
         ]
     )
     for entry in report.entries:
-        default = ",".join(
-            label
-            for label, enabled in (("ci", entry.ci), ("pr", entry.pr_check))
-            if enabled
-        ) or "-"
+        default = (
+            ",".join(
+                label
+                for label, enabled in (("ci", entry.ci), ("pr", entry.pr_check))
+                if enabled
+            )
+            or "-"
+        )
         lines.append(
             "| "
             f"`{markdown_cell(entry.tool_id)}` | "

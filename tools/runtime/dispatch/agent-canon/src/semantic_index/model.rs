@@ -39,9 +39,7 @@ pub(super) struct ScoredNode {
 
 pub(super) fn responsibility_scope_bucket(path: &str) -> &'static str {
     let normalized = path.replace('\\', "/");
-    if normalized.starts_with("eval/")
-        || normalized.starts_with("agents/evals/results/")
-    {
+    if normalized.starts_with("eval/") || normalized.starts_with("agents/evals/results/") {
         return "eval-and-hook-evidence";
     }
     if normalized.starts_with("tests/") {

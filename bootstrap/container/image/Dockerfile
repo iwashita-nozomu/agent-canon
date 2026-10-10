@@ -1,10 +1,10 @@
 # @dependency-start
 # contract environment
 # responsibility Defines the stable shared AgentCanon Python, Rust, LSP, and native diagnostic environment image.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
 # upstream design ../../../documents/design/cpp-debugging.md native diagnostic provisioning and execution boundary
 # upstream design ../../../documents/design/runtime-debugging.md system and Python diagnostic selection
-# upstream implementation ../../tools/runtime/container/compile.sh source-mounted Rust compilation
+# upstream implementation ../../../tools/runtime/container/compile.sh source-mounted Rust compilation
 # downstream implementation ../lifecycle/entrypoint.sh resident liveness and dispatch
 # @dependency-end
 

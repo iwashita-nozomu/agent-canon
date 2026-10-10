@@ -2,7 +2,7 @@
 name: structure-refactor
 description: "Use when repository structure review, repo-refactor requests, expected AgentCanon layout, directory responsibilities, canonical README ownership, path layout, root views, project .codex/.agents views, personal ~/.codex runtime boundaries, or responsibility-scope maps must be reviewed, repaired, or refactored using structure contracts, recursive directory README analysis, source/view ownership checks, stale-surface sweeps, dependency manifests, and behavior-preserving move/rename gates."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"585b585f5d347257c33c09cef10d7cff83628c0a226f45d088b972dab06dd07c"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f2809be8a135688c840d1e530da39bc5431622111cb611fb0d7f7c9e8fed8497"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/structure-refactor.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [structure-refactor](../../../../agents/skills/structure-refactor.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill structure-refactor --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

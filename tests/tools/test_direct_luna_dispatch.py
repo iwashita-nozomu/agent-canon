@@ -38,7 +38,7 @@ def test_packet_keeps_role_skill_profile_and_authority_independent() -> None:
     assert packet.authority == "read-only"
     assert packet.fork_turns == "none"
     serialized = json.loads(packet.to_json())
-    assert serialized["model"] == "gpt-5.6-luna"
+    assert serialized["model"] == "gpt-6-luna"
     assert "reuse_survey" not in serialized
 
 

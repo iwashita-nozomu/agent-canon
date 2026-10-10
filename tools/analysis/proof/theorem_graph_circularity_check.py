@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Checks proposition-graph circularity for formal-proof theorem routes.
-# upstream design ../../agents/skills/formal-proof-workflow.md requires graph-based circularity checks.
-# upstream design ../../agents/skills/algorithm-proof-exploration.md separates projection evidence from convergence evidence.
+# upstream design ../../../agents/skills/formal-proof-workflow.md requires graph-based circularity checks.
+# upstream design ../../../agents/skills/algorithm-proof-exploration.md separates projection evidence from convergence evidence.
 # @dependency-end
 
 """Check theorem dependency graphs for circularity and proof-leaf origins.

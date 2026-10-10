@@ -29,7 +29,7 @@ downstream design ./object-oriented-design.md general OOP policy for Python clas
 | 5 | 配置と責務を決める | [09_file_roles.md](python/09_file_roles.md) |
 | 6 | 名前を確定する | [11_naming.md](python/11_naming.md) |
 | 7 | 数値リテラルの由来を確認 | [基本方針](common/01_principles.md#数値ハードコード検証) |
-| 8 | `pyright` と `pytest` を通す | [07_type_checker.md](python/07_type_checker.md), [coding-conventions-testing.md](./coding-conventions-testing.md) |
+| 8 | `basedpyright` と `pytest` を通す | [07_type_checker.md](python/07_type_checker.md), [coding-conventions-testing.md](./coding-conventions-testing.md) |
 
 ## よくある間違い
 
@@ -83,13 +83,9 @@ Docstring の意味契約へ混ぜません。
 
 ## Import と責務境界
 
-- 未使用 import、wildcard import、責務外 local import は変更に残しません。
-- 追加した import が local file に解決できる場合は、repo top-level
-  `responsibility-scope.toml` の `[[import_rule]]` に沿う必要があります。
-- 既存 scope を越える import が必要な場合は、先に設計上の依存方向を確認し、
-  scope rule を更新するか、薄い adapter を既存責務側へ置きます。
-- `python3 tools/analysis/code/import_responsibility.py --changed` を
-  `ruff F401` より前の軽量 gate として使い、tool rejection を実装前に予測します。
+- 未使用 import と wildcard import は Ruff の `F401`、`F403`、`F405`、`F406` で検出します。
+- `responsibility-scope.toml` は tracked path の所有権を定めます。Python module 間の依存規約は定義しません。
+- module boundary の設計が変更される場合は、変更対象 package の実際の契約 owner と caller evidence を確認します。
 
 ## Library と helper-first の禁止
 
@@ -156,10 +152,10 @@ Markdown / JSON report の SOLID principle signal counts、OOP dimension、findi
 
 ## Python ファイル修正後
 
-- `python3 tools/validation/semantic/code/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports`
-- `python3 -m pyright`
+- `ruff check --config tools/validation/code/config/ruff-magic-values.toml --select PLR2004 python`
+- `basedpyright --project tools/validation/code/config/basedpyright-explicit-any.json python tests`
 - `python3 -m pytest tests/ -q --tb=short`
-- `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`
+- `ruff check --config tools/validation/code/config/ruff-docstrings.toml python tests --select D,E,F,I,UP --ignore E501`
 
 ## Markdown ファイル修正後
 

@@ -6,7 +6,7 @@
 # upstream design ../../documents/runtime/runtime-log-archive.md eval and hook result storage contract
 # upstream design ../../references/README.md external-source capture and Markdown retention contract
 # upstream implementation ./generate_agent_improvement_guide.py summarizes hook, private knowledge/feedback, eval, and Issue evidence
-# upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted archive result paths
 # downstream implementation ../../.github/workflows/agent-runtime-dashboard.yml publishes standalone AgentCanon dashboards
 # downstream implementation ../../tests/agent_tools/test_generate_agent_runtime_dashboard.py tests dashboard rendering
 # @dependency-end
@@ -47,7 +47,10 @@ from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
 )
 from tools.runtime.archive.runtime_log_paths import eval_result_search_dirs  # noqa: E402
 from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)  # noqa: E402
 from tools.repository.github.issue_sync import (  # noqa: E402
     IssueSyncError,
     IssueWorkerHandoff,
@@ -208,7 +211,6 @@ PROMPT_TOOL_EVIDENCE_TARGET = "compact report Markdown And Prompt Drilldown"
 REFERENCE_CAPTURE_EVIDENCE_TARGET = "compact report Reference Capture Drilldown"
 WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET = "compact report Workflow Attribution Drilldown"
 TOKEN_USAGE_EVIDENCE_TARGET = "compact report Token Consumption Drilldown"
-SKILL_EVAL_EVIDENCE_TARGET = "compact report Skill Eval Failure Drilldown"
 WAVE_EXECUTION_EVIDENCE_TARGET = "compact report Wave And Subagent Execution Drilldown"
 SELECTION_RESPONSIBILITIES = ("skill", "workflow", "tool")
 DASHBOARD_TOOL_ROUTE = (
@@ -252,18 +254,6 @@ class ResultFamilySummary:
 
 
 @dataclass(frozen=True)
-class SkillEvalBreakdown:
-    """Per-skill eval failure attribution inferred from accumulated reports."""
-
-    evaluated: Counter[str]
-    failed: Counter[str]
-    active_failed: Counter[str]
-    resolved_failed: Counter[str]
-    reports_missing_used_skills: int
-    failed_reports_missing_used_skills: int
-
-
-@dataclass(frozen=True)
 class HookWorkflowBreakdown:
     """Workflow attribution inferred from hook JSONL entries."""
 
@@ -283,7 +273,9 @@ class HookWorkflowBreakdown:
         """Return owner/context/missing counts without duplicating state."""
         return Counter(
             {
-                "owner": max(self.entries_with_workflow - self.context_attributed_entries, 0),
+                "owner": max(
+                    self.entries_with_workflow - self.context_attributed_entries, 0
+                ),
                 "context": self.context_attributed_entries,
                 "missing": self.entries_without_workflow,
             }
@@ -367,10 +359,8 @@ class PromptToolBreakdown:
 
 @dataclass(frozen=True)
 class MarkdownDocsBreakdown:
-    """Markdown/docs hook and eval signals inferred from accumulated evidence."""
+    """Markdown/docs hook signals inferred from accumulated evidence."""
 
-    eval_reports: int
-    failed_eval_reports: int
     candidate_skill_entries: int
     candidate_tool_entries: int
     candidate_tools: Counter[str]
@@ -493,7 +483,6 @@ class RuntimeDashboardSummary:
     hook_files: tuple[Path, ...]
     hook_entries: int
     result_families: tuple[ResultFamilySummary, ...]
-    skill_eval_breakdown: SkillEvalBreakdown
     hook_workflow_breakdown: HookWorkflowBreakdown
     token_usage_breakdown: TokenUsageBreakdown
     wave_execution_breakdown: WaveExecutionBreakdown
@@ -569,59 +558,6 @@ class ResultFamilyReader:
         return match.group(1) if match else "unknown"
 
 
-class SkillEvalBreakdownReader:
-    """Reads per-skill eval attribution from skill prompt eval reports."""
-
-    USED_SKILLS_RE = re.compile(r"^- used_skills:\s*`([^`]*)`", re.MULTILINE)
-
-    @classmethod
-    def read(cls, family: ResultFamilySummary) -> SkillEvalBreakdown:
-        """Return per-skill pass/fail attribution from one result family."""
-        evaluated: Counter[str] = Counter()
-        failed: Counter[str] = Counter()
-        latest_status: dict[str, str] = {}
-        missing = 0
-        failed_missing = 0
-        for report in family.reports:
-            status = ResultFamilyReader.report_status(report)
-            skills = cls.used_skills(report)
-            if not skills:
-                missing += 1
-                failed_missing += int(status == "fail")
-                continue
-            for skill in skills:
-                evaluated[skill] += 1
-                latest_status[skill] = status
-                if status == "fail":
-                    failed[skill] += 1
-        active_failed = Counter(
-            {skill: 1 for skill, status in latest_status.items() if status == "fail"}
-        )
-        resolved_failed = Counter(
-            {
-                skill: count
-                for skill, count in failed.items()
-                if latest_status.get(skill) not in {"fail", None}
-            }
-        )
-        return SkillEvalBreakdown(
-            evaluated=evaluated,
-            failed=failed,
-            active_failed=active_failed,
-            resolved_failed=resolved_failed,
-            reports_missing_used_skills=missing,
-            failed_reports_missing_used_skills=failed_missing,
-        )
-
-    @classmethod
-    def used_skills(cls, report: Path) -> tuple[str, ...]:
-        """Return used skills recorded in one eval report."""
-        match = cls.USED_SKILLS_RE.search(report.read_text(encoding="utf-8"))
-        if match is None:
-            return ()
-        return tuple(skill.strip() for skill in match.group(1).split(",") if skill.strip())
-
-
 class HookWorkflowBreakdownReader:
     """Reads workflow attribution from accumulated hook JSONL entries."""
 
@@ -663,7 +599,11 @@ class HookWorkflowBreakdownReader:
                 entries_without_workflow += 1
                 missing_by_file[relative_path_label(hook_file, root)] += 1
                 missing_events[
-                    str(entry.get("hook_event_name") or entry.get("event") or "missing_event")
+                    str(
+                        entry.get("hook_event_name")
+                        or entry.get("event")
+                        or "missing_event"
+                    )
                 ] += 1
                 missing_namespaces[namespace] += 1
                 missing_statuses[str(entry.get("status") or "missing_status")] += 1
@@ -674,7 +614,9 @@ class HookWorkflowBreakdownReader:
                     missing_tools[tool_name] += 1
                 continue
             entries_with_workflow += 1
-            event = str(entry.get("hook_event_name") or entry.get("event") or "missing_event")
+            event = str(
+                entry.get("hook_event_name") or entry.get("event") or "missing_event"
+            )
             for name in attributed_names:
                 workflows[name] += 1
                 workflow_events[f"{name}@{event}"] += 1
@@ -733,7 +675,9 @@ class HookWorkflowBreakdownReader:
                 continue
             if isinstance(value, dict):
                 entry = cast(dict[str, object], value)
-                if hook_entry_inside_recent_window(entry, hook_file, recent_cutoff_epoch):
+                if hook_entry_inside_recent_window(
+                    entry, hook_file, recent_cutoff_epoch
+                ):
                     entries.append(entry)
         return tuple(entries)
 
@@ -756,7 +700,11 @@ class HookWorkflowBreakdownReader:
         if entry.get("schema") == CANONICAL_BEHAVIOR_EVENT_SCHEMA:
             kind = str(entry.get("workflow_attribution_kind") or "")
             kind = kind if kind in WORKFLOW_ATTRIBUTION_KINDS else "missing"
-            field = "workflow_owner_workflows" if kind == "owner" else "workflow_context_workflows"
+            field = (
+                "workflow_owner_workflows"
+                if kind == "owner"
+                else "workflow_context_workflows"
+            )
             return kind, normalized_text_values(entry.get(field)), kind == "context"
         names = cls.workflow_names(entry)
         if names:
@@ -806,7 +754,13 @@ class TokenUsageBreakdownReader:
             objective_not_selected = objective_not_selected or not_selected
             if comparisons:
                 files.add(path)
-                base, candidate, base_counts, candidate_counts_for_file, ratios_for_file = cls.comparison_totals(comparisons)
+                (
+                    base,
+                    candidate,
+                    base_counts,
+                    candidate_counts_for_file,
+                    ratios_for_file,
+                ) = cls.comparison_totals(comparisons)
                 baseline_total += base
                 candidate_total += candidate
                 baseline_counts.extend(base_counts)
@@ -816,7 +770,9 @@ class TokenUsageBreakdownReader:
                     TimedIntMetric(epoch, item[1]) for item in comparisons if epoch > 0
                 )
                 timed_ratios.extend(
-                    TimedFloatMetric(epoch, item[2]) for item in comparisons if epoch > 0
+                    TimedFloatMetric(epoch, item[2])
+                    for item in comparisons
+                    if epoch > 0
                 )
             if summaries:
                 summary_files.add(path)
@@ -843,7 +799,9 @@ class TokenUsageBreakdownReader:
             latest_moving_average_total=latest_moving_average_total,
             average_tokens_per_event=average_tokens_per_event,
             timed_candidate_token_counts=tuple(
-                sorted(timed_candidate_counts, key=lambda observation: observation.epoch)
+                sorted(
+                    timed_candidate_counts, key=lambda observation: observation.epoch
+                )
             ),
             timed_token_ratios=tuple(
                 sorted(timed_ratios, key=lambda observation: observation.epoch)
@@ -893,7 +851,9 @@ class TokenUsageBreakdownReader:
         roots = (Path(runtime_root),) if runtime_root is not None else (root,)
         for evidence_root in roots:
             for pattern in patterns:
-                paths.update(path for path in evidence_root.glob(pattern) if path.is_file())
+                paths.update(
+                    path for path in evidence_root.glob(pattern) if path.is_file()
+                )
         return tuple(sorted(paths))
 
     @staticmethod
@@ -967,7 +927,9 @@ class WaveExecutionBreakdownReader:
         for workflow_path in cls.candidate_paths(root, runtime_root):
             text = workflow_path.read_text(encoding="utf-8")
             epoch = TokenUsageBreakdownReader.evidence_epoch(workflow_path, text)
-            if not evidence_inside_recent_window(workflow_path, epoch, recent_cutoff_epoch):
+            if not evidence_inside_recent_window(
+                workflow_path, epoch, recent_cutoff_epoch
+            ):
                 continue
             actual_rows = actual_wave_event_fields(text)
             planned_ids = cls.planned_wave_ids(workflow_path)
@@ -997,7 +959,9 @@ class WaveExecutionBreakdownReader:
                 blocked_event_count += int(
                     "blocked" in status or "required" in authority
                 )
-                completed_event_count += int(status in {"done", "complete", "completed"})
+                completed_event_count += int(
+                    status in {"done", "complete", "completed"}
+                )
         return WaveExecutionBreakdown(
             report_files=tuple(sorted(report_files)),
             planned_wave_count=planned_wave_count,
@@ -1028,7 +992,9 @@ class WaveExecutionBreakdownReader:
         roots = (Path(runtime_root),) if runtime_root is not None else (root,)
         for evidence_root in roots:
             for pattern in patterns:
-                paths.update(path for path in evidence_root.glob(pattern) if path.is_file())
+                paths.update(
+                    path for path in evidence_root.glob(pattern) if path.is_file()
+                )
         return tuple(sorted(paths))
 
     @staticmethod
@@ -1198,7 +1164,9 @@ class SelectionMetricsReader:
             entries_seen += 1
             entries_with_selection += int(any(selected.values()))
             entries_with_candidates += int(any(candidates.values()))
-            filtered_observations += self.add_selected_components(store, selected, entry_epoch)
+            filtered_observations += self.add_selected_components(
+                store, selected, entry_epoch
+            )
             filtered_observations += self.add_candidate_components(
                 store,
                 candidates,
@@ -1208,8 +1176,16 @@ class SelectionMetricsReader:
                 namespace,
                 sequence,
             )
-        for _sequence, entry_epoch, _namespace, selected, _candidates in workflow_events:
-            filtered_observations += self.add_selected_components(store, selected, entry_epoch)
+        for (
+            _sequence,
+            entry_epoch,
+            _namespace,
+            selected,
+            _candidates,
+        ) in workflow_events:
+            filtered_observations += self.add_selected_components(
+                store, selected, entry_epoch
+            )
         return SelectionMetricsBreakdown(
             metrics=store.to_metrics(),
             entries_seen=entries_seen,
@@ -1308,7 +1284,9 @@ class SelectionMetricsReader:
         return filtered
 
 
-def issue_worker_candidate_records(entry: Mapping[str, object]) -> tuple[Mapping[str, object], ...]:
+def issue_worker_candidate_records(
+    entry: Mapping[str, object],
+) -> tuple[Mapping[str, object], ...]:
     """Return explicit IssueWorker candidate records from one hook event.
 
     Dashboard collection never infers a finding from counts or selection
@@ -1349,7 +1327,9 @@ def _receipt_strings(value: object) -> tuple[str, ...]:
     """Return non-empty string values from one receipt list field."""
     if not isinstance(value, list):
         return ()
-    return tuple(item.strip() for item in value if isinstance(item, str) and item.strip())
+    return tuple(
+        item.strip() for item in value if isinstance(item, str) and item.strip()
+    )
 
 
 def read_issue_publication_receipts(
@@ -1386,9 +1366,7 @@ def read_issue_publication_receipts(
             except ValueError:
                 continue
             if any(
-                parent.is_symlink()
-                for parent in path.parents
-                if parent != published
+                parent.is_symlink() for parent in path.parents if parent != published
             ):
                 continue
             if len(relative.parts) != 3:
@@ -1438,12 +1416,16 @@ def read_issue_publication_receipts(
                 state=state,
                 action=action,
                 responsibility=_receipt_strings(value.get("responsibility")),
-                occurrence_locations=_receipt_strings(value.get("occurrence_locations")),
+                occurrence_locations=_receipt_strings(
+                    value.get("occurrence_locations")
+                ),
                 source_finding_kind=str(value.get("source_finding_kind") or ""),
                 timestamp=str(value.get("timestamp") or ""),
             )
             receipts[(repository, number)] = receipt
-    return tuple(sorted(receipts.values(), key=lambda item: (item.repository, int(item.number))))
+    return tuple(
+        sorted(receipts.values(), key=lambda item: (item.repository, int(item.number)))
+    )
 
 
 def read_issue_worker_handoffs(
@@ -1487,27 +1469,21 @@ class RuntimeDashboardVisuals:
         return [
             "```mermaid",
             "flowchart LR",
-            f"  Hooks[\"Hook JSONL<br/>files: {len(summary.hook_files)}<br/>entries: {summary.hook_entries}\"]",
-            f"  SkillEval[\"Skill prompt evals<br/>reports: {family_count(summary, 'skill-workflow-prompt')}\"]",
-            f"  SkillFailures[\"Skill failure attribution<br/>active failed skills: {len(summary.skill_eval_breakdown.active_failed)}\"]",
-            f"  WorkflowHooks[\"Workflow hook attribution<br/>attributed: {summary.hook_workflow_breakdown.entries_with_workflow}<br/>missing: {summary.hook_workflow_breakdown.entries_without_workflow}\"]",
-            f"  Tokens[\"Token consumption<br/>comparisons: {summary.token_usage_breakdown.comparison_count}<br/>summaries: {summary.token_usage_breakdown.summary_count}\"]",
-            f"  Waves[\"Wave execution<br/>events: {summary.wave_execution_breakdown.actual_wave_event_count}<br/>blocked: {summary.wave_execution_breakdown.blocked_event_count}\"]",
-            f"  PromptTools[\"Prompt + tool selection<br/>prompts: {summary.prompt_tool_breakdown.prompt_entries}<br/>tools: {summary.prompt_tool_breakdown.tool_selection_entries}\"]",
-            f"  Selection[\"Selection accuracy<br/>items: {len(summary.selection_metrics_breakdown.metrics)}<br/>misses: {selection_missed_total(summary)}\"]",
-            f"  MarkdownDocs[\"Markdown/docs signals<br/>eval fails: {summary.markdown_docs_breakdown.failed_eval_reports}<br/>hook signals: {markdown_hook_signal_count(summary)}\"]",
-            f"  ReferenceCapture[\"Reference capture<br/>urls: {summary.reference_capture_breakdown.url_observations}<br/>missing: {summary.reference_capture_breakdown.missing_url_observations}\"]",
-            f"  WorkflowEval[\"Workflow selection evals<br/>reports: {family_count(summary, 'workflow-selection')}\"]",
-            f"  ReportEval[\"Report quality evals<br/>reports: {family_count(summary, 'report-quality')}\"]",
-            f"  RoleEval[\"Codex role evals<br/>reports: {family_count(summary, 'codex-agent-role')}\"]",
-            f"  Issues[\"GitHub Issues<br/>refs: {len(summary.evidence.github_issue_refs)}\"]",
-            "  Dashboard[\"Runtime dashboard<br/>read-only view\"]",
-            "  Guide[\"Improvement guide<br/>next repair targets\"]",
-            "  Reviewer[\"Human / PR reviewer<br/>summary + artifacts\"]",
+            f'  Hooks["Hook JSONL<br/>files: {len(summary.hook_files)}<br/>entries: {summary.hook_entries}"]',
+            f'  WorkflowHooks["Workflow hook attribution<br/>attributed: {summary.hook_workflow_breakdown.entries_with_workflow}<br/>missing: {summary.hook_workflow_breakdown.entries_without_workflow}"]',
+            f'  Tokens["Token consumption<br/>comparisons: {summary.token_usage_breakdown.comparison_count}<br/>summaries: {summary.token_usage_breakdown.summary_count}"]',
+            f'  Waves["Wave execution<br/>events: {summary.wave_execution_breakdown.actual_wave_event_count}<br/>blocked: {summary.wave_execution_breakdown.blocked_event_count}"]',
+            f'  PromptTools["Prompt + tool selection<br/>prompts: {summary.prompt_tool_breakdown.prompt_entries}<br/>tools: {summary.prompt_tool_breakdown.tool_selection_entries}"]',
+            f'  Selection["Selection accuracy<br/>items: {len(summary.selection_metrics_breakdown.metrics)}<br/>misses: {selection_missed_total(summary)}"]',
+            f'  MarkdownDocs["Markdown/docs hook signals<br/>entries: {markdown_hook_signal_count(summary)}"]',
+            f'  ReferenceCapture["Reference capture<br/>urls: {summary.reference_capture_breakdown.url_observations}<br/>missing: {summary.reference_capture_breakdown.missing_url_observations}"]',
+            f'  WorkflowEval["Workflow selection evals<br/>reports: {family_count(summary, "workflow-selection")}"]',
+            f'  RoleEval["Codex role evals<br/>reports: {family_count(summary, "codex-agent-role")}"]',
+            f'  Issues["GitHub Issues<br/>refs: {len(summary.evidence.github_issue_refs)}"]',
+            '  Dashboard["Runtime dashboard<br/>read-only view"]',
+            '  Guide["Improvement guide<br/>next repair targets"]',
+            '  Reviewer["Human / PR reviewer<br/>summary + artifacts"]',
             "  Hooks --> Dashboard",
-            "  SkillEval --> Dashboard",
-            "  SkillEval --> SkillFailures",
-            "  SkillFailures --> Dashboard",
             "  Hooks --> WorkflowHooks",
             "  WorkflowHooks --> Dashboard",
             "  Tokens --> Dashboard",
@@ -1517,13 +1493,11 @@ class RuntimeDashboardVisuals:
             "  PromptTools --> Selection",
             "  Selection --> Dashboard",
             "  PromptTools --> MarkdownDocs",
-            "  SkillEval --> MarkdownDocs",
             "  MarkdownDocs --> Dashboard",
             "  Hooks --> ReferenceCapture",
             "  ReferenceCapture --> Dashboard",
             "  ReferenceCapture --> Guide",
             "  WorkflowEval --> Dashboard",
-            "  ReportEval --> Dashboard",
             "  RoleEval --> Dashboard",
             "  Issues --> Dashboard",
             "  Dashboard --> Reviewer",
@@ -1536,8 +1510,6 @@ class RuntimeDashboardVisuals:
         """Return a reader-facing table that maps signals to next actions."""
         rows = (
             self.hook_row(),
-            self.skill_eval_row(),
-            self.skill_failure_row(),
             self.workflow_hook_row(),
             self.token_usage_row(),
             self.wave_execution_row(),
@@ -1549,11 +1521,6 @@ class RuntimeDashboardVisuals:
                 "workflow selection eval",
                 "workflow-selection",
                 "repair workflow routing examples or classifier rules",
-            ),
-            self.family_row(
-                "report quality eval",
-                "report-quality",
-                "repair report-writing skill or reader-facing report outputs",
             ),
             self.family_row(
                 "Codex role eval",
@@ -1576,29 +1543,6 @@ class RuntimeDashboardVisuals:
             "review failing hook namespaces first",
             len(self.summary.hook_files),
             failed,
-        )
-
-    def skill_eval_row(self) -> str:
-        """Return the skill prompt eval action-map row."""
-        return action_map_row(
-            "skill prompt eval",
-            "repair skills or prompts with failed eval reports",
-            len(family_by_name(self.summary, "skill-workflow-prompt").reports),
-            bool(self.summary.skill_eval_breakdown.active_failed),
-        )
-
-    def skill_failure_row(self) -> str:
-        """Return the skill-failure analysis action-map row."""
-        breakdown = self.summary.skill_eval_breakdown
-        evidence_count = sum(breakdown.evaluated.values())
-        needs_attention = bool(
-            breakdown.active_failed or breakdown.failed_reports_missing_used_skills
-        )
-        return action_map_row(
-            "skill eval failure attribution",
-            "repair failed skills; missing attribution means eval reports need used_skills",
-            evidence_count,
-            needs_attention,
         )
 
     def workflow_hook_row(self) -> str:
@@ -1651,19 +1595,20 @@ class RuntimeDashboardVisuals:
         return action_map_row(
             "selection accuracy by responsibility",
             "repair routing or logging when candidate skills/workflows/tools are not selected",
-            selection_candidate_total(self.summary) + selection_selected_total(self.summary),
+            selection_candidate_total(self.summary)
+            + selection_selected_total(self.summary),
             selection_missed_total(self.summary) > 0,
         )
 
     def markdown_docs_row(self) -> str:
         """Return the Markdown/docs signal action-map row."""
         breakdown = self.summary.markdown_docs_breakdown
-        evidence_count = breakdown.eval_reports + markdown_hook_signal_count(self.summary)
+        evidence_count = markdown_hook_signal_count(self.summary)
         return action_map_row(
             "Markdown/docs hook signals",
             "add or inspect Markdown/docs hook measurements when markdown checks feel noisy",
             evidence_count,
-            breakdown.failed_eval_reports > 0 or markdown_hook_signal_count(self.summary) == 0,
+            evidence_count == 0,
         )
 
     def _reference_capture_row(self) -> str:
@@ -1673,13 +1618,17 @@ class RuntimeDashboardVisuals:
             "reference capture",
             "materialize consulted PDF/HTML sources under references/ before closeout",
             breakdown.url_observations,
-            breakdown.entries == 0 or breakdown.missing_url_observations > 0 or breakdown.blocked_entries > 0,
+            breakdown.entries == 0
+            or breakdown.missing_url_observations > 0
+            or breakdown.blocked_entries > 0,
         )
 
     def family_row(self, signal: str, family_name: str, action: str) -> str:
         """Return an eval-family action-map row."""
         family = family_by_name(self.summary, family_name)
-        return action_map_row(signal, action, len(family.reports), bool(family.failed_reports))
+        return action_map_row(
+            signal, action, len(family.reports), bool(family.failed_reports)
+        )
 
     def issue_row(self) -> str:
         """Return the durable issue action-map row."""
@@ -1735,17 +1684,12 @@ class AgentRuntimeDashboard:
             self.root, self.recent_cutoff_epoch, self.runtime_root
         )
         result_families = (
-            reader.read_family("skill-workflow-prompt"),
             reader.read_family("workflow-selection"),
-            reader.read_family("report-quality"),
             reader.read_family("codex-agent-role"),
         )
-        skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
         evidence = EvidenceSummary(
             github_issue_refs=issue_refs,
             knowledge_entries=evidence.knowledge_entries,
-            skill_eval_reports=result_families[0].reports,
-            failed_skill_eval_reports=result_families[0].failed_reports,
             hook_counts=read_hook_evidence_counts(
                 self.root,
                 hook_files,
@@ -1762,7 +1706,6 @@ class AgentRuntimeDashboard:
                 hook_entry_count(path, self.recent_cutoff_epoch) for path in hook_files
             ),
             result_families=result_families,
-            skill_eval_breakdown=skill_eval_breakdown,
             hook_workflow_breakdown=HookWorkflowBreakdownReader.read(
                 hook_files,
                 self.root,
@@ -1784,7 +1727,6 @@ class AgentRuntimeDashboard:
             ),
             markdown_docs_breakdown=read_markdown_docs_breakdown(
                 evidence.hook_counts,
-                skill_eval_breakdown,
             ),
             reference_capture_breakdown=read_reference_capture_breakdown(
                 hook_files,
@@ -1821,8 +1763,6 @@ class AgentRuntimeDashboard:
             EvidenceSummary(
                 github_issue_refs=self.guide.github_issue_refs(),
                 knowledge_entries=self.guide.knowledge_entry_counts(),
-                skill_eval_reports=(),
-                failed_skill_eval_reports=(),
                 hook_counts=read_hook_evidence_counts(
                     self.root,
                     hook_files,
@@ -1986,7 +1926,9 @@ def compact_selection_miss_lines(summary: RuntimeDashboardSummary) -> list[str]:
     return lines
 
 
-def top_selection_misses(summary: RuntimeDashboardSummary) -> tuple[SelectionMetric, ...]:
+def top_selection_misses(
+    summary: RuntimeDashboardSummary,
+) -> tuple[SelectionMetric, ...]:
     """Return highest-impact selection misses in compact-dashboard order."""
     missed = sorted(
         (
@@ -2009,10 +1951,6 @@ def compact_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[s
         "### Workflow Attribution Drilldown",
         "",
         *compact_workflow_attribution_drilldown_lines(summary),
-        "",
-        "### Skill Eval Failure Drilldown",
-        "",
-        *compact_skill_eval_failure_drilldown_lines(summary),
         "",
         "### Selection Evidence Drilldown",
         "",
@@ -2087,9 +2025,19 @@ def compact_hook_failure_drilldown_lines(summary: RuntimeDashboardSummary) -> li
                 str(entry.get("status") or "") == "fail"
                 and str(entry.get("failure_fingerprint") or "") == fingerprint
             ):
-                namespaces[str(entry.get("hook_log_namespace") or "missing_namespace")] += 1
-                events[str(entry.get("hook_event_name") or entry.get("event") or "missing_event")] += 1
-                tool = str(entry.get("tool_name") or entry.get("tool_command_verb") or "")
+                namespaces[
+                    str(entry.get("hook_log_namespace") or "missing_namespace")
+                ] += 1
+                events[
+                    str(
+                        entry.get("hook_event_name")
+                        or entry.get("event")
+                        or "missing_event"
+                    )
+                ] += 1
+                tool = str(
+                    entry.get("tool_name") or entry.get("tool_command_verb") or ""
+                )
                 if tool:
                     tools[tool] += 1
     return [
@@ -2111,7 +2059,9 @@ def compact_hook_failure_drilldown_lines(summary: RuntimeDashboardSummary) -> li
     ]
 
 
-def compact_workflow_attribution_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+def compact_workflow_attribution_drilldown_lines(
+    summary: RuntimeDashboardSummary,
+) -> list[str]:
     """Return generated missing-workflow dimensions without raw log files."""
     breakdown = summary.hook_workflow_breakdown
     schema = hook_schema_breakdown(summary)
@@ -2135,28 +2085,9 @@ def compact_workflow_attribution_drilldown_lines(summary: RuntimeDashboardSummar
     ]
 
 
-def compact_skill_eval_failure_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
-    """Return generated failed-skill attribution without report file targets."""
-    breakdown = summary.skill_eval_breakdown
-    lines = [
-        "| skill | evaluated reports | failed reports | failure rate |",
-        "| --- | ---: | ---: | ---: |",
-    ]
-    if not breakdown.active_failed:
-        return [*lines, "| `none` | `0` | `0` | `0.0%` |"]
-    lines.extend(
-        skill_eval_failure_row(breakdown, skill)
-        for skill, _count in breakdown.active_failed.most_common(MAX_COMPACT_REPORT_LINES)
-    )
-    if breakdown.failed_reports_missing_used_skills:
-        lines.append(
-            "| `_missing_used_skills` | `0` | "
-            f"`{breakdown.failed_reports_missing_used_skills}` | `unknown` |"
-        )
-    return lines
-
-
-def compact_selection_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+def compact_selection_evidence_drilldown_lines(
+    summary: RuntimeDashboardSummary,
+) -> list[str]:
     """Return selection accounting details from parsed hook logs."""
     breakdown = summary.selection_metrics_breakdown
     return [
@@ -2172,15 +2103,15 @@ def compact_selection_evidence_drilldown_lines(summary: RuntimeDashboardSummary)
     ]
 
 
-def compact_markdown_prompt_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+def compact_markdown_prompt_drilldown_lines(
+    summary: RuntimeDashboardSummary,
+) -> list[str]:
     """Return Markdown, prompt, and tool-selection details."""
     markdown = summary.markdown_docs_breakdown
     prompt = summary.prompt_tool_breakdown
     return [
         "| metric | value |",
         "| --- | --- |",
-        f"| `markdown_eval_reports` | `{markdown.eval_reports}` |",
-        f"| `markdown_failed_eval_reports` | `{markdown.failed_eval_reports}` |",
         f"| `markdown_candidate_skill_entries` | `{markdown.candidate_skill_entries}` |",
         f"| `markdown_candidate_tool_entries` | `{markdown.candidate_tool_entries}` |",
         f"| `markdown_candidate_tools` | `{compact_counter_summary(markdown.candidate_tools)}` |",
@@ -2195,7 +2126,9 @@ def compact_markdown_prompt_drilldown_lines(summary: RuntimeDashboardSummary) ->
     ]
 
 
-def compact_token_consumption_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+def compact_token_consumption_drilldown_lines(
+    summary: RuntimeDashboardSummary,
+) -> list[str]:
     """Return generated token-evidence details without report globs."""
     breakdown = summary.token_usage_breakdown
     return [
@@ -2215,7 +2148,9 @@ def compact_token_consumption_drilldown_lines(summary: RuntimeDashboardSummary) 
     ]
 
 
-def compact_prompt_token_trend_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+def compact_prompt_token_trend_drilldown_lines(
+    summary: RuntimeDashboardSummary,
+) -> list[str]:
     """Return rolling prompt/token trend metrics from generated summaries."""
     prompt = summary.prompt_tool_breakdown
     token = summary.token_usage_breakdown
@@ -2237,7 +2172,9 @@ def compact_prompt_token_trend_drilldown_lines(summary: RuntimeDashboardSummary)
     ]
 
 
-def compact_reference_capture_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+def compact_reference_capture_drilldown_lines(
+    summary: RuntimeDashboardSummary,
+) -> list[str]:
     """Return reference-capture details from parsed hook logs."""
     breakdown = summary.reference_capture_breakdown
     return [
@@ -2255,7 +2192,9 @@ def compact_reference_capture_drilldown_lines(summary: RuntimeDashboardSummary) 
     ]
 
 
-def compact_wave_execution_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+def compact_wave_execution_drilldown_lines(
+    summary: RuntimeDashboardSummary,
+) -> list[str]:
     """Return compact wave and subagent execution details."""
     breakdown = summary.wave_execution_breakdown
     return [
@@ -2282,8 +2221,7 @@ def compact_counter_summary(counter: Counter[str]) -> str:
     if not counter:
         return "none"
     return ", ".join(
-        f"{key}={value}"
-        for key, value in counter.most_common(MAX_COMPACT_REPORT_LINES)
+        f"{key}={value}" for key, value in counter.most_common(MAX_COMPACT_REPORT_LINES)
     )
 
 
@@ -2302,7 +2240,9 @@ def compact_mapping_summary(mapping: object) -> str:
             except ValueError:
                 continue
     items.sort()
-    return ", ".join(f"{key}={value}" for key, value in items[:MAX_COMPACT_REPORT_LINES])
+    return ", ".join(
+        f"{key}={value}" for key, value in items[:MAX_COMPACT_REPORT_LINES]
+    )
 
 
 def compact_nested_mapping_summary(mapping: object) -> str:
@@ -2338,7 +2278,9 @@ def render_dashboard_api(summary: RuntimeDashboardSummary) -> str:
     payload: dict[str, object] = {
         "schema": "agent_runtime_dashboard.v1",
         "root": summary.root.as_posix(),
-        "recent_days": summary.recent_days if summary.recent_days is not None else "all",
+        "recent_days": summary.recent_days
+        if summary.recent_days is not None
+        else "all",
         "hook_files": len(summary.hook_files),
         "hook_entries": summary.hook_entries,
         "github_issue_refs": list(summary.evidence.github_issue_refs),
@@ -2355,15 +2297,16 @@ def dashboard_repair_payload(summary: RuntimeDashboardSummary) -> dict[str, obje
     return {
         "priority_problems": [
             problem_component_payload(component)
-            for component in dashboard_problem_components(summary)[:MAX_COMPACT_REPORT_LINES]
+            for component in dashboard_problem_components(summary)[
+                :MAX_COMPACT_REPORT_LINES
+            ]
         ],
         "priority_next_actions": [
             next_action_payload(action)
             for action in dashboard_next_actions(summary)[:MAX_COMPACT_REPORT_LINES]
         ],
         "selection_misses": [
-            selection_metric_payload(row)
-            for row in top_selection_misses(summary)
+            selection_metric_payload(row) for row in top_selection_misses(summary)
         ],
         "issue_worker": issue_worker_payload(summary),
     }
@@ -2444,7 +2387,9 @@ def hook_schema_breakdown(summary: RuntimeDashboardSummary) -> dict[str, object]
             summary.recent_cutoff_epoch,
         ):
             status = str(entry.get("status") or "unknown")
-            event = str(entry.get("hook_event_name") or entry.get("event") or "missing_event")
+            event = str(
+                entry.get("hook_event_name") or entry.get("event") or "missing_event"
+            )
             status_by_hook_family[family][status] += 1
             if event in ("UnknownHookEvent", "missing_event"):
                 unknown_events_by_file[file_label] += 1
@@ -2533,12 +2478,12 @@ def counter_to_dict(counter: Counter[str]) -> dict[str, int]:
     return dict(sorted((key, int(value)) for key, value in counter.items()))
 
 
-def nested_counter_to_dict(mapping: dict[str, Counter[str]]) -> dict[str, dict[str, int]]:
+def nested_counter_to_dict(
+    mapping: dict[str, Counter[str]],
+) -> dict[str, dict[str, int]]:
     """Return a stable JSON object from nested counters."""
     return {
-        key: counter_to_dict(value)
-        for key, value in sorted(mapping.items())
-        if value
+        key: counter_to_dict(value) for key, value in sorted(mapping.items()) if value
     }
 
 
@@ -2559,9 +2504,8 @@ def read_prompt_tool_breakdown(
 
 def read_markdown_docs_breakdown(
     hook_counts: HookEvidenceCounts,
-    skill_eval: SkillEvalBreakdown,
 ) -> MarkdownDocsBreakdown:
-    """Return Markdown/docs-specific hook and eval signal counts."""
+    """Return Markdown/docs-specific hook signal counts."""
     markdown_tools = Counter(
         {
             tool: hook_counts.candidate_tools[tool]
@@ -2570,11 +2514,9 @@ def read_markdown_docs_breakdown(
         }
     )
     return MarkdownDocsBreakdown(
-        eval_reports=sum(skill_eval.evaluated.get(skill, 0) for skill in MARKDOWN_SKILL_IDS),
-        failed_eval_reports=sum(
-            skill_eval.active_failed.get(skill, 0) for skill in MARKDOWN_SKILL_IDS
+        candidate_skill_entries=sum(
+            hook_counts.candidate_skills.get(skill, 0) for skill in MARKDOWN_SKILL_IDS
         ),
-        candidate_skill_entries=sum(hook_counts.candidate_skills.get(skill, 0) for skill in MARKDOWN_SKILL_IDS),
         candidate_tool_entries=sum(markdown_tools.values()),
         candidate_tools=markdown_tools,
     )
@@ -2604,7 +2546,9 @@ class PromptToolAccumulator:
     prompt_missing_excerpt_entries: int = 0
     prompt_total_chars: int = 0
     prompt_char_counts: list[int] = field(default_factory=lambda: list[int]())
-    timed_prompt_char_counts: list[TimedIntMetric] = field(default_factory=lambda: list[TimedIntMetric]())
+    timed_prompt_char_counts: list[TimedIntMetric] = field(
+        default_factory=lambda: list[TimedIntMetric]()
+    )
     tool_selection_entries: int = 0
     tools: Counter[str] = field(default_factory=lambda: Counter[str]())
     command_verbs: Counter[str] = field(default_factory=lambda: Counter[str]())
@@ -2625,7 +2569,9 @@ class PromptToolAccumulator:
         self.prompt_char_counts.append(prompt_chars)
         timestamp = parse_hook_timestamp(entry.get("timestamp"))
         if timestamp > 0:
-            self.timed_prompt_char_counts.append(TimedIntMetric(timestamp, prompt_chars))
+            self.timed_prompt_char_counts.append(
+                TimedIntMetric(timestamp, prompt_chars)
+            )
         if str(entry.get("prompt_excerpt_redacted") or ""):
             self.prompt_excerpt_entries += 1
         else:
@@ -2652,7 +2598,10 @@ class PromptToolAccumulator:
             prompt_total_chars=self.prompt_total_chars,
             prompt_char_counts=tuple(self.prompt_char_counts),
             timed_prompt_char_counts=tuple(
-                sorted(self.timed_prompt_char_counts, key=lambda observation: observation.epoch)
+                sorted(
+                    self.timed_prompt_char_counts,
+                    key=lambda observation: observation.epoch,
+                )
             ),
             tool_selection_entries=self.tool_selection_entries,
             tools=self.tools,
@@ -2685,7 +2634,9 @@ class ReferenceCaptureAccumulator:
         self.registered_url_observations += integer_field(entry, "registered_count")
         self.missing_url_observations += integer_field(entry, "missing_count")
         self.blocked_entries += int(str(entry.get("decision") or "") == "block")
-        self.events[str(entry.get("hook_event_name") or entry.get("event") or "missing_event")] += 1
+        self.events[
+            str(entry.get("hook_event_name") or entry.get("event") or "missing_event")
+        ] += 1
         for field_name in normalized_text_values(entry.get("source_fields")):
             self.source_fields[field_name] += 1
         for url in normalized_text_values(entry.get("urls")):
@@ -2801,15 +2752,8 @@ def source_sync_state_lines(summary: RuntimeDashboardSummary) -> list[str]:
 
 
 def dashboard_analysis_lines(summary: RuntimeDashboardSummary) -> list[str]:
-    """Return skill, workflow, and token analysis sections."""
+    """Return workflow and token analysis sections."""
     return [
-        "## Skill Eval Failure Analysis",
-        "",
-        "This section attributes skill prompt eval failures to the `used_skills` field in eval reports.",
-        "If a failed report lacks `used_skills`, the dashboard reports missing evidence instead of guessing from file names.",
-        "",
-        *skill_eval_failure_lines(summary),
-        "",
         "## Hook Workflow Attribution",
         "",
         "This section attributes hook entries to workflow fields present in hook JSONL.",
@@ -2887,7 +2831,9 @@ def dashboard_hook_lines(summary: RuntimeDashboardSummary) -> list[str]:
 
 def non_empty_line_count(path: Path) -> int:
     """Count non-empty JSONL lines in one evidence file."""
-    return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+    return sum(
+        1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    )
 
 
 def hook_entry_count(path: Path, recent_cutoff_epoch: int | None = None) -> int:
@@ -2917,7 +2863,9 @@ def read_hook_evidence_counts(
     """Return hook counters from already-selected hook entries."""
     counter = HookEvidenceCounter(known_skill_ids(root), root=root)
     for path in hook_files:
-        for entry in HookWorkflowBreakdownReader.iter_entries(path, recent_cutoff_epoch):
+        for entry in HookWorkflowBreakdownReader.iter_entries(
+            path, recent_cutoff_epoch
+        ):
             counter.add_entry(path, canonical_dashboard_entry(entry))
     return counter.counts()
 
@@ -2939,9 +2887,7 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
         "- agent_report_archive_index: `.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl`",
         "- agent_report_archive_command: `python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
-        "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
-        "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- github_issue_refs: repository-qualified URLs from private run-local packets; otherwise `github_issue_lookup_required`",
         "- private_knowledge: `agent-canon-log/knowledge/topics/*/candidate.md` (on-demand; locator/count only)",
         "- token_comparison_reports: `reports/agents/**/workflow_monitoring.md` or `reports/agents/**/*token*.md`",
@@ -2967,7 +2913,9 @@ def result_family_lines(summary: RuntimeDashboardSummary) -> list[str]:
     return lines
 
 
-def result_family_row(summary: RuntimeDashboardSummary, family: ResultFamilySummary) -> str:
+def result_family_row(
+    summary: RuntimeDashboardSummary, family: ResultFamilySummary
+) -> str:
     """Return one accumulated result-family row."""
     cells = (
         f"`{family.family}`",
@@ -2981,7 +2929,7 @@ def result_family_row(summary: RuntimeDashboardSummary, family: ResultFamilySumm
 
 def failed_report_lines(summary: RuntimeDashboardSummary) -> list[str]:
     """Return bounded failed-report bullets."""
-    reports = list(summary.evidence.failed_skill_eval_reports)
+    reports: list[Path] = []
     for family in summary.result_families:
         reports.extend(family.failed_reports)
     if not reports:
@@ -2990,36 +2938,6 @@ def failed_report_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"- `{relative_path_label(path, summary.root)}`"
         for path in sorted(set(reports))[:MAX_REPORT_LINES]
     ]
-
-
-def skill_eval_failure_lines(summary: RuntimeDashboardSummary) -> list[str]:
-    """Return per-skill eval failure table lines."""
-    breakdown = summary.skill_eval_breakdown
-    lines = [
-        "| skill | eval reports | failed reports | failure rate |",
-        "| --- | ---: | ---: | ---: |",
-    ]
-    for skill in sorted(breakdown.evaluated):
-        lines.append(skill_eval_failure_row(breakdown, skill))
-    if not breakdown.evaluated:
-        lines.append("| `_missing_used_skills` | `0` | `0` | `unknown` |")
-    lines.extend(
-        (
-            "",
-            f"- reports_missing_used_skills: `{breakdown.reports_missing_used_skills}`",
-            f"- failed_reports_missing_used_skills: `{breakdown.failed_reports_missing_used_skills}`",
-            f"- historical_failed_skill_reports: `{sum(breakdown.failed.values())}`",
-            f"- resolved_failed_skill_reports: `{sum(breakdown.resolved_failed.values())}`",
-        )
-    )
-    return lines
-
-
-def skill_eval_failure_row(breakdown: SkillEvalBreakdown, skill: str) -> str:
-    """Return one per-skill eval failure table row."""
-    total = breakdown.evaluated[skill]
-    failed = breakdown.active_failed.get(skill, 0)
-    return f"| `{skill}` | `{total}` | `{failed}` | `{failure_rate(failed, total)}` |"
 
 
 def hook_workflow_lines(summary: RuntimeDashboardSummary) -> list[str]:
@@ -3200,7 +3118,9 @@ def selection_responsibility_rows(summary: RuntimeDashboardSummary) -> list[str]
     ]
 
 
-def selection_responsibility_row(summary: RuntimeDashboardSummary, responsibility: str) -> str:
+def selection_responsibility_row(
+    summary: RuntimeDashboardSummary, responsibility: str
+) -> str:
     """Return one aggregate responsibility row."""
     selected = selection_selected_total_for(summary, responsibility)
     candidates = selection_candidate_total_for(summary, responsibility)
@@ -3223,8 +3143,6 @@ def markdown_docs_lines(summary: RuntimeDashboardSummary) -> list[str]:
     return [
         f"- markdown_hook_signal_status: `{status}`",
         f"- markdown_hook_signal_reason: `{reason}`",
-        f"- markdown_skill_eval_reports: `{breakdown.eval_reports}`",
-        f"- markdown_failed_skill_eval_reports: `{breakdown.failed_eval_reports}`",
         f"- markdown_candidate_skill_entries: `{breakdown.candidate_skill_entries}`",
         f"- markdown_candidate_tool_entries: `{breakdown.candidate_tool_entries}`",
         "",
@@ -3325,7 +3243,9 @@ def dashboard_has_evidence_gaps(summary: RuntimeDashboardSummary) -> bool:
     )
 
 
-def issue_route_row(summary: RuntimeDashboardSummary, signal: str, slug: str, reason: str) -> str:
+def issue_route_row(
+    summary: RuntimeDashboardSummary, signal: str, slug: str, reason: str
+) -> str:
     """Return one durable issue routing row."""
     issue = issue_by_slug(summary, slug)
     issue_label = (
@@ -3373,7 +3293,9 @@ def problem_component_lines(summary: RuntimeDashboardSummary) -> list[str]:
     return lines
 
 
-def dashboard_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemComponent, ...]:
+def dashboard_problem_components(
+    summary: RuntimeDashboardSummary,
+) -> tuple[ProblemComponent, ...]:
     """Return skills, workflows, tools, and hooks with dashboard-visible problems."""
     builders = (
         hook_problem_components,
@@ -3387,7 +3309,9 @@ def dashboard_problem_components(summary: RuntimeDashboardSummary) -> tuple[Prob
     return tuple(sorted(components, key=problem_component_sort_key)[:MAX_REPORT_LINES])
 
 
-def hook_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemComponent, ...]:
+def hook_problem_components(
+    summary: RuntimeDashboardSummary,
+) -> tuple[ProblemComponent, ...]:
     """Return hook components that need attention."""
     components: list[ProblemComponent] = []
     failed = summary.evidence.hook_counts.statuses.get("fail", 0)
@@ -3423,27 +3347,16 @@ def hook_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemCo
     return tuple(components)
 
 
-def skill_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemComponent, ...]:
+def skill_problem_components(
+    summary: RuntimeDashboardSummary,
+) -> tuple[ProblemComponent, ...]:
     """Return skill components that need attention."""
-    components: list[ProblemComponent] = []
-    for skill, failed in summary.skill_eval_breakdown.active_failed.most_common(
-        MAX_REPORT_LINES
-    ):
-        components.append(
-            ProblemComponent(
-                component_type="skill",
-                name=skill,
-                status="fail",
-                problem=f"{failed} failed eval report(s)",
-                evidence=f"{SKILL_EVAL_EVIDENCE_TARGET} skill={skill}",
-                next_action=f"repair failed skill eval for {skill}",
-            )
-        )
-    components.extend(selection_problem_components(summary, "skill"))
-    return tuple(components)
+    return selection_problem_components(summary, "skill")
 
 
-def workflow_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemComponent, ...]:
+def workflow_problem_components(
+    summary: RuntimeDashboardSummary,
+) -> tuple[ProblemComponent, ...]:
     """Return workflow components that need attention."""
     components: list[ProblemComponent] = []
     missing = summary.hook_workflow_breakdown.entries_without_workflow
@@ -3462,7 +3375,9 @@ def workflow_problem_components(summary: RuntimeDashboardSummary) -> tuple[Probl
     return tuple(components)
 
 
-def wave_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemComponent, ...]:
+def wave_problem_components(
+    summary: RuntimeDashboardSummary,
+) -> tuple[ProblemComponent, ...]:
     """Return wave execution components that need attention."""
     breakdown = summary.wave_execution_breakdown
     components: list[ProblemComponent] = []
@@ -3502,7 +3417,9 @@ def wave_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemCo
     return tuple(components)
 
 
-def evidence_problem_components(summary: RuntimeDashboardSummary) -> tuple[ProblemComponent, ...]:
+def evidence_problem_components(
+    summary: RuntimeDashboardSummary,
+) -> tuple[ProblemComponent, ...]:
     """Return cross-cutting evidence components that need attention."""
     components: list[ProblemComponent] = []
     prompt = summary.prompt_tool_breakdown
@@ -3511,11 +3428,11 @@ def evidence_problem_components(summary: RuntimeDashboardSummary) -> tuple[Probl
             ProblemComponent(
                 component_type="hook",
                 name="prompt_classifier_and_behavior_event_assembly",
-            status="missing",
-            problem="prompt or tool selection evidence is missing",
-            evidence=PROMPT_TOOL_EVIDENCE_TARGET,
+                status="missing",
+                problem="prompt or tool selection evidence is missing",
+                evidence=PROMPT_TOOL_EVIDENCE_TARGET,
                 next_action="repair prompt classification and behavior-event evidence assembly",
-        )
+            )
         )
     if (
         summary.token_usage_breakdown.objective_selected
@@ -3596,7 +3513,9 @@ def next_action_lines(summary: RuntimeDashboardSummary) -> list[str]:
     return lines
 
 
-def dashboard_next_actions(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def dashboard_next_actions(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return prioritized concrete next actions inferred from dashboard metrics."""
     builders = (
         hook_failure_next_action,
@@ -3604,7 +3523,6 @@ def dashboard_next_actions(summary: RuntimeDashboardSummary) -> tuple[DashboardN
         workflow_attribution_next_action,
         wave_execution_next_action,
         selection_metrics_next_action,
-        skill_eval_next_action,
         markdown_docs_next_action,
         prompt_tool_next_action,
         token_usage_next_action,
@@ -3614,23 +3532,27 @@ def dashboard_next_actions(summary: RuntimeDashboardSummary) -> tuple[DashboardN
     return tuple(sorted(actions, key=next_action_sort_key))
 
 
-def hook_failure_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def hook_failure_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next action for failing hook evidence."""
     failed = summary.evidence.hook_counts.statuses.get("fail", 0)
     if failed <= 0:
         return ()
     evidence = top_hook_failure_evidence(summary)
-    return (DashboardNextAction(
-        priority="P0",
-        action="repair failing hook evidence",
-        reason=f"{failed} hook entries report status=fail",
-        evidence=evidence,
-        owner_surface=".codex/hooks/ and hook accumulation tooling",
-        command="python3 eval/checkers/eval_accumulation_check.py",
-        done_condition="hook status fail count is 0",
-        issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-        automation="agent-fix",
-    ),)
+    return (
+        DashboardNextAction(
+            priority="P0",
+            action="repair failing hook evidence",
+            reason=f"{failed} hook entries report status=fail",
+            evidence=evidence,
+            owner_surface=".codex/hooks/ and hook accumulation tooling",
+            command="python3 eval/checkers/eval_accumulation_check.py",
+            done_condition="hook status fail count is 0",
+            issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+            automation="agent-fix",
+        ),
+    )
 
 
 def top_hook_failure_evidence(summary: RuntimeDashboardSummary) -> str:
@@ -3643,165 +3565,172 @@ def top_hook_failure_evidence(summary: RuntimeDashboardSummary) -> str:
 
 def top_hook_failure_fingerprint(summary: RuntimeDashboardSummary) -> str:
     """Return the most frequent hook failure fingerprint."""
-    fingerprint = top_counter_key(summary.evidence.hook_counts.failures, "hook failure fingerprints")
+    fingerprint = top_counter_key(
+        summary.evidence.hook_counts.failures, "hook failure fingerprints"
+    )
     if fingerprint == "none":
         return "none"
     return fingerprint
 
 
-def reference_capture_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def reference_capture_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next action for reference-capture evidence gaps."""
     breakdown = summary.reference_capture_breakdown
     if breakdown.entries == 0:
-        return (DashboardNextAction(
-            priority="P1",
-            action="confirm reference capture hook is producing evidence",
-            reason="no reference_capture_guard entries are present",
-            evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
-            owner_surface="tools/analysis/documents/reference_materializer.py",
-            command=DASHBOARD_TOOL_ROUTE,
-            done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES>0",
-            issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-            automation="agent-fix",
-        ),)
+        return (
+            DashboardNextAction(
+                priority="P1",
+                action="confirm reference capture hook is producing evidence",
+                reason="no reference_capture_guard entries are present",
+                evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
+                owner_surface="tools/analysis/documents/reference_materializer.py",
+                command=DASHBOARD_TOOL_ROUTE,
+                done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES>0",
+                issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+                automation="agent-fix",
+            ),
+        )
     if breakdown.missing_url_observations <= 0 and breakdown.blocked_entries <= 0:
         return ()
-    return (DashboardNextAction(
-        priority="P1",
-        action="materialize missing consulted source URLs",
-        reason=f"{breakdown.missing_url_observations} observed URLs are not registered",
-        evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
-        owner_surface="references/external/ and tools/analysis/documents/reference_materializer.py",
-        command="python3 tools/analysis/documents/reference_materializer.py --url <url> --input <pdf-or-html>",
-        done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS=0",
-        issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-        automation="agent-fix-with-source-file",
-    ),)
+    return (
+        DashboardNextAction(
+            priority="P1",
+            action="materialize missing consulted source URLs",
+            reason=f"{breakdown.missing_url_observations} observed URLs are not registered",
+            evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
+            owner_surface="references/external/ and tools/analysis/documents/reference_materializer.py",
+            command="python3 tools/analysis/documents/reference_materializer.py --url <url> --input <pdf-or-html>",
+            done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS=0",
+            issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+            automation="agent-fix-with-source-file",
+        ),
+    )
 
 
-def workflow_attribution_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def workflow_attribution_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next action for missing workflow attribution."""
     breakdown = summary.hook_workflow_breakdown
     if breakdown.entries_without_workflow <= 0:
         return ()
-    return (DashboardNextAction(
-        priority="P1",
-        action="repair workflow attribution logging",
-        reason=f"{breakdown.entries_without_workflow} hook entries lack workflow attribution",
-        evidence=WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET,
+    return (
+        DashboardNextAction(
+            priority="P1",
+            action="repair workflow attribution logging",
+            reason=f"{breakdown.entries_without_workflow} hook entries lack workflow attribution",
+            evidence=WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET,
             owner_surface="tools/runtime/archive/behavior_event_assembly.py and workflow_monitoring.md",
-        command=DASHBOARD_TOOL_ROUTE,
-        done_condition="AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=0 or entries are explicitly exempt",
-        issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-        automation="agent-fix",
-    ),)
+            command=DASHBOARD_TOOL_ROUTE,
+            done_condition="AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=0 or entries are explicitly exempt",
+            issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+            automation="agent-fix",
+        ),
+    )
 
 
-def wave_execution_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def wave_execution_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next action for wave execution evidence gaps."""
     breakdown = summary.wave_execution_breakdown
     if breakdown.missing_actual_wave_count > 0:
-        return (DashboardNextAction(
-            priority="P1",
-            action="record missing actual wave execution rows",
-            reason=f"{breakdown.missing_actual_wave_count} planned waves lack actual events",
-            evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
-            owner_surface="schedule.md and workflow_monitoring.md",
-            command="python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>",
-            done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL=0",
-            issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
-            automation="agent-fix",
-        ),)
+        return (
+            DashboardNextAction(
+                priority="P1",
+                action="record missing actual wave execution rows",
+                reason=f"{breakdown.missing_actual_wave_count} planned waves lack actual events",
+                evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+                owner_surface="schedule.md and workflow_monitoring.md",
+                command="python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>",
+                done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL=0",
+                issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
+                automation="agent-fix",
+            ),
+        )
     if breakdown.blocked_event_count > 0:
-        return (DashboardNextAction(
-            priority="P1",
-            action="resolve wave execution authority blockers",
-            reason=f"{breakdown.blocked_event_count} wave events are authority blocked",
-            evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
-            owner_surface="parent Codex runtime subagent wave and run bundle ledger",
-            command="spawn/skip the listed roles, then update schedule.md and workflow_monitoring.md",
-            done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED=0 or explicit skipped wave rows remain",
-            issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
-            automation="parent-runtime",
-        ),)
+        return (
+            DashboardNextAction(
+                priority="P1",
+                action="resolve wave execution authority blockers",
+                reason=f"{breakdown.blocked_event_count} wave events are authority blocked",
+                evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+                owner_surface="parent Codex runtime subagent wave and run bundle ledger",
+                command="spawn/skip the listed roles, then update schedule.md and workflow_monitoring.md",
+                done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED=0 or explicit skipped wave rows remain",
+                issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
+                automation="parent-runtime",
+            ),
+        )
     if breakdown.actual_wave_event_count > 0:
         return ()
-    return (DashboardNextAction(
-        priority="P2",
-        action="add wave execution evidence to run bundles",
-        reason="no Actual Wave Events rows were found",
-        evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
-        owner_surface="tools/agent/orchestration/agent_team.py",
-        command="python3 tools/runtime/lifecycle/bootstrap_agent_run.py --task-id <id>",
-        done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS>0",
-        issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
-        automation="agent-fix",
-    ),)
+    return (
+        DashboardNextAction(
+            priority="P2",
+            action="add wave execution evidence to run bundles",
+            reason="no Actual Wave Events rows were found",
+            evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
+            owner_surface="tools/agent/orchestration/agent_team.py",
+            command="python3 tools/runtime/lifecycle/bootstrap_agent_run.py --task-id <id>",
+            done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS>0",
+            issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
+            automation="agent-fix",
+        ),
+    )
 
 
-def selection_metrics_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def selection_metrics_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next action for selection misses."""
     missed = selection_missed_total(summary)
     if missed <= 0:
         return ()
-    row = max(summary.selection_metrics_breakdown.metrics, key=lambda item: item.missed_count)
-    return (DashboardNextAction(
-        priority="P1",
-        action=f"repair {row.responsibility} selection for {row.name}",
-        reason=f"{missed} candidate selections were not confirmed",
-        evidence=SELECTION_EVIDENCE_TARGET,
-        owner_surface=row.reset_path,
-        command=DASHBOARD_TOOL_ROUTE,
-        done_condition=f"{row.responsibility}:{row.name} miss rate is 0% after its reset window",
-        issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-        automation="human-review-then-agent-fix",
-    ),)
+    row = max(
+        summary.selection_metrics_breakdown.metrics, key=lambda item: item.missed_count
+    )
+    return (
+        DashboardNextAction(
+            priority="P1",
+            action=f"repair {row.responsibility} selection for {row.name}",
+            reason=f"{missed} candidate selections were not confirmed",
+            evidence=SELECTION_EVIDENCE_TARGET,
+            owner_surface=row.reset_path,
+            command=DASHBOARD_TOOL_ROUTE,
+            done_condition=f"{row.responsibility}:{row.name} miss rate is 0% after its reset window",
+            issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+            automation="human-review-then-agent-fix",
+        ),
+    )
 
 
-def skill_eval_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
-    """Return the next action for failed skill evals."""
-    failed = summary.skill_eval_breakdown.active_failed
-    if not failed:
-        return ()
-    skill = failed.most_common(1)[0][0]
-    return (DashboardNextAction(
-        priority="P1",
-        action=f"repair failed skill eval for {skill}",
-        reason=f"{failed[skill]} failed eval reports are attributed to {skill}",
-        evidence=f"{SKILL_EVAL_EVIDENCE_TARGET} skill={skill}",
-        owner_surface=selection_reset_path_for(summary.root, "skill", skill),
-        command="python3 eval/producers/evaluate_skill_workflow_prompts.py",
-        done_condition=f"{skill} failed eval reports are 0",
-        issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-        automation="agent-fix",
-    ),)
-
-
-def markdown_docs_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def markdown_docs_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next action for Markdown/docs checker signals."""
     breakdown = summary.markdown_docs_breakdown
-    if breakdown.failed_eval_reports <= 0 and markdown_hook_signal_count(summary) > 0:
+    if markdown_hook_signal_count(summary) > 0:
         return ()
-    priority = "P1" if breakdown.failed_eval_reports > 0 else "P2"
-    reason = (
-        f"{breakdown.failed_eval_reports} Markdown skill evals failed"
-        if breakdown.failed_eval_reports > 0
-        else "Markdown/docs hook signals are missing"
+    return (
+        DashboardNextAction(
+            priority="P2",
+            action="repair Markdown/docs checking signal",
+            reason="Markdown/docs hook signals are missing",
+            evidence=MARKDOWN_EVIDENCE_TARGET,
+            owner_surface=".codex/personal/skills/md-style-check/SKILL.md and tools/runtime/dispatch/agent-canon/src/docs.rs",
+            command="tools/bin/agent-canon docs check",
+            done_condition="markdown_hook_signal_status=present",
+            issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+            automation="agent-fix",
+        ),
     )
-    return (DashboardNextAction(
-        priority=priority,
-        action="repair Markdown/docs checking signal",
-        reason=reason,
-        evidence=MARKDOWN_EVIDENCE_TARGET,
-        owner_surface=".codex/personal/skills/md-style-check/SKILL.md and tools/runtime/dispatch/agent-canon/src/docs.rs",
-        command="tools/bin/agent-canon docs check",
-        done_condition="markdown eval failures are 0 and markdown hook signal is present",
-        issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-        automation="agent-fix",
-    ),)
 
 
-def prompt_tool_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def prompt_tool_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next action for prompt/tool selection evidence gaps."""
     breakdown = summary.prompt_tool_breakdown
     if (
@@ -3810,20 +3739,24 @@ def prompt_tool_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
         and breakdown.prompt_missing_excerpt_entries == 0
     ):
         return ()
-    return (DashboardNextAction(
-        priority="P2",
-        action="repair prompt and tool selection evidence",
-        reason="prompt excerpts or tool selection entries are missing",
-        evidence=PROMPT_TOOL_EVIDENCE_TARGET,
+    return (
+        DashboardNextAction(
+            priority="P2",
+            action="repair prompt and tool selection evidence",
+            reason="prompt excerpts or tool selection entries are missing",
+            evidence=PROMPT_TOOL_EVIDENCE_TARGET,
             owner_surface="tools/runtime/archive/behavior_event_assembly.py",
-        command=DASHBOARD_TOOL_ROUTE,
-        done_condition="prompt_entries>0, tool_selection_entries>0, prompt_missing_excerpt_entries=0",
-        issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-        automation="agent-fix",
-    ),)
+            command=DASHBOARD_TOOL_ROUTE,
+            done_condition="prompt_entries>0, tool_selection_entries>0, prompt_missing_excerpt_entries=0",
+            issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+            automation="agent-fix",
+        ),
+    )
 
 
-def token_usage_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def token_usage_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next action for missing token evidence."""
     if not summary.token_usage_breakdown.objective_selected:
         return ()
@@ -3832,20 +3765,24 @@ def token_usage_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
         or summary.token_usage_breakdown.summary_count > 0
     ):
         return ()
-    return (DashboardNextAction(
-        priority="P2",
-        action="add token consumption moving-average evidence",
-        reason="no token footprint comparison or moving-average evidence found",
-        evidence=TOKEN_USAGE_EVIDENCE_TARGET,
-        owner_surface="workflow_monitoring.md and token logging hooks",
-        command="python3 eval/checkers/compare_codex_token_footprints.py --session-glob '<sessions>' --report-dir <run>",
-        done_condition="AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS>0 or AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES>0",
-        issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
-        automation="human-review-then-agent-fix",
-    ),)
+    return (
+        DashboardNextAction(
+            priority="P2",
+            action="add token consumption moving-average evidence",
+            reason="no token footprint comparison or moving-average evidence found",
+            evidence=TOKEN_USAGE_EVIDENCE_TARGET,
+            owner_surface="workflow_monitoring.md and token logging hooks",
+            command="python3 eval/checkers/compare_codex_token_footprints.py --session-glob '<sessions>' --report-dir <run>",
+            done_condition="AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS>0 or AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES>0",
+            issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
+            automation="human-review-then-agent-fix",
+        ),
+    )
 
 
-def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
+def durable_issue_next_action(
+    summary: RuntimeDashboardSummary,
+) -> tuple[DashboardNextAction, ...]:
     """Return the next host-publisher action for explicit IssueWorker candidates."""
     handoffs = getattr(summary, "issue_worker_handoffs", ())
     qualified = tuple(handoff for handoff in handoffs if handoff.qualifies)
@@ -3867,17 +3804,19 @@ def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
             if unresolved
             else f"{len(qualified)} same-repository candidate(s) require host publication"
         )
-        return (DashboardNextAction(
-            priority="P1",
-            action=action,
-            reason=reason,
-            evidence=repositories,
-            owner_surface="IssueWorker publisher and GitHub Issue readback",
-            command="route the typed handoff to the publisher role; dashboard remains read-only",
-            done_condition="each candidate is created, updated, reorganized, or explicitly deferred with readback",
-            issue="`issue-worker`",
-            automation="host-publisher",
-        ),)
+        return (
+            DashboardNextAction(
+                priority="P1",
+                action=action,
+                reason=reason,
+                evidence=repositories,
+                owner_surface="IssueWorker publisher and GitHub Issue readback",
+                command="route the typed handoff to the publisher role; dashboard remains read-only",
+                done_condition="each candidate is created, updated, reorganized, or explicitly deferred with readback",
+                issue="`issue-worker`",
+                automation="host-publisher",
+            ),
+        )
     published_urls = {
         receipt.url for receipt in getattr(summary, "issue_publication_receipts", ())
     }
@@ -3887,17 +3826,19 @@ def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
     if not pending_refs:
         return ()
     issue = pending_refs[0]
-    return (DashboardNextAction(
-        priority="P2",
-        action="triage oldest open durable issue",
-        reason=f"{len(pending_refs)} repository-qualified GitHub Issue references are pending",
-        evidence=issue,
-        owner_surface="GitHub Issue URL/number and private packet locator",
-        command="python3 tools/repository/github/issue_sync.py --sync-pending",
-        done_condition="GitHub Issue URL/number is read back or lookup is explicitly deferred",
-        issue=f"`{issue}`",
-        automation="human-review",
-    ),)
+    return (
+        DashboardNextAction(
+            priority="P2",
+            action="triage oldest open durable issue",
+            reason=f"{len(pending_refs)} repository-qualified GitHub Issue references are pending",
+            evidence=issue,
+            owner_surface="GitHub Issue URL/number and private packet locator",
+            command="python3 tools/repository/github/issue_sync.py --sync-pending",
+            done_condition="GitHub Issue URL/number is read back or lookup is explicitly deferred",
+            issue=f"`{issue}`",
+            automation="human-review",
+        ),
+    )
 
 
 def next_action_row(action: DashboardNextAction) -> str:
@@ -3929,7 +3870,11 @@ def next_action_sort_key(action: DashboardNextAction) -> tuple[int, str]:
 
 def blocking_next_action_count(summary: RuntimeDashboardSummary) -> int:
     """Return P0/P1 next action count."""
-    return sum(1 for action in dashboard_next_actions(summary) if action.priority in {"P0", "P1"})
+    return sum(
+        1
+        for action in dashboard_next_actions(summary)
+        if action.priority in {"P0", "P1"}
+    )
 
 
 def top_counter_key(counter: Counter[str], default_key: str) -> str:
@@ -3971,11 +3916,8 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_RECENT_DAYS={summary.recent_days if summary.recent_days is not None else 'all'}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_FILES={len(summary.hook_files)}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES={summary.hook_entries}",
-        f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS={family_count(summary, 'skill-workflow-prompt')}",
         f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS={family_count(summary, 'workflow-selection')}",
-        f"AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS={family_count(summary, 'report-quality')}",
         f"AGENT_RUNTIME_DASHBOARD_CODEX_AGENT_ROLE_REPORTS={family_count(summary, 'codex-agent-role')}",
-        f"AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_FAILED_SKILLS={len(summary.skill_eval_breakdown.active_failed)}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_ATTRIBUTED={summary.hook_workflow_breakdown.entries_with_workflow}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING={summary.hook_workflow_breakdown.entries_without_workflow}",
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_CONTEXT_ATTRIBUTED={summary.hook_workflow_breakdown.context_attributed_entries}",
@@ -4002,8 +3944,6 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE={selection_miss_rate(summary, 'skill')}",
         f"AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_MISS_RATE={selection_miss_rate(summary, 'workflow')}",
         f"AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_MISS_RATE={selection_miss_rate(summary, 'tool')}",
-        f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS={summary.markdown_docs_breakdown.eval_reports}",
-        f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES={summary.markdown_docs_breakdown.failed_eval_reports}",
         f"AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS={markdown_hook_signal_count(summary)}",
         f"AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES={summary.reference_capture_breakdown.entries}",
         f"AGENT_RUNTIME_DASHBOARD_REFERENCE_URL_OBSERVATIONS={summary.reference_capture_breakdown.url_observations}",
@@ -4015,16 +3955,19 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_GITHUB_ISSUE_REFS={len(summary.evidence.github_issue_refs)}",
         f"AGENT_RUNTIME_DASHBOARD_ISSUE_PUBLICATION_RECEIPTS={len(receipts)}",
         f"AGENT_RUNTIME_DASHBOARD_ISSUE_PUBLICATION_ACTIONS={compact_counter_summary(publication_actions)}",
-        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_QUALIFIED={sum(handoff.qualifies for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
-        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_ROUTEABLE={sum(handoff.can_route for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
-        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_HANDOFFS={sum(handoff.status == 'handoff' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
-        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_NO_ACTION={sum(handoff.status == 'no-action' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_QUALIFIED={sum(handoff.qualifies for handoff in getattr(summary, 'issue_worker_handoffs', ()))}",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_ROUTEABLE={sum(handoff.can_route for handoff in getattr(summary, 'issue_worker_handoffs', ()))}",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_HANDOFFS={sum(handoff.status == 'handoff' for handoff in getattr(summary, 'issue_worker_handoffs', ()))}",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_NO_ACTION={sum(handoff.status == 'no-action' for handoff in getattr(summary, 'issue_worker_handoffs', ()))}",
     ]
 
 
 def entry_is_reference_capture(entry: dict[str, object]) -> bool:
     """Return whether a hook entry carries reference-capture evidence."""
-    return "url_count" in entry or str(entry.get("hook_name") or "") == "reference_capture_guard"
+    return (
+        "url_count" in entry
+        or str(entry.get("hook_name") or "") == "reference_capture_guard"
+    )
 
 
 def family_count(summary: RuntimeDashboardSummary, family_name: str) -> int:
@@ -4067,12 +4010,16 @@ def markdown_hook_signal_count(summary: RuntimeDashboardSummary) -> int:
 
 def selection_selected_total(summary: RuntimeDashboardSummary) -> int:
     """Return total selected count for all responsibilities."""
-    return sum(row.selected_count for row in summary.selection_metrics_breakdown.metrics)
+    return sum(
+        row.selected_count for row in summary.selection_metrics_breakdown.metrics
+    )
 
 
 def selection_candidate_total(summary: RuntimeDashboardSummary) -> int:
     """Return total candidate count for all responsibilities."""
-    return sum(row.candidate_count for row in summary.selection_metrics_breakdown.metrics)
+    return sum(
+        row.candidate_count for row in summary.selection_metrics_breakdown.metrics
+    )
 
 
 def selection_missed_total(summary: RuntimeDashboardSummary) -> int:
@@ -4080,7 +4027,9 @@ def selection_missed_total(summary: RuntimeDashboardSummary) -> int:
     return sum(row.missed_count for row in summary.selection_metrics_breakdown.metrics)
 
 
-def selection_selected_total_for(summary: RuntimeDashboardSummary, responsibility: str) -> int:
+def selection_selected_total_for(
+    summary: RuntimeDashboardSummary, responsibility: str
+) -> int:
     """Return selected count for one responsibility."""
     return sum(
         row.selected_count
@@ -4089,7 +4038,9 @@ def selection_selected_total_for(summary: RuntimeDashboardSummary, responsibilit
     )
 
 
-def selection_candidate_total_for(summary: RuntimeDashboardSummary, responsibility: str) -> int:
+def selection_candidate_total_for(
+    summary: RuntimeDashboardSummary, responsibility: str
+) -> int:
     """Return candidate count for one responsibility."""
     return sum(
         row.candidate_count
@@ -4098,7 +4049,9 @@ def selection_candidate_total_for(summary: RuntimeDashboardSummary, responsibili
     )
 
 
-def selection_missed_total_for(summary: RuntimeDashboardSummary, responsibility: str) -> int:
+def selection_missed_total_for(
+    summary: RuntimeDashboardSummary, responsibility: str
+) -> int:
     """Return missed candidate count for one responsibility."""
     return sum(
         row.missed_count
@@ -4128,7 +4081,9 @@ def normalized_text_values(value: object) -> tuple[str, ...]:
         return (value,) if value else ()
     if not isinstance(value, list):
         return ()
-    return tuple(item for item in cast(list[object], value) if isinstance(item, str) and item)
+    return tuple(
+        item for item in cast(list[object], value) if isinstance(item, str) and item
+    )
 
 
 def split_counter_field(value: str) -> tuple[str, ...]:
@@ -4150,7 +4105,9 @@ def integer_field(entry: dict[str, object], key: str) -> int:
 
 def selection_namespace(entry: dict[str, object], hook_file: Path) -> str:
     """Return the runtime namespace used for cross-entry selection matching."""
-    return str(entry.get("hook_log_namespace") or hook_file.parent.name or "missing_namespace")
+    return str(
+        entry.get("hook_log_namespace") or hook_file.parent.name or "missing_namespace"
+    )
 
 
 def future_selected_positions(
@@ -4170,7 +4127,9 @@ def future_selected_positions(
         for responsibility, names in selected.items():
             for name in names:
                 positions[(namespace, responsibility, name)].append(sequence)
-                positions[(ALL_SELECTION_NAMESPACES, responsibility, name)].append(sequence)
+                positions[(ALL_SELECTION_NAMESPACES, responsibility, name)].append(
+                    sequence
+                )
     return {key: tuple(value) for key, value in positions.items()}
 
 
@@ -4188,7 +4147,10 @@ def has_future_selection(
     )
     if namespace_match:
         return True
-    if responsibility == "workflow" or (responsibility, name) in CROSS_NAMESPACE_SELECTION_COMPONENTS:
+    if (
+        responsibility == "workflow"
+        or (responsibility, name) in CROSS_NAMESPACE_SELECTION_COMPONENTS
+    ):
         return bool(positions.get((ALL_SELECTION_NAMESPACES, responsibility, name), ()))
     return False
 
@@ -4208,7 +4170,9 @@ def selected_by_responsibility(
     }
 
 
-def candidates_by_responsibility(entry: dict[str, object]) -> dict[str, tuple[str, ...]]:
+def candidates_by_responsibility(
+    entry: dict[str, object],
+) -> dict[str, tuple[str, ...]]:
     """Return candidate skills, workflows, and tools from one hook entry."""
     return {
         "skill": metric_candidate_skill_values(entry),
@@ -4233,7 +4197,9 @@ def metric_candidate_skill_values(entry: dict[str, object]) -> tuple[str, ...]:
     metric_candidates: list[str] = []
     for candidate in candidates:
         candidate_reasons = reasons_by_skill.get(candidate, [])
-        if candidate_reasons and all("related_to=" in detail for detail in candidate_reasons):
+        if candidate_reasons and all(
+            "related_to=" in detail for detail in candidate_reasons
+        ):
             continue
         metric_candidates.append(candidate)
     return unique_text_values(metric_candidates)
@@ -4278,9 +4244,13 @@ def canonical_selection_values(
     if responsibility == "skill":
         if not valid_skill_ids:
             return unique_text_values(values)
-        return tuple(value for value in unique_text_values(values) if value in valid_skill_ids)
+        return tuple(
+            value for value in unique_text_values(values) if value in valid_skill_ids
+        )
     if responsibility == "workflow":
-        workflows = unique_text_values(tuple(canonical_workflow_name(value) for value in values))
+        workflows = unique_text_values(
+            tuple(canonical_workflow_name(value) for value in values)
+        )
         if not valid_workflow_names:
             return workflows
         return tuple(value for value in workflows if value in valid_workflow_names)
@@ -4349,7 +4319,9 @@ def command_parts_to_tool_values(value: object) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     names: list[str] = []
-    parts = tuple(part for part in cast(list[object], value) if isinstance(part, str) and part)
+    parts = tuple(
+        part for part in cast(list[object], value) if isinstance(part, str) and part
+    )
     if not parts:
         return ()
     names.append(command_part_tool_name(parts[0]))
@@ -4405,7 +4377,10 @@ def recent_cutoff_epoch(recent_days: int | None) -> int | None:
     """Return the lower epoch bound for a recent-day filter."""
     if recent_days is None:
         return None
-    return int(time.time()) - recent_days * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE
+    return (
+        int(time.time())
+        - recent_days * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE
+    )
 
 
 def path_mtime_epoch(path: Path) -> int:
@@ -4529,7 +4504,9 @@ def read_selection_path_reset(root: Path, relative_path: Path) -> SelectionReset
     return SelectionReset(relative_path.as_posix(), NO_RESET_EPOCH, UNKNOWN_RESET_BASIS)
 
 
-def selection_source_path_candidates(responsibility: str, name: str) -> tuple[Path, ...]:
+def selection_source_path_candidates(
+    responsibility: str, name: str
+) -> tuple[Path, ...]:
     """Return likely source paths for one skill, workflow, or tool."""
     slug = name.removeprefix("$")
     if not _is_valid_selection_source_candidate(slug):
@@ -4624,7 +4601,9 @@ def average_ratio(values: Sequence[float]) -> str:
 
 def rolling_average_timed_ratio(values: Sequence[TimedFloatMetric]) -> str:
     """Return a compact chronological moving-average ratio."""
-    return average_ratio(tuple(observation.value for observation in values[-ROLLING_TREND_WINDOW:]))
+    return average_ratio(
+        tuple(observation.value for observation in values[-ROLLING_TREND_WINDOW:])
+    )
 
 
 def mean_int_label(values: Sequence[int]) -> str:
@@ -4636,7 +4615,9 @@ def mean_int_label(values: Sequence[int]) -> str:
 
 def rolling_mean_timed_int_label(values: Sequence[TimedIntMetric]) -> str:
     """Return a compact chronological integer moving-average label."""
-    return mean_int_label(tuple(observation.value for observation in values[-ROLLING_TREND_WINDOW:]))
+    return mean_int_label(
+        tuple(observation.value for observation in values[-ROLLING_TREND_WINDOW:])
+    )
 
 
 def prompt_token_joint_status(summary: RuntimeDashboardSummary) -> str:
@@ -4658,7 +4639,10 @@ def counter_table_rows(counter: Counter[str]) -> list[str]:
     """Return table rows for a counter, or an explicit none row."""
     if not counter:
         return ["| `_none` | `0` |"]
-    return [f"| `{key}` | `{value}` |" for key, value in counter.most_common(MAX_REPORT_LINES)]
+    return [
+        f"| `{key}` | `{value}` |"
+        for key, value in counter.most_common(MAX_REPORT_LINES)
+    ]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -4721,7 +4705,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"AGENT_RUNTIME_DASHBOARD={output}")
     print("AGENT_RUNTIME_DASHBOARD_STATUS=pass")
     print(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}")
-    print(f"AGENT_RUNTIME_DASHBOARD_RECENT_DAYS={summary.recent_days if summary.recent_days is not None else 'all'}")
+    print(
+        f"AGENT_RUNTIME_DASHBOARD_RECENT_DAYS={summary.recent_days if summary.recent_days is not None else 'all'}"
+    )
     print(f"AGENT_RUNTIME_DASHBOARD_HOOK_FILES={len(summary.hook_files)}")
     print(f"AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES={summary.hook_entries}")
     return 0
@@ -4731,5 +4717,8 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except RuntimeArtifactError as exc:
-        print(f"generate_agent_runtime_dashboard.py: runtime_root_required: {exc}", file=sys.stderr)
+        print(
+            f"generate_agent_runtime_dashboard.py: runtime_root_required: {exc}",
+            file=sys.stderr,
+        )
         raise SystemExit(2) from exc

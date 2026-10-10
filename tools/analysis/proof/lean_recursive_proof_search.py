@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Runs target-driven Lean tactic attempts from a JSON proof-search plan.
-# upstream design ../../agents/skills/formal-proof-workflow.md defines recursive target-driven proof search.
-# downstream design ../../documents/tools/lean_recursive_proof_search.md documents CLI usage.
+# upstream design ../../../agents/skills/formal-proof-workflow.md defines recursive target-driven proof search.
+# downstream design ../../../documents/tools/lean_recursive_proof_search.md documents CLI usage.
 # @dependency-end
 
 """Run recursive Lean proof-search targets and record unresolved goals.

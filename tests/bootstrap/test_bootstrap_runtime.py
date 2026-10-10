@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -57,7 +60,9 @@ def test_container_source_identity_matches_canonical_remote_normalization(
     remote: str, normalized: str
 ) -> None:
     """The resident identity operation delegates to the canonical resolver."""
-    from tools.runtime.archive.log_repository_identity import stable_source_repository_id
+    from tools.runtime.archive.log_repository_identity import (
+        stable_source_repository_id,
+    )
 
     result = _container_source_identity(remote)
     repository_id = stable_source_repository_id(remote)
@@ -75,8 +80,7 @@ def test_container_source_identity_preserves_live_agent_canon_branch() -> None:
         "git@github.com:iwashita-nozomu/agent-canon.git"
     )
     assert result["stable_branch"] == (
-        "logs/github.com-iwashita-nozomu-agent-canon-"
-        "9680c2230417944f4dd780e2"
+        "logs/github.com-iwashita-nozomu-agent-canon-9680c2230417944f4dd780e2"
     )
 
 
@@ -95,8 +99,7 @@ def test_source_identity_operation_has_no_runtime_side_effects(tmp_path: Path) -
         ]
     )
     assert run(args)["stable_branch"] == (
-        "logs/github.com-iwashita-nozomu-agent-canon-"
-        "9680c2230417944f4dd780e2"
+        "logs/github.com-iwashita-nozomu-agent-canon-9680c2230417944f4dd780e2"
     )
 
 
@@ -160,11 +163,16 @@ def test_source_identity_accepts_transport_variants_and_rejects_other_repo() -> 
         "ssh://git@github.com/iwashita-nozomu/agent-canon",
         "https://reader:credential@github.com:443/iwashita-nozomu/agent-canon.git",
     )
-    identities = {_container_source_identity(remote)["repository_id"] for remote in equivalent}
+    identities = {
+        _container_source_identity(remote)["repository_id"] for remote in equivalent
+    }
     assert len(identities) == 1
-    assert _container_source_identity(
-        "https://github.com/iwashita-nozomu/agent-canon-log.git"
-    )["repository_id"] not in identities
+    assert (
+        _container_source_identity(
+            "https://github.com/iwashita-nozomu/agent-canon-log.git"
+        )["repository_id"]
+        not in identities
+    )
 
 
 def test_remote_identity_mode_never_accepts_source_override() -> None:
@@ -236,7 +244,11 @@ def test_global_skill_projection_is_a_directory_link() -> None:
 
 def test_explicit_runtime_root_is_parse_only(tmp_path: Path) -> None:
     """Runtime state always belongs to the source checkout."""
-    control, source, supplied = tmp_path / "control", tmp_path / "source", tmp_path / "outside"
+    control, source, supplied = (
+        tmp_path / "control",
+        tmp_path / "source",
+        tmp_path / "outside",
+    )
     control.mkdir()
     source.mkdir()
     supplied.mkdir()
@@ -277,7 +289,10 @@ def test_runtime_paths_preserve_host_roots_and_fixed_container_destinations(
         monkeypatch.setenv(f"AGENT_CANON_HOST_{name}_ROOT", str(path))
 
     assert paths.mounts == Path(bootstrap_runtime_module.REGISTRY_DESTINATION)
-    assert paths.source_sync == Path(bootstrap_runtime_module.SOURCE_SYNC_DESTINATION) / "source-sync.json"
+    assert (
+        paths.source_sync
+        == Path(bootstrap_runtime_module.SOURCE_SYNC_DESTINATION) / "source-sync.json"
+    )
     assert paths.codex_home == host_surfaces["CODEX_HOME"]
     assert paths.spool == host_surfaces["SPOOL"]
     assert paths.archive == host_surfaces["ARCHIVE"]
@@ -295,8 +310,12 @@ def test_default_source_runtime_rebuilds_without_copying_legacy_state(
     (repository / "bootstrap" / "host" / "manifest.toml").write_bytes(
         (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
     )
-    scheduler_source = REPOSITORY_ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
-    scheduler_target = repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_source = (
+        REPOSITORY_ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    )
+    scheduler_target = (
+        repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    )
     scheduler_target.mkdir(parents=True)
     for template in scheduler_source.glob("*.in"):
         (scheduler_target / template.name).write_bytes(template.read_bytes())
@@ -349,7 +368,11 @@ def test_default_source_runtime_rebuilds_without_copying_legacy_state(
 
 def test_explicit_runtime_argument_does_not_redirect_state(tmp_path: Path) -> None:
     """The caller's runtime argument cannot move state outside the source root."""
-    control, source, supplied = tmp_path / "control", tmp_path / "source", tmp_path / "supplied"
+    control, source, supplied = (
+        tmp_path / "control",
+        tmp_path / "source",
+        tmp_path / "supplied",
+    )
     control.mkdir()
     source.mkdir()
     supplied.mkdir()
@@ -636,6 +659,272 @@ def test_multi_target_registry_and_admission_race_guard(
     manager.release_task("task-a")
 
 
+def _admit_process_owned_task(
+    manager: BootstrapRuntime, task_id: str, target: Path
+) -> tuple[dict[str, Any], int]:
+    """Admit one runtime-owned worker and retain its process lease descriptor."""
+    with manager.locked():
+        state = manager._read_state()
+        record, lease_fd = manager._admit_task_locked(
+            state, task_id, target_root=target, process_owned=True
+        )
+    assert lease_fd is not None
+    return record, lease_fd
+
+
+def _run_process_owned_worker_controller(
+    manager: BootstrapRuntime,
+    task_id: str,
+    target: Path,
+    ready_file: Path,
+    exchange_root: Path,
+) -> None:
+    """Spawn one resident worker that keeps its admitted process lease."""
+    os.environ["AGENT_CANON_CONTAINER_CONTROL"] = "1"
+    os.environ["AGENT_CANON_EXCHANGE_ROOT"] = str(exchange_root)
+    _, lease_fd = _admit_process_owned_task(manager, task_id, target)
+    try:
+        manager.docker.exec_container(
+            "resident",
+            cwd=str(target),
+            argv=[
+                "/bin/sh",
+                "-c",
+                'printf "%s\\n" "$$" > "$READY_FILE"; exec /bin/sleep 30',
+            ],
+            environment={"READY_FILE": str(ready_file)},
+            pass_fds=(lease_fd,),
+        )
+    finally:
+        os.close(lease_fd)
+
+
+def _ready_runtime_with_target(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> tuple[BootstrapRuntime, Path]:
+    """Build the minimum ready runtime state for task lease tests."""
+    manager = runtime(tmp_path, fake_docker)
+    target = tmp_path / "target"
+    target.mkdir()
+    manager.install()
+    manager.start()
+    manager.target_add(target)
+    return manager, target
+
+
+def test_resident_exec_passes_process_lease_to_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The local resident worker receives the FD that protects its task lease."""
+    lease_path = tmp_path / "process-lease.lock"
+    lease_fd = os.open(lease_path, os.O_CREAT | os.O_RDWR, 0o600)
+    observed: dict[str, tuple[int, ...]] = {}
+
+    def fake_run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["pass_fds"] = tuple(kwargs["pass_fds"])
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setattr(bootstrap_runtime_module.subprocess, "run", fake_run)
+    try:
+        result = DockerAdapter().exec_container(
+            "resident",
+            cwd="/",
+            argv=["worker"],
+            pass_fds=(lease_fd,),
+        )
+    finally:
+        os.close(lease_fd)
+
+    assert result.returncode == 0
+    assert observed["pass_fds"] == (lease_fd,)
+
+
+def test_process_lease_survives_controller_death_until_worker_exits(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """A live child keeps its lease after controller death until admission recovers."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    task_id = "exec-controller-death"
+    ready_file = tmp_path / "worker.pid"
+    exchange_root = manager.paths.runtime_root / "process-lease-exchange"
+    exchange_root.mkdir()
+    exchange_root.chmod(0o700)
+    controller = multiprocessing.get_context("fork").Process(
+        target=_run_process_owned_worker_controller,
+        args=(manager, task_id, target, ready_file, exchange_root),
+    )
+    worker_pid: int | None = None
+    worker_stop_sent = False
+    next_task_admitted = False
+
+    def ready_worker_pid() -> int | None:
+        try:
+            value = ready_file.read_text(encoding="ascii").strip()
+        except OSError:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    controller.start()
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            worker_pid = ready_worker_pid()
+            if worker_pid is not None:
+                break
+            if not controller.is_alive():
+                break
+            time.sleep(0.01)
+        assert worker_pid is not None, "resident worker did not publish its PID"
+
+        controller_pid = controller.pid
+        assert controller_pid is not None
+        os.kill(controller_pid, signal.SIGKILL)
+        controller.join(timeout=5)
+        assert not controller.is_alive(), "controller did not exit after SIGKILL"
+        assert controller.exitcode == -signal.SIGKILL
+        os.kill(worker_pid, 0)
+
+        with pytest.raises(BootstrapError) as live_worker:
+            manager.admit_task("exec-next", target_root=target)
+        assert live_worker.value.code == "target_busy"
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert state["tasks"][task_id]["state"] == "active"
+        assert state["tasks"][task_id]["pinned"] is True
+
+        try:
+            os.kill(worker_pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        worker_stop_sent = True
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                result = manager.admit_task("exec-next", target_root=target)
+            except BootstrapError as exc:
+                if exc.code != "target_busy" or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
+            else:
+                next_task_admitted = True
+                break
+
+        assert result["code"] == "task_reserved"
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert state["tasks"][task_id]["state"] == "cancelled"
+        assert state["tasks"][task_id]["outcome"] == "terminated"
+        assert state["tasks"][task_id]["pinned"] is False
+        assert state["tasks"]["exec-next"]["state"] == "active"
+    finally:
+        if worker_pid is None and controller.is_alive():
+            deadline = time.monotonic() + 1
+            while time.monotonic() < deadline:
+                worker_pid = ready_worker_pid()
+                if worker_pid is not None or not controller.is_alive():
+                    break
+                time.sleep(0.01)
+        if controller.is_alive():
+            controller_pid = controller.pid
+            if controller_pid is not None:
+                os.kill(controller_pid, signal.SIGKILL)
+            controller.join(timeout=5)
+        if worker_pid is not None and not worker_stop_sent:
+            try:
+                os.kill(worker_pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            worker_stop_sent = True
+        if worker_pid is not None:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                lease_fd = manager._open_task_process_lease(task_id)
+                if lease_fd is not None:
+                    os.close(lease_fd)
+                    break
+                time.sleep(0.01)
+        if next_task_admitted:
+            manager.release_task("exec-next")
+
+
+def test_dead_process_task_lease_is_reconciled_before_next_admission(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """An unlocked exec lease is released before it can keep its target busy."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    record, lease_fd = _admit_process_owned_task(manager, "exec-old", target)
+    os.close(lease_fd)
+
+    result = manager.admit_task("exec-next", target_root=target)
+
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert record["lease_kind"] == "process"
+    assert result["code"] == "task_reserved"
+    assert state["tasks"]["exec-old"]["state"] == "cancelled"
+    assert state["tasks"]["exec-old"]["outcome"] == "terminated"
+    assert state["tasks"]["exec-old"]["pinned"] is False
+    assert state["tasks"]["exec-next"]["state"] == "active"
+    manager.release_task("exec-next")
+
+
+def test_live_process_task_lease_and_manual_release_stay_protected(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """A held worker lock blocks both admission and explicit task release."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    record, lease_fd = _admit_process_owned_task(manager, "exec-live", target)
+    try:
+        with pytest.raises(BootstrapError, match="target_busy"):
+            manager.admit_task("exec-next", target_root=target)
+        with pytest.raises(BootstrapError, match="task_process_active"):
+            manager.release_task("exec-live", outcome="terminated")
+
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert state["tasks"][record["id"]]["state"] == "active"
+        assert state["tasks"][record["id"]]["pinned"] is True
+    finally:
+        os.close(lease_fd)
+
+
+def test_manual_task_lease_remains_persistent_without_process_marker(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """Caller-owned reservations remain pinned until their explicit release."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    receipt = manager.admit_task("caller-lease", target_root=target)
+
+    with pytest.raises(BootstrapError, match="target_busy"):
+        manager.admit_task("exec-next", target_root=target)
+
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert "lease_kind" not in receipt["details"]["task"]
+    assert state["tasks"]["caller-lease"]["state"] == "active"
+    assert state["tasks"]["caller-lease"]["pinned"] is True
+    manager.release_task("caller-lease")
+
+
+def test_closed_admission_does_not_reconcile_process_task_lease(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """Closed lifecycle states reject before reconciliation mutates task state."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    record, lease_fd = _admit_process_owned_task(manager, "exec-old", target)
+    os.close(lease_fd)
+    with manager.locked():
+        state = manager._read_state()
+        state["state"] = "stopped"
+        manager._write_state(state)
+
+    with pytest.raises(BootstrapError, match="task_admission_closed"):
+        manager.admit_task("exec-next", target_root=target)
+
+    after = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert after["tasks"][record["id"]]["state"] == "active"
+    assert after["tasks"][record["id"]]["pinned"] is True
+
+
 def test_target_add_prunes_missing_target_and_is_idempotent(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:
@@ -785,10 +1074,15 @@ def test_exec_and_tool_run_return_bounded_io_evidence_and_external_logs(
     output_env = next(
         docker_exec[index + 1]
         for index, value in enumerate(docker_exec)
-        if value == "--env" and docker_exec[index + 1].startswith("AGENT_CANON_OUTPUT_ROOT=")
+        if value == "--env"
+        and docker_exec[index + 1].startswith("AGENT_CANON_OUTPUT_ROOT=")
     )
-    assert output_env == "AGENT_CANON_OUTPUT_ROOT=/var/lib/agent-canon/runtime/tool-output"
-    assert "AGENT_CANON_HOOK_ARCHIVE_DIR=/var/lib/agent-canon/private-log" in docker_exec
+    assert (
+        output_env == "AGENT_CANON_OUTPUT_ROOT=/var/lib/agent-canon/runtime/tool-output"
+    )
+    assert (
+        "AGENT_CANON_HOOK_ARCHIVE_DIR=/var/lib/agent-canon/private-log" in docker_exec
+    )
     assert "AGENT_CANON_LOG_ROOT=/var/lib/agent-canon/private-log" in docker_exec
     assert any(
         value.startswith("TMPDIR=/var/lib/agent-canon/runtime/tasks/")
@@ -897,7 +1191,12 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
         environment: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         captured.update(
-            {"catalog_id": catalog_id, "argv": argv, "root": root, "environment": environment}
+            {
+                "catalog_id": catalog_id,
+                "argv": argv,
+                "root": root,
+                "environment": environment,
+            }
         )
         return {"code": "completed"}
 
@@ -957,7 +1256,13 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
         "mode": "read-only",
     }
     state = manager._new_state()
-    state.update({"state": "ready", "targets": {digest: target_record}, "resources": manager._resource_records()})
+    state.update(
+        {
+            "state": "ready",
+            "targets": {digest: target_record},
+            "resources": manager._resource_records(),
+        }
+    )
     manager._write_mounts(state)
     manager._write_mount_manifest(state)
     manager._write_state(state)
@@ -1062,7 +1367,9 @@ def test_structured_tool_environment_rejects_private_log_self_claim(
         "output_root": None,
     }
 
-    with pytest.raises(BootstrapError, match="archive path does not match private log mount"):
+    with pytest.raises(
+        BootstrapError, match="archive path does not match private log mount"
+    ):
         _container_request_environment(
             request,
             container_target=Path("/targets/target"),
@@ -1170,10 +1477,10 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     private_log = control / "private-log"
     private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
-    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
-    manager = BootstrapRuntime(
-        control, runtime_root, repository_root=REPOSITORY_ROOT
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
     )
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     current_root, previous_root = tmp_path / "current", tmp_path / "previous"
     current_root.mkdir()
@@ -1215,7 +1522,11 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
             },
             "resources": {
                 "image": {"id": current_id, "state": "present", "owned": True},
-                "container": {"id": "container-current", "state": "running", "owned": True},
+                "container": {
+                    "id": "container-current",
+                    "state": "running",
+                    "owned": True,
+                },
             },
         }
     )
@@ -1249,9 +1560,10 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     rollback = restored["generations"][restored["rollback_generation"]]
     assert active["targets"] == {previous_digest: previous_target}
     assert rollback["targets"] == {current_digest: current_target}
-    assert f"{previous_digest}\t{previous_root}\t/targets/{previous_digest}\tread-only" in (
-        manager.paths.container_runtime / "mounts.tsv"
-    ).read_text(encoding="utf-8")
+    assert (
+        f"{previous_digest}\t{previous_root}\t/targets/{previous_digest}\tread-only"
+        in (manager.paths.container_runtime / "mounts.tsv").read_text(encoding="utf-8")
+    )
 
 
 def test_container_restore_reads_mounted_target_backup(
@@ -1264,7 +1576,9 @@ def test_container_restore_reads_mounted_target_backup(
     private_log = control / "private-log"
     private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
-    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     candidate_root, restored_root = tmp_path / "candidate", tmp_path / "restored"
@@ -1302,7 +1616,11 @@ def test_container_restore_reads_mounted_target_backup(
             },
             "resources": {
                 "image": {"id": candidate_id, "state": "present", "owned": True},
-                "container": {"id": "container-candidate", "state": "running", "owned": True},
+                "container": {
+                    "id": "container-candidate",
+                    "state": "running",
+                    "owned": True,
+                },
             },
         }
     )
@@ -1315,9 +1633,7 @@ def test_container_restore_reads_mounted_target_backup(
         encoding="utf-8",
     )
     monkeypatch.setenv("AGENT_CANON_RESTORE_IMAGE_ID", restored_id)
-    monkeypatch.setenv(
-        "AGENT_CANON_CURRENT_IMAGE_ID", candidate_id
-    )
+    monkeypatch.setenv("AGENT_CANON_CURRENT_IMAGE_ID", candidate_id)
     monkeypatch.setenv(
         "AGENT_CANON_RESTORE_TARGETS_FILE",
         str(backup),
@@ -1356,7 +1672,9 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
     private_log = control / "private-log"
     private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
-    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
     image_id = "sha256:shared-image-1234567890"
     image_ref = "agent-canon-tools:shared"
     monkeypatch.setenv("AGENT_CANON_IMAGE_ID", image_id)
@@ -1369,8 +1687,17 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
         {
             "state": "ready",
             "resources": {
-                "image": {"id": image_id, "tag": image_ref, "state": "present", "owned": True},
-                "container": {"id": "container-shared", "state": "running", "owned": True},
+                "image": {
+                    "id": image_id,
+                    "tag": image_ref,
+                    "state": "present",
+                    "owned": True,
+                },
+                "container": {
+                    "id": "container-shared",
+                    "state": "running",
+                    "owned": True,
+                },
             },
         }
     )
@@ -1388,7 +1715,9 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
             return path
         return existing_no_symlink(path, field=field)
 
-    monkeypatch.setattr(bootstrap_runtime_module, "_existing_no_symlink", mounted_target)
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "_existing_no_symlink", mounted_target
+    )
     monkeypatch.setattr(
         bootstrap_runtime_module.BootstrapRuntime,
         "_prune_stale_targets",
@@ -1665,7 +1994,9 @@ def test_gc_enforces_archive_quota_only_without_unpublished_spool(
     manifest.write_text(
         (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml")
         .read_text(encoding="utf-8")
-        .replace("archive_lease_quota_bytes = 2147483648", "archive_lease_quota_bytes = 1"),
+        .replace(
+            "archive_lease_quota_bytes = 2147483648", "archive_lease_quota_bytes = 1"
+        ),
         encoding="utf-8",
     )
     control = tmp_path / "control"
@@ -1722,10 +2053,10 @@ def test_uninstall_removes_only_owned_container_and_image(
     cleanup_index = next(
         index
         for index, command in enumerate(fake_docker.commands)
-        if command[-2:] == [
+        if command[-2:]
+        == [
             "python3",
-            "/opt/agent-canon/source/tools/runtime/archive/"
-            "runtime_exchange_cleanup.py",
+            "/opt/agent-canon/source/tools/runtime/archive/runtime_exchange_cleanup.py",
         ]
     )
     stop_index = next(
@@ -1736,7 +2067,9 @@ def test_uninstall_removes_only_owned_container_and_image(
     assert cleanup_index < stop_index
 
 
-def test_exchange_cleanup_unlinks_symlink_without_touching_target(tmp_path: Path) -> None:
+def test_exchange_cleanup_unlinks_symlink_without_touching_target(
+    tmp_path: Path,
+) -> None:
     """The in-container cleanup cannot follow an exchange child symlink."""
     exchange = tmp_path / "exchange"
     outside = tmp_path / "outside"
@@ -1807,7 +2140,10 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
 
     status = changed.status()
     assert status["details"]["manifest_drift"] is True
-    assert status["resource_ids"]["container"]["id"] == old_state["resources"]["container"]["id"]
+    assert (
+        status["resource_ids"]["container"]["id"]
+        == old_state["resources"]["container"]["id"]
+    )
     updated = changed.update()
     rebound = json.loads(changed.paths.state.read_text(encoding="utf-8"))
     assert updated["code"] == "updated"
@@ -1862,10 +2198,12 @@ def test_public_python_source_sync_route_is_removed() -> None:
         "/tmp/runtime",
     ]
     with pytest.raises(SystemExit):
-        build_parser().parse_args(base + ["sync", "--install-root", str(REPOSITORY_ROOT)])
-    controller = (REPOSITORY_ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
-        encoding="utf-8"
-    )
+        build_parser().parse_args(
+            base + ["sync", "--install-root", str(REPOSITORY_ROOT)]
+        )
+    controller = (
+        REPOSITORY_ROOT / "tools/runtime/container/bootstrap_runtime.py"
+    ).read_text(encoding="utf-8")
     assert "SourceSync" not in controller
     assert "source_sync_image_required" not in controller
     assert not (REPOSITORY_ROOT / "tools/agent_tools/source_sync.py").exists()
@@ -1873,15 +2211,17 @@ def test_public_python_source_sync_route_is_removed() -> None:
 
 def test_source_sync_reader_uses_nested_directory_path() -> None:
     """The resident reads the host-mounted directory's nested state file."""
-    source = (REPOSITORY_ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
-        encoding="utf-8"
-    )
+    source = (
+        REPOSITORY_ROOT / "tools/runtime/container/bootstrap_runtime.py"
+    ).read_text(encoding="utf-8")
     assert 'SOURCE_SYNC_DESTINATION = "/var/lib/agent-canon/source-sync"' in source
     assert 'return self.runtime_root / "source-sync" / "source-sync.json"' in source
     assert 'return Path(SOURCE_SYNC_DESTINATION) / "source-sync.json"' in source
 
 
-def test_container_control_uses_host_passed_state_volume(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_container_control_uses_host_passed_state_volume(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Container control writes state below the mounted host runtime only."""
     repository = tmp_path / "image-source"
     (repository / "bootstrap" / "host").mkdir(parents=True)
@@ -1910,9 +2250,7 @@ def test_container_control_uses_host_passed_state_volume(tmp_path: Path, monkeyp
     assert not (repository / ".runtime").exists()
 
 
-def test_reconciliation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_reconciliation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A source-only refresh keeps active work; image replacement clears it."""
     control = tmp_path / "control"
     runtime_root = control / "runtime"
@@ -1932,7 +2270,9 @@ def test_reconciliation(
         "private_log_root",
         property(lambda _manager: private_log),
     )
-    monkeypatch.setattr(BootstrapRuntime, "_prune_stale_targets", lambda _manager, _state: [])
+    monkeypatch.setattr(
+        BootstrapRuntime, "_prune_stale_targets", lambda _manager, _state: []
+    )
     monkeypatch.setattr(BootstrapRuntime, "_write_mounts", lambda *_args: None)
     monkeypatch.setattr(BootstrapRuntime, "_write_mount_manifest", lambda *_args: None)
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
@@ -1957,9 +2297,12 @@ def test_reconciliation(
     args = build_parser().parse_args(
         [
             "--container-control",
-            "--repository-root", str(REPOSITORY_ROOT),
-            "--control-parent-root", str(control),
-            "--runtime-root", str(runtime_root),
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime_root),
             "update",
         ]
     )
@@ -1980,13 +2323,17 @@ def test_reconciliation(
     plan_text = plan.read_text(encoding="utf-8")
     assert "image-id\tsha256:" + "b" * 64 in plan_text
     assert "image-ref\tagent-canon-tools:previous" in plan_text
-    assert "mount\tmount\t" + str(tmp_path / "target-a") + "\t/targets/target-a\ttrue" in plan_text
+    assert (
+        "mount\tmount\t" + str(tmp_path / "target-a") + "\t/targets/target-a\ttrue"
+        in plan_text
+    )
 
     legacy_state = json.loads(json.dumps(after_replacement))
     legacy_state["generations"][legacy_state["rollback_generation"]].pop("targets")
     bootstrap_runtime_module._container_materialize_rollback_plan(manager, legacy_state)
-    assert "mount\tmount\t" + str(tmp_path / "target-a") + "\t/targets/target-a\ttrue" in plan.read_text(encoding="utf-8")
-
+    assert "mount\tmount\t" + str(
+        tmp_path / "target-a"
+    ) + "\t/targets/target-a\ttrue" in plan.read_text(encoding="utf-8")
 
 
 def test_eval_precondition_failure_creates_no_spool_or_exchange(
@@ -2054,7 +2401,9 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     source = tmp_path / "source"
     source.mkdir()
     subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
-    subprocess.run(["git", "-C", str(source), "config", "user.name", "Test"], check=True)
+    subprocess.run(
+        ["git", "-C", str(source), "config", "user.name", "Test"], check=True
+    )
     subprocess.run(
         ["git", "-C", str(source), "config", "user.email", "test@example.invalid"],
         check=True,
@@ -2063,7 +2412,15 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     subprocess.run(["git", "-C", str(source), "add", "README.md"], check=True)
     subprocess.run(["git", "-C", str(source), "commit", "-qm", "fixture"], check=True)
     subprocess.run(
-        ["git", "-C", str(source), "remote", "add", "origin", "https://github.com/example/source.git"],
+        [
+            "git",
+            "-C",
+            str(source),
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/example/source.git",
+        ],
         check=True,
     )
 
@@ -2108,7 +2465,10 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     collection = collected["details"]["collection"]
     assert collection["status"] == "collected"
     assert collection["source_tree_unchanged"] is True
-    assert len(collection["producer_matrix"]) == 4
+    assert sorted(producer["name"] for producer in collection["producer_matrix"]) == [
+        "codex-agent-role",
+        "workflow-selection",
+    ]
     assert collection["tool_image_digest"] == "sha256:fake-image-1"
     eval_command = next(
         command
@@ -2116,15 +2476,9 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
         if "/opt/agent-canon/source/eval/producers/run_accumulated_agent_evals.py"
         in command
     )
-    assert eval_command[eval_command.index("--root") + 1] == (
-        "/opt/agent-canon/source"
-    )
+    assert eval_command[eval_command.index("--root") + 1] == ("/opt/agent-canon/source")
     observed_target = eval_command[eval_command.index("--target-root") + 1]
     assert observed_target.startswith("/targets/")
-    assert eval_command[eval_command.index("--prompt-eval-manifest") + 1] == (
-        "/opt/agent-canon/source/eval/definitions/"
-        "skill_workflow_prompt_eval.toml"
-    )
     spool = manager.paths.runtime_root / "spool" / "eval-e2e"
     assert (spool / "collection.json").is_file()
     assert (source / "README.md").read_bytes() == before
@@ -2188,5 +2542,8 @@ def test_eval_producer_failure_is_not_masked_by_missing_export(
     collection = json.loads((spool / "collection.json").read_text(encoding="utf-8"))
     assert collection["status"] == "failed"
     assert collection["failure"] == "eval_producer_failed"
-    assert len(collection["producer_matrix"]) == 4
+    assert sorted(producer["name"] for producer in collection["producer_matrix"]) == [
+        "codex-agent-role",
+        "workflow-selection",
+    ]
     assert (spool / "producer-logs").is_dir()

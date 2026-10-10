@@ -4,7 +4,6 @@
 # contract test
 # responsibility Tests structured AgentCanon tool catalog validation.
 # upstream implementation ../../tools/runtime/manifest/tool_catalog.py validates tool catalog
-# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns the canonical visualization contract tool.
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
@@ -39,56 +38,6 @@ class CheckToolCatalogTest(unittest.TestCase):
             text=True,
         )
 
-    def test_catalog_renderer_and_visualization_entries(self) -> None:
-        """Canonical renderer and visualization entries retain their contracts."""
-        catalog = yaml.safe_load(
-            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
-        )
-        renderer = next(
-            entry
-            for entry in catalog["entries"]
-            if entry["path"]
-            == "tools/analysis/dependencies/render_dependency_manifest_graph.py"
-        )
-        self.assertEqual(
-            renderer["command"],
-            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py "
-            "--root . --scope full --bundle-dir reports/dependency-graph --format json",
-        )
-        visualization_entries = [
-            entry
-            for entry in catalog["entries"]
-            if entry["id"] == "visualization-contract"
-            or entry["path"] == "tools/validation/semantic/tools/visualization_contract.py"
-        ]
-        self.assertEqual(len(visualization_entries), 1)
-        visualization = visualization_entries[0]
-        self.assertEqual(visualization["status"], "canonical")
-        self.assertEqual(visualization["audience"], "skill")
-        self.assertIn(
-            visualization["placement"],
-            {"support_library", "validation_checker"},
-        )
-        self.assertEqual(
-            visualization["docs"],
-            [
-                "tools/README.md",
-                "documents/tools/README.md",
-                "documents/tools/visualization_contract.md",
-            ],
-        )
-        tool_docs = (
-            PROJECT_ROOT / "documents" / "tools" / "tool-docs.toml"
-        ).read_text(encoding="utf-8")
-        self.assertEqual(
-            tool_docs.count('tool = "tools/validation/semantic/tools/visualization_contract.py"'),
-            1,
-        )
-        self.assertEqual(
-            tool_docs.count('doc = "documents/tools/visualization_contract.md"'),
-            1,
-        )
-
     def test_workflow_command_rows_use_existing_catalog_schema(self) -> None:
         """Workflow monitor and waterfall gate are ordinary catalog entries."""
         catalog = yaml.safe_load(
@@ -100,8 +49,14 @@ class CheckToolCatalogTest(unittest.TestCase):
             if entry["id"] in {"workflow-monitor", "waterfall-gate-check"}
         }
         self.assertEqual(set(rows), {"workflow-monitor", "waterfall-gate-check"})
-        self.assertEqual(rows["workflow-monitor"]["path"], "tools/runtime/lifecycle/workflow_monitor.py")
-        self.assertEqual(rows["waterfall-gate-check"]["path"], "tools/validation/semantic/lifecycle/waterfall_gate_check.py")
+        self.assertEqual(
+            rows["workflow-monitor"]["path"],
+            "tools/runtime/lifecycle/workflow_monitor.py",
+        )
+        self.assertEqual(
+            rows["waterfall-gate-check"]["path"],
+            "tools/validation/semantic/lifecycle/waterfall_gate_check.py",
+        )
         self.assertTrue(rows["workflow-monitor"]["writes"])
         self.assertFalse(rows["waterfall-gate-check"]["writes"])
         result = self.run_checker(PROJECT_ROOT, "--format", "json")
@@ -148,7 +103,8 @@ class CheckToolCatalogTest(unittest.TestCase):
         )
         self.assertFalse(
             any(
-                entry["path"] == "tools/experiments/execution/execution_resource_plan.py"
+                entry["path"]
+                == "tools/experiments/execution/execution_resource_plan.py"
                 for entry in catalog["entries"]
             )
         )
@@ -180,7 +136,9 @@ class CheckToolCatalogTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_minimal_repo(root)
-            catalog = yaml.safe_load((root / "tools/catalog.yaml").read_text(encoding="utf-8"))
+            catalog = yaml.safe_load(
+                (root / "tools/catalog.yaml").read_text(encoding="utf-8")
+            )
             findings = check_tool_docs_manifest(root, catalog["entries"])
             self.assertEqual(findings, [])
 
@@ -191,8 +149,16 @@ class CheckToolCatalogTest(unittest.TestCase):
                 [finding.render() for finding in findings],
             )
 
-            self.write_file(root, "tools/runtime/manifest/catalog_only.py", self.manifest("Catalog-only fixture."))
-            self.write_file(root, "documents/tools/catalog_only.md", self.manifest("Catalog-only doc."))
+            self.write_file(
+                root,
+                "tools/runtime/manifest/catalog_only.py",
+                self.manifest("Catalog-only fixture."),
+            )
+            self.write_file(
+                root,
+                "documents/tools/catalog_only.md",
+                self.manifest("Catalog-only doc."),
+            )
             catalog_entry = dict(catalog["entries"][0])
             catalog_entry.update(
                 {
@@ -214,8 +180,12 @@ class CheckToolCatalogTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_minimal_repo(root)
-            self.write_file(root, "tools/runtime/manifest/extra.py", self.manifest("Extra fixture."))
-            self.write_file(root, "documents/tools/extra.md", self.manifest("Extra fixture doc."))
+            self.write_file(
+                root, "tools/runtime/manifest/extra.py", self.manifest("Extra fixture.")
+            )
+            self.write_file(
+                root, "documents/tools/extra.md", self.manifest("Extra fixture doc.")
+            )
             docs = root / "documents/tools/tool-docs.toml"
             docs.write_text(
                 docs.read_text(encoding="utf-8")
@@ -226,7 +196,9 @@ class CheckToolCatalogTest(unittest.TestCase):
                 + 'doc = "documents/tools/extra.md"\n',
                 encoding="utf-8",
             )
-            catalog = yaml.safe_load((root / "tools/catalog.yaml").read_text(encoding="utf-8"))
+            catalog = yaml.safe_load(
+                (root / "tools/catalog.yaml").read_text(encoding="utf-8")
+            )
             findings = check_tool_docs_manifest(root, catalog["entries"])
             self.assertIn(
                 "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-catalog-entry:extra-public:tools/runtime/manifest/extra.py",
@@ -245,7 +217,9 @@ class CheckToolCatalogTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            catalog = yaml.safe_load((root / "tools/catalog.yaml").read_text(encoding="utf-8"))
+            catalog = yaml.safe_load(
+                (root / "tools/catalog.yaml").read_text(encoding="utf-8")
+            )
             catalog["entries"][0].pop("public")
             findings = check_tool_docs_manifest(root, catalog["entries"])
             self.assertNotIn("public_tools", {finding.check for finding in findings})
@@ -255,7 +229,9 @@ class CheckToolCatalogTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_minimal_repo(root)
-            self.write_file(root, "tools/legacy/example/README.md", self.manifest("Legacy."))
+            self.write_file(
+                root, "tools/legacy/example/README.md", self.manifest("Legacy.")
+            )
             catalog = root / "tools" / "catalog.yaml"
             catalog.write_text(
                 catalog.read_text(encoding="utf-8")
@@ -387,8 +363,8 @@ class CheckToolCatalogTest(unittest.TestCase):
             tool_docs = root / "documents" / "tools" / "tool-docs.toml"
             tool_docs.write_text(
                 tool_docs.read_text(encoding="utf-8").replace(
-                    "doc = \"documents/tools/tool_catalog.md\"",
-                    "doc = \"documents/tools/catalog_checker.md\"",
+                    'doc = "documents/tools/tool_catalog.md"',
+                    'doc = "documents/tools/catalog_checker.md"',
                 ),
                 encoding="utf-8",
             )
@@ -646,7 +622,9 @@ class CheckToolCatalogTest(unittest.TestCase):
 
     def test_semantic_index_catalog_command_builds_index_before_reports(self) -> None:
         """The semantic-index catalog entry should be safe for fresh checkouts."""
-        catalog = yaml.safe_load((PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8"))
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
         entries = {entry["id"]: entry for entry in catalog["entries"]}
         command = entries["semantic-index"]["command"]
 

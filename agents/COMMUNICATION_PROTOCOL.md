@@ -253,7 +253,6 @@ repo_structure_contract=<artifact path>
 responsibility_scope=<artifact path>
 file_surface_inventory=<artifact path>
 document_inventory=<artifact path|not_applicable>
-import_responsibility=<artifact path|not_applicable>
 selected_owner_summary=<short summary tied to request clauses>
 llm_visible_context=<selected excerpts or structured summary>
 local_tool_context=<complete JSON/Markdown/raw artifact paths>
@@ -267,12 +266,10 @@ python3 tools/validation/semantic/structure/repo_structure_contract.py --root <r
 python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json
 python3 tools/analysis/code/file_surface_inventory.py --root <root> --submodule-aware --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
 agent-canon structured-analysis document-inventory --root <root> > <run>/document_inventory.txt
-python3 tools/analysis/code/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json
 ```
 
 Run `document-inventory` when document, README, generated report, stale-doc,
-or reader-navigation surfaces are implicated. Run `import_responsibility.py`
-when import boundaries or package layout are implicated. In parent repos where
+or reader-navigation surfaces are implicated. In parent repos where
 the structure contract is not a root view, pass the qualified source-clone
 path, for example
 `--contract <agent-canon-source-clone>/documents/structure/repo-structure-contract.toml`.
@@ -481,12 +478,6 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
 - `allowed_paths` / `do_not_read`: role-specific path boundaries
 - `expected_output_schema`: artifact name, findings format, or patch summary
 - `validation_route`: commands or review gate the parent will use
-- `conflict_or_rework_preservation`: when merge or repair work is in scope,
-  carry the repository-qualified base/head/merge-base, affected paths,
-  base/ours/theirs blob and hunk inventory, staged/unmerged state, unaffected
-  user/unknown content, selected cause, expected mechanism, exact owning edit
-  delta, disposition, rationale, and preservation readback. Omit this field
-  only when the handoff cannot mutate or rework repository content.
 - `return_contract`: what changed, what evidence supports it, unresolved
   blockers, and whether more context is needed
 - `checkout_identity`: repeat the same block in final handback, or provide the
@@ -629,9 +620,6 @@ facts and are not review decisions.
 - `revert_or_discard_authority`: rollback、revert、または slice discard を求める
   場合だけ、撤回 / 置換 / owner 外 / unsafe replacement / escalation の根拠を書く
 - `evidence`
-- `preservation_readback`: for conflict/rework findings, the inventory,
-  disposition/reconstruction map, and post-resolution proof that unaffected
-  content remains; a clean path list is not sufficient
 - `status`
 
 ## Write Scope Packet

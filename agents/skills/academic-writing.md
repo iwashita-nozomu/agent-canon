@@ -23,12 +23,26 @@ paper-style manuscript は `paper-writing` を優先します。選択基準は�
 
 ## Procedure
 
-1. `claim contract`（central contribution、gap、reader、non-goal）を固定し、既存本文・根拠から `evidence map`、`notation ledger`、section contract を作る。
-2. section/figure/table の順序や claim/evidence layout が未決定なら `structure-planning` を使う。discourse diagnostics は直接 review で解けない順序問題だけに使う。
-3. reader order で draft し、結果・解釈・limitation を分ける。graph/DSL、固定 handoff、全 sentence の順序、finding 件数ゼロを通常の開始/完了 gate にしない。
-4. draft 後に reverse outline を取り、`document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、docs-completeness review を別々に通す。
-5. PDF-ready、dense math、figure が必要なら TeX plan を立て、明示環境の `latexmk`、pdfLaTeX/XeLaTeX、必要時 `dvisvgm`/`pdfcrop` で検証する。
-6. `tools/bin/agent-canon docs check` で閉じる。一般 README/workflow/guide/migration/report は TeX route に送らない。
+Start from the requested claim, audience, existing draft, and sources. Make the
+claim, evidence links, notation/assumptions, or section contract explicit to the
+extent the document needs them; reuse an existing note when it already captures
+that information.
+
+Resolve section, figure, or table ordering with `structure-planning` only when a
+real choice remains. Draft in a reader-friendly order and keep observations,
+interpretation, and limitations distinct where the document makes evidence-based
+claims. A graph or fixed handoff is not a prerequisite for ordinary drafting.
+
+Choose review by the risk in the draft: reader flow for structural gaps,
+notation review for undefined or inconsistent symbols, and logic review for
+unsupported inferences. Add docs-completeness review when the requested scope
+spans required sections or linked documents. A PDF-ready or dense-math artifact
+may use the TeX route in an explicit environment; otherwise use the document
+owner's applicable check.
+
+Use `tools/bin/agent-canon docs check` when that check is selected for the
+document. General README/workflow/guide/migration/report work does not need a
+TeX route.
 
 ## Standard command
 

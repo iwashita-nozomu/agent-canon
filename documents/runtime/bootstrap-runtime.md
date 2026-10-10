@@ -62,13 +62,20 @@ project's own Docker test runner.
 
 ## One command family
 
+The installer entrypoint comes from the installed runtime source root; the
+observed project/worktree is a separate read-only `--root <topic>` target. Use
+the latest installed/bootstrap absolute entrypoint for that runtime; a topic
+checkout's `./bootstrap.sh` is only for validating lifecycle-source changes and
+may be stale.
+
 Every command starts with the install root and explicit control root. The
 persistent runtime defaults to the control root's ignored `.runtime/`:
 
 ```bash
-BOOTSTRAP=./bootstrap.sh
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
 ROOT=<authorized-parent-root>
-COMMON=(--control-parent-root "$ROOT")
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
 ```
 
 `--control-parent-root` is the authorized parent repository root and selects
@@ -224,8 +231,11 @@ no daemon, webhook listener, cron route, or `loginctl enable-linger` is added.
 Git-tracked `.codex/personal/skills` distribution, while `~/.codex/agents/<role>.toml`
 to the tracked role file, and `~/.codex/config.toml` to the ignored personal
 source under the AgentCanon checkout. An existing regular Codex config is moved
-byte-for-byte (including mode) before linking; update preserves it and uninstall
-restores a regular file. Foreign entries and foreign symlinks are preserved or
+byte-for-byte (including mode) before linking; install/update apply the canonical
+`model_context_window = 1050000` and
+`model_auto_compact_token_limit = 900000` defaults while preserving other
+personal TOML settings, and uninstall restores a regular file.
+Foreign entries and foreign symlinks are preserved or
 reported as collisions. Project hooks and user authentication, session,
 history, cache, plugins, rules, MCP, and TUI/trust settings are outside this
 projection. `codex prepare` remains the separate runtime-local isolated home
@@ -329,6 +339,13 @@ Network or archive failure retains the spool and a failure receipt for retry;
 it does not dirty AgentCanon source. Successful publication is complete only
 after non-force push and remote ref/tree/blob readback. A local bare remote is
 the focused end-to-end test fixture for this sequence.
+
+The existing host scheduler's `sync` route also drains pending hook events,
+eval runs with explicit sync requests, and private-feedback requests. These
+deliveries are attempted after the source-refresh phase even when that phase
+fails; failed publications retain their pending inputs for the next scheduled
+retry. Eval continues to use the root `spool/<run-id>`, while private feedback
+uses the separate resident `runtime/spool/private-feedback` path.
 
 The archive checkout is a runtime lease under the selected runtime root. It is
 not a submodule, vendor checkout, symlink, or required source-tree directory.

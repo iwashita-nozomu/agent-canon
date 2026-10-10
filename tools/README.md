@@ -149,13 +149,6 @@ repository. Archive branch/retention belong to that repository. Publication is
 successful only after remote ref/tree/blob readback; failure retains spool and
 receipt for retry. See [Runtime Log Archive](../documents/runtime/runtime-log-archive.md).
 
-The prompt-eval audit remains a first-class validation signal. A healthy audit
-reports `EVAL_AUDIT_STATUS=pass`, `EVAL_GROWTH_CANDIDATES=0`, and confirms
-`duplicate explicit targets` remain zero. Maintainers may run a producer with `--accumulate`; the
-receipt exposes `EVAL_RUN_ID` and `EVAL_ACCUMULATED_REPORT`, and skill reports
-use `<eval_run_id>-<status>-<skill-slug>.md`. These files live in the external
-archive checkout, never in the source tree.
-
 `generate_agent_improvement_guide.py` reads the mounted runtime hook archive
 and repository-qualified GitHub Issue URLs from run-local private packets as read-only evidence. Its generated guide is another
 external runtime artifact and is not permission to change source, Issue, or

@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Inventories and classifies branch, PR, and worktree orphan lifecycle state without mutating Git or GitHub.
-# upstream design ../../documents/operations/orphan-lifecycle.md defines semantic classification and cleanup admission.
-# upstream design ../../documents/operations/worktree-lifecycle.md delegates stale worktree cleanup evidence to this inventory.
-# downstream implementation ../../tests/agent_tools/test_orphan_lifecycle.py tests semantic inventory and fail-closed admission.
+# upstream design ../../../documents/operations/orphan-lifecycle.md defines semantic classification and cleanup admission.
+# upstream design ../../../documents/operations/worktree-lifecycle.md delegates stale worktree cleanup evidence to this inventory.
+# downstream implementation ../../../tests/agent_tools/test_orphan_lifecycle.py tests semantic inventory and fail-closed admission.
 # @dependency-end
 """Build a semantic orphan inventory and authorize explicit cleanup selections."""
 

@@ -481,6 +481,8 @@ class GeneratedRoleView:
     rendered_instructions: str
     model: str
     reasoning_effort: str
+    model_context_window: int | None
+    model_auto_compact_token_limit: int | None
     capabilities: tuple[str, ...]
     allowed_context: tuple[str, ...]
     forbidden_context: tuple[str, ...]
@@ -1084,6 +1086,20 @@ def _registered_role_descriptions(root: Path) -> dict[str, str]:
     return result
 
 
+def _codex_context_settings(root: Path) -> tuple[int | None, int | None]:
+    config = _read_toml_file(root / ".codex" / "config.toml")
+    values: list[int | None] = []
+    for key in ("model_context_window", "model_auto_compact_token_limit"):
+        value = config.get(key)
+        if value is None:
+            values.append(None)
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ModelProfileRegistryError(f"codex_config:{key}:must_be_positive_integer")
+        values.append(value)
+    return values[0], values[1]
+
+
 def _validate_projection_mode(projection: str) -> str:
     if projection not in {"live", "consumer-static"}:
         raise ModelProfileRegistryError(
@@ -1152,6 +1168,9 @@ def generate_role_views(
         for role_id, (logical_role, contract_ref, _derived_sandbox) in metadata.items()
     }
     descriptions = _registered_role_descriptions(root_path)
+    model_context_window, model_auto_compact_token_limit = _codex_context_settings(
+        root_path
+    )
     expected_roles = set(metadata) | set(descriptions)
     if set(metadata) != set(descriptions) or set(registry.role_profile_bindings) != expected_roles:
         raise ModelProfileRegistryError("role_projection:binding_registration_set_mismatch")
@@ -1185,6 +1204,8 @@ def generate_role_views(
                 rendered_instructions=instructions,
                 model=profile.model,
                 reasoning_effort=profile.reasoning_effort,
+                model_context_window=model_context_window,
+                model_auto_compact_token_limit=model_auto_compact_token_limit,
                 capabilities=profile.capabilities,
                 allowed_context=profile.allowed_context,
                 forbidden_context=profile.forbidden_context,
@@ -1230,6 +1251,14 @@ def _render_role_view(view: GeneratedRoleView, projection: str = "live") -> str:
             "# materializer: tools/agent/orchestration/model_profile_registry.py",
             f"# source canonical digest: {view.source_canonical_digest}",
         )
+    context_settings = tuple(
+        f"{key} = {value}"
+        for key, value in (
+            ("model_context_window", view.model_context_window),
+            ("model_auto_compact_token_limit", view.model_auto_compact_token_limit),
+        )
+        if value is not None
+    )
     return "\n".join(
         (
             *comments,
@@ -1241,6 +1270,7 @@ def _render_role_view(view: GeneratedRoleView, projection: str = "live") -> str:
             f"approval_policy = {_toml_string(view.approval_policy)}",
             f"model = {_toml_string(view.model)}",
             f"model_reasoning_effort = {_toml_string(view.reasoning_effort)}",
+            *context_settings,
             "",
             f"developer_instructions = {_toml_string(view.rendered_instructions)}",
             "",

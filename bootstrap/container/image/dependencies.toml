@@ -1,9 +1,9 @@
 # @dependency-start
 # contract environment
 # responsibility Declares only the shared AgentCanon Python, Rust, and LSP image capabilities.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
 # downstream implementation ./Dockerfile image-install and immutable receipts
-# downstream implementation ../../tools/analysis/dependencies/dependency_plan.py typed dependency planner
+# downstream implementation ../../../tools/analysis/dependencies/dependency_plan.py typed dependency planner
 # @dependency-end
 
 schema = "agent-canon.tool-dependencies"
@@ -56,6 +56,17 @@ source = "https://pypi.org/simple"
 verification = { kind = "pipx-package", executable = "ruff", args = ["--version"], output_contains = "0.16.10" }
 deps = ["pipx"]
 provides = ["ruff"]
+failure_policy = "fail"
+
+[[records]]
+id = "basedpyright"
+package = "basedpyright"
+method = "pipx"
+version = "1.40.2"
+source = "https://pypi.org/simple"
+verification = { kind = "pipx-package", executable = "basedpyright", args = ["--version"], output_contains = "1.40.2" }
+deps = ["pipx"]
+provides = ["basedpyright"]
 failure_policy = "fail"
 
 [[records]]

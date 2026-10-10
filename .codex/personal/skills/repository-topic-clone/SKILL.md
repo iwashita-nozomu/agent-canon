@@ -2,7 +2,7 @@
 name: repository-topic-clone
 description: "Use for any parent, dependency, or standalone repository topic checkout under workspace/<topic>/<repo>; linked-worktree or independent-clone mode is selected by repository relationship, and repository kind is a post-checkout policy decorator."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"74eb4610824f22d8dea70dba488690d3a470cd7b25301cf37302d795a7f35c0f"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"b3915134709e23efbec3140f3959d41f9469ee5ab343b6512a1949bb34fa273b"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/repository-topic-clone.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [repository-topic-clone](../../../../agents/skills/repository-topic-clone.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill repository-topic-clone --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

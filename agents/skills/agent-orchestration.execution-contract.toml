@@ -4,7 +4,6 @@
 # upstream design agent-orchestration.md sole owner policy prose and invariants
 # downstream implementation ../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py production contract checker
 # downstream implementation ../../tools/agent/orchestration/autonomous_convergence.py transition and closeout validator
-# downstream implementation ../../tools/agent/skills/skill_tool_commands.py maintenance selected-skill command route
 # downstream design pr-processing.md PR queue specialization consumer
 # downstream design ../../templates/agents/schedule.md schedule projection consumer
 # downstream implementation ../task_catalog.yaml task routing projection consumer
@@ -18,7 +17,6 @@ owner_heading = "Execution-Time-Aware Work-Conservation Contract"
 owner_ref = "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
 checker = "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py"
 checker_command = "python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root ."
-skill_command_phase = "maintenance"
 
 required_fields = [
   "dependency_dag",
@@ -34,25 +32,6 @@ required_fields = [
   "blocking_finding_ids",
   "focused_recheck",
   "terminal_state",
-]
-
-owner_markers = [
-  "Use a dependency/overlap graph only when the selected work has real ordering",
-  "lexicographic, in this order",
-  "minimum decision-relevant total work",
-  "Dispatch every ready node that is non-conflicting and admissible",
-  "Batch remote reads",
-  "Reuse the warm worker and reviewer contexts",
-  "candidate epoch",
-  "stable blocking finding IDs",
-  "focused recheck",
-  "same state fingerprint and action fingerprint",
-  "non_convergent_cycle",
-  "zero blocking findings",
-  "Invalidate only evidence affected by the repaired node",
-  "Wait only when the useful ready set is empty",
-  "prompt-keyword routing is never a scheduling signal",
-  "no fixed duration, elapsed-time limit, or timeout cutoff may cut the requested scope",
 ]
 
 rejected_classes = [
@@ -171,16 +150,6 @@ cycle_stop = "non_convergent_cycle"
 id = "pr-processing"
 path = "agents/skills/pr-processing.md"
 kind = "specialization"
-reference_mode = "text"
-required_markers = [
-  "Execution-Time-Aware Queue Specialization",
-  "batched queue snapshot",
-  "independent candidates",
-  "Each candidate epoch gets one initial owning review",
-  "focused recheck",
-  "same warm worker and reviewer context",
-  "merge candidates in dependency order",
-]
 
 [[consumers]]
 id = "task-catalog"

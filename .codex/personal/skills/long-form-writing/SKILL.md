@@ -2,7 +2,7 @@
 name: long-form-writing
 description: "Use for reader-facing README, workflow, guide, migration, or specification writing and revision; proceed from existing sources, text, and brief structure notes, and do not select this skill by text length alone."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"3f55b84a63cac4e02453c8f11bd8a4acb61459ae76c4198c8c007a42840fb5d6"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"dc961d1879558e5e6866e1aa3c767f7f699ec67f18e2871bfb79e565981c525d"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/long-form-writing.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [long-form-writing](../../../../agents/skills/long-form-writing.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill long-form-writing --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

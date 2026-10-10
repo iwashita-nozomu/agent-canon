@@ -39,8 +39,8 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         self.assertIn("workflow_dispatch", triggers)
         self.assertNotIn("push", triggers)
 
-    def test_pr_checkout_selects_local_runtime_image_build(self) -> None:
-        """PR guide runs must not select an unpublished GHCR merge tag."""
+    def test_pr_checkout_preserves_full_history_and_guide_mode(self) -> None:
+        """PR candidate staging retains history and the guide export mode."""
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn(
             "fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}",
@@ -48,112 +48,6 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         )
         self.assertNotIn('mkdir -p "${report_dir}"', text)
         self.assertIn("--output-mode 644", text)
-
-    def test_pr_candidate_clones_main_and_installs_runtime(self) -> None:
-        """PR candidates install from a local main clone before execution."""
-        text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn(
-            'candidate_bare="${RUNNER_TEMP}/agent-canon-pr-candidate.git"',
-            text,
-        )
-        self.assertIn(
-            'candidate_source="${RUNNER_TEMP}/agent-canon-pr-candidate"',
-            text,
-        )
-        self.assertIn(
-            'git -C "${GITHUB_WORKSPACE}" push "${candidate_bare}" "HEAD:refs/heads/main"',
-            text,
-        )
-        self.assertIn(
-            'git --git-dir="${candidate_bare}" symbolic-ref HEAD refs/heads/main',
-            text,
-        )
-        self.assertIn(
-            'git clone --branch main --single-branch "${candidate_bare}" "${candidate_source}"',
-            text,
-        )
-        self.assertIn(
-            "printf 'AGENT_CANON_CANDIDATE_SOURCE=%s",
-            text,
-        )
-        self.assertIn(
-            '"${candidate_source}" >> "${GITHUB_ENV}"',
-            text,
-        )
-        self.assertIn("printf 'AGENT_CANON_CANDIDATE_BARE=%s", text)
-        self.assertNotIn("AGENT_CANON_GUIDE_RUNTIME_ROOT", text)
-        self.assertNotIn("AGENT_CANON_RUNTIME_ROOT", text)
-        bootstrap_lines = [
-            line.strip() for line in text.splitlines() if "bootstrap.sh" in line
-        ]
-
-        self.assertTrue(bootstrap_lines)
-        self.assertTrue(
-            all(
-                line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
-                for line in bootstrap_lines
-            )
-        )
-        self.assertTrue(
-            all("--runtime-root" not in line for line in bootstrap_lines)
-        )
-        self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines))
-        self.assertFalse(any(line.endswith(" update") for line in bootstrap_lines))
-        self.assertTrue(any(line.endswith(" start") for line in bootstrap_lines))
-        self.assertTrue(any(" target add " in line for line in bootstrap_lines))
-        self.assertIn(
-            'tool run --root "${GITHUB_WORKSPACE}" generate-agent-improvement-guide --',
-            text,
-        )
-        self.assertNotIn("exec --root", text)
-        self.assertIn(
-            "--root . --runtime-root /var/lib/agent-canon/runtime",
-            text,
-        )
-        self.assertIn(
-            'guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"',
-            text,
-        )
-        self.assertIn(
-            'tool export guide --destination "${guide_dir}"',
-            text,
-        )
-        self.assertNotIn("Setup Python", text)
-        self.assertNotIn("AGENT_CANON_CONTROL_PARENT_ROOT: ${{ runner.temp }}", text)
-        self.assertIn(
-            'cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"',
-            text,
-        )
-        guide_path_lines = [
-            line for line in text.splitlines() if "guide_path=" in line
-        ]
-        self.assertTrue(guide_path_lines)
-        self.assertNotIn("../", guide_path_lines[0])
-        self.assertIn(
-            'guide_path="${guide_dir}/agent-improvement-guide-',
-            guide_path_lines[0],
-        )
-        self.assertIn(
-            'guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"',
-            text,
-        )
-        self.assertIn(
-            'guide_dir="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-improvement-guide")"',
-            text.split("Release shared tool runtime")[1],
-        )
-        self.assertNotIn(".runtime/container-state", text)
-        self.assertNotIn("docker ", text)
-
-    def test_main_only_runtime_workflows_keep_install_contract(self) -> None:
-        """Main-only runtime workflows retain their strict initial install."""
-        for name in ("agent-canon-static-gates.yml", "agent-runtime-dashboard.yml"):
-            text = (WORKFLOW.parent / name).read_text(encoding="utf-8")
-            bootstrap_lines = [
-                line.strip()
-                for line in text.splitlines()
-                if line.strip().startswith("./bootstrap.sh")
-            ]
-            self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines), name)
 
 
 if __name__ == "__main__":

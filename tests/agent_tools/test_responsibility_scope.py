@@ -117,6 +117,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             (PROJECT_ROOT / "responsibility-scope.toml").read_text(encoding="utf-8")
         )
         scopes = {str(raw["id"]): raw for raw in data["scope"]}
+        owned_scopes = tuple(scope_from_mapping(raw) for raw in data["scope"])
         paths = set(scopes["eval-and-hook-evidence"]["paths"])
         runtime_paths = set(scopes["runtime-entrypoints"]["paths"])
 
@@ -140,6 +141,28 @@ class ResponsibilityScopeTest(unittest.TestCase):
             scopes["shared-policy-documents"]["exclude_paths"],
         )
         self.assertIn(".vscode/**", runtime_paths)
+        expected_owners = {
+            "tools/runtime/archive/runtime_log_archive_git.py": "eval-and-hook-evidence",
+            "tools/runtime/archive/runtime_log_paths.py": "eval-and-hook-evidence",
+            "tests/agent_tools/test_eval_accumulation_check.py": "eval-and-hook-evidence",
+            "tests/agent_tools/test_runtime_log_archive_git.py": "eval-and-hook-evidence",
+            "tests/agent_tools/test_runtime_log_paths.py": "eval-and-hook-evidence",
+            ".obsidian/app.json": "runtime-entrypoints",
+            ".obsidian/appearance.json": "runtime-entrypoints",
+            ".obsidian/core-plugins.json": "runtime-entrypoints",
+            ".obsidian/graph.json": "runtime-entrypoints",
+            ".obsidian/workspace.json": "runtime-entrypoints",
+            "schemas/agent-canon/skill-catalog.schema.json": "shared-tooling",
+            "schemas/agent-canon/skill-dependencies.schema.json": "shared-tooling",
+            "schemas/agent-canon/tool-catalog.schema.json": "shared-tooling",
+            "schemas/agent-canon/yamllint.yaml": "shared-tooling",
+        }
+        for path, expected_owner in expected_owners.items():
+            with self.subTest(path=path):
+                actual_owners = tuple(
+                    scope.scope_id for scope in owned_scopes if scope_covers(scope, path)
+                )
+                self.assertEqual(actual_owners, (expected_owner,))
 
     def test_scope_overlap_fails_without_exclusion(self) -> None:
         """A tracked file must not be claimed by multiple responsibility scopes."""

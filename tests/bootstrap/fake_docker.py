@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import json
 import hashlib
+import fcntl
 import os
 import shutil
-import subprocess
 import sys
 import tarfile
 from pathlib import Path
@@ -676,6 +676,9 @@ def main(argv: list[str]) -> int:
             kind = copy_environment.get("AGENT_CANON_COPY_KIND", "")
             relative = copy_environment.get("AGENT_CANON_COPY_RELATIVE", "")
             expected_digest = copy_environment.get("AGENT_CANON_COPY_DIGEST", "")
+            acknowledged_digest = copy_environment.get(
+                "AGENT_CANON_COPY_EXPECTED_DIGEST", ""
+            )
             install_root = Path(
                 copy_environment.get("AGENT_CANON_COPY_INSTALL_ROOT", "")
             )
@@ -704,9 +707,86 @@ def main(argv: list[str]) -> int:
 
             source = Path(input_source) if copy_direction == "import" else None
             if copy_direction == "clear":
-                if kind != "host-mounts":
+                if kind == "host-mounts":
+                    (backing / "host-mounts.tsv").unlink(missing_ok=True)
+                elif kind in {"eval", "private-feedback"}:
+                    lock_root = backing / "runtime"
+                    if not lock_root.is_dir() or lock_root.is_symlink():
+                        return 1
+                    lock_path = (
+                        lock_root / "lifecycle.lock"
+                        if kind == "eval"
+                        else lock_root / "spool" / ".private-feedback.lock"
+                    )
+                    lock_path.parent.mkdir(parents=True, exist_ok=True)
+                    if lock_path.is_symlink():
+                        return 1
+                    with lock_path.open("a+b") as lock_handle:
+                        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+                        source_root = (
+                            backing / "spool" / relative
+                            if kind == "eval"
+                            else lock_root / "spool" / "private-feedback"
+                        )
+                        if (
+                            kind == "eval"
+                            and not source_root.exists()
+                            and not source_root.is_symlink()
+                        ):
+                            pass
+                        else:
+                            if source_root.is_symlink() or not source_root.is_dir():
+                                return 1
+                            if any(
+                                path.is_symlink() for path in source_root.rglob("*")
+                            ):
+                                return 1
+                            if any(
+                                not path.is_dir() and not path.is_file()
+                                for path in source_root.rglob("*")
+                            ) or any(
+                                path.is_file() and path.stat().st_nlink > 1
+                                for path in source_root.rglob("*")
+                            ):
+                                return 1
+                            if tree_digest(source_root) != acknowledged_digest:
+                                return 1
+                            if kind == "private-feedback":
+                                for child in source_root.iterdir():
+                                    if child.is_dir() and not child.is_symlink():
+                                        shutil.rmtree(child)
+                                    else:
+                                        child.unlink()
+                            else:
+                                shutil.rmtree(source_root)
+                else:
                     return 1
-                (backing / "host-mounts.tsv").unlink(missing_ok=True)
+            elif copy_direction == "list":
+                if kind != "eval":
+                    return 1
+                source_root = backing / "spool"
+                if not source_root.is_dir() or source_root.is_symlink():
+                    return 1
+                if any(path.is_symlink() for path in source_root.iterdir()):
+                    return 1
+                pending = sorted(
+                    path.parent.name
+                    for path in source_root.glob("*/sync-request.tsv")
+                    if path.is_file() or path.is_symlink()
+                )
+                if any(
+                    not run_id
+                    or len(run_id) > 128
+                    or any(
+                        character
+                        not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-"
+                        for character in run_id
+                    )
+                    for run_id in pending
+                ):
+                    return 1
+                for run_id in pending:
+                    print(run_id)
             elif copy_direction == "import":
                 destinations = {
                     "mount-registry": backing / "mount-registry.toml",
@@ -826,21 +906,32 @@ def main(argv: list[str]) -> int:
                     emit_tar(source_root.parent, [(source_root, source_root.name)])
                     readback_digest = tree_digest(source_root)
                 elif kind == "private-feedback":
-                    source_root = backing / "spool" / "private-feedback"
+                    source_root = backing / "runtime" / "spool" / "private-feedback"
+                    if not source_root.exists() and not source_root.is_symlink():
+                        return 75
                     if (
                         not source_root.is_dir()
                         or source_root.is_symlink()
                         or any(path.is_symlink() for path in source_root.rglob("*"))
+                        or any(
+                            not path.is_dir() and not path.is_file()
+                            for path in source_root.rglob("*")
+                        )
                     ):
                         return 1
-                    emit_tar(
-                        source_root,
-                        [
-                            (child, child.name)
-                            for child in sorted(source_root.iterdir())
-                        ],
-                    )
-                    readback_digest = tree_digest(source_root)
+                    lock_path = source_root.parent / ".private-feedback.lock"
+                    if lock_path.is_symlink():
+                        return 1
+                    with lock_path.open("a+b") as lock_handle:
+                        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_SH)
+                        emit_tar(
+                            source_root,
+                            [
+                                (child, child.name)
+                                for child in sorted(source_root.iterdir())
+                            ],
+                        )
+                        readback_digest = tree_digest(source_root)
                 elif kind == "codex-home":
                     source_root = backing / "codex-home"
                     if (
@@ -1036,6 +1127,9 @@ def main(argv: list[str]) -> int:
             if marked and (not directory.is_dir() or directory.is_symlink()):
                 return 1
             directory.mkdir(parents=True, exist_ok=True)
+        (runtime_backing / "spool" / "private-feedback").mkdir(
+            parents=True, exist_ok=True
+        )
         for directory in (backing / "exchange", backing / "private-log"):
             if marked and (directory.exists() or directory.is_symlink()):
                 if not directory.is_dir() or directory.is_symlink():
@@ -1315,16 +1409,45 @@ def main(argv: list[str]) -> int:
                     "mode": "read-only",
                     "digest": digest,
                 }
-                lifecycle.setdefault("targets", {})[digest] = target
+                targets = lifecycle.setdefault("targets", {})
+                if not isinstance(targets, dict):
+                    return 1
+                targets[digest] = target
+                # Match the controller's full projection, including prior targets.
+                mount_rows = []
+                mounts_toml = ['schema = "agent-canon.mount-registry.v2"', ""]
+                for target_digest, target_record in sorted(targets.items()):
+                    if not isinstance(target_record, dict):
+                        return 1
+                    target_root = target_record.get("root")
+                    target_host_root = target_record.get("host_root")
+                    target_mode = target_record.get("mode")
+                    if (
+                        not isinstance(target_root, str)
+                        or not isinstance(target_host_root, str)
+                        or target_mode != "read-only"
+                    ):
+                        return 1
+                    mount_rows.append(
+                        f"target\t{target_digest}\t{target_host_root}\t"
+                        f"/targets/{target_digest}\tread-only"
+                    )
+                    mounts_toml.extend(
+                        [
+                            f"[targets.{target_digest}]",
+                            f"root = {json.dumps(target_root)}",
+                            'mode = "read-only"',
+                            f"digest = {json.dumps(target_digest)}",
+                            "",
+                        ]
+                    )
                 state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
                 (exchange_root / "mounts.tsv").write_text(
-                    f"target\t{digest}\t{host_root}\t/targets/{digest}\tread-only\n",
+                    "\n".join(mount_rows) + ("\n" if mount_rows else ""),
                     encoding="utf-8",
                 )
                 (exchange_root / "mounts.toml").write_text(
-                    'schema = "agent-canon.mount-registry.v2"\n\n[targets.{}]\nroot = "{}"\nmode = "read-only"\ndigest = "{}"\n'.format(
-                        digest, container_root, digest
-                    ),
+                    "\n".join(mounts_toml),
                     encoding="utf-8",
                 )
                 print(
@@ -1504,17 +1627,9 @@ def main(argv: list[str]) -> int:
             eval_failed = os.environ.get("FAKE_EVAL_FAIL") == "1"
             (exchange / "eval-results").mkdir(parents=True, exist_ok=True)
             families = {
-                "skill-workflow-prompt": (
-                    "skill-eval-20260101T000000000000Z-0123456789-pass-bootstrap.md",
-                    f"EVAL_RUN_ID=skill-{run_id}\n",
-                ),
                 "workflow-selection": (
                     "workflow-selection-eval-20260101T000000000000Z-0123456789-pass.md",
                     f"WORKFLOW_SELECTION_EVAL_RUN_ID=workflow-{run_id}\n",
-                ),
-                "report-quality": (
-                    "report-quality-eval-20260101T000000000000Z-0123456789-pass.md",
-                    f"REPORT_QUALITY_EVAL_RUN_ID=quality-{run_id}\n",
                 ),
                 "codex-agent-role": (
                     "codex-agent-role-eval-20260101T000000000000Z-0123456789-pass.md",
@@ -1538,25 +1653,17 @@ def main(argv: list[str]) -> int:
                 f"stdout=tasks/{run_id}/logs/01-codex-agent-role.stdout.txt:"
                 f"stderr=tasks/{run_id}/logs/01-codex-agent-role.stderr.txt"
             )
-            for name in (
-                "skill-workflow-prompt",
-                "workflow-selection",
-                "report-quality",
-            ):
+            for name in ("workflow-selection",):
                 print(
                     "ACCUMULATED_AGENT_EVAL_PRODUCER="
                     f"{name}:{producer_status}:"
                     f"stdout=tasks/{run_id}/logs/{name}.stdout.txt:"
                     f"stderr=tasks/{run_id}/logs/{name}.stderr.txt"
                 )
-            print("ACCUMULATED_AGENT_EVAL_PRODUCERS=4")
+            print("ACCUMULATED_AGENT_EVAL_PRODUCERS=2")
             print(
                 "ACCUMULATED_AGENT_EVAL_FAILED="
-                + (
-                    "codex-agent-role,skill-workflow-prompt,workflow-selection,report-quality"
-                    if eval_failed
-                    else "-"
-                )
+                + ("codex-agent-role,workflow-selection" if eval_failed else "-")
             )
             print(f"ACCUMULATED_AGENT_EVAL={'fail' if eval_failed else 'pass'}")
             return 1 if eval_failed else 0
