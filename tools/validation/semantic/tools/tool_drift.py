@@ -249,8 +249,6 @@ CONTRACTS = (
             LinkCheck("agents/skills/agent-canon-update.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
-            LinkCheck("tools/analysis/dependencies/run_repo_dependency_review.sh"),
-            LinkCheck("tools/validation/ci/receipts/pr_gate_receipt.py"),
             LinkCheck("eval/producers/run_accumulated_agent_evals.py"),
             LinkCheck("tools/runtime/artifacts/generated_artifact_guard.py"),
             LinkCheck(
@@ -259,7 +257,6 @@ CONTRACTS = (
             LinkCheck(
                 "tools/validation/semantic/convention/check_convention_compliance.py"
             ),
-            LinkCheck("tools/validation/ci/checks/agent_canon_pr_graph_selector.py"),
             LinkCheck("tools/validation/ci/checks/check_github_workflows.py"),
         ),
         text_checks=(
@@ -277,36 +274,6 @@ CONTRACTS = (
                 "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 "not_applicable_standalone_source",
                 "missing-standalone-shared-surface-skip",
-            ),
-            TextCheck(
-                "tools/validation/ci/checks/check_agent_canon_pr.sh",
-                "agentcanon_pr_dependency_graph_required()",
-                "missing-dependency-graph-requirement-selector",
-            ),
-            TextCheck(
-                "tools/validation/ci/checks/check_agent_canon_pr.sh",
-                "if agentcanon_pr_dependency_graph_required; then",
-                "missing-conditional-dependency-graph-gate",
-            ),
-            TextCheck(
-                "tools/validation/ci/checks/check_agent_canon_pr.sh",
-                "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped",
-                "missing-optional-dependency-source-receipt-status",
-            ),
-            TextCheck(
-                "tools/validation/ci/checks/check_agent_canon_pr.sh",
-                'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
-                "missing-canonical-dependency-graph-selector",
-            ),
-            TextCheck(
-                "tools/validation/ci/checks/check_agent_canon_pr.sh",
-                "--selector-reason",
-                "missing-dependency-graph-selector-reason-receipt",
-            ),
-            TextCheck(
-                "tools/validation/ci/checks/check_agent_canon_pr.sh",
-                "--selector-evidence",
-                "missing-dependency-graph-selector-evidence-receipt",
             ),
         ),
     ),

@@ -3,7 +3,7 @@
 <!--
 @dependency-start
 contract design
-responsibility Defines the repository-wide dependency manifest DSL and validation model.
+responsibility Defines the optional dependency manifest DSL and validation model for explicitly selected analysis.
 downstream design source-owned-dependency-validation.md applies the DSL to source-owned validation
 downstream design dependency-contract-kinds.toml registered dependency header contract kinds
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates changed-file manifests
@@ -14,16 +14,8 @@ downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_
 downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency evidence separately
 downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design claims against manifest evidence
 downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
-downstream implementation ../../tools/validation/ci/checks/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
-downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh executes selected source review and writes the source/skipped receipt
-downstream implementation ../../tools/validation/ci/receipts/pr_gate_receipt.py owns the owner/root/PID/status-bound receipt schema
-downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh consumes the validated source/skipped receipt
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
-downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
-downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies the source/runtime boundary and receipt owner
-downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection
-downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py verifies writer/parser/consumer execution
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs owns canonical graph materialization and queries
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
@@ -35,33 +27,32 @@ downstream design ../structured-analysis/dependency-header-analysis.md maps mani
 @dependency-end
 -->
 
-このメモは、file 先頭に置く依存 manifest block の次期設計を固定します。
-目的は、agent と tool の両方が、ある file を編集する前後に読むべき関係 file を機械的に取得できるようにすることです。
+このメモは、明示的な dependency analysis で使う任意の manifest block の文法を定義します。
+通常の file 編集・追加・PR では manifest block を要求しません。選択された analysis では、既存注釈から agent と tool が関係 file を機械的に取得できます。
 旧 `Dependency Files:` block は廃止方向です。
-この設計では `@dependency-start` / `@dependency-end` marker による line-oriented DSL を正とします。
+analysis 対象が注釈を持つ場合は `@dependency-start` / `@dependency-end` marker による line-oriented DSL を使います。
 
 ## Reader Map
 
-Use this design to answer what dependency headers must express, how manifest
-blocks are parsed, and how dependency graphs drive edit-scope and validation
-tools. Read Goals, Non-Goals, and the evidence contract first; then use Manifest
-Block, Dependency Kinds, Contract Kinds, and Comment Wrapping for authoring.
-The later sections cover graph artifacts, responsibility-first expansion,
-consistency checks, isolated manifests, tool split, migration, and open design
-questions.
+Use this design when explicitly analyzing existing dependency annotations: it
+defines their syntax, graph projections, and validation behavior. It does not
+make annotations a prerequisite for ordinary edits, additions, or PRs. Read
+Goals, Non-Goals, and the evidence contract first; then use Manifest Block,
+Dependency Kinds, Contract Kinds, and Comment Wrapping when an analysis
+annotation is deliberately authored.
 
 ## Goals
 
 - 変更前に読むべき upstream context を、file から相対 path で取得できる
 - 変更後に確認すべき downstream context を、file から相対 path で取得できる
-- human reviewer、agent、CI tool が同じ manifest を読む
+- human reviewer、agent、selected analysis tool が既存 annotation を読む
 - Bash / awk で高速に scan と format check ができる
 - graph-level の双方向整合、自己参照、循環、closure を tool で検証できる
 - graph-level の孤立 manifest を tool で検証できる
 - dependency header check から repo-wide の machine-readable graph artifact を自動生成できる
 - responsibility-based search と bounded text search の hit file から、依存 graph を辿った edit-scope candidate を自動生成できる
 - design document の implementation-backed claim、implicit DSL / standard-form assumption、parent-doc alignment を dependency graph から検証できる
-- code、docs、workflow、test、environment file を同じ内部 DSL で扱う
+- code、docs、workflow、test、environment file に任意 annotation を付けて分析できる
 
 ## Non-Goals
 
@@ -137,35 +128,28 @@ context remains a separate persisted analysis capability. The claim checker
 does not parse dependency headers or open evidence files as a second fact
 authority.
 
-## Parent PR Gate Selection Contract
+## Explicit Dependency Analysis Route
 
-Dependency-manifest correctness is source-owned and does not require a
-persisted graph runtime. The authority, receipt meaning, and source/graph
-boundary are defined by
-[`source-owned-dependency-validation.md`](source-owned-dependency-validation.md).
-This document owns only the manifest DSL, relation semantics, contract kinds,
-changed-scope selection, and source-derived projections.
+Dependency-manifest analysis is source-owned and does not require a persisted
+graph runtime. This document owns the manifest DSL, relation semantics,
+contract kinds, changed-scope selection, and source-derived projections.
 
-The PR selector still selects trusted base/head evidence and the changed-path
-packet. `run_pr_dependency_source_gate.sh` then runs source scan, format,
-relation/cycle, and source-derived TSV/DOT projections. It records a receipt
-with exactly `source` or `skipped`; it never creates or reads persisted graph
-state. `tools/validation/ci/receipts/pr_gate_receipt.py` is the sole receipt schema/parser owner,
-and `run_all_checks.sh` consumes its single validated status output. The
-retired `prepared` and `scoped` graph states are not compatibility values.
+When explicitly selected, `run_repo_dependency_review.sh` runs source scan,
+format, relation/cycle, and TSV/DOT projection checks for dependency analysis.
+The normal PR and CI routes do not invoke a dependency-header gate or require a
+dependency receipt. Persisted graph commands remain explicit analysis
+capabilities rather than ordinary edit or PR prerequisites.
 
 The normal repository review route remains independent of graph executables and
 databases. `--ensure-graph` and `tools/bin/agent-canon graph
 build|status|query|context` are explicit analysis capabilities with their own
 runtime contract. They are mutually exclusive with source review where the
-wrapper promises an ensure-only route; no normal scan, format, review, or PR
-receipt path invokes them. Trusted base/head selection remains a selector
-responsibility and is not reimplemented by the source parser or receipt
-consumer.
+wrapper promises an ensure-only route. Ordinary PR validation does not select
+or consume dependency-header graph evidence.
 
 ## Manifest Block
 
-各 file の先頭付近に、共通 marker を含む dependency manifest block を置きます。
+dependency manifest を明示的な analysis 注釈として使う場合、file の先頭付近に共通 marker を含む block を置きます。
 外側は file type ごとの comment syntax を使います。
 内部 DSL はすべての file type で同じです。
 
@@ -247,7 +231,7 @@ dependency relation kind ではありません。依存 manifest の relation �
 Dependency relation はこの3種に限定します。`test`、`review`、`report`
 などの file-level contract 分類は、`dependency-contract-kinds.toml` の
 contract kind として別に管理します。新しい relation kind を増やす場合は、
-parser、tool、docs、review gate、migration plan を同じ変更で更新します。
+parser、tool、docs、および明示的な graph-analysis instructions を同じ変更で更新します。
 
 ## Contract Kinds
 
@@ -643,20 +627,10 @@ Responsibilities:
 
 - parse tracked `@dependency-start` / `@dependency-end` source blocks
 - select caller-requested, changed, or tracked paths without deriving facts
-- report missing manifests and source-owned owner classification
-- run in report-only mode during migration
-- later become a CI fail gate
-- accept a selector-owned `--changed-path-packet` containing the trusted PR
-  base/head, tree, merge-base, exact changed-path set, and path-set digest
-- fail closed when that packet is missing, malformed, stale, or differs from
-  the repository's verified base/head diff; the PR gate passes its separately
-  trusted base SHA and the scanner requires an exact packet binding to it
-- under a trusted PR packet, report unchanged missing headers as baseline
-  evidence and block only missing headers on changed or newly added paths;
-  deleted paths and existing root-view, symlink, and submodule skip rules stay
-  owned by this scanner
-- remain independent of graph-selection activation: a valid trusted PR packet
-  is sufficient to run this header gate without a graph executable or database
+- report existing annotations and missing annotations within an explicitly
+  selected analysis scope
+- keep missing annotations report-only by default; ordinary edits and PRs do
+  not activate this scanner
 
 ### `check_dependency_header_format.sh`
 
@@ -685,8 +659,10 @@ Responsibilities:
 - expand text-search hits into edit-scope candidates with `--edit-scope`, `--edit-scope-changed`, or `--search-hits-file`
 - with `--check-bidirectional`, validate bidirectional consistency and kind match on reverse edges
 
-Default graph validation is the fail gate for isolated manifests, self reference, and cycles.
-Bidirectional consistency is a stricter migration gate because a partially migrated repository can have useful upstream/downstream context before every reverse edge is written.
+When explicitly invoked, default graph validation rejects isolated manifests,
+self reference, and cycles. Bidirectional consistency is an optional stricter
+check over declared reverse edges; it does not impose repository-wide annotation
+coverage.
 
 The shell may use `jq`, `awk`, and `sort` to project canonical query rows. It
 cannot read source headers, rebuild graph facts, or open SQLite.
@@ -697,21 +673,17 @@ Responsibilities:
 
 - run source scan, format, relation/cycle, TSV/DOT, and edit-scope projections
 - keep the normal route independent of graph executable and persisted database
-- keep missing manifests report-only by default while repository-wide migration is incomplete
-- offer `--fail-missing` for strict checkpoint runs after a subtree or repo has been migrated
+- keep missing manifests report-only by default; ordinary edits and PRs do not
+  require repository-wide manifest coverage
+- offer `--fail-missing` for a user-selected strict coverage audit; ordinary
+  edits and PRs do not use it
 - offer `--explain-missing` for owner-classified missing-header repair output
-- accept `--allow-frontmatter` and pass it to the manifest tools for policy-explicit CI callers
+- accept `--allow-frontmatter` and pass it to the manifest tools for
+  policy-explicit analysis callers
 - pass `--check-bidirectional` through to graph validation when strict reverse-edge review is requested
 - offer `--list-changed-dependencies` so checkpoint review can hand reviewers every surface that changed files declare or are referenced by
 - automatically write `dependency_graph.tsv` when `--report-dir` is set
 - accept `--search-hits-file` and write `dependency_edit_scope.txt` when `--report-dir` is set
-- accept `--changed-path-packet` from the trusted PR graph selector and pass it
-  to the canonical header scan; the wrapper does not derive a second local
-  branch diff or duplicate changed-path authority
-- support a header-scan-only route that does not require a fresh graph status;
-  the PR gate uses it when derived-parent graph selection is skipped while
-  still requiring the trusted changed-path packet and strict missing-header
-  gate
 
 Template repos expose `make dependency-review-surfaces` to run an explicit
 strict review against both the parent root view and `vendor/agent-canon` source
@@ -719,44 +691,15 @@ tree. Persisted graph preparation is available only through the explicit
 `--ensure-graph` route; it exits before source review and is never a normal
 receipt prerequisite.
 
-## Migration Plan
+## Usage Boundary
 
-Phase 1: add this design and make changed-file validation require `@dependency-start` / `@dependency-end`.
-
-Phase 2: provide the shell entrypoints as source-derived consumers:
-
-- `scan_dependency_headers.sh`
-- `check_dependency_header_format.sh`
-- `check_dependency_graph.sh`
-
-`scan_dependency_headers.sh` starts as full-repo report-only so it can list
-missing manifests without blocking unrelated work. The scan and format tools
-consume the tracked source projection and contract registry directly; neither
-requires persisted graph state.
-The parent PR gate supplies a selector-owned changed-path packet rather than a
-local branch diff. The scanner verifies the packet against the trusted
-base/head snapshot, blocks missing manifests only for changed/new paths, and
-reports unchanged missing paths with stable count/path baseline evidence.
-`check_dependency_graph.sh` default mode rejects self references and cycles.
-`check_dependency_graph.sh --cycle-report-only` reports cycles without failing
-and is valid only when paired with a durable graph report artifact.
-`check_dependency_graph.sh --check-bidirectional` is used as a stricter migration report until reverse edges are complete.
-
-Phase 3: migrate files one by one from checker findings.
-Each touched file must be converted from `Dependency Files:` to `@dependency-start` in the same change that touches it.
-
-Phase 4: enable the source-owned CI fail gate for changed files.
-Full-repo missing-header scan remains report-only until the repository is migrated.
-The PR gate records `source` when the full source review is selected and
-`skipped` when only the trusted header scan is selected. Neither status claims
-persisted graph completeness. `--ensure-graph` remains explicit analysis and
-is validated by its own status/build read-back contract.
-
-Phase 5: remove legacy `Dependency Files:` wording from remaining docs after all checkable files use dependency manifest blocks.
+Dependency annotations remain available for explicitly selected analysis.
+Their absence is not a blocker for ordinary file edits, additions, or PRs, and
+the standard validation route does not ask writers to add them. The optional
+scanner and graph reviewer may report annotation gaps when a user selects that
+analysis contract; that does not create a repository-wide migration or PR gate.
 
 ## Open Design Questions
 
-- Whether strict JSON files should require a sidecar manifest or remain classified as commentless unsupported files
 - Whether explicitly reviewed cycle debt needs any policy beyond report-only review
-- Whether generated files should point to generators via sidecar metadata or stay outside the checkable set
 - Whether closure output should be ordered by graph distance, kind, or stable path sort
