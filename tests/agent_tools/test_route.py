@@ -519,7 +519,7 @@ class RouteToolTest(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(reviewer_view["model"], "gpt-5.6-luna")
+        self.assertEqual(reviewer_view["model"], "gpt-6-luna")
         self.assertEqual(reviewer_view["model_reasoning_effort"], "high")
 
     def test_conditional_math_reviewer_enters_capacity_only_when_active(self) -> None:
