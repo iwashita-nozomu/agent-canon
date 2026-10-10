@@ -130,16 +130,6 @@ def run_native_workflow_checks(root: Path, workflows: list[Path]) -> list[int]:
         f"shellcheck={SHELLCHECK_EXECUTABLE}",
         flush=True,
     )
-    actionlint_version_status = run_native_command(
-        "actionlint-version",
-        [str(ACTIONLINT_EXECUTABLE), "-version"],
-        root,
-    )
-    shellcheck_version_status = run_native_command(
-        "shellcheck-version",
-        [str(SHELLCHECK_EXECUTABLE), "--version"],
-        root,
-    )
     actionlint_status = run_native_command(
         "actionlint",
         [
@@ -158,11 +148,6 @@ def run_native_workflow_checks(root: Path, workflows: list[Path]) -> list[int]:
         f"executable={ZIZMOR_EXECUTABLE} policy=default",
         flush=True,
     )
-    zizmor_version_status = run_native_command(
-        "zizmor-version",
-        [str(ZIZMOR_EXECUTABLE), "--version"],
-        root,
-    )
     zizmor_status = run_native_command(
         "zizmor",
         [
@@ -175,13 +160,7 @@ def run_native_workflow_checks(root: Path, workflows: list[Path]) -> list[int]:
         ],
         root,
     )
-    return [
-        actionlint_version_status,
-        shellcheck_version_status,
-        actionlint_status,
-        zizmor_version_status,
-        zizmor_status,
-    ]
+    return [actionlint_status, zizmor_status]
 
 
 def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
