@@ -141,7 +141,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertIn(trap_marker, text)
         self.assertIn("runtime_boundary_root()", text)
         self.assertIn("runtime_boundary_path()", text)
-        self.assertIn('mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"', text)
+        self.assertIn('mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_PATH}"', text)
         self.assertNotIn('"${WORKSPACE_ROOT}/.agent-canon', text)
 
     def test_all_checks_removes_home_tools_defaults_for_cli_target(self) -> None:
