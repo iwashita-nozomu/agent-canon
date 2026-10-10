@@ -64,12 +64,17 @@ def test_logical_role_changes_do_not_create_a_new_physical_profile() -> None:
     ),
 )
 def test_write_accepts_existing_evidence_without_reuse_grammar(context: str) -> None:
-    worker = _packet(authority="workspace-write", logical_role_id="implementer", context=context)
+    worker = _packet(
+        authority="workspace-write", logical_role_id="implementer", context=context
+    )
     reviewer = _packet(context=context)
     worker_payload = json.loads(worker.to_json())
     reviewer_payload = json.loads(reviewer.to_json())
     assert worker_payload["context"] == reviewer_payload["context"] == context
-    assert worker_payload["allowed_paths"] == ["tools/agent/orchestration", "tests/tools"]
+    assert worker_payload["allowed_paths"] == [
+        "tools/agent/orchestration",
+        "tests/tools",
+    ]
     assert worker_payload["do_not_read"] == ["reports/private"]
     assert worker_payload["authority"] == "workspace-write"
     assert reviewer_payload["authority"] == "read-only"
@@ -106,7 +111,9 @@ def test_evidence_cannot_override_forbidden_paths(allowed_paths, do_not_read) ->
 
 
 def test_context_does_not_grant_write_access_or_add_paths() -> None:
-    packet = _packet(context="A candidate outside scope was considered. Write access is not granted by this context.")
+    packet = _packet(
+        context="A candidate outside scope was considered. Write access is not granted by this context."
+    )
     assert packet.authority == "read-only"
     assert packet.allowed_paths == ("tools/agent/orchestration", "tests/tools")
     assert packet.do_not_read == ("reports/private",)
@@ -116,4 +123,3 @@ def test_context_does_not_grant_write_access_or_add_paths() -> None:
 def test_unsupported_authority_is_rejected(authority: str) -> None:
     with pytest.raises(ValueError, match="unsupported authority"):
         _packet(authority=authority)
-

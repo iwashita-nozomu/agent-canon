@@ -16,10 +16,11 @@ runtime.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Literal, Sequence
+from typing import Literal
 
 LUNA_MODEL = "gpt-6-luna"
 PACKET_SCHEMA_ID = "direct_luna_handoff_packet_v1"
@@ -113,11 +114,7 @@ def _bounded_paths(name: str, values: Sequence[str]) -> tuple[str, ...]:
 
 
 def _paths_overlap(left: str, right: str) -> bool:
-    return (
-        left == right
-        or left.startswith(f"{right}/")
-        or right.startswith(f"{left}/")
-    )
+    return left == right or left.startswith(f"{right}/") or right.startswith(f"{left}/")
 
 
 def build_direct_luna_packet(
@@ -174,4 +171,3 @@ def build_direct_luna_packet(
             "request_clause_ids", request_clause_ids, required=False
         ),
     )
-

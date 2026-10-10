@@ -38,5 +38,8 @@ def test_logical_roles_and_skills_keep_separate_owners() -> None:
     assert topology["skill_owner"] == "agents/skills"
     assert topology["profile_binding_owner"].startswith("agents/model_profiles.toml")
     assert topology["communication_skill"] == "direct-luna-communication"
-    assert topology["projection_policy"]["new_logical_role_may_add_physical_profile"] is False
+    assert (
+        topology["projection_policy"]["new_logical_role_may_add_physical_profile"]
+        is False
+    )
     assert (ROOT / "agents/skills/direct-luna-communication.md").is_file()
