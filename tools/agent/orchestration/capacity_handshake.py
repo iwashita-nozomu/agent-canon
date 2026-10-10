@@ -18,12 +18,17 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import List, Mapping, Optional, Sequence, Tuple, TypedDict
 
 import tomllib
+
+if __package__ in (None, ""):
+    # Preserve the documented direct-file CLI's canonical package imports.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from tools.runtime.values import is_object_list, is_string_object_dict
 

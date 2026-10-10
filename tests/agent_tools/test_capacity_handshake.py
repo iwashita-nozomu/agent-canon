@@ -8,6 +8,9 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -317,3 +320,25 @@ def test_capacity_config_generator_and_readback(
         == 0
     )
     assert capsys.readouterr().out == "CAPACITY_CONFIG_PROJECTION=pass\n"
+
+
+def test_direct_cli_bootstraps_repository_package_without_pythonpath(
+    tmp_path: Path,
+) -> None:
+    root = _projection_root(tmp_path, 18)
+    source_root = Path(__file__).resolve().parents[2]
+    cli = source_root / "tools" / "agent" / "orchestration" / "capacity_handshake.py"
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+
+    result = subprocess.run(
+        [sys.executable, str(cli), "--root", str(root), "--write-config-projection"],
+        cwd=root,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout == "CAPACITY_CONFIG_PROJECTION=written\n"
