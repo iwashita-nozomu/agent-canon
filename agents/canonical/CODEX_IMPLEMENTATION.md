@@ -99,19 +99,24 @@ the common [Validation Routing](../../ROOT_AGENTS.md#validation-routing).
 
 ## Library And Reuse Sweep
 
-Before any new code path, helper, API, module, test, or script, inspect the owning
-abstractions and the existing dependency/build declarations, public configuration,
-extension points, source, and actual callers. Use
-[reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-and [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding).
-Choose direct use/configuration/composition for new functionality; reconsider
-preservation and compare removal/replacement for repairs. Record the verified
-remaining gap and engineering basis in the owning design.
+Follow this order:
 
-An existing `reuse_survey` supplies current asset and test context; reuse it under
-matching premises. Tests are evidence of current behavior, not a veto on the
-agreed correction. Preserve the necessary shared asset/history findings through
-related handoffs and consolidate changes to the same responsibility.
+1. For a known, selected CLI, API, helper, configuration, or composition that
+   meets the request, invoke it through its existing owner. Reuse valid results
+   and artifacts while their inputs, owner, and required guarantees still match;
+   do not copy the implementation or manually rebuild its flow.
+2. If the entrypoint is unknown, the invocation fails, or required behavior is
+   unmet, inspect only the caller, API/source, configuration, dependency/build
+   declarations, extension points, or prior attempts that could change the next
+   action. Use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+   and [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding)
+   for that concrete question; expand the search only while a material question
+   remains.
+3. For a confirmed repair gap, trace the first failing operation to its source
+   owner and correct there. Preserve caller permissions and task scope, and
+   migrate affected callers or retire obsolete relay paths as required. Rerun
+   only operations or checks affected by changed inputs or failure conditions;
+   keep prior results whose premises still match.
 
 When a related branch/PR or prepared checkout exists, verify it serves the same
 owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
