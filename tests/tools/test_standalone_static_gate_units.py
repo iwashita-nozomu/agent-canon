@@ -275,8 +275,7 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(
     called = calls.read_text().splitlines()
     assert len(called) == 3
     assert any(
-        line.endswith("run_standalone_static_gate_unit.sh contracts")
-        for line in called
+        line.endswith("run_standalone_static_gate_unit.sh contracts") for line in called
     )
     assert summary.read_text().splitlines() == [
         "unit=docs status=fail exit=7",
