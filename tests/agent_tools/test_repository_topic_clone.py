@@ -1037,10 +1037,10 @@ def test_linked_foreign_occupant_does_not_mutate_common_git_state(
     assert run_git(target, "symbolic-ref", "--short", "HEAD") == "feature/foreign"
 
 
-def test_linked_reuse_never_switches_and_preserves_branch_in_use_and_dirty_errors(
+def test_linked_reuse_preserves_owned_dirty_wip_and_branch_in_use(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Linked reuse is read-only with native branch-in-use and dirty failures."""
+    """Exact managed reuse keeps scoped WIP and never switches a linked branch."""
     _, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -1084,11 +1084,54 @@ def test_linked_reuse_never_switches_and_preserves_branch_in_use_and_dirty_error
             checkout_mode=rtc.CHECKOUT_MODE_LINKED,
         )
 
-    dirty = prepared.clone / "dirty.txt"
+    packet_path = prepared.writer_target_packet
+    assert packet_path is not None
+    dirty = prepared.clone / "first.py"
     dirty.write_text("preserve\n", encoding="utf-8")
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="dirty-worktree"):
-        rtc.request(**request)
+    before_files = snapshot_checkout_files(prepared.clone)
+    before_packet = packet_path.read_bytes()
+    index_path = git_metadata_path(prepared.clone, "index")
+    config_path = git_metadata_path(prepared.clone, "config.worktree")
+    exclude_path = git_metadata_path(prepared.clone, "info/exclude")
+    before_index = index_path.read_bytes()
+    before_config = config_path.read_bytes()
+    before_excludes = exclude_path.read_bytes()
+    before_status = run_git(
+        prepared.clone,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+        "--ignore-submodules=none",
+    )
+    before_head = run_git(prepared.clone, "rev-parse", "HEAD")
+    before_branch = run_git(prepared.clone, "symbolic-ref", "--short", "HEAD")
+
+    reused_dirty = rtc.request(**request)
+
+    assert reused_dirty.clone == prepared.clone
+    assert reused_dirty.request.allowed_paths == ("first.py",)
+    assert reused_dirty.writer_target_packet == packet_path
     assert dirty.read_text(encoding="utf-8") == "preserve\n"
+    assert snapshot_checkout_files(reused_dirty.clone) == before_files
+    assert packet_path.read_bytes() == before_packet
+    assert index_path.read_bytes() == before_index
+    assert config_path.read_bytes() == before_config
+    assert exclude_path.read_bytes() == before_excludes
+    assert (
+        run_git(
+            reused_dirty.clone,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignore-submodules=none",
+        )
+        == before_status
+    )
+    assert run_git(reused_dirty.clone, "rev-parse", "HEAD") == before_head
+    assert (
+        run_git(reused_dirty.clone, "symbolic-ref", "--short", "HEAD")
+        == before_branch
+    )
 
 
 def test_prepare_updates_dirty_linked_target_without_touching_checkout_data(
