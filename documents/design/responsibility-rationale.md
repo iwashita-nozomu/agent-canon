@@ -4,9 +4,10 @@
 contract design
 responsibility Canonical rationale and activation boundaries for reusable AgentCanon skills, gates, workflows, diagnostics, and durable issue publication.
 upstream design README.md design canon index
+upstream design ../conventions/software-engineering-principles.md shared engineering decision precedence
 upstream design ../../PHILOSOPHY.md shared design principles
 downstream design ../../agents/skills/README.md skill authoring and review entry
-downstream design ../../agents/skills/skill-cleanup.md skill procedure and rationale maintenance
+downstream design ../../agents/canonical/skills.md official skill authoring route
 downstream design ../../agents/skills/structure-planning.md consumes structure and visualization activation rationale
 downstream design ../../agents/skills/report-writing.md consumes report semantics and finding-closure rationale
 downstream design ../../agents/skills/test-design.md consumes regression-test admission rationale
@@ -27,76 +28,25 @@ The common rule is reachability: a responsibility is selected only when the chan
 
 ## Skill procedure derivation
 
-When creating, changing, or reviewing a skill procedure, read this contract and
-the affected decisions in that skill's owning design. Preserve the correspondence
-**shared principle -> skill-specific decision under stated assumptions -> concrete
-procedure**. [PHILOSOPHY](../../PHILOSOPHY.md) owns common principles;
-[engineering principles](../conventions/software-engineering-principles.md) owns
-their decision precedence. Reference the applicable principles rather than copying
-them, and treat the latest agreed user requirements as design inputs.
+When a skill procedure has a material, non-obvious operation order, branch
+condition, or completion check, record in the existing owning design the relevant
+principle, requirement, or assumption and why it supports that choice. Link the
+affected procedure section to that rationale; one decision may cover several
+steps. Shared principles remain in
+[PHILOSOPHY](../../PHILOSOPHY.md) and
+[engineering principles](../conventions/software-engineering-principles.md); do
+not copy them into individual skills.
 
-Keep each current decision in its existing responsibility-owned design document
-or design section. A link to general philosophy alone does not explain a procedure:
-record how the selected criterion applies to this skill and link the affected
-procedure sections. The procedure links back to that rationale for authoring and
-review. An independently owned design gap may need its own document; every skill
-does not need a new file, registry, or record schema.
+Use actual specifications and evidence when they support the choice. Distinguish
+reasoned derivation, static confirmation, and observed behavior, and leave unknown
+assumptions explicit. Do not invent historical intent, alternatives, or test
+results. Review that the linked rationale supports the changed procedure; link
+existence alone is not evidence.
 
-| Design question | Information to preserve |
-| --- | --- |
-| What must this skill achieve? | Purpose, inputs, assumptions, scope, and required guarantees. |
-| Which criteria select the method? | Applicable principle or requirement, its source, and the priority used when criteria conflict. |
-| Why these steps? | The decision leading to each material operation, its input-dependent order, branch conditions, and completion evidence. One decision may explain several steps. |
-| What supports the choice? | Relevant specifications, engineering arguments, actually considered alternatives and their comparison, and precise verification or failure-evidence references. |
-| When should the choice change? | Applicability limits, unresolved assumptions, and premise or requirement changes that trigger reconsideration. |
-
-Explain order through the inputs an earlier operation produces, branches through
-their differing premises, and completion through evidence of the required
-postconditions. Distinguish reasoned arguments, static inspection, and observed
-behavior. Record untested assumptions and unavailable evidence explicitly; do not
-invent alternatives, historical intent, or successful tests to fill the record.
-When an old rationale is missing, identify the newly justified current decision
-as such rather than claiming to have recovered the author's original reasoning.
-
-Update affected rationale, procedure, and verification criteria in the same change.
-Review their correspondence and whether the evidence supports the claimed scope;
-link existence alone is insufficient. Reuse valid unchanged decisions. Typo or
-format-only edits need no new design decision, and a scoped skill change does not
-require retrofitting unrelated skills.
-
-The design owns the current justification; Issue/PR discussions and authorized
-logs retain history and detailed evidence. Preserve access boundaries rather than
-copying private logs into public prose. Runtime instructions retain the inputs,
-conditions, actions, and completion checks needed to execute correctly. Ordinary
-skill use does not require reading its design history or all upstream principles.
-
-### Skill maintenance derivation
-
-[skill-cleanup](../../agents/skills/skill-cleanup.md#route) keeps a maintained skill
-and its distributed view consistent. Its authoring decisions assume one canonical
-procedure owner, the existing
-[adapter materializer](skill-runtime-shim-materialization.md), and conditional
-reading of relevant sections.
-
-| Procedure decision | Criterion and derivation |
-| --- | --- |
-| Read the affected design before changing a procedure. | A step depends on its purpose and assumptions. The author needs those inputs to preserve a valid decision or revise a changed premise; the agreed target itself is not reopened. |
-| Update rationale and procedure before generating their derived view. | Generated identity depends on the final canonical inputs. Generating first would validate an obsolete source, so the existing source-to-readback sequence follows the authored change. |
-| Review the changed decision-to-step correspondence alongside selected validation. | Projection equality establishes source/view consistency, not the adequacy of the decision or actual agent behavior. The existing behavioral evaluation owner supplies observations when selected. |
-
-Procedure-only records lose the reason for a choice. Copying the design history
-into each runtime skill duplicates ownership and expands execution-time reading.
-A separate decision registry adds another synchronization obligation. The selected
-existing-design-plus-links approach keeps one current justification and makes its
-procedure correspondence inspectable. This is an engineering argument, not a
-measured reduction in tokens or behavioral failures.
-
-Revisit the affected decisions when the skill's guarantees, applicable premises,
-source ownership, or generation inputs change. The
-[authoring and review route](../../agents/skills/skill-cleanup.md#procedure-rationale)
-checks this correspondence; [behavioral tuning](../../agents/skills/skill-cleanup.md#behavioral-tuning)
-retains its existing evaluation conditions. Change-specific observations and
-unverified results belong in the linked Issue/PR evidence.
+Update the rationale and affected procedure together when a relevant premise or
+guarantee changes. Routine wording edits and self-evident steps need no additional
+rationale. Ordinary skill use follows operative instructions and does not require
+reading design history.
 
 ## Validation selection and remote execution
 

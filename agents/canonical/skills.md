@@ -71,11 +71,11 @@ Naming carries the visibility boundary:
 - Workflow-only routines live in `../internal-routines/` as Markdown routines
   rather than Codex skill shims.
 
-When creating, modifying, or reviewing a skill procedure, start with
-[Updating Skills](../skills/README.md#updating-skills) to select the local design
-rationale before making the affected decision. Carry that owner and decision
-into any authoring delegation; ordinary skill execution keeps the read boundary
-above.
+For an AgentCanon change that alters a consequential procedure choice, use
+[Updating Skills](../skills/README.md#updating-skills) to locate its existing
+design rationale before revising the step. Carry the relevant owner into any
+`$skill-creator` delegation. Routine skill use follows operative instructions
+without reading design history.
 
 ## Official System Skill Delegation
 
