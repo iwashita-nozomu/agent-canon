@@ -2323,10 +2323,10 @@ def check_completion_coverage(
         if not is_string_object_mapping(response):
             errors["empty"].append("failure_response")
             continue
-        taxonomy_refs = response.get("taxonomy_refs")
+        response_taxonomy_refs = response.get("taxonomy_refs")
         if (
-            not is_object_list_or_tuple(taxonomy_refs)
-            or tuple(taxonomy_refs) != COMPLETION_COVERAGE_TAXONOMY_REFS
+            not is_object_list_or_tuple(response_taxonomy_refs)
+            or tuple(response_taxonomy_refs) != COMPLETION_COVERAGE_TAXONOMY_REFS
         ):
             errors["empty"].append("failure_response:taxonomy_refs")
         try:

@@ -25,7 +25,11 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
-from tools.runtime.values import is_object_mapping, is_string_object_mapping
+from tools.runtime.values import (
+    is_object_list_or_tuple,
+    is_object_mapping,
+    is_string_object_mapping,
+)
 
 UTC = timezone.utc  # noqa: UP017
 
@@ -75,7 +79,7 @@ def _reject_noncanonical_json(value: object) -> None:
             if not isinstance(key, str):
                 raise ArtifactIdentityError("artifact_identity:non_string_key")
             _reject_noncanonical_json(item)
-    elif isinstance(value, (list, tuple)):
+    elif is_object_list_or_tuple(value):
         for item in value:
             _reject_noncanonical_json(item)
 

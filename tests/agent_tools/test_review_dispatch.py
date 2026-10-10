@@ -199,8 +199,9 @@ class ReviewDispatchTest(unittest.TestCase):
                 def append_automatic_event(
                     _path: Path,
                     payload: Mapping[str, object],
-                    _outcome: str,
+                    outcome: str,
                 ) -> None:
+                    del outcome
                     captured.append(dict(payload))
 
                 with (

@@ -110,23 +110,6 @@ def _parent_write(
             temporary.unlink()
 
 
-def _git_blob_oid(data: bytes) -> str:
-    """Return the Git SHA-1 blob identity for exact bytes."""
-    return hashlib.sha1(
-        f"blob {len(data)}\0".encode("ascii") + data,
-        usedforsecurity=False,
-    ).hexdigest()
-
-
-def _json_sha256(value: object) -> str:
-    """Hash one canonical JSON value in the repository's integer/string domain."""
-    return hashlib.sha256(
-        json.dumps(
-            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
-    ).hexdigest()
-
-
 def _required_ledger_text(event: Mapping[str, object], field: str) -> str:
     """Return one required ledger text field."""
     value = event.get(field)
