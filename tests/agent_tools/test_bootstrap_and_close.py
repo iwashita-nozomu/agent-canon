@@ -81,10 +81,16 @@ from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snap
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )
-BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
+BOOTSTRAP_SCRIPT = (
+    PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
+)
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "task_close.py"
-WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "repository" / "workspace" / "worktree_start.py"
-SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "repository" / "worktree" / "setup_worktree.sh"
+WORKTREE_START_SCRIPT = (
+    PROJECT_ROOT / "tools" / "repository" / "workspace" / "worktree_start.py"
+)
+SETUP_WORKTREE_SCRIPT = (
+    PROJECT_ROOT / "tools" / "repository" / "worktree" / "setup_worktree.sh"
+)
 TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
 # Keep test artifacts outside both the parent checkout and AgentCanon source;
 # the exact process-owned root is removed when the test process exits.
@@ -184,7 +190,11 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
     gate_contracts = {
         "G1": (
             "source_correctness",
-            PROJECT_ROOT / "tools" / "repository" / "github" / "publication_integrator.py",
+            PROJECT_ROOT
+            / "tools"
+            / "repository"
+            / "github"
+            / "publication_integrator.py",
             "resolve_publication_eligibility",
         ),
         "G3": (
@@ -194,19 +204,26 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
         ),
         "G4": (
             "standalone_source_branch_integrity",
-            PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py",
+            PROJECT_ROOT
+            / "tools"
+            / "repository"
+            / "workspace"
+            / "repository_topic_clone.py",
             "_ensure_branch",
         ),
         "G5": (
             "remote_publication_readback",
-            PROJECT_ROOT / "tools" / "repository" / "github" / "publication_integrator.py",
+            PROJECT_ROOT
+            / "tools"
+            / "repository"
+            / "github"
+            / "publication_integrator.py",
             "integrate_publication",
         ),
     }
     for index, gate_id in enumerate(("G1", "G3", "G4", "G5"), 1):
         evidence_refs = [
-            cast("dict[str, object]", gate["binding"])["evidence_ref"]
-            for gate in gates
+            cast("dict[str, object]", gate["binding"])["evidence_ref"] for gate in gates
         ]
         ordered_inputs = {
             "G1": [seed_ref],
@@ -297,9 +314,7 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
         "durable_handback": handback,
         "descendants": descendants,
         "reservations": reservations,
-        "descendants_closed_evidence_ref": closeout[
-            "descendants_closed_evidence_ref"
-        ],
+        "descendants_closed_evidence_ref": closeout["descendants_closed_evidence_ref"],
         "reservations_released_evidence_ref": closeout[
             "reservations_released_evidence_ref"
         ],
@@ -674,7 +689,10 @@ def append_mid_task_wave_checkpoint(
         spawn_authority = spawn_authority or "parent_checkpoint_then_spawn_fresh_wave"
         target_agents = target_agents or "worker"
         spawned_roles = spawned_roles or target_agents
-        role_instances = role_instances or f"{spawned_roles}:followup:{spawned_roles}:{updated_packet}"
+        role_instances = (
+            role_instances
+            or f"{spawned_roles}:followup:{spawned_roles}:{updated_packet}"
+        )
         skipped_roles = skipped_roles or "none"
     elif input_classification == "new_task":
         scope_status = scope_status or "new_task"
@@ -979,7 +997,9 @@ def write_ready_closeout_bundle(
     verifier_unsigned = dict(verifier_receipt)
     verifier_unsigned.pop("receipt_sha256")
     verifier_receipt["receipt_sha256"] = hashlib.sha256(
-        json.dumps(verifier_unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+        json.dumps(
+            verifier_unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode()
     ).hexdigest()
     (runtime_dir / "verifier_receipt.json").write_text(
         json.dumps(verifier_receipt, sort_keys=True) + "\n", encoding="utf-8"
@@ -996,7 +1016,9 @@ def write_ready_closeout_bundle(
     parent_unsigned = dict(parent_evidence)
     parent_unsigned.pop("receipt_sha256")
     parent_evidence["receipt_sha256"] = hashlib.sha256(
-        json.dumps(parent_unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+        json.dumps(
+            parent_unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode()
     ).hexdigest()
     (runtime_dir / "parent_mutation_evidence.json").write_text(
         json.dumps(parent_evidence, sort_keys=True) + "\n", encoding="utf-8"
@@ -1177,7 +1199,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
         decision = self.consume_update_lifecycle_fixture(payload)
 
-        self.assertEqual(decision["reason"], "close_agent:cleanup_before_remote_readback")
+        self.assertEqual(
+            decision["reason"], "close_agent:cleanup_before_remote_readback"
+        )
 
     def test_update_lifecycle_rejects_missing_gate_receipt(self) -> None:
         """Terminal close requires the ordered complete G1-G6 boundary set."""
@@ -1187,7 +1211,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
         decision = self.consume_update_lifecycle_fixture(payload)
 
-        self.assertEqual(decision["reason"], "close_agent:all_six_gate_evidence_required")
+        self.assertEqual(
+            decision["reason"], "close_agent:all_six_gate_evidence_required"
+        )
 
     def assert_current_checkout_write_policy(
         self,
@@ -1271,7 +1297,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
             "requirements_organizer:pending_explicit_runtime_spawn_authority",
             schedule_text,
         )
-        self.assertNotIn("explorer:pending_explicit_runtime_spawn_authority", schedule_text)
+        self.assertNotIn(
+            "explorer:pending_explicit_runtime_spawn_authority", schedule_text
+        )
         self.assertNotIn(
             "execution_planner:pending_explicit_runtime_spawn_authority",
             schedule_text,
@@ -1383,9 +1411,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         ):
             self.assertFalse((report_dir / path).exists(), path)
 
-        manifest_text = (report_dir / "team_manifest.yaml").read_text(
-            encoding="utf-8"
-        )
+        manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
         manifest_value: object = yaml.safe_load(manifest_text)
         self.assertIsInstance(manifest_value, dict)
         manifest = cast("dict[str, object]", manifest_value)
@@ -2024,7 +2050,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             self.assertIn("ADVERSARIAL_REQUIRED=yes", result.stdout)
             self.assertIn("terra:terra_terra:terra", result.stdout)
-            self.assertIn("START_DECLARATION=workflow=Comprehensive Development", result.stdout)
+            self.assertIn(
+                "START_DECLARATION=workflow=Comprehensive Development", result.stdout
+            )
             start_declaration = next(
                 line
                 for line in result.stdout.splitlines()
@@ -2085,12 +2113,14 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("ADVERSARIAL_REQUIRED=no", result.stdout)
             self.assertNotIn("terra:terra_terra:terra", result.stdout)
-            self.assertNotIn("terra", next(
-                line
-                for line in result.stdout.splitlines()
-                if line.startswith("START_DECLARATION=")
-            ))
-
+            self.assertNotIn(
+                "terra",
+                next(
+                    line
+                    for line in result.stdout.splitlines()
+                    if line.startswith("START_DECLARATION=")
+                ),
+            )
 
     def test_empty_registry_does_not_materialize_configured_candidates(self) -> None:
         """Configured codex_agents are candidate order, not executable availability."""
@@ -2294,7 +2324,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn("agent type selection for implementer must be one of", result.stdout)
+            self.assertIn(
+                "agent type selection for implementer must be one of", result.stdout
+            )
             self.assertFalse((report_root / "test-invalid-selection").exists())
 
     def test_bootstrap_activation_policy_cases(self) -> None:
@@ -2345,9 +2377,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
             ),
         )
         for name, task, run_id, expected, forbidden, check_review_policy in cases:
-            with self.subTest(case=name), tempfile.TemporaryDirectory(
-                dir=TEST_TEMP_ROOT
-            ) as tmp_dir:
+            with (
+                self.subTest(case=name),
+                tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir,
+            ):
                 workspace_root = Path(tmp_dir) / "workspace"
                 report_root = Path(tmp_dir) / "reports"
                 workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2609,9 +2642,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("/documents/conventions/REVIEW_PROCESS.md", result.stdout)
             self.assertIn("/notes/guardrails/README.md", result.stdout)
             self.assertNotIn("/docker/README.md", result.stdout)
-            self.assertIn(
-                "/agents/skills/codex-task-workflow.md", result.stdout
-            )
+            self.assertIn("/agents/skills/codex-task-workflow.md", result.stdout)
             self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
             manifest_text = (report_dir / "team_manifest.yaml").read_text(
@@ -2632,9 +2663,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("/documents/conventions/REVIEW_PROCESS.md", manifest_text)
             self.assertIn("/notes/guardrails/README.md", manifest_text)
             self.assertNotIn("/docker/README.md", manifest_text)
-            self.assertIn(
-                "/agents/skills/codex-task-workflow.md", manifest_text
-            )
+            self.assertIn("/agents/skills/codex-task-workflow.md", manifest_text)
 
     def test_bootstrap_custom_report_root_writes_active_run_baseline_there(
         self,
@@ -2677,7 +2706,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 (report_root / run_id / "task_authority.yaml.sha256").is_file()
             )
 
-    def test_task_workflow_context_roundtrips_through_the_active_hook_report(self) -> None:
+    def test_task_workflow_context_roundtrips_through_the_active_hook_report(
+        self,
+    ) -> None:
         """The selected task family is stored in and read from its active run bundle."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2744,7 +2775,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
             context_path = report_dir / "skill_usage_context.json"
             stored_context = json.loads(context_path.read_text(encoding="utf-8"))
             self.assertEqual(stored_context["workflows"], ["owner_bounded_change"])
-            self.assertEqual(stored_context["source_event"], "bootstrap_agent_run.task_id")
+            self.assertEqual(
+                stored_context["source_event"], "bootstrap_agent_run.task_id"
+            )
             stale_root_context = workspace_root / "skill_usage_context.json"
             stale_root_context.write_text(
                 json.dumps(
@@ -2792,7 +2825,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 ["owner_bounded_change"],
                 events[0],
             )
-            self.assertEqual(events[0]["workflow_context_source_event"], "bootstrap_agent_run.task_id")
+            self.assertEqual(
+                events[0]["workflow_context_source_event"],
+                "bootstrap_agent_run.task_id",
+            )
             self.assertEqual(events[0]["workflow_attribution_kind"], "context")
             self.assertEqual(events[0]["workflow_monitor_report_dir"], str(report_dir))
 
@@ -2843,9 +2879,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             manifest = yaml.safe_load(
                 (
-                    report_root
-                    / "test-bootstrap-spawn-budget"
-                    / "team_manifest.yaml"
+                    report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
                 ).read_text(encoding="utf-8")
             )
             spawn_budget = manifest["run"]["spawn_budget"]
@@ -2857,7 +2891,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assert_current_checkout_write_policy(
                 manifest["run"]["write_scope_policy"], expected_write
             )
-
 
     def test_task_catalog_workflow_families_define_role_topology(self) -> None:
         """Every workflow family should define role topology separately from thread budget."""
@@ -2944,9 +2977,15 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "implementation_handoff_required",
                 contract_complete_implementation_policy,
             )
-            self.assertNotIn("parent_repo_edits_allowed", contract_complete_implementation_policy)
-            self.assertNotIn("parent_orchestration_only", contract_complete_implementation_policy)
-            self.assertNotIn("write_capable_child_required", contract_complete_implementation_policy)
+            self.assertNotIn(
+                "parent_repo_edits_allowed", contract_complete_implementation_policy
+            )
+            self.assertNotIn(
+                "parent_orchestration_only", contract_complete_implementation_policy
+            )
+            self.assertNotIn(
+                "write_capable_child_required", contract_complete_implementation_policy
+            )
             self.assertEqual(
                 default_quality_check_policy["candidate_roles"],
                 ["change_reviewer"],
@@ -2956,7 +2995,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 [],
             )
             self.assertEqual(
-                default_quality_check_policy["provenance"]["language_review_candidates"],
+                default_quality_check_policy["provenance"][
+                    "language_review_candidates"
+                ],
                 [],
             )
             self.assertEqual(
@@ -3032,9 +3073,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     subagent_prompt_packet["native_argv"],
                     "run.repo_tool_routing_policy",
                 )
-                self.assertNotIn(
-                    "tool_command_packet_command", subagent_prompt_packet
-                )
+                self.assertNotIn("tool_command_packet_command", subagent_prompt_packet)
                 self.assertNotIn("tool_commands", subagent_prompt_packet)
                 self.assert_role_prompt_includes(
                     manifest,
@@ -3055,7 +3094,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 workflow_entry = next(
                     entry
                     for entry in sectioned_entries
-                    if entry["path"].endswith("agents/canonical/CODEX_IMPLEMENTATION.md")
+                    if entry["path"].endswith(
+                        "agents/canonical/CODEX_IMPLEMENTATION.md"
+                    )
                 )
                 self.assertIn(
                     "5. Implementation",
@@ -3927,7 +3968,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     self.assertIn("CLOSEOUT_READY=no", result.stdout)
                     self.assertIn(expected_blocker, result.stdout)
 
-    def test_task_close_accepts_unselected_diff_check_on_clean_no_change_workspace(self) -> None:
+    def test_task_close_accepts_unselected_diff_check_on_clean_no_change_workspace(
+        self,
+    ) -> None:
         """An unselected diff-check is valid only for a clean no-change checkout."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             root = Path(tmp_dir)
@@ -4013,7 +4056,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
             (workspace_root / "changed.txt").write_text("changed\n", encoding="utf-8")
             report_dir = root / "reports" / "test-task-close-dirty-no-change"
             report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, "test-task-close-dirty-no-change", workspace_root)
+            write_ready_closeout_bundle(
+                report_dir, "test-task-close-dirty-no-change", workspace_root
+            )
             mark_diff_check_not_applicable(report_dir)
 
             result = subprocess.run(
@@ -4391,8 +4436,12 @@ class BootstrapAndCloseTest(unittest.TestCase):
             report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
-            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
-                write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            with patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}
+            ):
+                write_ready_closeout_bundle(
+                    report_dir, run_id, workspace=workspace_root
+                )
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
             closeout_path = report_dir / "closeout_gate.md"
             text = closeout_path.read_text(encoding="utf-8")
@@ -4457,8 +4506,12 @@ class BootstrapAndCloseTest(unittest.TestCase):
             report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
-            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
-                write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            with patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}
+            ):
+                write_ready_closeout_bundle(
+                    report_dir, run_id, workspace=workspace_root
+                )
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
             closeout_path = report_dir / "closeout_gate.md"
             text = closeout_path.read_text(encoding="utf-8")
@@ -4533,9 +4586,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             run_id = "parent-owned-nested-closeout"
             report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
-            with patch.dict(
-                os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
-            ):
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}):
                 write_ready_closeout_bundle(
                     report_dir, run_id, workspace=workspace_root
                 )
@@ -4563,7 +4614,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             self.assertTrue(expected_outer_diff_ref.startswith(outer_head))
             self.assertNotIn("Unable to resolve git HEAD", result.stderr)
-            self.assertTrue(report_dir.resolve().is_relative_to(TEST_TEMP_ROOT.resolve()))
+            self.assertTrue(
+                report_dir.resolve().is_relative_to(TEST_TEMP_ROOT.resolve())
+            )
             self.assertFalse(report_dir.resolve().is_relative_to(parent_root.resolve()))
 
     def test_task_close_rejects_stale_closeout_and_artifact_diff_ref(self) -> None:

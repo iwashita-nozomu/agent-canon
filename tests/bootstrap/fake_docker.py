@@ -676,7 +676,9 @@ def main(argv: list[str]) -> int:
             kind = copy_environment.get("AGENT_CANON_COPY_KIND", "")
             relative = copy_environment.get("AGENT_CANON_COPY_RELATIVE", "")
             expected_digest = copy_environment.get("AGENT_CANON_COPY_DIGEST", "")
-            acknowledged_digest = copy_environment.get("AGENT_CANON_COPY_EXPECTED_DIGEST", "")
+            acknowledged_digest = copy_environment.get(
+                "AGENT_CANON_COPY_EXPECTED_DIGEST", ""
+            )
             install_root = Path(
                 copy_environment.get("AGENT_CANON_COPY_INSTALL_ROOT", "")
             )
@@ -726,12 +728,18 @@ def main(argv: list[str]) -> int:
                             if kind == "eval"
                             else lock_root / "spool" / "private-feedback"
                         )
-                        if kind == "eval" and not source_root.exists() and not source_root.is_symlink():
+                        if (
+                            kind == "eval"
+                            and not source_root.exists()
+                            and not source_root.is_symlink()
+                        ):
                             pass
                         else:
                             if source_root.is_symlink() or not source_root.is_dir():
                                 return 1
-                            if any(path.is_symlink() for path in source_root.rglob("*")):
+                            if any(
+                                path.is_symlink() for path in source_root.rglob("*")
+                            ):
                                 return 1
                             if any(
                                 not path.is_dir() and not path.is_file()
@@ -769,7 +777,11 @@ def main(argv: list[str]) -> int:
                 if any(
                     not run_id
                     or len(run_id) > 128
-                    or any(character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-" for character in run_id)
+                    or any(
+                        character
+                        not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-"
+                        for character in run_id
+                    )
                     for run_id in pending
                 ):
                     return 1
@@ -897,10 +909,15 @@ def main(argv: list[str]) -> int:
                     source_root = backing / "runtime" / "spool" / "private-feedback"
                     if not source_root.exists() and not source_root.is_symlink():
                         return 75
-                    if not source_root.is_dir() or source_root.is_symlink() or any(
-                        path.is_symlink() for path in source_root.rglob("*")) or any(
-                        not path.is_dir() and not path.is_file()
-                        for path in source_root.rglob("*")):
+                    if (
+                        not source_root.is_dir()
+                        or source_root.is_symlink()
+                        or any(path.is_symlink() for path in source_root.rglob("*"))
+                        or any(
+                            not path.is_dir() and not path.is_file()
+                            for path in source_root.rglob("*")
+                        )
+                    ):
                         return 1
                     lock_path = source_root.parent / ".private-feedback.lock"
                     if lock_path.is_symlink():
@@ -909,7 +926,10 @@ def main(argv: list[str]) -> int:
                         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_SH)
                         emit_tar(
                             source_root,
-                            [(child, child.name) for child in sorted(source_root.iterdir())],
+                            [
+                                (child, child.name)
+                                for child in sorted(source_root.iterdir())
+                            ],
                         )
                         readback_digest = tree_digest(source_root)
                 elif kind == "codex-home":
@@ -1107,7 +1127,9 @@ def main(argv: list[str]) -> int:
             if marked and (not directory.is_dir() or directory.is_symlink()):
                 return 1
             directory.mkdir(parents=True, exist_ok=True)
-        (runtime_backing / "spool" / "private-feedback").mkdir(parents=True, exist_ok=True)
+        (runtime_backing / "spool" / "private-feedback").mkdir(
+            parents=True, exist_ok=True
+        )
         for directory in (backing / "exchange", backing / "private-log"):
             if marked and (directory.exists() or directory.is_symlink()):
                 if not directory.is_dir() or directory.is_symlink():

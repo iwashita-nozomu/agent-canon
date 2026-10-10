@@ -32,18 +32,20 @@ def run_adapter(tmp_path: Path, script: str) -> subprocess.CompletedProcess[str]
     )
 
 
-def test_resident_request_is_exported_before_host_request_lookup(tmp_path: Path) -> None:
+def test_resident_request_is_exported_before_host_request_lookup(
+    tmp_path: Path,
+) -> None:
     """A request that only exists in the volume still reaches the publisher."""
     result = run_adapter(
         tmp_path,
-        r'''
+        r"""
 _agent_canon_volume_copy() {
   printf '%s\n' "$1 $2" >> "$TEST_CALLS"
   mkdir -p "$3"
   printf 'invalid-request\n' > "$3/sync-request.json"
 }
 _agent_canon_private_feedback_sync resident
-''',
+""",
     )
     calls = tmp_path / "calls"
     assert calls.exists(), "resident spool was never exported"
@@ -62,7 +64,7 @@ def test_source_sync_attempts_pending_delivery_independently(
     archive_owner.write_text("# fixture archive owner entrypoint\n", encoding="utf-8")
     result = run_adapter(
         tmp_path,
-        r'''
+        r"""
 command_args=(sync --install-root "$AGENT_CANON_REPOSITORY_ROOT")
 _agent_canon_source_sync_write() { :; }
 _agent_canon_image_reference() { AGENT_CANON_IMAGE_REF=fixture; }
@@ -100,7 +102,7 @@ git() {
   esac
 }
 _agent_canon_sync_operation
-'''.replace("FETCH_STATUS", str(fetch_status)),
+""".replace("FETCH_STATUS", str(fetch_status)),
     )
     calls = tmp_path / "calls"
     assert calls.exists(), "source synchronization never attempted archive delivery"

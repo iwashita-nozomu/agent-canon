@@ -61,12 +61,19 @@ def topic_slug(value: str) -> str:
     value = value.strip().lower()
     slug = TOPIC_PATTERN.sub("-", value).strip("-")
     if not slug or len(slug) > 96:
-        raise PrivateFeedbackError("topic_invalid", "topic must be lowercase ASCII and non-empty")
+        raise PrivateFeedbackError(
+            "topic_invalid", "topic must be lowercase ASCII and non-empty"
+        )
     return slug
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def _source_commit(source_root: Path | None = None) -> str:
@@ -86,10 +93,15 @@ def _source_commit(source_root: Path | None = None) -> str:
 def _runtime_root(value: str | None) -> Path:
     raw = value or os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
     if not raw:
-        raise PrivateFeedbackError("runtime_root_required", "pass --runtime-root or set AGENT_CANON_RUNTIME_ROOT")
+        raise PrivateFeedbackError(
+            "runtime_root_required",
+            "pass --runtime-root or set AGENT_CANON_RUNTIME_ROOT",
+        )
     path = Path(raw).expanduser()
     if not path.is_absolute():
-        raise PrivateFeedbackError("runtime_root_invalid", "runtime root must be absolute")
+        raise PrivateFeedbackError(
+            "runtime_root_invalid", "runtime root must be absolute"
+        )
     path.mkdir(parents=True, exist_ok=True)
     return path.resolve()
 
@@ -106,7 +118,9 @@ def _log_root(value: str | None) -> Path:
         raw = str(Path(parent) / "agent-canon-log")
     path = Path(raw).expanduser()
     if not path.is_absolute():
-        raise PrivateFeedbackError("log_root_invalid", "private log root must be absolute")
+        raise PrivateFeedbackError(
+            "log_root_invalid", "private log root must be absolute"
+        )
     return path.resolve()
 
 
@@ -122,9 +136,7 @@ def _private_feedback_spool_lock(spool: Path) -> Iterator[None]:
     """Serialize spool mutations with the host's exact-snapshot cleanup."""
     lock_path = spool.parent / ".private-feedback.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(
-        lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600
-    )
+    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         os.fchmod(descriptor, 0o600)
         fcntl.flock(descriptor, fcntl.LOCK_EX)
@@ -150,13 +162,19 @@ def _valid_sync_request(request: object) -> bool:
 
 def _read_sync_request(path: Path) -> dict[str, Any]:
     if path.is_symlink() or not path.is_file():
-        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request is invalid")
+        raise PrivateFeedbackError(
+            "sync_request_invalid", "private feedback sync request is invalid"
+        )
     try:
         request = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request is invalid") from exc
+        raise PrivateFeedbackError(
+            "sync_request_invalid", "private feedback sync request is invalid"
+        ) from exc
     if not _valid_sync_request(request):
-        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request schema is invalid")
+        raise PrivateFeedbackError(
+            "sync_request_invalid", "private feedback sync request schema is invalid"
+        )
     return request
 
 
@@ -182,15 +200,22 @@ def _ensure_sync_request(runtime: Path) -> bool:
     }
     _write_once(
         request_path,
-        json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+        json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n",
     )
     return False
 
 
 def _safe_relative(value: str) -> Path:
     path = Path(value)
-    if path.is_absolute() or ".." in path.parts or any(part in {"", "."} for part in path.parts):
-        raise PrivateFeedbackError("locator_invalid", "locator must be a controlled relative path")
+    if (
+        path.is_absolute()
+        or ".." in path.parts
+        or any(part in {"", "."} for part in path.parts)
+    ):
+        raise PrivateFeedbackError(
+            "locator_invalid", "locator must be a controlled relative path"
+        )
     return path
 
 
@@ -200,7 +225,9 @@ def _sensitive(body: str) -> bool:
 
 def _body(args: argparse.Namespace) -> tuple[str, str]:
     if bool(args.stdin) == bool(args.text):
-        raise PrivateFeedbackError("input_required", "provide direct prose or --stdin, exactly once")
+        raise PrivateFeedbackError(
+            "input_required", "provide direct prose or --stdin, exactly once"
+        )
     if args.stdin:
         value = sys.stdin.read()
         mode = "stdin"
@@ -210,7 +237,10 @@ def _body(args: argparse.Namespace) -> tuple[str, str]:
     if not value.strip() or "\x00" in value:
         raise PrivateFeedbackError("body_invalid", "body must be non-empty UTF-8 text")
     if _sensitive(value):
-        raise PrivateFeedbackError("private_data_rejected", "credential-shaped or private payload is not accepted")
+        raise PrivateFeedbackError(
+            "private_data_rejected",
+            "credential-shaped or private payload is not accepted",
+        )
     return value.rstrip() + "\n", mode
 
 
@@ -222,8 +252,16 @@ def _scope(args: argparse.Namespace) -> tuple[str, str, str]:
 
 
 def _metadata(
-    *, kind: str, topic: str, locator: str, digest: str, run: str, task: str,
-    input_mode: str, status: str, source_commit: str,
+    *,
+    kind: str,
+    topic: str,
+    locator: str,
+    digest: str,
+    run: str,
+    task: str,
+    input_mode: str,
+    status: str,
+    source_commit: str,
 ) -> dict[str, str]:
     return {
         "schema": SCHEMA,
@@ -249,7 +287,11 @@ def _frontmatter(meta: dict[str, str], body: str) -> str:
         "input_mode": meta["input_mode"],
         "status": meta["status"],
     }
-    lines = ["---"] + [f"{key}: {value}" for key, value in fields.items()] + ["---", "", body.rstrip(), ""]
+    lines = (
+        ["---"]
+        + [f"{key}: {value}" for key, value in fields.items()]
+        + ["---", "", body.rstrip(), ""]
+    )
     return "\n".join(lines)
 
 
@@ -262,7 +304,9 @@ def _write_once(path: Path, content: str) -> None:
     path.parent.chmod(0o700)
     if path.exists():
         if path.read_text(encoding="utf-8") != content:
-            raise PrivateFeedbackError("content_conflict", f"existing private record differs: {path.name}")
+            raise PrivateFeedbackError(
+                "content_conflict", f"existing private record differs: {path.name}"
+            )
         return
     fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
@@ -300,7 +344,9 @@ def _receipt_lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8").splitlines()
 
 
-def _receipt_metadata(topic: str, digest: str, run: str, task: str, source_commit: str) -> str:
+def _receipt_metadata(
+    topic: str, digest: str, run: str, task: str, source_commit: str
+) -> str:
     return "\n".join(
         [
             "## Read receipt",
@@ -369,7 +415,9 @@ def _skill_content(topic: str, body: str, digest: str, scopes: set[str]) -> str:
     )
 
 
-def _source_candidate(log_root: Path, spool: Path, topic: str) -> tuple[Path | None, Path]:
+def _source_candidate(
+    log_root: Path, spool: Path, topic: str
+) -> tuple[Path | None, Path]:
     relative = _candidate_locator(topic)
     for root in (log_root, spool):
         path = root / relative
@@ -419,15 +467,23 @@ def read(args: argparse.Namespace) -> int:
     with _private_feedback_spool_lock(spool):
         candidate, relative = _source_candidate(log_root, spool, topic)
         if candidate is None:
-            raise PrivateFeedbackError("knowledge_not_found", "private knowledge candidate is unavailable")
+            raise PrivateFeedbackError(
+                "knowledge_not_found", "private knowledge candidate is unavailable"
+            )
         content = candidate.read_text(encoding="utf-8")
-        body = content.split("---", 2)[-1].strip() if content.startswith("---") else content.strip()
+        body = (
+            content.split("---", 2)[-1].strip()
+            if content.startswith("---")
+            else content.strip()
+        )
         digest = _sha256(body.encode("utf-8"))
         run, task, scope = _scope(args)
         source_commit = _source_commit()
         receipt_path = spool / "knowledge" / "topics" / topic / "read-receipt.md"
         old = receipt_path.read_text(encoding="utf-8") if receipt_path.exists() else ""
-        duplicate = bool(scope) and (f"task: {task}" in old if task else f"run: {run}" in old)
+        duplicate = bool(scope) and (
+            f"task: {task}" in old if task else f"run: {run}" in old
+        )
         receipt = _receipt_metadata(topic, digest, run, task, source_commit)
         if not duplicate:
             receipt_path.parent.mkdir(parents=True, exist_ok=True)
@@ -441,12 +497,19 @@ def read(args: argparse.Namespace) -> int:
             skill_path = spool / "runtime" / "skills" / topic / "SKILL.md"
             _write_once(skill_path, _skill_content(topic, body, digest, scopes))
             private_root = runtime / PRIVATE_SKILLS_DIR / topic
-            _write_once(private_root / "SKILL.md", _skill_content(topic, body, digest, scopes))
+            _write_once(
+                private_root / "SKILL.md", _skill_content(topic, body, digest, scopes)
+            )
             promoted = True
         meta = _metadata(
-            kind="knowledge-read-receipt", topic=topic,
-            locator=relative.as_posix(), digest=digest, run=run, task=task,
-            input_mode="read", status="duplicate" if duplicate else "read",
+            kind="knowledge-read-receipt",
+            topic=topic,
+            locator=relative.as_posix(),
+            digest=digest,
+            run=run,
+            task=task,
+            input_mode="read",
+            status="duplicate" if duplicate else "read",
             source_commit=source_commit,
         )
         meta["promotion"] = "private-skill-candidate" if promoted else "none"
@@ -456,10 +519,18 @@ def read(args: argparse.Namespace) -> int:
         return 0
 
 
-def _git(path: Path, argv: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(["git", "-C", str(path), *argv], capture_output=True, text=True, check=False)
+def _git(
+    path: Path, argv: list[str], *, check: bool = True
+) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        ["git", "-C", str(path), *argv], capture_output=True, text=True, check=False
+    )
     if check and result.returncode != 0:
-        detail = result.stderr.strip().splitlines()[-1] if result.stderr.strip() else "git command failed"
+        detail = (
+            result.stderr.strip().splitlines()[-1]
+            if result.stderr.strip()
+            else "git command failed"
+        )
         raise PrivateFeedbackError("git_failed", detail[:240])
     return result
 
@@ -495,9 +566,23 @@ def status(args: argparse.Namespace) -> int:
     spool = _spool_root(runtime)
     log_root = _log_root(args.log_root)
     pending = [path.relative_to(spool).as_posix() for path in _pending_paths(spool)]
-    payload: dict[str, str] = {"schema": SCHEMA, "status": "pending" if pending else "clean", "pending": str(len(pending)), "log_root": str(log_root)}
+    payload: dict[str, str] = {
+        "schema": SCHEMA,
+        "status": "pending" if pending else "clean",
+        "pending": str(len(pending)),
+        "log_root": str(log_root),
+    }
     if log_root.exists():
-        payload.update({"branch": _git(log_root, ["branch", "--show-current"], check=False).stdout.strip(), "remote": _git(log_root, ["remote", "get-url", "origin"], check=False).stdout.strip()})
+        payload.update(
+            {
+                "branch": _git(
+                    log_root, ["branch", "--show-current"], check=False
+                ).stdout.strip(),
+                "remote": _git(
+                    log_root, ["remote", "get-url", "origin"], check=False
+                ).stdout.strip(),
+            }
+        )
     _json_meta(payload)
     return 0
 
@@ -506,7 +591,9 @@ def capture(args: argparse.Namespace) -> int:
     # Structured runtime feedback is intentionally short and metadata-like.
     body, input_mode = _body(args)
     if len(body.encode("utf-8")) > 16 * 1024:
-        raise PrivateFeedbackError("capture_too_large", "structured capture exceeds 16 KiB")
+        raise PrivateFeedbackError(
+            "capture_too_large", "structured capture exceeds 16 KiB"
+        )
     args.text = [body]
     args.stdin = False
     return add(args, "feedback")
@@ -526,7 +613,10 @@ def capture_runtime_feedback(
     without the event body.
     """
     if len(entry.encode("utf-8")) > 16 * 1024 or _sensitive(entry):
-        raise PrivateFeedbackError("private_data_rejected", "structured feedback is not a permitted private payload")
+        raise PrivateFeedbackError(
+            "private_data_rejected",
+            "structured feedback is not a permitted private payload",
+        )
     runtime = _runtime_root(str(runtime_root))
     spool = _spool_root(runtime)
     topic = "runtime-feedback"
@@ -544,14 +634,18 @@ def capture_runtime_feedback(
         source_commit=_source_commit(),
     )
     with _private_feedback_spool_lock(spool):
-        _write_once(spool / "feedback" / topic / f"{digest[:16]}.md", _frontmatter(meta, body))
+        _write_once(
+            spool / "feedback" / topic / f"{digest[:16]}.md", _frontmatter(meta, body)
+        )
         request_reused = _ensure_sync_request(runtime)
     meta["sync_request"] = "reused" if request_reused else "created"
     return meta
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Private AgentCanon feedback and knowledge route")
+    parser = argparse.ArgumentParser(
+        description="Private AgentCanon feedback and knowledge route"
+    )
     parser.add_argument("--runtime-root")
     parser.add_argument("--log-root")
     parser.add_argument("--run", default="")
@@ -622,18 +716,38 @@ def main(argv: list[str] | None = None) -> int:
         spool = _spool_root(runtime)
         query = str(getattr(args, "query", "")).strip().lower()
         log_root = _log_root(args.log_root)
-        roots = [spool / "knowledge", spool / "feedback", log_root / "knowledge", log_root / "feedback"]
+        roots = [
+            spool / "knowledge",
+            spool / "feedback",
+            log_root / "knowledge",
+            log_root / "feedback",
+        ]
         results: list[dict[str, str]] = []
         for root in roots:
             if not root.is_dir():
                 continue
             for path in root.rglob("*.md"):
-                relative = path.relative_to(spool if path.is_relative_to(spool) else log_root).as_posix()
+                relative = path.relative_to(
+                    spool if path.is_relative_to(spool) else log_root
+                ).as_posix()
                 if query and query not in relative.lower():
                     continue
                 data = path.read_bytes()
-                results.append({"locator": relative, "content_digest": f"sha256:{_sha256(data)}", "status": "spooled"})
-        print(json.dumps({"schema": SCHEMA, "status": "ok", "results": results}, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+                results.append(
+                    {
+                        "locator": relative,
+                        "content_digest": f"sha256:{_sha256(data)}",
+                        "status": "spooled",
+                    }
+                )
+        print(
+            json.dumps(
+                {"schema": SCHEMA, "status": "ok", "results": results},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
         return 0
     raise PrivateFeedbackError("operation_invalid", operation)
 
@@ -642,5 +756,16 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except PrivateFeedbackError as exc:
-        print(json.dumps({"schema": SCHEMA, "status": "error", "code": exc.code, "detail": exc.detail}, sort_keys=True), file=sys.stderr)
+        print(
+            json.dumps(
+                {
+                    "schema": SCHEMA,
+                    "status": "error",
+                    "code": exc.code,
+                    "detail": exc.detail,
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
         raise SystemExit(2)

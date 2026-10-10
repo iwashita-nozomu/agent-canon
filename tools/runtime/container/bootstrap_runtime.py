@@ -4586,7 +4586,9 @@ class BootstrapRuntime:
         with self.locked():
             spool = self.paths.spool / run_id
             if not spool.is_dir() or spool.is_symlink():
-                raise BootstrapError("eval_spool_missing", f"eval spool does not exist: {run_id}")
+                raise BootstrapError(
+                    "eval_spool_missing", f"eval spool does not exist: {run_id}"
+                )
             collection_path = spool / "collection.json"
             try:
                 collection = json.loads(
@@ -4597,7 +4599,9 @@ class BootstrapRuntime:
                     "eval_collection_invalid", f"invalid eval collection: {run_id}"
                 ) from exc
             if not isinstance(collection, dict) or collection.get("run_id") != run_id:
-                raise BootstrapError("eval_collection_invalid", "eval collection run id mismatch")
+                raise BootstrapError(
+                    "eval_collection_invalid", "eval collection run id mismatch"
+                )
             if (
                 collection.get("status") != "collected"
                 or collection.get("source_tree_unchanged") is not True
@@ -4615,16 +4619,27 @@ class BootstrapRuntime:
             source_root = collection.get("source_repository")
             target_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST", "")
             if not isinstance(source_root, str) or not source_root.startswith("/"):
-                raise BootstrapError("eval_collection_invalid", "eval source root is not absolute")
+                raise BootstrapError(
+                    "eval_collection_invalid", "eval source root is not absolute"
+                )
             if any(character in source_root for character in "\x00\t\n\r"):
-                raise BootstrapError("eval_collection_invalid", "eval source root contains a control character")
+                raise BootstrapError(
+                    "eval_collection_invalid",
+                    "eval source root contains a control character",
+                )
             if not target_digest and source_root.startswith("/targets/"):
                 target_digest = source_root.removeprefix("/targets/")
-            if target_digest and not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", target_digest):
-                raise BootstrapError("eval_collection_invalid", "eval target digest is invalid")
+            if target_digest and not re.fullmatch(
+                r"[A-Za-z0-9_.-]{1,128}", target_digest
+            ):
+                raise BootstrapError(
+                    "eval_collection_invalid", "eval target digest is invalid"
+                )
             request_path = spool / "sync-request.tsv"
             if request_path.is_symlink():
-                raise BootstrapError("eval_sync_request_invalid", "eval sync request is a symlink")
+                raise BootstrapError(
+                    "eval_sync_request_invalid", "eval sync request is a symlink"
+                )
             lines = [
                 "schema\tagent-canon.eval-sync-request.v1",
                 "operation\tsync",
@@ -4633,7 +4648,9 @@ class BootstrapRuntime:
                 f"target-digest\t{target_digest}",
                 f"source-root\t{source_root}",
             ]
-            _atomic_bytes(request_path, ("\n".join(lines) + "\n").encode("utf-8"), mode=0o600)
+            _atomic_bytes(
+                request_path, ("\n".join(lines) + "\n").encode("utf-8"), mode=0o600
+            )
             return self._result(
                 self._receipt(
                     "eval_sync",

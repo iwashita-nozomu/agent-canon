@@ -1111,7 +1111,11 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(
     volume_state = tmp_path / f".fake-volume-{volume_name}" / "runtime" / "state.json"
     assert volume_state.read_text(encoding="utf-8") == '{"legacy":true}\n'
     assert (
-        tmp_path / f".fake-volume-{volume_name}" / "runtime" / "spool" / "private-feedback"
+        tmp_path
+        / f".fake-volume-{volume_name}"
+        / "runtime"
+        / "spool"
+        / "private-feedback"
     ).is_dir()
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["volumes"][volume_name]["Mode"] == "0700"
@@ -2361,7 +2365,9 @@ def test_private_feedback_volume_copy_uses_canonical_subtree(tmp_path: Path) -> 
     assert json.loads(invalid.stderr)["code"] == "volume_copy_invalid"
 
 
-def test_private_feedback_volume_copy_fails_if_initialized_spool_is_absent(tmp_path: Path) -> None:
+def test_private_feedback_volume_copy_fails_if_initialized_spool_is_absent(
+    tmp_path: Path,
+) -> None:
     """An absent canonical spool is a copy failure, not an empty fallback."""
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
@@ -2414,7 +2420,9 @@ def test_private_feedback_volume_copy_fails_if_initialized_spool_is_absent(tmp_p
     assert (stage / "stale.txt").read_text(encoding="utf-8") == "stale\n"
 
 
-def test_private_feedback_volume_clear_requires_the_exported_tree_digest(tmp_path: Path) -> None:
+def test_private_feedback_volume_clear_requires_the_exported_tree_digest(
+    tmp_path: Path,
+) -> None:
     """A readback receipt clears only the exact private-feedback snapshot."""
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
@@ -2429,7 +2437,9 @@ def test_private_feedback_volume_clear_requires_the_exported_tree_digest(tmp_pat
     (feedback / "sync-request.json").write_text("request\n", encoding="utf-8")
     eval_spool_neighbor = volume_root / "spool" / "private-feedback"
     eval_spool_neighbor.mkdir(parents=True)
-    (eval_spool_neighbor / "retained-eval.txt").write_text("different owner\n", encoding="utf-8")
+    (eval_spool_neighbor / "retained-eval.txt").write_text(
+        "different owner\n", encoding="utf-8"
+    )
     entries = []
     for path in sorted(feedback.rglob("*")):
         if path.is_file():
@@ -2437,7 +2447,9 @@ def test_private_feedback_volume_clear_requires_the_exported_tree_digest(tmp_pat
                 f"{hashlib.sha256(path.read_bytes()).hexdigest()}  ./"
                 f"{path.relative_to(feedback).as_posix()}\n"
             )
-    snapshot_digest = hashlib.sha256("".join(sorted(entries)).encode("utf-8")).hexdigest()
+    snapshot_digest = hashlib.sha256(
+        "".join(sorted(entries)).encode("utf-8")
+    ).hexdigest()
     state_path = tmp_path / "docker-state.json"
     state_path.write_text(
         json.dumps(
@@ -2477,7 +2489,9 @@ def test_private_feedback_volume_clear_requires_the_exported_tree_digest(tmp_pat
             env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
         )
 
-    (feedback / "newer.txt").write_text("not in acknowledged snapshot\n", encoding="utf-8")
+    (feedback / "newer.txt").write_text(
+        "not in acknowledged snapshot\n", encoding="utf-8"
+    )
     mismatch = clear(snapshot_digest)
     assert mismatch.returncode == 2
     assert feedback.is_dir()
@@ -2514,7 +2528,9 @@ def test_eval_volume_clear_requires_the_exported_run_digest(tmp_path: Path) -> N
         for path in run_spool.rglob("*")
         if path.is_file()
     ]
-    snapshot_digest = hashlib.sha256("".join(sorted(entries)).encode("utf-8")).hexdigest()
+    snapshot_digest = hashlib.sha256(
+        "".join(sorted(entries)).encode("utf-8")
+    ).hexdigest()
     state_path = tmp_path / "docker-state.json"
     state_path.write_text(
         json.dumps(
@@ -2577,7 +2593,7 @@ def test_private_feedback_raw_without_payload_owner_retains_the_spool(
     assert git is not None
 
     def run_git(root: Path | None, *argv: str) -> subprocess.CompletedProcess[str]:
-        command = [git, *( ["-C", str(root)] if root is not None else []), *argv]
+        command = [git, *(["-C", str(root)] if root is not None else []), *argv]
         return subprocess.run(command, check=True, capture_output=True, text=True)
 
     run_git(None, "init", "--bare", str(remote))
@@ -2621,7 +2637,7 @@ _agent_canon_volume_copy() {{
   cp -a -- {str(volume_spool)!r}/. "$3/"
 }}
 AGENT_CANON_STATE_ROOT={str(host_runtime)!r}
-AGENT_CANON_REPOSITORY_ROOT={str(tmp_path / 'agent-canon-source')!r}
+AGENT_CANON_REPOSITORY_ROOT={str(tmp_path / "agent-canon-source")!r}
 AGENT_CANON_SOURCE_REPOSITORY_REMOTE=file:///source.git
 AGENT_CANON_LOG_REMOTE={str(remote)!r}
 AGENT_CANON_PRIVATE_LOG_ROOT={str(log_root)!r}
@@ -2636,10 +2652,19 @@ _agent_canon_private_feedback_sync resident
     assert (volume_spool / "sync-request.json").is_file()
     assert (host_spool / "raw/topic/payload.bin").read_bytes() == payload
     assert (log_root / ".git").is_dir()
-    assert run_git(log_root, "branch", "--show-current").stdout.strip() == "logs/test-source"
+    assert (
+        run_git(log_root, "branch", "--show-current").stdout.strip()
+        == "logs/test-source"
+    )
     assert run_git(log_root, "status", "--porcelain").stdout == ""
     remote_payload = subprocess.run(
-        [git, "--git-dir", str(remote), "show", "logs/test-source:raw/topic/payload.bin"],
+        [
+            git,
+            "--git-dir",
+            str(remote),
+            "show",
+            "logs/test-source:raw/topic/payload.bin",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -5512,8 +5537,8 @@ _agent_canon_archive_eval_sync() {{ printf 'eval-publish\\n' >> {str(phases)!r};
 _agent_canon_private_feedback_sync() {{ printf 'feedback\\n' >> {str(phases)!r}; return 0; }}
 AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
-AGENT_CANON_STATE_ROOT={str(runtime / 'container-state')!r}
-AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / 'agent-canon-log')!r}
+AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
+AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / "agent-canon-log")!r}
 AGENT_CANON_DOCKER_CMD=/bin/true
 command_args=(sync --install-root {str(install)!r})
 _agent_canon_sync_operation
