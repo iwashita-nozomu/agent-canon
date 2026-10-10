@@ -21,10 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, Iterable, Mapping, Sequence, TypedDict, cast
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib
+import tomllib
 
 SCHEMA_IDS = {
     "registry": "model_profile_registry_v1",
