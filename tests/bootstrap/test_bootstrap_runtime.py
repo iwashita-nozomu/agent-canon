@@ -1368,10 +1368,10 @@ def test_container_control_gc_delegates_to_runtime_gc(
     assert calls == [True]
 
 
-def test_container_control_gc_skips_docker_and_cleans_local_state(
+def test_resident_gc_cleans_local_cache_without_host_resource_fields(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Resident GC cleans the mounted cache while retaining local task state."""
+    """Resident GC cleans the mounted cache without reporting Host resources."""
     control = tmp_path / "control"
     control.mkdir()
     cache = tmp_path / "host-cache"
@@ -1408,8 +1408,8 @@ def test_container_control_gc_skips_docker_and_cleans_local_state(
 
     preview = manager.gc(dry_run=True)
     assert preview["code"] == "gc_plan"
-    assert preview["details"]["idle_stop"] is False
-    assert preview["details"]["stale_images"] == []
+    assert "idle_stop" not in preview["details"]
+    assert "stale_images" not in preview["details"]
     assert cached.is_file()
 
     completed = manager.gc()

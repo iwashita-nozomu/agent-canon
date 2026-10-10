@@ -2615,8 +2615,6 @@ class BootstrapRuntime:
             archive_high_water = bool(
                 archive_quota and archive_bytes >= archive_quota * 0.8
             )
-            idle_stop = False
-            stale_images: list[str] = []
             tasks = [
                 (key, val)
                 for key, val in state.get("tasks", {}).items()
@@ -2639,8 +2637,6 @@ class BootstrapRuntime:
                 "cache_high_water": cache_high_water,
                 "archive_high_water": archive_high_water,
                 "archive_cleanup_blocked_by_spool": False,
-                "idle_stop": idle_stop,
-                "stale_images": stale_images,
                 "candidates": candidates,
                 "preserved": {
                     "current_generation": current,
@@ -2650,11 +2646,7 @@ class BootstrapRuntime:
                 },
                 "deleted": [],
             }
-            if not dry_run and (
-                high_water
-                or cache_high_water
-                or archive_high_water
-            ):
+            if not dry_run and (high_water or cache_high_water or archive_high_water):
                 if cache_high_water and not state.get("active_task_count", 0):
                     cache_root = self.paths.cache
                     for child in (
@@ -2694,69 +2686,6 @@ class BootstrapRuntime:
                             elif child.is_file():
                                 child.unlink()
                             details["deleted"].append(f"archive:{child.name}")
-            if not dry_run and (
-                high_water
-                or cache_high_water
-                or archive_high_water
-                or idle_stop
-                or stale_images
-            ):
-                if idle_stop:
-                    self._stop_owned_container(state)
-                    state["state"] = "stopped"
-                    details["deleted"].append("idle-container")
-                if cache_high_water and not state.get("active_task_count", 0):
-                    cache_root = self.paths.cache
-                    for child in (
-                        sorted(cache_root.iterdir()) if cache_root.is_dir() else ()
-                    ):
-                        if child.is_symlink():
-                            raise BootstrapError(
-                                "symlink_path_rejected",
-                                f"cache path is a symlink: {child}",
-                            )
-                        if child.is_dir():
-                            shutil.rmtree(child)
-                        elif child.is_file():
-                            child.unlink()
-                        details["deleted"].append(f"cache:{child.name}")
-                if archive_high_water and not state.get("active_task_count", 0):
-                    spool_root = self.paths.spool
-                    spool_has_entries = bool(
-                        spool_root.is_dir() and next(spool_root.iterdir(), None)
-                    )
-                    if spool_has_entries:
-                        details["archive_cleanup_blocked_by_spool"] = True
-                    else:
-                        archive_root = self.paths.archive
-                        for child in (
-                            sorted(archive_root.iterdir())
-                            if archive_root.is_dir()
-                            else ()
-                        ):
-                            if child.is_symlink():
-                                raise BootstrapError(
-                                    "symlink_path_rejected",
-                                    f"archive path is a symlink: {child}",
-                                )
-                            if child.is_dir():
-                                shutil.rmtree(child)
-                            elif child.is_file():
-                                child.unlink()
-                            details["deleted"].append(f"archive:{child.name}")
-                for image_id in stale_images:
-                    inspected = self.docker.inspect_image(image_id)
-                    if inspected is None:
-                        continue
-                    self.docker.validate_image(
-                        inspected,
-                        {
-                            "io.agent-canon.runtime": "shared-v1",
-                            "io.agent-canon.control-root-digest": self.control_digest,
-                        },
-                    )
-                    self.docker.remove_image(image_id)
-                    details["deleted"].append(f"image:{image_id}")
                 if high_water:
                     for key, _ in tasks:
                         path = self.paths.tasks / key
