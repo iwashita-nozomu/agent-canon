@@ -14,15 +14,13 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal, cast
+from typing import cast
 
 import yaml
 
