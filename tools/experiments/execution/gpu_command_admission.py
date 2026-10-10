@@ -119,9 +119,7 @@ def _environment_contract_items(
             {
                 "present": True,
                 "redacted": True,
-                "sha256": hashlib.sha256(
-                    environment[key].encode("utf-8")
-                ).hexdigest(),
+                "sha256": hashlib.sha256(environment[key].encode("utf-8")).hexdigest(),
                 "byte_count": len(environment[key].encode("utf-8")),
             }
             if _is_sensitive_environment_key(key)
@@ -249,10 +247,7 @@ class CandidateAllocation:
         parent_by_uuid = dict(self.mig_parent_by_uuid)
         if set(parent_by_uuid) != set(self.mig_uuids):
             raise ValueError("MIG parent mapping must cover exactly every MIG UUID")
-        if any(
-            parent not in self.physical_uuids
-            for parent in parent_by_uuid.values()
-        ):
+        if any(parent not in self.physical_uuids for parent in parent_by_uuid.values()):
             raise ValueError("MIG parent mapping must reference known physical UUIDs")
         for uuid in (*self.physical_uuids, *self.mig_uuids, *self.candidate_ids):
             _validate_full_uuid(uuid)
@@ -398,16 +393,9 @@ def resolve_candidate_allocation(
     executable = nvidia_smi or shutil.which("nvidia-smi") or ""
     inventory = read_strict_nvidia_list(executable, command=command)
     mig_parents = {join.parent_uuid for join in inventory.joins}
-    executable_leaf_ids = (
-        tuple(
-            sorted(
-                uuid
-                for uuid in inventory.physical_uuids
-                if uuid not in mig_parents
-            )
-        )
-        + tuple(sorted(inventory.mig_uuids))
-    )
+    executable_leaf_ids = tuple(
+        sorted(uuid for uuid in inventory.physical_uuids if uuid not in mig_parents)
+    ) + tuple(sorted(inventory.mig_uuids))
     leaf_set = frozenset(executable_leaf_ids)
     scheduler_restriction = _visible_environment_restriction(environment)
 
@@ -420,7 +408,9 @@ def resolve_candidate_allocation(
             )
         for uuid in requested:
             _validate_full_uuid(uuid)
-        source: Literal["cli", "scheduler_environment", "strict_nvidia_inventory"] = "cli"
+        source: Literal["cli", "scheduler_environment", "strict_nvidia_inventory"] = (
+            "cli"
+        )
     elif scheduler_restriction is not None:
         requested = scheduler_restriction
         source = "scheduler_environment"
@@ -437,9 +427,7 @@ def resolve_candidate_allocation(
             executable_leaf_ids=executable_leaf_ids,
         )
     if scheduler_restriction is not None:
-        escaped = tuple(
-            sorted(set(requested).difference(scheduler_restriction))
-        )
+        escaped = tuple(sorted(set(requested).difference(scheduler_restriction)))
         if escaped:
             raise TypedPreflightFailure(
                 "gpu_candidate_outside_scheduler_visibility",
@@ -517,7 +505,9 @@ class DirectGpuCommandRequest:
                 lock_root=str(self.lock_root),
             )
         object.__setattr__(self, "argv", tuple(self.argv))
-        object.__setattr__(self, "environment", MappingProxyType(dict(self.environment)))
+        object.__setattr__(
+            self, "environment", MappingProxyType(dict(self.environment))
+        )
 
 
 @dataclass(frozen=True)
@@ -578,10 +568,11 @@ class FrozenDirectGpuCommandPlan:
             raise ValueError("post-lock observation must use a fresh event ID")
         selected_memory = dict(self.selected_free_memory_bytes)
         if set(selected_memory) != set(self.selected_ids):
-            raise ValueError("selected memory evidence must cover exactly selected UUIDs")
+            raise ValueError(
+                "selected memory evidence must cover exactly selected UUIDs"
+            )
         if any(
-            value < self.minimum_free_memory_bytes
-            for value in selected_memory.values()
+            value < self.minimum_free_memory_bytes for value in selected_memory.values()
         ):
             raise ValueError("selected memory evidence violates the request threshold")
         final_states = dict(self.final_unit_states)
@@ -680,9 +671,7 @@ class MaterializedDirectEnvironment:
                 "plan_fingerprint": self.plan_fingerprint,
                 "environment_fingerprint": self.environment_fingerprint,
                 "selected_uuid_list": self.selected_uuid_list,
-                "cuda_visible_devices": self.exact_environment[
-                    "CUDA_VISIBLE_DEVICES"
-                ],
+                "cuda_visible_devices": self.exact_environment["CUDA_VISIBLE_DEVICES"],
                 "nvidia_visible_devices": self.exact_environment[
                     "NVIDIA_VISIBLE_DEVICES"
                 ],
@@ -1170,9 +1159,7 @@ def _observe_occupancy(observation: ResourceObservation) -> ProcessOccupancyEvid
         namespace_inode=namespace_inode,
         processes=observation.process_identities,
         process_inventory_disposition=(
-            "COMPLETE_EMPTY"
-            if not observation.process_identities
-            else "COMPLETE"
+            "COMPLETE_EMPTY" if not observation.process_identities else "COMPLETE"
         ),
         unknown_gpu_ids=observation.unknown_gpu_ids,
     ).observe()
@@ -1281,8 +1268,7 @@ def _validate_fresh_post_lock_observation(
         uuid
         for uuid in selected_ids
         if final_occupancy.unit_states.get(uuid) != "FREE"
-        or final.free_memory_bytes.get(uuid, -1)
-        < request.minimum_free_memory_bytes
+        or final.free_memory_bytes.get(uuid, -1) < request.minimum_free_memory_bytes
     )
     if violations:
         raise TypedPreflightFailure(
@@ -1419,9 +1405,7 @@ def freeze_direct_gpu_command_plan(
         "gpu-command-"
         + hashlib.sha256(
             (
-                "\0".join(request.argv)
-                + str(request.cwd)
-                + final.observation_event_id
+                "\0".join(request.argv) + str(request.cwd) + final.observation_event_id
             ).encode("utf-8")
         ).hexdigest()[:20]
     )
@@ -1464,9 +1448,7 @@ def freeze_direct_gpu_command_plan(
         ),
         "admission_fingerprint": admission.admission_fingerprint,
         "base_environment_fingerprint": base_environment_fingerprint,
-        "environment_key_witness": dict(
-            _environment_key_witness(request.environment)
-        ),
+        "environment_key_witness": dict(_environment_key_witness(request.environment)),
         "output_dir": str(request.output_dir),
         "unknown_initial_ids": initial_occupancy.unknown_uuids,
         "unknown_final_ids": final_occupancy.unknown_uuids,
@@ -1564,7 +1546,8 @@ def _release_dispositions_complete(
 ) -> bool:
     return bool(dispositions) and all(
         item.error_kind is None
-        and item.disposition in {
+        and item.disposition
+        in {
             "busy_candidate",
             "released",
             "rolled_back",
@@ -1849,12 +1832,11 @@ class DirectGpuCommandRunner:
             assert transaction is not None
             owned_transaction = transaction
             transaction = None
-            release_dispositions, release_close_failure = (
-                _attempt_reservation_release(owned_transaction)
+            release_dispositions, release_close_failure = _attempt_reservation_release(
+                owned_transaction
             )
-            if (
-                release_close_failure is not None
-                or not _release_dispositions_complete(release_dispositions)
+            if release_close_failure is not None or not _release_dispositions_complete(
+                release_dispositions
             ):
                 raise _release_failure(
                     primary_failure=None,
@@ -1916,9 +1898,7 @@ class DirectGpuCommandRunner:
                 else {}
             )
             lifecycle = (
-                dict(execution.lifecycle.record())
-                if execution is not None
-                else None
+                dict(execution.lifecycle.record()) if execution is not None else None
             )
             failure_record = {
                 "schema_version": DIRECT_FAILURE_SCHEMA,
@@ -1934,9 +1914,7 @@ class DirectGpuCommandRunner:
                     else None
                 ),
                 "admission_fingerprint": (
-                    admission.admission_fingerprint
-                    if admission is not None
-                    else None
+                    admission.admission_fingerprint if admission is not None else None
                 ),
                 "release_dispositions": _release_record(release_dispositions),
                 "release_close_failure": (

@@ -58,15 +58,25 @@ from tools.experiments.execution.run_managed_experiment import (
 
 SYNC_CONTEXT_SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "tools" / "experiments" / "registry" / "sync_experiment_registry_context.py"
+    / "tools"
+    / "experiments"
+    / "registry"
+    / "sync_experiment_registry_context.py"
 )
 SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "tools" / "experiments" / "execution" / "run_managed_experiment.py"
+    / "tools"
+    / "experiments"
+    / "execution"
+    / "run_managed_experiment.py"
 )
 CHECK_SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "tools" / "validation" / "ci" / "checks" / "check_experiment_registry.py"
+    / "tools"
+    / "validation"
+    / "ci"
+    / "checks"
+    / "check_experiment_registry.py"
 )
 CANONICAL_ENTRYPOINT = "experiments/demo_topic/run.py"
 DEFAULT_INNER_COMMAND = (
@@ -154,7 +164,9 @@ def write_demo_topic_base(repo_root: Path) -> None:
         "from __future__ import annotations\n",
         encoding="utf-8",
     )
-    (repo_root / "tools" / "experiments" / "execution" / "run_managed_experiment.py").write_text(
+    (
+        repo_root / "tools" / "experiments" / "execution" / "run_managed_experiment.py"
+    ).write_text(
         "# placeholder\n",
         encoding="utf-8",
     )
@@ -721,7 +733,9 @@ def test_r5_admitted_environment_and_context_are_composition_only() -> None:
 
 def test_r5_admitted_environment_missing_composite_fails_closed() -> None:
     """The post-freeze environment refuses an unbound GPU allocation."""
-    from tools.experiments.execution.run_managed_experiment import build_admitted_environment
+    from tools.experiments.execution.run_managed_experiment import (
+        build_admitted_environment,
+    )
 
     uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     plan = SimpleNamespace(
@@ -742,7 +756,9 @@ def test_r5_admitted_environment_missing_composite_fails_closed() -> None:
 
 def test_cpu_admitted_environment_does_not_require_gpu_runtime_route() -> None:
     """A CPU-only plan carries no GPU runtime identity requirement."""
-    from tools.experiments.execution.run_managed_experiment import build_admitted_environment
+    from tools.experiments.execution.run_managed_experiment import (
+        build_admitted_environment,
+    )
 
     plan = SimpleNamespace(
         gpu_allocation=SimpleNamespace(selected_ids=(), admission_fingerprint=None),
@@ -759,7 +775,9 @@ def test_cpu_admitted_environment_does_not_require_gpu_runtime_route() -> None:
 
 def test_gpu_admitted_environment_requires_selected_project_runtime_route() -> None:
     """A selected GPU plan must identify the project managed-container route."""
-    from tools.experiments.execution.run_managed_experiment import build_admitted_environment
+    from tools.experiments.execution.run_managed_experiment import (
+        build_admitted_environment,
+    )
 
     uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     plan = _valid_environment_plan(uuid)
@@ -776,8 +794,12 @@ def test_r5_runner_lifecycle_fingerprint_uses_protocol_projection() -> None:
     """The terminal reducer fingerprints the admitted CLI lifecycle projection."""
     import hashlib
 
-    from tools.experiments.execution.execution_resource_plan import ManagedGpuOutcomeReducer
-    from tools.experiments.execution.run_managed_experiment import ManagedRunLifecycleEvidence
+    from tools.experiments.execution.execution_resource_plan import (
+        ManagedGpuOutcomeReducer,
+    )
+    from tools.experiments.execution.run_managed_experiment import (
+        ManagedRunLifecycleEvidence,
+    )
 
     lifecycle = ManagedRunLifecycleEvidence(
         run_id="r5-lifecycle",
@@ -1038,7 +1060,9 @@ def test_r5_provider_result_mismatches_fail_closed(
     expected_code: str,
 ) -> None:
     """Provider schema, fingerprint, quiescence, and exit mismatches are typed failures."""
-    from tools.experiments.execution.run_managed_experiment import _validate_admitted_result
+    from tools.experiments.execution.run_managed_experiment import (
+        _validate_admitted_result,
+    )
 
     request_fingerprint = "a" * 64
     result = _valid_provider_result(request_fingerprint)
@@ -1079,7 +1103,9 @@ def test_r5_provider_result_identity_is_required_and_matches_request(
     remove_identity: bool,
 ) -> None:
     """Provider results must preserve the request's complete nested identity."""
-    from tools.experiments.execution.run_managed_experiment import _validate_admitted_result
+    from tools.experiments.execution.run_managed_experiment import (
+        _validate_admitted_result,
+    )
 
     request_identity = ExperimentIdentity("demo", "smoke", "run-mismatch")
     result = _valid_provider_result("a" * 64)
@@ -1177,11 +1203,17 @@ def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
     ).read_text(encoding="utf-8")
     jit_source = (
         Path(__file__).resolve().parents[2]
-        / "tools" / "analysis" / "proof" / "jit_canonical_ir.py"
+        / "tools"
+        / "analysis"
+        / "proof"
+        / "jit_canonical_ir.py"
     ).read_text(encoding="utf-8")
     planner_source = (
         Path(__file__).resolve().parents[2]
-        / "tools" / "experiments" / "execution" / "execution_resource_plan.py"
+        / "tools"
+        / "experiments"
+        / "execution"
+        / "execution_resource_plan.py"
     ).read_text(encoding="utf-8")
     assert (
         "managed_runner_required=tools/experiments/execution/run_managed_experiment.py"
@@ -1565,7 +1597,14 @@ def test_check_experiment_registry_defaults_to_repo_root_via_symlink(
 ) -> None:
     """The checker should infer the derived repo root from the invoked symlink path."""
     repo_root = build_repo(tmp_path)
-    script_path = repo_root / "tools" / "validation" / "ci" / "checks" / "check_experiment_registry.py"
+    script_path = (
+        repo_root
+        / "tools"
+        / "validation"
+        / "ci"
+        / "checks"
+        / "check_experiment_registry.py"
+    )
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.symlink_to(CHECK_SCRIPT)
 

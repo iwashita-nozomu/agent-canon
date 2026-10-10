@@ -102,9 +102,7 @@ def validate_normalized_input(payload: dict[str, Any]) -> None:
     if not isinstance(tool_input, dict):
         raise ProjectionError("normalized tool_input is not an object")
     require_sha256(payload["tool_input_fingerprint"], "tool_input_fingerprint")
-    expected_fingerprint = hashlib.sha256(
-        canonical_bytes(tool_input)
-    ).hexdigest()
+    expected_fingerprint = hashlib.sha256(canonical_bytes(tool_input)).hexdigest()
     if payload["tool_input_fingerprint"] != expected_fingerprint:
         raise ProjectionError("tool_input_fingerprint does not match tool_input")
     tool_response = payload["tool_response"]
@@ -129,14 +127,20 @@ def validate_admission(value: object) -> None:
     if not isinstance(value, dict) or set(value) != ADMISSION_KEYS:
         raise ProjectionError("admission fields are not exact")
     require_sha256(value["admission_fingerprint"], "admission_fingerprint")
-    require_sha256(value["runtime_identity_fingerprint"], "runtime_identity_fingerprint")
+    require_sha256(
+        value["runtime_identity_fingerprint"], "runtime_identity_fingerprint"
+    )
     if value["guarantee"] != ADMISSION_GUARANTEE:
         raise ProjectionError("admission guarantee is not exact")
-    if not isinstance(value["namespace_id"], str) or OPAQUE_NAMESPACE_RE.fullmatch(value["namespace_id"]) is None:
+    if (
+        not isinstance(value["namespace_id"], str)
+        or OPAQUE_NAMESPACE_RE.fullmatch(value["namespace_id"]) is None
+    ):
         raise ProjectionError("admission namespace_id is not bounded opaque text")
     selected = value["selected_uuids"]
     if not isinstance(selected, list) or any(
-        not isinstance(item, str) or UUID_RE.fullmatch(item) is None for item in selected
+        not isinstance(item, str) or UUID_RE.fullmatch(item) is None
+        for item in selected
     ):
         raise ProjectionError("admission selected_uuids are not opaque UUIDs")
 
@@ -166,7 +170,9 @@ def validate_projection_bytes(stdout: str) -> dict[str, Any]:
     if not isinstance(projection, dict) or set(projection) != PROJECTION_KEYS:
         raise ProjectionError("projection fields are not the exact nine-key set")
     if projection["schema_version"] != PROJECTION_SCHEMA_VERSION:
-        raise ProjectionError("projection schema_version is not execution-resource-plan-projection/v2")
+        raise ProjectionError(
+            "projection schema_version is not execution-resource-plan-projection/v2"
+        )
     if projection["projection"] != "post_tool_use":
         raise ProjectionError("projection kind is not post_tool_use")
     run_id = projection["run_id"]
@@ -175,7 +181,10 @@ def validate_projection_bytes(stdout: str) -> dict[str, Any]:
     expected_runtime = f"reports/agents/{run_id}/runtime"
     if projection["plan_path"] != f"{expected_runtime}/execution_resource_plan.json":
         raise ProjectionError("projection plan_path is not canonical")
-    if projection["completion_coverage_path"] != f"{expected_runtime}/completion_coverage.json":
+    if (
+        projection["completion_coverage_path"]
+        != f"{expected_runtime}/completion_coverage.json"
+    ):
         raise ProjectionError("projection completion_coverage_path is not canonical")
     if type(projection["exit_code"]) is not int:
         raise ProjectionError("projection exit_code is not an integer")
