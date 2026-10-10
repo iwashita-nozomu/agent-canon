@@ -169,7 +169,7 @@ responsibility <role statement...>
 ```
 
 - `direction` は `upstream` または `downstream`
-- `kind` は `design`、`implementation`、`environment`
+- `kind` は `design`、`implementation`、`environment`、`reference`
 - `relative-path` は manifest を持つ file から見た相対 path
 - `relative-path` は `./` の有無や bare sibling を問わず、宣言元 file の
   repo-relative parent から正規化します。absolute path は受理せず、root の
@@ -183,7 +183,8 @@ responsibility <role statement...>
 
 孤立判定は全 source topology の outgoing / incoming edge を使います。
 自分から宣言がない manifest も、他の file から実依存が宣言されていれば孤立ではありません。
-`upstream` は実際の前提、`downstream` はその前提を使う consumer に限ります。
+`reference` の `upstream` / `downstream` は参照方向だけを記録し、実際の前提を意味しません。
+それ以外の kind では `upstream` は実際の前提、`downstream` はその前提を使う consumer に限ります。
 単なる索引、相互参照、生成 mirror という理由で前提へ昇格させず、孤立診断を消すための架空の anchor は追加しません。
 Dockerfile や repo-local environment file は universal anchor にしません。
 shared canon は派生 repo に配布されるため、environment edge はその file が本当に Docker / CI / requirements / runtime assumption に依存する場合だけ使います。
@@ -195,16 +196,26 @@ shared canon は派生 repo に配布されるため、environment edge はそ�
 `implementation` は code、script、test、runtime consumer、生成元、生成先を表します。
 
 `test` は contract kind registry の file-level contract 分類であり、
-dependency relation kind ではありません。依存 manifest の relation は
-`design`、`implementation`、`environment` の3種に限定し、テストへの
-依存も `downstream implementation` として宣言します。
+dependency relation kind ではありません。テストへの依存も
+`downstream implementation` として宣言します。
 
 `environment` は Docker、CI、requirements、lock、tool config、runtime assumption を表します。
 
-Dependency relation はこの3種に限定します。`test`、`review`、`report`
-などの file-level contract 分類は、`dependency-contract-kinds.toml` の
-contract kind として別に管理します。新しい relation kind を増やす場合は、
-parser、tool、docs、および明示的な graph-analysis instructions を同じ変更で更新します。
+`reference` は、memo、source record、調査ノートなどの非権威資料を参照する
+evidence relation です。対象は通常の dependency target と同様に repository 内で
+解決可能でなければなりません。明示的な context projection では対象を
+`evidence_paths` に含めますが、`parent_paths` や prerequisite ordering には
+含めず、design/contract owner として扱いません。仕様や設計判断の正本には
+引き続き `design` を使います。
+
+`reference` を含む dependency relation は、この明示的な source review / graph
+analysis の入力です。通常の edit や PR の必須 header gate にはなりません。
+`test`、`review`、`report` などの file-level contract 分類は、
+`dependency-contract-kinds.toml` の contract kind として別に管理します。
+`contract reference` も file-level 分類であり、`upstream reference` / `downstream reference`
+relation の意味とは独立です。
+新しい relation kind を増やす場合は、optional parser、tool、docs、および
+明示的な graph-analysis instructions を同じ変更で更新します。
 
 ## Contract Kinds
 
@@ -277,8 +288,10 @@ B upstream A    =>  A -> B
 ```
 
 The two declarations coalesce to one edge, not a two-node cycle. Kind and source
-provenance remain in the existing declaration/TSV output; they do not partition
-cycle detection. A cycle may cross direction spellings and dependency kinds.
+provenance remain in the existing declaration/TSV output. `reference` relations
+remain visible there but do not assert prerequisite ordering and are excluded
+from cycle detection. A prerequisite cycle may cross direction spellings and
+the `design`, `implementation`, and `environment` kinds.
 
 ## Explicit Graph Analysis Artifact
 

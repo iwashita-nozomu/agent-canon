@@ -28,12 +28,17 @@ CYCLE = (
 )
 
 
-def write_graph(root: Path, rows: tuple[tuple[str, str, str], ...]) -> None:
-    """Write declarations; incoming-only nodes also carry an empty manifest."""
+def write_graph(
+    root: Path,
+    rows: tuple[tuple[str, str, str], ...],
+    *,
+    kind: str = "implementation",
+) -> None:
+    """Write relation declarations; incoming-only nodes carry an empty manifest."""
     nodes = {node for source, _, target in rows for node in (source, target)}
     for node in nodes:
         declarations = [
-            f"# {direction} implementation {target} declared prerequisite relation"
+            f"# {direction} {kind} {target} declared relation"
             for source, direction, target in rows
             if source == node
         ]
@@ -92,6 +97,22 @@ class DependencyCycleScopeTest(unittest.TestCase):
                 reported_components(result.stdout),
                 {frozenset(("a.py", "b.py", "c.py"))},
             )
+
+    def test_reference_cycle_remains_evidence_without_prerequisite_cycle(self) -> None:
+        """Reference edges stay visible but do not create ordering cycles."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_graph(
+                root,
+                (("a.py", "upstream", "b.py"), ("b.py", "upstream", "a.py")),
+                kind="reference",
+            )
+
+            result = self.check(root, "--print-edges")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("upstream\treference\ta.py\tb.py", result.stdout)
+            self.assertNotIn("dependency cycle includes", result.stdout)
 
     def test_selected_cycle_through_unchanged_nodes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

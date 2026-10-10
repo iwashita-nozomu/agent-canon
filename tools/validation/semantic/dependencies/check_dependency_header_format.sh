@@ -431,7 +431,8 @@ check_file() {
       echo "$file:$line_no: invalid direction '$direction'"
       return 1
     fi
-    if [[ "$kind" != "design" && "$kind" != "implementation" && "$kind" != "environment" ]]; then
+    if [[ "$kind" != "design" && "$kind" != "implementation" &&
+      "$kind" != "environment" && "$kind" != "reference" ]]; then
       echo "$file:$line_no: invalid kind '$kind'"
       return 1
     fi
