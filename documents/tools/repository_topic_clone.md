@@ -77,8 +77,6 @@ python3 tools/repository/workspace/repository_topic_clone.py finalize-merge \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
   --checkout-mode <linked-worktree|independent-clone>
-
-# `resume-merge` is an alias for `finalize-merge`.
 ```
 
 `finalize-merge` は native Git index の未解決 entry を拒否し、resolved index tree と
