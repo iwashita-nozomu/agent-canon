@@ -43,7 +43,7 @@ from tools.agent.skills.skill_dependency_map import (  # noqa: E402
     render_graph_mermaid,
     write_artifacts,
 )
-from tools.agent.skills.skill_route_catalog import SkillOrderConstraint  # noqa: E402
+from tools.agent.skills.skill_route_catalog import SkillOrderConstraint
 
 
 class SkillToolInvocationGraphTests(unittest.TestCase):
