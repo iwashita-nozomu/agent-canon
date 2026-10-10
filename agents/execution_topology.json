@@ -10,8 +10,8 @@
     "model": "gpt-6-luna",
     "dispatch_mode": "direct_model_override",
     "fork_turns": "none",
-    "effective_runtime_readback": "required",
-    "unavailable_policy": "typed_blocker_no_fallback",
+    "effective_runtime_readback": "unverified",
+    "unavailable_policy": "no_profile_fallback",
     "continuation_policy": "active_child_update_or_fresh_bounded_spawn",
     "resume_policy": "unverified_native_resume_forbidden"
   },

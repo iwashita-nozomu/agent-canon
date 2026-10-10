@@ -6,9 +6,7 @@ import pytest
 
 from tools.agent.orchestration.direct_luna_dispatch import (
     LUNA_MODEL,
-    DirectLunaBlocker,
     build_direct_luna_packet,
-    verify_direct_luna_runtime,
 )
 
 
@@ -39,6 +37,9 @@ def test_packet_keeps_role_skill_profile_and_authority_independent() -> None:
     assert packet.fork_turns == "none"
     serialized = json.loads(packet.to_json())
     assert serialized["model"] == "gpt-6-luna"
+    assert serialized["reasoning_effort"] == "high"
+    assert "effective_model" not in serialized
+    assert "effective_reasoning_effort" not in serialized
     assert "reuse_survey" not in serialized
 
 
@@ -57,18 +58,23 @@ def test_logical_role_changes_do_not_create_a_new_physical_profile() -> None:
 @pytest.mark.parametrize(
     "context",
     (
-        "Use the existing serializer in tools/agent/orchestration/direct_luna_dispatch.py. Issue #1232 explains the redundant admission; preserve path and runtime checks.",
+        "Use the existing serializer in tools/agent/orchestration/direct_luna_dispatch.py. Issue #1232 explains the redundant admission; preserve path and authority checks.",
         "Follow the reviewed design and Issue #1232. This spelling-only edit does not choose a new asset or require a new test.",
         "The existing owner covers serialization; extend it for the missing case described in the Issue. The rejected vendor implementation has a different lifecycle.",
     ),
 )
 def test_write_accepts_existing_evidence_without_reuse_grammar(context: str) -> None:
-    worker = _packet(authority="workspace-write", logical_role_id="implementer", context=context)
+    worker = _packet(
+        authority="workspace-write", logical_role_id="implementer", context=context
+    )
     reviewer = _packet(context=context)
     worker_payload = json.loads(worker.to_json())
     reviewer_payload = json.loads(reviewer.to_json())
     assert worker_payload["context"] == reviewer_payload["context"] == context
-    assert worker_payload["allowed_paths"] == ["tools/agent/orchestration", "tests/tools"]
+    assert worker_payload["allowed_paths"] == [
+        "tools/agent/orchestration",
+        "tests/tools",
+    ]
     assert worker_payload["do_not_read"] == ["reports/private"]
     assert worker_payload["authority"] == "workspace-write"
     assert reviewer_payload["authority"] == "read-only"
@@ -105,7 +111,9 @@ def test_evidence_cannot_override_forbidden_paths(allowed_paths, do_not_read) ->
 
 
 def test_context_does_not_grant_write_access_or_add_paths() -> None:
-    packet = _packet(context="A candidate outside scope was considered. Write access is not granted by this context.")
+    packet = _packet(
+        context="A candidate outside scope was considered. Write access is not granted by this context."
+    )
     assert packet.authority == "read-only"
     assert packet.allowed_paths == ("tools/agent/orchestration", "tests/tools")
     assert packet.do_not_read == ("reports/private",)
@@ -115,43 +123,3 @@ def test_context_does_not_grant_write_access_or_add_paths() -> None:
 def test_unsupported_authority_is_rejected(authority: str) -> None:
     with pytest.raises(ValueError, match="unsupported authority"):
         _packet(authority=authority)
-
-
-def test_effective_runtime_readback_is_required() -> None:
-    with pytest.raises(DirectLunaBlocker) as captured:
-        verify_direct_luna_runtime(
-            _packet(), override_available=True,
-            effective_model=None, effective_reasoning_effort=None,
-        )
-    assert captured.value.code == "direct_luna_unverified"
-
-
-@pytest.mark.parametrize(
-    ("model", "effort"),
-    (("gpt-5.6-sol", "high"), (LUNA_MODEL, "low")),
-)
-def test_runtime_mismatch_is_not_silently_fallbacked(model: str, effort: str) -> None:
-    with pytest.raises(DirectLunaBlocker) as captured:
-        verify_direct_luna_runtime(
-            _packet(), override_available=True,
-            effective_model=model, effective_reasoning_effort=effort,
-        )
-    assert captured.value.code == "direct_luna_unverified"
-
-
-def test_unavailable_override_is_a_distinct_blocker() -> None:
-    with pytest.raises(DirectLunaBlocker) as captured:
-        verify_direct_luna_runtime(
-            _packet(), override_available=False,
-            effective_model=None, effective_reasoning_effort=None,
-        )
-    assert captured.value.code == "direct_luna_unavailable"
-
-
-def test_matching_effective_runtime_returns_evidence() -> None:
-    evidence = verify_direct_luna_runtime(
-        _packet(reasoning_effort="xhigh"), override_available=True,
-        effective_model=LUNA_MODEL, effective_reasoning_effort="xhigh",
-    )
-    assert evidence.requested_model == evidence.effective_model == LUNA_MODEL
-    assert evidence.requested_reasoning_effort == evidence.effective_reasoning_effort == "xhigh"

@@ -2,23 +2,23 @@
 <!--
 @dependency-start
 contract skill
-responsibility Owns bounded packet exchange and effective-runtime acknowledgement for direct Luna subagents.
+responsibility Owns bounded packet exchange and truthful handback for direct Luna subagents.
 upstream design ./agent-orchestration.md selects the logical role, Skill set, execution profile, and authority.
 upstream design ./subagent-bootstrap.md owns launch readiness and lifecycle handoff.
 upstream design ../canonical/CODEX_SUBAGENTS.md owns capacity and logical-role lifecycle policy.
-downstream implementation ../../tools/agent/orchestration/direct_luna_dispatch.py validates packets and runtime evidence.
-downstream implementation ../../tests/tools/test_direct_luna_dispatch.py validates packet and readback invariants.
+downstream implementation ../../tools/agent/orchestration/direct_luna_dispatch.py validates handoff packets.
+downstream implementation ../../tests/tools/test_direct_luna_dispatch.py validates packet invariants.
 downstream implementation ../../tests/tools/test_direct_luna_topology.py validates profile-level topology.
 @dependency-end
 -->
 
 ## Purpose
 
-Exchange one bounded packet between the parent and a direct Luna subagent without sharing implicit raw history or creating a physical custom-agent alias per logical role.
+Exchange one bounded packet between the parent and a directly selected Luna subagent without sharing implicit raw history or creating a physical custom-agent alias per logical role.
 
-This Skill owns packet construction, runtime acknowledgement, and handback semantics. It does not choose the logical role, replace specialist Skills, grant authority, or provide a fallback model.
+This Skill owns packet construction and handback semantics. The packet's model and reasoning-effort fields record the requested profile; they do not prove the child's effective runtime. This Skill does not choose the logical role, replace specialist Skills, grant authority, or provide a fallback model.
 
-The validator checks the direct-Luna authority and runtime boundary. It does not prove the quality or completeness of a reuse investigation from a record's format, and it does not introduce admission requirements for other runtime routes.
+The packet builder checks bounded paths and direct-Luna authority. It does not prove effective runtime identity or the quality or completeness of a reuse investigation from a record's format, and it does not introduce admission requirements for other runtime routes.
 
 ## Inputs
 
@@ -40,16 +40,19 @@ Build `direct_luna_handoff_packet_v1` with
 `tools/agent/orchestration/direct_luna_dispatch.py`. For `workspace-write`, the
 packet must carry explicit bounded `allowed_paths`; reject invalid authority,
 escaping paths, and overlap with `do_not_read`. Context cannot enlarge those
-permissions. If launch is needed, send the serialized packet to direct
-`gpt-6-luna` with `fork_turns="none"`, then read back the effective model and
-reasoning effort before admitting work. Return `direct_luna_unavailable` when
-the override is rejected or unavailable, and `direct_luna_unverified` when
-effective metadata is hidden or differs from the request. Do not substitute
-another model or a legacy role alias after either blocker.
+permissions. If launch is needed, send the serialized packet to the selected
+direct `gpt-6-luna` profile with `fork_turns="none"`. Treat the packet's model
+and effort as requested values only. If child-correlated runtime metadata is not
+available in the current context, report “effective runtime unverified”; do not
+infer effective values from the request. If the invocation is observably
+rejected or unavailable, report that observed failure. Never substitute
+another model or a legacy role alias.
 
-Use the packet's expected output, evidence, blockers, and validation observations
-as the handback. Continue with a compatible active child by sending only the
-changed objective, findings, or scope within its authority. A new child is for
+Use the packet's expected output, findings, observed limitations, and validation
+observations as the handback. State whether effective runtime is unverified
+when no child-correlated readback exists. Continue with a compatible active
+child by sending only the changed objective, findings, or scope within its
+authority. A new child is for
 initial work, a child that actually ended or was lost, or independent review;
 unverified native resume is not a continuation route.
 
@@ -88,4 +91,6 @@ only the delta. This is the engineering basis, not a measured token-saving claim
 
 ## Output
 
-Return matching `direct_luna_runtime_evidence_v1` plus the expected child output, or one typed blocker: `direct_luna_unavailable` or `direct_luna_unverified`.
+Return the expected child output and observed limitations. Do not report
+effective runtime identity unless child-correlated evidence is available; when
+it is not, state “effective runtime unverified.”

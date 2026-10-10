@@ -2,7 +2,7 @@
 name: agent-orchestration
 description: "Use at repository-task intake to select the workflow, Skills, roles, and execution route."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"eb26f9a81e16e17f27724a8c988e64982c03a9fb2746b0e8c40fb8d933b0deb1"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"418f17ed3af35ba932c6f546c824cdf92636fe7c23804e151d0dba9a98790605"} -->
 
 <!--
 @dependency-start
