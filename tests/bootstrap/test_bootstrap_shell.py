@@ -5959,6 +5959,14 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
             env=environment,
         )
         assert installed.returncode == 0, installed.stderr
+        prepared = subprocess.run(
+            [*common, "codex", "prepare"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        assert prepared.returncode == 0, prepared.stderr
         codex_home = runtime / "container-state" / "codex-home"
         manifest = json.loads(
             (codex_home / "manifest.json").read_text(encoding="utf-8")
