@@ -12,7 +12,6 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency evidence separately
-downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design claims against manifest evidence
 downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
@@ -101,32 +100,6 @@ resolved path を `/usr/bin/dpkg-query --listfiles` ownership で照合します
 所有者が所有境界に失敗した場合は fail-closed です。Rust は pinned
 toolchain の `rust-analyzer` path を保存します。ambient `PATH` や `shutil.which`
 はこの境界に入りません。
-
-## Design Claim Evidence Contract
-
-Design documents state implementation-facing claims within the evidence exposed
-by current code, dependency headers, existing docs, and parent design
-documents. The design artifact records that evidence in an `Evidence And
-Assumption Ledger` before file-by-file implementation planning.
-
-The ledger carries four fields:
-
-- `Evidence sources`: code paths, tool paths, dependency-header graph artifacts,
-  or existing documents that support the claim.
-- `Assumptions`: first-use DSL terms, problem standard forms, normalization
-  rules, and governing definitions.
-- `Parent-doc alignment`: parent documents that agree with the claim, plus the
-  governing source when a child design chooses a more constrained interpretation.
-- `Refactor handoff`: structure, ownership, or route changes passed to
-  `dependency-analysis` and `structure-refactor`.
-
-`check_design_doc_claims.py` implements the deterministic design-evidence gate.
-It requests a bounded dependency closure and tokenless context through the
-source-derived `GraphClient` projections, checks the returned typed evidence,
-and reports unsupported tokens or parent contradictions. Explicit token graph
-context remains a separate persisted analysis capability. The claim checker
-does not parse dependency headers or open evidence files as a second fact
-authority.
 
 ## Explicit Dependency Analysis Route
 

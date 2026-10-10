@@ -8,7 +8,6 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design result-artifact-writeout.md raw result and summary artifact policy
 upstream design report-writing.md reader-facing evidence report policy
 downstream design refactor-loop.md consumes finding packets for repair slices
-upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py emits design evidence findings
 downstream implementation ../../.codex/personal/skills/tool-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -128,7 +127,6 @@ stages every tool run must complete.
    - Module groups: `python-module-groups-check`
    - OOP readability: `tools/oop/<language>/readability.py --format json`
    - Dependency surface: `run_repo_dependency_review.sh` and related manifest tools
-   - Design evidence drift: `check_design_doc_claims.py`
 1. When priority order is requested or needed to choose repair work, rank the
    selected findings using the relevant available signals and retain the ranking
    rule. Otherwise preserve the tool's ordering and report whether it supplied

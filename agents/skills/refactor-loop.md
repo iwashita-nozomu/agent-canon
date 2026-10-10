@@ -11,7 +11,6 @@ upstream design ../../documents/design/semantic-responsibility-contract.md seman
 upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first refactor precedence and abstraction admission
 upstream design ./agent-orchestration.md write-capable handoff validation trust boundary and work-conservation owner
-upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py emits design evidence findings for refactor plans
 upstream design ../internal-routines/design-implementation-correspondence.md design read, clause fingerprint, and drift-block route
 @dependency-end
 -->
