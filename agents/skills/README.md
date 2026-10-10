@@ -10,8 +10,8 @@ upstream design ./skill-dependencies.yaml owns the typed public-skill dependency
 upstream design ../../documents/design/responsibility-cleanup.md skill maintenance delegation rationale
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public and official skill boundaries
-upstream design code-visualization.md sole public visualization owner and typed projection contract
-downstream implementation ../../tools/agent/skills/skill_route_catalog.py validates visualization owner and adapter metadata
+upstream design code-visualization.md visualization selection and native renderer delegation
+downstream implementation ../../tools/agent/skills/skill_route_catalog.py validates public skill routing
 downstream implementation ../../tools/agent/skills/skill_dependency_map.py validates the dependency dictionary and generates its Mermaid projection
 @dependency-end
 -->
@@ -27,12 +27,11 @@ downstream implementation ../../tools/agent/skills/skill_dependency_map.py valid
 
 ## Visualization Ownership
 
-[`code-visualization`](code-visualization.md) is the sole public visualization skill.
-Visualization-producing skills remain native fact producers or renderer/formatter adapters
-and use its `VisualizationSourceUniverse`, schema-bearing `ToolCall`,
-`ProjectionCoverageManifest`, post-format readback, and final coverage status.
-The public catalog adds neither a second visualization owner nor copies of the
-universal omission/granularity policy in adapter entries.
+[`code-visualization`](code-visualization.md) selects the visualization family,
+source evidence owner, renderer, and final artifact checks. Visualization-
+producing skills retain native source-fact and renderer responsibilities; the
+public catalog does not impose a private intermediate representation or a
+second omission/granularity policy.
 
 ## Rules
 
