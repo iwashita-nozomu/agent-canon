@@ -1524,8 +1524,10 @@ pub(crate) fn capture_snapshot(
                 ));
                 continue;
             }
-            if !matches!(kind, "design" | "implementation" | "environment" | "reference")
-                || target.is_empty()
+            if !matches!(
+                kind,
+                "design" | "implementation" | "environment" | "reference"
+            ) || target.is_empty()
                 || reason.is_empty()
             {
                 diagnostics.push(source_diagnostic(
