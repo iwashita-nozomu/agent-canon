@@ -31,13 +31,6 @@ case "${TEST_PROFILE}" in
     ;;
 esac
 
-RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
-RUNTIME_ROOT="${RUNTIME_ROOT%/}"
-if [[ "${RUNTIME_ROOT}" != /* || "${RUNTIME_ROOT}" == "/" || ! -d "${RUNTIME_ROOT}" ]]; then
-  echo "AGENT_CANON_RUNTIME_ROOT must name an existing absolute external runtime directory" >&2
-  exit 2
-fi
-
 SOURCE_IMAGE="/opt/agent-canon/source"
 TEST_NODE="${SOURCE_IMAGE}/tests/bootstrap/test_live_projection_authority.py::test_topic_registration_anchor_status_remove_share_projection"
 LEAN_PROOF_COMMAND='
@@ -100,6 +93,7 @@ expect_lean_failure \
   "${fixtures}/counterexample-type-error-result.json"
 '
 IMAGE_BUILT=0
+IMAGE_TAG=""
 
 cleanup() {
   local status=$?
@@ -144,7 +138,7 @@ if [[ "${TEST_PROFILE}" == "live-projection" ]]; then
   esac
 fi
 
-TEST_WORKAREA="$(mktemp -d "${RUNTIME_ROOT}/agent-canon-live-test.XXXXXX")"
+TEST_WORKAREA="$(mktemp -d)"
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM

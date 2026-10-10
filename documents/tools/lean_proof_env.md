@@ -108,13 +108,12 @@ Lean toolchain を image へ導入し、実行時は task-owned workarea だけ�
 作業用 runtime や共有 AgentCanon tool image を変更しません。
 
 ```bash
-AGENT_CANON_RUNTIME_ROOT=<existing-external-runtime> \
-  bash tests/bootstrap/docker.sh lean-proof
+bash tests/bootstrap/docker.sh lean-proof
 ```
 
-この entrypoint は host Docker CLI を使い、image と workarea を task 終了時に
-削除します。これは source qualification route であり、通常の proof package を
-実行する runtime の選択や構築方法を変更するものではありません。
+この entrypoint は host Docker CLI を使い、task-owned の一時 workarea と runtime を
+作成し、image とともに task 終了時に削除します。これは source qualification route であり、
+通常の proof package を実行する runtime の選択や構築方法を変更するものではありません。
 
 ## 根拠
 
