@@ -4,6 +4,7 @@
 @dependency-start
 contract skill
 responsibility Indexes public skills and owns AgentCanon-specific skill maintenance.
+upstream design ../../documents/design/responsibility-rationale.md skill procedure derivation contract
 upstream design ./catalog.yaml enumerates public skill families
 upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
 upstream design ../../documents/design/responsibility-cleanup.md skill maintenance delegation rationale
@@ -175,7 +176,7 @@ execution stage で [codex-task-workflow](codex-task-workflow.md)、handoff / wa
    必要な保証を満たすか確認します。同じ owner の branch / PR / prepared checkout があれば
    [Branch Reuse Default](../canonical/CODEX_INTAKE.md#branch-reuse-default) に沿って継続し、残る gap が
    確認できた場合だけ、その owner と影響する skill surface を更新します。
-2. material な設計 rationale は既存 design owner に残します。bounded な文言変更に新しい design artifact は要りません。authority、safety、compatibility、completion の契約は既存 owner に保持します。
+2. material な設計 rationale は既存 design owner に残します。skill procedure の導出根拠は既存の [手順の設計根拠](../../documents/design/responsibility-rationale.md#skill-procedure-derivation) を参照します。bounded な文言変更に新しい design artifact は要りません。authority、safety、compatibility、completion の契約は既存 owner に保持します。
 3. public skill の canonical doc と catalog を整合させ、dependency、caller、配布面は影響する場合だけ更新します。既存 capability を包む skill を作りません。
 4. caller の選択を変えるときは、判断点に適用条件と canonical link を置き、条件成立時の到達と不成立時の非起動を確認します。[条件付き読込](task-routing.md#in-flight-skill-reads) に従います。
 5. canonical source の変更で adapter 更新が必要なら、保守者用 [materializer](../../README.md#source-and-artifact-boundary) を使って生成物を読み戻します。利用時には生成しません。変更した Markdown は [md-style-check](md-style-check.md)、他の検査は影響した surface の既存 owner に従います。
