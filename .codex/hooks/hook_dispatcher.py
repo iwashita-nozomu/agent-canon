@@ -325,12 +325,15 @@ def _active_report_target(
     if not value:
         return None
     declared = Path(value)
-    if declared.is_absolute() or ".." in declared.parts:
+    if ".." in declared.parts:
         return None
-    if declared.parts[:2] == REPORT_ROOT_RELATIVE.parts:
-        target = active_root / declared
-    else:
-        target = report_root / declared
+    target = (
+        declared
+        if declared.is_absolute()
+        else active_root / declared
+        if declared.parts[:2] == REPORT_ROOT_RELATIVE.parts
+        else report_root / declared
+    )
     try:
         resolved_active_root = active_root.resolve()
         resolved_report_root = report_root.resolve()
@@ -424,10 +427,11 @@ def prepare_parts(
     parsed = payload is not None
     safe_payload = payload if parsed else None
     payload_data = payload or {}
-    try:
-        context = load_workflow_context(root / "skill_usage_context.json")
-    except Exception:
-        context = WorkflowContext()
+    context = (
+        load_workflow_context(report_dir / "skill_usage_context.json")
+        if report_dir is not None
+        else WorkflowContext()
+    )
     try:
         tools = select_tools(payload_data)
         subagents = select_subagents(payload_data, context)
