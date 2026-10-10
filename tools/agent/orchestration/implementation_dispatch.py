@@ -3,9 +3,12 @@
 # responsibility AgentTeam implementation dispatch owner module.
 # upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
 # upstream implementation ./capacity_handshake.py owns provider capacity transitions.
+# upstream implementation ./team_config.py owns shared configuration normalization.
 # upstream implementation ./implementation_route.py owns implementation eligibility.
 # upstream implementation ./model_profile_registry.py owns prompt/profile materialization.
+# upstream implementation ../../runtime/values.py refines decoded packet containers.
 # downstream implementation ./agent_team.py facade consumes capacity APIs.
+# downstream implementation ../../runtime/manifest/manifest_rendering.py consumes capacity and closeout projections.
 # downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes capacity APIs.
 # @dependency-end
 """Own AgentTeam capacity derivation and implementation dispatch."""
@@ -14,15 +17,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tomllib
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import cast
 
-try:
-    import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python < 3.11 compatibility.
-    import tomli as tomllib  # type: ignore[no-redef]
+from tools.runtime.values import (
+    is_object_list,
+    is_string_object_dict,
+    is_string_object_mapping,
+)
 
 if __package__:
     from . import capacity_handshake, implementation_route, model_profile_registry
@@ -61,10 +65,10 @@ if __package__:
         SubagentWaveSlot,
         TaskCatalog,
         TeamConfig,
-        _as_mapping_tuple,
-        _as_object_mapping,
-        _as_required_string,
-        _as_string_tuple,
+        as_mapping_tuple,
+        as_object_mapping,
+        as_required_string,
+        as_string_tuple,
         catalog_stage_waves,
     )
 else:
@@ -76,10 +80,10 @@ else:
         SubagentWaveSlot,
         TaskCatalog,
         TeamConfig,
-        _as_mapping_tuple,
-        _as_object_mapping,
-        _as_required_string,
-        _as_string_tuple,
+        as_mapping_tuple,
+        as_object_mapping,
+        as_required_string,
+        as_string_tuple,
         catalog_stage_waves,
     )
 
@@ -137,7 +141,7 @@ class CapacityHandshakeConsumerBinding:
 
 
 @dataclass
-class _CapacityRuntime:
+class CapacityRuntime:
     """Runtime-owned objects shared by parent and nested lifecycle consumers."""
 
     binding: CapacityHandshakeConsumerBinding
@@ -194,23 +198,16 @@ def _capacity_family_record(
     include_math_intent: bool = False,
 ) -> capacity_handshake.DeclaredFamilyCapacity:
     """Derive one family capacity record from its declared stage topology."""
-    family_id = _as_required_string(family.get("id"), "workflow_family.id")
-    roles = _as_object_mapping(
-        cast(object, family.get("roles", {})), "workflow_family.roles"
-    )
+    family_id = as_required_string(family.get("id"), "workflow_family.id")
+    roles = as_object_mapping(family.get("roles", {}), "workflow_family.roles")
     declared_roles = set(
-        _as_string_tuple(roles.get("always_on"), "workflow_family.roles.always_on")
-        + _as_string_tuple(
-            roles.get("specialists"), "workflow_family.roles.specialists"
-        )
+        as_string_tuple(roles.get("always_on"), "workflow_family.roles.always_on")
+        + as_string_tuple(roles.get("specialists"), "workflow_family.roles.specialists")
     )
-    topology = _as_object_mapping(
-        cast(object, family.get("role_topology", {})),
-        "workflow_family.role_topology",
+    topology = as_object_mapping(
+        family.get("role_topology", {}), "workflow_family.role_topology"
     )
-    waves = _as_mapping_tuple(
-        topology.get("stage_waves"), "workflow_family.stage_waves"
-    )
+    waves = as_mapping_tuple(topology.get("stage_waves"), "workflow_family.stage_waves")
 
     def stage_roles(stage_class: str) -> tuple[str, ...]:
         selected: list[str] = []
@@ -222,9 +219,7 @@ def _capacity_family_record(
                 continue
             if wave.get("stage_class") != stage_class:
                 continue
-            for role_id in _as_string_tuple(
-                wave.get("role_ids"), "stage_wave.role_ids"
-            ):
+            for role_id in as_string_tuple(wave.get("role_ids"), "stage_wave.role_ids"):
                 if role_id in declared_roles and role_id not in selected:
                     selected.append(role_id)
         return tuple(selected)
@@ -358,7 +353,7 @@ def _capacity_topology_witness(
     )
 
 
-def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
+def capacity_runtime_for_spec(spec: RunBundleSpec) -> CapacityRuntime:
     """Create one provider-owned ledger and snapshot for a run bundle."""
     if spec.task_catalog is None:
         raise RuntimeError("task catalog is required for capacity handshake")
@@ -396,7 +391,7 @@ def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
             parent_work_id=spec.run_id
         )
     )
-    return _CapacityRuntime(
+    return CapacityRuntime(
         binding=CapacityHandshakeConsumerBinding(),
         snapshot=snapshot,
         ledger=ledger,
@@ -409,24 +404,13 @@ def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
 
 def _json_capacity_record(
     record: capacity_handshake.DescendantLifecycleRecord,
-) -> dict[str, object]:
-    return {
-        "work_id": record.work_id,
-        "parent_work_id": record.parent_work_id,
-        "profile_id": record.profile_id,
-        "status": record.status.value,
-        "durable_result_evidence_ref": record.durable_result_evidence_ref,
-        "durable_handback": record.durable_handback,
-        "descendants_closed": record.descendants_closed,
-        "close_readback": record.close_readback,
-        "reserved_slots": record.reserved_slots,
-        "reserved_write_slots": record.reserved_write_slots,
-        "transition_generation": record.transition_generation,
-    }
+) -> capacity_handshake.DescendantLifecycleRecordProjection:
+    """Delegate the serialized record shape to its capacity owner."""
+    return capacity_handshake.descendant_record_projection(record)
 
 
-def _capacity_projection(
-    runtime: _CapacityRuntime, spec: RunBundleSpec
+def capacity_projection(
+    runtime: CapacityRuntime, spec: RunBundleSpec
 ) -> dict[str, object]:
     """Return the machine-readable manifest projection for shared runtime state."""
     configured = runtime.snapshot.configured_max_threads
@@ -496,8 +480,8 @@ def _capacity_projection(
     }
 
 
-def _closeout_projection(
-    runtime: _CapacityRuntime,
+def closeout_projection(
+    runtime: CapacityRuntime,
     spec: RunBundleSpec,
 ) -> dict[str, object]:
     """Materialize the provider closeout state with canonical close-agent tokens."""
@@ -529,7 +513,7 @@ def _closeout_projection(
             record.profile_id,
             registry,
         )
-        token_projection = {
+        token_projection: dict[str, object] = {
             "tool_id": token.tool_id,
             "arguments": dict(token.arguments),
         }
@@ -570,7 +554,7 @@ def dispatch_fixed_implementation(
     *,
     workspace_root: Path = ROOT,
     source_root: Path | None = None,
-    capacity_runtime: _CapacityRuntime | None = None,
+    capacity_runtime: CapacityRuntime | None = None,
     writer_target: WriterTarget | Mapping[str, object] | None = None,
     checkout_identity: Mapping[str, object] | None = None,
     math_intent_route: str | None = None,
@@ -661,7 +645,9 @@ def dispatch_fixed_implementation(
         raise RuntimeError(str(exc)) from exc
     if selected_math_route is not None:
         try:
-            validate_mathematical_writer_target(parsed_writer_target, normalized_math_packet)
+            validate_mathematical_writer_target(
+                parsed_writer_target, normalized_math_packet
+            )
         except WriterTargetError as exc:
             return ImplementationDispatch(
                 route_result,
@@ -677,9 +663,11 @@ def dispatch_fixed_implementation(
         packet_payload: object = request.fixed_implementation_packet
     else:
         packet_payload = request.get("fixed_implementation_packet")
-    if is_dataclass(packet_payload):
-        packet_context = asdict(packet_payload)
-    elif isinstance(packet_payload, Mapping):
+    if isinstance(packet_payload, implementation_route.FixedImplementationPacket):
+        packet_context: dict[str, object] = {
+            key: value for key, value in asdict(packet_payload).items()
+        }
+    elif is_string_object_mapping(packet_payload):
         packet_context = dict(packet_payload)
     else:
         raise RuntimeError("implementation_dispatch:fixed_packet_missing")
@@ -719,18 +707,11 @@ def dispatch_fixed_implementation(
                     if normalized_math_packet is not None
                     else ()
                 ),
-                *(
-                    (
-                        model_profile_registry.ContextItem(
-                            "writer_target", parsed_writer_target.as_dict()
-                        ),
-                        model_profile_registry.ContextItem(
-                            "writer_target_environment",
-                            parsed_writer_target.environment(),
-                        ),
-                    )
-                    if parsed_writer_target is not None
-                    else ()
+                model_profile_registry.ContextItem(
+                    "writer_target", parsed_writer_target.as_dict()
+                ),
+                model_profile_registry.ContextItem(
+                    "writer_target_environment", parsed_writer_target.environment()
                 ),
             ),
             objective=objective,
@@ -852,11 +833,11 @@ def dispatch_fixed_implementation(
 
 def capacity_manifest_output_lines(
     spec: RunBundleSpec,
-    runtime: _CapacityRuntime | None = None,
+    runtime: CapacityRuntime | None = None,
 ) -> tuple[str, ...]:
     """Return task-start/bootstrap fields projected from one typed capacity runtime."""
     runtime = runtime or capacity_runtime_for_spec(spec)
-    projection = _capacity_projection(runtime, spec)
+    projection = capacity_projection(runtime, spec)
     return (
         "CAPACITY_REQUEST_SCHEMA=team_manifest_capacity_request_v1",
         f"REQUESTED_TOTAL_CAPACITY={projection['requested_total_capacity']}",
@@ -937,24 +918,30 @@ def workflow_topology_policy_violations(
             violations.append(("<unknown>", "missing-family-id"))
             continue
         roles_raw = family.get("roles")
-        if not isinstance(roles_raw, dict):
+        if not is_string_object_dict(roles_raw):
             violations.append((family_id, "malformed-roles"))
             continue
-        roles = cast(dict[str, object], roles_raw)
+        roles = roles_raw
         always_on_raw = roles.get("always_on")
         specialists_raw = roles.get("specialists")
-        if not isinstance(always_on_raw, list) or not all(
-            isinstance(role_id, str) for role_id in cast(list[object], always_on_raw)
-        ):
+        if not is_object_list(always_on_raw):
             violations.append((family_id, "malformed-always-on"))
             continue
-        if not isinstance(specialists_raw, list) or not all(
-            isinstance(role_id, str) for role_id in cast(list[object], specialists_raw)
-        ):
+        always_on = tuple(
+            role_id for role_id in always_on_raw if isinstance(role_id, str)
+        )
+        if len(always_on) != len(always_on_raw):
+            violations.append((family_id, "malformed-always-on"))
+            continue
+        if not is_object_list(specialists_raw):
             violations.append((family_id, "malformed-specialists"))
             continue
-        always_on = tuple(cast(list[str], always_on_raw))
-        specialists = tuple(cast(list[str], specialists_raw))
+        specialists = tuple(
+            role_id for role_id in specialists_raw if isinstance(role_id, str)
+        )
+        if len(specialists) != len(specialists_raw):
+            violations.append((family_id, "malformed-specialists"))
+            continue
         if len(always_on) != len(set(always_on)) or len(specialists) != len(
             set(specialists)
         ):
@@ -993,11 +980,12 @@ def codex_runtime_agent_int(key: str, *, root: Path = ROOT) -> int:
     """Return one configured integer from the Codex [agents] runtime section."""
     config_path = root.resolve() / ".codex" / "config.toml"
     parsed: object = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    data = _as_object_mapping(parsed, ".codex/config.toml")
+    data = as_object_mapping(parsed, ".codex/config.toml")
     agents = data.get("agents")
-    if not isinstance(agents, dict):
-        raise RuntimeError("missing [agents] section in .codex/config.toml")
-    agents = _as_object_mapping(cast(object, agents), ".codex/config.toml agents")
+    if not is_string_object_dict(agents):
+        if not isinstance(agents, dict):
+            raise RuntimeError("missing [agents] section in .codex/config.toml")
+        raise RuntimeError(".codex/config.toml agents must be a mapping")
     value = agents.get(key)
     if not isinstance(value, int) or value < 1:
         raise RuntimeError(f"agents.{key} must be an integer >= 1")
@@ -1151,7 +1139,8 @@ def _materialize_stage_wave_slots(
     available_agents: set[str],
     used_role_ids: set[str],
     selections: dict[str, AgentTypeSelection],
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
     math_intent_route_id: str | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return one default executable slot for each active role in the stage."""
@@ -1212,7 +1201,8 @@ def _initial_stage_wave_slots(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
     math_intent_route_id: str | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return intake-stage slots derived from active roles and catalog topology."""
@@ -1221,10 +1211,7 @@ def _initial_stage_wave_slots(
     stage_waves = catalog_stage_waves(catalog)
     roles_by_id = {role.id: role for role in roles}
     if workflow_family_id == "issue_worker_publication":
-        if not (
-            isinstance(issue_worker_candidate, Mapping)
-            and issue_worker_candidate
-        ):
+        if not (isinstance(issue_worker_candidate, Mapping) and issue_worker_candidate):
             return ()
         stage_id = "publication"
     else:
@@ -1277,7 +1264,8 @@ def recommended_initial_subagent_wave(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
     math_intent_route_id: str | None = None,
 ) -> tuple[str, ...]:
     """Return executable agent_type values for active catalog intake roles."""
@@ -1306,7 +1294,8 @@ def recommended_initial_subagent_wave_slots(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
     math_intent_route_id: str | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return role-aware initial-wave slots carrying writer targets."""
@@ -1333,7 +1322,8 @@ def recommended_dynamic_expansion_waves(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
     math_intent_route_id: str | None = None,
 ) -> tuple[tuple[str, ...], ...]:
     """Return executable follow-up stage waves inside the active budget."""
@@ -1364,7 +1354,8 @@ def recommended_dynamic_expansion_wave_slots(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
     math_intent_route_id: str | None = None,
 ) -> tuple[tuple[SubagentWaveSlot, ...], ...]:
     """Return executable follow-up role-instance waves inside the active budget."""
@@ -1450,9 +1441,7 @@ def dispatch_subagent_wave(
             validate_mathematical_intent_route,
         )
     route_ids = {
-        slot.math_intent_route_id
-        for slot in slots
-        if slot.requires_math_intent
+        slot.math_intent_route_id for slot in slots if slot.requires_math_intent
     }
     if math_intent_packet is not None and not route_ids:
         route_ids.add(MATHEMATICAL_INTENT_ROUTE_ID)
@@ -1462,12 +1451,20 @@ def dispatch_subagent_wave(
         next(iter(route_ids)) if route_ids else None
     )
     normalized_math_packet = None
+    nonmath_handoffs: tuple[Mapping[str, object], ...] = ()
     if selected_math_route is not None:
         if math_intent_packet is None:
             raise RuntimeError("math_packet_missing")
-        normalized_math_packet = mathematical_intent_packet_mapping(
-            normalize_mathematical_intent_packet(math_intent_packet)
+        normalized_math_intent_packet = normalize_mathematical_intent_packet(
+            math_intent_packet
         )
+        normalized_math_packet = mathematical_intent_packet_mapping(
+            normalized_math_intent_packet
+        )
+        if nonmath_handoff is not None:
+            nonmath_handoffs = separate_nonmath_handoff_mapping(
+                normalized_math_intent_packet
+            )
     elif math_intent_packet is not None:
         raise RuntimeError("math_packet_not_applicable")
     if selected_math_route is not None:
@@ -1492,18 +1489,14 @@ def dispatch_subagent_wave(
         or not prompts[slot.executable_identity].strip()
     ]
     if missing_prompts:
-        raise RuntimeError(
-            "subagent_wave_prompt_missing:" + ",".join(missing_prompts)
-        )
-    if selected_math_route is not None and nonmath_handoff is not None:
-        for handoff in separate_nonmath_handoff_mapping(normalized_math_packet):
+        raise RuntimeError("subagent_wave_prompt_missing:" + ",".join(missing_prompts))
+    if nonmath_handoff is not None:
+        for handoff in nonmath_handoffs:
             nonmath_handoff(handoff)
     spawned: list[str] = []
     for slot in slots:
         agent_id = spawn(slot.agent_type, prompts[slot.executable_identity])
         if not agent_id:
-            raise RuntimeError(
-                f"subagent_wave_spawn_failed:{slot.executable_identity}"
-            )
+            raise RuntimeError(f"subagent_wave_spawn_failed:{slot.executable_identity}")
         spawned.append(agent_id)
     return tuple(spawned)
