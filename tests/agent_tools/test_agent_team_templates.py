@@ -37,11 +37,11 @@ from tools.agent.orchestration.implementation_dispatch import (
     dispatch_fixed_implementation,
 )
 from tools.agent.orchestration.packets import (
+    _spec_source_root,
     iter_artifacts,
     resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_role_document_packet,
-    _spec_source_root,
 )
 from tools.agent.orchestration.team_config import (
     current_stage_skills,
@@ -50,7 +50,7 @@ from tools.agent.orchestration.team_config import (
     resolve_role,
 )
 from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary
-from tools.runtime.authority.checkout_identity import resolve_checkout_identity
+from tools.runtime.authority.checkout_identity import CheckoutIdentity
 from tools.runtime.authority.task_authority import hash_baseline_bytes
 from tools.runtime.authority.writer_target import WriterTarget
 from tools.runtime.lifecycle import task_close, update_lifecycle_contract
@@ -58,9 +58,9 @@ from tools.runtime.manifest.manifest_rendering import (
     COMMON_PROMPT_MUST_INCLUDE,
     language_review_candidates,
     manifest_run_lines,
-    render_subagent_prompt_packet,
     public_command_for_layout,
     render_code_template,
+    render_subagent_prompt_packet,
     render_template,
     suggested_public_skills,
 )
@@ -290,16 +290,18 @@ class AgentTeamTemplateTest(unittest.TestCase):
                     raise RuntimeError("injected-stage-write-failure")
                 return original_write(boundary, path, payload, mode=mode)
 
-            with patch.object(
-                RuntimeArtifactBoundary,
-                "atomic_write_bytes",
-                new=fail_second_stage_write,
-            ):
-                with self.assertRaisesRegex(
+            with (
+                patch.object(
+                    RuntimeArtifactBoundary,
+                    "atomic_write_bytes",
+                    new=fail_second_stage_write,
+                ),
+                self.assertRaisesRegex(
                     RuntimeError,
                     r"^injected-stage-write-failure$",
-                ):
-                    create_run_bundle(spec)
+                ),
+            ):
+                create_run_bundle(spec)
 
             self.assertGreaterEqual(atomic_writes, 2)
             self.assertFalse(spec.report_dir.exists())
@@ -790,11 +792,18 @@ class AgentTeamTemplateTest(unittest.TestCase):
             missing_target.owner_gate_id,
             "writer_target:required_before_spawn",
         )
-        identity = resolve_checkout_identity(PROJECT_ROOT).as_dict()
+        identity = CheckoutIdentity(
+            cwd=str(PROJECT_ROOT),
+            git_root=str(PROJECT_ROOT),
+            branch="test/agent-team-templates",
+            head="f" * 40,
+            remote="iwashita-nozomu/agent-canon",
+        )
+        identity_record = identity.as_dict()
         target = WriterTarget(
             str(PROJECT_ROOT),
-            identity["branch"],
-            identity["remote"],
+            identity.branch,
+            identity.remote,
             ("tools/agent_tools",),
         )
         math_blocked = dispatch_fixed_implementation(
@@ -813,6 +822,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             lambda role, prompt: "must-not-spawn",
             workspace_root=PROJECT_ROOT,
             writer_target=target,
+            checkout_identity=identity_record,
             selected_skills=(),
         )
         self.assertEqual(nonmath_dispatch.status, "spawned")
@@ -826,17 +836,21 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 lambda role, prompt: "snapshot-worker",
                 workspace_root=PROJECT_ROOT,
                 writer_target=target,
-                checkout_identity=identity,
+                checkout_identity=identity_record,
             )
         self.assertEqual(snapshot_dispatch.status, "spawned")
-        self.assertIn(identity["head"], snapshot_dispatch.prompt_capsule.body)
-        dispatch = dispatch_fixed_implementation(
-            request,
-            "materialize P3",
-            lambda role, prompt: calls.append((role, prompt)) or "spark-1",
-            workspace_root=PROJECT_ROOT,
-            writer_target=target,
-        )
+        self.assertIn(identity_record["head"], snapshot_dispatch.prompt_capsule.body)
+        with patch(
+            "tools.agent.orchestration.implementation_dispatch.resolve_checkout_identity",
+            return_value=identity,
+        ):
+            dispatch = dispatch_fixed_implementation(
+                request,
+                "materialize P3",
+                lambda role, prompt: calls.append((role, prompt)) or "spark-1",
+                workspace_root=PROJECT_ROOT,
+                writer_target=target,
+            )
         self.assertEqual(dispatch.status, "spawned")
         self.assertEqual(dispatch.spawn_count, 1)
         self.assertEqual(dispatch.owner_gate_count, 1)
@@ -857,6 +871,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             lambda role, prompt: None,
             workspace_root=PROJECT_ROOT,
             writer_target=target,
+            checkout_identity=identity_record,
         )
         self.assertEqual(blocked.status, "blocked")
         self.assertEqual(blocked.owner_gate_id, "WRITE_SUBAGENT_AUTHORIZATION=required")
