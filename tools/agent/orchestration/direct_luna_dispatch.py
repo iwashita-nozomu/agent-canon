@@ -1,28 +1,29 @@
 # @dependency-start
 # contract tool
-# responsibility Builds and verifies bounded direct-Luna subagent handoff packets.
+# responsibility Builds bounded direct-Luna subagent handoff packets.
 # upstream design ../../../agents/skills/direct-luna-communication.md direct Luna routing contract
 # downstream implementation ../../../tests/tools/test_direct_luna_dispatch.py validates packet behavior
 # @dependency-end
-"""Build and verify bounded direct-Luna subagent handoff packets.
+"""Build bounded direct-Luna subagent handoff packets.
 
 Logical role, Skill procedure, execution profile, and authority remain
 independent. The parent selects role and Skills; this module validates the
 actual authority boundary and serializes the handoff. Reuse evidence belongs
-in the existing context, not in a second admission language. Requested runtime
-values alone are not execution evidence.
+in the existing context, not in a second admission language. Model and effort
+fields record the requested profile; they do not prove the child's effective
+runtime.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Literal, Sequence
+from typing import Literal
 
 LUNA_MODEL = "gpt-6-luna"
 PACKET_SCHEMA_ID = "direct_luna_handoff_packet_v1"
-EVIDENCE_SCHEMA_ID = "direct_luna_runtime_evidence_v1"
 FORK_TURNS = "none"
 CONTINUATION_POLICY = "active_child_update_or_fresh_bounded_spawn"
 RESUME_POLICY = "unverified_native_resume_forbidden"
@@ -31,31 +32,6 @@ AuthorityMode = Literal["read-only", "workspace-write"]
 ReasoningEffort = Literal["low", "medium", "high", "xhigh"]
 _ALLOWED_AUTHORITY = frozenset({"read-only", "workspace-write"})
 _ALLOWED_EFFORT = frozenset({"low", "medium", "high", "xhigh"})
-
-
-@dataclass(frozen=True, slots=True)
-class DirectLunaBlocker(Exception):
-    """Typed blocker returned when direct-Luna execution cannot be proven."""
-
-    code: Literal["direct_luna_unavailable", "direct_luna_unverified"]
-    message: str
-    requested_model: str
-    requested_reasoning_effort: str
-    effective_model: str | None = None
-    effective_reasoning_effort: str | None = None
-
-    def __str__(self) -> str:
-        return f"{self.code}: {self.message}"
-
-    def as_dict(self) -> dict[str, str | None]:
-        return {
-            "code": self.code,
-            "message": self.message,
-            "requested_model": self.requested_model,
-            "requested_reasoning_effort": self.requested_reasoning_effort,
-            "effective_model": self.effective_model,
-            "effective_reasoning_effort": self.effective_reasoning_effort,
-        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,24 +79,6 @@ class DirectLunaHandoffPacket:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class DirectLunaRuntimeEvidence:
-    requested_model: str
-    requested_reasoning_effort: str
-    effective_model: str
-    effective_reasoning_effort: str
-    schema_id: str = EVIDENCE_SCHEMA_ID
-
-    def as_dict(self) -> dict[str, str]:
-        return {
-            "schema_id": self.schema_id,
-            "requested_model": self.requested_model,
-            "requested_reasoning_effort": self.requested_reasoning_effort,
-            "effective_model": self.effective_model,
-            "effective_reasoning_effort": self.effective_reasoning_effort,
-        }
-
-
 def _required_text(name: str, value: str) -> str:
     normalized = value.strip()
     if not normalized:
@@ -156,11 +114,7 @@ def _bounded_paths(name: str, values: Sequence[str]) -> tuple[str, ...]:
 
 
 def _paths_overlap(left: str, right: str) -> bool:
-    return (
-        left == right
-        or left.startswith(f"{right}/")
-        or right.startswith(f"{left}/")
-    )
+    return left == right or left.startswith(f"{right}/") or right.startswith(f"{left}/")
 
 
 def build_direct_luna_packet(
@@ -216,49 +170,4 @@ def build_direct_luna_packet(
         request_clause_ids=_unique_ids(
             "request_clause_ids", request_clause_ids, required=False
         ),
-    )
-
-
-def verify_direct_luna_runtime(
-    packet: DirectLunaHandoffPacket,
-    *,
-    override_available: bool,
-    effective_model: str | None,
-    effective_reasoning_effort: str | None,
-) -> DirectLunaRuntimeEvidence:
-    if not override_available:
-        raise DirectLunaBlocker(
-            code="direct_luna_unavailable",
-            message="the runtime rejected or does not expose direct model override",
-            requested_model=packet.model,
-            requested_reasoning_effort=packet.reasoning_effort,
-            effective_model=effective_model,
-            effective_reasoning_effort=effective_reasoning_effort,
-        )
-    if not effective_model or not effective_reasoning_effort:
-        raise DirectLunaBlocker(
-            code="direct_luna_unverified",
-            message="effective model and reasoning effort readback are required",
-            requested_model=packet.model,
-            requested_reasoning_effort=packet.reasoning_effort,
-            effective_model=effective_model,
-            effective_reasoning_effort=effective_reasoning_effort,
-        )
-    if (
-        effective_model != packet.model
-        or effective_reasoning_effort != packet.reasoning_effort
-    ):
-        raise DirectLunaBlocker(
-            code="direct_luna_unverified",
-            message="effective child runtime does not match the requested profile",
-            requested_model=packet.model,
-            requested_reasoning_effort=packet.reasoning_effort,
-            effective_model=effective_model,
-            effective_reasoning_effort=effective_reasoning_effort,
-        )
-    return DirectLunaRuntimeEvidence(
-        requested_model=packet.model,
-        requested_reasoning_effort=packet.reasoning_effort,
-        effective_model=effective_model,
-        effective_reasoning_effort=effective_reasoning_effort,
     )

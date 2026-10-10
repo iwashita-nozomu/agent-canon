@@ -1,8 +1,8 @@
 ---
 name: direct-luna-communication
-description: "Use after orchestration selects a Luna execution profile and needs bounded context, explicit authority, effective model/effort readback, and typed handback without a role-specific physical alias."
+description: "Use after orchestration selects a Luna execution profile and needs bounded context, explicit authority, and truthful handback about requested versus unverified effective runtime."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"48cc5cc2a8768e23027f09bc48b00b2de0ff14944ff0718f5666cadfea98065f"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f5376073dceea977eaa61100a251adc0e67897d4ffc6b3b6ae3bd0d65b24595a"} -->
 
 <!--
 @dependency-start
