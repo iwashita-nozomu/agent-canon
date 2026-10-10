@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -25,7 +26,8 @@ class WorkLogTest(unittest.TestCase):
         """Explicit report-dir mode should append the run-local work log."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-1"
+            runtime_root = Path(tmp_dir) / "runtime"
+            report_dir = runtime_root / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True, exist_ok=True)
             (report_dir / "work_log.md").write_text(
                 "\n".join(
@@ -50,6 +52,8 @@ class WorkLogTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--kind",
                     "edit",
                     "--request-clause-id",
@@ -75,9 +79,11 @@ class WorkLogTest(unittest.TestCase):
         """Active-run pointer mode should append the run-local work log."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-2"
+            runtime_root = Path(tmp_dir) / "runtime"
+            # Full checks supply a runtime root, so keep the active pointer external too.
+            report_dir = runtime_root / "reports" / "agents" / "run-2"
             report_dir.mkdir(parents=True, exist_ok=True)
-            active_pointer = workspace_root / "reports" / "agents" / ".active_run"
+            active_pointer = runtime_root / "reports" / "agents" / ".active_run"
             active_pointer.write_text("run-2\n", encoding="utf-8")
             (report_dir / "user_request_contract.md").write_text(
                 "# User Request Contract\n",
@@ -117,6 +123,10 @@ class WorkLogTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+                },
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -131,7 +141,8 @@ class WorkLogTest(unittest.TestCase):
         """Run-bundle preflight notes can be recorded before clauses exist."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-3"
+            runtime_root = Path(tmp_dir) / "runtime"
+            report_dir = runtime_root / "reports" / "agents" / "run-3"
 
             result = subprocess.run(
                 [
@@ -141,6 +152,8 @@ class WorkLogTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--kind",
                     "preflight",
                     "--allow-missing-request-clause-id",
@@ -167,7 +180,8 @@ class WorkLogTest(unittest.TestCase):
         """Clause-free logging must be an explicit exception."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-4"
+            runtime_root = Path(tmp_dir) / "runtime"
+            report_dir = runtime_root / "reports" / "agents" / "run-4"
 
             result = subprocess.run(
                 [
@@ -177,6 +191,8 @@ class WorkLogTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--kind",
                     "preflight",
                     "--allow-missing-request-clause-id",

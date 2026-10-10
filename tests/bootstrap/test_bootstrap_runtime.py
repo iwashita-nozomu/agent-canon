@@ -741,10 +741,17 @@ def test_resident_exec_passes_process_lease_to_worker(
 
 
 def test_process_lease_survives_controller_death_until_worker_exits(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path,
+    fake_docker: DockerAdapter,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A live child keeps its lease after controller death until admission recovers."""
     manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    private_log = manager.private_log_root
+    # Container-control admission validates the fixed private-log mount first.
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
     task_id = "exec-controller-death"
     ready_file = tmp_path / "worker.pid"
     exchange_root = manager.paths.runtime_root / "process-lease-exchange"
@@ -1244,8 +1251,13 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
     target = tmp_path / "target"
     control.mkdir()
     target.mkdir()
-    (control / "private-log").mkdir()
+    private_log = control / "private-log"
+    private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    # Preserve the resident mount precondition while testing the request filter.
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     digest = "target-secret"

@@ -8,19 +8,17 @@
 
 from __future__ import annotations
 
-import sys
 import unittest
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-
-from tools.runtime.artifacts.external_artifact_binding import (  # noqa: E402
+from tools.runtime.artifacts.external_artifact_binding import (
     LOCAL_EVENT_SCHEMA,
     ExternalProjectionError,
     materialize_external_projection_acknowledgement,
     verify_external_projection_acknowledgement,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def local_event() -> dict[str, object]:
