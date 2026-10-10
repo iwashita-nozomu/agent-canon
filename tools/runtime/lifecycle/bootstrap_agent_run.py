@@ -548,9 +548,7 @@ def emit_bootstrap_output(
     context: BootstrapRunContext,
     workspace_root: Path,
     runtime: BootstrapRuntime,
-    writer_targets: Mapping[
-        str, WriterTarget | Mapping[str, object] | None
-    ]
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
     | None = None,
 ) -> None:
     """Print the machine-readable bootstrap summary."""

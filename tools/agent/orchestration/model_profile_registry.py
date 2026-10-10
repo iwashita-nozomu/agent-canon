@@ -19,7 +19,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, Mapping, Sequence, cast
+from typing import Any, ClassVar, Iterable, Mapping, Sequence, TypedDict, cast
 
 try:
     import tomllib
@@ -538,6 +538,15 @@ class ModelProfile:
     close_tool_id: str
 
 
+class WriterIsolationPolicy(TypedDict):
+    """Typed normalized writer-isolation policy produced by the registry loader."""
+
+    current_checkout_mode: str
+    parallel_requirements: tuple[str, ...]
+    collision_action: str
+    isolated_worktree_mode: str
+
+
 @dataclass(frozen=True)
 class ModelProfileRegistry:
     schema_id: str
@@ -548,7 +557,7 @@ class ModelProfileRegistry:
     role_sandbox_bindings: Mapping[str, str]
     role_instruction_templates: Mapping[str, tuple[RoleInstructionClause, ...]]
     standalone_role_metadata: Mapping[str, tuple[str, str, str]]
-    writer_isolation_policy: Mapping[str, object]
+    writer_isolation_policy: WriterIsolationPolicy
 
     def by_profile(self, profile_id: str) -> ModelProfile:
         matches = [profile for profile in self.model_profiles if profile.id == profile_id]
@@ -697,7 +706,7 @@ def load_model_profile_registry(
         raw_writer_policy["parallel_requirements"],
         "writer_isolation_policy.parallel_requirements",
     )
-    writer_policy = {
+    writer_policy: WriterIsolationPolicy = {
         "current_checkout_mode": current_checkout_mode,
         "parallel_requirements": parallel_requirements,
         "collision_action": collision_action,

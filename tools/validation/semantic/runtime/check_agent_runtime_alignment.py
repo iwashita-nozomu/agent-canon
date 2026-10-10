@@ -313,12 +313,8 @@ def validate_project_config() -> None:
         == "parallel_only_for_disjoint_paths_without_shared_state",
         "writer isolation policy must protect shared current-checkout state",
     )
-    parallel_requirements = require_list(
-        writer_policy.get("parallel_requirements", []),
-        "writer isolation policy requirements must be a list",
-    )
     ensure(
-        tuple(parallel_requirements)
+        writer_policy["parallel_requirements"]
         == (
             "disjoint_paths",
             "no_shared_git_index_or_head",

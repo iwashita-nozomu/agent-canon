@@ -48,15 +48,23 @@ from tools.repository.workspace.parent_root_side_effects import (
 def _parent_validate(path: Path, purpose: str) -> None:
     configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
     parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
     if path.resolve() == parent:
         # The attestation itself pins the authenticated parent root; asking
         # the path capability to resolve the root as a child would be an
         # invalid target lookup rather than an additional safety check.
         return
-    ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
+    ParentRootSideEffectBoundary().resolve_parent_owned_path(
+        attestation, path, purpose, create=False
+    )
+
 
 from tools.agent.orchestration.tool_calls import (
     CloseAgentLifecycleEvidence,
@@ -83,8 +91,14 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
     validate_durable_handback,
     validate_gate_chain,
 )
-from tools.agent.orchestration.autonomous_convergence import validate_closeout_projection
-from tools.agent.orchestration.packets import normalize_owner_guarantee_packet, owner_receipt_is_compatible, owner_receipt_key
+from tools.agent.orchestration.autonomous_convergence import (
+    validate_closeout_projection,
+)
+from tools.agent.orchestration.packets import (
+    normalize_owner_guarantee_packet,
+    owner_receipt_is_compatible,
+    owner_receipt_key,
+)
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
 COMMIT_PUSH_COMPLETE_STATUSES = {"yes", "not_applicable"}
@@ -127,9 +141,14 @@ def _validated_runtime_receipt(
         return None
     unsigned = dict(value)
     unsigned.pop("receipt_sha256", None)
-    if hashlib.sha256(
-        json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
-    ).hexdigest() != receipt_sha:
+    if (
+        hashlib.sha256(
+            json.dumps(
+                unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+            ).encode()
+        ).hexdigest()
+        != receipt_sha
+    ):
         return None
     return value
 
@@ -148,7 +167,9 @@ def _child_closeout_evidence(
     )
     missing = tuple(field for field in required if not closeout.get(field, "").strip())
     if missing:
-        return False, tuple(f"runtime_child_closeout_missing:{field}" for field in missing)
+        return False, tuple(
+            f"runtime_child_closeout_missing:{field}" for field in missing
+        )
     verifier = _validated_runtime_receipt(
         report_dir,
         closeout["verifier_receipt_ref"],
@@ -184,11 +205,18 @@ def _child_closeout_evidence(
             ledger_path = Path(ledger_ref)
             if not ledger_path.is_absolute() and ".." not in ledger_path.parts:
                 ledger_target = (report_dir / ledger_path).resolve()
-                if report_dir.resolve() in ledger_target.parents and ledger_target.is_file():
+                if (
+                    report_dir.resolve() in ledger_target.parents
+                    and ledger_target.is_file()
+                ):
                     try:
-                        for line in ledger_target.read_text(encoding="utf-8").splitlines():
+                        for line in ledger_target.read_text(
+                            encoding="utf-8"
+                        ).splitlines():
                             item = json.loads(line)
-                            if isinstance(item, dict) and isinstance(item.get("hook_run_id"), str):
+                            if isinstance(item, dict) and isinstance(
+                                item.get("hook_run_id"), str
+                            ):
                                 ledger_ids.add(item["hook_run_id"])
                                 control = item.get("mutation_control")
                                 if isinstance(control, Mapping):
@@ -208,6 +236,8 @@ def _child_closeout_evidence(
         ):
             blockers.append("parent_mutation_provenance_mismatch")
     return not blockers, tuple(blockers)
+
+
 OWNER_GUARANTEE_RECEIPTS_ARTIFACT_NAME = "owner_guarantee_receipts.json"
 
 
@@ -251,7 +281,9 @@ def owner_receipt_closeout_consumer(
     failures: list[str] = []
     for index, receipt in enumerate(receipts):
         try:
-            packet = normalize_owner_guarantee_packet(receipt, f"owner_receipts[{index}]")
+            packet = normalize_owner_guarantee_packet(
+                receipt, f"owner_receipts[{index}]"
+            )
         except (RuntimeError, TypeError, ValueError) as exc:
             failures.append(str(exc))
             continue
@@ -259,7 +291,10 @@ def owner_receipt_closeout_consumer(
         if key in keys:
             continue
         keys.add(key)
-        if packet["correspondence_state"] != "verified" or packet["observation_outcome"] != "observed_pass":
+        if (
+            packet["correspondence_state"] != "verified"
+            or packet["observation_outcome"] != "observed_pass"
+        ):
             continue
         if not owner_receipt_is_compatible(packet, candidate_digest=candidate_digest):
             failures.append(f"incompatible:{packet['primary_observation_ref']}")
@@ -336,7 +371,9 @@ def _lifecycle_status(value: object) -> capacity_handshake.LifecycleStatus:
         raise ValueError(f"unknown lifecycle status: {value}") from exc
 
 
-def _ledger_from_projection(projection: dict[str, object]) -> capacity_handshake.CapacityLedger:
+def _ledger_from_projection(
+    projection: dict[str, object],
+) -> capacity_handshake.CapacityLedger:
     ledger_data = projection.get("ledger")
     if not isinstance(ledger_data, dict):
         raise ValueError("capacity_ledger_missing")
@@ -414,7 +451,9 @@ def _postorder_descendant_ids(
         if record.work_id in visiting:
             raise ValueError("descendant_cycle")
         visiting.add(record.work_id)
-        for child in sorted(by_parent.get(record.work_id, []), key=lambda item: item.work_id):
+        for child in sorted(
+            by_parent.get(record.work_id, []), key=lambda item: item.work_id
+        ):
             visit(child)
         visiting.remove(record.work_id)
         result.append(record.work_id)
@@ -492,7 +531,8 @@ def validate_capacity_lifecycle_closeout(
             close_agent_tokens=tokens_by_work_id,
         )
         failures.extend(
-            f"{failure.work_id}:{failure.detail}" for failure in provider_packet.failures
+            f"{failure.work_id}:{failure.detail}"
+            for failure in provider_packet.failures
         )
     if failures:
         return False, tuple(dict.fromkeys(failures))
@@ -511,7 +551,9 @@ def validate_capacity_lifecycle_closeout(
     return True, ()
 
 
-def capacity_lifecycle_closeout_from_report(report_dir: Path) -> tuple[bool, tuple[str, ...]]:
+def capacity_lifecycle_closeout_from_report(
+    report_dir: Path,
+) -> tuple[bool, tuple[str, ...]]:
     """Validate a generated capacity projection when the run contains one."""
     packet_path = report_dir / "closeout_packet.json"
     if not packet_path.is_file():
@@ -522,7 +564,9 @@ def capacity_lifecycle_closeout_from_report(report_dir: Path) -> tuple[bool, tup
             return False, ("closeout_packet_invalid",)
         capacity_projection = payload.get("capacity_request", payload)
         closeout_projection = payload.get("closeout_packet", payload)
-        if not isinstance(capacity_projection, dict) or not isinstance(closeout_projection, dict):
+        if not isinstance(capacity_projection, dict) or not isinstance(
+            closeout_projection, dict
+        ):
             return False, ("closeout_packet_projection_invalid",)
         ledger = _ledger_from_projection(capacity_projection)
         calls = closeout_projection.get("close_agent_tool_calls", ())
@@ -639,9 +683,12 @@ def workflow_tool_warning_problems(workflow_monitoring_path: Path) -> tuple[str,
     """Return unresolved workflow-monitoring tool warning problems."""
     if not workflow_monitoring_path.is_file():
         return ("workflow_monitoring.md missing",)
-    status = parse_markdown_status(workflow_monitoring_path).get(
-        "tool_warnings_status", ""
-    ).strip().lower()
+    status = (
+        parse_markdown_status(workflow_monitoring_path)
+        .get("tool_warnings_status", "")
+        .strip()
+        .lower()
+    )
     problems: list[str] = []
     if status not in {"none", "resolved"}:
         problems.append("tool_warnings_status must be none or resolved")
@@ -662,7 +709,10 @@ def workflow_tool_warning_problems(workflow_monitoring_path: Path) -> tuple[str,
         severity = fields.get("severity", "").lower()
         if warning_status in {"", "open", "pending", "observed", "unresolved"}:
             problems.append(f"tool warning remains open: {warning_id}")
-        if severity in {"fix-now", "s0", "s1", "blocker"} and warning_status != "resolved":
+        if (
+            severity in {"fix-now", "s0", "s1", "blocker"}
+            and warning_status != "resolved"
+        ):
             problems.append(f"fix-now tool warning must be resolved: {warning_id}")
     return tuple(problems)
 
@@ -677,7 +727,11 @@ def resolve_run_artifact(report_dir: Path, value: str) -> Path | None:
     if not value:
         return None
     raw_path = Path(value)
-    candidate = raw_path.resolve() if raw_path.is_absolute() else (report_dir / raw_path).resolve()
+    candidate = (
+        raw_path.resolve()
+        if raw_path.is_absolute()
+        else (report_dir / raw_path).resolve()
+    )
     try:
         candidate.relative_to(report_dir)
     except ValueError:
@@ -785,7 +839,9 @@ def changed_file_paths(workspace: Path) -> tuple[str, ...]:
             path = line.strip()
             if not path:
                 continue
-            if path.startswith("reports/") or path.startswith(".agent-canon/log-archive/"):
+            if path.startswith("reports/") or path.startswith(
+                ".agent-canon/log-archive/"
+            ):
                 continue
             paths.add(path)
     return tuple(sorted(paths))
@@ -822,7 +878,9 @@ def document_split_decision_ready(status: str, decision: str) -> bool:
     if normalized_decision in DOCUMENT_STRUCTURE_MISSING_VALUES:
         return False
     if status == "skipped":
-        return normalized_decision.startswith(DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX)
+        return normalized_decision.startswith(
+            DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX
+        )
     if status == "complete":
         return normalized_decision.startswith(DOCUMENT_SPLIT_DECISION_PREFIXES)
     return False
@@ -899,8 +957,10 @@ def document_structure_evidence_ready(
         and evidence.get("format_only_reason", "")
         not in DOCUMENT_STRUCTURE_VALUE_MISSING
     )
-    return paths_recorded, split_decision_ready, split_decision_ready and (
-        complete_route or skipped_route
+    return (
+        paths_recorded,
+        split_decision_ready,
+        split_decision_ready and (complete_route or skipped_route),
     )
 
 
@@ -1000,13 +1060,18 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
     ):
         return {"ready": False, "reason": "generated_artifact_identity_mismatch"}
     ledger_snapshot_identity = projection_metadata.get("ledger_snapshot_identity")
-    if not isinstance(ledger_snapshot_identity, str) or not ledger_snapshot_identity.strip():
+    if (
+        not isinstance(ledger_snapshot_identity, str)
+        or not ledger_snapshot_identity.strip()
+    ):
         return {"ready": False, "reason": "ledger_snapshot_identity_missing"}
     if projection_metadata.get("source_refs") != source_binding.get("source_refs"):
         return {"ready": False, "reason": "projection_source_refs_mismatch"}
     coverage_check = artifact.get("coverage_check")
     completion_boundary = artifact.get("completion_boundary")
-    if not isinstance(coverage_check, dict) or not isinstance(completion_boundary, dict):
+    if not isinstance(coverage_check, dict) or not isinstance(
+        completion_boundary, dict
+    ):
         return {"ready": False, "reason": "checked_projection_fields_missing"}
     if coverage_check.get("schema") != "agent-canon.completion-coverage-check.v1":
         return {"ready": False, "reason": "coverage_check_schema_mismatch"}
@@ -1038,7 +1103,10 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         return {"ready": False, "reason": "coverage_check_not_ok"}
     if coverage_check.get("source_binding") != source_binding:
         return {"ready": False, "reason": "coverage_source_binding_mismatch"}
-    if tuple(coverage_check.get("taxonomy_refs", ())) != COMPLETION_COVERAGE_TAXONOMY_REFS:
+    if (
+        tuple(coverage_check.get("taxonomy_refs", ()))
+        != COMPLETION_COVERAGE_TAXONOMY_REFS
+    ):
         return {"ready": False, "reason": "coverage_taxonomy_refs_mismatch"}
     if completion_boundary.get("schema") != "agent-canon.completion-boundary.v1":
         return {"ready": False, "reason": "completion_boundary_schema_mismatch"}
@@ -1053,9 +1121,9 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         return {"ready": False, "reason": "coverage_delivery_gate_mismatch"}
     if completion_boundary.get("topology_errors") != []:
         return {"ready": False, "reason": "completion_boundary_topology_invalid"}
-    if not isinstance(completion_boundary.get("control_topology_observation_ref"), str) or not completion_boundary.get(
-        "control_topology_observation_ref"
-    ):
+    if not isinstance(
+        completion_boundary.get("control_topology_observation_ref"), str
+    ) or not completion_boundary.get("control_topology_observation_ref"):
         return {"ready": False, "reason": "completion_boundary_topology_ref_missing"}
     for field in ("open_repairs", "open_crossing_edges"):
         values = completion_boundary.get(field)
@@ -1083,7 +1151,11 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         if not isinstance(event, dict):
             return {"ready": False, "reason": "semantic_event_invalid"}
         event_id = event.get("event_id")
-        if not isinstance(event_id, str) or not event_id.strip() or event_id in events_by_id:
+        if (
+            not isinstance(event_id, str)
+            or not event_id.strip()
+            or event_id in events_by_id
+        ):
             return {"ready": False, "reason": "semantic_event_identity_invalid"}
         if event.get("run_id") != source_binding.get("run_id"):
             return {"ready": False, "reason": "semantic_event_run_id_mismatch"}
@@ -1100,7 +1172,10 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         if not isinstance(mapping, dict):
             return {"ready": False, "reason": "coverage_mapping_invalid"}
         source_event_ref = mapping.get("source_event_ref")
-        if not isinstance(source_event_ref, str) or source_event_ref in source_event_refs:
+        if (
+            not isinstance(source_event_ref, str)
+            or source_event_ref in source_event_refs
+        ):
             return {"ready": False, "reason": "coverage_source_event_identity_invalid"}
         if source_event_ref not in events_by_id:
             return {"ready": False, "reason": "coverage_source_event_missing"}
@@ -1129,8 +1204,10 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         refs = evidence.get("source_event_refs")
         if not isinstance(gate_id, str) or not gate_id.strip() or gate_id in gate_ids:
             return {"ready": False, "reason": "gate_evidence_identity_invalid"}
-        if not isinstance(refs, list) or not refs or any(
-            not isinstance(ref, str) or ref not in events_by_id for ref in refs
+        if (
+            not isinstance(refs, list)
+            or not refs
+            or any(not isinstance(ref, str) or ref not in events_by_id for ref in refs)
         ):
             return {"ready": False, "reason": "gate_evidence_source_invalid"}
         gate_ids.add(gate_id)
@@ -1144,7 +1221,10 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         if not isinstance(certificate, dict):
             return {"ready": False, "reason": "resource_certificate_invalid"}
         source_event_ref = certificate.get("source_event_ref")
-        if not isinstance(source_event_ref, str) or source_event_ref in resource_certificate_refs:
+        if (
+            not isinstance(source_event_ref, str)
+            or source_event_ref in resource_certificate_refs
+        ):
             return {"ready": False, "reason": "resource_certificate_source_invalid"}
         if source_event_ref not in events_by_id:
             return {"ready": False, "reason": "resource_certificate_source_missing"}
@@ -1155,7 +1235,9 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
         resource_certificate_refs.add(source_event_ref)
     failure_event_refs = artifact.get("failure_event_refs")
     failure_responses = artifact.get("failure_responses")
-    if not isinstance(failure_event_refs, list) or not isinstance(failure_responses, list):
+    if not isinstance(failure_event_refs, list) or not isinstance(
+        failure_responses, list
+    ):
         return {"ready": False, "reason": "failure_response_projection_invalid"}
     expected_failure_refs = {
         event_id
@@ -1201,7 +1283,10 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
             "applicable": True,
             "reason": f"close_agent:artifact_unreadable:{exc}",
         }
-    if not isinstance(raw, dict) or raw.get("schema") != UPDATE_LIFECYCLE_CLOSEOUT_SCHEMA:
+    if (
+        not isinstance(raw, dict)
+        or raw.get("schema") != UPDATE_LIFECYCLE_CLOSEOUT_SCHEMA
+    ):
         return {
             "ready": False,
             "applicable": True,
@@ -1237,8 +1322,7 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
         )
         identity = binding_identity(source_gates[0]["binding"])
         if any(
-            binding_identity(gate["binding"]) != identity
-            for gate in source_gates[1:]
+            binding_identity(gate["binding"]) != identity for gate in source_gates[1:]
         ):
             raise ValueError("close_agent:identity_mismatch")
         handback = validate_durable_handback(raw["durable_handback"])
@@ -1453,7 +1537,9 @@ def main() -> int:
         report_dir,
         closeout,
     )
-    diff_check = parse_markdown_status_section(closeout_path, "Diff-Check Agent Evidence")
+    diff_check = parse_markdown_status_section(
+        closeout_path, "Diff-Check Agent Evidence"
+    )
     diff_check_artifact_path = resolve_run_artifact(
         report_dir, diff_check.get("diff_check_artifact", "")
     )
@@ -1480,13 +1566,10 @@ def main() -> int:
             "diff_check_artifact",
         )
     )
-    diff_check_not_applicable_valid = (
-        not diff_check_not_applicable
-        or (
-            diff_check_route_unselected
-            and not changed_all
-            and active_diff_ref == current_git_head(workspace)
-        )
+    diff_check_not_applicable_valid = not diff_check_not_applicable or (
+        diff_check_route_unselected
+        and not changed_all
+        and active_diff_ref == current_git_head(workspace)
     )
     requires_canon_parent_sync = agent_canon_parent_sync_gate_required(
         changed_all,
@@ -1498,9 +1581,7 @@ def main() -> int:
         document_structure_paths_ready,
         document_split_decision_route_ready,
         document_structure_route_ready,
-    ) = (
-        document_structure_evidence_ready(changed_markdown, document_structure)
-    )
+    ) = document_structure_evidence_ready(changed_markdown, document_structure)
     agent_evaluation = parse_markdown_status(agent_evaluation_path)
     workflow_tool_warning_blockers = workflow_tool_warning_problems(
         workflow_monitoring_path
@@ -1513,7 +1594,9 @@ def main() -> int:
         else ""
     )
     schedule_blockers = check_schedule_artifact(schedule_text)
-    work_log_blockers = check_work_log_artifact(work_log_path.read_text(encoding="utf-8"))
+    work_log_blockers = check_work_log_artifact(
+        work_log_path.read_text(encoding="utf-8")
+    )
     final_review_blockers = (
         check_final_review_artifact(final_review_path.read_text(encoding="utf-8"))
         if final_review_path.is_file()
@@ -1560,14 +1643,18 @@ def main() -> int:
             and closeout.get("overall_delivery_complete") == "yes"
         ),
         "unfinished_tasks_absent": closeout.get("unfinished_tasks_absent") == "yes",
-        "dependency_headers_complete": closeout.get("dependency_headers_complete") == "yes",
-        "repo_wide_dependency_tools_complete": closeout.get("repo_wide_dependency_tools_complete")
+        "dependency_headers_complete": closeout.get("dependency_headers_complete")
+        == "yes",
+        "repo_wide_dependency_tools_complete": closeout.get(
+            "repo_wide_dependency_tools_complete"
+        )
         == "yes",
         "repo_wide_static_analysis_complete": closeout.get(
             "repo_wide_static_analysis_complete"
         )
         in STATIC_ANALYSIS_COMPLETE_STATUSES,
-        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes"
+        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete")
+        == "yes"
         if requires_canon_parent_sync
         else closeout.get("agent_canon_latest_complete") in {"yes", "not_applicable"},
         "agent_canon_latest_command": (
@@ -1596,7 +1683,9 @@ def main() -> int:
         if requires_canon_parent_sync
         else True,
         "agent_canon_parent_gitlink_commit": (
-            parent_gitlink_commit is not None if requires_parent_gitlink_integrity else True
+            parent_gitlink_commit is not None
+            if requires_parent_gitlink_integrity
+            else True
         ),
         "mapping_error_sets_empty": (
             closeout.get(
@@ -1613,7 +1702,8 @@ def main() -> int:
             == "pass"
         ),
         "canonical_format_check_status": canonical_evidence.get(
-            "canonical_format_check_status", closeout.get("canonical_format_check_status", "")
+            "canonical_format_check_status",
+            closeout.get("canonical_format_check_status", ""),
         )
         == "pass",
         "canonical_dispatcher_schema_status": (
@@ -1628,7 +1718,8 @@ def main() -> int:
             closeout.get("validation_failure_response_status", ""),
         )
         == "pass",
-        "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
+        "review_findings_integrated": closeout.get("review_findings_integrated")
+        == "yes",
         "focused_recheck_complete": closeout.get("focused_recheck_complete")
         in {"yes", "not_applicable"},
         "tool_warnings_resolved": closeout.get("tool_warnings_resolved") == "yes",
@@ -1646,9 +1737,7 @@ def main() -> int:
         "document_structure_paths_recorded": document_structure_paths_ready,
         "document_split_decision_evidence": document_split_decision_route_ready,
         "document_structure_evidence": document_structure_route_ready,
-        "review_convergence_complete": closeout.get(
-            "review_convergence_complete"
-        )
+        "review_convergence_complete": closeout.get("review_convergence_complete")
         == "yes",
         "review_convergence_evidence": convergence_decision.ready,
         "subagents_closed": closeout.get("subagents_closed") == "yes",
@@ -1667,7 +1756,9 @@ def main() -> int:
         )
         in {"reconciled", "not_applicable"},
         "subagent_wave_reconciliation_clean": not wave_reconciliation,
-        "dynamic_spawn_policy_status": subagent_lifecycle.get("dynamic_spawn_policy_status")
+        "dynamic_spawn_policy_status": subagent_lifecycle.get(
+            "dynamic_spawn_policy_status"
+        )
         in {"applied", "not_applicable"},
         "subagent_closeout_status": subagent_lifecycle.get("subagent_closeout_status")
         in {"closed", "not_applicable"},
@@ -1702,10 +1793,13 @@ def main() -> int:
         "diff_check_artifact_independent": diff_check_not_applicable
         or diff_check_artifact.get("diff_check_independent_agent") == "yes",
         "diff_check_artifact_findings_status": diff_check_not_applicable
-        or diff_check_artifact.get("diff_check_findings_status") in {"none", "resolved"},
-        "canonical_tree_head_complete": closeout.get("canonical_tree_head_complete") == "yes",
+        or diff_check_artifact.get("diff_check_findings_status")
+        in {"none", "resolved"},
+        "canonical_tree_head_complete": closeout.get("canonical_tree_head_complete")
+        == "yes",
         "agent_evaluation_complete": closeout.get("agent_evaluation_complete") == "yes",
-        "runtime_log_archive_synced": closeout.get("runtime_log_archive_synced") == "yes",
+        "runtime_log_archive_synced": closeout.get("runtime_log_archive_synced")
+        == "yes",
         "runtime_log_archive_sync_command": runtime_log_archive.get(
             "runtime_log_archive_sync_command", ""
         )
@@ -1739,18 +1833,24 @@ def main() -> int:
         )
         not in {"", "missing", "none"},
         "agent_evaluation_status": agent_evaluation.get("evaluation_status") == "pass",
-        "agent_feedback_resolved": agent_evaluation.get("feedback_actions_resolved") == "yes",
-        "agent_learning_capture_complete": agent_evaluation.get("learning_capture_complete")
+        "agent_feedback_resolved": agent_evaluation.get("feedback_actions_resolved")
         == "yes",
-        "request_contract_resolved": request_contract.get("all_clauses_resolved") == "yes",
+        "agent_learning_capture_complete": agent_evaluation.get(
+            "learning_capture_complete"
+        )
+        == "yes",
+        "request_contract_resolved": request_contract.get("all_clauses_resolved")
+        == "yes",
         "no_forbidden_drift": request_contract.get("forbidden_drift_detected") == "no",
         "todo_artifact_complete": not schedule_blockers,
         "work_log_complete": not work_log_blockers,
         "final_review_artifact_complete": not final_review_blockers,
         "report_active_run_match": active_run_matches(active_run, report_dir),
         "report_artifact_placement_clean": not report_artifact_blockers,
-        "commit_created": closeout.get("commit_created") in COMMIT_PUSH_COMPLETE_STATUSES,
-        "push_completed": closeout.get("push_completed") in COMMIT_PUSH_COMPLETE_STATUSES,
+        "commit_created": closeout.get("commit_created")
+        in COMMIT_PUSH_COMPLETE_STATUSES,
+        "push_completed": closeout.get("push_completed")
+        in COMMIT_PUSH_COMPLETE_STATUSES,
         "closeout_unlock": closeout.get("user_completion_report") == "unlocked",
     }
     ready = all(closeout_checks.values())
@@ -1766,23 +1866,25 @@ def main() -> int:
     print(f"REQUIRED_REVIEWS_COMPLETE={closeout.get('required_reviews_complete', '')}")
     print(f"VALIDATION_COMPLETE={closeout.get('validation_complete', '')}")
     print(f"REQUEST_CONTRACT_COMPLETE={closeout.get('request_contract_complete', '')}")
-    print(f"ALL_PLANNED_CHUNKS_COMPLETE={closeout.get('all_planned_chunks_complete', '')}")
+    print(
+        f"ALL_PLANNED_CHUNKS_COMPLETE={closeout.get('all_planned_chunks_complete', '')}"
+    )
     print(f"OVERALL_DELIVERY_COMPLETE={closeout.get('overall_delivery_complete', '')}")
-    print(f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}")
-    print(f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}")
-    print(f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}")
+    print(
+        f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}"
+    )
+    print(
+        f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}"
+    )
+    print(
+        f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}"
+    )
     print(
         "OWNER_RECEIPTS_CONSUMER="
         f"{'yes' if owner_receipt_decision.get('ready') else 'no'}"
     )
-    print(
-        "OWNER_RECEIPTS_CONSUMER_REASON="
-        f"{owner_receipt_decision.get('reason', '')}"
-    )
-    print(
-        "CAPACITY_LIFECYCLE_CLOSEOUT="
-        f"{'yes' if capacity_lifecycle_ready else 'no'}"
-    )
+    print(f"OWNER_RECEIPTS_CONSUMER_REASON={owner_receipt_decision.get('reason', '')}")
+    print(f"CAPACITY_LIFECYCLE_CLOSEOUT={'yes' if capacity_lifecycle_ready else 'no'}")
     print(
         "CAPACITY_LIFECYCLE_BLOCKERS="
         f"{join_blockers(list(capacity_lifecycle_blockers))}"
@@ -1820,7 +1922,9 @@ def main() -> int:
         f"{completion_coverage_evidence.get('validation_failure_response_status', '')}"
     )
     print(f"UNFINISHED_TASKS_ABSENT={closeout.get('unfinished_tasks_absent', '')}")
-    print(f"DEPENDENCY_HEADERS_COMPLETE={closeout.get('dependency_headers_complete', '')}")
+    print(
+        f"DEPENDENCY_HEADERS_COMPLETE={closeout.get('dependency_headers_complete', '')}"
+    )
     print(
         "REPO_WIDE_DEPENDENCY_TOOLS_COMPLETE="
         f"{closeout.get('repo_wide_dependency_tools_complete', '')}"
@@ -1834,8 +1938,7 @@ def main() -> int:
         f"{review_convergence.get('review_convergence_static_analysis_status', '')}"
     )
     print(
-        "AGENT_CANON_LATEST_COMPLETE="
-        f"{closeout.get('agent_canon_latest_complete', '')}"
+        f"AGENT_CANON_LATEST_COMPLETE={closeout.get('agent_canon_latest_complete', '')}"
     )
     print(
         "AGENT_CANON_LATEST_COMMAND="
@@ -1854,14 +1957,12 @@ def main() -> int:
         f"{agent_canon_latest.get('agent_canon_source_head', '')}"
     )
     print(
-        "AGENT_CANON_PARENT_PIN="
-        f"{agent_canon_latest.get('agent_canon_parent_pin', '')}"
+        f"AGENT_CANON_PARENT_PIN={agent_canon_latest.get('agent_canon_parent_pin', '')}"
     )
-    print(f"REVIEW_FINDINGS_INTEGRATED={closeout.get('review_findings_integrated', '')}")
     print(
-        "FOCUSED_RECHECK_COMPLETE="
-        f"{closeout.get('focused_recheck_complete', '')}"
+        f"REVIEW_FINDINGS_INTEGRATED={closeout.get('review_findings_integrated', '')}"
     )
+    print(f"FOCUSED_RECHECK_COMPLETE={closeout.get('focused_recheck_complete', '')}")
     print(f"TOOL_WARNINGS_RESOLVED={closeout.get('tool_warnings_resolved', '')}")
     print(
         "TOOL_WARNING_MONITORING_STATUS="
@@ -1879,10 +1980,7 @@ def main() -> int:
         "WORKFLOW_TOOL_WARNING_BLOCKERS="
         f"{join_blockers(list(workflow_tool_warning_blockers))}"
     )
-    print(
-        "DOCUMENT_STRUCTURE_REQUIRED="
-        f"{'yes' if changed_markdown else 'no'}"
-    )
+    print(f"DOCUMENT_STRUCTURE_REQUIRED={'yes' if changed_markdown else 'no'}")
     print(
         "DOCUMENT_STRUCTURE_CHANGED_MARKDOWN="
         f"{','.join(changed_markdown) if changed_markdown else 'none'}"
@@ -1908,13 +2006,9 @@ def main() -> int:
         f"{'yes' if document_structure_route_ready else 'no'}"
     )
     print(
-        "REVIEW_CONVERGENCE_COMPLETE="
-        f"{closeout.get('review_convergence_complete', '')}"
+        f"REVIEW_CONVERGENCE_COMPLETE={closeout.get('review_convergence_complete', '')}"
     )
-    print(
-        "REVIEW_CONVERGENCE_READY="
-        f"{'yes' if convergence_decision.ready else 'no'}"
-    )
+    print(f"REVIEW_CONVERGENCE_READY={'yes' if convergence_decision.ready else 'no'}")
     print(
         "REVIEW_CONVERGENCE_BLOCKERS="
         f"{join_blockers(list(convergence_decision.reasons))}"
@@ -1935,18 +2029,19 @@ def main() -> int:
         "SUBAGENT_CLOSEOUT_STATUS="
         f"{subagent_lifecycle.get('subagent_closeout_status', '')}"
     )
-    print(
-        "SUBAGENT_WAVE_RECONCILIATION_BLOCKERS="
-        f"{join_blockers(wave_reconciliation)}"
-    )
+    print(f"SUBAGENT_WAVE_RECONCILIATION_BLOCKERS={join_blockers(wave_reconciliation)}")
     print(
         "SUBAGENT_OPEN_INSTANCES="
         f"{subagent_lifecycle.get('open_subagent_instances', '')}"
     )
     print(f"DIFF_CHECK_AGENT_COMPLETE={closeout.get('diff_check_agent_complete', '')}")
     print(f"DIFF_CHECK_AGENT_ROLE={diff_check.get('diff_check_agent_role', '')}")
-    print(f"DIFF_CHECK_AGENT_DECISION={diff_check.get('diff_check_agent_decision', '')}")
-    print(f"DIFF_CHECK_LATEST_DIFF_REF={diff_check.get('diff_check_latest_diff_ref', '')}")
+    print(
+        f"DIFF_CHECK_AGENT_DECISION={diff_check.get('diff_check_agent_decision', '')}"
+    )
+    print(
+        f"DIFF_CHECK_LATEST_DIFF_REF={diff_check.get('diff_check_latest_diff_ref', '')}"
+    )
     print(f"DIFF_CHECK_CURRENT_DIFF_REF={active_diff_ref}")
     print(f"DIFF_CHECK_ARTIFACT={diff_check.get('diff_check_artifact', '')}")
     print(
@@ -1958,7 +2053,9 @@ def main() -> int:
         f"{closeout.get('canonical_tree_head_complete', '')}"
     )
     print(f"AGENT_EVALUATION_COMPLETE={closeout.get('agent_evaluation_complete', '')}")
-    print(f"RUNTIME_LOG_ARCHIVE_SYNCED={closeout.get('runtime_log_archive_synced', '')}")
+    print(
+        f"RUNTIME_LOG_ARCHIVE_SYNCED={closeout.get('runtime_log_archive_synced', '')}"
+    )
     print(
         "RUNTIME_LOG_ARCHIVE_SYNC_COMMAND="
         f"{runtime_log_archive.get('runtime_log_archive_sync_command', '')}"
@@ -1984,36 +2081,46 @@ def main() -> int:
         f"{runtime_log_archive.get('runtime_log_archive_branch_match', '')}"
     )
     print(f"AGENT_EVALUATION_STATUS={agent_evaluation.get('evaluation_status', '')}")
-    print(f"AGENT_FEEDBACK_RESOLVED={agent_evaluation.get('feedback_actions_resolved', '')}")
+    print(
+        f"AGENT_FEEDBACK_RESOLVED={agent_evaluation.get('feedback_actions_resolved', '')}"
+    )
     print(
         "AGENT_LEARNING_CAPTURE_COMPLETE="
         f"{agent_evaluation.get('learning_capture_complete', '')}"
     )
-    print(f"REQUEST_CONTRACT_RESOLVED={request_contract.get('all_clauses_resolved', '')}")
-    print(f"FORBIDDEN_DRIFT_DETECTED={request_contract.get('forbidden_drift_detected', '')}")
+    print(
+        f"REQUEST_CONTRACT_RESOLVED={request_contract.get('all_clauses_resolved', '')}"
+    )
+    print(
+        f"FORBIDDEN_DRIFT_DETECTED={request_contract.get('forbidden_drift_detected', '')}"
+    )
     print(f"UNRESOLVED_CLAUSE_IDS={request_contract.get('unresolved_clause_ids', '')}")
     print(f"TODO_ARTIFACT_COMPLETE={'yes' if not schedule_blockers else 'no'}")
     print(f"TODO_ARTIFACT_BLOCKERS={join_blockers(schedule_blockers)}")
     print(f"WORK_LOG_COMPLETE={'yes' if not work_log_blockers else 'no'}")
     print(f"WORK_LOG_BLOCKERS={join_blockers(work_log_blockers)}")
-    print(f"FINAL_REVIEW_ARTIFACT_COMPLETE={'yes' if not final_review_blockers else 'no'}")
+    print(
+        f"FINAL_REVIEW_ARTIFACT_COMPLETE={'yes' if not final_review_blockers else 'no'}"
+    )
     print(f"FINAL_REVIEW_ARTIFACT_BLOCKERS={join_blockers(final_review_blockers)}")
     print(f"REPORT_ACTIVE_RUN={active_run or ''}")
-    print(f"REPORT_ACTIVE_RUN_MATCH={'yes' if active_run_matches(active_run, report_dir) else 'no'}")
+    print(
+        f"REPORT_ACTIVE_RUN_MATCH={'yes' if active_run_matches(active_run, report_dir) else 'no'}"
+    )
     print(
         "REPORT_ARTIFACT_PLACEMENT_CLEAN="
         f"{'yes' if not report_artifact_blockers else 'no'}"
     )
-    print(f"REPORT_ARTIFACT_PLACEMENT_BLOCKERS={join_blockers(report_artifact_blockers)}")
+    print(
+        f"REPORT_ARTIFACT_PLACEMENT_BLOCKERS={join_blockers(report_artifact_blockers)}"
+    )
     print(f"COMMIT_CREATED={closeout.get('commit_created', '')}")
     print(f"PUSH_COMPLETED={closeout.get('push_completed', '')}")
     print(f"USER_COMPLETION_REPORT={closeout.get('user_completion_report', '')}")
     print(f"CLOSEOUT_READY={'yes' if ready else 'no'}")
 
     if not ready:
-        missing = ",".join(
-            key for key, passed in closeout_checks.items() if not passed
-        )
+        missing = ",".join(key for key, passed in closeout_checks.items() if not passed)
         print(f"CLOSEOUT_BLOCKERS={missing}")
         return 1
     return 0

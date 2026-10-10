@@ -2502,8 +2502,11 @@ class DependencyModelTests(unittest.TestCase):
         """Manifest executable resolution is receipt-bound and independent of PATH."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            init_authentic_git(root)
-            prefix = root / "npm"
+            # The fake-runner receipt test must not depend on host Node/npm.
+            workspace = root / "workspace"
+            workspace.mkdir()
+            init_authentic_git(workspace)
+            prefix = workspace / "npm"
             bin_dir = prefix / "bin"
             bin_dir.mkdir(parents=True)
             target_dir = prefix / "lib"
@@ -2514,7 +2517,7 @@ class DependencyModelTests(unittest.TestCase):
                 target.write_text("#!/usr/bin/env true\n", encoding="utf-8")
                 target.chmod(0o755)
             (bin_dir / "pyright").symlink_to(target_v1)
-            manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"
+            manifest = workspace / "bootstrap" / "container" / "image" / "dependencies.toml"
             write_manifest(
                 manifest,
                 [
@@ -2533,7 +2536,24 @@ class DependencyModelTests(unittest.TestCase):
                 ],
             )
             fake = FakeRunner()
-            receipts = root / "receipts"
+            receipts = workspace / "receipts"
+            oci_root = root / "trusted" / "usr" / "local"
+            oci_bin = oci_root / "bin"
+            system_root = root / "trusted" / "usr"
+            system_bin = system_root / "bin"
+            oci_bin.mkdir(parents=True)
+            system_bin.mkdir(parents=True)
+            trusted_dirs = (str(oci_bin), str(system_bin))
+            trusted_roots = {
+                str(oci_bin): str(oci_root),
+                str(system_bin): str(system_root),
+            }
+            trusted_path = os.pathsep.join(trusted_dirs)
+
+            def trusted_which(name: str, *, path: str | None = None) -> str:
+                self.assertEqual(path, trusted_path)
+                return str(oci_bin / name)
+
             parsed = parse_record(
                 record(
                     "pyright-language-server",
@@ -2551,10 +2571,32 @@ class DependencyModelTests(unittest.TestCase):
                 index=0,
             )
             plan = build_plan((loaded_manifest(manifest, (parsed,)),))
-            with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
+            with (
+                mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_SYSTEM_BIN_DIRS",
+                    trusted_dirs,
+                ),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_TRUSTED_BIN_DIRS",
+                    trusted_dirs,
+                ),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_TRUSTED_BIN_ROOTS",
+                    trusted_roots,
+                ),
+                mock.patch.object(
+                    dependency_module.shutil,
+                    "which",
+                    side_effect=trusted_which,
+                ),
+            ):
                 Installer(fake).install(
                     plan,
-                    workspace=root,
+                    workspace=workspace,
                     receipts=receipts,
                 )
                 with mock.patch.object(
@@ -2563,7 +2605,7 @@ class DependencyModelTests(unittest.TestCase):
                     lambda: Installer(fake),
                 ):
                     resolved = dependency_module.resolve_verified_executable(
-                        root,
+                        workspace,
                         receipts,
                         "pyright-language-server",
                         "pyright",
@@ -2594,7 +2636,7 @@ class DependencyModelTests(unittest.TestCase):
                         DependencyError, "executable receipt binding is stale"
                     ):
                         dependency_module.resolve_verified_executable(
-                            root,
+                            workspace,
                             receipts,
                             "pyright-language-server",
                             "pyright",
@@ -2617,7 +2659,7 @@ class DependencyModelTests(unittest.TestCase):
                         DependencyError, "receipt path or output drift"
                     ):
                         dependency_module.resolve_verified_executable(
-                            root,
+                            workspace,
                             receipts,
                             "pyright-language-server",
                             "pyright",

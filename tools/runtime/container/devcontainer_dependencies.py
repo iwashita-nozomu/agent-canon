@@ -56,7 +56,10 @@ try:
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
     )
-    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+    from tools.runtime.artifacts.runtime_artifacts import (
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+    )
 except ImportError:  # direct script execution
     from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationReceipt,
@@ -111,25 +114,46 @@ RUSTUP_INIT_URL = (
 )
 RUSTUP_INIT_SHA256 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c"
 CANONICAL_RUST_SOURCE_FILES = (
-    "Cargo.lock", "Cargo.toml", "src/dependency_manifest.rs", "src/docs.rs",
-    "src/graph.rs", "src/jit_ir_to_lean.rs", "src/main.rs",
-    "src/migration_audit.rs", "src/python_algorithm_contract.rs",
-    "src/python_module_groups.rs", "src/python_structure_hash.rs",
-    "src/python_structure_hash_impact.rs", "src/python_structure_hash_report.rs",
-    "src/python_structure_hash_scope_plan.rs", "src/runtime_boundary.rs",
+    "Cargo.lock",
+    "Cargo.toml",
+    "src/dependency_manifest.rs",
+    "src/docs.rs",
+    "src/graph.rs",
+    "src/jit_ir_to_lean.rs",
+    "src/main.rs",
+    "src/migration_audit.rs",
+    "src/python_algorithm_contract.rs",
+    "src/python_module_groups.rs",
+    "src/python_structure_hash.rs",
+    "src/python_structure_hash_impact.rs",
+    "src/python_structure_hash_report.rs",
+    "src/python_structure_hash_scope_plan.rs",
+    "src/runtime_boundary.rs",
     "src/rust_migration_plan.rs",
-    "src/semantic_index/args.rs", "src/semantic_index/cli.rs",
-    "src/semantic_index/embedding.rs", "src/semantic_index/eval.rs",
-    "src/semantic_index/mod.rs", "src/semantic_index/model.rs",
-    "src/semantic_index/pipeline.rs", "src/semantic_index/query.rs",
-    "src/semantic_index/relations.rs", "src/semantic_index/report.rs",
-    "src/semantic_index/source.rs", "src/semantic_index/storage.rs",
-    "src/semantic_index/tests.rs", "src/structured_analysis.rs",
-    "src/test_design.rs", "src/private_feedback.rs",
+    "src/semantic_index/args.rs",
+    "src/semantic_index/cli.rs",
+    "src/semantic_index/embedding.rs",
+    "src/semantic_index/eval.rs",
+    "src/semantic_index/mod.rs",
+    "src/semantic_index/model.rs",
+    "src/semantic_index/pipeline.rs",
+    "src/semantic_index/query.rs",
+    "src/semantic_index/relations.rs",
+    "src/semantic_index/report.rs",
+    "src/semantic_index/source.rs",
+    "src/semantic_index/storage.rs",
+    "src/semantic_index/tests.rs",
+    "src/structured_analysis.rs",
+    "src/test_design.rs",
+    "src/private_feedback.rs",
     "tests/python_algorithm_contract_cli.rs",
 )
-CANONICAL_RUST_SOURCE_SHA256 = "c586f4e0688c7499aac9041b0784d61619ae0c8c4a000391aa755fc46f178183"
-CANONICAL_CARGO_LOCK_SHA256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
+CANONICAL_RUST_SOURCE_SHA256 = (
+    "c586f4e0688c7499aac9041b0784d61619ae0c8c4a000391aa755fc46f178183"
+)
+CANONICAL_CARGO_LOCK_SHA256 = (
+    "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
+)
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
 NPM_PACKAGE_RE = re.compile(r"^(?:@[a-z0-9._~-]+/[a-z0-9._~-]+|[a-z0-9._~-]+)$")
@@ -222,9 +246,7 @@ def _parent_temp_root(workspace: Path, purpose: str) -> Path:
     """Return the explicitly selected external runtime scratch directory."""
     configured = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
     if not configured:
-        raise DependencyError(
-            f"dependency-{purpose}: runtime_root_required"
-        )
+        raise DependencyError(f"dependency-{purpose}: runtime_root_required")
     source = workspace if workspace.exists() else workspace.parent
     try:
         boundary = RuntimeArtifactBoundary.for_source(
@@ -298,9 +320,7 @@ class NetworkOperation:
 
 _COMMAND_PHASES = frozenset({"image-install", "image-verify"})
 _COMMAND_OWNERS = frozenset({"image-installer", "typed-verifier"})
-_COMMAND_SHELLS = frozenset(
-    {"bash", "dash", "fish", "ksh", "sh", "tcsh", "zsh"}
-)
+_COMMAND_SHELLS = frozenset({"bash", "dash", "fish", "ksh", "sh", "tcsh", "zsh"})
 _COMMAND_INTERPRETERS = {
     "python": {"--version", "-V", "--help"},
     "python3": {"--version", "-V", "--help"},
@@ -399,7 +419,10 @@ def _command_shape_capabilities(
         if not _command_is_identity_probe(argv, executable):
             capability = (
                 CommandCapability.DYNAMIC_INTERPRETER
-                if any(item in {"-c", "-e", "-E", "-m", "-p", "--eval", "--print", "-"} for item in args)
+                if any(
+                    item in {"-c", "-e", "-E", "-m", "-p", "--eval", "--print", "-"}
+                    for item in args
+                )
                 else CommandCapability.UNKNOWN
             )
             raise _command_failure(
@@ -410,8 +433,10 @@ def _command_shape_capabilities(
             )
         capabilities.add(CommandCapability.READ_ONLY_QUERY)
         return capabilities
-    if executable in {"xargs"} or executable == "find" and any(
-        item in {"-exec", "-execdir"} for item in args
+    if (
+        executable in {"xargs"}
+        or executable == "find"
+        and any(item in {"-exec", "-execdir"} for item in args)
     ):
         raise _command_failure(
             CommandCapability.DYNAMIC_INTERPRETER,
@@ -427,19 +452,53 @@ def _command_shape_capabilities(
             context,
         )
 
-    if executable in {"apt", "apt-get", "aptitude", "pip", "pipx", "cargo", "playwright"}:
+    if executable in {
+        "apt",
+        "apt-get",
+        "aptitude",
+        "pip",
+        "pipx",
+        "cargo",
+        "playwright",
+    }:
         mutation_words = {
-            "install", "update", "upgrade", "remove", "uninstall", "purge",
-            "add", "default", "build", "fetch", "sync", "download", "init",
+            "install",
+            "update",
+            "upgrade",
+            "remove",
+            "uninstall",
+            "purge",
+            "add",
+            "default",
+            "build",
+            "fetch",
+            "sync",
+            "download",
+            "init",
         }
-        if executable == "pipx" and args[:1] == ["runpip"] and len(args) >= 4 and args[2] == "show":
+        if (
+            executable == "pipx"
+            and args[:1] == ["runpip"]
+            and len(args) >= 4
+            and args[2] == "show"
+        ):
             capabilities.add(CommandCapability.READ_ONLY_QUERY)
             return capabilities
         if executable == "cargo" and args[:1] == ["build"]:
-            capabilities.update({CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH})
+            capabilities.update(
+                {CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH}
+            )
         elif any(item in mutation_words for item in args):
             capabilities.add(CommandCapability.PACKAGE_INSTALL)
-            if executable in {"apt", "apt-get", "aptitude", "pip", "pipx", "cargo", "playwright"}:
+            if executable in {
+                "apt",
+                "apt-get",
+                "aptitude",
+                "pip",
+                "pipx",
+                "cargo",
+                "playwright",
+            }:
                 capabilities.add(CommandCapability.NETWORK_FETCH)
         else:
             raise _command_failure(
@@ -452,7 +511,9 @@ def _command_shape_capabilities(
         if args[:2] == ["ls", "--global"] and "--json" in args and "--depth=0" in args:
             capabilities.add(CommandCapability.READ_ONLY_QUERY)
         elif args and args[0] in {"install", "update", "uninstall", "exec", "publish"}:
-            capabilities.update({CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH})
+            capabilities.update(
+                {CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH}
+            )
         elif args == ["--version"]:
             capabilities.add(CommandCapability.READ_ONLY_QUERY)
         else:
@@ -467,11 +528,7 @@ def _command_shape_capabilities(
             args[:3] == ["show", "active-toolchain"]
             or args[:2] == ["toolchain", "list"]
             or args[:2] == ["component", "list"]
-            or (
-                args[:1] == ["run"]
-                and len(args) == 4
-                and args[-1] == "--version"
-            )
+            or (args[:1] == ["run"] and len(args) == 4 and args[-1] == "--version")
         ):
             capabilities.add(CommandCapability.READ_ONLY_QUERY)
         elif executable == "elan" and (
@@ -479,11 +536,15 @@ def _command_shape_capabilities(
             or (args[:1] == ["run"] and len(args) == 4 and args[-1] == "--version")
         ):
             if args[:1] == ["toolchain"] and args[1:2] not in (["list"],):
-                capabilities.update({CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH})
+                capabilities.update(
+                    {CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH}
+                )
             else:
                 capabilities.add(CommandCapability.READ_ONLY_QUERY)
         elif any(item in {"install", "uninstall", "add", "default"} for item in args):
-            capabilities.update({CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH})
+            capabilities.update(
+                {CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH}
+            )
         else:
             raise _command_failure(
                 CommandCapability.UNKNOWN,
@@ -492,14 +553,26 @@ def _command_shape_capabilities(
                 context,
             )
     elif executable == "git":
-        if args[:2] == ["-C", args[1] if len(args) > 1 else ""] and args[2:] == ["rev-parse", "--verify", "HEAD"]:
+        if args[:2] == ["-C", args[1] if len(args) > 1 else ""] and args[2:] == [
+            "rev-parse",
+            "--verify",
+            "HEAD",
+        ]:
             capabilities.add(CommandCapability.READ_ONLY_QUERY)
         elif args == ["--version"]:
             capabilities.add(CommandCapability.READ_ONLY_QUERY)
-        elif any(item in {"clone", "fetch", "pull", "push", "checkout", "reset"} for item in args):
+        elif any(
+            item in {"clone", "fetch", "pull", "push", "checkout", "reset"}
+            for item in args
+        ):
             capabilities.add(CommandCapability.PACKAGE_INSTALL)
         else:
-            raise _command_failure(CommandCapability.UNKNOWN, "git command shape is not owner-declared", argv, context)
+            raise _command_failure(
+                CommandCapability.UNKNOWN,
+                "git command shape is not owner-declared",
+                argv,
+                context,
+            )
     elif executable == "dpkg-query":
         if args[:1] in (["--show"], ["--listfiles"]):
             capabilities.add(CommandCapability.READ_ONLY_QUERY)
@@ -522,7 +595,17 @@ def _command_shape_capabilities(
             capabilities.add(CommandCapability.NETWORK_FETCH)
     elif executable == "install":
         capabilities.add(CommandCapability.PACKAGE_INSTALL)
-    elif executable in {"id", "mktemp", "cat", "rm", "command", "printf", "test", "source", "cd"}:
+    elif executable in {
+        "id",
+        "mktemp",
+        "cat",
+        "rm",
+        "command",
+        "printf",
+        "test",
+        "source",
+        "cd",
+    }:
         capabilities.add(CommandCapability.READ_ONLY_QUERY)
     else:
         capabilities.add(CommandCapability.EXECUTABLE_VERIFICATION)
@@ -534,43 +617,111 @@ def classify_command(
     argv: Sequence[str], *, context: CommandProvenance
 ) -> frozenset[CommandCapability]:
     """Validate and classify one complete command graph under its owner phase."""
-    if context.phase not in _COMMAND_PHASES or context.owner not in _COMMAND_OWNERS or not context.operation:
-        raise _command_failure(CommandCapability.UNKNOWN, "invalid command provenance", argv, context)
+    if (
+        context.phase not in _COMMAND_PHASES
+        or context.owner not in _COMMAND_OWNERS
+        or not context.operation
+    ):
+        raise _command_failure(
+            CommandCapability.UNKNOWN, "invalid command provenance", argv, context
+        )
     if context.phase == "image-install" and context.owner != "image-installer":
-        raise _command_failure(CommandCapability.UNKNOWN, "image-install requires image-installer ownership", argv, context)
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "image-install requires image-installer ownership",
+            argv,
+            context,
+        )
     if context.phase == "image-verify" and context.owner != "typed-verifier":
-        raise _command_failure(CommandCapability.UNKNOWN, "image-verify requires typed-verifier ownership", argv, context)
-    if context.method is not None and context.method not in {item.value for item in Method}:
-        raise _command_failure(CommandCapability.UNKNOWN, "method is not a closed dependency method", argv, context)
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "image-verify requires typed-verifier ownership",
+            argv,
+            context,
+        )
+    if context.method is not None and context.method not in {
+        item.value for item in Method
+    }:
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "method is not a closed dependency method",
+            argv,
+            context,
+        )
     expected_methods = _COMMAND_OPERATION_METHODS.get(context.operation)
     if expected_methods is not None and context.method not in expected_methods:
-        raise _command_failure(CommandCapability.UNKNOWN, "operation and method provenance disagree", argv, context)
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "operation and method provenance disagree",
+            argv,
+            context,
+        )
     if context.phase == "image-verify" and not context.operation.startswith("verify-"):
-        raise _command_failure(CommandCapability.UNKNOWN, "image verification operation is not a verifier operation", argv, context)
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "image verification operation is not a verifier operation",
+            argv,
+            context,
+        )
     if context.phase == "image-install" and not (
-        context.operation.startswith("install-") or context.operation.startswith("verify-")
+        context.operation.startswith("install-")
+        or context.operation.startswith("verify-")
     ):
-        raise _command_failure(CommandCapability.UNKNOWN, "image install operation is not owner-declared", argv, context)
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "image install operation is not owner-declared",
+            argv,
+            context,
+        )
     if not hasattr(argv, "__iter__") or type(argv) in (str, bytes) or not argv:
-        raise _command_failure(CommandCapability.UNKNOWN, "argv must be a non-empty string sequence", (), context)
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "argv must be a non-empty string sequence",
+            (),
+            context,
+        )
     normalized = tuple(argv)
     if any(type(item) is not str or not item for item in normalized):
-        raise _command_failure(CommandCapability.UNKNOWN, "argv contains an empty or non-string token", normalized, context)
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "argv contains an empty or non-string token",
+            normalized,
+            context,
+        )
     if any(CONTROL_RE.search(item) for item in normalized):
-        raise _command_failure(CommandCapability.UNKNOWN, "argv contains an empty or control-character token", normalized, context)
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "argv contains an empty or control-character token",
+            normalized,
+            context,
+        )
 
     # Unwrap only the finite env grammar.  env -S and an absent target would
     # require a second parser and therefore fail closed.
     if _command_basename(normalized[0]) == "env":
         index = 1
-        while index < len(normalized) and "=" in normalized[index] and not normalized[index].startswith("-"):
+        while (
+            index < len(normalized)
+            and "=" in normalized[index]
+            and not normalized[index].startswith("-")
+        ):
             index += 1
         if index >= len(normalized) or normalized[index] == "-S":
-            raise _command_failure(CommandCapability.UNKNOWN, "env child selection is dynamic", normalized, context)
+            raise _command_failure(
+                CommandCapability.UNKNOWN,
+                "env child selection is dynamic",
+                normalized,
+                context,
+            )
         if normalized[index] == "--":
             index += 1
         if index >= len(normalized):
-            raise _command_failure(CommandCapability.UNKNOWN, "env has no command target", normalized, context)
+            raise _command_failure(
+                CommandCapability.UNKNOWN,
+                "env has no command target",
+                normalized,
+                context,
+            )
         nested = classify_command(normalized[index:], context=context)
         capabilities = set(nested)
     else:
@@ -600,22 +751,42 @@ def classify_command(
                 )
                 if item in denied
             )
-            raise _command_failure(capability, f"{capability.value} is not allowed in {context.phase}", normalized, context)
-    elif CommandCapability.SHELL_EVALUATION in capabilities or CommandCapability.DYNAMIC_INTERPRETER in capabilities or CommandCapability.UNKNOWN in capabilities:
+            raise _command_failure(
+                capability,
+                f"{capability.value} is not allowed in {context.phase}",
+                normalized,
+                context,
+            )
+    elif (
+        CommandCapability.SHELL_EVALUATION in capabilities
+        or CommandCapability.DYNAMIC_INTERPRETER in capabilities
+        or CommandCapability.UNKNOWN in capabilities
+    ):
         capability = next(
-            item for item in (
+            item
+            for item in (
                 CommandCapability.SHELL_EVALUATION,
                 CommandCapability.DYNAMIC_INTERPRETER,
                 CommandCapability.UNKNOWN,
-            ) if item in capabilities
+            )
+            if item in capabilities
         )
-        raise _command_failure(capability, f"{capability.value} is not allowed in image-install", normalized, context)
+        raise _command_failure(
+            capability,
+            f"{capability.value} is not allowed in image-install",
+            normalized,
+            context,
+        )
     return frozenset(capabilities)
 
 
-def check_python_source_safety(source: str | Path) -> tuple[CommandBoundaryFinding, ...]:
+def check_python_source_safety(
+    source: str | Path,
+) -> tuple[CommandBoundaryFinding, ...]:
     """Find unsafe Python subprocess/eval structure without lexical matching."""
-    text = Path(source).read_text(encoding="utf-8") if isinstance(source, Path) else source
+    text = (
+        Path(source).read_text(encoding="utf-8") if isinstance(source, Path) else source
+    )
     try:
         tree = ast.parse(text)
     except SyntaxError as exc:
@@ -636,18 +807,41 @@ def check_python_source_safety(source: str | Path) -> tuple[CommandBoundaryFindi
         if not isinstance(node, ast.Call):
             continue
         process_call = False
-        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
-            process_call = node.func.value.id in subprocess_aliases and node.func.attr in {
-                "run", "Popen", "call", "check_call", "check_output"
-            }
+        if isinstance(node.func, ast.Attribute) and isinstance(
+            node.func.value, ast.Name
+        ):
+            process_call = (
+                node.func.value.id in subprocess_aliases
+                and node.func.attr
+                in {"run", "Popen", "call", "check_call", "check_output"}
+            )
         elif isinstance(node.func, ast.Name):
             process_call = node.func.id in process_functions
         if process_call:
-            shell = next((keyword.value for keyword in node.keywords if keyword.arg == "shell"), None)
-            if shell is not None and not (isinstance(shell, ast.Constant) and shell.value is False):
-                findings.append(CommandBoundaryFinding(CommandCapability.SHELL_EVALUATION, "subprocess shell value is not literal False", (), "image-install"))
+            shell = next(
+                (keyword.value for keyword in node.keywords if keyword.arg == "shell"),
+                None,
+            )
+            if shell is not None and not (
+                isinstance(shell, ast.Constant) and shell.value is False
+            ):
+                findings.append(
+                    CommandBoundaryFinding(
+                        CommandCapability.SHELL_EVALUATION,
+                        "subprocess shell value is not literal False",
+                        (),
+                        "image-install",
+                    )
+                )
         if isinstance(node.func, ast.Name) and node.func.id == "eval":
-            findings.append(CommandBoundaryFinding(CommandCapability.DYNAMIC_INTERPRETER, "direct builtin eval call", (), "image-install"))
+            findings.append(
+                CommandBoundaryFinding(
+                    CommandCapability.DYNAMIC_INTERPRETER,
+                    "direct builtin eval call",
+                    (),
+                    "image-install",
+                )
+            )
     return tuple(findings)
 
 
@@ -754,9 +948,7 @@ def parse_python_extras(raw: str | Sequence[str]) -> tuple[str, ...]:
     return tuple(extras)
 
 
-def validate_project_extras(
-    workspace: Path, extras: Sequence[str]
-) -> tuple[str, ...]:
+def validate_project_extras(workspace: Path, extras: Sequence[str]) -> tuple[str, ...]:
     """Validate requested extras against ``project.optional-dependencies``."""
     validated = parse_python_extras(extras)
     pyproject = workspace / "pyproject.toml"
@@ -766,19 +958,23 @@ def validate_project_extras(
         with pyproject.open("rb") as stream:
             document = tomllib.load(stream)
     except (OSError, tomllib.TOMLDecodeError) as exc:
-        raise DependencyError(f"cannot parse project packaging manifest: {pyproject}") from exc
-    project = document.get("project") if isinstance(document, dict) else None
-    optional = project.get("optional-dependencies") if isinstance(project, dict) else None
-    if not isinstance(optional, dict):
         raise DependencyError(
-            f"project.optional-dependencies is missing: {pyproject}"
-        )
+            f"cannot parse project packaging manifest: {pyproject}"
+        ) from exc
+    project = document.get("project") if isinstance(document, dict) else None
+    optional = (
+        project.get("optional-dependencies") if isinstance(project, dict) else None
+    )
+    if not isinstance(optional, dict):
+        raise DependencyError(f"project.optional-dependencies is missing: {pyproject}")
     available = {
         canonicalize_name(name)
         for name in optional
         if isinstance(name, str) and PYTHON_EXTRA_RE.fullmatch(name)
     }
-    missing = [extra for extra in validated if canonicalize_name(extra) not in available]
+    missing = [
+        extra for extra in validated if canonicalize_name(extra) not in available
+    ]
     if missing:
         raise DependencyError(
             "project extras are not declared in pyproject.toml: " + ", ".join(missing)
@@ -826,7 +1022,9 @@ def read_runtime_identity(
             if separator and name in {"ID", "VERSION_ID"}:
                 values[name] = raw_value.strip().strip('"').strip("'")
     except OSError as exc:
-        raise DependencyError(f"runtime identity cannot read {os_release}: {exc}") from exc
+        raise DependencyError(
+            f"runtime identity cannot read {os_release}: {exc}"
+        ) from exc
     os_id = values.get("ID", "")
     version_id = values.get("VERSION_ID", "")
     machine_name = (machine or platform.machine()).lower()
@@ -1581,12 +1779,11 @@ def _validate_method_values(record: DependencyRecord) -> None:
         if record.method is Method.APT_REPOSITORY:
             _validate_https_url(record.source, f"{record.id}.source")
             if record.repository_suite is None:
-                raise DependencyError(
-                    f"{record.id}.repository_suite must be declared"
-                )
-            if re.fullmatch(
-                r"[A-Za-z0-9][A-Za-z0-9.+_-]*", record.repository_suite
-            ) is None:
+                raise DependencyError(f"{record.id}.repository_suite must be declared")
+            if (
+                re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+_-]*", record.repository_suite)
+                is None
+            ):
                 raise DependencyError(
                     f"{record.id}.repository_suite has an unsupported value"
                 )
@@ -1595,9 +1792,7 @@ def _validate_method_values(record: DependencyRecord) -> None:
                     f"{record.id}.repository_components must not be empty"
                 )
             for component in record.repository_components:
-                if re.fullmatch(
-                    r"[A-Za-z0-9][A-Za-z0-9.+_-]*", component
-                ) is None:
+                if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+_-]*", component) is None:
                     raise DependencyError(
                         f"{record.id}.repository_components has an unsupported value"
                     )
@@ -1624,12 +1819,17 @@ def _validate_method_values(record: DependencyRecord) -> None:
                         raise DependencyError(
                             f"{record.id}.{field_name} has unsupported architecture: {architecture_name}"
                         )
-                    if field_name != "repository_package_urls" and SHA256_RE.fullmatch(value) is None:
+                    if (
+                        field_name != "repository_package_urls"
+                        and SHA256_RE.fullmatch(value) is None
+                    ):
                         raise DependencyError(
                             f"{record.id}.{field_name}[{architecture_name}] must be a 64-character SHA256"
                         )
                     if field_name == "repository_package_urls":
-                        _validate_https_url(value, f"{record.id}.{field_name}[{architecture_name}]")
+                        _validate_https_url(
+                            value, f"{record.id}.{field_name}[{architecture_name}]"
+                        )
                         if not value.lower().endswith(".deb"):
                             raise DependencyError(
                                 f"{record.id}.{field_name}[{architecture_name}] must name a .deb artifact"
@@ -1640,9 +1840,12 @@ def _validate_method_values(record: DependencyRecord) -> None:
                 raise DependencyError(
                     f"{record.id}: repository package URL/checksum architecture maps differ"
                 )
-            if record.platforms and package_url_arches and {
-                value.split("/", 1)[1] for value in record.platforms
-            } != package_url_arches:
+            if (
+                record.platforms
+                and package_url_arches
+                and {value.split("/", 1)[1] for value in record.platforms}
+                != package_url_arches
+            ):
                 raise DependencyError(
                     f"{record.id}: repository package map does not cover declared platforms"
                 )
@@ -1749,11 +1952,24 @@ def _validate_method_values(record: DependencyRecord) -> None:
                 f"{record.id}.source_identity must be one of active-source or canonical-snapshot"
             )
         if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
-            if record.source_tree_sha256 is not None and SHA256_RE.fullmatch(record.source_tree_sha256) is None:
-                raise DependencyError(f"{record.id}.source_tree_sha256 must be a SHA256 when declared")
-            if record.cargo_lock_sha256 is None or SHA256_RE.fullmatch(record.cargo_lock_sha256) is None:
-                raise DependencyError(f"{record.id}.cargo_lock_sha256 is required for canonical-snapshot")
-        elif record.source_tree_sha256 is not None or record.cargo_lock_sha256 is not None:
+            if (
+                record.source_tree_sha256 is not None
+                and SHA256_RE.fullmatch(record.source_tree_sha256) is None
+            ):
+                raise DependencyError(
+                    f"{record.id}.source_tree_sha256 must be a SHA256 when declared"
+                )
+            if (
+                record.cargo_lock_sha256 is None
+                or SHA256_RE.fullmatch(record.cargo_lock_sha256) is None
+            ):
+                raise DependencyError(
+                    f"{record.id}.cargo_lock_sha256 is required for canonical-snapshot"
+                )
+        elif (
+            record.source_tree_sha256 is not None
+            or record.cargo_lock_sha256 is not None
+        ):
             raise DependencyError(
                 f"{record.id}: source snapshot digests require canonical-snapshot"
             )
@@ -2079,7 +2295,9 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
         for field in ("uid", "gid"):
             value = container.get(field)
             if type(value) is not int or value <= 0:
-                raise DependencyError(f"{path}: container.{field} must be a positive integer")
+                raise DependencyError(
+                    f"{path}: container.{field} must be a positive integer"
+                )
     records = raw.get("records")
     if not isinstance(records, list):
         raise DependencyError(f"{path}: records must be an array of tables")
@@ -2131,7 +2349,9 @@ def manifest_sources(
         if not explicit.is_file():
             raise DependencyError(f"manifest not found: {explicit}")
         return (ManifestSource(explicit, ManifestRole.CANONICAL),)
-    bootstrap_path = workspace / "bootstrap" / "container" / "image" / "dependencies.toml"
+    bootstrap_path = (
+        workspace / "bootstrap" / "container" / "image" / "dependencies.toml"
+    )
     return (
         (ManifestSource(bootstrap_path, ManifestRole.CANONICAL),)
         if bootstrap_path.is_file()
@@ -2430,8 +2650,7 @@ def _image_plan_payload(
         "order": list(selected),
         "records": [by_id[record_id].payload() for record_id in selected],
         "provider_closure": [
-            [record_id, list(plan.providers_for(record_id))]
-            for record_id in selected
+            [record_id, list(plan.providers_for(record_id))] for record_id in selected
         ],
         "receipts": [f"receipts/{record_id}.json" for record_id in selected],
     }
@@ -2530,9 +2749,7 @@ def _validate_image_parent_chain(
             )
 
 
-def _freeze_image_tree(
-    staging: Path, *, owner_uid: int, owner_gid: int
-) -> None:
+def _freeze_image_tree(staging: Path, *, owner_uid: int, owner_gid: int) -> None:
     """Freeze every staging node to the immutable image ownership contract."""
     pending = [staging]
     nodes: list[tuple[Path, os.stat_result]] = []
@@ -2552,7 +2769,9 @@ def _freeze_image_tree(
     for path, observed in sorted(
         nodes, key=lambda item: len(item[0].parts), reverse=True
     ):
-        mode = IMAGE_DIRECTORY_MODE if stat.S_ISDIR(observed.st_mode) else IMAGE_FILE_MODE
+        mode = (
+            IMAGE_DIRECTORY_MODE if stat.S_ISDIR(observed.st_mode) else IMAGE_FILE_MODE
+        )
         try:
             os.chown(path, owner_uid, owner_gid)
             os.chmod(path, mode)
@@ -2572,7 +2791,9 @@ def _assert_frozen_image_node(
 ) -> None:
     """Require one exact regular, owned, non-writable image node."""
     observed = _lstat_image_path(path, description=description)
-    expected_kind = stat.S_ISDIR(observed.st_mode) if directory else stat.S_ISREG(observed.st_mode)
+    expected_kind = (
+        stat.S_ISDIR(observed.st_mode) if directory else stat.S_ISREG(observed.st_mode)
+    )
     expected_mode = IMAGE_DIRECTORY_MODE if directory else IMAGE_FILE_MODE
     if not expected_kind:
         raise DependencyError(f"{description} has the wrong type: {path}")
@@ -2717,9 +2938,7 @@ def image_install_plan(
             receipts=receipts,
             records=selected_ids,
             final_binary_dir=(
-                (final_binary_dir or Path("/usr/local/bin"))
-                if production
-                else None
+                (final_binary_dir or Path("/usr/local/bin")) if production else None
             ),
         )
         expected = set(selected_ids)
@@ -2741,7 +2960,9 @@ def image_install_plan(
         if {path.name for path in staging.iterdir()} != {"receipts"}:
             raise DependencyError("image-install staging contents are unexpected")
         (staging / "plan.json").write_text(
-            json.dumps(_image_plan_payload(plan, selected_ids), indent=2, sort_keys=True)
+            json.dumps(
+                _image_plan_payload(plan, selected_ids), indent=2, sort_keys=True
+            )
             + "\n",
             encoding="utf-8",
         )
@@ -2780,7 +3001,9 @@ def image_verify_plan(
         )
         payload = json.loads(plan_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise DependencyError(f"image-verify rebuild-required: unreadable plan: {exc}") from exc
+        raise DependencyError(
+            f"image-verify rebuild-required: unreadable plan: {exc}"
+        ) from exc
     if (
         not isinstance(payload, dict)
         or plan_path.is_symlink()
@@ -2789,16 +3012,16 @@ def image_verify_plan(
         raise DependencyError("image-verify rebuild-required: image plan is malformed")
     requested = payload.get("order") if records is None else records
     if requested is None or not isinstance(requested, (str, Sequence)):
-        raise DependencyError("image-verify rebuild-required: image selection is malformed")
+        raise DependencyError(
+            "image-verify rebuild-required: image selection is malformed"
+        )
     try:
         selected_ids = select_record_ids(plan, requested)
     except DependencyError as exc:
         raise DependencyError(
             f"image-verify rebuild-required: image selection is invalid: {exc}"
         ) from exc
-    expected_plan = json.loads(
-        canonical_json(_image_plan_payload(plan, selected_ids))
-    )
+    expected_plan = json.loads(canonical_json(_image_plan_payload(plan, selected_ids)))
     if payload != expected_plan:
         raise DependencyError("image-verify rebuild-required: image plan mismatch")
     # Re-check the exact receipt set after the stored order has been read.
@@ -2915,6 +3138,7 @@ class EnvironmentBoundaryModel:
                 "bootstrap-runtime",
                 executable=executable,
             )
+
     def validate(self) -> EnvironmentBoundaryReport:
         """Validate typed ownership coverage without running project commands."""
         findings: list[BoundaryFinding] = []
@@ -2936,7 +3160,12 @@ def architecture() -> str:
 def platform_architecture() -> str:
     """Return the OCI architecture key used by architecture maps."""
     value = platform.machine().lower()
-    normalized = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(value, value)
+    normalized = {
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+    }.get(value, value)
     if normalized not in {"amd64", "arm64"}:
         raise DependencyError(f"unsupported target architecture: {normalized}")
     return normalized
@@ -2994,11 +3223,16 @@ def _executable_binding_names(
             for name in record.provides
             if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name)
         )
-        if record.verification.executable and record.verification.executable not in names:
+        if (
+            record.verification.executable
+            and record.verification.executable not in names
+        ):
             names = (record.verification.executable, *names)
         return tuple(dict.fromkeys(names))
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
-        return (record.verification.executable,) if record.verification.executable else ()
+        return (
+            (record.verification.executable,) if record.verification.executable else ()
+        )
     if record.method is Method.RUST_TOOLCHAIN:
         names = ("cargo",) if image_owned and "cargo" in record.provides else ()
         if image_owned and record.verification.executable:
@@ -3068,7 +3302,12 @@ def _parse_dpkg_owned_paths(output: str, record_id: str) -> frozenset[str]:
     """Parse normalized absolute paths from one package ownership listing."""
     paths: set[str] = set()
     for line in output.splitlines():
-        if not line or "\x00" in line or line.startswith("//") or not line.startswith("/"):
+        if (
+            not line
+            or "\x00" in line
+            or line.startswith("//")
+            or not line.startswith("/")
+        ):
             raise DependencyError(
                 f"{record_id}: dpkg ownership output contains an unsafe path"
             )
@@ -3115,7 +3354,9 @@ class Installer:
         self.runner = runner or SubprocessRunner()
         self._parent_attestation: ParentRootAttestationReceipt | None = None
         self._image_owned = image_owned
-        self._image_owned_root = image_owned_root.resolve() if image_owned_root else None
+        self._image_owned_root = (
+            image_owned_root.resolve() if image_owned_root else None
+        )
         self._install_workspace: Path | None = None
         self._active_record: DependencyRecord | None = None
         self._active_phase = "image-install"
@@ -3294,9 +3535,8 @@ class Installer:
                 raise DependencyError(
                     f"{record.id}: lexical executable target cannot be resolved: {lexical}"
                 ) from resolver_exc
-        if (
-            not resolved.is_absolute()
-            or str(resolved) != os.path.normpath(str(resolved))
+        if not resolved.is_absolute() or str(resolved) != os.path.normpath(
+            str(resolved)
         ):
             raise DependencyError(
                 f"{record.id}: resolved executable path is not normalized absolute: {resolved}"
@@ -3381,7 +3621,9 @@ class Installer:
         source = self._cargo_source(record, workspace)
         binary = self._cargo_binary_path(record, source=source)
         if not binary.is_file() or not os.access(binary, os.X_OK):
-            raise DependencyError(f"{record.id}: Cargo build binary is missing: {binary}")
+            raise DependencyError(
+                f"{record.id}: Cargo build binary is missing: {binary}"
+            )
         name = Path(record.verification.path or "").name
         if not name or name in {".", ".."}:
             raise DependencyError(f"{record.id}: final binary name is unsafe")
@@ -3415,10 +3657,18 @@ class Installer:
             or not isinstance(digest, str)
             or not SHA256_RE.fullmatch(digest)
         ):
-            raise DependencyError(f"{record.id}: final binary receipt binding is malformed")
+            raise DependencyError(
+                f"{record.id}: final binary receipt binding is malformed"
+            )
         final_binary = Path(final_value)
-        if final_binary.is_symlink() or not final_binary.is_file() or not os.access(final_binary, os.X_OK):
-            raise DependencyError(f"{record.id}: final image binary is missing: {final_binary}")
+        if (
+            final_binary.is_symlink()
+            or not final_binary.is_file()
+            or not os.access(final_binary, os.X_OK)
+        ):
+            raise DependencyError(
+                f"{record.id}: final image binary is missing: {final_binary}"
+            )
         observed = hashlib.sha256(final_binary.read_bytes()).hexdigest()
         if observed != digest:
             raise DependencyError(
@@ -3472,10 +3722,15 @@ class Installer:
             receipts.mkdir(parents=True, exist_ok=True)
             self._parent_attestation = None
         else:
-            self._parent_attestation = _parent_attestation(workspace, "dependency-install")
+            self._parent_attestation = _parent_attestation(
+                workspace, "dependency-install"
+            )
             try:
                 receipts = resolve_parent_owned_path(
-                    self._parent_attestation, receipts, "dependency-receipts", create=False
+                    self._parent_attestation,
+                    receipts,
+                    "dependency-receipts",
+                    create=False,
                 ).physical_path
             except ParentRootSideEffectError as exc:
                 raise DependencyError(
@@ -3490,11 +3745,15 @@ class Installer:
         unknown = sorted(set(order) - set(by_id))
         if unknown:
             raise DependencyError(
-                "selected dependency records are not in the plan: "
-                + ", ".join(unknown)
+                "selected dependency records are not in the plan: " + ", ".join(unknown)
             )
-        if self._image_owned and final_binary_dir is None and any(
-            by_id[record_id].method is Method.CARGO_SOURCE_BUILD for record_id in order
+        if (
+            self._image_owned
+            and final_binary_dir is None
+            and any(
+                by_id[record_id].method is Method.CARGO_SOURCE_BUILD
+                for record_id in order
+            )
         ):
             raise DependencyError(
                 "image-owned Cargo install requires a final binary directory"
@@ -3633,7 +3892,9 @@ class Installer:
         if not isinstance(bindings, dict):
             return False
         expected_bindings = set(
-            _executable_binding_names(record, image_owned=payload.get("status") == "installed")
+            _executable_binding_names(
+                record, image_owned=payload.get("status") == "installed"
+            )
         )
         if set(bindings) != expected_bindings or any(
             not isinstance(value, dict)
@@ -3662,8 +3923,7 @@ class Installer:
             and set(bindings) == expected_bindings
             and payload.get("repository_packages")
             == _repository_packages_payload(record)
-            and payload.get("repository_package")
-            == _repository_package_payload(record)
+            and payload.get("repository_package") == _repository_package_payload(record)
             and (
                 record.source_tree_sha256 is None
                 or payload.get("source_tree_sha256") == record.source_tree_sha256
@@ -3742,12 +4002,12 @@ class Installer:
         bindings = payload.get("executable_bindings")
         expected_names = _executable_binding_names(record, image_owned=True)
         if not isinstance(bindings, dict) or set(bindings) != set(expected_names):
-            raise DependencyError(f"{record.id}: installed executable bindings are stale")
+            raise DependencyError(
+                f"{record.id}: installed executable bindings are stale"
+            )
         for name in expected_names:
             binding = bindings[name]
-            expected_path = _configured_executable_path(
-                record, name, image_owned=True
-            )
+            expected_path = _configured_executable_path(record, name, image_owned=True)
             if (
                 not isinstance(binding, dict)
                 or binding.get("provided") != name
@@ -3766,12 +4026,16 @@ class Installer:
         elif spec.executable is not None:
             binding = bindings.get(spec.executable)
             if not isinstance(binding, dict):
-                raise DependencyError(f"{record.id}: installed executable binding is missing")
+                raise DependencyError(
+                    f"{record.id}: installed executable binding is missing"
+                )
             absolute = binding.get("absolute_path")
         else:
             return None
         if not isinstance(absolute, str) or not Path(absolute).is_absolute():
-            raise DependencyError(f"{record.id}: installed executable binding is invalid")
+            raise DependencyError(
+                f"{record.id}: installed executable binding is invalid"
+            )
         result = self._capture(
             [absolute, *spec.args],
             workspace=workspace,
@@ -3806,7 +4070,9 @@ class Installer:
         """Normalize live executable output for atomic receipt identity."""
         output = f"{result.stdout}\n{result.stderr}".strip()
         if not output:
-            raise DependencyError(f"{record_id}: executable verification output is empty")
+            raise DependencyError(
+                f"{record_id}: executable verification output is empty"
+            )
         return output
 
     @staticmethod
@@ -3847,8 +4113,7 @@ class Installer:
             "verification": record.verification.payload(),
             "source_identity": source_identity,
             "executable_bindings": {
-                key: dict(value)
-                for key, value in (executable_bindings or {}).items()
+                key: dict(value) for key, value in (executable_bindings or {}).items()
             },
         }
         repository_packages = _repository_packages_payload(record)
@@ -3857,7 +4122,10 @@ class Installer:
         repository_package = _repository_package_payload(record)
         if repository_package is not None:
             payload["repository_package"] = repository_package
-        if record.method is Method.CARGO_SOURCE_BUILD and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+        if (
+            record.method is Method.CARGO_SOURCE_BUILD
+            and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY
+        ):
             source = self._cargo_source(
                 record,
                 self._install_workspace
@@ -3883,12 +4151,12 @@ class Installer:
             )
             if final_binary_path is not None:
                 payload["build_binary_path"] = str(binary)
-        content = (json.dumps(payload, sort_keys=True, indent=2) + "\n").encode(
-            "utf-8"
-        )
+        content = (json.dumps(payload, sort_keys=True, indent=2) + "\n").encode("utf-8")
         if self._image_owned:
             if self._image_owned_root is None:
-                raise DependencyError("image-owned receipt publication lacks an image root")
+                raise DependencyError(
+                    "image-owned receipt publication lacks an image root"
+                )
             try:
                 path = path.resolve()
                 path.relative_to(self._image_owned_root)
@@ -3983,23 +4251,28 @@ class Installer:
         )
         rustup_home = merged.get(
             "RUSTUP_HOME",
-            str(home / ".rustup") if home_is_parent_owned
+            str(home / ".rustup")
+            if home_is_parent_owned
             else str(parent_root / ".agent-canon" / "rustup-home")
             if parent_root is not None
             else str(home / ".rustup"),
         )
         elan_home = merged.get(
             "ELAN_HOME",
-            str(home / ".elan") if home_is_parent_owned
+            str(home / ".elan")
+            if home_is_parent_owned
             else str(parent_root / ".agent-canon" / "elan-home")
             if parent_root is not None
             else str(home / ".elan"),
         )
         path_entries = list(filter(None, merged.get("PATH", "").split(os.pathsep)))
         tool_paths = (
-            str(home / ".cargo" / "bin") if home_is_parent_owned else f"{cargo_home}/bin",
+            str(home / ".cargo" / "bin")
+            if home_is_parent_owned
+            else f"{cargo_home}/bin",
             f"{elan_home}/bin",
-            str(home / ".local" / "bin") if home_is_parent_owned
+            str(home / ".local" / "bin")
+            if home_is_parent_owned
             else str(parent_root / ".agent-canon" / "local-bin")
             if parent_root is not None
             else str(home / ".local" / "bin"),
@@ -4297,17 +4570,23 @@ class Installer:
                     f"{source_identity}!={expected_source_identity}"
                 )
         verifiers = {
-            VerificationKind.APT_PACKAGE: lambda item, *, workspace: self._verify_apt_package(
-                item, workspace=workspace, strict_executable=strict_executables
+            VerificationKind.APT_PACKAGE: lambda item, *, workspace: (
+                self._verify_apt_package(
+                    item, workspace=workspace, strict_executable=strict_executables
+                )
             ),
-            VerificationKind.APT_REPOSITORY: lambda item, *, workspace: self._verify_apt_repository(
-                item,
-                workspace=workspace,
-                strict_executable=strict_executables,
-                allow_network=allow_network,
+            VerificationKind.APT_REPOSITORY: lambda item, *, workspace: (
+                self._verify_apt_repository(
+                    item,
+                    workspace=workspace,
+                    strict_executable=strict_executables,
+                    allow_network=allow_network,
+                )
             ),
-            VerificationKind.NPM_PACKAGE: lambda item, *, workspace: self._verify_npm_package(
-                item, workspace=workspace, strict_executable=strict_executables
+            VerificationKind.NPM_PACKAGE: lambda item, *, workspace: (
+                self._verify_npm_package(
+                    item, workspace=workspace, strict_executable=strict_executables
+                )
             ),
             VerificationKind.PIPX_PACKAGE: self._verify_pipx_package,
             VerificationKind.ABSOLUTE_EXECUTABLE: self._verify_absolute_executable,
@@ -4673,7 +4952,10 @@ class Installer:
                 workspace=workspace,
             )
             if tool == "rust-analyzer":
-                self._require_output(result, f"rust-analyzer {record.version}", record.id)
+                self._require_output(
+                    result, f"rust-analyzer {record.version}", record.id
+                )
+
     @staticmethod
     def _rust_toolchain_matches(line: str, version: str) -> bool:
         """Match rustup's optional host-triple suffix for one exact version."""
@@ -4700,7 +4982,9 @@ class Installer:
     def _cargo_source(self, record: DependencyRecord, workspace: Path) -> Path:
         workspace_root = workspace.resolve()
         source = (workspace_root / record.source).resolve()
-        if os.path.commonpath((str(workspace_root), str(source))) != str(workspace_root):
+        if os.path.commonpath((str(workspace_root), str(source))) != str(
+            workspace_root
+        ):
             raise DependencyError(f"{record.id}: cargo source escapes workspace")
         if not source.is_dir():
             raise DependencyError(f"{record.id}: cargo source is missing: {source}")
@@ -4713,11 +4997,14 @@ class Installer:
         for relative in CANONICAL_RUST_SOURCE_FILES:
             path = source / relative
             if path.is_symlink() or not path.is_file():
-                raise DependencyError(f"cargo source snapshot file is missing: {relative}")
+                raise DependencyError(
+                    f"cargo source snapshot file is missing: {relative}"
+                )
         actual = {
             path.relative_to(source).as_posix()
             for path in source.rglob("*")
-            if path.is_file() and not path.is_symlink()
+            if path.is_file()
+            and not path.is_symlink()
             and "target" not in path.relative_to(source).parts
             and ".git" not in path.relative_to(source).parts
         }
@@ -4743,9 +5030,9 @@ class Installer:
         source = self._cargo_source(record, workspace)
         source_digest, lock_digest = self._cargo_snapshot(source)
         if (
-            (record.source_tree_sha256 is not None and source_digest != record.source_tree_sha256)
-            or lock_digest != record.cargo_lock_sha256
-        ):
+            record.source_tree_sha256 is not None
+            and source_digest != record.source_tree_sha256
+        ) or lock_digest != record.cargo_lock_sha256:
             raise DependencyError(
                 f"{record.id}: immutable source snapshot mismatch "
                 f"{source_digest}!={record.source_tree_sha256} or "
@@ -5036,9 +5323,13 @@ class Installer:
                         f"{record.id}: extracted destination not found"
                     )
                 candidate = matches[0]
-            self._run_install_file(candidate, Path(record.destination), workspace=workspace)
+            self._run_install_file(
+                candidate, Path(record.destination), workspace=workspace
+            )
 
-    def _run_install_file(self, source: Path, destination: Path, *, workspace: Path) -> None:
+    def _run_install_file(
+        self, source: Path, destination: Path, *, workspace: Path
+    ) -> None:
         self._run_command(
             ["install", "-D", "-m", "0755", str(source), str(destination)],
             self._command_provenance(
@@ -5095,7 +5386,9 @@ def _repository_packages_url(record: DependencyRecord) -> str:
     elif record.platform is None:
         raise DependencyError(f"{record.id}: Packages index URL requires platform")
     if record.repository_suite is None:
-        raise DependencyError(f"{record.id}: Packages index URL requires repository suite")
+        raise DependencyError(
+            f"{record.id}: Packages index URL requires repository suite"
+        )
     if len(record.repository_components) != 1:
         raise DependencyError(
             f"{record.id}: Packages index URL requires exactly one repository component"
@@ -5171,7 +5464,9 @@ def resolve_verified_executable(
 ) -> VerifiedExecutable:
     """Resolve a receipt-bound executable after strict live verification."""
     if not executable or Path(executable).name != executable:
-        raise DependencyError(f"requested executable must be one command name: {executable!r}")
+        raise DependencyError(
+            f"requested executable must be one command name: {executable!r}"
+        )
     plan = load_plan(workspace, manifest=manifest)
     record = plan.by_id().get(record_id)
     if record is None:
@@ -5257,7 +5552,9 @@ def resolve_verified_executable(
     live_bindings = installer._executable_bindings(record, workspace=workspace)
     live = live_bindings.get(executable)
     if live is None:
-        raise DependencyError(f"{record_id}: executable binding is unavailable: {executable}")
+        raise DependencyError(
+            f"{record_id}: executable binding is unavailable: {executable}"
+        )
     if (
         live["lexical_path"] != binding["lexical_path"]
         or live["absolute_path"] != binding["absolute_path"]
@@ -5463,7 +5760,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if "order" in payload:
             print("AGENT_CANON_TOOL_DEPENDENCY_ORDER=" + ",".join(payload["order"]))
         if "completed" in payload:
-            print("AGENT_CANON_TOOL_DEPENDENCY_COMPLETED=" + ",".join(payload["completed"]))
+            print(
+                "AGENT_CANON_TOOL_DEPENDENCY_COMPLETED="
+                + ",".join(payload["completed"])
+            )
     return exit_status
 
 
