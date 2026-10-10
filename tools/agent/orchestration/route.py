@@ -307,12 +307,12 @@ AREA_DATA: tuple[AreaData, ...] = (
     ),
     (
         "search",
-        "coordinated search",
-        "Find candidate tools, documents, code, and dependency context from a purpose string.",
-        "run_coordinated_search",
+        "repository search",
+        "Route exact text and explicit semantic, catalog, dependency, or code queries to their owning provider.",
+        "select_search_provider",
         (
-            'python3 tools/analysis/search/search.py --purpose "<goal>"',
-            'python3 tools/analysis/search/search.py --purpose "<goal>" --refresh-index --surface tools --surface documents',
+            'python3 tools/analysis/search/search.py --query "<git-pattern>" --providers text --regex',
+            'python3 tools/analysis/search/search.py --purpose "<goal>" --providers semantic',
         ),
         (
             "vector_search.py",

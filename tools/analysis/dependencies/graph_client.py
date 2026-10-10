@@ -7,7 +7,7 @@
 # upstream implementation ./source_dependency_graph.py derives dependency query and context without runtime state
 # upstream implementation ../../runtime/dispatch/agent-canon/src/graph.rs owns opt-in persisted graph build/status and non-dependency relations
 # downstream implementation ../../validation/semantic/tools/tool_drift.py consumes source-derived dependency facts
-# downstream implementation ../search/vector_search.py consumes source-derived dependency facts
+# downstream implementation ../search/search.py consumes selected source-derived dependency facts
 # @dependency-end
 """Typed compatibility adapter for source dependency projections and opt-in graph runtime."""
 
@@ -286,17 +286,8 @@ class GraphClient:
         direction: str = "both",
         depth: int = 0,
         all_nodes: bool = False,
-        **legacy_options: bool,
     ) -> GraphResponse:
         """Query dependency source directly; use runtime for other graph relations."""
-        legacy_all = legacy_options.pop("all", None)
-        if legacy_options:
-            unsupported = ",".join(sorted(legacy_options))
-            raise GraphClientError(f"unsupported graph query options: {unsupported}")
-        if legacy_all is not None:
-            if all_nodes and legacy_all is not all_nodes:
-                raise GraphClientError("conflicting all/all_nodes graph query options")
-            all_nodes = legacy_all
         if relation not in GRAPH_RELATIONS:
             raise GraphClientError(f"unsupported graph relation: {relation}")
         if direction not in GRAPH_DIRECTIONS:

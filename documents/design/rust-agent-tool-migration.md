@@ -67,9 +67,12 @@ provenance or source-identity receipt.
 Records that select an explicit `commit` retain their existing Git commit
 verification and provenance checks.
 
-Repository search uses the deterministic Python `search.py` / `search_index.py`
-surfaces and the Rust `semantic-index` command. No model server, installer,
-model cache, or compatibility dispatch is part of the compiled-tool cache.
+Repository search keeps `search.py` as a thin provider router: exact text and
+catalog patterns use Git, dependency context uses the source graph owner, and
+code facts use the LSP owner. Ranked semantic retrieval remains in the Rust
+`semantic-index` command and its external cache; the Python route does not build
+heuristic cards or combine provider scores. No model server, installer, model
+cache, or compatibility dispatch is part of the compiled-tool cache.
 
 After the AgentCanon CLI is built, DevContainer post-create also runs
 `agent-canon structured-analysis build --root <workspace> --profile devcontainer`
@@ -182,7 +185,6 @@ current canonical command.
 
 Recommended first migrations:
 
-- vector_search.py
 - file_surface_inventory.py
 - helper_function_inventory.py
 - log_surface_inventory.py
@@ -248,20 +250,14 @@ It reports:
 
 ## Deterministic Search Surfaces
 
-Purpose-based repository search remains an explicit deterministic tool surface:
+The Python search entrypoint selects one or more native owners explicitly. Its
+default `text` provider is stateless Git search; `--regex` and `--word-regexp`
+use Git's own query syntax. Tool-catalog search is scoped to `tools/catalog.yaml`.
+Dependency and code providers return source-graph and LSP results separately.
 
-```bash
-python3 tools/analysis/search/search_index.py build --root .
-python3 tools/analysis/search/search.py \
-  --purpose "find responsibility scope tooling" \
-  --providers text,semantic,vector,tool,header-deps,code-deps \
-  --format json
-```
-
-The Rust `semantic-index` command owns SQLite-backed vector evidence. The
-Python coordinator combines deterministic cards, exact text, TF-IDF, tool
-catalog, dependency-header, and Python call facts. Neither surface is edit or
-review authority; ownership and dependency evidence remain separate gates.
+`semantic-index` owns ranked semantic/vector evidence and its cache. Selecting
+that provider does not implicitly build or repair the cache. Provider outputs
+remain separate and advisory; none is edit or review authority.
 
 ## Validation
 
@@ -272,7 +268,6 @@ cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
 agent-canon rust-migration-audit --root .
 agent-canon rust-migration-plan --root .
 python3 tools/analysis/search/search.py --help
-python3 tools/analysis/search/search_index.py --help
 python3 tools/runtime/manifest/tool_catalog.py
 python3 tools/validation/semantic/tools/tool_drift.py
 python3 tools/validation/ci/runners/container_runtime.py

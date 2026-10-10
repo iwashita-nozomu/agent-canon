@@ -5,7 +5,6 @@
 # upstream design ../../../documents/prose-reasoning-graph/dsl-spec.md normative graph and DSL contract
 # upstream design ../../../agents/skills/prose-reasoning-graph.md prose graph skill contract
 # upstream design ../../../agents/workflows/workflow-references.md writing and discourse prior art
-# upstream implementation ../search/vector_search.py provides deterministic prose term extraction
 # downstream implementation ../../../tests/agent_tools/test_prose_reasoning_graph.py tests CLI behavior
 # downstream design ../../../documents/tools/prose_reasoning_graph.md documents tool contract
 # @dependency-end

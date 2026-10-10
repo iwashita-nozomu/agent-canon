@@ -14,11 +14,6 @@ const DEFAULT_LIMIT: usize = 12;
 
 const PORT_NOW_TARGETS: &[ToolTarget] = &[
     ToolTarget {
-        name: "vector_search.py",
-        path: "tools/analysis/search/vector_search.py",
-        reason: "heavy repo-wide text search and ranking logic",
-    },
-    ToolTarget {
         name: "file_surface_inventory.py",
         path: "tools/analysis/code/file_surface_inventory.py",
         reason: "repo-wide filesystem classification with stable output schema",
@@ -510,13 +505,13 @@ mod tests {
     }
 
     #[test]
-    fn plan_includes_policy_first_target() {
+    fn plan_includes_first_remaining_policy_target() {
         let root = make_fixture_root();
         write_foundation(&root);
 
         let plan = build_plan(&root, 3);
 
-        assert_eq!(plan.candidates[0].name, "vector_search.py");
+        assert_eq!(plan.candidates[0].name, "file_surface_inventory.py");
         assert_eq!(plan.candidates[0].class, "port-now");
         let _ = fs::remove_dir_all(root);
     }
@@ -528,7 +523,7 @@ mod tests {
         write(
             &root,
             "agents/evals/results/hook-runs/example/skill_usage.jsonl",
-            r#"{"candidate_tools":["skill_usage_logger.py","vector_search.py"],"feedback_targets":["tool:skill_usage_logger.py"],"tool_name":"workflow_monitor.py"}"#,
+            r#"{"candidate_tools":["skill_usage_logger.py","file_surface_inventory.py"],"feedback_targets":["tool:skill_usage_logger.py"],"tool_name":"workflow_monitor.py"}"#,
         );
 
         let plan = build_plan(&root, 10);

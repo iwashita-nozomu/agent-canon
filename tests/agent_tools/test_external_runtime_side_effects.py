@@ -93,33 +93,6 @@ def test_review_scan_publishes_external_report(tmp_path: Path) -> None:
     assert list(runtime.rglob("review_backlog_scan.md"))
 
 
-def test_search_index_requires_and_uses_external_runtime(tmp_path: Path) -> None:
-    """Search cards never fall back to a source-local directory."""
-    source = tmp_path / "source"
-    runtime = tmp_path / "runtime"
-    source.mkdir()
-    (source / "README.md").write_text("# fixture\n", encoding="utf-8")
-    environment = clean_runtime_environment()
-    environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(PROJECT_ROOT / "tools" / "analysis" / "search" / "search_index.py"),
-            "build",
-            "--root",
-            str(source),
-        ],
-        cwd=PROJECT_ROOT,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stderr
-    assert not (source / ".agent-canon").exists()
-    assert list(runtime.rglob("semantic-cards.jsonl"))
-
-
 def test_container_lifecycle_receipt_is_external(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
