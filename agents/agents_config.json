@@ -2178,7 +2178,7 @@
       "approval_policy": "never",
       "model": "gpt-6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review bounded diffs findings-first. Perform one initial owning review per candidate epoch, emit stable blocking finding IDs separately from advisory notes, and on repair perform only a focused recheck of addressed IDs and invalidated evidence; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
+      "developer_instructions": "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review bounded diffs findings-first. Perform one initial owning review per candidate epoch, emit stable blocking finding IDs separately from advisory notes, and on repair perform only a focused recheck of addressed IDs and invalidated evidence; route SOLID-sensitive Python boundary questions to python_reviewer, and keep validation within the parent-selected route. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
       "logical_role_id": "change_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7",
       "profile_id": "luna_reasoning_high",
@@ -2200,7 +2200,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3a7ed2b0e0fd3df50669fa1c141e5a109a32c8ba65607cb25430d7398dfebbbf"
+      "projection_digest": "620771ebb18252b7ae8095ccf9914af41ddbb5b0f247ba42b71f4458cbaf7ce9"
     },
     "docs_workflow_steward": {
       "name": "docs_workflow_steward",
@@ -2964,7 +2964,7 @@
       "approval_policy": "never",
       "model": "gpt-6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
+      "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For Python changes, follow the parent-selected validation route; require SOLID evidence only when that route selects it, and return revise only when required evidence or changed-path coverage is incomplete. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
       "logical_role_id": "change_reviewer+final_reviewer+research_reviewer+experiment_reviewer+infra_reviewer+mathematical_correctness_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/3+agents/agents_config.json#/specialist_roles/5+agents/agents_config.json#/specialist_roles/12+agents/agents_config.json#/specialist_roles/27",
       "profile_id": "luna_reasoning_high",
@@ -2986,7 +2986,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "49b3913d6f3ea366015b116edc8d61d658979729d7db9e13e9a27604363ee27b"
+      "projection_digest": "b3c450e77ff88252c546a83a0a72ba473f09446fd8773c480fcb812d14c707b8"
     },
     "scientific_computing_reviewer": {
       "name": "scientific_computing_reviewer",
@@ -3395,7 +3395,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3a7ed2b0e0fd3df50669fa1c141e5a109a32c8ba65607cb25430d7398dfebbbf"
+      "projection_digest": "620771ebb18252b7ae8095ccf9914af41ddbb5b0f247ba42b71f4458cbaf7ce9"
     },
     {
       "id": "docs_workflow_steward",
@@ -3928,7 +3928,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "49b3913d6f3ea366015b116edc8d61d658979729d7db9e13e9a27604363ee27b"
+      "projection_digest": "b3c450e77ff88252c546a83a0a72ba473f09446fd8773c480fcb812d14c707b8"
     },
     {
       "id": "scientific_computing_reviewer",
@@ -4105,6 +4105,6 @@
     "materializer": "tools/agent/orchestration/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 37,
-    "projection_digest": "cc318bfc98dd3ad3943c3ccf454bf0e8b41297ad3c511bf8156312fa3e829745"
+    "projection_digest": "c7575d04bb5d2f3744c3e7740af0e68fde81d691c3562a777562a9f936f6031e"
   }
 }
