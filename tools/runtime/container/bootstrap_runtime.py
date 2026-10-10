@@ -4,6 +4,7 @@
 # responsibility Owns container-side TOML/JSON/state/tool/check/eval logic for the shared AgentCanon tool container without implicit source writes.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 # upstream implementation ../source/agent_canon_source_root.py standalone source identity
+# upstream implementation ../../../bootstrap/container/image/Dockerfile builds the resident runtime image
 # downstream implementation ../../../bootstrap.sh fixed host entrypoint
 # downstream implementation ../../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 # @dependency-end
@@ -2693,33 +2694,92 @@ class BootstrapRuntime:
                             elif child.is_file():
                                 child.unlink()
                             details["deleted"].append(f"archive:{child.name}")
-            if not dry_run and high_water:
-                for key, _ in tasks:
-                    path = self.paths.tasks / key
-                    if path.is_symlink():
-                        raise BootstrapError(
-                            "symlink_path_rejected", f"task path is a symlink: {path}"
-                        )
-                    if path.is_dir():
-                        shutil.rmtree(path)
-                    state["tasks"].pop(key, None)
-                    details["deleted"].append(f"task:{key}")
-                for key, _ in generations:
-                    path = self.paths.generations / key
-                    if path.is_symlink():
-                        raise BootstrapError(
-                            "symlink_path_rejected",
-                            f"generation path is a symlink: {path}",
-                        )
-                    if path.is_dir():
-                        shutil.rmtree(path)
-                    state["generations"].pop(key, None)
-                    details["deleted"].append(f"generation:{key}")
             if not dry_run and (
                 high_water
                 or cache_high_water
                 or archive_high_water
+                or idle_stop
+                or stale_images
             ):
+                if idle_stop:
+                    self._stop_owned_container(state)
+                    state["state"] = "stopped"
+                    details["deleted"].append("idle-container")
+                if cache_high_water and not state.get("active_task_count", 0):
+                    cache_root = self.paths.cache
+                    for child in (
+                        sorted(cache_root.iterdir()) if cache_root.is_dir() else ()
+                    ):
+                        if child.is_symlink():
+                            raise BootstrapError(
+                                "symlink_path_rejected",
+                                f"cache path is a symlink: {child}",
+                            )
+                        if child.is_dir():
+                            shutil.rmtree(child)
+                        elif child.is_file():
+                            child.unlink()
+                        details["deleted"].append(f"cache:{child.name}")
+                if archive_high_water and not state.get("active_task_count", 0):
+                    spool_root = self.paths.spool
+                    spool_has_entries = bool(
+                        spool_root.is_dir() and next(spool_root.iterdir(), None)
+                    )
+                    if spool_has_entries:
+                        details["archive_cleanup_blocked_by_spool"] = True
+                    else:
+                        archive_root = self.paths.archive
+                        for child in (
+                            sorted(archive_root.iterdir())
+                            if archive_root.is_dir()
+                            else ()
+                        ):
+                            if child.is_symlink():
+                                raise BootstrapError(
+                                    "symlink_path_rejected",
+                                    f"archive path is a symlink: {child}",
+                                )
+                            if child.is_dir():
+                                shutil.rmtree(child)
+                            elif child.is_file():
+                                child.unlink()
+                            details["deleted"].append(f"archive:{child.name}")
+                for image_id in stale_images:
+                    inspected = self.docker.inspect_image(image_id)
+                    if inspected is None:
+                        continue
+                    self.docker.validate_image(
+                        inspected,
+                        {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": self.control_digest,
+                        },
+                    )
+                    self.docker.remove_image(image_id)
+                    details["deleted"].append(f"image:{image_id}")
+                if high_water:
+                    for key, _ in tasks:
+                        path = self.paths.tasks / key
+                        if path.is_symlink():
+                            raise BootstrapError(
+                                "symlink_path_rejected",
+                                f"task path is a symlink: {path}",
+                            )
+                        if path.is_dir():
+                            shutil.rmtree(path)
+                        state["tasks"].pop(key, None)
+                        details["deleted"].append(f"task:{key}")
+                    for key, _ in generations:
+                        path = self.paths.generations / key
+                        if path.is_symlink():
+                            raise BootstrapError(
+                                "symlink_path_rejected",
+                                f"generation path is a symlink: {path}",
+                            )
+                        if path.is_dir():
+                            shutil.rmtree(path)
+                        state["generations"].pop(key, None)
+                        details["deleted"].append(f"generation:{key}")
                 self._write_state(state)
             return self._result(
                 self._receipt(

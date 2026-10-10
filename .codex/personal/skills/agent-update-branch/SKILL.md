@@ -2,7 +2,7 @@
 name: agent-update-branch
 description: "Use when private knowledge, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5f2ec34502813e152ddb33ecc3277e59868d25605a5b588f8921ef798469b0ac"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"7b7e21c0acdde55c06207305db959efb7e3fe88ac3d47515438b5d3c662c2254"} -->
 
 <!--
 @dependency-start

@@ -4,6 +4,8 @@
 # upstream design ../../templates/agents/README.md template partial contract
 # downstream implementation ../../tools/runtime/manifest/manifest_rendering.py renders templates and partials
 # downstream implementation ../../templates/code/python/docstring_template.py is the materializable code source
+# downstream implementation ../../templates/code/cpp/include/agent_canon_template/status.hpp C++ interface template
+# downstream implementation ../../templates/code/cpp/src/status.cpp C++ implementation template
 # downstream implementation ../../tools/agent/orchestration/agent_team.py owns facade orchestration
 # @dependency-end
 
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -25,43 +28,46 @@ from unittest.mock import patch
 
 import yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-
-from tools.agent.orchestration import capacity_handshake  # noqa: E402
-from tools.runtime.lifecycle import task_close, update_lifecycle_contract  # noqa: E402
-from tools.agent.orchestration.agent_team import (  # noqa: E402
+from tools.agent.orchestration import capacity_handshake
+from tools.agent.orchestration.agent_team import (
     RunBundleSpec,
     create_run_bundle,
 )
-from tools.agent.orchestration.implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
-from tools.runtime.authority.writer_target import WriterTarget  # noqa: E402
-from tools.runtime.manifest.manifest_rendering import (  # noqa: E402
-    COMMON_PROMPT_MUST_INCLUDE,
-    language_review_candidates,
-    manifest_run_lines,
-    render_subagent_prompt_packet,
-    public_command_for_layout,
-    render_code_template,
-    render_template,
-    suggested_public_skills,
+from tools.agent.orchestration.implementation_dispatch import (
+    dispatch_fixed_implementation,
 )
-from tools.agent.orchestration.packets import (  # noqa: E402
+from tools.agent.orchestration.packets import (
+    _spec_source_root,
     iter_artifacts,
     resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_role_document_packet,
-    _spec_source_root,
 )
-from tools.agent.orchestration.team_config import (  # noqa: E402
+from tools.agent.orchestration.team_config import (
     current_stage_skills,
     load_task_catalog,
     load_team_config,
     resolve_role,
 )
-from tools.runtime.authority.task_authority import hash_baseline_bytes  # noqa: E402
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary  # noqa: E402
-from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary
+from tools.runtime.authority.checkout_identity import CheckoutIdentity
+from tools.runtime.authority.task_authority import hash_baseline_bytes
+from tools.runtime.authority.writer_target import WriterTarget
+from tools.runtime.lifecycle import task_close, update_lifecycle_contract
+from tools.runtime.manifest.manifest_rendering import (
+    COMMON_PROMPT_MUST_INCLUDE,
+    language_review_candidates,
+    manifest_run_lines,
+    public_command_for_layout,
+    render_code_template,
+    render_subagent_prompt_packet,
+    render_template,
+    suggested_public_skills,
+)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SECOND_ATOMIC_WRITE = 2
+
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
@@ -69,9 +75,14 @@ class AgentTeamTemplateTest(unittest.TestCase):
     def test_prompt_packets_do_not_require_rejection_prediction(self) -> None:
         """Optional diagnostics must not become mandatory handoff fields."""
         self.assertNotIn("pre_edit_rejection_prediction", COMMON_PROMPT_MUST_INCLUDE)
-        packet = yaml.safe_load("\n".join(render_subagent_prompt_packet(
-            {"subagent_prompt": {"purpose": "fixture"}}, "",
-        )))["subagent_prompt_packet"]
+        packet = yaml.safe_load(
+            "\n".join(
+                render_subagent_prompt_packet(
+                    {"subagent_prompt": {"purpose": "fixture"}},
+                    "",
+                )
+            )
+        )["subagent_prompt_packet"]
         self.assertNotIn("tool_rejection_prediction", packet["required_tool_fields"])
         for field in ("tool_route", "native_argv", "tool_evidence"):
             self.assertIn(field, packet["required_tool_fields"])
@@ -103,11 +114,20 @@ class AgentTeamTemplateTest(unittest.TestCase):
             ):
                 manifest = yaml.safe_load("\n".join(manifest_run_lines(spec, None)))
         defaults = manifest["run"]["implementation_gate_defaults"]
-        self.assertEqual(defaults["pre_edit_rejection_prediction_status"], "optional_diagnostic")
-        self.assertIn("tool_rejection_preflight.py", defaults["pre_edit_rejection_command"])
-        self.assertEqual(defaults["tool_reuse_ledger_status"], "required_before_custom_implementation")
+        self.assertEqual(
+            defaults["pre_edit_rejection_prediction_status"], "optional_diagnostic"
+        )
+        self.assertIn(
+            "tool_rejection_preflight.py", defaults["pre_edit_rejection_command"]
+        )
+        self.assertEqual(
+            defaults["tool_reuse_ledger_status"],
+            "required_before_custom_implementation",
+        )
 
-    def test_project_cpp_tests_select_cpp_reviewer_without_python_reviewer(self) -> None:
+    def test_project_cpp_tests_select_cpp_reviewer_without_python_reviewer(
+        self,
+    ) -> None:
         """Out-of-tree project C++ tests route only to the native reviewer."""
         candidates = language_review_candidates(
             PROJECT_ROOT,
@@ -115,7 +135,9 @@ class AgentTeamTemplateTest(unittest.TestCase):
         )
         self.assertEqual(candidates, ("cpp_reviewer", "docs_workflow_steward"))
 
-    def test_public_command_display_quotes_structured_whitespace_and_metacharacters(self) -> None:
+    def test_public_command_display_quotes_structured_whitespace_and_metacharacters(
+        self,
+    ) -> None:
         """Structured argv is shell-quoted only in the human display projection."""
         value = "path with spaces;$(not-executed)|quoted"
         rendered = public_command_for_layout(
@@ -264,20 +286,22 @@ class AgentTeamTemplateTest(unittest.TestCase):
             ) -> Path:
                 nonlocal atomic_writes
                 atomic_writes += 1
-                if atomic_writes == 2:
+                if atomic_writes == SECOND_ATOMIC_WRITE:
                     raise RuntimeError("injected-stage-write-failure")
                 return original_write(boundary, path, payload, mode=mode)
 
-            with patch.object(
-                RuntimeArtifactBoundary,
-                "atomic_write_bytes",
-                new=fail_second_stage_write,
-            ):
-                with self.assertRaisesRegex(
+            with (
+                patch.object(
+                    RuntimeArtifactBoundary,
+                    "atomic_write_bytes",
+                    new=fail_second_stage_write,
+                ),
+                self.assertRaisesRegex(
                     RuntimeError,
                     r"^injected-stage-write-failure$",
-                ):
-                    create_run_bundle(spec)
+                ),
+            ):
+                create_run_bundle(spec)
 
             self.assertGreaterEqual(atomic_writes, 2)
             self.assertFalse(spec.report_dir.exists())
@@ -294,7 +318,9 @@ class AgentTeamTemplateTest(unittest.TestCase):
             )
             self.assertTrue(success_spec.report_dir.is_dir())
             self.assertTrue(
-                all((success_spec.report_dir / path).is_file() for path in created_files)
+                all(
+                    (success_spec.report_dir / path).is_file() for path in created_files
+                )
             )
             self.assertEqual(tuple(report_root.glob(".stage-run.*")), ())
             self.assertEqual(
@@ -312,6 +338,86 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertIn("Args:", rendered)
         self.assertIn("Ownership:", rendered)
         self.assertNotIn("return None", rendered)
+
+    def test_cpp_code_template_materializes_paths_for_independent_local_consumers(
+        self,
+    ) -> None:
+        """Rendered include/src files support separate consumer-local CMake graphs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            consumer_root = tmp_root / "consumer"
+            rendered_sources = {
+                "cpp/include/agent_canon_template/status.hpp": (
+                    "include/agent_canon_template/status.hpp"
+                ),
+                "cpp/src/status.cpp": "src/status.cpp",
+            }
+            for template_name, relative_path in rendered_sources.items():
+                rendered = render_code_template(template_name)
+                destination = consumer_root / relative_path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(rendered, encoding="utf-8")
+                self.assertEqual(destination.read_text(encoding="utf-8"), rendered)
+
+            self.assertTrue((consumer_root / "include").is_dir())
+            self.assertTrue((consumer_root / "src").is_dir())
+            # This fixture selects the consumer-local profile; root-aggregate
+            # remains a separate valid project-owned layout.
+            self.assertFalse((consumer_root / "CMakeLists.txt").exists())
+
+            for topic, sibling in (
+                ("topic_alpha", "topic_beta"),
+                ("topic_beta", "topic_alpha"),
+            ):
+                topic_dir = consumer_root / "experiments" / topic
+                topic_dir.mkdir(parents=True)
+                self.assertFalse((consumer_root / "experiments" / sibling).exists())
+                (topic_dir / "main.cpp").write_text(
+                    "#include <agent_canon_template/status.hpp>\n\n"
+                    "int main() {\n"
+                    "    return agent_canon_template::status() == "
+                    "agent_canon_template::Status::ready ? 0 : 1;\n"
+                    "}\n",
+                    encoding="utf-8",
+                )
+                (topic_dir / "CMakeLists.txt").write_text(
+                    "cmake_minimum_required(VERSION 3.16)\n"
+                    f"project({topic} LANGUAGES CXX)\n"
+                    "set(CMAKE_CXX_STANDARD 11)\n"
+                    "set(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
+                    "enable_testing()\n"
+                    'get_filename_component(CONSUMER_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)\n'
+                    f'add_executable({topic}_smoke main.cpp "${{CONSUMER_ROOT}}/src/status.cpp")\n'
+                    f'target_include_directories({topic}_smoke PRIVATE "${{CONSUMER_ROOT}}/include")\n'
+                    f"add_test(NAME {topic}_smoke COMMAND {topic}_smoke)\n",
+                    encoding="utf-8",
+                )
+                build_dir = tmp_root / "build" / topic
+                configure = subprocess.run(
+                    ["cmake", "-S", str(topic_dir), "-B", str(build_dir)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(
+                    configure.returncode, 0, configure.stdout + configure.stderr
+                )
+                build = subprocess.run(
+                    ["cmake", "--build", str(build_dir), "--parallel", "1"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+                test = subprocess.run(
+                    ["ctest", "--output-on-failure"],
+                    cwd=build_dir,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(test.returncode, 0, test.stdout + test.stderr)
+                shutil.rmtree(topic_dir)
 
     def test_code_template_renderer_works_from_repo_root_package_route(self) -> None:
         """リポジトリ root の canonical package invocation が source を読み戻せます."""
@@ -426,7 +532,9 @@ class AgentTeamTemplateTest(unittest.TestCase):
 
         self.assertNotIn("{{>", rendered)
         self.assertIn("## 判定（Decision）", rendered)
-        self.assertIn("<!-- approve、revise、escalate のいずれかを記録します。 -->", rendered)
+        self.assertIn(
+            "<!-- approve、revise、escalate のいずれかを記録します。 -->", rendered
+        )
         self.assertEqual(rendered.count("@dependency-start"), 1)
 
     def test_research_driven_skill_calls_literature_survey_first(self) -> None:
@@ -463,7 +571,9 @@ class AgentTeamTemplateTest(unittest.TestCase):
             current_stage_skills(selected, "implement", typed_route_required=True),
         )
 
-    def test_optional_review_templates_are_materialized_only_when_selected(self) -> None:
+    def test_optional_review_templates_are_materialized_only_when_selected(
+        self,
+    ) -> None:
         """Core bundle artifacts stay available without empty review templates."""
         config = load_team_config()
         packet = resolve_active_design_packet_config(config)
@@ -682,11 +792,18 @@ class AgentTeamTemplateTest(unittest.TestCase):
             missing_target.owner_gate_id,
             "writer_target:required_before_spawn",
         )
-        identity = resolve_checkout_identity(PROJECT_ROOT).as_dict()
+        identity = CheckoutIdentity(
+            cwd=str(PROJECT_ROOT),
+            git_root=str(PROJECT_ROOT),
+            branch="test/agent-team-templates",
+            head="f" * 40,
+            remote="iwashita-nozomu/agent-canon",
+        )
+        identity_record = identity.as_dict()
         target = WriterTarget(
             str(PROJECT_ROOT),
-            identity["branch"],
-            identity["remote"],
+            identity.branch,
+            identity.remote,
             ("tools/agent_tools",),
         )
         math_blocked = dispatch_fixed_implementation(
@@ -705,6 +822,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             lambda role, prompt: "must-not-spawn",
             workspace_root=PROJECT_ROOT,
             writer_target=target,
+            checkout_identity=identity_record,
             selected_skills=(),
         )
         self.assertEqual(nonmath_dispatch.status, "spawned")
@@ -718,17 +836,21 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 lambda role, prompt: "snapshot-worker",
                 workspace_root=PROJECT_ROOT,
                 writer_target=target,
-                checkout_identity=identity,
+                checkout_identity=identity_record,
             )
         self.assertEqual(snapshot_dispatch.status, "spawned")
-        self.assertIn(identity["head"], snapshot_dispatch.prompt_capsule.body)
-        dispatch = dispatch_fixed_implementation(
-            request,
-            "materialize P3",
-            lambda role, prompt: calls.append((role, prompt)) or "spark-1",
-            workspace_root=PROJECT_ROOT,
-            writer_target=target,
-        )
+        self.assertIn(identity_record["head"], snapshot_dispatch.prompt_capsule.body)
+        with patch(
+            "tools.agent.orchestration.implementation_dispatch.resolve_checkout_identity",
+            return_value=identity,
+        ):
+            dispatch = dispatch_fixed_implementation(
+                request,
+                "materialize P3",
+                lambda role, prompt: calls.append((role, prompt)) or "spark-1",
+                workspace_root=PROJECT_ROOT,
+                writer_target=target,
+            )
         self.assertEqual(dispatch.status, "spawned")
         self.assertEqual(dispatch.spawn_count, 1)
         self.assertEqual(dispatch.owner_gate_count, 1)
@@ -749,6 +871,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             lambda role, prompt: None,
             workspace_root=PROJECT_ROOT,
             writer_target=target,
+            checkout_identity=identity_record,
         )
         self.assertEqual(blocked.status, "blocked")
         self.assertEqual(blocked.owner_gate_id, "WRITE_SUBAGENT_AUTHORIZATION=required")

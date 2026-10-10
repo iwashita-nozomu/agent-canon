@@ -7,9 +7,9 @@
 # upstream design ../../tools/README.md shared tool index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # upstream design ../../tools/catalog.yaml structured tool catalog
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py owns accumulated report destinations
 # upstream implementation ./evaluate_codex_agent_roles.py writes Codex agent role eval reports
 # upstream implementation ./evaluate_workflow_selection.py writes workflow selection eval reports
-# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh runs producers before accumulation validation
 # downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs producers before accumulation validation
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs producers before accumulation validation
 # downstream implementation ../../tests/agent_tools/test_run_accumulated_agent_evals.py validates command construction and log writeout
@@ -121,17 +121,16 @@ def build_producers(
     python_bin: str,
     runtime_root: Path | str | None = None,
 ) -> tuple[EvalProducer, ...]:
-    """Build role/workflow argv with explicit runtime result paths.
+    """Build role/workflow argv and delegate report paths to the archive owner.
 
-    This collector owns the producer set and routes each report to
-    ``<runtime>/eval-results/<family>``. The calling CI runner owns the mounted
-    archive reader/capture root; this builder does not select that location or
-    validate archive completeness. Collection flow:
+    This collector owns the producer set and passes the explicit runtime
+    capability. Leaving ``--results-dir`` unset lets each producer use the
+    shared ``runtime_log_paths`` resolver, while this runner keeps capture
+    logs separate. Collection flow:
     ``agents/skills/agent-eval-accumulation.md#Required Flow``.
     """
     canon = script_root()
     boundary = runtime_artifact_boundary(root, runtime_root)
-    eval_root = boundary.resolve(Path("eval-results"))
     runtime_option = ("--runtime-root", str(boundary.root))
     return (
         EvalProducer(
@@ -144,8 +143,6 @@ def build_producers(
                 "--accumulate",
                 "--run-id",
                 run_id,
-                "--results-dir",
-                str(eval_root / "codex-agent-role"),
                 *runtime_option,
             ),
         ),
@@ -159,8 +156,6 @@ def build_producers(
                 "--accumulate",
                 "--run-id",
                 run_id,
-                "--results-dir",
-                str(eval_root / "workflow-selection"),
                 *runtime_option,
             ),
         ),
@@ -273,7 +268,6 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> int:
     )
     runtime_root = args.runtime_root
     boundary = runtime_artifact_boundary(root, runtime_root)
-    boundary.ensure_directory("eval-results")
     log_dir = resolve_log_dir(root, args.log_dir, str(args.run_id), runtime_root)
     boundary.ensure_directory(log_dir.relative_to(boundary.root))
     producers = build_producers(

@@ -762,7 +762,12 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
     target = tmp_path / "target"
     control.mkdir()
     target.mkdir()
-    (control / "private-log").mkdir()
+    private_log = control / "private-log"
+    private_log.mkdir()
+    # Preserve the resident mount precondition while testing the request filter.
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     digest = "target-secret"
