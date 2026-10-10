@@ -33,6 +33,8 @@ SCRIPT = (
     / "dependencies"
     / "check_dependency_headers.py"
 )
+
+
 def manifest(
     *,
     contract: str | None = "design",
