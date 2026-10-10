@@ -56,6 +56,7 @@ REVIEW_INTENT_SCHEMA = "agent-canon.terminal-resume-intent.v1"
 REVIEW_FRAME_SCHEMA = "agent-canon.review-frame.v3"
 RESUME_EVENT_SCHEMA = "agent-canon.terminal-resume-event.v3"
 REVIEW_DECISION_SCHEMA = "agent-canon.review-decision-event.v1"
+MINIMUM_TABLE_PIPE_COUNT = 2
 MINIMAL_HANDOFF_KEYS = (
     "objective",
     "owner_unit",
@@ -149,7 +150,7 @@ def parse_finding_rows(markdown: str) -> tuple[dict[str, str], ...]:
 
     def table_cells(line: str) -> list[str] | None:
         stripped = line.strip()
-        if not stripped.startswith("|") or stripped.count("|") < 2:
+        if not stripped.startswith("|") or stripped.count("|") < MINIMUM_TABLE_PIPE_COUNT:
             return None
         return [cell.strip() for cell in stripped.strip("|").split("|")]
 

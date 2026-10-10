@@ -50,6 +50,7 @@ from tools.runtime.values import (
     is_object_list_or_tuple,
     is_string_object_mapping,
 )
+from tools.runtime.archive.work_log import MIN_GROUP_MEMBER_COUNT
 from tools.agent.orchestration.mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,
@@ -135,6 +136,8 @@ EVAL_TRANSIENT_CAPTURE_PATTERN = re.compile(
 # these contracts here, beside the artifact checker, so task_close remains a
 # consumer and no second persistence or closeout authority is introduced.
 COMPLETION_COVERAGE_SCHEMA = "agent-canon.completion-coverage.v1"
+RESOURCE_MAPPING_REQUIRED_CLAUSE_IDS = ("W2-12", "W2-19")
+SHA256_HEX_DIGEST_BYTE_LENGTH = hashlib.sha256().digest_size * 2
 VALIDATION_RESULT_SCHEMA = "agent-canon.validation-result-projection.v1"
 VALIDATION_ROUTE_ID = "python.ruff.full"
 VALIDATION_OWNER_PATHS = (
@@ -416,7 +419,9 @@ def _validation_locator(workspace: Path) -> dict[str, object]:
         ) from exc
     if not stat.S_ISDIR(report_stat.st_mode):
         raise ValidationMaterializerError("canonical_run_locator:report_dir_invalid")
-    if not baseline_bytes.endswith(b"\n") or len(baseline_bytes) != 65:
+    if not baseline_bytes.endswith(b"\n") or len(baseline_bytes) != (
+        SHA256_HEX_DIGEST_BYTE_LENGTH + len(b"\n")
+    ):
         raise ValidationMaterializerError("canonical_run_locator:baseline_invalid")
     baseline = baseline_bytes[:-1].decode("ascii", errors="replace")
     if not re.fullmatch(r"[0-9a-f]{64}", baseline):
@@ -1479,7 +1484,7 @@ def _mapping_from_event(event: Mapping[str, object]) -> dict[str, object] | None
         raise ValueError(f"unsupported mapping_mode: {mapping_mode}")
     if mapping_mode == "direct" and members != (_nonempty_text(clause_id),):
         raise ValueError("direct mappings must contain exactly their clause_id")
-    if mapping_mode == "group" and len(set(members)) < 2:
+    if mapping_mode == "group" and len(set(members)) < MIN_GROUP_MEMBER_COUNT:
         raise ValueError("group mappings require at least two distinct member clauses")
     source_event_ref = _nonempty_text(event.get("event_id", event.get("sequence", "")))
     group_identity = _nonempty_text(
@@ -1972,7 +1977,7 @@ def check_completion_coverage(
             if member_ids != [clause_id]:
                 errors["redundant"].append(clause_id or "mapping")
         elif mode == "group":
-            if len(member_ids) < 2:
+            if len(member_ids) < MIN_GROUP_MEMBER_COUNT:
                 errors["redundant"].append(clause_id or "mapping")
             if raw_mapping.get("semantic_kind") in NON_GROUPABLE_SEMANTIC_KINDS:
                 errors["empty"].append(f"group:{clause_id or 'mapping'}")
@@ -2264,7 +2269,7 @@ def check_completion_coverage(
                 f"resource_certificate:{source_event_ref}:source_clause"
             )
     resource_mapping_event_refs: dict[str, str] = {}
-    for clause_id in ("W2-12", "W2-19"):
+    for clause_id in RESOURCE_MAPPING_REQUIRED_CLAUSE_IDS:
         if clause_id not in expected_set:
             continue
         mapping = mappings_by_clause.get(clause_id)
@@ -2304,8 +2309,10 @@ def check_completion_coverage(
             ] != list(GPU_CERTIFICATE_SEQUENCE):
                 errors["empty"].append("resource_mapping:W2-19:ordered_gpu_semantics")
     if (
-        len(resource_mapping_event_refs) == 2
-        and len(set(resource_mapping_event_refs.values())) != 2
+        len(resource_mapping_event_refs)
+        == len(RESOURCE_MAPPING_REQUIRED_CLAUSE_IDS)
+        and len(set(resource_mapping_event_refs.values()))
+        != len(resource_mapping_event_refs)
     ):
         errors["empty"].append("resource_mapping:distinct_source_events")
     responses = completion_coverage.get("failure_responses", [])

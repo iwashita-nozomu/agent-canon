@@ -283,7 +283,7 @@ def _hex_oid(value: object, field: str) -> str:
     """Return one exact SHA-1 object ID."""
     if (
         not isinstance(value, str)
-        or len(value) != 40
+        or len(value) != len(ZERO_OID)
         or any(character not in "0123456789abcdef" for character in value)
     ):
         raise PublicationError("publication_authority:oid_invalid", field)
