@@ -25,12 +25,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-except ImportError:  # direct script/module execution
-    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
-        runtime_artifact_boundary,
-    )
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 from tools.runtime.authority.writer_target import WriterTargetError, parse_writer_target
 
