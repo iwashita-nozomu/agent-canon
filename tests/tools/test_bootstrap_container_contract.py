@@ -25,7 +25,6 @@ except ModuleNotFoundError:
 
 from tools.runtime.dispatch import tool_dispatch
 
-
 ROOT = Path(__file__).resolve().parents[2]
 CONTAINER = ROOT / "bootstrap" / "container"
 DOCKERFILE = CONTAINER / "image" / "Dockerfile"
