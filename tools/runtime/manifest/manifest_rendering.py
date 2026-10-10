@@ -5,6 +5,7 @@
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ../../agent/orchestration/team_config.py provides rendering configuration inputs.
 # upstream implementation ../../agent/orchestration/packets.py provides rendering packet inputs.
+# upstream implementation ../../agent/orchestration/implementation_dispatch.py owns capacity and closeout projections.
 # upstream implementation ../values.py refines decoded rendering containers.
 # upstream implementation ../../repository/workspace/workspace_scope.py provides rendering paths.
 # downstream implementation ../../agent/orchestration/agent_team.py facade consumes rendering APIs.
@@ -21,11 +22,11 @@ import re
 import shlex
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import cast
+from typing import TypedDict
 
 import yaml
 
-from tools.runtime.values import is_object_list
+from tools.runtime.values import is_object_list, is_string_object_dict
 
 from tools.repository.workspace.parent_root_side_effects import (
     ParentRootAttestationRequest,
@@ -91,8 +92,8 @@ from tools.agent.orchestration.tool_calls import (
 )
 
 from tools.agent.orchestration.implementation_dispatch import (
-    _capacity_projection,
-    _CapacityRuntime,
+    CapacityRuntime,
+    capacity_projection,
     closeout_projection,
     capacity_runtime_for_spec,
     codex_runtime_max_depth,
@@ -123,7 +124,9 @@ def _render_prompt_entry(value: object, field_name: str) -> str:
     if isinstance(value, str):
         return value
     if isinstance(value, dict):
-        mapping = as_object_mapping(value, field_name)
+        if not is_string_object_dict(value):
+            raise RuntimeError(f"{field_name} must be a mapping")
+        mapping = dict(value)
         if not mapping:
             raise RuntimeError(f"{field_name} mapping entries must not be empty")
         rendered: dict[str, str] = {}
@@ -397,7 +400,15 @@ VALIDATION_FAILURE_TAXONOMY_SOURCE = (
 
 RUNTIME_PROFILE_INVENTORY_PATH = ROOT / VALIDATION_FAILURE_TAXONOMY_SOURCE
 
-_validation_failure_response_policy_cache: dict[str, object] | None = None
+class ValidationFailureResponsePolicy(TypedDict):
+    """Owner projection read from the validation-failure taxonomy."""
+
+    taxonomy_source: str
+    required_fields: tuple[str, ...]
+    intent_preservation: tuple[str, ...]
+
+
+_validation_failure_response_policy_cache: ValidationFailureResponsePolicy | None = None
 
 CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX = 6
 
@@ -428,41 +439,49 @@ OOP_EVIDENCE_DIMENSIONS = (
 
 def validation_failure_response_policy(
     source_root: Path | None = None,
-) -> dict[str, object]:
+) -> ValidationFailureResponsePolicy:
     """Return validation-failure response taxonomy from the JSON owner."""
     global _validation_failure_response_policy_cache
     if _validation_failure_response_policy_cache is None or source_root is not None:
-        raw_data = cast(
-            "dict[str, object]",
-            json.loads(
-                ((source_root or ROOT) / VALIDATION_FAILURE_TAXONOMY_SOURCE).read_text(
-                    encoding="utf-8"
-                )
-            ),
+        raw_data: object = json.loads(
+            ((source_root or ROOT) / VALIDATION_FAILURE_TAXONOMY_SOURCE).read_text(
+                encoding="utf-8"
+            )
         )
+        if not is_string_object_dict(raw_data):
+            raise ValueError("validation failure response taxonomy must be an object")
         raw_policy = raw_data.get("validation_failure_response")
-        if not isinstance(raw_policy, dict):
+        if not is_string_object_dict(raw_policy):
             raise ValueError("validation_failure_response must be an object")
-        policy = cast("dict[str, object]", raw_policy)
+        policy = raw_policy
         required_fields = policy.get("required_fields")
         intent_preservation = policy.get("intent_preservation")
-        if not isinstance(required_fields, list) or not all(
-            isinstance(field, str) for field in cast("list[object]", required_fields)
-        ):
+        if not is_object_list(required_fields):
             raise ValueError(
                 "validation_failure_response.required_fields must be strings"
             )
-        if not isinstance(intent_preservation, list) or not all(
-            isinstance(value, str)
-            for value in cast("list[object]", intent_preservation)
-        ):
+        required_field_values = tuple(
+            field for field in required_fields if isinstance(field, str)
+        )
+        if len(required_field_values) != len(required_fields):
+            raise ValueError(
+                "validation_failure_response.required_fields must be strings"
+            )
+        if not is_object_list(intent_preservation):
             raise ValueError(
                 "validation_failure_response.intent_preservation must be strings"
             )
-        policy_cache = {
+        intent_preservation_values = tuple(
+            value for value in intent_preservation if isinstance(value, str)
+        )
+        if len(intent_preservation_values) != len(intent_preservation):
+            raise ValueError(
+                "validation_failure_response.intent_preservation must be strings"
+            )
+        policy_cache: ValidationFailureResponsePolicy = {
             "taxonomy_source": VALIDATION_FAILURE_TAXONOMY_SOURCE,
-            "required_fields": tuple(cast("list[str]", required_fields)),
-            "intent_preservation": tuple(cast("list[str]", intent_preservation)),
+            "required_fields": required_field_values,
+            "intent_preservation": intent_preservation_values,
         }
         if source_root is None:
             _validation_failure_response_policy_cache = policy_cache
@@ -862,8 +881,6 @@ def public_command_for_layout(
         return command
     else:
         argv = tuple(command)
-    if any(not isinstance(item, str) for item in argv):
-        raise TypeError("display command argv must contain strings")
     return shlex.join(argv)
 
 
@@ -1237,7 +1254,7 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
 
 def build_manifest(
     spec: RunBundleSpec,
-    capacity_runtime: _CapacityRuntime | None = None,
+    capacity_runtime: CapacityRuntime | None = None,
 ) -> str:
     """Build the team manifest yaml."""
     workflow_family = None
@@ -1267,11 +1284,11 @@ def build_manifest(
 def manifest_run_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
-    capacity_runtime: _CapacityRuntime | None = None,
+    capacity_runtime: CapacityRuntime | None = None,
 ) -> list[str]:
     """Render run-level manifest fields."""
     capacity_runtime = capacity_runtime or capacity_runtime_for_spec(spec)
-    capacity_projection = _capacity_projection(capacity_runtime, spec)
+    capacity_payload = capacity_projection(capacity_runtime, spec)
     closeout_payload = closeout_projection(capacity_runtime, spec)
     active_design_packet = (
         spec.active_design_packet
@@ -1362,7 +1379,7 @@ def manifest_run_lines(
         ]
     )
     capacity_yaml = yaml.safe_dump(
-        capacity_projection,
+        capacity_payload,
         sort_keys=False,
         default_flow_style=False,
     ).splitlines()
@@ -1504,10 +1521,7 @@ def manifest_run_lines(
         )
         lines.append("    initial_three_agent_intake_is_total_cap: false")
         lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
-        writer_targets = cast(
-            Mapping[str, object],
-            spec.writer_targets,
-        )
+        writer_targets = spec.writer_targets
         initial_slots = recommended_initial_subagent_wave_slots(
             spec.roles,
             active_subagents,
@@ -1622,10 +1636,10 @@ def manifest_run_lines(
         )
         lines.append(f"      taxonomy_source: {validation_policy['taxonomy_source']}")
         lines.append("      repair_required_fields:")
-        for field in cast("tuple[str, ...]", validation_policy["required_fields"]):
+        for field in validation_policy["required_fields"]:
             lines.append(f"        - {field}")
         lines.append("      intent_preservation_values:")
-        for value in cast("tuple[str, ...]", validation_policy["intent_preservation"]):
+        for value in validation_policy["intent_preservation"]:
             lines.append(f"        - {value}")
         lines.append("    same_role_instances:")
         lines.append(f"      status: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}")
@@ -2298,16 +2312,17 @@ def render_role_topology(
     topology = workflow_family.get("role_topology")
     if not isinstance(topology, dict):
         return []
-    topology = as_object_mapping(topology, "role_topology")
+    if not is_string_object_dict(topology):
+        raise RuntimeError("role_topology must be a mapping")
     lines = [f"{indent}role_topology:"]
     role_families = topology.get("role_families")
     if isinstance(role_families, dict):
+        if not is_string_object_dict(role_families):
+            raise RuntimeError("role_topology.role_families must be a mapping")
         lines.append(f"{indent}  role_families:")
-        for family_name, agent_types in as_object_mapping(
-            role_families, "role_topology.role_families"
-        ).items():
+        for family_name, agent_types in role_families.items():
             lines.append(f"{indent}    {family_name}:")
-            if isinstance(agent_types, list):
+            if is_object_list(agent_types):
                 for agent_type in as_string_tuple(
                     agent_types,
                     f"role_topology.role_families.{family_name}",
@@ -2322,11 +2337,12 @@ def render_role_topology(
                 )
     same_role_instances = topology.get("same_role_parallel_instances")
     if isinstance(same_role_instances, dict):
+        if not is_string_object_dict(same_role_instances):
+            raise RuntimeError(
+                "role_topology.same_role_parallel_instances must be a mapping"
+            )
         lines.append(f"{indent}  same_role_parallel_instances:")
-        for key, value in as_object_mapping(
-            same_role_instances,
-            "role_topology.same_role_parallel_instances",
-        ).items():
+        for key, value in same_role_instances.items():
             if isinstance(value, bool):
                 rendered_value = "true" if value else "false"
             elif isinstance(value, str):
@@ -2338,7 +2354,7 @@ def render_role_topology(
                 )
             lines.append(f"{indent}    {key}: {rendered_value}")
     stage_waves = topology.get("stage_waves")
-    if isinstance(stage_waves, list):
+    if is_object_list(stage_waves):
         lines.append(f"{indent}  stage_waves:")
         for wave in as_mapping_tuple(
             stage_waves,
@@ -2367,7 +2383,8 @@ def render_subagent_prompt_packet(
     prompt = workflow_family.get("subagent_prompt")
     if not isinstance(prompt, dict):
         return []
-    prompt = as_object_mapping(prompt, "subagent_prompt")
+    if not is_string_object_dict(prompt):
+        raise RuntimeError("subagent_prompt must be a mapping")
     lines = [f"{indent}subagent_prompt_packet:"]
     purpose = as_optional_string(prompt.get("purpose"), "subagent_prompt.purpose")
     if purpose:

@@ -1310,7 +1310,7 @@ class CommandRunner(Protocol):
 class DependencyVerifier(Protocol):
     """One selected record verifier in the existing verification dispatch."""
 
-    def __call__(self, record: DependencyRecord, *, workspace: Path) -> None:
+    def __call__(self, record: DependencyRecord, /, *, workspace: Path) -> None:
         """Verify one dependency record in its selected workspace."""
         ...
 

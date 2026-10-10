@@ -8,6 +8,7 @@
 # upstream implementation ./model_profile_registry.py owns prompt/profile materialization.
 # upstream implementation ../../runtime/values.py refines decoded packet containers.
 # downstream implementation ./agent_team.py facade consumes capacity APIs.
+# downstream implementation ../../runtime/manifest/manifest_rendering.py consumes capacity and closeout projections.
 # downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes capacity APIs.
 # @dependency-end
 """Own AgentTeam capacity derivation and implementation dispatch."""
@@ -140,7 +141,7 @@ class CapacityHandshakeConsumerBinding:
 
 
 @dataclass
-class _CapacityRuntime:
+class CapacityRuntime:
     """Runtime-owned objects shared by parent and nested lifecycle consumers."""
 
     binding: CapacityHandshakeConsumerBinding
@@ -358,7 +359,7 @@ def _capacity_topology_witness(
     )
 
 
-def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
+def capacity_runtime_for_spec(spec: RunBundleSpec) -> CapacityRuntime:
     """Create one provider-owned ledger and snapshot for a run bundle."""
     if spec.task_catalog is None:
         raise RuntimeError("task catalog is required for capacity handshake")
@@ -396,7 +397,7 @@ def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
             parent_work_id=spec.run_id
         )
     )
-    return _CapacityRuntime(
+    return CapacityRuntime(
         binding=CapacityHandshakeConsumerBinding(),
         snapshot=snapshot,
         ledger=ledger,
@@ -414,8 +415,8 @@ def _json_capacity_record(
     return capacity_handshake.descendant_record_projection(record)
 
 
-def _capacity_projection(
-    runtime: _CapacityRuntime, spec: RunBundleSpec
+def capacity_projection(
+    runtime: CapacityRuntime, spec: RunBundleSpec
 ) -> dict[str, object]:
     """Return the machine-readable manifest projection for shared runtime state."""
     configured = runtime.snapshot.configured_max_threads
@@ -486,7 +487,7 @@ def _capacity_projection(
 
 
 def closeout_projection(
-    runtime: _CapacityRuntime,
+    runtime: CapacityRuntime,
     spec: RunBundleSpec,
 ) -> dict[str, object]:
     """Materialize the provider closeout state with canonical close-agent tokens."""
@@ -559,7 +560,7 @@ def dispatch_fixed_implementation(
     *,
     workspace_root: Path = ROOT,
     source_root: Path | None = None,
-    capacity_runtime: _CapacityRuntime | None = None,
+    capacity_runtime: CapacityRuntime | None = None,
     writer_target: WriterTarget | Mapping[str, object] | None = None,
     checkout_identity: Mapping[str, object] | None = None,
     math_intent_route: str | None = None,
@@ -838,11 +839,11 @@ def dispatch_fixed_implementation(
 
 def capacity_manifest_output_lines(
     spec: RunBundleSpec,
-    runtime: _CapacityRuntime | None = None,
+    runtime: CapacityRuntime | None = None,
 ) -> tuple[str, ...]:
     """Return task-start/bootstrap fields projected from one typed capacity runtime."""
     runtime = runtime or capacity_runtime_for_spec(spec)
-    projection = _capacity_projection(runtime, spec)
+    projection = capacity_projection(runtime, spec)
     return (
         "CAPACITY_REQUEST_SCHEMA=team_manifest_capacity_request_v1",
         f"REQUESTED_TOTAL_CAPACITY={projection['requested_total_capacity']}",
@@ -989,7 +990,8 @@ def codex_runtime_agent_int(key: str, *, root: Path = ROOT) -> int:
     agents = data.get("agents")
     if not isinstance(agents, dict):
         raise RuntimeError("missing [agents] section in .codex/config.toml")
-    agents = as_object_mapping(agents, ".codex/config.toml agents")
+    if not is_string_object_dict(agents):
+        raise RuntimeError(".codex/config.toml agents must be a mapping")
     value = agents.get(key)
     if not isinstance(value, int) or value < 1:
         raise RuntimeError(f"agents.{key} must be an integer >= 1")
@@ -1459,12 +1461,15 @@ def dispatch_subagent_wave(
     if selected_math_route is not None:
         if math_intent_packet is None:
             raise RuntimeError("math_packet_missing")
+        normalized_math_intent_packet = normalize_mathematical_intent_packet(
+            math_intent_packet
+        )
         normalized_math_packet = mathematical_intent_packet_mapping(
-            normalize_mathematical_intent_packet(math_intent_packet)
+            normalized_math_intent_packet
         )
         if nonmath_handoff is not None:
             nonmath_handoffs = separate_nonmath_handoff_mapping(
-                normalized_math_packet
+                normalized_math_intent_packet
             )
     elif math_intent_packet is not None:
         raise RuntimeError("math_packet_not_applicable")

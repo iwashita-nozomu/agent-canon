@@ -3,6 +3,7 @@
 # responsibility AgentTeam packets owner module.
 # upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
 # upstream implementation ./team_config.py owns shared configuration normalizers.
+# upstream implementation ../../runtime/values.py refines decoded packet containers.
 # downstream implementation ./agent_team.py facade consumes packet APIs.
 # downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes packet APIs.
 # downstream implementation ../../validation/semantic/lifecycle/waterfall_gate_check.py consumes packet APIs.
@@ -17,9 +18,14 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Literal, TypedDict, cast
+from typing import Literal, TypedDict
 
 from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
+from tools.runtime.values import (
+    is_object_list,
+    is_object_list_or_tuple,
+    is_string_object_mapping,
+)
 
 
 if __package__:
@@ -278,7 +284,7 @@ def _math_packet_relative_paths(
     value: object, field: str, *, allow_empty: bool
 ) -> tuple[str, ...]:
     """Validate canonical relative paths carried by a math packet."""
-    if not isinstance(value, (list, tuple)) or (not allow_empty and not value):
+    if not is_object_list_or_tuple(value) or (not allow_empty and not value):
         raise RuntimeError(f"mathematical_intent_packet.{field}:list_required")
     result: list[str] = []
     for index, item in enumerate(value):
@@ -306,7 +312,7 @@ def _math_packet_strings(
     value: object, field: str, *, allow_empty: bool
 ) -> tuple[str, ...]:
     """Validate a non-empty list of labels or handoff references."""
-    if not isinstance(value, (list, tuple)) or (not allow_empty and not value):
+    if not is_object_list_or_tuple(value) or (not allow_empty and not value):
         raise RuntimeError(f"mathematical_intent_packet.{field}:list_required")
     result: list[str] = []
     for index, item in enumerate(value):
@@ -320,13 +326,13 @@ def _math_packet_strings(
 
 def _math_packet_map(value: object) -> tuple[Mapping[str, str], ...]:
     """Validate the equation-to-code correspondence rows."""
-    if not isinstance(value, list) or not value:
+    if not is_object_list(value) or not value:
         raise RuntimeError(
             "mathematical_intent_packet.equation_to_code_map:list_required"
         )
     rows: list[Mapping[str, str]] = []
     for index, raw_row in enumerate(value):
-        if not isinstance(raw_row, Mapping):
+        if not is_string_object_mapping(raw_row):
             raise RuntimeError(
                 f"mathematical_intent_packet.equation_to_code_map[{index}]:mapping_required"
             )
@@ -359,7 +365,7 @@ def normalize_mathematical_intent_packet(
     field_prefix: str = "mathematical_intent_packet",
 ) -> MathematicalIntentPacket:
     """Normalize one math packet and fail closed on incomplete correspondence."""
-    if not isinstance(raw_packet, Mapping):
+    if not is_string_object_mapping(raw_packet):
         raise RuntimeError(f"{field_prefix}:mapping_required")
     unknown = sorted(set(raw_packet).difference(MATHEMATICAL_INTENT_PACKET_FIELDS))
     missing = sorted(MATHEMATICAL_INTENT_PACKET_FIELDS.difference(raw_packet))
@@ -452,14 +458,9 @@ def mathematical_intent_packet_mapping(
 
 
 def separate_nonmath_handoff_mapping(
-    packet: MathematicalIntentPacket | Mapping[str, object],
+    packet: MathematicalIntentPacket,
 ) -> tuple[Mapping[str, object], ...]:
     """Materialize deferred parent-owned handoffs without creating writer paths."""
-    targets = (
-        packet.separate_handoff_targets
-        if isinstance(packet, MathematicalIntentPacket)
-        else tuple(str(item) for item in packet.get("separate_handoff_targets", ()))
-    )
     return tuple(
         {
             "target": target,
@@ -468,7 +469,7 @@ def separate_nonmath_handoff_mapping(
             "writer_tool_call": "none",
             "math_writer_paths": [],
         }
-        for target in targets
+        for target in packet.separate_handoff_targets
     )
 
 
@@ -528,11 +529,11 @@ def _math_intent_route_records(
 ) -> tuple[Mapping[str, object], ...]:
     """Return the canonical task-catalog math route records."""
     raw_routes = catalog.raw.get("math_intent_routes")
-    if not isinstance(raw_routes, Mapping):
+    if not is_string_object_mapping(raw_routes):
         raise RuntimeError("mathematical_intent_route:catalog_records_missing")
     records: list[Mapping[str, object]] = []
     for route_id, raw_record in raw_routes.items():
-        if not isinstance(raw_record, Mapping):
+        if not is_string_object_mapping(raw_record):
             raise RuntimeError(f"mathematical_intent_route:record_invalid:{route_id}")
         record = dict(raw_record)
         record.setdefault("id", route_id)
@@ -576,7 +577,7 @@ def validate_mathematical_intent_route(
     """Validate the selected task/workflow route that makes math mandatory."""
     if route_id is None:
         return None
-    if not isinstance(route_id, str) or route_id != MATHEMATICAL_INTENT_ROUTE_ID:
+    if route_id != MATHEMATICAL_INTENT_ROUTE_ID:
         raise RuntimeError(f"mathematical_intent_route:unknown_id:{route_id}")
     return route_id
 
@@ -599,9 +600,7 @@ def resolve_math_intent_packet_for_spec(
     mathematical_intent_route_config(spec.task_catalog, selected_route_id)
     if raw_packet is None:
         raise RuntimeError("math_packet_missing")
-    if isinstance(raw_packet, MathematicalIntentPacket):
-        return raw_packet
-    return normalize_mathematical_intent_packet(raw_packet)
+    return raw_packet
 
 
 def math_intent_route_id_for_spec(spec: RunBundleSpec) -> str | None:
@@ -717,7 +716,7 @@ def _packet_text_list(
 ) -> tuple[str, ...]:
     """Read a bounded list of non-empty packet references."""
     value = raw.get(field)
-    if not isinstance(value, list) or (not allow_empty and not value):
+    if not is_object_list(value) or (not allow_empty and not value):
         raise RuntimeError(f"{prefix}.{field}:list_required")
     normalized: list[str] = []
     for index, item in enumerate(value):
@@ -737,7 +736,7 @@ def normalize_owner_guarantee_packet(
     not decide whether the authority is valid, whether the mechanism is
     sufficient, or whether a repository may be published.
     """
-    if not isinstance(raw_packet, Mapping):
+    if not is_string_object_mapping(raw_packet):
         raise RuntimeError(f"{field_prefix}:mapping_required")
     unknown = sorted(set(raw_packet).difference(OWNER_GUARANTEE_PACKET_FIELDS))
     missing = sorted(OWNER_GUARANTEE_PACKET_FIELDS.difference(raw_packet))
@@ -808,16 +807,13 @@ def normalize_owner_guarantee_packet(
 def owner_receipt_key(packet: Mapping[str, object]) -> tuple[str, str, str, str, str]:
     """Return the existing lookup tuple used for receipt reuse/deduplication."""
     normalized = normalize_owner_guarantee_packet(packet)
-    return tuple(
-        str(normalized[field])
-        for field in (
-            "candidate_digest",
-            "property_ref",
-            "owner_ref",
-            "execution_plane",
-            "tool_input_locator",
-        )
-    )  # type: ignore[return-value]
+    return (
+        normalized["candidate_digest"],
+        normalized["property_ref"],
+        normalized["owner_ref"],
+        normalized["execution_plane"],
+        normalized["tool_input_locator"],
+    )
 
 
 def owner_receipt_is_compatible(
@@ -854,7 +850,7 @@ def normalize_owner_invalidation_packet(
     field_prefix: str = "owner_invalidation",
 ) -> dict[str, object]:
     """Normalize one bounded existing-DAG invalidation packet."""
-    if not isinstance(raw_packet, Mapping):
+    if not is_string_object_mapping(raw_packet):
         raise RuntimeError(f"{field_prefix}:mapping_required")
     unknown = sorted(set(raw_packet).difference(OWNER_INVALIDATION_PACKET_FIELDS))
     missing = sorted(OWNER_INVALIDATION_PACKET_FIELDS.difference(raw_packet))
@@ -862,7 +858,7 @@ def normalize_owner_invalidation_packet(
         raise RuntimeError(f"{field_prefix}:field_unknown:{','.join(unknown)}")
     if missing:
         raise RuntimeError(f"{field_prefix}:field_missing:{','.join(missing)}")
-    normalized = {
+    normalized: dict[str, object] = {
         "schema": _packet_text(raw_packet, "schema", field_prefix),
         **{
             field: _packet_text(raw_packet, field, field_prefix)
@@ -940,6 +936,15 @@ ActiveDesignSection = Literal[
     "design_to_implementation_trace",
 ]
 
+ActiveDesignReferenceField = Literal[
+    "clause_refs",
+    "owner_refs",
+    "source_refs",
+    "dependency_refs",
+    "output_refs",
+    "reviewer_refs",
+]
+
 ACTIVE_DESIGN_SECTIONS: tuple[ActiveDesignSection, ...] = (
     "abstract_design_frame",
     "implementation_source_packet",
@@ -947,7 +952,7 @@ ACTIVE_DESIGN_SECTIONS: tuple[ActiveDesignSection, ...] = (
     "design_to_implementation_trace",
 )
 
-ACTIVE_DESIGN_REFERENCE_FIELDS = (
+ACTIVE_DESIGN_REFERENCE_FIELDS: tuple[ActiveDesignReferenceField, ...] = (
     "clause_refs",
     "owner_refs",
     "source_refs",
@@ -1095,7 +1100,7 @@ def parse_typed_locator(
     value: str, *, field: str = "reference"
 ) -> dict[str, str | None]:
     """Parse a raw typed locator before path normalization or file access."""
-    if not isinstance(value, str) or not value:
+    if not value:
         raise RuntimeError(f"active_design_packet_reference_invalid:syntax:{value}")
     if value.startswith("repo:"):
         raise RuntimeError(f"active_design_packet_reference_ambiguous_root:{value}")
@@ -1125,7 +1130,7 @@ def _parse_typed_header(
     value: str,
 ) -> tuple[dict[str, str | None], dict[str, str | None], str, str]:
     """Parse a typed dependency header and return endpoint identities."""
-    if not isinstance(value, str) or value.startswith("header:") is False:
+    if not value.startswith("header:"):
         raise RuntimeError(f"active_design_packet_reference_invalid:dependency:{value}")
     if value.startswith("header:") and ("repo:" in value or "->repo:" in value):
         raise RuntimeError(f"active_design_packet_reference_ambiguous_root:{value}")
@@ -1231,7 +1236,7 @@ def normalize_active_design_packet_config(
     if not isinstance(document_flow_required, bool):
         raise RuntimeError(f"{field_prefix}:field_invalid:document_flow_required")
     raw_clauses = packet["clause_registry"]
-    if not isinstance(raw_clauses, list) or not raw_clauses:
+    if not is_object_list(raw_clauses) or not raw_clauses:
         raise RuntimeError(f"{field_prefix}.clause_registry:field_invalid")
     clauses: list[ActiveDesignClause] = []
     for index, raw_clause in enumerate(raw_clauses):
@@ -1258,7 +1263,7 @@ def normalize_active_design_packet_config(
     clause_ids = tuple(clause.clause_id for clause in clauses)
     if len(set(clause_ids)) != len(clause_ids):
         raise RuntimeError(f"{field_prefix}.clause_registry:duplicate_id")
-    entries = {
+    entries: dict[ActiveDesignSection, ActiveDesignPacketEntry] = {
         section: _normalize_active_packet_entry(packet[section], section, field_prefix)
         for section in ACTIVE_DESIGN_SECTIONS
     }
@@ -1361,12 +1366,20 @@ ACTIVE_DESIGN_PACKET_MATERIALIZATION_SCHEMA = (
 
 def _distinct_active_packet_references(
     packet: ActiveDesignPacketConfig,
-    field: str,
+    field: ActiveDesignReferenceField,
 ) -> tuple[str, ...]:
     """Return packet references once, preserving the declared order."""
     values: list[str] = []
     for _section, entry in packet.section_entries():
-        for reference in cast(tuple[str, ...], getattr(entry, field)):
+        references: dict[ActiveDesignReferenceField, tuple[str, ...]] = {
+            "clause_refs": entry.clause_refs,
+            "owner_refs": entry.owner_refs,
+            "source_refs": entry.source_refs,
+            "dependency_refs": entry.dependency_refs,
+            "output_refs": entry.output_refs,
+            "reviewer_refs": entry.reviewer_refs,
+        }
+        for reference in references[field]:
             if reference not in values:
                 values.append(reference)
     return tuple(values)
@@ -1485,26 +1498,24 @@ def active_design_packet_reference_projection(
         if reference.startswith("header:")
     )
     output_refs = _distinct_active_packet_references(packet, "output_refs")
-    role_output_projections = [
-        {
-            "role_ref": f"role:{role.id}",
-            "output_refs": [
-                f"artifact:{output}"
-                for output in selected_role_outputs(spec.config, role, packet)
-            ],
-        }
-        for role in spec.roles
-    ]
+    role_output_projections: list[dict[str, object]] = []
+    role_output_map: dict[str, list[str]] = {}
+    for role in spec.roles:
+        role_ref = f"role:{role.id}"
+        role_output_refs = [
+            f"artifact:{output}"
+            for output in selected_role_outputs(spec.config, role, packet)
+        ]
+        role_output_projections.append(
+            {"role_ref": role_ref, "output_refs": role_output_refs}
+        )
+        role_output_map[role_ref] = role_output_refs
     reviewer_refs = _distinct_active_packet_references(packet, "reviewer_refs")
     review_outputs = {
         f"artifact:{packet.design_review_artifact}",
         f"artifact:{packet.document_flow_review_artifact}",
     }
-    reviewer_projections = []
-    role_output_map = {
-        item["role_ref"]: cast(list[str], item["output_refs"])
-        for item in role_output_projections
-    }
+    reviewer_projections: list[dict[str, object]] = []
     for reviewer in reviewer_refs:
         matches = [
             output

@@ -21,11 +21,11 @@
 from __future__ import annotations
 
 if __package__:
-    from .implementation_dispatch import _capacity_projection as __capacity_projection
+    from .implementation_dispatch import capacity_projection
     from .implementation_dispatch import closeout_projection
 else:
     from tools.agent.orchestration.implementation_dispatch import (
-        _capacity_projection as __capacity_projection,
+        capacity_projection,
     )
     from tools.agent.orchestration.implementation_dispatch import (
         closeout_projection,
@@ -431,7 +431,7 @@ def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
     rendered["closeout_packet.json"] = (
         _json.dumps(
             {
-                "capacity_request": __capacity_projection(capacity_runtime, spec),
+                "capacity_request": capacity_projection(capacity_runtime, spec),
                 "closeout_packet": closeout_projection(capacity_runtime, spec),
             },
             indent=2,

@@ -142,6 +142,11 @@ class TeamConfig:
     artifacts: dict[str, str]
 
 
+def _empty_writer_targets() -> dict[str, WriterTarget | Mapping[str, object] | None]:
+    """Provide the empty value at the typed writer-target boundary."""
+    return {}
+
+
 @dataclass(frozen=True)
 class TaskCatalog:
     """Materialized task catalog."""
@@ -185,7 +190,9 @@ class RunBundleSpec:
     active_design_packet: ActiveDesignPacketConfig | None = None
     math_intent_route: str | None = None
     math_intent_packet: "MathematicalIntentPacket | None" = None
-    writer_targets: Mapping[str, object] = field(default_factory=dict)
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] = field(
+        default_factory=_empty_writer_targets
+    )
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
@@ -416,13 +423,10 @@ def default_specialists_for_task(
     task = resolve_task_spec(catalog, task_id)
     family = resolve_workflow_family(catalog, str(task["family"]))
     family_roles = family.get("roles", {})
-    if not isinstance(family_roles, dict):
+    if not is_string_object_dict(family_roles):
         raise RuntimeError(
             f"workflow family roles must be a mapping for {family['id']}"
         )
-    family_roles = as_object_mapping(
-        family_roles, f"workflow_families[{family['id']}].roles"
-    )
     family_specialists = as_string_tuple(
         family_roles.get("specialists"),
         f"workflow_families[{family['id']}].roles.specialists",
@@ -528,10 +532,10 @@ def workflow_always_on_roles(
     family_roles = family.get("roles", {})
     if not isinstance(family_roles, dict):
         return config.always_on_roles
-    family_roles = as_object_mapping(
-        family_roles,
-        f"workflow_families[{workflow_family_id}].roles",
-    )
+    if not is_string_object_dict(family_roles):
+        raise RuntimeError(
+            f"workflow_families[{workflow_family_id}].roles must be a mapping"
+        )
     if "always_on" not in family_roles:
         return config.always_on_roles
     role_ids = as_string_tuple(

@@ -6,6 +6,8 @@
 # downstream implementation ../agent/orchestration/capacity_handshake.py narrows lifecycle projection values
 # downstream implementation ../agent/orchestration/team_config.py narrows config values
 # downstream implementation ../agent/orchestration/implementation_dispatch.py narrows packet values
+# downstream implementation ../agent/orchestration/packets.py narrows packet values
+# downstream implementation ./manifest/manifest_rendering.py narrows rendering values
 # downstream implementation ../agent/skills/skill_shim_materializer.py narrows YAML frontmatter values
 # downstream implementation ./lifecycle/bootstrap_agent_run.py narrows command payload values
 # downstream implementation ./lifecycle/task_close.py narrows lifecycle artifact values
@@ -39,3 +41,10 @@ def is_string_object_dict(value: object) -> TypeGuard[dict[str, object]]:
 def is_object_list(value: object) -> TypeGuard[list[object]]:
     """Return whether a decoded value is a list of objects."""
     return isinstance(value, list)
+
+
+def is_object_list_or_tuple(
+    value: object,
+) -> TypeGuard[list[object] | tuple[object, ...]]:
+    """Refine the list-or-tuple container accepted by normalized packet APIs."""
+    return isinstance(value, (list, tuple))

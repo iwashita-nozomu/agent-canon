@@ -401,11 +401,18 @@ def materialize_subagent_spawn_tool_call(
         math_intent_route
         or (MATHEMATICAL_INTENT_ROUTE_ID if math_intent_packet is not None else None)
     )
+    separate_handoffs: tuple[Mapping[str, object], ...] = ()
     if selected_math_route is not None:
         if math_intent_packet is None:
             raise RuntimeError("math_packet_missing")
+        normalized_math_intent_packet = normalize_mathematical_intent_packet(
+            math_intent_packet
+        )
         normalized_math_packet = mathematical_intent_packet_mapping(
-            normalize_mathematical_intent_packet(math_intent_packet)
+            normalized_math_intent_packet
+        )
+        separate_handoffs = separate_nonmath_handoff_mapping(
+            normalized_math_intent_packet
         )
     elif math_intent_packet is not None:
         raise RuntimeError("math_packet_not_applicable")
@@ -440,7 +447,6 @@ def materialize_subagent_spawn_tool_call(
         }
         arguments["mathematical_intent_packet"] = normalized_math_packet
         argument_properties["mathematical_intent_packet"] = {"type": "object"}
-        separate_handoffs = separate_nonmath_handoff_mapping(normalized_math_packet)
         if separate_handoffs:
             arguments["separate_nonmath_handoffs"] = [
                 dict(item) for item in separate_handoffs
