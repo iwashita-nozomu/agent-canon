@@ -43,7 +43,7 @@ scope 確定後は同じ exact Git identity で再prepareし、current allowed p
 | --- | --- |
 | `prepare` | [事前条件と Checkout mode](../../documents/rule/repository-topic-clone.md#事前条件)、[作成・再利用と writer packet](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
 | `merge-main` | [事前条件](../../documents/rule/repository-topic-clone.md#事前条件)、[merge と authority](../../documents/rule/repository-topic-clone.md#clone-ライフサイクル) |
-| `finalize-merge` / `resume-merge` | [競合の再開条件](../../documents/rule/repository-topic-clone.md#競合の再開) と [再開コマンド](../../documents/tools/repository_topic_clone.md#競合の再開) |
+| `finalize-merge` | [競合の再開条件](../../documents/rule/repository-topic-clone.md#競合の再開) と [確定コマンド](../../documents/tools/repository_topic_clone.md#競合の再開) |
 | `cleanup`（不要になった時点） | [起動・保持判断と復元可能性・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
 
 `linked-worktree` の `cleanup --apply` は request の exact worktree/topic path を回収しますが、

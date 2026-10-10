@@ -1445,15 +1445,6 @@ def finalize_merge_main(
     return receipt
 
 
-def resume_merge_main(
-    request_state: RepositoryTopicCloneRequest,
-    *,
-    policy: RepositoryPolicyCallback | None = None,
-) -> MergeMainReceipt:
-    """Resume a stopped conflict through the native Git finalization route."""
-    return finalize_merge_main(request_state, policy=policy)
-
-
 def _read_json_artifact(path: Path | str, label: str) -> object:
     """Read one JSON artifact with a typed lifecycle error."""
     try:
@@ -1785,22 +1776,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
     )
 
-    resume = commands.add_parser(
-        "resume-merge",
-        help="Alias for finalize-merge after native index conflicts are resolved",
-    )
-    resume.add_argument("--url", required=True)
-    resume.add_argument("--repo-name", required=True)
-    resume.add_argument("--workspace-root", required=True)
-    resume.add_argument("--topic", required=True)
-    resume.add_argument("--branch", required=True)
-    resume.add_argument("--owner-evidence", required=True)
-    resume.add_argument(
-        "--checkout-mode",
-        choices=sorted(CHECKOUT_MODES),
-        required=True,
-    )
-
     clean = commands.add_parser("cleanup")
     clean.add_argument("--url", required=True)
     clean.add_argument("--repo-name", required=True)
@@ -1875,8 +1850,8 @@ def main(argv: list[str] | None = None) -> None:
             print(f"MERGE_INTEGRATED_SHA={receipt.merged_sha}")
             print(f"MERGE_INTEGRATED_TREE={receipt.merged_tree}")
             print(f"MERGE_ORIGIN_MAIN_SHA={receipt.origin_main_sha}")
-        elif args.command in {"finalize-merge", "resume-merge"}:
-            receipt = resume_merge_main(request_state)
+        elif args.command == "finalize-merge":
+            receipt = finalize_merge_main(request_state)
             print("MERGE_STATUS=finalized")
             print(f"MERGE_CLONE={receipt.clone}")
             print(f"MERGE_CANDIDATE_SHA={receipt.candidate_sha}")

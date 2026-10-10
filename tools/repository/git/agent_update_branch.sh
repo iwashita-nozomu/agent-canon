@@ -14,8 +14,8 @@ BASE_REF="${AGENT_UPDATE_BASE_REF:-origin/main}"
 usage() {
   cat <<'EOF'
 Usage:
-  bash tools/repository/git/agent_update_branch.sh validate <knowledge-eval|canon-pin|integration> [base-ref]
-  bash tools/repository/git/agent_update_branch.sh push <knowledge-eval|canon-pin|integration> <branch> [base-ref]
+  bash tools/repository/git/agent_update_branch.sh validate <knowledge-eval|integration> [base-ref]
+  bash tools/repository/git/agent_update_branch.sh push <knowledge-eval|integration> <branch> [base-ref]
 
 The command validates that an agent update branch only changes the allowed lane
 surface, then pushes the current HEAD to the requested branch.
@@ -41,15 +41,6 @@ path_allowed() {
       [[ "$path" == .codex/personal/skills/*/SKILL.md ]] && return 0
       [[ "$path" == reports/agents/*/agent_evaluation.md ]] && return 0
       [[ "$path" == reports/agents/*/workflow_monitoring.md ]] && return 0
-      return 1
-      ;;
-    canon-pin)
-      [[ "$path" == .agent-canon/* ]] && return 0
-      [[ "$path" == AGENTS.md ]] && return 0
-      [[ "$path" == .agents || "$path" == agents ]] && return 0
-      [[ "$path" == .codex/* || "$path" == .github/* ]] && return 0
-      [[ "$path" == documents/* || "$path" == documents/notes/* ]] && return 0
-      [[ "$path" == mcp || "$path" == tools || "$path" == tests/agent_tools/* || "$path" == tests/tools/* ]] && return 0
       return 1
       ;;
     integration)

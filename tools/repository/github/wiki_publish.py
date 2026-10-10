@@ -28,21 +28,11 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    from tools.repository.workspace.parent_root_side_effects import (
-        ParentRootReject,
-        ParentRootSideEffectError,
-    )
-except ImportError:
-    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootReject,
-        ParentRootSideEffectError,
-    )
-
-try:
-    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
-except ImportError:  # pragma: no cover - direct script execution
-    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
+from tools.repository.workspace.parent_root_side_effects import (
+    ParentRootReject,
+    ParentRootSideEffectError,
+)
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 
 MAX_ERROR_CHARS = 4000
 REMOTE_UNINITIALIZED = "REMOTE_UNINITIALIZED"

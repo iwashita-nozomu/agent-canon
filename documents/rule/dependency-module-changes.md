@@ -22,7 +22,8 @@ checkout path、branch reuse、`origin/main` merge、publication evidence、clea
 
 ## 責務境界
 
-- 親 repository の `.gitmodules` が module path、URL、任意 branch を所有する。
+- 親 repository の `.gitmodules` が module path と URL を所有する。topic branch は
+  `--branch` で明示し、generic clone owner がその branch lifecycle を扱う。
 - `dependency_module_change.py` は構造化 manifest から URL と repository name を解決し、
   generic `RepositoryTopicCloneRequest` を構成する。
 - `repository_topic_clone.py` が唯一の `workspace/<topic-slug>/<repo-name>` path、checkout mode、branch、

@@ -88,9 +88,6 @@ TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "task_clo
 WORKTREE_START_SCRIPT = (
     PROJECT_ROOT / "tools" / "repository" / "workspace" / "worktree_start.py"
 )
-SETUP_WORKTREE_SCRIPT = (
-    PROJECT_ROOT / "tools" / "repository" / "worktree" / "setup_worktree.sh"
-)
 TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
 # Keep test artifacts outside both the parent checkout and AgentCanon source;
 # the exact process-owned root is removed when the test process exits.
@@ -3127,39 +3124,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("cleanup diagnostic only", result.stderr)
-            self.assertFalse((workspace_root / ".worktrees").exists())
-
-    def test_setup_worktree_wrapper_rejects_legacy_creation(self) -> None:
-        """setup_worktree.sh should warn and stop instead of creating worktrees."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
-                ["git", "init"], cwd=workspace_root, check=True, capture_output=True
-            )
-
-            result = subprocess.run(
-                [
-                    "bash",
-                    str(SETUP_WORKTREE_SCRIPT),
-                    "feature/demo",
-                ],
-                cwd=workspace_root,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("SETUP_WORKTREE_FORWARDER=deprecated", result.stderr)
-            self.assertIn("CALLER_CHAIN=", result.stderr)
-            self.assertIn(
-                "tools/repository/workspace/repository_topic_clone.py prepare",
-                result.stderr,
-            )
-            self.assertIn("--checkout-mode linked-worktree", result.stderr)
-            self.assertIn("--checkout-mode independent-clone", result.stderr)
             self.assertFalse((workspace_root / ".worktrees").exists())
 
     def test_task_close_rejects_locked_bundle(self) -> None:
