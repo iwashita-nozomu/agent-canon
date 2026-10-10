@@ -18,6 +18,7 @@ import os
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
@@ -42,6 +43,7 @@ from tools.agent.skills.skill_dependency_map import (  # noqa: E402
     render_graph_mermaid,
     write_artifacts,
 )
+from tools.agent.skills.skill_route_catalog import SkillOrderConstraint  # noqa: E402
 
 
 class SkillToolInvocationGraphTests(unittest.TestCase):
@@ -224,7 +226,6 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             {edge["display_label"] for edge in graph["edges"]},
             {
                 "prerequisite",
-                "order",
                 "routing",
                 "parallel",
             },
@@ -237,6 +238,59 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         )
         self.assertNotIn("coverage_refs", graph["manifest"])
         self.assertNotIn("coverage_ref", graph["readback"])
+
+    def test_graph_materializes_public_order_constraint(self) -> None:
+        """Explicit dependency-map order constraints produce ordered graph edges."""
+        before = "repo-onboarding"
+        after = "start-repository"
+        constraint = SkillOrderConstraint(
+            before=before,
+            after=after,
+            reason="test explicit order",
+        )
+        dependency_rules = dict(
+            skill_dependency_map.load_skill_dependency_map(PROJECT_ROOT)
+        )
+        dependency_rules[before] = replace(
+            dependency_rules[before], order_constraints=(constraint,)
+        )
+        route_rules = tuple(
+            replace(rule, order_constraints=(constraint,))
+            if rule.skill == before
+            else rule
+            for rule in skill_dependency_map.load_skill_route_rules(PROJECT_ROOT)
+        )
+
+        with (
+            mock.patch.object(
+                skill_dependency_map,
+                "load_skill_dependency_map",
+                return_value=dependency_rules,
+            ),
+            mock.patch.object(
+                skill_dependency_map,
+                "load_skill_route_rules",
+                return_value=route_rules,
+            ),
+        ):
+            graph = build_graph(PROJECT_ROOT)
+
+        order_edges = [
+            (edge["source_ref"]["id"], edge["target_ref"]["id"])
+            for edge in graph["edges"]
+            if edge["display_label"] == "order"
+        ]
+        self.assertEqual(
+            order_edges,
+            [(f"skill:{before}", f"skill:{after}")],
+        )
+        invocation_order = [
+            item["ref"]["id"] for item in graph["invocation_order"]
+        ]
+        self.assertLess(
+            invocation_order.index(f"skill:{before}"),
+            invocation_order.index(f"skill:{after}"),
+        )
 
     def test_identity_payloads_are_unique_and_all_projections_are_refs(self) -> None:
         """Each full payload appears once and every envelope resolves through a Ref."""
