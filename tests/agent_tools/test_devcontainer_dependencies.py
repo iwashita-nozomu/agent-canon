@@ -4305,9 +4305,7 @@ class DependencyModelTests(unittest.TestCase):
         )
         self.assertIn("dependency_plan.py", dockerfile)
         self.assertIn("image-install --workspace /src", dockerfile)
-        self.assertIn(
-            "CARGO_HOME=/var/lib/agent-canon/cache/cargo", dockerfile
-        )
+        self.assertIn("CARGO_HOME=/var/lib/agent-canon/cache/cargo", dockerfile)
         self.assertIn(
             "PATH=/var/lib/agent-canon/cache/bin:/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin",
             dockerfile,
