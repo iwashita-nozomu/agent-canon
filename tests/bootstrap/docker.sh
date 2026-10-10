@@ -19,11 +19,28 @@ if [[ "${RUNTIME_ROOT}" != /* || "${RUNTIME_ROOT}" == "/" || ! -d "${RUNTIME_ROO
   exit 2
 fi
 
-TEST_WORKAREA="$(mktemp -d "${RUNTIME_ROOT}/live-projection-1370.XXXXXX")"
-IMAGE_TAG="agent-canon-live-projection:${TEST_WORKAREA##*/}-$$"
 SOURCE_IMAGE="/opt/agent-canon/source"
 TEST_NODE="${SOURCE_IMAGE}/tests/bootstrap/test_live_projection_authority.py::test_topic_registration_anchor_status_remove_share_projection"
 IMAGE_BUILT=0
+
+cleanup() {
+  local status=$?
+  local cleanup_status=0
+  trap - EXIT INT TERM
+
+  if [[ "${IMAGE_BUILT}" -eq 1 ]] && ! docker image rm -- "${IMAGE_TAG}"; then
+    echo "failed to remove task-owned test image ${IMAGE_TAG}" >&2
+    cleanup_status=1
+  fi
+  if ! rm -rf -- "${TEST_WORKAREA}"; then
+    echo "failed to remove task-owned test workarea ${TEST_WORKAREA}" >&2
+    cleanup_status=1
+  fi
+  if [[ "${status}" -eq 0 && "${cleanup_status}" -ne 0 ]]; then
+    status="${cleanup_status}"
+  fi
+  exit "${status}"
+}
 
 # Match Docker CLI precedence without forwarding its context or auth files:
 # DOCKER_CONTEXT wins, then DOCKER_HOST, then the configured current context.
@@ -46,27 +63,11 @@ case "${DOCKER_ENDPOINT}" in
     ;;
 esac
 
-cleanup() {
-  local status=$?
-  local cleanup_status=0
-  trap - EXIT INT TERM
-
-  if [[ "${IMAGE_BUILT}" -eq 1 ]] && ! docker image rm -- "${IMAGE_TAG}"; then
-    echo "failed to remove task-owned test image ${IMAGE_TAG}" >&2
-    cleanup_status=1
-  fi
-  if ! rm -rf -- "${TEST_WORKAREA}"; then
-    echo "failed to remove task-owned test workarea ${TEST_WORKAREA}" >&2
-    cleanup_status=1
-  fi
-  if [[ "${status}" -eq 0 && "${cleanup_status}" -ne 0 ]]; then
-    status="${cleanup_status}"
-  fi
-  exit "${status}"
-}
+TEST_WORKAREA="$(mktemp -d "${RUNTIME_ROOT}/live-projection-1370.XXXXXX")"
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+IMAGE_TAG="agent-canon-live-projection:${TEST_WORKAREA##*/}-$$"
 
 docker build \
   --file "${SCRIPT_DIR}/Dockerfile.live" \
