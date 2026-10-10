@@ -219,7 +219,9 @@ def validate_protecting_tools(
         if not any(candidate.exists() for candidate in candidates):
             findings.append(Finding("scope_tool", scope.scope_id, f"missing:{tool}"))
         if logical_tool not in catalog_paths:
-            findings.append(Finding("scope_tool", scope.scope_id, f"uncataloged:{tool}"))
+            findings.append(
+                Finding("scope_tool", scope.scope_id, f"uncataloged:{tool}")
+            )
     return findings
 
 
@@ -233,7 +235,14 @@ def tracked_paths(root: Path) -> tuple[str, ...]:
     )
     if result.returncode == 0:
         return tuple(path for path in result.stdout.splitlines() if path)
-    ignored = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", "reports", "target"}
+    ignored = {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "reports",
+        "target",
+    }
     paths: list[str] = []
     for path in root.rglob("*"):
         if not path.is_file():
@@ -249,11 +258,15 @@ def ownership_findings(paths: Sequence[str], scopes: Sequence[Scope]) -> list[Fi
     """Validate that tracked-path ownership is a total single-valued relation."""
     findings: list[Finding] = []
     for path in paths:
-        scope_ids = tuple(scope.scope_id for scope in scopes if scope_covers(scope, path))
+        scope_ids = tuple(
+            scope.scope_id for scope in scopes if scope_covers(scope, path)
+        )
         if not scope_ids:
             findings.append(Finding("scope_unowned", path, "no-owning-scope"))
         elif len(scope_ids) > 1:
-            findings.append(Finding("scope_overlap", path, "scopes:" + ",".join(scope_ids)))
+            findings.append(
+                Finding("scope_overlap", path, "scopes:" + ",".join(scope_ids))
+            )
     return findings
 
 

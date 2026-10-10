@@ -16,7 +16,14 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "validation" / "semantic" / "tools" / "tool_rejection_preflight.py"
+TOOL = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "tools"
+    / "tool_rejection_preflight.py"
+)
 
 
 class ToolRejectionPreflightTest(unittest.TestCase):
@@ -26,7 +33,9 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         """CLI guidance must not reintroduce a mandatory edit preflight."""
         result = subprocess.run(
             [sys.executable, str(TOOL), "--help"],
-            check=True, capture_output=True, text=True,
+            check=True,
+            capture_output=True,
+            text=True,
         )
         help_text = " ".join(result.stdout.split())
         self.assertIn("Optionally predict candidate", help_text)
@@ -321,7 +330,10 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             for gate in payload["predicted_gates"]
             if gate["gate"] == "experiment_execution_surface_guard"
         )
-        self.assertIn("tools.validation.ci.checks.check_experiment_registry", guarded_gate["command"])
+        self.assertIn(
+            "tools.validation.ci.checks.check_experiment_registry",
+            guarded_gate["command"],
+        )
         self.assertIn("test_run_managed_experiment.py", guarded_gate["command"])
         self.assertIn("$experiment-lifecycle", guarded_gate["handoff"])
         self.assertIn("$test-design", guarded_gate["handoff"])
