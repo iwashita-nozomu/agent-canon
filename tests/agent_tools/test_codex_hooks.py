@@ -25,19 +25,17 @@ from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 from unittest import mock
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
-HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 import hook_dispatcher
 import hook_event_log
-
 from tools.agent.orchestration.prompt_classifier import (
     PromptClassifierInputs,
     prompt_intake_signals,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
+HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
 RETIRED_ROUTE_TABLE = (

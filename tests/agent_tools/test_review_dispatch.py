@@ -8,20 +8,18 @@
 
 from __future__ import annotations
 
-import sys
 import tempfile
 import unittest
 from collections.abc import Mapping
 from pathlib import Path
 from unittest.mock import patch
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT))
-
 from tools.agent.orchestration import review_dispatch
 from tools.runtime.artifacts.artifact_identity import (
     canonical_body_sha256,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def candidate() -> dict[str, object]:

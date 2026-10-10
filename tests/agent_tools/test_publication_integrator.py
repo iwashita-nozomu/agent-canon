@@ -10,15 +10,11 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from unittest.mock import patch
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from tools.repository.github.publication_integrator import (
     CANONICAL_INTERFACE_PATH,
@@ -32,6 +28,8 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
     materialize_gate_verdict,
 )
 from tools.runtime.values import is_string_object_mapping
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def lifecycle_binding() -> dict[str, object]:
@@ -263,7 +261,11 @@ class PublicationIntegratorTest(unittest.TestCase):
                 authority = authority_for(interface_path)
                 with (
                     patch.dict(
-                        os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+                        os.environ,
+                        {
+                            "AGENT_CANON_PARENT_ROOT": str(parent_root),
+                            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": str(parent_root),
+                        },
                     ),
                     patch(
                         "tools.repository.github.publication_integrator.resolve_publication_authority",
