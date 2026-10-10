@@ -643,17 +643,19 @@ def resolve_publication_authority(
         "candidate_commit": candidate_commit,
         "candidate_tree": candidate_tree,
     }
+    source = {"commit": source_commit, "tree": source_tree}
+    validation_provenance_ref = {
+        "validation_result_id": validation["validation_result_id"],
+        "validation_result_body_sha256": validation[
+            "validation_result_body_sha256"
+        ],
+    }
     selection_payload = {
         "candidate_authority": candidate_authority,
         "owner_receipt_projection": receipt_projection,
-        "source": {"commit": source_commit, "tree": source_tree},
+        "source": source,
         "target": target,
-        "validation_provenance_ref": {
-            "validation_result_id": validation["validation_result_id"],
-            "validation_result_body_sha256": validation[
-                "validation_result_body_sha256"
-            ],
-        },
+        "validation_provenance_ref": validation_provenance_ref,
     }
     selection_sha256 = hashlib.sha256(
         canonical_json_bytes(selection_payload)
@@ -665,7 +667,11 @@ def resolve_publication_authority(
         "state": "selected",
         "selection_version": 1,
         "selection_owner": "completion_authority",
-        **selection_payload,
+        "candidate_authority": candidate_authority,
+        "owner_receipt_projection": receipt_projection,
+        "source": source,
+        "target": target,
+        "validation_provenance_ref": validation_provenance_ref,
         "selection_sha256": selection_sha256,
         "owner_attestation": {
             "scheme": "agent-canon-ledger-publication-authority-v3",

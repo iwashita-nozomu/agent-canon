@@ -374,8 +374,9 @@ class PublicationIntegratorTest(unittest.TestCase):
         self.assertEqual(receipt["result_tree_oid"], server_tree)
         self.assertEqual(receipt["post_cas_ref_oid"], server_result)
         gate = receipt["remote_publication_readback_gate"]
-        self.assertIsInstance(gate, dict)
-        self.assertEqual(gate["gate_id"], "G5")
+        if not is_string_object_mapping(gate):
+            raise AssertionError("publication omitted its readback gate")
+        self.assertEqual(gate.get("gate_id"), "G5")
 
     def test_boundary_gate_identity_is_distinct_and_replay_stable(self) -> None:
         """The lifecycle owner separates gate identities and stabilizes replay."""
