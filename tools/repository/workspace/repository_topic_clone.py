@@ -849,17 +849,16 @@ def _update_existing_prepare_metadata(
         or packet_target.as_dict() != target.as_dict()
         or packet_identity != checkout_identity
     )
-    if not marker_changed and not packet_changed:
-        return None
 
-    # This owner operation changes only the canonical task marker, the reserved
-    # writer-packet ignore entry, and that ignored packet. Source files and the
-    # Git index remain untouched.
+    # Current metadata is a read-only reuse receipt; update only reserved metadata
+    # whose observed values actually changed.
     effective_request = request
-    updated_packet: Path | None = None
+    updated_packet: Path | None = (
+        clone / WRITER_TARGET_PACKET_RELATIVE if packet_target is not None else None
+    )
     if target is not None:
-        exclude = _git_path(clone, "info/exclude")
         if packet_target is not None:
+            exclude = _git_path(clone, "info/exclude")
             try:
                 exclude_bytes = _parent_boundary.read_parent_owned_bytes(
                     parent_attestation,
@@ -878,21 +877,26 @@ def _update_existing_prepare_metadata(
                 return None
             if WRITER_TARGET_PACKET_RELATIVE.as_posix() not in excluded_lines:
                 return None
-        _ensure_writer_target_packet_ignored(clone, parent_attestation)
-        try:
-            updated_packet = materialize_writer_target_packet(target, checkout_identity)
-            updated_target, updated_identity = read_writer_target_packet(clone)
-        except WriterTargetError as exc:
-            raise RepositoryTopicCloneError(
-                "writer_target_packet:metadata_update_failed"
-            ) from exc
-        if (
-            updated_target.as_dict() != target.as_dict()
-            or updated_identity != checkout_identity
-        ):
-            raise RepositoryTopicCloneError(
-                "writer_target_packet:metadata_update_readback_mismatch"
-            )
+        if packet_changed:
+            # Only changed reserved metadata is written; source files and the
+            # Git index remain untouched.
+            _ensure_writer_target_packet_ignored(clone, parent_attestation)
+            try:
+                updated_packet = materialize_writer_target_packet(
+                    target, checkout_identity
+                )
+                updated_target, updated_identity = read_writer_target_packet(clone)
+            except WriterTargetError as exc:
+                raise RepositoryTopicCloneError(
+                    "writer_target_packet:metadata_update_failed"
+                ) from exc
+            if (
+                updated_target.as_dict() != target.as_dict()
+                or updated_identity != checkout_identity
+            ):
+                raise RepositoryTopicCloneError(
+                    "writer_target_packet:metadata_update_readback_mismatch"
+                )
         if not request.allowed_paths:
             effective_request = replace(request, allowed_paths=target.allowed_paths)
     if marker_changed:
