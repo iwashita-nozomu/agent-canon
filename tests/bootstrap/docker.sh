@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Runs AgentCanon live and native proof regressions in one disposable test image.
+# responsibility Runs AgentCanon live, native proof, and full-check profiles in one disposable test image.
 # upstream implementation ./Dockerfile.live provides Python, Git, and Docker CLI
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh owns the full-check body
 # downstream test ./test_live_projection_authority.py validates live projection authority
 # downstream design ./lean-proof-dependencies.toml pins the native proof toolchain
 # downstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs the selected proof profile dependencies
@@ -16,7 +17,7 @@ source "${SCRIPT_DIR}/../../tools/repository/support/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 
 usage() {
-  printf 'usage: %s [live-projection|lean-proof]\n' "${BASH_SOURCE[0]}" >&2
+  printf 'usage: %s [live-projection|lean-proof|full-checks]\n' "${BASH_SOURCE[0]}" >&2
 }
 
 if [[ "$#" -gt 1 ]]; then
@@ -25,7 +26,7 @@ if [[ "$#" -gt 1 ]]; then
 fi
 TEST_PROFILE="${1:-live-projection}"
 case "${TEST_PROFILE}" in
-  live-projection|lean-proof) ;;
+  live-projection|lean-proof|full-checks) ;;
   *)
     usage
     exit 2
@@ -121,15 +122,36 @@ IMAGE_TAG=""
 cleanup() {
   local status=$?
   local cleanup_status=0
+  local image_cleanup=not-built
+  local workarea_cleanup=not-removed
   trap - EXIT INT TERM
 
-  if [[ "${IMAGE_BUILT}" -eq 1 ]] && ! docker image rm -- "${IMAGE_TAG}"; then
-    echo "failed to remove task-owned test image ${IMAGE_TAG}" >&2
-    cleanup_status=1
+  if [[ "${IMAGE_BUILT}" -eq 1 ]]; then
+    if ! docker image rm -- "${IMAGE_TAG}"; then
+      echo "failed to remove task-owned test image ${IMAGE_TAG}" >&2
+      cleanup_status=1
+    elif docker image inspect "${IMAGE_TAG}" >/dev/null 2>&1; then
+      echo "task-owned test image remains after removal: ${IMAGE_TAG}" >&2
+      cleanup_status=1
+    else
+      image_cleanup=removed
+    fi
   fi
   if ! rm -rf -- "${TEST_WORKAREA}"; then
     echo "failed to remove task-owned test workarea ${TEST_WORKAREA}" >&2
     cleanup_status=1
+  elif [[ -e "${TEST_WORKAREA}" ]]; then
+    echo "task-owned test workarea remains after removal: ${TEST_WORKAREA}" >&2
+    cleanup_status=1
+  else
+    workarea_cleanup=removed
+  fi
+  if [[ "${cleanup_status}" -eq 0 ]]; then
+    printf 'AGENT_CANON_TEST_CLEANUP=pass image=%s workarea=%s\n' \
+      "${image_cleanup}" "${workarea_cleanup}"
+  else
+    printf 'AGENT_CANON_TEST_CLEANUP=fail image=%s workarea=%s\n' \
+      "${image_cleanup}" "${workarea_cleanup}" >&2
   fi
   if [[ "${status}" -eq 0 && "${cleanup_status}" -ne 0 ]]; then
     status="${cleanup_status}"
@@ -165,13 +187,24 @@ TEST_WORKAREA="$(mktemp -d)"
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-IMAGE_TAG="agent-canon-live-test:${TEST_WORKAREA##*/}-$$"
+IMAGE_TAG="agent-canon-test:${TEST_PROFILE}-${TEST_WORKAREA##*/}-$$"
+SOURCE_REVISION="$(git -C "${WORKSPACE_ROOT}" rev-parse HEAD)"
 
 docker build \
+  --build-arg "TEST_PROFILE=${TEST_PROFILE}" \
+  --build-arg "SOURCE_REVISION=${SOURCE_REVISION}" \
   --file "${SCRIPT_DIR}/Dockerfile.live" \
   --tag "${IMAGE_TAG}" \
   "${WORKSPACE_ROOT}"
 IMAGE_BUILT=1
+IMAGE_ID="$(docker image inspect --format '{{.Id}}' "${IMAGE_TAG}")"
+IMAGE_REVISION="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "${IMAGE_TAG}")"
+if [[ "${IMAGE_REVISION}" != "${SOURCE_REVISION}" ]]; then
+  echo "test image source revision mismatch: expected ${SOURCE_REVISION}, got ${IMAGE_REVISION}" >&2
+  exit 1
+fi
+printf 'AGENT_CANON_TEST_SOURCE_REVISION=%s\n' "${SOURCE_REVISION}"
+printf 'AGENT_CANON_TEST_IMAGE_ID=%s\n' "${IMAGE_ID}"
 
 DOCKER_RUN_ARGS=(
   --rm
@@ -188,9 +221,24 @@ if [[ "${TEST_PROFILE}" == "live-projection" ]]; then
   )
   DOCKER_WORKDIR="${TEST_WORKAREA}"
   DOCKER_COMMAND=(python3 -m pytest -vv "${TEST_NODE}")
-else
+elif [[ "${TEST_PROFILE}" == "lean-proof" ]]; then
   DOCKER_WORKDIR="${SOURCE_IMAGE}"
   DOCKER_COMMAND=(bash -euo pipefail -c "${LEAN_PROOF_COMMAND}")
+else
+  mkdir -p \
+    "${TEST_WORKAREA}/control" \
+    "${TEST_WORKAREA}/runtime" \
+    "${TEST_WORKAREA}/cache/home"
+  DOCKER_RUN_ARGS+=(
+    --read-only
+    --tmpfs /tmp:rw,nosuid,nodev
+    --env "AGENT_CANON_CONTROL_PARENT_ROOT=${TEST_WORKAREA}/control"
+    --env "AGENT_CANON_CHILD_PURPOSE=standalone-static-gate-unit"
+    --env "AGENT_CANON_CLI_CMD=/usr/local/bin/agent-canon"
+    --env "HOME=${TEST_WORKAREA}/cache/home"
+  )
+  DOCKER_WORKDIR="${SOURCE_IMAGE}"
+  DOCKER_COMMAND=(bash "${SOURCE_IMAGE}/tools/validation/ci/runners/run_all_checks.sh")
 fi
 
 # Clear root-owned task files before the host removes the empty workarea directory.
@@ -218,7 +266,13 @@ trap "exit 143" TERM
   "${DOCKER_COMMAND[@]}"
 )
 
-docker run "${DOCKER_RUN_ARGS[@]}" \
+if docker run "${DOCKER_RUN_ARGS[@]}" \
   --workdir "${DOCKER_WORKDIR}" \
   "${IMAGE_TAG}" \
-  "${DOCKER_COMMAND[@]}"
+  "${DOCKER_COMMAND[@]}"; then
+  printf 'AGENT_CANON_TEST_STATUS=pass profile=%s\n' "${TEST_PROFILE}"
+else
+  status=$?
+  printf 'AGENT_CANON_TEST_STATUS=fail profile=%s exit=%s\n' "${TEST_PROFILE}" "${status}"
+  exit "${status}"
+fi

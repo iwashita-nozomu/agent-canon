@@ -1,17 +1,30 @@
 # @dependency-start
 # contract environment
-# responsibility Defines the disposable test image for AgentCanon live and native
-# proof checks.
+# responsibility Defines the disposable test image for AgentCanon live, native
+# proof, and full-check profiles.
 # upstream implementation ./docker.sh selects and runs each test capability profile
 # downstream design ./lean-proof-dependencies.toml pins the native Lean test toolchain
 # downstream test ./test_live_projection_authority.py exercises the shared host Docker daemon
+# downstream implementation ../../bootstrap/container/image/dependencies.toml pins full-check providers
 # downstream implementation ../../tools/analysis/proof/lean_proof_env.py owns native Lean behavior
 # @dependency-end
 
 FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
 
+ARG TEST_PROFILE=live-projection
+ARG SOURCE_REVISION=unknown
+ARG TARGETARCH
+
 ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    CARGO_HOME=/usr/local/share/agent-canon/test-toolchains/cargo \
+    RUSTUP_HOME=/usr/local/share/agent-canon/test-toolchains/rustup \
+    PIPX_HOME=/usr/local/share/agent-canon/test-toolchains/pipx \
+    PIPX_BIN_DIR=/usr/local/bin \
+    PATH=/usr/local/share/agent-canon/test-toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
+
+LABEL org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      io.agent-canon.test.profile="${TEST_PROFILE}"
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
@@ -26,3 +39,38 @@ RUN apt-get update \
 
 WORKDIR /opt/agent-canon/source
 COPY . /opt/agent-canon/source
+
+# The full-check profile uses the same typed providers as the shared image,
+# but installs only the tools required by run_all_checks. Its source snapshot
+# is Git-backed for the existing repository-root and graph checkers, then made
+# read-only before the test container runs it.
+RUN if [ "${TEST_PROFILE}" = "full-checks" ]; then \
+      apt-get update; \
+      apt-get install --yes --no-install-recommends build-essential python3-yaml; \
+      case "${TARGETARCH}" in \
+        amd64) rustup_target=x86_64-unknown-linux-gnu; rustup_sha=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c ;; \
+        arm64) rustup_target=aarch64-unknown-linux-gnu; rustup_sha=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c ;; \
+        *) echo "unsupported_target_arch=${TARGETARCH}" >&2; exit 2 ;; \
+      esac; \
+      install -d -m 0755 "${CARGO_HOME}" "${RUSTUP_HOME}" "${PIPX_HOME}"; \
+      curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output /usr/local/bin/rustup-init "https://static.rust-lang.org/rustup/archive/1.28.2/${rustup_target}/rustup-init"; \
+      echo "${rustup_sha}  /usr/local/bin/rustup-init" | sha256sum --check --strict; \
+      chmod 0555 /usr/local/bin/rustup-init; \
+      rustup-init -y --no-modify-path --default-toolchain none; \
+      python3 -m tools.analysis.dependencies.dependency_plan image-install \
+        --workspace /opt/agent-canon/source \
+        --manifest /opt/agent-canon/source/bootstrap/container/image/dependencies.toml \
+        --records ruff basedpyright shellcheck actionlint zizmor rust-toolchain python3-pytest \
+        --format text; \
+      CARGO_TARGET_DIR=/tmp/agent-canon-test-cargo-target cargo build \
+        --locked --release \
+        --manifest-path /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/Cargo.toml; \
+      install -m 0555 /tmp/agent-canon-test-cargo-target/release/agent-canon /usr/local/bin/agent-canon; \
+      git -C /opt/agent-canon/source init --quiet --initial-branch=main; \
+      git -C /opt/agent-canon/source config user.name "AgentCanon test image"; \
+      git -C /opt/agent-canon/source config user.email "agent-canon-test-image@example.invalid"; \
+      git -C /opt/agent-canon/source add --all; \
+      git -C /opt/agent-canon/source commit --quiet -m "AgentCanon source snapshot ${SOURCE_REVISION}"; \
+      chmod -R a-w /opt/agent-canon/source; \
+      rm -rf /tmp/agent-canon-test-cargo-target /tmp/* /var/lib/apt/lists/*; \
+    fi
