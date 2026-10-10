@@ -136,13 +136,16 @@ update, and sync paths derive a new image reference.
 
 ## Command Shape
 
-The install root is the source input; the effective runtime is always the fixed
-bootstrap path `<control-parent-root>/.runtime`:
+Use the absolute installed AgentCanon source root as `INSTALL_ROOT`; the
+project or topic checkout is a separate `--root` target. The effective runtime
+is always the fixed bootstrap path `<control-parent-root>/.runtime`:
 
 ```bash
-bash bootstrap.sh \
-  --repository-root . \
-  --control-parent-root <authorized-parent-workspace> \
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
+ROOT=<authorized-parent-workspace>
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
+"$BOOTSTRAP" "${COMMON[@]}" \
   tool run --root <project-root> <catalog-id> -- <args...>
 ```
 

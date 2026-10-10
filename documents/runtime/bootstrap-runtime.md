@@ -72,9 +72,10 @@ Every command starts with the install root and explicit control root. The
 persistent runtime defaults to the control root's ignored `.runtime/`:
 
 ```bash
-BOOTSTRAP=./bootstrap.sh
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
 ROOT=<authorized-parent-root>
-COMMON=(--control-parent-root "$ROOT")
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
 ```
 
 `--control-parent-root` is the authorized parent repository root and selects
