@@ -3736,9 +3736,7 @@ class BootstrapRuntime:
             raise
         return descriptor
 
-    def _reconcile_process_task_leases_locked(
-        self, state: dict[str, Any]
-    ) -> None:
+    def _reconcile_process_task_leases_locked(self, state: dict[str, Any]) -> None:
         """Release only process-owned leases whose inherited lock has drained."""
         tasks = state.get("tasks", {})
         if not isinstance(tasks, dict):

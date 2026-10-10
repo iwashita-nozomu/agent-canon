@@ -720,9 +720,7 @@ def test_resident_exec_passes_process_lease_to_worker(
     lease_fd = os.open(lease_path, os.O_CREAT | os.O_RDWR, 0o600)
     observed: dict[str, tuple[int, ...]] = {}
 
-    def fake_run(
-        argv: list[str], **kwargs: Any
-    ) -> subprocess.CompletedProcess[str]:
+    def fake_run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         observed["pass_fds"] = tuple(kwargs["pass_fds"])
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
