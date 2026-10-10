@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Rejects legacy setup worktree repository automation.
-# upstream design README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 set -euo pipefail

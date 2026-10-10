@@ -2,15 +2,15 @@
 # @dependency-start
 # contract tool
 # responsibility Validates the structured AgentCanon tool catalog.
-# upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
-# upstream design ../../tools/README.md shared tool family ownership
-# upstream design ../../documents/tools/README.md root-facing tool entrypoint policy
-# upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
-# upstream implementation ./visualization_contract.py canonical typed visualization contract/checker
-# upstream design ../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
-# upstream implementation ./tool_path_policy.py defines retired legacy path policy
-# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs catalog validation
-# downstream implementation ../../tests/agent_tools/test_tool_catalog.py tests validator
+# upstream design ../../catalog.yaml structured AgentCanon tool catalog
+# upstream design ../../README.md shared tool family ownership
+# upstream design ../../../documents/tools/README.md root-facing tool entrypoint policy
+# upstream design ../../../documents/tools/tool-docs.toml one-to-one tool documentation map
+# upstream implementation ../../validation/semantic/tools/visualization_contract.py canonical typed visualization contract/checker
+# upstream design ../../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
+# upstream implementation ../authority/tool_path_policy.py defines retired legacy path policy
+# downstream implementation ../../validation/ci/runners/run_all_checks.sh runs catalog validation
+# downstream implementation ../../../tests/agent_tools/test_tool_catalog.py tests validator
 # @dependency-end
 """Validate the structured AgentCanon tool catalog."""
 

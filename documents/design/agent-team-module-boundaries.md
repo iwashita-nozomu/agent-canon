@@ -2,8 +2,8 @@
 @dependency-start
 contract design
 responsibility Defines the approved Python module-boundary target for AgentTeam runtime orchestration.
-upstream design README.md design index and evidence-ledger policy
-upstream design dependency-manifest-design.md dependency graph and claim-evidence contract
+upstream design README.md design index and source-reference policy
+upstream design dependency-manifest-design.md dependency-manifest graph semantics
 upstream design ../../agents/COMMUNICATION_PROTOCOL.md active-design packet and caller readback contract
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow and repository-changing gate
 downstream implementation ../../tools/agent/orchestration/agent_team.py facade and public-surface source
@@ -21,7 +21,6 @@ downstream implementation ../../tools/runtime/lifecycle/task_close.py close-agen
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py runtime alignment caller
 downstream implementation ../../tools/validation/semantic/authority/validate_role_write_scope.py write-scope caller
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py lifecycle event caller
-downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py changed design claim checker
 downstream design README.md AgentCanon design reader index
 @dependency-end
 -->
@@ -72,7 +71,7 @@ flowchart LR
 | document unit | Python runtime の module boundary `tools/agent/orchestration/agent_team.py`、public import surface、side effect、validation route `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` |
 | document split decision | `split:semantic-index-module-boundaries.md`。Rust CLI/cache は別 owner、別 compiler、別 behavior oracle |
 | invalid split boundaries | line count、token budget、chunking convenience、近い path、同じ test oracle |
-| validation gate | fresh graph、`agent-canon docs check`、changed design claim checker、既存 Python static/behavior checks |
+| validation gate | changed dependency/header checks、`agent-canon docs check`、direct source readback、既存 Python static/behavior checks |
 
 行数や token 数で module を割りません。各 owner `tools/agent/orchestration/team_config.py` は独立した責務、依存方向 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`、
 validation route、rollback 単位を持つ replaceable responsibility unit `tools/agent/orchestration/agent_team.py` とします `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
@@ -211,7 +210,7 @@ tools/
 `ReportBundleArtifactPathError`, `active_design_packet_mapping`,
 `normalize_active_design_packet_config`, `resolve_report_bundle_artifact_path`,
 `resolve_report_root` です。`SINGLE_SET` は `resolve_report_root`、
-`TOOL_CALL_SET` は `materialize_skill_tool_call_token`、`MONITOR_SET` は
+`TOOL_CALL_SET` は `materialize_tool_call_token`, `materialize_dynamic_route_tool_call_token`、`MONITOR_SET` は
 `resolve_report_root`, `schedule_wave_row` です。
 
 test caller は `tests/agent_tools/test_agent_team_templates.py` の次の exact set も確認します。
@@ -228,7 +227,7 @@ test caller は `tests/agent_tools/test_agent_team_templates.py` の次の exact
 
 `tools/agent/orchestration/agent_team.py` は `__package__` が truthy の
 package import では相対 import を使い、falsey の direct-script import では同じ
-module を top-level import します。`route`, `skill_tool_commands`, `task_authority`,
+module を top-level import します。`route`, `task_authority`,
 `update_lifecycle_contract` は両 mode で top-level import のままです。この inventory
 は mode 差が既存の caller contract であることを示し、target では次を固定します。
 
@@ -267,7 +266,7 @@ module を top-level import します。`route`, `skill_tool_commands`, `task_au
 | --- | --- | --- | --- |
 | `tools/agent/orchestration/team_config.py` | config/catalog/base types | `WritePolicy`, `Role`, `SubagentWaveSlot`, `AgentTypeSelection`, `StageWave`, `TeamConfig`, `TaskCatalog`, `RunBundleSpec`, `CapacityHandshakeConsumerBinding`, `load_team_config`, `load_task_catalog`, role/task/workflow/stage selection | `WritePolicy` と config/catalog の dataclass、loader、resolver、型検証だけ。scope result type、template rendering、write は持たない |
 | `tools/agent/orchestration/packets.py` | document/active-design packets | `DocumentSectionLocator`, `DocumentPacketEntry`, `RoleDocumentPacket`, `ActiveDesignClause`, `ActiveDesignPacketEntry`, `ActiveDesignPacketConfig`、active packet normalization/mapping/reference projection、document packet resolution | packet schema、identity、reference、section locator だけ。manifest line rendering は持たない |
-| `tools/agent/orchestration/tool_calls.py` | ToolCall materialization | `materialize_tool_call_token`, `materialize_skill_tool_call_token`, `materialize_dynamic_route_tool_call_token`, `CloseAgentLifecycleEvidence`, `materialize_close_agent_tool_call` | ToolCall と close receipt の typed output だけ。capacity reservation は持たない |
+| `tools/agent/orchestration/tool_calls.py` | ToolCall materialization | `materialize_tool_call_token`, `materialize_dynamic_route_tool_call_token`, `CloseAgentLifecycleEvidence`, `materialize_close_agent_tool_call` | ToolCall と close receipt の typed output だけ。capacity reservation は持たない |
 | `tools/agent/orchestration/implementation_dispatch.py` | capacity + fixed implementation dispatch | `ImplementationDispatch`、capacity derivation/runtime/projection、agent type selection、spawn budget、`dispatch_fixed_implementation` | capacity reservation、eligibility、dispatch の state transition。prompt/manifest text は持たない |
 | `tools/runtime/manifest/manifest_rendering.py` | manifest/prompt/topology rendering | policy output lines、wave formatting、`build_manifest`、manifest sections、`render_role_topology`、`render_subagent_prompt_packet`、template helper | deterministic text projection と template expansion。config load、git snapshot、capacity mutation は持たない |
 | `tools/repository/workspace/workspace_scope.py` | report paths/write scope/snapshots | `RoleWriteScope`, `resolve_workspace_document_path`, `resolve_report_root`, `ReportBundleArtifactPathError`, report artifact path、role scope、changed-path/snapshot helpers、`slugify`, `make_run_id` | `RoleWriteScope`、path validation、scope read、snapshot read/write。manifest schema は持たない |
@@ -325,8 +324,8 @@ allowlist に追加しません。
   `parse_agent_type_selections`, `format_agent_type_selections`,
   `validate_agent_type_selections`, `agent_type_selection_map`,
   `capacity_start_output_lines`
-- ToolCall/lifecycle: `materialize_skill_tool_call_token`,
-  `materialize_close_agent_tool_call`, `CloseAgentLifecycleEvidence`
+- ToolCall/lifecycle: `materialize_tool_call_token`,
+  `materialize_dynamic_route_tool_call_token`, `materialize_close_agent_tool_call`, `CloseAgentLifecycleEvidence`
 - rendering/orchestration: `create_run_bundle`, `run_active_design_packet`,
   `run_workflow_family`, `format_subagent_wave`, `format_subagent_wave_chunks`,
   `format_subagent_role_instance_wave_chunks`,
@@ -488,9 +487,8 @@ smoke/test、manifest bytes、JSON snapshot、capacity receipt、stdout/stderr/e
 | `RC-05` | `tools/validation/semantic/authority/validate_role_write_scope.py`、`workflow_monitor.py` | `workspace_scope.py` と `manifest_rendering.py` の side-effect boundary | snapshot/scope/manifest oracle |
 | `RC-06` | package branch と direct branch の imports | 両 branch で同じ underscore collaborator alias と明示 public assignment | 両 mode の import/behavior smoke |
 | `RC-07` | test caller の `_closeout_projection`、`capacity_handshake`、`implementation_route` | test は explicit owner API のみを import し、underscore collaborator の明示 import 可能性を API 承認に使わない | `capacity_handshake`、`implementation_route` 等の旧 forbidden facade names だけが失敗する negative check |
-| `RC-08` | `tools/validation/semantic/documents/check_design_doc_claims.py` | fresh graph と changed claim check | graph `status=fresh`、docs pass、claim findings 0 |
 
-`RC-01` から `RC-08` はこの design pass の request clauses です。実装者は各 wave
+`RC-01` から `RC-07` はこの design pass の request clauses です。実装者は各 wave
 の commit message と review packet で該当 clause を再掲し、future module path を
 実装後の graph source identities（`tools/agent/orchestration/agent_team.py` facade と六つの owner module）に接続します `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
 

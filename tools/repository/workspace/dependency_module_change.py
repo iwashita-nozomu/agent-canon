@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Manages one dependency module source clone through generic repository-topic lifecycle primitives.
-# upstream design ../../documents/rule/dependency-module-changes.md generic dependency module policy
-# upstream design ../../documents/design/dependency-manifest-design.md structured dependency ownership model
-# upstream design ../../documents/design/request-intent-and-update-relation.md one-to-one lifecycle adapter and evidence projection
-# downstream implementation ../../tests/agent_tools/test_dependency_module_change.py validates dependency identity gate and generic-call behavior
-# downstream design ../../documents/tools/dependency_module_change.md documents the CLI surface
+# upstream design ../../../documents/rule/dependency-module-changes.md generic dependency module policy
+# upstream design ../../../documents/design/dependency-manifest-design.md structured dependency ownership model
+# upstream design ../../../documents/design/request-intent-and-update-relation.md one-to-one lifecycle adapter and evidence projection
+# downstream implementation ../../../tests/agent_tools/test_dependency_module_change.py validates dependency identity gate and generic-call behavior
+# downstream design ../../../documents/tools/dependency_module_change.md documents the CLI surface
 # @dependency-end
 """Dependency module lifecycle adapter backed by generic repository-topic clone primitives."""
 

@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Enumerates canonical parent-repository audit units by semantic change surface and records selected tracked evidence.
-# upstream design ../../documents/design/parent-repository-audit.md owns unit boundaries, migration, and failure semantics
-# upstream design ../../documents/parent-repository-audit/README.md owns the audit surface reader route
-# upstream implementation ./agent_canon_source_root.py resolves the AgentCanon source root and typed source-root failures
-# downstream implementation ../../agents/skills/parent-repository-audit.md consumes deterministic unit selection and closure protocol
-# downstream implementation ../../tests/agent_tools/test_parent_repository_audit.py tests semantic selection and failure semantics
+# upstream design ../../../documents/design/parent-repository-audit.md owns unit boundaries, migration, and failure semantics
+# upstream design ../../../documents/parent-repository-audit/README.md owns the audit surface reader route
+# upstream implementation ../../runtime/source/agent_canon_source_root.py resolves the AgentCanon source root and typed source-root failures
+# downstream implementation ../../../agents/skills/parent-repository-audit.md consumes deterministic unit selection and closure protocol
+# downstream implementation ../../../tests/agent_tools/test_parent_repository_audit.py tests semantic selection and failure semantics
 # @dependency-end
 """Enumerate and validate the canonical parent-repository audit units."""
 

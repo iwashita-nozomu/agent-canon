@@ -152,14 +152,6 @@ language = "python"
 summary = "Git diff and dependency expansion summary documentation."
 
 [[tool]]
-id = "check-design-doc-claims"
-classification = "public"
-tool = "tools/validation/semantic/documents/check_design_doc_claims.py"
-doc = "documents/tools/check_design_doc_claims.md"
-language = "python"
-summary = "Design-document claim evidence checker documentation."
-
-[[tool]]
 id = "check-semantic-responsibility-contract"
 classification = "public"
 tool = "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"
@@ -174,14 +166,6 @@ tool = "tools/repository/workspace/repository_topic_clone.py"
 doc = "documents/tools/repository_topic_clone.md"
 language = "python"
 summary = "Generic repository topic checkout lifecycle and reconstructibility cleanup documentation."
-
-[[tool]]
-id = "conflict-preservation"
-classification = "public"
-tool = "tools/repository/git/conflict_preservation.py"
-doc = "documents/tools/conflict_preservation.md"
-language = "python"
-summary = "Three-way conflict and focused rework content-preservation packet documentation."
 
 [[tool]]
 id = "compose-consumer-entrypoint"

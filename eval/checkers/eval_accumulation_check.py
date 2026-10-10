@@ -6,9 +6,9 @@
 # upstream design ../../eval/definitions/eval_result_families.toml eval family artifact registry
 # upstream design ../../documents/runtime/runtime-log-archive.md eval and hook result archive contract
 # upstream design ../../documents/runtime/runtime-log-archive-migration.md legacy in-tree result migration contract
-# upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
-# upstream implementation ./runtime_artifacts.py owns the external artifact boundary
-# upstream implementation ./prompt_capture.py owns prompt secret redaction patterns
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted archive result paths
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns the external artifact boundary
+# upstream implementation ../../tools/agent/orchestration/prompt_capture.py owns prompt secret redaction patterns
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs eval accumulation checks
@@ -87,14 +87,8 @@ BEHAVIOR_HINT_FIELDS = frozenset(
         "prompt_char_count",
     }
 )
-SKILL_REPORT_RE = re.compile(
-    r"^skill-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)-[a-z0-9-]+(?:-[a-z0-9-]+)*\.md$"
-)
 WORKFLOW_SELECTION_REPORT_RE = re.compile(
     r"^workflow-selection-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
-)
-REPORT_QUALITY_REPORT_RE = re.compile(
-    r"^report-quality-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)\.md$"
 )
 DEFAULT_FAMILY_REGISTRY = Path(eval_manifest_path("eval_result_families.toml"))
 COMPACT_FINDING_SAMPLE_LIMIT = 25
@@ -150,18 +144,20 @@ def is_warning_finding(finding: Finding) -> bool:
     if finding.check == "hook_jsonl" and is_mounted_archive_path(finding.path):
         return True
     return (
-        finding.detail == "missing-eval-run-id"
+        finding.detail.startswith("missing-")
+        and finding.detail.endswith("-eval-run-id")
         and "archive/agent-canon-log/eval-results/legacy-import/"
         in Path(finding.path).as_posix()
     ) or (
-        finding.check == "behavior_event"
-        and finding.detail == "legacy-behavior-schema"
+        finding.check == "behavior_event" and finding.detail == "legacy-behavior-schema"
     )
 
 
 def blocking_findings(report: EvalAccumulationReport) -> tuple[Finding, ...]:
     """Return findings that should fail the checker."""
-    return tuple(finding for finding in report.findings if not is_warning_finding(finding))
+    return tuple(
+        finding for finding in report.findings if not is_warning_finding(finding)
+    )
 
 
 def warning_findings(report: EvalAccumulationReport) -> tuple[Finding, ...]:
@@ -226,7 +222,8 @@ def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
     return [
         Finding("gitignore", relative(root, path), "ignored-result-path")
         for path in paths
-        if not intentionally_ignored_archive_path(path) and git_check_ignored(root, path)
+        if not intentionally_ignored_archive_path(path)
+        and git_check_ignored(root, path)
     ]
 
 
@@ -266,10 +263,26 @@ def _behavior_envelope_findings(label: str, entry: dict[str, object]) -> list[Fi
             findings.append(Finding("behavior_event", label, f"missing-field:{field}"))
 
     for field, value, valid in (
-        ("prompt_excerpt_redacted", entry.get("prompt_excerpt_redacted"), isinstance(entry.get("prompt_excerpt_redacted"), str)),
-        ("prompt_fingerprint", entry.get("prompt_fingerprint"), isinstance(entry.get("prompt_fingerprint"), str)),
-        ("prompt_char_count", entry.get("prompt_char_count"), _nonnegative_int(entry.get("prompt_char_count"))),
-        ("prompt_excerpt_truncated", entry.get("prompt_excerpt_truncated"), isinstance(entry.get("prompt_excerpt_truncated"), bool)),
+        (
+            "prompt_excerpt_redacted",
+            entry.get("prompt_excerpt_redacted"),
+            isinstance(entry.get("prompt_excerpt_redacted"), str),
+        ),
+        (
+            "prompt_fingerprint",
+            entry.get("prompt_fingerprint"),
+            isinstance(entry.get("prompt_fingerprint"), str),
+        ),
+        (
+            "prompt_char_count",
+            entry.get("prompt_char_count"),
+            _nonnegative_int(entry.get("prompt_char_count")),
+        ),
+        (
+            "prompt_excerpt_truncated",
+            entry.get("prompt_excerpt_truncated"),
+            isinstance(entry.get("prompt_excerpt_truncated"), bool),
+        ),
     ):
         if not valid:
             findings.append(Finding("behavior_event", label, f"missing-field:{field}"))
@@ -290,7 +303,9 @@ def _behavior_workflow_findings(label: str, entry: dict[str, object]) -> list[Fi
     selected = entry.get("selected_workflows", [])
     owner_workflows = entry.get("workflow_owner_workflows", [])
     context_workflows = entry.get("workflow_context_workflows", [])
-    findings = _workflow_list_findings(label, selected, owner_workflows, context_workflows)
+    findings = _workflow_list_findings(
+        label, selected, owner_workflows, context_workflows
+    )
     findings.extend(_workflow_kind_findings(label, entry))
     return findings
 
@@ -321,7 +336,9 @@ def _workflow_kind_findings(
     findings: list[Finding] = []
     attribution = entry.get("workflow_attribution_kind")
     if attribution not in WORKFLOW_ATTRIBUTION_KINDS:
-        findings.append(Finding("behavior_event", label, "invalid-workflow-attribution-kind"))
+        findings.append(
+            Finding("behavior_event", label, "invalid-workflow-attribution-kind")
+        )
     if attribution == "owner":
         findings.extend(_workflow_owner_findings(label, entry))
     elif attribution == "context":
@@ -346,9 +363,13 @@ def _workflow_owner_findings(label: str, entry: dict[str, object]) -> list[Findi
         and owner_workflows
     ):
         if owner != selected[0] or owner_workflows != selected:
-            return [Finding("behavior_event", label, "workflow-owner-fields-incoherent")]
+            return [
+                Finding("behavior_event", label, "workflow-owner-fields-incoherent")
+            ]
         if _workflow_owner_optional_mismatch(entry, owner, selected):
-            return [Finding("behavior_event", label, "workflow-owner-fields-incoherent")]
+            return [
+                Finding("behavior_event", label, "workflow-owner-fields-incoherent")
+            ]
         if any(
             _workflow_value_present(entry.get(field, default))
             for field, default in (
@@ -359,7 +380,9 @@ def _workflow_owner_findings(label: str, entry: dict[str, object]) -> list[Findi
                 ("workflow_context_source_event", ""),
             )
         ):
-            return [Finding("behavior_event", label, "workflow-owner-fields-incoherent")]
+            return [
+                Finding("behavior_event", label, "workflow-owner-fields-incoherent")
+            ]
         return []
     return [Finding("behavior_event", label, "workflow-owner-fields-incoherent")]
 
@@ -413,7 +436,9 @@ def _workflow_context_findings(label: str, entry: dict[str, object]) -> list[Fin
         and bool(source_event.strip())
         and selection_kind == "context_workflow"
     )
-    if coherent_context and not any(_workflow_value_present(value) for _field, value in owner_carriers):
+    if coherent_context and not any(
+        _workflow_value_present(value) for _field, value in owner_carriers
+    ):
         return []
     return [Finding("behavior_event", label, "workflow-context-fields-incoherent")]
 
@@ -432,12 +457,17 @@ def _workflow_missing_findings(label: str, entry: dict[str, object]) -> list[Fin
         ("workflow_context_source", entry.get("workflow_context_source", "")),
         ("workflow_context_workflows", entry.get("workflow_context_workflows", [])),
         ("workflow_context_timestamp", entry.get("workflow_context_timestamp", "")),
-        ("workflow_context_source_event", entry.get("workflow_context_source_event", "")),
+        (
+            "workflow_context_source_event",
+            entry.get("workflow_context_source_event", ""),
+        ),
         ("selected_workflow_count", entry.get("selected_workflow_count", 0)),
     )
-    return [] if all(not _workflow_value_present(value) for _field, value in fields) else [
-        Finding("behavior_event", label, "workflow-missing-fields-incoherent")
-    ]
+    return (
+        []
+        if all(not _workflow_value_present(value) for _field, value in fields)
+        else [Finding("behavior_event", label, "workflow-missing-fields-incoherent")]
+    )
 
 
 def _workflow_value_present(value: object) -> bool:
@@ -456,7 +486,9 @@ def _behavior_prompt_findings(label: str, entry: dict[str, object]) -> list[Find
     char_count = entry.get("prompt_char_count")
     truncated = entry.get("prompt_excerpt_truncated")
     if prompt_status not in PROMPT_CAPTURE_STATUSES:
-        findings.append(Finding("behavior_event", label, "invalid-prompt-capture-status"))
+        findings.append(
+            Finding("behavior_event", label, "invalid-prompt-capture-status")
+        )
     if not isinstance(excerpt, str) or len(excerpt) > 600:
         findings.append(Finding("behavior_event", label, "invalid-prompt-excerpt"))
     if not isinstance(fingerprint, str):
@@ -466,13 +498,21 @@ def _behavior_prompt_findings(label: str, entry: dict[str, object]) -> list[Find
     if not isinstance(truncated, bool):
         findings.append(Finding("behavior_event", label, "invalid-prompt-truncated"))
     if prompt_status == "present":
-        findings.extend(_prompt_present_findings(label, excerpt, fingerprint, char_count))
+        findings.extend(
+            _prompt_present_findings(label, excerpt, fingerprint, char_count)
+        )
     elif prompt_status == "missing":
         if (excerpt, fingerprint, char_count, truncated) != ("", "", 0, False):
-            findings.append(Finding("behavior_event", label, "prompt-missing-fields-incoherent"))
+            findings.append(
+                Finding("behavior_event", label, "prompt-missing-fields-incoherent")
+            )
     cause = entry.get("prompt_capture_reason")
-    if cause is not None and (not isinstance(cause, str) or not PROMPT_CAPTURE_CAUSE_RE.fullmatch(cause)):
-        findings.append(Finding("behavior_event", label, "invalid-prompt-capture-reason"))
+    if cause is not None and (
+        not isinstance(cause, str) or not PROMPT_CAPTURE_CAUSE_RE.fullmatch(cause)
+    ):
+        findings.append(
+            Finding("behavior_event", label, "invalid-prompt-capture-reason")
+        )
     return findings
 
 
@@ -490,9 +530,13 @@ def _prompt_present_findings(
         or not isinstance(char_count, int)
         or char_count <= 0
     ):
-        findings.append(Finding("behavior_event", label, "prompt-present-fields-incoherent"))
+        findings.append(
+            Finding("behavior_event", label, "prompt-present-fields-incoherent")
+        )
     if isinstance(excerpt, str) and redact_sensitive_text(excerpt) != excerpt:
-        findings.append(Finding("behavior_event", label, "prompt-excerpt-secret-material"))
+        findings.append(
+            Finding("behavior_event", label, "prompt-excerpt-secret-material")
+        )
     return findings
 
 
@@ -509,7 +553,9 @@ def behavior_event_findings(label: str, entry: dict[str, object]) -> list[Findin
     ]
 
 
-def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, int, list[Finding]]:
+def parse_hook_line(
+    root: Path, path: Path, line_no: int, raw_line: str
+) -> tuple[str, int, list[Finding]]:
     """Parse one hook JSONL line and return its run id plus findings."""
     label = f"{relative(root, path)}:{line_no}"
     try:
@@ -520,10 +566,14 @@ def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tupl
         return "", 0, [Finding("hook_jsonl", label, "entry-not-object")]
     entry = cast(dict[str, object], loaded)
     namespaced = path.parent.name not in ("hook-runs", "legacy-import")
-    required_fields = HOOK_REQUIRED_FIELDS if namespaced else (
-        "hook_run_id",
-        "timestamp",
-        "payload_fingerprint",
+    required_fields = (
+        HOOK_REQUIRED_FIELDS
+        if namespaced
+        else (
+            "hook_run_id",
+            "timestamp",
+            "payload_fingerprint",
+        )
     )
     findings = [
         Finding("hook_jsonl", label, f"missing-field:{field}")
@@ -535,10 +585,16 @@ def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tupl
         legacy_missing_namespace = 1
     findings.extend(behavior_event_findings(label, entry))
     run_id = entry.get("hook_run_id")
-    return (run_id if isinstance(run_id, str) else ""), legacy_missing_namespace, findings
+    return (
+        (run_id if isinstance(run_id, str) else ""),
+        legacy_missing_namespace,
+        findings,
+    )
 
 
-def hook_result_findings(root: Path, hook_dirs: Sequence[Path]) -> tuple[int, int, int, list[Finding]]:
+def hook_result_findings(
+    root: Path, hook_dirs: Sequence[Path]
+) -> tuple[int, int, int, list[Finding]]:
     """Validate hook JSONL files."""
     findings: list[Finding] = []
     seen_run_ids: dict[str, str] = {}
@@ -553,7 +609,9 @@ def hook_result_findings(root: Path, hook_dirs: Sequence[Path]) -> tuple[int, in
     entries = 0
     legacy_missing_namespace = 0
     for path in files:
-        for line_no, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        for line_no, raw_line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
             if not raw_line.strip():
                 continue
             entries += 1
@@ -611,7 +669,9 @@ def load_family_contracts(registry_path: Path) -> tuple[EvalFamilyContract, ...]
     data = tomllib.loads(registry_path.read_text(encoding="utf-8"))
     families = data.get("families")
     if not isinstance(families, list) or not families:
-        raise ValueError("eval family registry must define at least one [[families]] entry")
+        raise ValueError(
+            "eval family registry must define at least one [[families]] entry"
+        )
     contracts: list[EvalFamilyContract] = []
     seen_ids: set[str] = set()
     seen_labels: set[str] = set()
@@ -634,12 +694,16 @@ def load_family_contracts(registry_path: Path) -> tuple[EvalFamilyContract, ...]
         ):
             value = family.get(field)
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"eval family registry entry missing string field: {field}")
+                raise ValueError(
+                    f"eval family registry entry missing string field: {field}"
+                )
             values[field] = value.strip()
         if values["id"] in seen_ids:
             raise ValueError(f"duplicate eval family id: {values['id']}")
         if values["count_label"] in seen_labels:
-            raise ValueError(f"duplicate eval family count label: {values['count_label']}")
+            raise ValueError(
+                f"duplicate eval family count label: {values['count_label']}"
+            )
         re.compile(values["filename_regex"])
         re.compile(values["run_id_regex"])
         seen_ids.add(values["id"])
@@ -689,13 +753,19 @@ def eval_family_findings(
         text = path.read_text(encoding="utf-8")
         run_id_match = run_id_pattern.search(text)
         if run_id_match is None:
-            findings.append(Finding(contract.check_id, rel_path, contract.missing_run_id_detail))
+            findings.append(
+                Finding(contract.check_id, rel_path, contract.missing_run_id_detail)
+            )
             continue
         run_id = run_id_match.group(1)
         previous = seen_run_ids.get(run_id)
         if previous is not None:
             findings.append(
-                Finding(contract.check_id, rel_path, f"{contract.duplicate_run_id_detail}:{previous}")
+                Finding(
+                    contract.check_id,
+                    rel_path,
+                    f"{contract.duplicate_run_id_detail}:{previous}",
+                )
             )
         seen_run_ids[run_id] = rel_path
     findings.extend(ignored_path_findings(root, reports))
@@ -710,22 +780,30 @@ def validate(
     """Validate accumulated eval results."""
     requested_root = root.resolve()
     canon_root = agent_canon_root(requested_root)
-    contracts = load_family_contracts(resolve_family_registry(canon_root, family_registry))
+    contracts = load_family_contracts(
+        resolve_family_registry(canon_root, family_registry)
+    )
     findings: list[Finding] = []
-    hook_files, hook_entries, hook_legacy_missing_namespace, hook_findings = hook_result_findings(
-        canon_root,
-        hook_result_search_dirs(requested_root, canon_root, runtime_root),
+    hook_files, hook_entries, hook_legacy_missing_namespace, hook_findings = (
+        hook_result_findings(
+            canon_root,
+            hook_result_search_dirs(requested_root, canon_root, runtime_root),
+        )
     )
     archive_mounted = mounted_log_archive_root(canon_root, runtime_root).is_dir()
     eval_report_counts: dict[str, int] = {}
     findings.extend(hook_findings)
     for contract in contracts:
-        results_dirs = eval_result_search_dirs(canon_root, contract.family_id, runtime_root)
+        results_dirs = eval_result_search_dirs(
+            canon_root, contract.family_id, runtime_root
+        )
         report_count, family_findings = eval_family_findings(
             canon_root,
             contract,
             results_dirs,
-            require_reports=reports_required(results_dirs, archive_mounted=archive_mounted),
+            require_reports=reports_required(
+                results_dirs, archive_mounted=archive_mounted
+            ),
         )
         eval_report_counts[contract.family_id] = report_count
         findings.extend(family_findings)
@@ -734,7 +812,9 @@ def validate(
         hook_entries=hook_entries,
         hook_legacy_missing_namespace=hook_legacy_missing_namespace,
         eval_report_counts=eval_report_counts,
-        findings=tuple(sorted(findings, key=lambda item: (item.check, item.path, item.detail))),
+        findings=tuple(
+            sorted(findings, key=lambda item: (item.check, item.path, item.detail))
+        ),
     )
 
 
@@ -750,9 +830,9 @@ def render_json(report: EvalAccumulationReport) -> str:
             "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
             "hook_namespace_debt": report.hook_legacy_missing_namespace,
             "eval_report_counts": report.eval_report_counts,
-            "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
-            "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
-            "report_quality_reports": eval_report_count(report, "report-quality"),
+            "workflow_selection_reports": eval_report_count(
+                report, "workflow-selection"
+            ),
             "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
             "blocking_finding_count": len(blocking),
             "warning_count": len(warnings),
@@ -794,9 +874,7 @@ def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
         "hook_legacy_missing_namespace": report.hook_legacy_missing_namespace,
         "hook_namespace_debt": report.hook_legacy_missing_namespace,
         "eval_report_counts": report.eval_report_counts,
-        "skill_reports": eval_report_count(report, "skill-workflow-prompt"),
         "workflow_selection_reports": eval_report_count(report, "workflow-selection"),
-        "report_quality_reports": eval_report_count(report, "report-quality"),
         "codex_agent_role_reports": eval_report_count(report, "codex-agent-role"),
         "blocking_finding_samples": [
             asdict(finding) for finding in blocking[:COMPACT_FINDING_SAMPLE_LIMIT]
@@ -805,7 +883,8 @@ def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
             asdict(finding) for finding in warnings[:COMPACT_FINDING_SAMPLE_LIMIT]
         ],
         "finding_samples": [
-            asdict(finding) for finding in report.findings[:COMPACT_FINDING_SAMPLE_LIMIT]
+            asdict(finding)
+            for finding in report.findings[:COMPACT_FINDING_SAMPLE_LIMIT]
         ],
     }
 
@@ -843,10 +922,8 @@ def render_text(
             "EVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE="
             f"{report.hook_legacy_missing_namespace}",
             f"EVAL_ACCUMULATION_HOOK_NAMESPACE_DEBT={report.hook_legacy_missing_namespace}",
-            f"EVAL_ACCUMULATION_SKILL_REPORTS={eval_report_count(report, 'skill-workflow-prompt')}",
             "EVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS="
             f"{eval_report_count(report, 'workflow-selection')}",
-            f"EVAL_ACCUMULATION_REPORT_QUALITY_REPORTS={eval_report_count(report, 'report-quality')}",
             f"EVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS={eval_report_count(report, 'codex-agent-role')}",
             *eval_family_count_lines(report),
             f"EVAL_ACCUMULATION_FINDINGS={len(report.findings)}",
@@ -866,9 +943,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         report = validate(args.root, str(args.family_registry), args.runtime_root)
     except RuntimeError as error:
-        if "AgentCanon log archive root is required" not in str(error) and not isinstance(
-            error, RuntimeArtifactError
-        ):
+        if "AgentCanon log archive root is required" not in str(
+            error
+        ) and not isinstance(error, RuntimeArtifactError):
             raise
         if args.format == "json":
             print(

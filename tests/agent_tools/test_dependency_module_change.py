@@ -22,8 +22,12 @@ import pytest
 TOPIC = "dependency-module-change"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-TOOL = PROJECT_ROOT / "tools" / "repository" / "workspace" / "dependency_module_change.py"
-GENERIC_TOOL = PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py"
+TOOL = (
+    PROJECT_ROOT / "tools" / "repository" / "workspace" / "dependency_module_change.py"
+)
+GENERIC_TOOL = (
+    PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py"
+)
 
 
 def run_git(path: Path, *args: str) -> str:
@@ -44,27 +48,14 @@ def create_remote(tmp_path: Path) -> Path:
     subprocess.run(
         ["git", "init", "-b", "main", str(source)], check=True, capture_output=True
     )
+    run_git(source, "config", "user.name", "Test")
+    run_git(source, "config", "user.email", "test@example.invalid")
     (source / "README.md").write_text("source\n", encoding="utf-8")
     run_git(source, "add", "README.md")
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(source),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "-m",
-            "initial",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    run_git(source, "commit", "-m", "initial")
     run_git(source, "remote", "add", "origin", str(remote))
     run_git(source, "push", "origin", "main")
+    run_git(remote, "symbolic-ref", "HEAD", "refs/heads/main")
     return remote
 
 
@@ -124,6 +115,7 @@ def create_parent(
     )
     run_git(parent_source, "remote", "add", "origin", str(parent_remote))
     run_git(parent_source, "push", "origin", "main")
+    run_git(parent_remote, "symbolic-ref", "HEAD", "refs/heads/main")
     selected = tmp_path / "host" / "parent"
     selected.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
@@ -159,17 +151,17 @@ def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
     workspace_tools.mkdir(parents=True)
     shutil.copy2(TOOL, workspace_tools / TOOL.name)
     shutil.copy2(GENERIC_TOOL, workspace_tools / GENERIC_TOOL.name)
-    shutil.copy2(TOOL.parent / "parent_root_side_effects.py", workspace_tools / "parent_root_side_effects.py")
-    git_tools = source_tools / "repository" / "git"
-    git_tools.mkdir(parents=True)
     shutil.copy2(
-        PROJECT_ROOT / "tools" / "repository" / "git" / "conflict_preservation.py",
-        git_tools / "conflict_preservation.py",
+        TOOL.parent / "parent_root_side_effects.py",
+        workspace_tools / "parent_root_side_effects.py",
     )
     authority_tools = source_tools / "runtime" / "authority"
     authority_tools.mkdir(parents=True)
     for name in ("checkout_identity.py", "writer_target.py"):
-        shutil.copy2(PROJECT_ROOT / "tools" / "runtime" / "authority" / name, authority_tools / name)
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "runtime" / "authority" / name,
+            authority_tools / name,
+        )
     artifacts_tools = source_tools / "runtime" / "artifacts"
     artifacts_tools.mkdir(parents=True)
     shutil.copy2(

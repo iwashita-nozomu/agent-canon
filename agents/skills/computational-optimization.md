@@ -51,8 +51,10 @@ downstream implementation ../../.codex/personal/skills/computational-optimizatio
 
 数学または数値の挙動を修正する write-capable route は、実装者へ渡す
 `mathematical_intent_packet` を先に埋めます。この packet は説明用の設計案ではなく、
-数学担当者の書込範囲を決める source packet です。次のフィールドを省略せず、該当しない
-場合は `not_applicable` と理由を書きます。
+数学担当者の書込範囲を決める source packet です。次のフィールド群から、対象の問題、
+変更、検証に関係する情報を記録します。関係しない情報を `not_applicable` として
+埋める必要はありません。選択した runtime packet consumer が closed schema を要求する
+場合は、その schema に従います。
 
 - `math_object`: 対象の数理オブジェクト、入力・出力、対象の主張
 - `problem`: 問題設定、適用範囲、求める性質
@@ -120,23 +122,24 @@ declaration です。`$test-design` の output は常時生成しません。own
 既存 test、targeted validation で閉じない具体的な test-owned runtime risk が残る
 場合だけ、`Activation Decision` と最小の test plan を出力します。
 
-実装、実験、review の前に次を固定します。
+実装、実験、review の前に、対象に関わる最小の optimization contract を明らかにします。
+典型的な内容は次ですが、全カテゴリが全問題に必要とは限りません。
 
-1. Objective / Residual
+1. Objective / Residual（最適化・残差問題の場合）
    - 最小化する量、残差、正規化、weight、sign convention
-1. Variables / Parameters
+1. Variables / Parameters（変数・設定が意味を持つ場合）
    - optimize する変数、固定 parameter、shape、dtype、device、batch semantics
-1. Constraints
+1. Constraints（制約問題の場合）
    - equality、inequality、box、manifold、projection、barrier / penalty、feasibility 判定
-1. Derivatives
+1. Derivatives（導関数がアルゴリズム契約に関わる場合）
    - gradient、Jacobian、Hessian、HVP、finite-difference check、autodiff boundary
-1. Algorithm State
+1. Algorithm State（反復 state がある場合）
    - iterate、step、trust radius、line-search state、preconditioner state、random seed
-1. Stopping Policy
+1. Stopping Policy（停止挙動を主張・変更する場合）
    - residual norm、objective delta、step norm、KKT residual、max iteration、failure status
-1. Numerical Invariants
+1. Numerical Invariants（対象の correctness claim に関わるもの）
    - monotonicity where required、finite state、symmetry / PSD、scaling, conditioning, tolerance rationale
-1. Failure Semantics
+1. Failure Semantics（対象の公開・検証結果に関わる terminal outcome）
    - infeasible、singular、non-finite、max-iter、not-converged を success と分ける
 
 ### Mathematical Necessity Gate
@@ -192,32 +195,25 @@ surfaces when the route packet makes them part of the product contract.
 
 ## Workflow
 
-1. Classify the algorithm surface: unconstrained optimization, constrained optimization, least squares, root finding, linear solve, preconditioning, or benchmark-only.
-1. Read existing algorithm docs, source dependency headers, tests, and experiment records before changing code.
-1. Write the optimization contract in the run bundle or design packet before implementation.
-1. Identify the implemented recurrence, state transition, stopping scalar,
-   acceptance rule, and failure semantics that the contract requires.
-1. Identify the first bad iteration or first contract-violating code-side
-   mechanism for failures; final NaN, Inf, residual, or failing assertion is
-   only symptom evidence.
-1. Select the algorithmic repair route before editing tests: initializer,
-   update rule, line search, inner-solver policy, regularization, feasibility
-   restoration, scaling, or status semantics.
-1. Create the targeted numeric validation plan after the contract and repair
-   route are fixed: exact small case, ill-conditioned case,
-   constraint-boundary case, non-finite guard, not-converged status, derivative
-   check, and device / dtype case when relevant.
-1. Implement the responsibility-preserving change that matches the contract and
-   validation plan.
-1. Validate with targeted tests and one protocol-consistent GPU run; record
-   skipped GPU, benchmark, or formal run evidence as a blocker with reason
-   instead of replacing it with CPU computation.
-1. Review numerical claims separately from code style: convergence evidence, stopping status, failure mode, tolerance rationale, and documentation alignment.
+Trace the requested numerical property to its public contract and existing
+implementation. For iterative behavior, identify the recurrence, state,
+acceptance/stopping quantity, and failure result that bear on the change. For a
+reported failure, use the first contract-violating mechanism or bad iteration
+to distinguish cause from final NaN, Inf, residual, or assertion symptoms.
+
+Choose the repair surface from that cause, then select validation that can
+establish the affected property. Relevant small, boundary, ill-conditioned,
+derivative, dtype, or device cases are examples, not a universal test list.
+Keep numerical correctness, performance, and formal evidence distinct. Use the
+project's prescribed backend/runner; run GPU, benchmark, or formal validation
+when the request, contract, profile, or claim requires it, and record required
+unavailable evidence as a blocker.
 
 ## Validation Rules
 
-- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、CPU alternate route、CPU smoke、CPU-only regression をしません。
-- solver、optimizer、JAX / XLA / IREE lowering、convergence、residual、benchmark、experiment validation などの計算テストは CPU で実行しません。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence を残します。
+- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、手書きの host 計算や別 runner による代用をしません。
+- 検証 backend は project が所有する契約・configure/compile-time 設定と規定の実行経路に従います。対応する CPU/OpenMP backend の正規実行を CPU fallback とみなさず、数値処理というだけで GPU 専用に再分類しません。
+- GPU 固有の要求・契約・runtime profile・検証主張には GPU の証拠が必要です。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence を残し、CPU smoke / CPU-only regression をその代用にしません。CPU/OpenMP の結果と CUDA/GPU の結果を明確に分け、未実行の backend へ成功を拡張しません。build 失敗で assertion に到達しなかった場合も数値検証成功にしません。
 - `converged=false`、`max_iter`、non-finite intermediate、constraint violation は pass evidence ではありません。
   ただし原結果と実際の status は保持・報告し、数値判定による削除、置換、隠蔽、
   保存・返却拒否はしません。生成済み artifact は `$result-artifact-writeout` に渡し、
@@ -245,10 +241,10 @@ before / after は、同じ mathematical problem、initial state、stopping poli
 dtype / device contract、workload で比較します。少なくとも次の decomposition を
 同じ record に残します。
 
-\[
+$$
 T_{total} = T_{compile/JIT} + N_{iter} \times
 (T_{iter\_eval} + T_{linear\_solve} + T_{communication}) + T_{other}.
-\]
+$$
 
 `T_iter_eval`、`T_linear_solve`、`T_communication` を可能な範囲で分離し、cold
 compile/JIT、warm execution、transfer / synchronization、algorithmic iteration
@@ -300,11 +296,11 @@ semantics を変えて速度差を作らないでください。
 
 ## Review Route
 
-- Mathematical or scientific-computing risk: `scientific_computing_reviewer`
-- Benchmark or performance claim: `benchmark_reviewer` plus `reproducibility_reviewer`
-- Python implementation: `$python-review`
-- C / C++ implementation: `$cpp-review`
-- Paper or report claim: `$report-writing` with the relevant research reviewer
+Select review by the risk in the change: `scientific_computing_reviewer` for
+mathematical behavior, `benchmark_reviewer` for performance claims, and
+`reproducibility_reviewer` when the comparison depends on reproducible runs.
+Use `$python-review` / `$cpp-review` for the corresponding implementation diff,
+and `$report-writing` for reader-facing claims with the relevant research review.
 
 ## Outputs
 
@@ -369,12 +365,13 @@ The runtime discovery adapter delegates these required operating clauses to this
    not emit a test plan. When activated, include exact small cases,
    ill-conditioned cases, constraint-boundary cases, derivative checks,
    non-finite guards, and not-converged status handling only when relevant.
-1. Do not green numerical tests by relaxing tolerances, deleting assertions,
-   skipping cases, changing expected values to match current output, or running
-   computational tests on CPU; using CPU as substitute evidence is a validation
-   blocker, not pass evidence. Solver, optimizer, JAX/XLA/IREE lowering,
-   convergence, residual, benchmark, and experiment validation must run on the
-   GPU target or be recorded as `gpu_validation_blocker=<reason>`.
+1. Apply [Validation Rules](#validation-rules) to the project-owned configured
+   backend and prescribed runner. Supported CPU/OpenMP execution is valid only
+   for the contract and backend actually exercised; it is not GPU evidence.
+   Keep tolerances, assertions, cases, and independently justified expected
+   values intact. For required GPU validation, CPU substitutes are not pass
+   evidence; record `gpu_validation_blocker=<reason>` when the GPU target is
+   unavailable. Numerical subject matter alone does not require a GPU run.
 1. Diagnose failed runs by first bad iteration, finite state before failure, residual components, reference norm, tolerance, status flag, and unconfirmed hypotheses; do not infer cause only from the final NaN, Inf, or residual.
 1. Keep correctness evidence separate from performance evidence; benchmark claims need reproducibility and confounder review.
 1. Route review by risk: `scientific_computing_reviewer` for math/numerical risk, `benchmark_reviewer` for performance claims, `$python-review` or `$cpp-review` for implementation diffs, and `$report-writing` for reader-facing claims.

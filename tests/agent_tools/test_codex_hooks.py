@@ -98,9 +98,10 @@ class CodexHooksTest(unittest.TestCase):
                     **os.environ,
                     **(extra_env or {}),
                     "AGENT_CANON_HOOK_SOURCE_ROOT": temp_dir,
-                    "AGENT_CANON_RUNTIME_ROOT": (
-                        extra_env or {}
-                    ).get("AGENT_CANON_RUNTIME_ROOT", str(Path(temp_dir).parent / "hook-runtime")),
+                    "AGENT_CANON_RUNTIME_ROOT": (extra_env or {}).get(
+                        "AGENT_CANON_RUNTIME_ROOT",
+                        str(Path(temp_dir).parent / "hook-runtime"),
+                    ),
                 },
             )
 
@@ -128,7 +129,15 @@ class CodexHooksTest(unittest.TestCase):
         if not (parent / ".git").exists():
             subprocess.run(["git", "init", "-q", str(parent)], check=True)
             subprocess.run(
-                ["git", "-C", str(parent), "remote", "add", "origin", "https://example.invalid/fixture.git"],
+                [
+                    "git",
+                    "-C",
+                    str(parent),
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/fixture.git",
+                ],
                 check=True,
             )
             subprocess.run(
@@ -158,15 +167,15 @@ class CodexHooksTest(unittest.TestCase):
                 **os.environ,
                 **(extra_env or {}),
                 "AGENT_CANON_HOOK_SOURCE_ROOT": str(root),
-                "AGENT_CANON_PARENT_ROOT": (
-                    extra_env or {}
-                ).get("AGENT_CANON_PARENT_ROOT", str(parent)),
-                "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": (
-                    extra_env or {}
-                ).get("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", str(parent)),
-                "AGENT_CANON_RUNTIME_ROOT": (
-                    extra_env or {}
-                ).get("AGENT_CANON_RUNTIME_ROOT", str(parent)),
+                "AGENT_CANON_PARENT_ROOT": (extra_env or {}).get(
+                    "AGENT_CANON_PARENT_ROOT", str(parent)
+                ),
+                "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": (extra_env or {}).get(
+                    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT", str(parent)
+                ),
+                "AGENT_CANON_RUNTIME_ROOT": (extra_env or {}).get(
+                    "AGENT_CANON_RUNTIME_ROOT", str(parent)
+                ),
             },
         )
 
@@ -210,6 +219,7 @@ class CodexHooksTest(unittest.TestCase):
     @staticmethod
     def _spooled_event(root: Path, pattern: str = "**/*.json") -> dict[str, object]:
         """Read the one isolated hook event emitted by a fixture invocation."""
+
         def event_paths(base: Path) -> list[Path]:
             result: list[Path] = []
             for path in base.glob(pattern):
@@ -234,7 +244,9 @@ class CodexHooksTest(unittest.TestCase):
                     break
         if len(paths) != 1:
             raise AssertionError(f"expected one spooled event, found {paths}")
-        return cast("dict[str, object]", json.loads(paths[0].read_text(encoding="utf-8")))
+        return cast(
+            "dict[str, object]", json.loads(paths[0].read_text(encoding="utf-8"))
+        )
 
     def test_hook_report_target_precedence_and_spool_only_fallback(self) -> None:
         """Projection follows the explicit target, while no target remains spool-only."""
@@ -244,7 +256,9 @@ class CodexHooksTest(unittest.TestCase):
             root.mkdir()
             pointer_target = root / "reports" / "agents" / "pointer-run"
             pointer_target.parent.mkdir(parents=True)
-            (pointer_target.parent / ".active_run").write_text("pointer-run\n", encoding="utf-8")
+            (pointer_target.parent / ".active_run").write_text(
+                "pointer-run\n", encoding="utf-8"
+            )
             explicit_target = root / "explicit-run"
             explicit_target.mkdir()
 
@@ -252,7 +266,9 @@ class CodexHooksTest(unittest.TestCase):
                 root,
                 "UserPromptSubmit",
                 payload,
-                extra_env={"AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(explicit_target)},
+                extra_env={
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(explicit_target)
+                },
             )
 
             event = self._spooled_event(root)
@@ -312,7 +328,10 @@ class CodexHooksTest(unittest.TestCase):
         payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
         cases = ("missing-run", "../escape", "/absolute/escape", "symlink-escape")
         for declared in cases:
-            with self.subTest(declared=declared), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(declared=declared),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 root = Path(tmp_dir) / "source"
                 root.mkdir()
                 report_root = root / "reports" / "agents"
@@ -320,7 +339,9 @@ class CodexHooksTest(unittest.TestCase):
                 outside = root / "outside"
                 outside.mkdir()
                 if declared == "symlink-escape":
-                    (report_root / declared).symlink_to(outside, target_is_directory=True)
+                    (report_root / declared).symlink_to(
+                        outside, target_is_directory=True
+                    )
                 (report_root / ".active_run").write_text(
                     declared + "\n",
                     encoding="utf-8",
@@ -400,24 +421,32 @@ class CodexHooksTest(unittest.TestCase):
 
     def test_active_hook_config_has_exact_three_events(self) -> None:
         """Project config and hooks JSON expose only the three active dispatcher events."""
-        hooks = cast("dict[str, object]", json.loads(HOOKS_JSON.read_text(encoding="utf-8")))
+        hooks = cast(
+            "dict[str, object]", json.loads(HOOKS_JSON.read_text(encoding="utf-8"))
+        )
         self.assertEqual(set(hooks), {"hooks"})
         hook_groups = cast("dict[str, object]", hooks["hooks"])
         self.assertEqual(set(hook_groups), set(ACTIVE_EVENTS))
         self.assertNotIn("Stop", hook_groups)
 
-        prompt_group = cast("list[dict[str, object]]", hook_groups["UserPromptSubmit"])[0]
+        prompt_group = cast("list[dict[str, object]]", hook_groups["UserPromptSubmit"])[
+            0
+        ]
         pre_tool_group = cast("list[dict[str, object]]", hook_groups["PreToolUse"])[0]
         post_tool_group = cast("list[dict[str, object]]", hook_groups["PostToolUse"])[0]
         self.assertEqual(
-            [hook["command"] for hook in cast("list[dict[str, object]]", prompt_group["hooks"])],
+            [
+                hook["command"]
+                for hook in cast("list[dict[str, object]]", prompt_group["hooks"])
+            ],
             ["python3 .codex/hooks/hook_dispatcher.py UserPromptSubmit"],
         )
+        self.assertEqual(pre_tool_group["matcher"], "Bash|apply_patch|python|python3")
         self.assertEqual(
-            pre_tool_group["matcher"], "Bash|apply_patch|python|python3"
-        )
-        self.assertEqual(
-            [hook["command"] for hook in cast("list[dict[str, object]]", pre_tool_group["hooks"])],
+            [
+                hook["command"]
+                for hook in cast("list[dict[str, object]]", pre_tool_group["hooks"])
+            ],
             ["python3 .codex/hooks/hook_dispatcher.py PreToolUse"],
         )
         post_matcher = cast(str, post_tool_group["matcher"])
@@ -430,12 +459,17 @@ class CodexHooksTest(unittest.TestCase):
             }.issubset(set(post_matcher.split("|")))
         )
         self.assertEqual(
-            [hook["command"] for hook in cast("list[dict[str, object]]", post_tool_group["hooks"])],
+            [
+                hook["command"]
+                for hook in cast("list[dict[str, object]]", post_tool_group["hooks"])
+            ],
             ["python3 .codex/hooks/hook_dispatcher.py PostToolUse"],
         )
 
         contract = self._contract()
-        self.assertEqual(set(cast("list[str]", contract["active_events"])), set(ACTIVE_EVENTS))
+        self.assertEqual(
+            set(cast("list[str]", contract["active_events"])), set(ACTIVE_EVENTS)
+        )
 
     def test_hook_contract_is_table_driven_static_and_stop_noop(self) -> None:
         """The static contract covers active events, inactive Stop, and all retired routes."""
@@ -443,7 +477,9 @@ class CodexHooksTest(unittest.TestCase):
         events = cast("dict[str, dict[str, object]]", contract["events"])
         active_events = cast("list[str]", contract["active_events"])
         inactive_events = cast("list[str]", contract["inactive_events"])
-        retired_rows = cast("list[dict[str, object]]", contract["retired_child_tombstones"])
+        retired_rows = cast(
+            "list[dict[str, object]]", contract["retired_child_tombstones"]
+        )
         moved_rows = cast("list[dict[str, object]]", contract["moved_source_absences"])
         active_handlers = set(cast("list[str]", contract["active_handlers"]))
 
@@ -478,7 +514,9 @@ class CodexHooksTest(unittest.TestCase):
             with self.subTest(route=route_name):
                 route = retired_routes[route_name]
                 self.assertEqual(set(route), RETIRED_ROUTE_FIELDS)
-                self.assertTrue(all(isinstance(value, str) and value for value in route.values()))
+                self.assertTrue(
+                    all(isinstance(value, str) and value for value in route.values())
+                )
 
         stop = self._run_hook("Stop", "not-json")
         self.assertEqual(stop.stdout, "")
@@ -564,7 +602,9 @@ class CodexHooksTest(unittest.TestCase):
                 {
                     "hookEventName": "PreToolUse",
                     "tool_name": "apply_patch",
-                    "tool_input": {"patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"},
+                    "tool_input": {
+                        "patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"
+                    },
                 },
                 extra_env={
                     "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(run_dir),
@@ -584,7 +624,9 @@ class CodexHooksTest(unittest.TestCase):
             run_dir.mkdir()
             self._write_identity_receipt(run_dir, "implementer")
             identity = json.loads(
-                (run_dir / "runtime" / "agent_identity.json").read_text(encoding="utf-8")
+                (run_dir / "runtime" / "agent_identity.json").read_text(
+                    encoding="utf-8"
+                )
             )
             spool = root / "hook-results" / ".event-spool"
             spool.mkdir(parents=True)
@@ -606,7 +648,9 @@ class CodexHooksTest(unittest.TestCase):
                 {
                     "hookEventName": "PreToolUse",
                     "tool_name": "apply_patch",
-                    "tool_input": {"patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"},
+                    "tool_input": {
+                        "patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"
+                    },
                 },
                 extra_env={
                     "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(run_dir),
@@ -636,9 +680,9 @@ class CodexHooksTest(unittest.TestCase):
             "run_id": run_id,
             "schema_version": "execution-resource-plan/v1",
         }
-        projection_stdout = json.dumps(
-            projection, sort_keys=True, separators=(",", ":")
-        ) + "\n"
+        projection_stdout = (
+            json.dumps(projection, sort_keys=True, separators=(",", ":")) + "\n"
+        )
         raw = {
             "hookEventName": "PostToolUse",
             "tool_name": "Bash",
@@ -656,26 +700,44 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(hook_output["hookEventName"], "PostToolUse")
         self.assertEqual(hook_output["additionalContext"], projection_stdout)
 
-    def test_post_tool_projection_failure_keeps_one_redacted_behavior_event(self) -> None:
+    def test_post_tool_projection_failure_keeps_one_redacted_behavior_event(
+        self,
+    ) -> None:
         """Ordinary results and foreign response shapes still record safe behavior."""
         cases = (
-            ("Bash", {"command": "printf 'private-command-value'"},
-             {"exit_code": 0, "stderr": "private-stderr", "stdout": "ok\n"}),
-            ("Bash", {"command": "printf 'private-command-value'"},
-             {"exit_code": 0, "stderr": "", "stdout": "private-stdout"}),
-            ("apply_patch", {"patch": "private-patch-value"},
-             {"result": "private-result-value"}),
+            (
+                "Bash",
+                {"command": "printf 'private-command-value'"},
+                {"exit_code": 0, "stderr": "private-stderr", "stdout": "ok\n"},
+            ),
+            (
+                "Bash",
+                {"command": "printf 'private-command-value'"},
+                {"exit_code": 0, "stderr": "", "stdout": "private-stdout"},
+            ),
+            (
+                "apply_patch",
+                {"patch": "private-patch-value"},
+                {"result": "private-result-value"},
+            ),
         )
         for tool, tool_input, response in cases:
-            with self.subTest(tool=tool, response=response), tempfile.TemporaryDirectory() as tmp:
+            with (
+                self.subTest(tool=tool, response=response),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
                 root = Path(tmp) / "source"
                 root.mkdir()
-                result = self._run_hook_in_root(root, "PostToolUse", {
-                    "hookEventName": "PostToolUse",
-                    "tool_name": tool,
-                    "tool_input": tool_input,
-                    "tool_response": response,
-                })
+                result = self._run_hook_in_root(
+                    root,
+                    "PostToolUse",
+                    {
+                        "hookEventName": "PostToolUse",
+                        "tool_name": tool,
+                        "tool_input": tool_input,
+                        "tool_response": response,
+                    },
+                )
                 self.assertEqual(result.stdout, "")
                 self.assertEqual(result.stderr, "")
                 event = self._spooled_event(root)
@@ -684,8 +746,13 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertEqual(event["tool_name"], tool)
                 self.assertEqual(event["selected_tools"], [tool])
                 serialized = json.dumps(event)
-                for value in ("private-command-value", "private-stderr", "private-stdout",
-                              "private-patch-value", "private-result-value"):
+                for value in (
+                    "private-command-value",
+                    "private-stderr",
+                    "private-stdout",
+                    "private-patch-value",
+                    "private-result-value",
+                ):
                     self.assertNotIn(value, serialized)
                 self.assertNotIn("tool_response", event)
 
@@ -695,11 +762,18 @@ class CodexHooksTest(unittest.TestCase):
             "hookEventName": "PostToolUse",
             "tool_name": "Bash",
             "tool_input": {"command": "printf 'private-command-value'"},
-            "tool_response": {"exit_code": 0, "stdout": "private-stdout", "stderr": "private-stderr"},
+            "tool_response": {
+                "exit_code": 0,
+                "stdout": "private-stdout",
+                "stderr": "private-stderr",
+            },
             "metadata": "private-metadata-value",
         }
         for append_status in ("spooled", "duplicate", "failed", "exception"):
-            with self.subTest(append_status=append_status), tempfile.TemporaryDirectory() as tmp:
+            with (
+                self.subTest(append_status=append_status),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
                 root = Path(tmp)
                 context = mock.Mock()
                 context.run_id.return_value = "hook-projection-failure"
@@ -708,16 +782,32 @@ class CodexHooksTest(unittest.TestCase):
                 else:
                     context.append.return_value = mock.Mock(status=append_status)
                 with (
-                    mock.patch.object(hook_dispatcher, "hook_root", return_value=
-                        hook_dispatcher.HookRootState(root, False, hook_dispatcher.HookRootStatus.OVERRIDE)),
-                    mock.patch.object(hook_dispatcher, "resolve_report_target", return_value=root / "report"),
-                    mock.patch.object(hook_dispatcher, "HookLogContext", return_value=context),
-                    mock.patch.object(hook_dispatcher, "emit_behavior_projection") as emit,
+                    mock.patch.object(
+                        hook_dispatcher,
+                        "hook_root",
+                        return_value=hook_dispatcher.HookRootState(
+                            root, False, hook_dispatcher.HookRootStatus.OVERRIDE
+                        ),
+                    ),
+                    mock.patch.object(
+                        hook_dispatcher,
+                        "resolve_report_target",
+                        return_value=root / "report",
+                    ),
+                    mock.patch.object(
+                        hook_dispatcher, "HookLogContext", return_value=context
+                    ),
+                    mock.patch.object(
+                        hook_dispatcher, "emit_behavior_projection"
+                    ) as emit,
                     mock.patch("sys.stdout", new_callable=io.StringIO) as output,
                 ):
-                    self.assertEqual(hook_dispatcher.dispatch_event(
-                        "PostToolUse", json.dumps(payload).encode("utf-8")
-                    ), 0)
+                    self.assertEqual(
+                        hook_dispatcher.dispatch_event(
+                            "PostToolUse", json.dumps(payload).encode("utf-8")
+                        ),
+                        0,
+                    )
                 self.assertEqual(output.getvalue(), "")
                 context.append.assert_called_once()
                 event = context.append.call_args.args[0]
@@ -730,7 +820,12 @@ class CodexHooksTest(unittest.TestCase):
                         self.assertEqual(event[key], value)
                 else:
                     emit.assert_not_called()
-                for value in ("private-command-value", "private-stdout", "private-stderr", "private-metadata-value"):
+                for value in (
+                    "private-command-value",
+                    "private-stdout",
+                    "private-stderr",
+                    "private-metadata-value",
+                ):
                     self.assertNotIn(value, json.dumps(event))
 
     def test_coordination_receipt_uses_real_posttool_result(self) -> None:
@@ -795,9 +890,9 @@ class CodexHooksTest(unittest.TestCase):
             "run_id": "r5",
             "schema_version": "execution-resource-plan/v1",
         }
-        projection_stdout = json.dumps(
-            valid_projection, sort_keys=True, separators=(",", ":")
-        ) + "\n"
+        projection_stdout = (
+            json.dumps(valid_projection, sort_keys=True, separators=(",", ":")) + "\n"
+        )
         base = {
             "hookEventName": "PostToolUse",
             "tool_name": "Bash",
@@ -811,7 +906,7 @@ class CodexHooksTest(unittest.TestCase):
         invalid_projection_schema = dict(valid_projection)
         invalid_projection_schema["schema_version"] = "wrong/v1"
         cases: tuple[tuple[str, object], ...] = (
-            ("malformed-json", "{\"hookEventName\":"),
+            ("malformed-json", '{"hookEventName":'),
             ("json-array", []),
             ("missing-raw-key", {"hookEventName": "PostToolUse"}),
             ("extra-raw-key", {**base, "unexpected": True}),
@@ -820,15 +915,33 @@ class CodexHooksTest(unittest.TestCase):
             ("tool-input-type", {**base, "tool_input": []}),
             (
                 "response-extra-key",
-                {**base, "tool_response": {**cast("dict[str, object]", base["tool_response"]), "extra": True}},
+                {
+                    **base,
+                    "tool_response": {
+                        **cast("dict[str, object]", base["tool_response"]),
+                        "extra": True,
+                    },
+                },
             ),
             (
                 "response-exit-bool",
-                {**base, "tool_response": {**cast("dict[str, object]", base["tool_response"]), "exit_code": False}},
+                {
+                    **base,
+                    "tool_response": {
+                        **cast("dict[str, object]", base["tool_response"]),
+                        "exit_code": False,
+                    },
+                },
             ),
             (
                 "response-stdout-type",
-                {**base, "tool_response": {**cast("dict[str, object]", base["tool_response"]), "stdout": []}},
+                {
+                    **base,
+                    "tool_response": {
+                        **cast("dict[str, object]", base["tool_response"]),
+                        "stdout": [],
+                    },
+                },
             ),
             (
                 "projection-schema",
@@ -972,14 +1085,17 @@ class CodexHooksTest(unittest.TestCase):
                     <= set(signals.candidate_workflows)
                 )
                 self.assertTrue(
-                    cast("set[str]", case.get("forbidden_candidates", set())).isdisjoint(
-                        candidates
-                    )
+                    cast(
+                        "set[str]", case.get("forbidden_candidates", set())
+                    ).isdisjoint(candidates)
                 )
                 reason_fragment = case.get("reason_fragment")
                 if reason_fragment is not None:
                     self.assertTrue(
-                        any(reason_fragment in reason for reason in signals.candidate_skill_reasons)
+                        any(
+                            reason_fragment in reason
+                            for reason in signals.candidate_skill_reasons
+                        )
                     )
 
     def test_shared_checkout_guard_blocks_destructive_git_parser_table(self) -> None:
@@ -1007,71 +1123,13 @@ class CodexHooksTest(unittest.TestCase):
             with self.subTest(command=command):
                 payload = self._run_shared_checkout_guard(command)
                 self.assertIsNotNone(payload)
-                self.assertEqual(cast("dict[str, object]", payload)["decision"], "block")
+                self.assertEqual(
+                    cast("dict[str, object]", payload)["decision"], "block"
+                )
                 self.assertIn(
                     "DESTRUCTIVE_GIT_GUARD=block",
                     cast("str", cast("dict[str, object]", payload)["reason"]),
                 )
-
-    def test_conflict_inventory_blocks_unbound_whole_file_operations(self) -> None:
-        """An existing conflict inventory binds destructive Git to a preservation plan."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir) / "source"
-            root.mkdir()
-            conflict_dir = root / ".agent-canon"
-            conflict_dir.mkdir()
-            (conflict_dir / "conflict-preservation.json").write_text("{}\n", encoding="utf-8")
-            command = (
-                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-                "AGENT_CANON_DESTRUCTIVE_GIT_REASON=conflict-resolution "
-                "git --no-pager checkout --ours -- file.py"
-            )
-            payload = self._run_hook_in_root(
-                root,
-                "PreToolUse",
-                {
-                    "hookEventName": "PreToolUse",
-                    "tool_name": "Bash",
-                    "tool_input": {"cmd": command},
-                },
-            )
-            body = cast("dict[str, object]", json.loads(payload.stdout))
-            self.assertIn("CONFLICT_PRESERVATION_GUARD=block", body["reason"])
-
-            attached = (
-                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-                "AGENT_CANON_DESTRUCTIVE_GIT_REASON=conflict-resolution "
-                "AGENT_CANON_CONFLICT_PRESERVATION_INVENTORY=inventory.json "
-                "AGENT_CANON_CONFLICT_PRESERVATION_PLAN=plan.json "
-                "git --no-pager checkout --ours -- file.py"
-            )
-            attached_result = self._run_hook_in_root(
-                root,
-                "PreToolUse",
-                {
-                    "hookEventName": "PreToolUse",
-                    "tool_name": "Bash",
-                    "tool_input": {"cmd": attached},
-                },
-            )
-            if attached_result.stdout:
-                attached_body = cast("dict[str, object]", json.loads(attached_result.stdout))
-                self.assertIn(
-                    "CONFLICT_PRESERVATION_GUARD=block",
-                    attached_body.get("reason", ""),
-                )
-
-            commit_result = self._run_hook_in_root(
-                root,
-                "PreToolUse",
-                {
-                    "hookEventName": "PreToolUse",
-                    "tool_name": "Bash",
-                    "tool_input": {"cmd": "git commit --no-edit"},
-                },
-            )
-            commit_body = cast("dict[str, object]", json.loads(commit_result.stdout))
-            self.assertIn("CONFLICT_PRESERVATION_GUARD=block", commit_body["reason"])
 
     def test_shared_checkout_guard_authority_is_same_segment_and_one_shot(self) -> None:
         """Ambient, incomplete, and earlier-segment authority never leaks to Git."""
@@ -1085,7 +1143,9 @@ class CodexHooksTest(unittest.TestCase):
         ):
             payload = self._run_shared_checkout_guard(command)
             self.assertIsNotNone(payload)
-            self.assertEqual(payload.get("mutation_authority"), "blocked_authority_required")
+            self.assertEqual(
+                payload.get("mutation_authority"), "blocked_authority_required"
+            )
         self.assertIsNotNone(
             self._run_shared_checkout_guard(
                 "git restore file.py",
@@ -1101,13 +1161,17 @@ class CodexHooksTest(unittest.TestCase):
             )
         )
         self.assertIsNotNone(
-            self._run_shared_checkout_guard(f"{destructive} git restore file.py && git reset HEAD")
+            self._run_shared_checkout_guard(
+                f"{destructive} git restore file.py && git reset HEAD"
+            )
         )
         self.assertIsNotNone(
             self._run_shared_checkout_guard(f"{destructive}; git restore file.py")
         )
 
-    def test_shared_checkout_guard_checks_opaque_protected_git_per_segment(self) -> None:
+    def test_shared_checkout_guard_checks_opaque_protected_git_per_segment(
+        self,
+    ) -> None:
         """A parsed safe Git segment never hides opaque protected Git elsewhere."""
         commands = [
             "git status && sudo git reset --hard",
@@ -1241,13 +1305,14 @@ class CodexHooksTest(unittest.TestCase):
             with self.subTest(command=command):
                 payload = self._run_shared_checkout_guard(
                     "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-                    "AGENT_CANON_BRANCH_WORKTREE_REASON=requested "
-                    + command
+                    "AGENT_CANON_BRANCH_WORKTREE_REASON=requested " + command
                 )
                 self.assertIsNotNone(payload)
                 self.assertEqual(payload.get("decision"), "block")
 
-    def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(self) -> None:
+    def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(
+        self,
+    ) -> None:
         """Only explicit branch/worktree read-only allowlists stay quiet."""
         commands = [
             "git branch -Mtopic",

@@ -10,7 +10,6 @@ upstream design ./catalog.yaml registers this public skill
 upstream design ../../documents/tools/lsp_code_analysis.md owns LSP relation evidence and capability limits
 upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts file-level code dependency evidence
 upstream implementation ../../tools/analysis/code/helper_function_inventory.py extracts Python function-level call graph context
-upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py validates design-document evidence claims
 @dependency-end
 -->
 
@@ -23,7 +22,7 @@ upstream implementation ../../tools/validation/semantic/documents/check_design_d
   Core References define how outputs feed planning and handoff. For cause repair,
   follow Root-Cause Repair Scope: fix the cause, then trace and repair LSP-linked issues.
 - Use when: dependency manifests, changed-file gates, graph edges, reverse
-  edges, design-claim evidence, or repair-planning packets are needed.
+  edges, source references, or repair-planning packets are needed.
 - Boundary: code dependency evidence and dependency-header evidence remain
   separate until summarized in a structured Change Impact Packet.
   Repository-wide dependency graph projection and rendering is owned by
@@ -49,6 +48,11 @@ code dependency と header dependency は別 evidence として扱い、修正�
 - refactor-loop や implementation subagent に渡す repair batch / handoff context を機械的に作りたい
 
 ## Required Commands
+
+Choose commands from the question and affected surfaces below; these are
+conditional routes, not one command sequence. A changed-file gate applies when
+changed headers or their gate are in scope, graph checks when edges change, and
+a full migration inventory only for a repository-wide migration question.
 
 Code dependency surface:
 
@@ -104,31 +108,10 @@ bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --search-hits-file reports/search_hits.txt
 ```
 
-Design-document claim evidence gate:
-
-```bash
-python3 tools/validation/semantic/documents/check_design_doc_claims.py \
-  --root . \
-  --recursive-depth 3 \
-  documents/design/<topic>.md
-```
-
-or through the dependency review wrapper:
-
-```bash
-bash tools/analysis/dependencies/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review \
-  --check-design-doc-claims
-```
-
-For an explicit design document:
-
-```bash
-bash tools/analysis/dependencies/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review \
-  --check-design-doc-claims \
-  --design-doc-claim-path documents/design/<topic>.md
-```
+Design documents use ordinary prose and Markdown links to identify source and
+governing references. Read those sources directly at the selected revision;
+`agent-canon docs check` owns local-link and Markdown validation. No separate
+claim-token or evidence-ledger parser is part of this dependency route.
 
 ## Cause Investigation Surface
 
@@ -217,28 +200,31 @@ The cause-to-action sequence is ordered, not a list of independent checks:
 4. Compare only alternatives that could change that decision and record each
    as `disconfirmed`, `bounded`, or selected with its supporting evidence.
 5. Fix the concrete causal location using the supported mechanism, then follow
-   the LSP tracing and repair sequence below. An unresolved cause stays analysis
-   work; it does not become a symptom-level action or a completed cause search.
+   the related-code route below when affected relations could change the repair
+   or validation. An unresolved cause stays analysis work; it does not become a
+   symptom-level action or a completed cause search.
 
 ## Root-Cause Repair Scope After Cause Selection
 
-Use this order: identify the cause, fix that location, trace related code with
-LSP, and fix problems found through those relations. Do not separate diagnosis
+The cause fix precedes related-code follow-up. Trace only relations that can
+change the repair, migration, or selected validation; do not separate diagnosis
 from repair or select a broader repair surface before fixing the known cause.
 
 1. Correct the identified expression, branch, call, state update, or missing
    operation at its owner. Preserve the governing contract with the simplest
    sufficient change. Do not suppress the symptom with a wrapper, compatibility
    shim, weakened oracle, or caller workaround that leaves the root cause intact.
-2. After that edit, use this skill's existing [LSP usage procedure](../../documents/tools/lsp_code_analysis.md)
-   and code-dependency commands, starting from the changed symbol and file.
-   Follow references, callers/callees, definitions, and implementations supported
-   by the server. Inspect the corresponding code and relevant tests/contracts;
-   a relation is a place to inspect, not by itself a reason to edit.
+2. After that edit, inspect relationships that could affect the repair or its
+   validation. Use this skill's existing [LSP usage procedure](../../documents/tools/lsp_code_analysis.md)
+   and code-dependency commands when their supported relations can change the
+   consumer migration or affected contract; otherwise use narrower relevant
+   source and test evidence. Follow the relations supported by the selected
+   evidence. A relation is a place to inspect, not by itself a reason to edit.
 3. Fix concrete problems found along those relations, including broken calls,
    incompatible types/contracts, or affected state and failure behavior. Do not
-   stop at listing findings. Follow newly affected relations after each repair
-   and recheck affected evidence; leave related code unchanged when it is sound.
+   stop at listing findings. Follow newly affected relations when a repair
+   changes them and recheck evidence that bears on the defect or correction;
+   leave related code unchanged when it is sound.
    Do not expand into unrelated repository work or edit sound code just to
    synchronize every consumer.
 4. Run the existing formatter and targeted validation for the final changes.
@@ -260,17 +246,17 @@ that fix; unresolved required verification still prevents a verified closeout.
 
 - code dependency は実 import / include / source 関係、header dependency は design / implementation / environment / test の明示文脈です。混ぜずに別々の evidence として記録します。header edge を実行・build reachability や caller の証拠に読み替えず、code edge を design ownership や文書の正本性に読み替えません。両者を結合するのは Change Impact Packet の影響範囲整理だけです。
 - Python code 変更では、`helper_function_inventory.py --changed --all-functions` を関数 / class / method 単位の evidence として使います。この tool は変更 Python file を報告対象にしつつ、whole-repo call graph context から direct callers / callees を保持します。変更 Python file count が 0 件の場合は `HELPER_INVENTORY_FILES=0` を scope evidence にします。
-- 原因箇所を特定したらまずそこを修正し、[Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) に従って既存LSP利用手順で関連をたどり、問題があれば修正します。`scan_code_dependencies.sh` の実コード依存と header dependency の design / docs / tests は区別し、関連全体の事前調査を原因修正の開始条件にしません。
+- 原因箇所を特定したらまずそこを修正し、[Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) に従います。関連が修正・移行・validation の判断に影響する場合は既存LSP利用手順や対象source evidenceでたどり、問題があれば修正します。`scan_code_dependencies.sh` の実コード依存と header dependency の design / docs / tests は区別し、関連全体の事前調査を原因修正の開始条件にしません。
 - `required_action` や solution proposal より先に causal ambiguity と owner / fix / validation を変え得る alternative の有無を判定します。該当時だけ cause-evidence note を完成させ、incoming callers/entrypoints、owning mechanism/state/guards、downstream consumers/side effects/cleanup、sibling implementations/tests/docs/config を evidence-linked にたどります。straightforward finding は direct cause proof、rejected/duplicate/already-covered/unreachable finding は reason/evidence だけで閉じます。snapshot drift が原因候補になり得る場合だけ latest remote/Issue/branch history を追加します。
 - 原因探索の最終目標は、原因となるコードの具体的な一か所の特定です。[Cause Investigation Surface](#cause-investigation-surface) に従い、source snapshot、path、symbol、該当行/block と、入力/状態から現象に至る因果根拠を既存記録に残します。候補一覧・原因分類・症状の発生地点だけでは完了しません。一か所と因果関係を特定し、判断を変え得る代替を disconfirmed / bounded にしたら、その原因箇所の修正へ進みます。十分な静的根拠に追加実行を要求せず、未特定は `cause_unproven` とし、根拠なく一つに断定しません。
 - activated packet の `required_action` は `Selected Cause` と `Expected Mechanism` から、straightforward packet の action は direct cause proof から導出します。症状だけの修正提案は `cause_unproven` として保留します。発生不能な分岐と過剰・重複ガードは、`reason_code=unreachable_branch|overcheck` と証拠を残して review 対象から除外します。
-- コード改善の修正箇所を選ぶ task では、この skill の `Cause Investigation Surface` と `Root-Cause Repair Scope` に従って `Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`fix_surface_validated=yes` を実装前に固定します。
-- 原因修正後のLSP関連確認・必要な修正・対象検証を行い、`Post-Change Evidence` と `Hypothesis Decision: supported|rejected|inconclusive` を残します。`rejected` または `inconclusive` の場合は、同じ実装 pass を広げず次仮説へ戻します。
+- 複数の因果仮説を比較して修正箇所を選ぶ task では、この skill の `Cause Investigation Surface` と `Root-Cause Repair Scope` に従って既存 packet に `Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`fix_surface_validated=yes` を記録してから実装します。直接原因を示す十分な証明や reason/evidence-only disposition にはこの比較記録を追加しません。
+- 既存 hypothesis packet を使った場合は、原因修正後の関連確認と対象検証のうち判断に必要な evidence を `Post-Change Evidence` と `Hypothesis Decision: supported|rejected|inconclusive` として残します。`rejected` または `inconclusive` の場合は、同じ実装 pass を広げず次仮説へ戻します。
 - changed-file header / scan / format failure は fix-now blocker です。
 - default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
 - `run_repo_dependency_review.sh --report-dir` は dependency header 由来の `dependency_graph.tsv` を生成します。
 - search result を編集対象に変換するときは、responsibility-based context、bounded `git grep` hit、`dependency_edit_scope.txt` の `DEPENDENCY_EDIT_SCOPE_PATH` を issue / PR evidence に残します。raw text-search hit だけで編集対象を決めません。
-- design document を修正または作成するときは、major claim の code / path token、初出 DSL / standard-form terms、parent-doc alignment を `Evidence And Assumption Ledger` に接続し、`check_design_doc_claims.py` の finding を design evidence gap として扱います。
+- design document を修正または作成するときは、重要な implementation-facing statement を通常の Markdown source link と説明文で根拠に結び付け、関連 source と governing parent document を直接確認します。初出の専門用語や前提は、判断に影響する範囲で本文中に定義します。
 - Dockerfile や environment file を universal anchor にしません。実際に Docker、CI、requirements、runtime configuration に依存する file だけ `environment` edge を使い、それ以外は [AGENTS.md](../../AGENTS.md)、`README.md`、directory README、workflow/design doc、tool index、skill guide などの nearest true canon anchor に接続します。
 - `--check-bidirectional` の full-repo failure は、reverse-edge 移行期間中は baseline として扱えます。ただし pass とは呼びません。
 - baseline 扱いにする場合も、今回差分で old-format header、自己参照、reverse edge 欠落、kind mismatch、cycle を増やしていないことを review artifact に残します。
@@ -396,18 +382,22 @@ agent-canon python-structure-hash-scope-plan \
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read [documents/design/dependency-manifest-design.md](../../documents/design/dependency-manifest-design.md).
+1. Read [documents/design/dependency-manifest-design.md](../../documents/design/dependency-manifest-design.md)
+   when dependency-header format, graph semantics, or tool ownership affects the decision.
 1. If the task selects or justifies a fix surface, read this skill's `Cause Investigation Surface` and `Root-Cause Repair Scope`; use `change-review` for the findings-first review after the owner is selected.
-1. For code-improvement work, do not implement until the artifact records `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `fix_surface_validated=yes`.
+1. When competing causal hypotheses could change the fix surface, record the
+   comparison in the existing packet before implementation; direct cause proofs
+   and reason/evidence-only dispositions do not need that comparison.
 1. Apply [Cause Investigation Surface](#cause-investigation-surface) before deriving
    an action: use its conditional cause-evidence note or direct cause proof,
    preserving the reason/evidence-only dispositions. For code causes, identify
    the concrete causal location and supported mechanism, then fix that location
-   and follow [Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection):
-   use the existing LSP procedure after the fix, trace related code, and repair
-   problems found there. Do not stop at cause identification, defer the cause fix
-   for a broad survey, or treat unsupported LSP results as absence of problems.
-1. After the cause fix, LSP-related repairs, and targeted validation, record `Post-Change Evidence` and `Hypothesis Decision: supported|rejected|inconclusive`. If the decision is `rejected` or `inconclusive`, return to hypothesis selection instead of expanding the implementation pass.
+   and follow [Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection)
+   for relations that could affect the repair or validation. Do not stop at cause
+   identification or treat unsupported LSP results as absence of problems.
+1. When an existing hypothesis packet is used, record its post-change evidence
+   and decision there; return to hypothesis selection when evidence rejects or
+   leaves that hypothesis inconclusive.
 1. Choose the mode that answers the task without hiding dependency evidence:
    - code dependency surface: run `scan_code_dependencies.sh`
    - changed-file closeout gate: use `--changed`
@@ -415,7 +405,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    - repo migration inventory: run full scan without `--changed`
    - dependency edge change: include graph validation
    - repo-wide search triage: run responsibility-based search first, then use bounded `git grep -l` only as comparison evidence or within selected source surfaces before search-to-edit-scope expansion
-   - design-document evidence: run `check_design_doc_claims.py` on changed or newly authored design docs
+   - design-source review: read linked implementation and governing documents directly; use the selected documentation owner's standard Markdown/link check for syntax and target validity
    - repair planning or subagent handoff: build a structured `Change Impact
      Packet` manifest before selecting implementation targets
 1. Use the `Required Commands` and `Change Impact Packet` sections above for

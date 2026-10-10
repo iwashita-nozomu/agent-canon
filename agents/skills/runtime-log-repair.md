@@ -21,8 +21,8 @@ downstream implementation ../../.codex/personal/skills/runtime-log-repair/SKILL.
 - Use When: dashboard next actions, hook failure evidence, missing actual wave
   rows, workflow attribution gaps, missing consulted source URLs, or recurring
   runtime-log repair work need routed action rather than more analysis.
-- Section path: Purpose and Use When define the trigger; Required Flow fixes the
-  packet and closeout sequence; Boundaries keep raw analysis, durable issues,
+- Section path: Purpose and Use When define the trigger; Required Flow connects
+  selected findings to owner decisions and closeout; Boundaries keep raw analysis, durable issues,
   and owner-specific repairs with their existing skills.
 - Boundary: this skill coordinates repair routing from dashboard evidence; it
   does not own the dashboard schema, raw log analysis, hook implementation,
@@ -31,10 +31,10 @@ downstream implementation ../../.codex/personal/skills/runtime-log-repair/SKILL.
 
 ## Purpose
 
-`agent-log-analysis` が作成した compact dashboard / API evidence から、次に
-直すべき runtime-log 問題を owner surface へ分配する skill です。観測値を
-直接 patch に変換せず、Runtime Log Repair Packet に evidence cell、owner、
-required follow-up skill、validation gate を固定してから修復へ進みます。
+`agent-log-analysis` が選んだ compact dashboard / API evidence から、修復が
+選択された項目を owner surface につなぐ skill です。観測だけでは patch や
+repair wave を起動しません。修復を行う場合は既存の Runtime Log Repair Packet
+で根拠、担当、入力、適用する closeout を伝えます。
 
 ## Use When
 
@@ -49,16 +49,18 @@ required follow-up skill、validation gate を固定してから修復へ進み�
 
 ## Required Flow
 
-1. Reuse the evidence selected by `$agent-log-analysis`: an existing API JSON
-   or compact summary, or a bounded snapshot-qualified excerpt when the needed
-   summary is unavailable. Preserve its scope, age, and missing fields. Neither
-   both formats, regeneration, archive sync, nor clean state is a prerequisite
-   for routing a supported finding; do not expand raw JSONL broadly.
-1. Classify each repair item by owner:
-   `hook_failure`, `wave_execution`, `workflow_attribution`,
-   `reference_capture`, `skill_selection`, `tool_selection`, `eval_gap`,
-   `archive_hygiene`, or `prompt_or_config_drift`.
-1. Write a Runtime Log Repair Packet before editing or spawning a repair wave:
+Start with the evidence selected by `$agent-log-analysis`: one existing API JSON,
+compact summary, or bounded snapshot-qualified excerpt is enough when it supports
+the item. Preserve its scope, age, and gaps. Neither both formats, regeneration,
+archive sync, nor clean state is a prerequisite for an otherwise supported
+finding; do not expand raw JSONL broadly.
+
+For a repair that is actually selected, identify its owner from the observed
+failure and affected surface. Use the existing classes below only where they fit;
+an item that crosses owners may need more than one responsibility, and an
+uncertain cause stays uncertain. Before editing or launching a repair wave,
+carry the evidence and selected operation in the existing Runtime Log Repair
+Packet:
 
 ```text
 repair_class=<hook_failure|wave_execution|workflow_attribution|reference_capture|skill_selection|tool_selection|eval_gap|archive_hygiene|prompt_or_config_drift>
@@ -70,33 +72,23 @@ non_goals=<raw log analysis, schema change, durable issue writing, or owner-spec
 closeout_gate=<command or dashboard field that proves routed repair completion>
 ```
 
-1. Route owner work without absorbing it into this skill:
-   - skill/tool/workflow selection repair -> `$task-routing` plus affected owner
-   - eval family repair -> `$agent-eval-accumulation`
-   - missing delivery, pending publication, or absent automatic retry ->
-     [runtime delivery owner](../../documents/runtime/runtime-log-archive.md#operational-responsibility-and-delivery-routing)
-   - archive layout, branch, retention, or archive dashboard/Actions problems ->
-     the corresponding log-repository owner in that same responsibility map
-   - raw/summary artifact placement -> `$result-artifact-writeout`
-   - durable issue candidates -> `$issue-finding-report`
-   - subagent wave mechanics -> `$subagent-bootstrap`
-   - recurrence learning -> `$agent-learning`
-1. For hook failure, workflow attribution, wave reconciliation, and reference
-   capture repairs, cite the available evidence locator and the verified owner
-   path before touching hook, monitoring, schedule, reference, or closeout
-   tooling. An unavailable summary does not justify inventing an owner or cause.
-1. Verify closeout with the owner-selected gate and, when the repair changes
-   dashboard-producing behavior or routing, rerun the focused route/eval/check
-   that covers the changed owner. A full dashboard rerun is evidence only when
-   the owner gate requires accumulated post-change measurement.
-1. owner-selected gate が fail した場合は、runtime-log repair intent の変更、
-   pass 目的の単純化、revert、intended behavior / test 削除、oracle weakening、
-   validation downscope の前に `failing_contract`、`observation_level`、
-   `cause_classification`、`intent_preservation`、`evidence` を Runtime Log
-   Repair Packet へ追記します。dashboard/schema/tooling の implementation bug は
-   owner intent を保って修復し、oracle / spec、fixture / environment / stale
-   artifact、unrelated failure、approved-design / user-request conflict は owner
-   route、residual、または escalation に分けます。
+Route the operation to its existing owner: selection repairs use `$task-routing`
+and the affected owner; eval repair uses `$agent-eval-accumulation`; delivery or
+archive maintenance uses the linked runtime delivery owner; artifacts,
+Issues, wave mechanics, and recurrence learning use their existing owners.
+Before changing hook, monitoring, schedule, reference, or closeout tooling, cite
+the evidence locator and verify that owner path. A missing summary is not
+evidence for an invented cause.
+
+Verify the selected owner gate. Rerun only the focused route/eval/check that
+covers the changed behavior; a full dashboard run is useful only when the owner
+needs accumulated post-change evidence. If the selected gate fails, preserve
+`failing_contract`, `observation_level`, `cause_classification`,
+`intent_preservation`, and `evidence` in the existing packet before changing
+intent, reverting, weakening an oracle, or reducing validation. Keep
+implementation bugs, specification or oracle mismatch, fixture/environment
+issues, unrelated failures, and approved-design conflicts with their owner or
+escalation path.
 
 ## Boundaries
 
@@ -121,36 +113,19 @@ evidence and does not duplicate those policy definitions.
 
 ## Runtime Contract Clauses
 
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
+The runtime discovery adapter delegates these clauses to this owner. Reuse one
+existing summary or a bounded snapshot-qualified excerpt; missing or stale
+evidence limits the claim and does not justify broad raw-log reads or automatic
+sync, repair, or eval collection. When repair is selected, use the existing
+Runtime Log Repair Packet and route the action through the owner named in
+Required Flow. Analysis, artifact writeout, eval production, publication, and
+retry remain with their respective owners.
 
-1. Read [agents/skills/runtime-log-repair.md](runtime-log-repair.md).
-1. Follow Required Flow's evidence reuse boundary: one existing summary or a
-   bounded snapshot-qualified excerpt is sufficient for a supported finding.
-   Missing or stale evidence limits the claim, not independent owner routing.
-1. Keep bounded raw-event drilldown with `$agent-log-analysis`; do not require
-   both summary formats, regeneration, sync, or clean state before routing.
-1. Build a Runtime Log Repair Packet with `repair_class`,
-   `dashboard_evidence`, `owner_surface`, `repair_route`, `required_input`,
-   `non_goals`, and `closeout_gate` before editing or launching repair work.
-1. Route delivery and archive-maintenance findings through Required Flow's
-   responsibility map; analysis and artifact writeout do not own continuous
-   publication or retry. Source/retention success is not delivery evidence.
-1. Route repairs to owners: eval gaps to `$agent-eval-accumulation`, durable
-   artifacts to `$result-artifact-writeout`, issue candidates to
-   `$issue-finding-report`, wave mechanics to `$subagent-bootstrap`,
-   prompt/config or selection repair to `$task-routing` plus the affected owner,
-   and recurrence learning to `$agent-learning`.
-1. Keep boundaries explicit: this skill does not own raw log analysis,
-   dashboard schema, eval producer loops, artifact placement, durable issue
-   writing, subagent launch mechanics, prompt/config review, hook
-   implementation details, or reference extraction internals.
-1. Verify closeout with the owner-selected gate. Rerun a full dashboard only
-   when the owner gate needs accumulated post-change evidence.
-1. If the owner-selected gate fails, add `failing_contract`,
-   `observation_level`, `cause_classification`, `intent_preservation`, and
-   `evidence` to the Runtime Log Repair Packet before changing repair
-   intent, simplifying to pass, reverting, deleting intended behavior/tests,
-   weakening an oracle, or downscoping validation. Preserve owner intent for
-   implementation bugs and route oracle/spec, fixture/environment/stale
-   artifact, unrelated, and approved-design/user-request conflicts to owner
-   repair, residual, or escalation.
+Use the selected owner gate for closeout. Rerun a full dashboard only when that
+owner needs accumulated post-change evidence. If the gate fails, keep
+`failing_contract`, `observation_level`, `cause_classification`,
+`intent_preservation`, and `evidence` with the existing packet before changing
+repair intent, reverting, deleting intended behavior, weakening an oracle, or
+downscoping validation. Route implementation, specification/oracle,
+fixture/environment, unrelated, and approved-design conflicts to their owner,
+residual, or escalation path.

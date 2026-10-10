@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides registry lib experiment workflow tooling.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Shared helpers for experiment registry tooling."""

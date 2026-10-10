@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Provides analyze refactor surface agent workflow automation.
-# upstream design ../../agents/skills/refactor-loop.md analyzer gate
-# upstream design ../../documents/conventions/object-oriented-design.md OOP boundary policy
-# downstream implementation ../../tests/agent_tools/test_analyze_refactor_surface.py analyzer tests
+# upstream design ../../../agents/skills/refactor-loop.md analyzer gate
+# upstream design ../../../documents/conventions/object-oriented-design.md OOP boundary policy
+# downstream implementation ../../../tests/agent_tools/test_analyze_refactor_surface.py analyzer tests
 # @dependency-end
 """Score Python refactor surfaces using AST-level size and OOP-boundary heuristics."""
 

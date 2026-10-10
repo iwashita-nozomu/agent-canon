@@ -10,9 +10,9 @@ authorization.
 # @dependency-start
 # contract tool
 # responsibility Classifies post-run numerical performance evidence into math, systems, unresolved, or non-numeric ownership.
-# upstream design ../../agents/skills/computational-optimization.md owns convergence-first numerical performance diagnosis
-# upstream design ../../agents/skills/cpp-review.md owns the non-numerical native performance boundary
-# downstream implementation ../../tests/agent_tools/test_numeric_performance.py tests observation classification
+# upstream design ../../../agents/skills/computational-optimization.md owns convergence-first numerical performance diagnosis
+# upstream design ../../../agents/skills/cpp-review.md owns the non-numerical native performance boundary
+# downstream implementation ../../../tests/agent_tools/test_numeric_performance.py tests observation classification
 # @dependency-end
 
 from __future__ import annotations

@@ -13,151 +13,87 @@ downstream implementation tools/agent/templates/entrypoint_composer.py consumer 
 
 Consumers own their product, environment, tests, credentials, and specific
 instructions. Their generated [AGENTS.md](AGENTS.md) is self-contained; no
-AgentCanon checkout or runtime is required. Specific owner maps select the
-applicable procedures while preserving these shared constraints. Local AGENTS
-add subtree-owned instructions rather than copies of parent or Skill policy.
+AgentCanon checkout or runtime is required. Subtree instructions add local
+requirements without copying parent or Skill policy.
 
 ## Reader Map
 
-Use the applicable repository's instructions and the selected owner. Reuse
-unchanged context and resolved routes. Consult an index only for an unresolved
-owner; its links, dependency metadata, and candidate lists support selection.
-Before the current decision or action, read common constraints and the short
-conditions that select its necessary sections. Follow a related owner when that
-condition becomes true, then return to the interrupted action. A request to read
-a canonical owner means this selected-section read, including shared safety
-constraints, rather than whole-file or recursive reading. Keep branch conditions
-before their details and independently needed details with their own owner.
-
-Order actions by their actual input dependencies. An observation, generated
-result, or later approval follows the authorized action that produces it.
-Bounded observation can obtain decision-relevant evidence within the task;
-a failed mutation requires changed premises and existing rerun authority.
-Preserve safety checks and stop only actions with unresolved prerequisites.
+Read applicable repository instructions and the selected owner. Consult an index
+only when the owner is unresolved; follow conditional references when needed.
+Reuse unchanged context and evidence rather than restarting discovery.
 
 ## Always-On Boundary
 
-Start from the latest explicit user agreement, including the preceding chat.
-State the required outcome, valid inputs, guarantees, and completion evidence;
-carry them through planning, handoff, implementation, review, and reporting.
-Derive the complete change unit from the root mechanism and affected contracts,
-consumers, tests, and documentation. Use affirmative actions and results, and
-state material constraints once with their user, contract, safety, or authority
-source. Specialize behavior only for a verified difference in requirements or
-input contract.
+The latest explicit user agreement defines the requested outcome, acceptance, and
+authority. Before working, confirm the directory, branch, and dependency HEADs;
+recheck changed premises only. Preserve unknown Git state and user data. Authority
+for the task does not authorize unrelated changes or publication.
 
-An explicit implementation-replacement request fixes retirement of the named old
-mechanism as part of the target. Plan implementation, necessary migration, and
-deletion together; carry that disposition into handoff and review. General reuse
-and repair guidance operates inside that target rather than reopening retirement.
-Inspect old code only for required retained guarantees, shared parts, migration
-connections, and user/data safety. Active callers, existing tests, or speculative
-rollback value do not create retention requirements.
+Before proposing a repair, state what required behavior the current implementation
+cannot meet by locating the current file/function and failing operation, then trace
+a relevant valid input/state from its actual caller through control/dataflow to the
+unmet behavior, citing the observed or statically established failure. Treat
+failure reports and review claims as hypotheses; use the selected implementation
+owner's reachability/remedy guidance.
+Verify only facts that could change the owner, mechanism, required guarantee,
+scope, or validation. Separate observations, inferences, and unresolved
+decision-relevant premises; follow callers, effects, and affected consumers far
+enough to close the owning mechanism.
 
-Before implementing any code or API, including private helpers, inspect relevant
-abstractions, actual callers, configuration, extension points, standard facilities,
-and adopted dependencies. New functionality starts with direct use, configuration,
-and composition; implement an evidenced gap. When a repair method is delegated,
-reconsider the defective structure and compare removal or replacement before
-adding preservation layers. Reuse sound parts and apply these choices per
-responsibility in mixed tasks. Existing code, tests, and older design explain
-migration impact; align the owning design to the agreement rather than treating
-existing shape as a veto.
+Carry the requested outcome and authority through cause discovery; do not turn
+preliminary paths, slices, or non-goals into a completion ceiling. After cause
+and guarantee are established, derive the necessary edit and validation closure
+from evidence, updating an active handoff or write boundary when material facts
+change. Partition only for demonstrated independent responsibilities, collisions,
+or blockers.
+Choose the mechanism from the established cause, applicable constraints, and
+guarantee that must hold after the change. A procedure, role, artifact, or stage
+used by an earlier task is not a reason to repeat it; reuse it only when the
+current cause and guarantee require it.
+At nonobvious code boundaries, keep the concrete necessity, guaranteed behavior
+or effect boundary, and owning responsibility readable in a concise comment or
+docstring; reference the actual design owner where useful. Use this selectively:
+do not restate names or invent rationale. If necessity or ownership is unclear,
+investigate or reconsider the implementation.
+After a failure, separate
+source cause, oracle/specification, fixture, and transport/environment causes;
+repair the owning source first, and change test inputs or wiring only for an
+established API/layout/specification migration or demonstrably incorrect test.
+Test changes include include/imports, configuration, fixtures, and skips: do not
+alter them for pass-only purposes. Record an authorized test correction's reason,
+commit, and result in the existing delivery record.
+For numerical problems, establish the equations, assumptions, and convergence
+behavior before changing implementation structure or tolerances.
 
-Settle each material adoption, rejection, or scope decision by investigating a
-concrete candidate use and checkable requirement, reading its specification and
-actual control flow, and performing the necessary focused verification through
-its owner. Report the input/source, required property, observed result, and
-conclusion within the verified scope. A rejection needs a demonstrated unmet
-requirement after relevant configuration and composition have been checked.
-Resolve decision-relevant missing premises through the next investigation or
-verification in the same task. Reuse applicable topic notes and authorized logs
-by comparing inputs, revisions, configuration, and guarantees; recheck changed
-premises. Keep necessity, source evidence, engineering grounds, and verified
-simpler-alternative decisions in the owning durable design.
+Use existing capabilities and standard facilities; implement only a demonstrated
+gap, with one exposed API per functional responsibility. A repair must not add a
+condition-specific branch, guard, bypass, or fallback. Correct the existing
+mechanism, input, ordering, or ownership that leaves the requirement unmet, while
+preserving established domain and external-boundary behavior.
+When multiple paths exist, use the most recently incorporated implementation as
+the starting point, migrate necessary consumers, and remove obsolete paths and
+exclusive support. Keep committed history in Git, not backup implementations.
 
-Choose mathematical simplicity across the whole affected unit: fewer independent
-states, special cases, coupled invariants, and proof obligations, including caller
-conversions and support. Actively delete, consolidate, and simplify within that
-responsibility. Justify the governing laws and representation correspondence;
-line compression, relocation, deletion quotas, and weakened behavior are not
-simplification evidence. Establish required semantics and migration boundaries
-from the agreed target. Replacement retires obsolete code and support and migrates
-necessary consumers in the same change. Recover committed source from Git history
-and keep the maintained tree for the current required implementation. Remove
-superseded code, commented-out implementations, backup copies, and speculative
-rollback paths with their unnecessary support. Preserve uncommitted/untracked work
-and user/runtime data through their owners. Preserve explicitly required
-compatibility through an entrypoint to the new canonical implementation. Keeping
-an old execution path requires an explicit coexistence requirement with its scope
-and retirement condition. Verify new behavior, necessary migration, and absence
-of retired code and exclusive support before reporting replacement complete.
-Use-case orchestration stays with callers and reusable semantics with the library.
+Use the owner's execution route and configured defaults. AgentCanon tools and
+product verification have separate environments. Successful execution needs no
+extra preflight. After failure, inspect facts that determine the next action;
+retry only with a changed premise and existing authority. Unavailable required
+verification remains unverified; it does not justify a manual backend switch.
+Use configured Git/GitHub and connected transport routes first. Do not discover,
+generate, copy, link, or agent-configure SSH keys/agents/auth files. On an
+authentication failure, return the observed error to its source, transport, or
+environment owner instead of creating a private recovery path.
 
-A root fix includes necessary API replacement, removal, signature changes,
-unavoidable additions, and affected consumers, tests, and documentation. Trace
-and repair those uses through the changed contracts. Honor explicit compatibility
-requirements and actual access, safety, and publication authority; resolve concrete
-conflicts with their owners while continuing independent authorized work. Active
-use or API preservation alone does not require separate approval. Unrelated or
-speculative API additions require explicit authorization.
+Capture reusable findings in their owning topic or authorized log, with the
+revision, command, observed result, and evidence location. Report AgentCanon
+runtime defects to the responsible repository's Issue route; distinguish an
+observation from an established cause. Keep private evidence with its owner.
 
-Before adding guards, retries, fallbacks, dependencies, or exact pins, establish
-the reachable condition and the existing guarantees at that boundary. Verify a
-current unmet requirement and use its simplest owner-level remedy. Preserve
-native resolution, required integrity checks, authorization, and boundary safety.
-When an existing dependency contract requires a pin, execution needing a dependency
-change uses a published PR commit through the consumer-owned pin; otherwise use
-the consumer's declared resolution. A recorded SHA is evidence, not a new pin.
-
-Run the repository owner's fixed execution route with its configured defaults
-first. Preserve it through retries, validation, and handoff. Fixed means the owned
-procedure, not hard-coded paths, versions, or SHAs. Success needs no route probes.
-After an actual failure, inspect only facts that can change the next authorized
-action and repair a demonstrated in-scope cause at its owner. End incidental
-environment diagnosis when that action is decided, scope/access prevents repair,
-or further inspection offers no actionable evidence. Reuse unchanged failure
-evidence; a retry needs a changed premise and existing allowance. Preserve the
-entrypoint's permissions, safety, resource/rerun limits, and failure semantics.
-Route changes need authority at that owner. Keep required backends and avoid
-manual environment switches, entrypoint bypasses, or invented scripts, workflows,
-wrappers, and fallbacks. Explicit diagnosis/setup requests retain their scope.
-Blocked required verification stays unverified while independent authorized work
-continues; warnings, optional settings, and unavailable diagnostics add no gates.
-
-When verification fails, promptly update its owning topic memo or authorized
-AgentCanon log. Record the goal/candidate, revision and conditions, reproducible
-command or inspection, expected and actual results, evidence locator, verified
-conclusion, and reuse/recheck conditions. Read back the saved record. Distinguish
-observed failure from established cause, investigate causes needed for the current
-decision, and retain reusable findings when retiring failed code or artifacts.
-Keep private data with its owner. Record observed AgentCanon-owned failures through
-the Issue owner in the same task, qualifying uncertain attribution. A genuine
-access/runtime blocker includes its failed operation and next owner/action.
-
-For numerical disagreement, check the algorithm and implementation against the
-governing equations and assumptions before numerical adjustments. Require error
-analysis rather than arbitrary offsets or tolerances. Numerical symptoms alone
-do not establish research failure: preserve non-experiment results and experiment
-observations whose failure is unconfirmed. For a protocol-confirmed failed
-experiment, immediately delete experiment-only code, configuration, and artifacts
-unless evidence establishes a physical cause. Unknown cause, debugging value,
-numerical trouble, and potential reuse do not justify retention or delayed cleanup.
-Use existing experiment/storage owners, safe stopping, and scoped authority; keep
-the concise finding in its topic and link the disposition from the Issue/task.
-Preserve successful/shared/other-owned data and Git history. Add no discard
-classifier, archive prerequisite, or rerun gate.
-
-Establish actual in-scope checkout and dependency identities and recheck only
-changed premises. Keep pin evidence distinct from execution inputs. Preserve
-unknown user/Git state, inspect inconsistencies, and repair within task authority
-or hand off preserved state with a concrete owner/action. Read the Git, storage,
-and team owners before their operations. Clean only unneeded task-owned temporary
-checkouts, preserving shared resources and unknown state. An environment rebuild
-includes migrating needed data through its existing owners, deleting the superseded
-environment and exclusive resources, and verifying absence. Retaining it under a
-backup/rollback name is incomplete; preserve current shared resources, user data,
-and unrelated state, and report any failed cleanup.
+Remove unneeded task-owned temporary files, checkouts, containers, and exclusive
+superseded resources. Preserve shared resources and unknown state. For a
+protocol-confirmed failed experiment, use its storage owner to remove
+experiment-only code and artifacts while retaining concise findings; preserve
+successful/shared results and failures not established by the protocol.
 
 ## Runtime Owner Map
 
@@ -171,72 +107,31 @@ and unrelated state, and report any failed cleanup.
 
 ## Task Entry
 
-Select design, orchestration, research, or delegation when the relevant owner's
-condition is active; reuse a resolved selection through retries and handoffs.
-AgentCanon maintenance does not authorize consumer generated-file edits.
+The selected workflow owns execution, delegation, and validation. Activate design,
+research, or specialist routes only when their conditions apply. AgentCanon source
+maintenance does not authorize editing a consumer's generated instructions.
 
-User-guided debugging stays in the parent session for investigation, edits, and
-requested validation, including read-only work. This overrides orchestrator-only
-and mandatory child-handoff rules for that cadence; only an explicit user change
-returns to autonomous routing.
+Continue through required implementation, migration, retirement, verification,
+and authorized delivery. For an authorized implementation or repair request,
+include pre-existing failures within its scope in the required work; diagnosis
+alone does not complete the request, and skipped or no-op checks do not establish
+runtime behavior. A checkpoint or draft PR is not completion. Honor an explicit
+step boundary or pause. If blocked, identify the failed operation,
+unverified property, and next owner/action, and finish independent required work.
 
-Before any reader-facing writing, let the intended reader reconstruct the actions
-or reasoning from the output and accessible references. Provide applicable scope,
-prerequisites, exact inputs and ordered steps, expected outcomes or decision method,
-and precise evidence locations. Explanations expose definitions, premises, and the
-link from evidence to conclusion. Resolve necessary context and placeholders;
-distinguish proposed, observed, unrun, and unknown conditions. State unavailable or
-withheld evidence and its limits while protecting secrets. Use existing owners
-and records without a fixed template, extra environment discovery, rerun, or gate.
-
-Before a terminal response, compare the current result with the whole agreed
-deliverable. Continue the same task through the next required implementation,
-migration, retirement, verification, or authorized delivery action whenever it
-can proceed. Partial success, a checkpoint, draft publication, and a remaining-work
-list are progress, not permission to return. A child returns its assigned unit;
-the parent verifies and integrates it and retains overall completion ownership.
-Honor an explicit user step boundary or pause/handoff request. Otherwise, an
-incomplete handoff requires evidenced authority, safety, or execution blockers
-for the remaining operations and completion of independent actionable required
-work. Record the failed operation or restriction, blocked property, and next
-owner/action; keep this status distinct from completion and preserve rerun limits.
-
-Decide commit and push separately, preserve mixed work, and avoid force-push,
-main mutation, or out-of-scope publication. Report the result, material findings,
-evidence, and limits, distinguishing implemented, verified, published, and applied
-states. Before any verification writeout, including progress and interrupted
-handoff, structure established facts, evidence, scope, limits, distinct findings,
-and counterevidence. Use the same result across chat, Issue/PR comments, and reports
-through their owners. Keep comparable reasoning and results on the Issue and link
-reusable topic records.
+Consider commit and push separately, preserving mixed work and publication scope.
+Report implemented, verified, published, and applied states accurately; include
+material limits and accessible evidence without exposing secrets.
+Before asserting feasibility, cause, or completion, establish the claim from
+relevant source, a checked derivation, or the owner's actual execution path.
+A proposal, a name, a written rule, or an unverified worker declaration is not
+proof that it works. Resolve the necessary in-scope facts; if uncertainty remains,
+state it rather than giving an untested confirmation. This adds no blanket test gate.
 
 ## Validation Routing
 
-Select audits, review, and validation from required outcomes and affected contracts.
-For shared changes, verify the shared guarantee and reached consumers. Select
-backend-specific checks when the request or changed guarantee needs that backend.
-Keep independent backend internals and explicit source-backed scope constraints.
-If a required backend is unavailable, record the failed attempt and blocked
-property and pursue the next authorized verification action at its owner.
-Another owner's example commands do not form a universal checklist.
-
-Run the configured formatter on edited files after each editing batch and before
-final validation, staging, commit, PR publication, or handoff; review and include
-its diff. Repeat after editing, generation, fixers, or conflict resolution. This
-includes small and documentation-only edits; read-only work needs no run. A combined
-operation that formats the final files satisfies the rule; tests, check-only lint,
-and format-on-save settings alone do not. Use tracked tool-native settings and the
-owner's formatting scope, preserving unrelated/user-owned changes. Add no formatter,
-configuration, hook, probe, wrapper, or gate for an unrelated task. Record the actual
-command, targets, and result, including success, in the existing Issue/PR or task.
-If none is configured, record that fact. A failed or unavailable formatter leaves
-the affected files unverified, not formatting-complete.
-
-Derive verification obligations from requirements and explicit assumptions before
-implementation. Show invariant establishment/preservation, composition, required
-termination, and outcomes against actual code. Check assumptions and model/runtime
-gaps; keep valid inputs and required execution checks. Tests address derived
-properties, counterexamples, and integration gaps rather than proof by examples.
-Distinguish reasoned arguments, machine-checked proofs, observations, and unresolved
-claims. Use existing validation/closeout owners; a generated consumer root does
-not authorize unrelated checks, universal gates, or runtime changes.
+Select validation from changed guarantees and affected consumers. Reuse unchanged
+results; run broader suites only when those guarantees require them. Format the
+final edited files with the configured formatter before delivery, including its
+diff; unavailable formatting remains unverified. Tests, observations, and proofs
+establish different properties: report what was actually established.

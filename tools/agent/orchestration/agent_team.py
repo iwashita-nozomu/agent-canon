@@ -36,11 +36,6 @@ from tools.runtime.manifest.manifest_rendering import (
     initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
 )
 
-from tools.agent.skills.skill_tool_commands import (
-    validate_command_plan_executables as _validate_command_plan_executables,
-)
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
-
 if __package__:
     from .packets import (
         MATHEMATICAL_INTENT_PACKET_SCHEMA,
@@ -231,7 +226,6 @@ from tools.runtime.manifest.manifest_rendering import (
     pre_handoff_scope_policy_output_lines,
     repo_tool_routing_policy_output_lines,
     required_output_templates_missing,
-    selected_skill_command_packets,
     same_role_subagent_policy_output_lines,
     standard_agent_wave_sequence_output_lines,
     subagent_wave_record_command,
@@ -246,7 +240,6 @@ if __package__:
         materialize_close_agent_tool_call,
         materialize_issue_worker_tool_call,
         materialize_subagent_spawn_tool_call,
-        materialize_skill_tool_call_token,
     )
 else:
     from tools.agent.orchestration.tool_calls import (
@@ -254,7 +247,6 @@ else:
         materialize_close_agent_tool_call,
         materialize_issue_worker_tool_call,
         materialize_subagent_spawn_tool_call,
-        materialize_skill_tool_call_token,
     )
 
 
@@ -382,13 +374,6 @@ def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
         raise RuntimeError(
             "preflight_output_templates_missing:" + ",".join(missing_templates)
         )
-    if spec.selected_skills:
-        source_resolution = _resolve_source_root(source_root)
-        for packet in selected_skill_command_packets(
-            spec.selected_skills,
-            source_root,
-        ):
-            _validate_command_plan_executables(source_resolution, packet)
     created_files = list(_iter_artifacts(spec.config, spec.roles, active_design_packet))
     selected_templates = {
         active_design_packet.design_artifact: spec.config.artifacts["design_brief"],
@@ -522,7 +507,6 @@ __all__ = (
     "validate_writer_handoff_waves",
     "agent_type_selection_map",
     "capacity_start_output_lines",
-    "materialize_skill_tool_call_token",
     "materialize_close_agent_tool_call",
     "materialize_issue_worker_tool_call",
     "materialize_subagent_spawn_tool_call",

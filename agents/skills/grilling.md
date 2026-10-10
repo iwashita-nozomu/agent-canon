@@ -47,7 +47,7 @@ answers before the next round.
 
 Format a round like so:
 
-```
+```text
 ❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
 
 ➡️ <your recommended answer>
