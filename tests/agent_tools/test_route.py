@@ -284,17 +284,19 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("CANONICAL_AREA=runtime", result.stdout)
         self.assertIn("CANONICAL_SKILL=task-routing", result.stdout)
 
-    def test_search_area_exposes_coordinated_search_tools(self) -> None:
-        """Search routing should expose the purpose-based search entrypoint."""
+    def test_search_area_exposes_native_text_and_explicit_semantic_routes(self) -> None:
+        """Search routing should select text or semantic owners explicitly."""
         result = self.run_route("--area", "search", "--risk", "focused")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AREA=search", result.stdout)
-        self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
-        self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
+        self.assertIn("NEXT_ACTION=select_search_provider", result.stdout)
+        self.assertIn("--providers text --regex", result.stdout)
+        self.assertIn("--providers semantic", result.stdout)
+        self.assertNotIn("--refresh-index", result.stdout)
 
     def test_search_alias_resolves_to_search_area(self) -> None:
-        """Legacy vector-search names should route to coordinated search."""
+        """Legacy vector-search names should route to the retained search entrypoint."""
         result = self.run_route("--name", "vector_search.py")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

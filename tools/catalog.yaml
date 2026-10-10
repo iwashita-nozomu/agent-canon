@@ -1073,13 +1073,13 @@ entries:
       - tools/runtime/dispatch/agent-canon/src/test_design.rs
 
   - id: agent-search
-    summary: Coordinates purpose-based search across text, semantic cards, vector search, tool catalog, dependency headers, and code facts.
+    summary: Routes explicit text, semantic-index, tool-catalog, dependency, or LSP searches to separate native owners.
     path: tools/analysis/search/search.py
     family: agent_tools
     role: inventory
     status: canonical
-    command: python3 tools/analysis/search/search.py --purpose "<goal>"
-    dispatch: {argv: ["python3", "tools/analysis/search/search.py", "--purpose", "<goal>"]}
+    command: python3 tools/analysis/search/search.py --query "<literal>" --providers text
+    dispatch: {argv: ["python3", "tools/analysis/search/search.py", "--query", "<literal>", "--providers", "text"]}
     writes: false
     default_wiring:
       ci: false
@@ -1111,26 +1111,6 @@ entries:
       - documents/structured-analysis/code-analysis.md
     tests:
       - tests/agent_tools/test_lsp_code_analysis.py
-
-  - id: search-index
-    summary: Builds repo-local ignored semantic cards for coordinated search.
-    path: tools/analysis/search/search_index.py
-    family: agent_tools
-    role: inventory
-    status: canonical
-    command: python3 tools/analysis/search/search_index.py build
-    dispatch: {argv: ["python3", "tools/analysis/search/search_index.py", "build"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/search-coordination.md
-      - .gitignore
-    tests:
-      - tests/agent_tools/test_search.py
 
   - id: semantic-index
     public: true
@@ -2057,24 +2037,6 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/agent_tools/test_review_backlog_scan.py
-
-  - id: vector-search
-    summary: Provides dependency-free TF-IDF search plus dependency-aware context expansion.
-    path: tools/analysis/search/vector_search.py
-    family: agent_tools
-    role: inventory
-    status: canonical
-    command: python3 tools/analysis/search/vector_search.py
-    dispatch: {argv: ["python3", "tools/analysis/search/vector_search.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_vector_search.py
 
   - id: file-surface-inventory
     summary: Classifies root, submodule, and AgentCanon source file surfaces.
