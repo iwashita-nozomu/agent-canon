@@ -27,6 +27,7 @@ from unittest import mock
 
 import hook_dispatcher
 import hook_event_log
+
 from tools.agent.orchestration.prompt_classifier import (
     PromptClassifierInputs,
     prompt_intake_signals,
