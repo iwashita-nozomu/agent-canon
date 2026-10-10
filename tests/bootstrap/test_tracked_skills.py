@@ -18,11 +18,24 @@ from pathlib import Path
 import pytest
 import yaml
 
+import tools.runtime.container.bootstrap_runtime as bootstrap_runtime_module
 from tools.runtime.container.bootstrap_runtime import BootstrapError, BootstrapRuntime
 
 ROOT = Path(__file__).resolve().parents[2]
 ADAPTER = ROOT / "bootstrap/host/lifecycle/entrypoint.sh"
 SKILLS = Path(".codex/personal/skills")
+
+
+@pytest.fixture(autouse=True)
+def resident_private_log_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Provide the private-log mount required by resident controller calls."""
+    private_log = tmp_path / "private-log"
+    private_log.mkdir()
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log)
+    )
 
 
 def git(root: Path, *args: str) -> str:

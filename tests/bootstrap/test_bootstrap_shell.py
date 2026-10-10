@@ -27,7 +27,7 @@ def test_host_entrypoint_has_no_python_fallback() -> None:
     assert "bootstrap_python_entrypoint" not in text
     assert "exec python3" not in text
     assert '"$AGENT_CANON_DOCKER_CMD" exec' in text
-    assert "AGENT_CANON_CONTAINER_CONTROL" in text
+    assert "--container-control" not in text
     assert "docker.sock" not in text
     assert "AGENT_CANON_CONTAINER_NETWORK" in text
     assert "docker-rpc" not in text
@@ -5591,7 +5591,6 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
         [
             "python3",
             str(ROOT / "tools/runtime/container/bootstrap_runtime.py"),
-            "--container-control",
             "--repository-root",
             str(ROOT),
             "--control-parent-root",
@@ -5607,7 +5606,6 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
             **os.environ,
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "AGENT_CANON_DOCKER": "missing-docker",
-            "AGENT_CANON_CONTAINER_CONTROL": "1",
         },
     )
     assert completed.returncode == 0, completed.stderr

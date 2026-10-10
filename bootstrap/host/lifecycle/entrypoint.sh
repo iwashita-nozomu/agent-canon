@@ -2020,7 +2020,6 @@ _agent_canon_container_exec() {
   extra_env+=(--env "AGENT_CANON_HOST_CODEX_HOME_ROOT=$AGENT_CANON_CODEX_HOME_DESTINATION")
   "$AGENT_CANON_DOCKER_CMD" exec "${exec_options[@]}" \
     --workdir "$AGENT_CANON_RUNTIME_DESTINATION" \
-    --env "AGENT_CANON_CONTAINER_CONTROL=1" \
     --env "AGENT_CANON_IMAGE_REF=$AGENT_CANON_IMAGE_REF" \
     --env "AGENT_CANON_CONTROL_ROOT_DIGEST=$(_agent_canon_control_digest)" \
     --env "AGENT_CANON_CONTAINER_NAME=$(_agent_canon_container_name)" \
@@ -2780,7 +2779,6 @@ _agent_canon_run_controller() {
   error_file=$(mktemp "$temporary_root/.bootstrap.stderr.XXXXXX")
   _agent_canon_container_exec "$container" \
     python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
-    --container-control \
     --repository-root /opt/agent-canon/source \
     --control-parent-root /var/lib/agent-canon \
     --runtime-root /var/lib/agent-canon/runtime \
@@ -2803,7 +2801,6 @@ _agent_canon_restore_candidate_failure() {
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
     if _agent_canon_container_exec "$container" \
       python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
-      --container-control \
       --repository-root /opt/agent-canon/source \
       --control-parent-root /var/lib/agent-canon \
       --runtime-root /var/lib/agent-canon/runtime \
@@ -4879,7 +4876,6 @@ bootstrap_host_entrypoint() {
       rc=0
       _agent_canon_container_exec "$container" \
         python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
-        --container-control \
         --repository-root /opt/agent-canon/source \
         --control-parent-root /var/lib/agent-canon \
         --runtime-root /var/lib/agent-canon/runtime \
