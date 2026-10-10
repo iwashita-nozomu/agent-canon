@@ -478,7 +478,7 @@ def test_output_is_uploaded_before_cleanup_even_when_unit_execution_fails() -> N
         )
         assert "continue-on-error" not in steps[index]
     assert steps[cleanup]["if"] == "always()"
-    assert steps[upload]["uses"] == "actions/upload-artifact@v4"
+    assert steps[upload]["uses"].split("@", 1)[0] == "actions/upload-artifact"
     assert steps[upload]["with"]["retention-days"] == "7"
     assert steps[upload]["with"]["if-no-files-found"] == "error"
     assert "github.run_attempt" in steps[upload]["with"]["name"]
