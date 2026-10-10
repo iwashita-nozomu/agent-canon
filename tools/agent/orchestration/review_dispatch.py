@@ -11,6 +11,7 @@
 # upstream design ../../../agents/skills/pr-processing.md owns PR-head review handling.
 # upstream implementation ./team_config.py resolves task, role, and resume routing.
 # upstream implementation ./implementation_dispatch.py resolves agent type and dispatch routing.
+# upstream implementation ../../runtime/values.py refines decoded ledger and manifest containers.
 # upstream implementation ../../runtime/lifecycle/workflow_monitor.py produces write-result triggers and records review waves.
 # upstream implementation ../../repository/github/github_publish.py produces verified PR-head update triggers.
 # upstream implementation ../../runtime/artifacts/artifact_identity.py materializes review artifact byte identities.
@@ -24,14 +25,17 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypedDict
 
 import yaml
+
+from tools.agent.orchestration.team_config import load_team_config, resolve_role
+from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot
 from tools.runtime.artifacts.artifact_identity import (
     canonical_body_sha256,
     canonical_json_bytes,
@@ -40,15 +44,22 @@ from tools.runtime.artifacts.artifact_identity import (
 from tools.runtime.artifacts.external_artifact_binding import (
     materialize_external_projection_acknowledgement,
 )
+from tools.runtime.artifacts.report_artifact_checks import (
+    markdown_without_adjudicated_rejected_hypotheses,
+)
 from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER
-from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot
-from tools.runtime.artifacts.report_artifact_checks import markdown_without_adjudicated_rejected_hypotheses
+from tools.runtime.values import (
+    is_object_list,
+    is_string_object_dict,
+    is_string_object_mapping,
+)
 
 REVIEW_CANDIDATE_SCHEMA = "agent-canon.review-candidate-event.v1"
 REVIEW_INTENT_SCHEMA = "agent-canon.terminal-resume-intent.v1"
 REVIEW_FRAME_SCHEMA = "agent-canon.review-frame.v3"
 RESUME_EVENT_SCHEMA = "agent-canon.terminal-resume-event.v3"
 REVIEW_DECISION_SCHEMA = "agent-canon.review-decision-event.v1"
+MINIMUM_TABLE_PIPE_COUNT = 2
 MINIMAL_HANDOFF_KEYS = (
     "objective",
     "owner_unit",
@@ -142,14 +153,16 @@ def parse_finding_rows(markdown: str) -> tuple[dict[str, str], ...]:
 
     def table_cells(line: str) -> list[str] | None:
         stripped = line.strip()
-        if not stripped.startswith("|") or stripped.count("|") < 2:
+        if (
+            not stripped.startswith("|")
+            or stripped.count("|") < MINIMUM_TABLE_PIPE_COUNT
+        ):
             return None
         return [cell.strip() for cell in stripped.strip("|").split("|")]
 
     def separator_row(cells: Sequence[str]) -> bool:
         return bool(cells) and all(
-            bool(re.fullmatch(r":?-+:?", cell.replace(" ", "")))
-            for cell in cells
+            bool(re.fullmatch(r":?-+:?", cell.replace(" ", ""))) for cell in cells
         )
 
     def header_name(value: str) -> str:
@@ -201,7 +214,34 @@ class AutomaticReviewError(ValueError):
         super().__init__(code if not detail else f"{code}:{detail}")
 
 
-RuntimeDispatcher = Callable[[Mapping[str, object]], Mapping[str, object]]
+class CurrentReviewState(TypedDict):
+    """Describe the producer-owned projection consumed by publication."""
+
+    schema: str
+    candidate: dict[str, object]
+    decision: dict[str, object] | None
+    dispatch_blocker: dict[str, object] | None
+    publication_unlocked: bool
+
+
+class ReviewEligibilityProjection(TypedDict):
+    """Describe the canonical eligibility projection consumed by publication."""
+
+    schema: str
+    schema_version: int
+    validation_result_ref: dict[str, object]
+    candidate_id: object
+    candidate_revision: object
+    review_lineage_id: object
+    review_frame_ref: dict[str, object]
+    reviewer: dict[str, object]
+    outcome: str
+    failure_codes: list[str]
+    review_eligibility_id: str
+    review_eligibility_body_sha256: str
+
+
+RuntimeDispatcher = Callable[[Mapping[str, object]], object]
 
 
 def _run_git(workspace: Path, args: Sequence[str]) -> str:
@@ -265,14 +305,10 @@ def _record_id(prefix: str, payload: Mapping[str, object]) -> str:
 
 def _ledger_events(report_dir: Path) -> list[dict[str, object]]:
     """Return canonical events in snapshot order."""
-    snapshot = read_ledger_snapshot(
+    return read_ledger_snapshot(
         report_dir,
         f"w2-current-ledger:{report_dir.name}",
-    )
-    events = snapshot.get("events")
-    if not isinstance(events, list):
-        raise AutomaticReviewError("automatic_review:ledger_invalid")
-    return [event for event in events if isinstance(event, dict)]
+    )["events"]
 
 
 def _automatic_payloads(
@@ -283,7 +319,7 @@ def _automatic_payloads(
     payloads: list[dict[str, object]] = []
     for event in _ledger_events(report_dir):
         payload = event.get("automatic_review")
-        if not isinstance(payload, dict):
+        if not is_string_object_dict(payload):
             continue
         if kind is None or payload.get("record_kind") == kind:
             payloads.append(payload)
@@ -299,31 +335,36 @@ def _canonical_writer_identity(report_dir: Path) -> dict[str, str]:
             "team_manifest.yaml",
         )
     raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, Mapping):
+    if not is_string_object_dict(raw):
         raise AutomaticReviewError("automatic_review:routing_packet_missing", "roles")
     roles = raw.get("roles")
-    if not isinstance(roles, list):
+    if not is_object_list(roles):
         raise AutomaticReviewError("automatic_review:routing_packet_missing", "roles")
     implementer = next(
         (
             role
             for role in roles
-            if isinstance(role, Mapping) and role.get("id") == "implementer"
+            if is_string_object_dict(role) and role.get("id") == "implementer"
         ),
         None,
     )
-    if not isinstance(implementer, Mapping):
+    if not is_string_object_dict(implementer):
         raise AutomaticReviewError(
             "automatic_review:structure_owner_missing",
             "implementer",
         )
     agent_types = implementer.get("codex_agents")
-    if not isinstance(agent_types, list) or not agent_types:
+    if not is_object_list(agent_types) or not agent_types:
         raise AutomaticReviewError(
             "automatic_review:routing_packet_missing",
             "implementer.codex_agents",
         )
-    agent_type = str(agent_types[0])
+    agent_type = agent_types[0]
+    if not isinstance(agent_type, str):
+        raise AutomaticReviewError(
+            "automatic_review:routing_packet_missing",
+            "implementer.codex_agents",
+        )
     runtime_agent_id = f"writer:{report_dir.name}:implementer"
     context_id = f"writer-context:{report_dir.name}"
     instance_id = "implementer_worker"
@@ -356,40 +397,16 @@ def _review_route(report_dir: Path, role_id: str) -> dict[str, str]:
             "automatic_review:role_config_mismatch",
             role_id,
         )
-    config_path = Path(__file__).resolve().parents[3] / "agents" / "agents_config.json"
-    raw = json.loads(config_path.read_text(encoding="utf-8"))
-    role_groups = (
-        [raw.get("always_on_roles"), raw.get("specialist_roles")]
-        if isinstance(raw, Mapping)
-        else []
-    )
-    roles = [
-        item
-        for group in role_groups
-        if isinstance(group, list)
-        for item in group
-        if isinstance(item, Mapping)
-    ]
-    role = next(
-        (
-            item
-            for item in roles
-            if isinstance(item, Mapping) and item.get("id") == role_id
-        ),
-        None,
-    )
-    if not isinstance(role, Mapping):
+    try:
+        role = resolve_role(load_team_config(), role_id)
+    except KeyError as exc:
         raise AutomaticReviewError(
             "automatic_review:structure_owner_missing",
             role_id,
-        )
-    candidates = role.get("codex_agents")
-    policy = role.get("write_policy")
+        ) from exc
     if (
-        not isinstance(candidates, list)
-        or expected_agent_type not in candidates
-        or not isinstance(policy, Mapping)
-        or policy.get("mode") != "artifacts_only"
+        expected_agent_type not in role.codex_agents
+        or role.write_policy.mode != "artifacts_only"
     ):
         raise AutomaticReviewError(
             "automatic_review:role_config_mismatch",
@@ -576,7 +593,7 @@ def _review_context(
         ]
         if prior_events:
             observed_result = prior_events[-1].get("observed_result")
-            if isinstance(observed_result, Mapping):
+            if is_string_object_mapping(observed_result):
                 assigned_runtime_agent_id = observed_result.get(
                     "nested_runtime_agent_id"
                 )
@@ -727,7 +744,7 @@ def dispatch_current_candidate_review(
         }
         _append_automatic_event(report_dir, blocker, outcome="dispatch_blocked")
         return blocker
-    if not isinstance(observed, Mapping):
+    if not is_string_object_mapping(observed):
         raise AutomaticReviewError("automatic_review:dispatch_result_invalid")
     route = _review_route(report_dir, role_id)
     runtime_action = _required_text(observed, "runtime_action")
@@ -739,7 +756,7 @@ def dispatch_current_candidate_review(
     if provider_status not in {"running", *TERMINAL_RUNTIME_STATUSES}:
         raise AutomaticReviewError("automatic_review:dispatch_result_invalid")
     writer = candidate.get("writer")
-    if not isinstance(writer, Mapping):
+    if not is_string_object_mapping(writer):
         raise AutomaticReviewError("automatic_review:writer_lineage_missing")
     if runtime_id == writer.get("runtime_agent_id"):
         raise AutomaticReviewError("automatic_review:self_review_forbidden")
@@ -913,8 +930,8 @@ def record_current_review_decision(
         raise AutomaticReviewError("automatic_review:decision_missing")
     if decisions and len(set(decisions)) != 1:
         raise AutomaticReviewError("automatic_review:decision_ambiguous")
-    decision = decisions[-1] if decisions else canonicalize_review_decision(
-        derived_outcome
+    decision = (
+        decisions[-1] if decisions else canonicalize_review_decision(derived_outcome)
     )
     explicit_escalate_decision = "ESCALATE" in decisions
     if derived_outcome == "changes-required" and decision == "APPROVE":
@@ -929,7 +946,7 @@ def record_current_review_decision(
     ):
         raise AutomaticReviewError("automatic_review:approve_with_findings")
     observed_result = event.get("observed_result")
-    if not isinstance(observed_result, Mapping):
+    if not is_string_object_mapping(observed_result):
         raise AutomaticReviewError("automatic_review:resume_event_invalid")
     reviewer_runtime_agent_id = observed_result.get("nested_runtime_agent_id")
     if not isinstance(reviewer_runtime_agent_id, str) or not reviewer_runtime_agent_id:
@@ -983,7 +1000,7 @@ def record_current_review_decision(
     return payload
 
 
-def resolve_current_review_state(workspace: Path) -> dict[str, object]:
+def resolve_current_review_state(workspace: Path) -> CurrentReviewState:
     """Return the unique current review state projected from canonical L."""
     report_dir = _active_report_dir(workspace.resolve())
     candidate = _current_candidate(report_dir)
@@ -1017,13 +1034,12 @@ def resolve_current_review_state(workspace: Path) -> dict[str, object]:
         "decision": decision,
         "dispatch_blocker": dispatch_blockers[-1] if dispatch_blockers else None,
         "publication_unlocked": bool(
-            isinstance(decision, Mapping)
-            and decision.get("decision") == "APPROVE"
+            decision is not None and decision.get("decision") == "APPROVE"
         ),
     }
 
 
-def resolve_review_eligibility(workspace: Path) -> dict[str, object]:
+def resolve_review_eligibility(workspace: Path) -> ReviewEligibilityProjection:
     """Regenerate the current review eligibility from validation and L."""
     root = workspace.resolve()
     from tools.runtime.artifacts.report_artifact_checks import resolve_validation_result
@@ -1044,7 +1060,7 @@ def resolve_review_eligibility(workspace: Path) -> dict[str, object]:
     validation_candidate = validation.get("candidate")
     validation_candidate_id = (
         validation_candidate.get("candidate_id")
-        if isinstance(validation_candidate, Mapping)
+        if is_string_object_mapping(validation_candidate)
         else None
     )
     if validation_candidate_id != candidate.get("candidate_id"):
@@ -1063,17 +1079,17 @@ def resolve_review_eligibility(workspace: Path) -> dict[str, object]:
         for event in _automatic_payloads(report_dir, "resume_event"):
             if event.get("review_frame_id") == frame.get("review_frame_id"):
                 observed = event.get("observed_result")
-                if isinstance(observed, Mapping):
+                if is_string_object_mapping(observed):
                     assigned_runtime_agent_id = observed.get("nested_runtime_agent_id")
     producer = validation.get("producer_evidence")
     producer_runtime_agent_id = (
         producer.get("producer_runtime_agent_id")
-        if isinstance(producer, Mapping)
+        if is_string_object_mapping(producer)
         else None
     )
     writer = candidate.get("writer")
     writer_runtime_agent_id = (
-        writer.get("runtime_agent_id") if isinstance(writer, Mapping) else None
+        writer.get("runtime_agent_id") if is_string_object_mapping(writer) else None
     )
     if assigned_runtime_agent_id != producer_runtime_agent_id:
         failure_codes.append("review_eligibility:producer_not_assigned_reviewer")
@@ -1083,11 +1099,9 @@ def resolve_review_eligibility(workspace: Path) -> dict[str, object]:
         failure_codes.append("review_eligibility:dispatch_blocked")
     failure_codes = sorted(set(failure_codes), key=lambda item: item.encode("utf-8"))
     outcome = "eligible" if not failure_codes else "ineligible"
-    frame_id = frame.get("review_frame_id") if isinstance(frame, Mapping) else None
-    frame_hash = (
-        frame.get("review_frame_body_sha256") if isinstance(frame, Mapping) else None
-    )
-    core: dict[str, object] = {
+    frame_id = frame.get("review_frame_id") if frame is not None else None
+    frame_hash = frame.get("review_frame_body_sha256") if frame is not None else None
+    core: ReviewEligibilityProjection = {
         "schema": "agent-canon.review-eligibility-projection.v1",
         "schema_version": 1,
         "validation_result_ref": {
@@ -1099,7 +1113,7 @@ def resolve_review_eligibility(workspace: Path) -> dict[str, object]:
         "candidate_id": candidate.get("candidate_id"),
         "candidate_revision": candidate.get("candidate_revision"),
         "review_lineage_id": frame.get("review_lineage_id")
-        if isinstance(frame, Mapping)
+        if frame is not None
         else None,
         "review_frame_ref": {
             "review_frame_id": frame_id,
@@ -1113,11 +1127,10 @@ def resolve_review_eligibility(workspace: Path) -> dict[str, object]:
         },
         "outcome": outcome,
         "failure_codes": failure_codes,
+        "review_eligibility_id": "",
         "review_eligibility_body_sha256": "",
     }
     validation_ref = core["validation_result_ref"]
-    if not isinstance(validation_ref, Mapping):
-        raise AutomaticReviewError("review_eligibility:schema_mismatch")
     core["review_eligibility_id"] = (
         "review-eligibility:"
         + hashlib.sha256(

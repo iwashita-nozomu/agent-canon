@@ -3,6 +3,7 @@
 # responsibility Selects and runs standalone AgentCanon validation in one shared tool runtime and one required check.
 # upstream design ../../agents/skills/agent-canon-update.md agent-canon PR workflow
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
+# upstream design ../../documents/runtime/runtime-log-archive.md canonical eval archive storage
 # upstream implementation ../../tools/validation/semantic/path/classify_path_risk.py canonical changed-path selector and unit mapping
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh executes one selected static-gate unit
 # downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates workflow and PR template conventions
@@ -164,7 +165,7 @@ jobs:
           docker cp -- "${container}:/var/lib/agent-canon/runtime/tasks" - > "${evidence}/runtime-task-output.tar.part"
           mv -- "${evidence}/runtime-task-output.tar.part" "${evidence}/runtime-task-output.tar"
           if [[ ",${SELECTED_UNITS}," == *,eval,* ]]; then
-            docker cp -- "${container}:/var/lib/agent-canon/runtime/eval-results" - > "${evidence}/runtime-eval-results.tar.part"
+            docker cp -- "${container}:/var/lib/agent-canon/runtime/archive/agent-canon-log/eval-results" - > "${evidence}/runtime-eval-results.tar.part"
             mv -- "${evidence}/runtime-eval-results.tar.part" "${evidence}/runtime-eval-results.tar"
             if [[ "${EVAL_UNIT_STATUS}" == "fail" ]]; then
               docker cp -- "${container}:/var/lib/agent-canon/runtime/eval/agent-canon-pr-gate" - > "${evidence}/runtime-eval-producer-logs.tar.part"

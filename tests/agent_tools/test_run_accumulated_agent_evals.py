@@ -4,6 +4,7 @@
 # contract test
 # responsibility Tests accumulated agent eval producer routing and bounded output capture.
 # upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs eval producers in accumulation mode
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py owns family report destinations
 # upstream design ../../eval/definitions/README.md eval accumulation contract
 # upstream design ../../documents/runtime/runtime-log-archive.md external eval archive contract
 # @dependency-end
@@ -105,7 +106,7 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
     """Validate command construction and output bounding."""
 
     def test_build_producers_uses_accumulation_for_registered_producers(self) -> None:
-        """Registered behavior/routing producers accumulate without source-prose scans."""
+        """Registered producers accumulate without overriding archive-owned paths."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "source"
             root.mkdir()
@@ -128,6 +129,7 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
         )
         for producer in producers:
             self.assertIn("--accumulate", producer.command)
+            self.assertNotIn("--results-dir", producer.command)
         workflow = next(
             producer for producer in producers if producer.name == "workflow-selection"
         )
