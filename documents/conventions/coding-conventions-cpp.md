@@ -93,12 +93,14 @@ design fact を再定義しません。
 - C++ source / header を変更した後は、次を実行します。
 
 ```bash
-python3 tools/validation/code/static/cpp/static_analysis.py clang-tidy \
-  --workspace-root <workspace-root> \
-  --source <source> \
-  --build-dir <module-build-dir> \
-  --config-file <workspace-root>/clang/clang-tidy.yaml
+run-clang-tidy.py -p <module-build-dir> \
+  -config-file=<workspace-root>/clang/clang-tidy.yaml <source>
 ```
+
+`<module-build-dir>` は、project CMake preset または明示 configure command が選択した
+実際の binary directory です。この引数は compile database の場所だけを指定し、runtime
+backend を選びません。compile database の生成・更新は project build owner が行い、
+この repository は active symlink や既定 compile database を作りません。
 
 ## 5. テスト
 

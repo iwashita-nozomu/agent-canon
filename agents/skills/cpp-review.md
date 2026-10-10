@@ -84,9 +84,11 @@ argv の記録であり、依存を取得・同梱しません。参照する so
 既存の生成 target までを準備し、解析準備だけを理由に full build / test を要求しません。
 include path、define、言語規格を Neovim 側で手書きして第二の設定にしません。
 
-開いている workspace 内で依存を実際に include する translation unit を選び、下記の
-既存 `clangd-check` 経路で DB と compile command の読込み・依存解決・診断を確認します。
-DB 生成成功と依存込み解析成功を分け、結果と未検証範囲を Issue / PR に残します。
+開いている workspace 内で依存を実際に include する translation unit を選び、現在の
+project build directory を指定して直接 `clangd` を実行します。
+`clangd --check=<source> --compile-commands-dir=<build-directory>` で DB と compile
+command の読込み・依存解決・診断を確認します。DB 生成成功と依存込み解析成功を分け、
+結果と未検証範囲を Issue / PR に残します。
 ホストの Neovim とコンテナの workspace path 対応は必要ですが、コンテナ専用の外部
 ヘッダー自体をホストで開くための複製・転送は、この workspace 内解析の終了条件にしません。
 通常の docs-only 編集へ configure / build / LSP 実行を一律に追加しません。
@@ -103,10 +105,13 @@ consume combined runner results without duplicating each underlying command.
 Use configured `ctest` and installation evidence when those contracts are affected.
 
 When static analysis is relevant and a CMake-generated database exists, use the
-existing `tools/validation/code/static/cpp/static_analysis.py` operations `select-db`,
-`clangd-check`, and `clang-tidy` with explicit `--workspace-root`, module `--build-dir`,
-and the selected `--source` where required. Execute through the existing owner route.
-Do not enumerate extra include paths, compiler flags, or provider-specific diagnostics.
+project's selected preset or binary directory directly:
+`clangd --check=<source> --compile-commands-dir=<build-directory>` for one translation
+unit, and `run-clang-tidy.py -p <build-directory> <sources...>` for the selected native
+checks. The build-directory argument locates the project's compile database; it does
+not select a runtime backend. Preserve the native tools' output and exit status; do not
+materialize an active compile-database symlink or enumerate extra include paths,
+compiler flags, or provider-specific diagnostics.
 
 Trace public header/implementation and call-site correspondence, linkage/ABI,
 lifetime, ownership, move/copy, resource release, bounds, null, exception/error

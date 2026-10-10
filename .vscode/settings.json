@@ -19,9 +19,6 @@
     "build": true,
     "logs": true
   },
-  "clangd.arguments": [
-    "--compile-commands-dir=${workspaceFolder}/build/cpp/dev"
-  ],
   "clangd.path": "clangd",
   "clang-format.executable": "clang-format",
   "[c]": {
