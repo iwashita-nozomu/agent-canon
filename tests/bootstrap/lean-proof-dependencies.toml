@@ -6,7 +6,7 @@
 # downstream implementation ./docker.sh runs the selected native proof checks
 # @dependency-end
 
-schema = "agent_canon.tool-dependencies"
+schema = "agent-canon.tool-dependencies"
 schema_version = 2
 
 [[records]]
