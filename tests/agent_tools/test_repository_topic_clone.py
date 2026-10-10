@@ -1383,6 +1383,91 @@ def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content
     )
 
 
+@pytest.mark.parametrize(
+    ("packet_present", "requested_paths"),
+    [
+        pytest.param(False, ("first.py",), id="metadata-create"),
+        pytest.param(True, ("first.py",), id="normal-prepare"),
+        pytest.param(True, ("updated.py",), id="metadata-refresh"),
+    ],
+)
+@pytest.mark.parametrize(
+    "linked_workspace_root", [False, True], ids=["main-parent", "linked-parent"]
+)
+def test_prepare_holds_external_info_exclude_symlink_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    packet_present: bool,
+    requested_paths: tuple[str, ...],
+    linked_workspace_root: bool,
+) -> None:
+    """An exclude symlink outside the parent cannot receive writer metadata."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    anchor = tmp_path / "parent"
+    init_workspace_parent(anchor)
+    run_git(anchor, "remote", "add", "origin", remote_url)
+    workspace = anchor
+    if linked_workspace_root:
+        workspace = tmp_path / "parent-linked"
+        run_git(anchor, "worktree", "add", "--detach", str(workspace), "HEAD")
+    patch_linked_checkout_identity(monkeypatch)
+    request = dict(
+        url=remote_url,
+        repository="repo-external-exclude",
+        workspace_root=workspace,
+        topic="topic-external-exclude",
+        branch="feature/external-exclude",
+        owner_evidence=evidence,
+        allowed_paths=("first.py",),
+        checkout_mode=rtc.CHECKOUT_MODE_LINKED,
+    )
+
+    prepared = rtc.request(**request)
+    packet = prepared.writer_target_packet
+    assert packet is not None
+    packet_before = packet.read_bytes() if packet_present else None
+    if not packet_present:
+        packet.unlink()
+
+    exclude = git_metadata_path(prepared.clone, "info/exclude")
+    external_exclude = tmp_path / "outside-info-exclude"
+    external_before = b".agent-canon/*\n"
+    external_exclude.write_bytes(external_before)
+    exclude.unlink()
+    exclude.symlink_to(external_exclude)
+
+    index = git_metadata_path(prepared.clone, "index")
+    config = git_metadata_path(prepared.clone, "config.worktree")
+    before_index = index.read_bytes()
+    before_config = config.read_bytes()
+    before_files = snapshot_checkout_files(prepared.clone)
+    before_head = run_git(prepared.clone, "rev-parse", "HEAD")
+    before_branch = run_git(prepared.clone, "symbolic-ref", "--short", "HEAD")
+    before_status = run_git(prepared.clone, "status", "--porcelain=v1")
+    assert before_status == ""
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="parent-root-attestation:symlink_escape",
+    ):
+        rtc.request(**{**request, "allowed_paths": requested_paths})
+
+    assert external_exclude.read_bytes() == external_before
+    assert exclude.is_symlink()
+    assert exclude.resolve() == external_exclude.resolve()
+    assert index.read_bytes() == before_index
+    assert config.read_bytes() == before_config
+    assert snapshot_checkout_files(prepared.clone) == before_files
+    assert run_git(prepared.clone, "rev-parse", "HEAD") == before_head
+    assert run_git(prepared.clone, "symbolic-ref", "--short", "HEAD") == before_branch
+    assert run_git(prepared.clone, "status", "--porcelain=v1") == before_status
+    if packet_before is None:
+        assert not packet.exists()
+    else:
+        assert packet.read_bytes() == packet_before
+
+
 def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1446,10 +1531,10 @@ def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
     )
 
 
-def test_linked_merge_conflict_uses_worktree_git_paths(
+def test_linked_merge_conflict_keeps_native_merge_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Conflict preservation resolves MERGE_HEAD and info/exclude via Git paths."""
+    """A linked checkout retains merge state in the native Git index."""
     _, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -1505,13 +1590,10 @@ def test_linked_merge_conflict_uses_worktree_git_paths(
     )
     run_git(source, "push", "origin", "main")
 
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict"):
         rtc.merge_main(request.request)
-    merge_head = Path(run_git(clone, "rev-parse", "--git-path", "MERGE_HEAD"))
-    info_exclude = Path(run_git(clone, "rev-parse", "--git-path", "info/exclude"))
-    assert merge_head.is_file()
-    assert info_exclude.is_file()
-    assert (clone / ".agent-canon" / "conflict-preservation.json").is_file()
+    assert run_git(clone, "rev-parse", "MERGE_HEAD")
+    assert run_git(clone, "ls-files", "-u")
     assert run_git(clone, "status", "--porcelain")
 
 
@@ -2237,7 +2319,7 @@ def test_merge_main_before_publication_receipt_is_created(tmp_path: Path) -> Non
     )
 
 
-def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
+def test_merge_main_leaves_actual_conflict_in_native_git_state(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -2264,17 +2346,12 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
     run_git(source, "commit", "-m", "main conflict")
     run_git(source, "push", "origin", "main")
 
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"
-    ) as raised:
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict"):
         rtc.merge_main(receipt.request)
-    inventory_path = receipt.clone / ".agent-canon" / "conflict-preservation.json"
-    assert inventory_path.is_file()
-    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-    assert inventory["conflict_paths"] == ["base.txt"]
-    assert "inventory=" in str(raised.value)
-    assert "base" in inventory["paths"][0]["stages"]
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"):
+    assert run_git(receipt.clone, "rev-parse", "MERGE_HEAD")
+    unmerged = run_git(receipt.clone, "ls-files", "-u")
+    assert "base.txt" in unmerged
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-in-progress"):
         rtc.request(
             remote_url,
             "repo-conflict",
@@ -2286,8 +2363,8 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
         )
 
 
-def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) -> None:
-    """Captured merge can finish after main advances, then next merge catches up."""
+def test_finalize_merge_uses_native_index_and_readback(tmp_path: Path) -> None:
+    """A resolved native index can finish after main advances, then catch up."""
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -2314,48 +2391,15 @@ def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) 
     run_git(source, "commit", "-m", "main conflict")
     run_git(source, "push", "origin", "main")
 
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict"):
         rtc.merge_main(receipt.request)
-    inventory_path = receipt.clone / ".agent-canon" / "conflict-preservation.json"
-    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="preservation plan"):
+    captured_main_sha = run_git(receipt.clone, "rev-parse", "MERGE_HEAD")
+    assert "base.txt" in run_git(receipt.clone, "ls-files", "-u")
+    with pytest.raises(rtc.GitCommandError):
         rtc.finalize_merge_main(receipt.request)
 
-    source_hunk = inventory["paths"][0]["hunks"]["base_to_ours"][0]
-    plan = {
-        "repository": inventory["repository"],
-        "base": inventory["base"]["commit"],
-        "head": inventory["ours"]["commit"],
-        "merge_base": inventory["merge_base"],
-        "selected_cause": "the two branch edits target one line",
-        "expected_mechanism": "resolve the line manually and keep the candidate value",
-        "exact_edit_delta": "retain base.txt line one from ours",
-        "paths": [
-            {
-                "path": "base.txt",
-                "owner": "integration_executor",
-                "disposition": "manual",
-                "operation": "manual",
-                "rationale": "the captured stages are reviewed before manual resolution",
-                "expected_edit_delta": "retain topic line",
-                "unaffected_content": [
-                    {
-                        "path": "base.txt",
-                        "hunk_identity": {
-                            "source_sha256": source_hunk["sha256"],
-                            "source_header": source_hunk["header"],
-                            "required_lines": ["+topic\n"],
-                        },
-                    }
-                ],
-            }
-        ],
-    }
-    plan_path = receipt.clone / ".agent-canon" / "conflict-preservation-plan.json"
-    plan_path.write_text(json.dumps(plan) + "\n", encoding="utf-8")
     (receipt.clone / "base.txt").write_text("topic\n", encoding="utf-8")
     run_git(receipt.clone, "add", "base.txt")
-    captured_main_sha = inventory["theirs"]["commit"]
     (source / "later-main.txt").write_text(
         "advanced after conflict capture\n", encoding="utf-8"
     )
@@ -2377,6 +2421,11 @@ def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) 
     finalized = rtc.finalize_merge_main(receipt.request)
     assert finalized.origin_main_sha == captured_main_sha
     assert finalized.merged_sha != finalized.candidate_sha
+    assert run_git(receipt.clone, "show", "-s", "--format=%P", "HEAD").split() == [
+        finalized.candidate_sha,
+        captured_main_sha,
+    ]
+    assert finalized.merged_tree == run_git(receipt.clone, "rev-parse", "HEAD^{tree}")
     assert run_git(receipt.clone, "status", "--porcelain") == ""
     assert run_git(receipt.clone, "rev-parse", "origin/main") == captured_main_sha
 
