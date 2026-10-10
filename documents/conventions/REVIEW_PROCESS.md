@@ -46,10 +46,10 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - C / C++ 差分の review
   - `cpp-review`
 - C++ project layout / CMake command の差分
-  - `cpp/CMakeLists.txt` を project entrypoint とする target graph の readback
-  - `cpp/include`、`cpp/src`、`tests/cpp`、`cpp/experiments` の owner readback。production
-    subtree に test compatibility path がないことを確認
-  - parent-root anchor `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` の command review
+  - [cpp-build-layout.md](../design/cpp-build-layout.md) で選択された `root-aggregate` または
+    `consumer-local` profile と、その project-owned CMake entrypoint の readback
+  - production path owner、selected consumer manifest、target dependency direction の readback
+  - 実際の project configure/build/test command を使い、他 profile や sibling consumer を要求しないことを確認
 - 大規模 refactor の review
   - `change-review`
   - `project_review`
@@ -95,10 +95,9 @@ change. A no-change or unselected route records its rationale as evidence.
   - `python3 -m pytest tests/ -q --tb=short`
   - `ruff check python tests --select D,E,F,I,UP --ignore E501`
 - C / C++ 差分を含む場合は、project-native configure / build / test evidence を追加します。
-  - CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`
-  - CMake project なら `cmake --build "$ROOT/build/cpp/<profile>" --parallel`
-  - test target があれば `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure`
-  - install contract があれば `cmake --install "$ROOT/build/cpp/<profile>"`
+  - `documents/design/cpp-build-layout.md` の selected profile と consumer-owned CMake entrypoint を使います。
+  - `configure`, `build`, `test`, `install` の command と binary directory はその project owner が決めます。
+  - test target / install contract が選択 profile に存在する場合だけ対応する project-native validation を実行します。
 - C++ design-only / convention-only 差分では native execution を `not_run` とし、
   docs、dependency、target/path contract の evidence と実行 phase の未実行項目を分離します。
 - Markdown 差分を含む場合は、少なくとも `tools/bin/agent-canon docs check` を実行します。

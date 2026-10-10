@@ -112,19 +112,19 @@ source / pin routing を参照として担当します。
 
 ## C++ project migration projection
 
-For a C++ path or build-layout refactor, the replaceable project boundary is
-`cpp/CMakeLists.txt`. The path map is `cpp/include/` for public headers,
-`cpp/src/` for production source, `tests/cpp/` for derived-project CTest-owned test targets, and
-`cpp/experiments/` for native experiment targets. The parent root remains
-language-neutral; commands use `cmake -S "$ROOT/cpp" -B
-"$ROOT/build/cpp/<profile>"` and the matching
-`$ROOT/.state/cpp-install/<profile>` install prefix.
+For a C++ path or build-layout refactor, start from the consumer's selected profile
+in [cpp-build-layout.md](../../documents/design/cpp-build-layout.md). The
+`root-aggregate` profile uses its project root CMake entrypoint; the
+`consumer-local` profile uses the selected consumer manifest. Production path
+ownership and target-graph topology are separate review axes: do not infer one
+from the other's directory shape.
 
-The target graph is consumer-to-provider: individual test and experiment targets
-consume `cpp-core`, while `cpp-tests` and `cpp-experiments` group builds. Run,
-config, result, and retention records remain with the existing experiment
-lifecycle and save-results owners. Refactor review reads this mapping back from
-the design trace before accepting a path or dependency-direction change.
+Targets and build/install paths are project-owned. The target graph remains
+consumer-to-provider; individual tests and experiments consume the project's
+production target when that relation exists. Run, config, result, and retention
+records remain with the existing experiment lifecycle and save-results owners.
+Refactor review reads back the selected profile and actual CMake commands before
+accepting a path or dependency-direction change.
 
 ## Procedure
 
