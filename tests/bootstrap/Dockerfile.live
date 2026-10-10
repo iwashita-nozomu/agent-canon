@@ -3,7 +3,6 @@
 # responsibility Defines the disposable test image for AgentCanon live and native
 # proof checks.
 # upstream implementation ./docker.sh selects and runs each test capability profile
-# upstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs the proof manifest
 # downstream design ./lean-proof-dependencies.toml pins the native Lean test toolchain
 # downstream test ./test_live_projection_authority.py exercises the shared host Docker daemon
 # downstream implementation ../../tools/analysis/proof/lean_proof_env.py owns native Lean behavior
@@ -12,9 +11,7 @@
 FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONDONTWRITEBYTECODE=1 \
-    ELAN_HOME=/root/.elan \
-    PATH="/root/.elan/bin:${PATH}"
+    PYTHONDONTWRITEBYTECODE=1
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
@@ -28,8 +25,3 @@ RUN apt-get update \
 
 WORKDIR /opt/agent-canon/source
 COPY . /opt/agent-canon/source
-
-RUN python3 -m tools.analysis.dependencies.dependency_plan image-install \
-    --workspace /opt/agent-canon/source \
-    --manifest tests/bootstrap/lean-proof-dependencies.toml \
-    --format text

@@ -2,9 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Runs AgentCanon live and native proof regressions in one disposable test image.
-# upstream implementation ./Dockerfile.live provides Python, Git, Docker CLI, and Lean
+# upstream implementation ./Dockerfile.live provides Python, Git, and Docker CLI
 # downstream test ./test_live_projection_authority.py validates live projection authority
 # downstream design ./lean-proof-dependencies.toml pins the native proof toolchain
+# downstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs the selected proof profile dependencies
 # downstream implementation ../../tools/analysis/proof/lean_proof_env.py runs native Lean checks
 # @dependency-end
 
@@ -38,9 +39,19 @@ set -euo pipefail
 
 tool=/opt/agent-canon/source/tools/analysis/proof/lean_proof_env.py
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:?}"
+# The installer anchors receipts to a Git workspace; the disposable container owns it.
+workspace="$(mktemp -d /tmp/agent-canon-lean-workspace.XXXXXX)"
 env_dir="${runtime_root}/tasks/formal-proof/lean-proof-env"
 fixtures="${runtime_root}/lean-proof-fixtures"
-mkdir -p "${fixtures}"
+export HOME="${runtime_root}/home"
+export ELAN_HOME="${runtime_root}/elan"
+export PATH="${ELAN_HOME}/bin:${PATH}"
+mkdir -p "${fixtures}" "${HOME}"
+git -C "${workspace}" init --quiet
+python3 -m tools.analysis.dependencies.dependency_plan install \
+  --workspace "${workspace}" \
+  --manifest /opt/agent-canon/source/tests/bootstrap/lean-proof-dependencies.toml \
+  --format json
 
 printf "%s\n" "import Mathlib" "" "example : True := by trivial" > "${fixtures}/positive.lean"
 printf "%s\n" "import Mathlib" "" "example : False := by trivial" > "${fixtures}/negative.lean"

@@ -101,9 +101,11 @@ toolchain-only bootstrap、native command、manifest/version readback、既存�
 検証に使った source head、native version、native manifest、command と実結果を Issue/PR に残します。
 
 AgentCanon source の native regression には、既存の disposable test image を使う
-`bash tests/bootstrap/docker.sh lean-proof` を用います。これは build 時に exact
-Lean toolchain を image へ導入し、実行時は task-owned workarea だけを mount して
-`all-smoke` と `check-file` の成功・失敗例を同じ Lake package で確認します。
+`bash tests/bootstrap/docker.sh lean-proof` を用います。`lean-proof` profile は同じ
+disposable test container 内で既存の typed dependency installer を実行し、container 内の
+一時 install workspace と task-owned runtime に exact Lean toolchain を導入してから、
+`all-smoke` と `check-file` の成功・失敗例を同じ Lake package で確認します。Lean は default の
+`live-projection` profile では導入しません。
 この profile は Docker socket、host home、credential を mount せず、通常の proof
 作業用 runtime や共有 AgentCanon tool image を変更しません。
 
