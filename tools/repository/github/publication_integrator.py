@@ -27,7 +27,7 @@ import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import TypedDict, cast
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (
@@ -47,15 +47,20 @@ except ImportError:
     )
 
 from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes
-from tools.agent.orchestration.review_dispatch import resolve_current_review_state, resolve_review_eligibility
+from tools.agent.orchestration.review_dispatch import (
+    ReviewEligibilityProjection,
+    resolve_current_review_state,
+    resolve_review_eligibility,
+)
 from tools.runtime.lifecycle.update_lifecycle_contract import (
     binding_identity,
     materialize_gate_verdict,
     validate_publication_readback_receipt,
     validate_record_binding,
 )
-from tools.runtime.values import is_string_object_mapping
+from tools.runtime.values import is_object_list, is_string_object_mapping
 from tools.agent.orchestration.packets import (
+    OwnerGuaranteePacket,
     normalize_owner_guarantee_packet,
     owner_receipt_is_compatible,
     owner_receipt_key,
@@ -101,20 +106,75 @@ class PublicationError(ValueError):
         super().__init__(code if not detail else f"{code}:{detail}")
 
 
+class OwnerReceiptProjection(TypedDict):
+    """Describe the normalized owner receipts consumed by authority selection."""
+
+    candidate_digest: str | None
+    owner_receipt_refs: list[str]
+    dependency_edges: list[str]
+    missing_or_incompatible: list[str]
+    publication_state: str
+
+
+class PublicationTargetTuple(TypedDict):
+    """Describe the validated target tuple carried by a candidate authority."""
+
+    repository_id: object
+    route: str
+    mode: str
+    target_ref: str
+    expected_target_oid: str
+    expected_target_tree: str
+    remote_name: object
+    pr_owner_api: object
+
+
+class CandidateAuthority(TypedDict):
+    """Describe the frozen commit and attestation identities for one candidate."""
+
+    attestation_id: str
+    attestation_body_sha256: str
+    candidate_ref: str
+    candidate_commit: str
+    candidate_tree: str
+
+
+class PublicationAuthority(TypedDict):
+    """Describe the source projection consumed by expected-old publication CAS."""
+
+    schema: str
+    schema_version: int
+    publication_id: str
+    state: str
+    selection_version: int
+    selection_owner: str
+    candidate_authority: CandidateAuthority
+    owner_receipt_projection: OwnerReceiptProjection
+    source: dict[str, str]
+    target: PublicationTargetTuple
+    validation_provenance_ref: dict[str, object]
+    selection_sha256: str
+    owner_attestation: dict[str, object]
+    candidate_attestation: Mapping[str, object]
+    result: None
+    pr_identity_cas_gate: dict[str, object] | None
+    publication_authority_body_sha256: str
+
+
 def owner_receipt_projection(
     owner_receipts: Sequence[Mapping[str, object]],
     *,
     candidate_digest: str | None = None,
     required_owner_refs: Sequence[str] = (),
     dependency_edges: Sequence[str] = (),
-) -> dict[str, object]:
+) -> OwnerReceiptProjection:
     """Consume owner-local receipts without rerunning their commands.
 
     The integrator checks only packet presence, tuple compatibility, and the
     already-declared dependency edges.  It never treats approval, a copied
     claim, or a local command invocation as owner evidence.
     """
-    normalized: list[dict[str, object]] = []
+    normalized: list[OwnerGuaranteePacket] = []
     keys: set[tuple[str, str, str, str, str]] = set()
     missing: list[str] = []
     for index, raw in enumerate(owner_receipts):
@@ -144,7 +204,6 @@ def owner_receipt_projection(
         str(edge)
         for packet in normalized
         for edge in packet["downstream_edges"]
-        if isinstance(packet["downstream_edges"], list)
     }
     missing.extend(
         f"missing_dependency_edge:{edge}"
@@ -356,7 +415,7 @@ def observe_git_tree_delta(
     }
 
 
-def _target_tuple(candidate: Mapping[str, object]) -> dict[str, object]:
+def _target_tuple(candidate: Mapping[str, object]) -> PublicationTargetTuple:
     """Return the frozen target tuple from canonical candidate acceptance identity."""
     acceptance = candidate.get("acceptance_identity")
     if not is_string_object_mapping(acceptance):
@@ -379,36 +438,42 @@ def _target_tuple(candidate: Mapping[str, object]) -> dict[str, object]:
     route = target.get("route")
     mode = target.get("mode")
     target_ref = target.get("target_ref")
-    if route not in {"local_ref", "remote_ref", "pull_request"}:
+    if not isinstance(route, str) or route not in {
+        "local_ref",
+        "remote_ref",
+        "pull_request",
+    }:
         raise PublicationError("publication_authority:target_route_invalid")
-    if mode not in {"direct_head", "merge", "cherry_pick"}:
+    if not isinstance(mode, str) or mode not in {
+        "direct_head",
+        "merge",
+        "cherry_pick",
+    }:
         raise PublicationError("publication_authority:integration_mode_mismatch")
     if not isinstance(target_ref, str) or not target_ref.startswith("refs/heads/"):
         raise PublicationError("publication_authority:target_ref_not_full")
-    _hex_oid(target.get("expected_target_oid"), "expected_target_oid")
-    _hex_oid(target.get("expected_target_tree"), "expected_target_tree")
-    if route == "remote_ref" and not isinstance(target.get("remote_name"), str):
+    expected_target_oid = _hex_oid(
+        target.get("expected_target_oid"), "expected_target_oid"
+    )
+    expected_target_tree = _hex_oid(
+        target.get("expected_target_tree"), "expected_target_tree"
+    )
+    remote_name = target.get("remote_name")
+    pr_owner_api = target.get("pr_owner_api")
+    if route == "remote_ref" and not isinstance(remote_name, str):
         raise PublicationError("publication_authority:target_tuple_mismatch")
-    if route == "pull_request" and not isinstance(target.get("pr_owner_api"), str):
+    if route == "pull_request" and not isinstance(pr_owner_api, str):
         raise PublicationError("publication_authority:target_tuple_mismatch")
-    return dict(target)
-
-
-def _review_approval(workspace: Path) -> tuple[dict[str, object], dict[str, object]]:
-    """Return current candidate and exact explicit APPROVE event."""
-    review_eligibility = resolve_review_eligibility(workspace)
-    if review_eligibility.get("outcome") != "eligible":
-        raise PublicationError("publication_eligibility:review_not_eligible")
-    state = resolve_current_review_state(workspace)
-    candidate = state["candidate"]
-    decision = state["decision"]
-    if decision is None:
-        raise PublicationError("publication_eligibility:approve_missing")
-    if decision.get("decision") != "APPROVE":
-        raise PublicationError("publication_eligibility:decision_mismatch")
-    if decision.get("candidate_id") != candidate.get("candidate_id"):
-        raise PublicationError("publication_eligibility:review_stale")
-    return dict(candidate), dict(decision)
+    return {
+        "repository_id": target["repository_id"],
+        "route": route,
+        "mode": mode,
+        "target_ref": target_ref,
+        "expected_target_oid": expected_target_oid,
+        "expected_target_tree": expected_target_tree,
+        "remote_name": remote_name,
+        "pr_owner_api": pr_owner_api,
+    }
 
 
 def _review_candidate(workspace: Path) -> dict[str, object]:
@@ -476,7 +541,7 @@ def resolve_publication_authority(
     owner_receipts: Sequence[Mapping[str, object]] = (),
     required_owner_refs: Sequence[str] = (),
     dependency_edges: Sequence[str] = (),
-) -> dict[str, object]:
+) -> PublicationAuthority:
     """Resolve publication inputs from owner receipts, never review approval."""
     root = workspace.resolve()
     candidate = _review_candidate(root)
@@ -545,6 +610,7 @@ def resolve_publication_authority(
         "source_tree",
     )
     delta = observe_git_tree_delta(root, source_tree, candidate_tree)
+    candidate_ref = f"refs/agent-canon/candidates/{candidate_commit}"
     attestation_core = {
         "repository_id": root.name,
         "owner_identity": "completion_authority",
@@ -555,24 +621,25 @@ def resolve_publication_authority(
         "candidate_tree": candidate_tree,
         "candidate_parent": source_commit,
         "interface_delta": delta,
-        "candidate_ref": f"refs/agent-canon/candidates/{candidate_commit}",
+        "candidate_ref": candidate_ref,
         "immutable_object_identity": candidate_commit,
         "intended_integration_target": target,
     }
     attestation_hash = hashlib.sha256(
         canonical_json_bytes(attestation_core)
     ).hexdigest()
+    attestation_id = f"interface-candidate:{attestation_hash}"
     attestation = {
         "schema": "agent-canon.interface-candidate-attestation.v1",
         "schema_version": 1,
-        "attestation_id": f"interface-candidate:{attestation_hash}",
+        "attestation_id": attestation_id,
         **attestation_core,
         "attestation_body_sha256": attestation_hash,
     }
-    candidate_authority = {
-        "attestation_id": attestation["attestation_id"],
-        "attestation_body_sha256": attestation["attestation_body_sha256"],
-        "candidate_ref": attestation["candidate_ref"],
+    candidate_authority: CandidateAuthority = {
+        "attestation_id": attestation_id,
+        "attestation_body_sha256": attestation_hash,
+        "candidate_ref": candidate_ref,
         "candidate_commit": candidate_commit,
         "candidate_tree": candidate_tree,
     }
@@ -591,7 +658,7 @@ def resolve_publication_authority(
     selection_sha256 = hashlib.sha256(
         canonical_json_bytes(selection_payload)
     ).hexdigest()
-    authority: dict[str, object] = {
+    authority: PublicationAuthority = {
         "schema": PUBLICATION_AUTHORITY_SCHEMA,
         "schema_version": 3,
         "publication_id": f"w2-publication:{selection_sha256}:1",
@@ -642,10 +709,11 @@ def resolve_publication_eligibility(
     dependency_edges: Sequence[str] = (),
 ) -> dict[str, object]:
     """Return one pure publication-eligibility projection."""
-    review_eligibility: dict[str, object] | None = None
+    review_eligibility: ReviewEligibilityProjection | None = None
     try:
-        review_eligibility = resolve_review_eligibility(workspace)
-        if review_eligibility.get("outcome") != "eligible":
+        resolved_review_eligibility = resolve_review_eligibility(workspace)
+        review_eligibility = resolved_review_eligibility
+        if resolved_review_eligibility["outcome"] != "eligible":
             raise PublicationError("publication_eligibility:review_not_eligible")
         authority = resolve_publication_authority(
             workspace,
@@ -752,47 +820,38 @@ def _checked_out_refs(
 def _interface_entry(delta: Mapping[str, object]) -> Mapping[str, object]:
     """Return the sole canonical interface entry."""
     entries = delta.get("entries")
+    if not is_object_list(entries) or len(entries) != 1:
+        raise PublicationError("ordered_integration:path_set_mismatch")
+    entry = entries[0]
     if (
-        not isinstance(entries, list)
-        or len(entries) != 1
-        or not isinstance(entries[0], Mapping)
-        or entries[0].get("path") != CANONICAL_INTERFACE_PATH
+        not is_string_object_mapping(entry)
+        or entry.get("path") != CANONICAL_INTERFACE_PATH
     ):
         raise PublicationError("ordered_integration:path_set_mismatch")
-    return entries[0]
+    return entry
 
 
 def _construct_result_commit(
     workspace: Path,
-    authority: Mapping[str, object],
+    authority: PublicationAuthority,
     *,
     runner: Runner,
 ) -> str:
     """Construct the exact direct, merge, or cherry-pick result without moving a ref."""
-    target = authority["target"]
-    source = authority["source"]
-    candidate = authority["candidate_authority"]
-    attestation = authority["candidate_attestation"]
-    if not all(
-        isinstance(item, Mapping) for item in (target, source, candidate, attestation)
-    ):
-        raise PublicationError("publication_authority:schema_mismatch")
-    target_map = cast(Mapping[str, object], target)
-    source_map = cast(Mapping[str, object], source)
-    candidate_map = cast(Mapping[str, object], candidate)
-    attestation_map = cast(Mapping[str, object], attestation)
+    target_map = authority["target"]
+    source_map = authority["source"]
+    candidate_map = authority["candidate_authority"]
+    attestation_map = authority["candidate_attestation"]
     mode = target_map["mode"]
     expected = _hex_oid(target_map["expected_target_oid"], "expected_target_oid")
     candidate_commit = _hex_oid(candidate_map["candidate_commit"], "candidate_commit")
     source_commit = _hex_oid(source_map["commit"], "source_commit")
-    if target_map["route"] == "pull_request":
-        return candidate_commit
     if mode == "direct_head":
         if expected != source_commit:
             raise PublicationError("publication_authority:target_not_source_successor")
         return candidate_commit
     delta = attestation_map.get("interface_delta")
-    if not isinstance(delta, Mapping):
+    if not is_string_object_mapping(delta):
         raise PublicationError("publication_authority:delta_missing")
     entry = _interface_entry(delta)
     new_blob = _hex_oid(entry.get("new_blob"), "new_blob")
@@ -889,12 +948,10 @@ def integrate_publication(
         required_owner_refs=required_owner_refs,
         dependency_edges=dependency_edges,
     )
-    target = authority.get("target")
-    if not isinstance(target, Mapping):
-        raise PublicationError("publication_authority:target_tuple_mismatch")
-    target_ref = str(target["target_ref"])
-    route = str(target["route"])
-    expected = _hex_oid(target["expected_target_oid"], "expected_target_oid")
+    target = authority["target"]
+    target_ref = target["target_ref"]
+    route = target["route"]
+    expected = target["expected_target_oid"]
     observed_expected = _git_text(
         root,
         ["rev-parse", target_ref],
@@ -916,9 +973,7 @@ def integrate_publication(
     result_commit: str | None = None
     if route != "pull_request":
         result_commit = _construct_result_commit(root, authority, runner=runner)
-    candidate_authority = cast(
-        Mapping[str, object], authority["candidate_authority"]
-    )
+    candidate_authority = authority["candidate_authority"]
     candidate_commit = _hex_oid(
         candidate_authority["candidate_commit"], "candidate_commit"
     )

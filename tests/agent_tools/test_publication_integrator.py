@@ -1,15 +1,19 @@
-"""Tests for APPROVE-only publication eligibility."""
+"""Tests for owner-eligible publication and expected-old CAS behavior."""
 
 # @dependency-start
 # contract test
-# responsibility Tests publication eligibility refuses CAS ingress without current approval.
+# responsibility Tests owner-eligible publication and expected-old CAS behavior.
 # upstream implementation ../../tools/repository/github/publication_integrator.py resolves publication authority and CAS eligibility
 # @dependency-end
 
 from __future__ import annotations
 
 import sys
+import os
+import subprocess
+import tempfile
 import unittest
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,15 +22,16 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from tools.repository.github.publication_integrator import (  # noqa: E402
     CANONICAL_INTERFACE_PATH,
-    _construct_result_commit,
-    _interface_entry,
-    _review_approval,
-    _publication_gate,
+    CommandResult,
     PublicationError,
+    PublicationAuthority,
     integrate_publication,
     resolve_publication_eligibility,
-    subprocess_runner,
 )
+from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
+    materialize_gate_verdict,
+)
+from tools.runtime.values import is_string_object_mapping  # noqa: E402
 
 
 def lifecycle_binding() -> dict[str, object]:
@@ -98,35 +103,196 @@ def publication_readback_receipt(
 
 
 class PublicationIntegratorTest(unittest.TestCase):
-    """Verify review state remains a prerequisite for publication CAS."""
+    """Verify owner-eligible publication remains bound to the selected candidate."""
 
     def test_ordered_integration_uses_durable_interface_path(self) -> None:
-        """The ordered integration gate accepts only the durable contract path."""
+        """The public CAS route accepts only the durable interface path."""
         self.assertEqual(
             CANONICAL_INTERFACE_PATH,
             "documents/contracts/ordered_integration_interface.json",
         )
-        entry = {"path": CANONICAL_INTERFACE_PATH, "new_blob": "a" * 40}
-        self.assertEqual(_interface_entry({"entries": [entry]}), entry)
-        with self.assertRaisesRegex(
-            PublicationError,
-            "ordered_integration:path_set_mismatch",
-        ):
-            retired_path = (
-                "reports" + "/agents/"
-                + "convergence-w2-gates-completion-20260716/"
-                + "ordered_integration_interface.json"
+        base_oid = "1" * 40
+        base_tree = "2" * 40
+        source_commit = "3" * 40
+        source_tree = "4" * 40
+        candidate_commit = "5" * 40
+        candidate_tree = "6" * 40
+        result_tree = "7" * 40
+        result_commit = "8" * 40
+        target_ref = "refs/heads/main"
+
+        with tempfile.TemporaryDirectory() as parent_root_text:
+            parent_root = Path(parent_root_text)
+            subprocess.run(
+                ("git", "init", "-q", "--initial-branch=main", str(parent_root)),
+                check=True,
             )
-            _interface_entry(
-                {
-                    "entries": [
-                        {
-                            "path": retired_path,
-                            "new_blob": "a" * 40,
+            subprocess.run(
+                ("git", "-C", str(parent_root), "config", "user.name", "Test"),
+                check=True,
+            )
+            subprocess.run(
+                (
+                    "git",
+                    "-C",
+                    str(parent_root),
+                    "config",
+                    "user.email",
+                    "test@example.invalid",
+                ),
+                check=True,
+            )
+            subprocess.run(
+                (
+                    "git",
+                    "-C",
+                    str(parent_root),
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/agent-canon-test.git",
+                ),
+                check=True,
+            )
+            subprocess.run(
+                (
+                    "git",
+                    "-C",
+                    str(parent_root),
+                    "commit",
+                    "--allow-empty",
+                    "-q",
+                    "-m",
+                    "fixture",
+                ),
+                check=True,
+            )
+
+            current_ref = base_oid
+            executed: list[tuple[str, ...]] = []
+
+            def runner(
+                command: Sequence[str],
+                _environment: Mapping[str, str] | None = None,
+                _input_bytes: bytes | None = None,
+            ) -> CommandResult:
+                nonlocal current_ref
+                args = tuple(command)
+                executed.append(args)
+                operation = args[3]
+                if operation == "rev-parse":
+                    revision = args[-1]
+                    if revision == target_ref:
+                        stdout = current_ref
+                    elif revision == f"{base_oid}^{{tree}}":
+                        stdout = base_tree
+                    elif revision == f"{result_commit}^{{tree}}":
+                        stdout = result_tree
+                    else:
+                        raise AssertionError(args)
+                elif operation == "merge-base":
+                    stdout = ""
+                elif operation == "write-tree":
+                    stdout = result_tree
+                elif operation == "commit-tree":
+                    stdout = result_commit
+                elif operation == "update-ref":
+                    current_ref = result_commit
+                    stdout = ""
+                elif operation in {"read-tree", "update-index", "status", "worktree"}:
+                    stdout = ""
+                else:
+                    raise AssertionError(args)
+                return CommandResult(args, 0, stdout, "")
+
+            def authority_for(interface_path: str) -> PublicationAuthority:
+                return {
+                    "schema": "agent-canon.publication-authority.v3",
+                    "schema_version": 3,
+                    "publication_id": "w2-publication:test",
+                    "state": "selected",
+                    "selection_version": 1,
+                    "selection_owner": "completion_authority",
+                    "candidate_authority": {
+                        "attestation_id": "attestation:test",
+                        "attestation_body_sha256": "a" * 64,
+                        "candidate_ref": f"refs/agent-canon/candidates/{candidate_commit}",
+                        "candidate_commit": candidate_commit,
+                        "candidate_tree": candidate_tree,
+                    },
+                    "owner_receipt_projection": {
+                        "candidate_digest": candidate_commit,
+                        "owner_receipt_refs": [],
+                        "dependency_edges": [],
+                        "missing_or_incompatible": [],
+                        "publication_state": "ready",
+                    },
+                    "source": {"commit": source_commit, "tree": source_tree},
+                    "target": {
+                        "repository_id": "agent-canon-test",
+                        "route": "local_ref",
+                        "mode": "merge",
+                        "target_ref": target_ref,
+                        "expected_target_oid": base_oid,
+                        "expected_target_tree": base_tree,
+                        "remote_name": "origin",
+                        "pr_owner_api": "owner/repo",
+                    },
+                    "validation_provenance_ref": {},
+                    "selection_sha256": "b" * 64,
+                    "owner_attestation": {},
+                    "candidate_attestation": {
+                        "interface_delta": {
+                            "entries": [
+                                {
+                                    "path": interface_path,
+                                    "new_blob": "9" * 40,
+                                    "new_mode": "100644",
+                                }
+                            ]
                         }
-                    ]
+                    },
+                    "result": None,
+                    "pr_identity_cas_gate": None,
+                    "publication_authority_body_sha256": "c" * 64,
                 }
+
+            def integrate(interface_path: str) -> dict[str, object]:
+                nonlocal current_ref
+                current_ref = base_oid
+                authority = authority_for(interface_path)
+                with (
+                    patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}),
+                    patch(
+                        "tools.repository.github.publication_integrator.resolve_publication_authority",
+                        side_effect=[authority, authority],
+                    ),
+                ):
+                    return integrate_publication(PROJECT_ROOT, runner=runner)
+
+            valid_receipt = integrate(CANONICAL_INTERFACE_PATH)
+            self.assertEqual(valid_receipt["result_oid"], result_commit)
+            self.assertIn(
+                (
+                    "git",
+                    "-C",
+                    str(PROJECT_ROOT.resolve()),
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    f"100644,{'9' * 40},{CANONICAL_INTERFACE_PATH}",
+                ),
+                executed,
             )
+
+            retired_path = "reports/agents/ordered_integration_interface.json"
+            executed.clear()
+            with self.assertRaisesRegex(
+                PublicationError,
+                "ordered_integration:path_set_mismatch",
+            ):
+                integrate(retired_path)
+            self.assertFalse(any(args[3] == "update-index" for args in executed))
 
     def test_ineligible_review_never_produces_publication_authority(self) -> None:
         """A non-eligible review fails closed before authority derivation."""
@@ -141,48 +307,6 @@ class PublicationIntegratorTest(unittest.TestCase):
         self.assertEqual(
             projection["failure_codes"],
             ["publication_eligibility:review_not_eligible"],
-        )
-
-    def test_publication_consumes_only_canonical_approve_decision(self) -> None:
-        """Template aliases must be canonicalized before this exact boundary."""
-        with (
-            patch(
-                "tools.repository.github.publication_integrator.resolve_review_eligibility",
-                return_value={"outcome": "eligible"},
-            ),
-            patch(
-                "tools.repository.github.publication_integrator.resolve_current_review_state",
-                return_value={
-                    "candidate": {"candidate_id": "candidate-1"},
-                    "decision": {
-                        "candidate_id": "candidate-1",
-                        "decision": "ACCEPT",
-                    },
-                },
-            ),
-        ):
-            with self.assertRaisesRegex(
-                PublicationError,
-                "publication_eligibility:decision_mismatch",
-            ):
-                _review_approval(PROJECT_ROOT)
-
-    def test_pull_request_result_starts_from_the_reviewed_head(self) -> None:
-        """A PR route delegates the server result instead of predicting its SHA."""
-        authority = {
-            "target": {
-                "route": "pull_request",
-                "mode": "merge",
-                "expected_target_oid": "a" * 40,
-            },
-            "source": {"commit": "b" * 40},
-            "candidate_authority": {"candidate_commit": "c" * 40},
-            "candidate_attestation": {},
-        }
-
-        self.assertEqual(
-            _construct_result_commit(PROJECT_ROOT, authority, runner=subprocess_runner),
-            "c" * 40,
         )
 
     def test_pull_request_receipt_binds_server_result_readback(self) -> None:
@@ -223,10 +347,6 @@ class PublicationIntegratorTest(unittest.TestCase):
             ),
             patch("tools.repository.github.publication_integrator._git_text", side_effect=read_git),
             patch("tools.repository.github.publication_integrator._worktree_status", return_value=""),
-            patch(
-                "tools.repository.github.publication_integrator._construct_result_commit",
-                return_value=candidate,
-            ) as result_builder,
         ):
             receipt = integrate_publication(
                 PROJECT_ROOT,
@@ -248,7 +368,6 @@ class PublicationIntegratorTest(unittest.TestCase):
                 ordered_input_evidence_refs=["evidence:" + "8" * 64],
             )
 
-        result_builder.assert_not_called()
         self.assertEqual(receipt["candidate_oid"], candidate)
         self.assertEqual(receipt["candidate_tree_oid"], candidate_tree)
         self.assertEqual(receipt["result_oid"], server_result)
@@ -259,37 +378,53 @@ class PublicationIntegratorTest(unittest.TestCase):
         self.assertEqual(gate["gate_id"], "G5")
 
     def test_boundary_gate_identity_is_distinct_and_replay_stable(self) -> None:
-        """G1, G3, and G5 reuse identity while retaining separate evidence IDs."""
+        """The lifecycle owner separates gate identities and stabilizes replay."""
         binding = lifecycle_binding()
-        gates = [
-            _publication_gate(
+
+        def gate_for(
+            gate_id: str,
+            invariant: str,
+            owner_symbol: str,
+        ) -> dict[str, object]:
+            return materialize_gate_verdict(
                 binding=binding,
                 gate_id=gate_id,
                 ordered_input_evidence_refs=["evidence:" + "8" * 64],
                 invariant=invariant,
-                owner_symbol=owner_symbol,
-                output={"candidate": "3" * 40},
+                output_digest="sha256:" + "a" * 64,
+                owner=(
+                    f"{PROJECT_ROOT / 'tools/repository/github/publication_integrator.py'}"
+                    f"#{owner_symbol}"
+                ),
                 verdict="pass",
+                retry_reason=None,
+                next_checkpoint=None,
             )
+
+        gates = [
+            gate_for(gate_id, invariant, owner_symbol)
             for gate_id, invariant, owner_symbol in (
                 ("G1", "source_correctness", "resolve_publication_eligibility"),
                 ("G3", "pr_identity_cas", "resolve_publication_authority"),
                 ("G5", "remote_publication_readback", "integrate_publication"),
             )
         ]
-        replay = _publication_gate(
-            binding=binding,
-            gate_id="G3",
-            ordered_input_evidence_refs=["evidence:" + "8" * 64],
-            invariant="pr_identity_cas",
-            owner_symbol="resolve_publication_authority",
-            output={"candidate": "3" * 40},
-            verdict="pass",
-        )
+        replay = gate_for("G3", "pr_identity_cas", "resolve_publication_authority")
 
-        evidence_refs = [gate["binding"]["evidence_ref"] for gate in gates]
+        evidence_refs: list[str] = []
+        for gate in gates:
+            gate_binding = gate.get("binding")
+            if not is_string_object_mapping(gate_binding):
+                raise AssertionError("materialized gate has no typed binding")
+            evidence_ref = gate_binding.get("evidence_ref")
+            if not isinstance(evidence_ref, str):
+                raise AssertionError("materialized gate has no evidence reference")
+            evidence_refs.append(evidence_ref)
+        replay_binding = replay.get("binding")
+        if not is_string_object_mapping(replay_binding):
+            raise AssertionError("replayed gate has no typed binding")
         self.assertEqual(len(set(evidence_refs)), 3)
-        self.assertEqual(replay["binding"]["evidence_ref"], evidence_refs[1])
+        self.assertEqual(replay_binding.get("evidence_ref"), evidence_refs[1])
 
     def test_pull_request_post_cas_readback_mismatch_fails_closed(self) -> None:
         """A server result and publication readback mismatch cannot emit G5."""
@@ -322,7 +457,6 @@ class PublicationIntegratorTest(unittest.TestCase):
             patch("tools.repository.github.publication_integrator.resolve_publication_authority", return_value=authority),
             patch("tools.repository.github.publication_integrator._git_text", side_effect=read_git),
             patch("tools.repository.github.publication_integrator._worktree_status", return_value=""),
-            patch("tools.repository.github.publication_integrator._construct_result_commit", return_value=candidate),
             self.assertRaises(PublicationError) as raised,
         ):
             integrate_publication(
