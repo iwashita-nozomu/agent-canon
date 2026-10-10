@@ -284,9 +284,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             order_edges,
             [(f"skill:{before}", f"skill:{after}")],
         )
-        invocation_order = [
-            item["ref"]["id"] for item in graph["invocation_order"]
-        ]
+        invocation_order = [item["ref"]["id"] for item in graph["invocation_order"]]
         self.assertLess(
             invocation_order.index(f"skill:{before}"),
             invocation_order.index(f"skill:{after}"),
