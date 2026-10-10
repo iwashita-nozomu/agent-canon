@@ -5334,16 +5334,10 @@ def _container_source_identity(
     remote: str, repository_id: str = "", *, mode: str = "source"
 ) -> dict[str, str]:
     """Return a canonical source or generic remote identity without I/O."""
-    try:
-        from tools.runtime.archive.log_repository_identity import (  # type: ignore[import-not-found]
-            normalize_remote,
-            stable_source_repository_id,
-        )
-    except ImportError:  # pragma: no cover - direct container script execution
-        from tools.runtime.archive.log_repository_identity import (
-            normalize_remote,
-            stable_source_repository_id,
-        )
+    from tools.runtime.archive.log_repository_identity import (
+        normalize_remote,
+        stable_source_repository_id,
+    )
 
     try:
         normalized = normalize_remote(remote)
@@ -5598,9 +5592,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             if operation in {"install", "update"}:
                 runtime._prune_stale_targets(state)
             before = str(state.get("state"))
-            resources = state.setdefault(
-                "resources", _container_resource_state(runtime)
-            )
+            resources = state.setdefault("resources", {})
             resources.update(_container_resource_state(runtime))
             if operation == "install":
                 # A clean install reconstructs controller-owned lifecycle
