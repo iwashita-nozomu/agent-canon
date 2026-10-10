@@ -31,6 +31,16 @@ an AgentCanon checker. If a check reports a path, inspect the relevant text and
 repair that formatting, link, heading, math, or Mermaid issue. Route semantic or
 cross-document findings to the content owner.
 
+The AgentCanon docs route uses the pinned `markdownlint-cli2` configuration at
+`.markdownlint-cli2.jsonc` for heading increments, trailing spaces, hard tabs,
+list spacing, and fenced-code languages. Per-depth unordered-marker consistency
+remains repository-specific because the standard `sublist` rule also requires
+parent and child markers to differ. Use `agent-canon docs check` so these
+provider findings stay composed with the repository's local-link, math,
+bootstrap-documentation, and runtime-profile checks.
+The `0.17.2` pin reuses the shared Node 18 runtime; `0.23.3` requires Node 22,
+which is outside this documentation-check migration.
+
 Use the selected math/Mermaid formatter when available. Preserve existing
 delimiter and literal-command conventions. After a formatter/fixer edit, rerun
 the same required check when it can establish the corrected property, reusing a
@@ -49,5 +59,6 @@ failure owner.
 
 - [`coding-conventions-project.md`](../../documents/conventions/coding-conventions-project.md)
 - [`05_docs.md`](../../documents/conventions/common/05_docs.md)
-- `.markdownlint.json`
+- [`.markdownlint-cli2.jsonc`](../../.markdownlint-cli2.jsonc)
+- [`dependencies.toml`](../../bootstrap/container/image/dependencies.toml)
 - `tools/runtime/dispatch/agent-canon/src/docs.rs`
