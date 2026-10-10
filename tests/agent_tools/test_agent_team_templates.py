@@ -380,7 +380,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
                     configure.returncode, 0, configure.stdout + configure.stderr
                 )
                 build = subprocess.run(
-                    ["cmake", "--build", str(build_dir)],
+                    ["cmake", "--build", str(build_dir), "--parallel", "1"],
                     check=False,
                     capture_output=True,
                     text=True,
