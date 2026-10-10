@@ -552,6 +552,14 @@ def tool_doc_name_matches(tool: str, doc: str) -> bool:
         return doc_stem in {owner_stem, owner_stem.replace("_", "-")}
     return tool_path.stem == doc_stem
 
+
+def validate_catalog(root: Path) -> CatalogReport:
+    """Run catalog validation."""
+    root = root.resolve()
+    data, findings = load_catalog(resolve_repo_path(root, CATALOG_PATH))
+    if data is None:
+        return CatalogReport(tuple(findings), ())
+
     families_map = as_mapping(data.get("families")) or {}
     family_defaults = {
         name: as_mapping(raw_family) or {} for name, raw_family in families_map.items()
