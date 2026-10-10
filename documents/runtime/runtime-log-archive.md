@@ -55,7 +55,10 @@ the runtime-local layout is:
 
 ```text
 $RUNTIME/
-  spool/<run-id>/                 # pending eval/event/archive inputs
+  spool/<run-id>/                 # pending eval inputs (separate root spool)
+  container-state/
+    spool/<run-id>/               # host staging copy for eval publication
+    spool/private-feedback/       # host staging copy for private feedback
   tasks/<task-id>/                # logs, reports, locks, receipts
   codex-home/                     # managed isolated Codex surfaces
 
@@ -76,7 +79,7 @@ families so the host shell remains the Git publisher. The publisher injects a
 resident writer and invokes `bootstrap.sh ... tool run/exec issue-sync --
 --stage-publication-receipt`; its runtime/spool route is a precondition for
 GitHub mutation and its sync request is consumed by the existing
-private-feedback host synchronization path.
+host-shell private-feedback archive adapter.
 
 The receipt ToolCall keeps the AgentCanon source root (the owner of
 `bootstrap.sh` and the resident image) separate from the registered product
@@ -113,13 +116,17 @@ repository remains the passive destination and policy owner.
 | Archive layout, branch, migration, or retention needs maintenance | The log repository policy owner; artifact placement uses the existing writeout owner. |
 
 The existing automatic entrypoint is `agent-canon-sync.timer` and its one-shot
-service under `bootstrap/host/scheduler/systemd/user/`. Its current host `sync`
-implementation updates source and resident state but does not drain pending
-hook, eval, or private-feedback publications. Private-feedback synchronization
-currently runs after successful managed tool/exec or Codex completion.
+service under `bootstrap/host/scheduler/systemd/user/`. Each scheduled `sync`
+advances source first, then independently attempts hook-spool publication,
+eval runs with explicit `sync-request.tsv` records, and the private-feedback
+request in the resident state volume. A source-refresh failure does not
+suppress these archive attempts. Private feedback is also attempted after
+successful managed tool/exec or Codex completion. Eval's root `spool/<run-id>`
+and private feedback's `runtime/spool/private-feedback` are separate producer
+paths.
 [Issue #1199](https://github.com/iwashita-nozomu/agent-canon/issues/1199) tracks
-connecting automatic delivery to the existing publishers. This routing contract
-does not claim that periodic archive delivery is already implemented or active.
+the implementation and evidence for connecting automatic delivery to the
+existing publishers.
 
 The engineering requirement is progress for already-produced pending evidence
 without a later successful conversation or a source revision change. Reuse the
