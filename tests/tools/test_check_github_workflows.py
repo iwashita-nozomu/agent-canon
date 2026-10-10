@@ -107,12 +107,12 @@ def test_native_actionlint_failure_is_visible() -> None:
         assert "GITHUB_WORKFLOWS=fail" in output
 
 
-def test_native_zizmor_rejects_uploaded_checkout_credentials() -> None:
+def test_native_zizmor_rejects_default_checkout_credentials_in_artifact() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         copy_required_surfaces(root)
         vulnerable_workflow = VALID_WORKFLOW.replace(
-            "persist-credentials: false", "persist-credentials: true"
+            "        with:\n          persist-credentials: false\n", ""
         ).replace(
             "      - run: echo standalone\n",
             "      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2\n"
