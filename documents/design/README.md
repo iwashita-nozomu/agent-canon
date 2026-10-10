@@ -44,8 +44,6 @@ upstream design dependency-manifest-design.md dependency evidence contract
     install / `pip check` を所有します。pack/env の typed extras は
     `tools/runtime/container/devcontainer_dependencies.py` から Compose 境界へ
     projection されます。
-- [environment-resolution-gpu-build-capability.md](environment-resolution-gpu-build-capability.md)
-  - GPU-dependent image buildのstage別receipt契約。通常のGPU実行をこのbuild検査へ迂回させません。
 - [experiment_runner.md](experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
 - [experiment-topic-template.md](experiment-topic-template.md)

@@ -16,6 +16,10 @@ import unittest
 from pathlib import Path
 
 from tools.analysis.dependencies.graph_client import GraphClient, GraphClientError
+from tools.analysis.dependencies.source_dependency_graph import (
+    SourceDependencyError,
+    parse_manifest_document,
+)
 
 
 def write(path: Path, content: str) -> None:
@@ -50,11 +54,16 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
             contract design
             responsibility Defines the feature contract.
             upstream design parent.md inherits the parent contract
+            upstream reference ../notes/source-evidence.md records non-authoritative context
             downstream implementation ../../tools/feature.py implements the feature
             @dependency-end
             -->
             # Feature
             """,
+        )
+        write(
+            root / "documents" / "notes" / "source-evidence.md",
+            "# Source evidence\n\nThis note is supporting context, not a design owner.\n",
         )
         write(
             root / "tools" / "feature.py",
@@ -111,6 +120,7 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
                 [
                     "documents/design/feature.md",
                     "documents/design/parent.md",
+                    "documents/notes/source-evidence.md",
                     "tools/feature.py",
                 ],
             )
@@ -161,6 +171,27 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
                     direction="both",
                     depth=0,
                 )
+
+    def test_unknown_dependency_relation_kind_stays_closed(self) -> None:
+        """The evidence relation adds only `reference`, not arbitrary aliases."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "tools" / "invalid.py",
+                """
+                # @dependency-start
+                # contract tool
+                # responsibility Exercises the closed relation kind set.
+                # upstream citation ../documents/evidence.md unsupported alias
+                # @dependency-end
+                """,
+            )
+            write(root / "documents" / "evidence.md", "# Evidence\n")
+
+            with self.assertRaisesRegex(
+                SourceDependencyError, "invalid dependency kind: citation"
+            ):
+                parse_manifest_document(root, "tools/invalid.py")
 
     def test_generated_skill_view_resolves_to_catalog_owner_without_view(self) -> None:
         """Ignored generated skill paths use the catalog owner in a clean checkout."""
