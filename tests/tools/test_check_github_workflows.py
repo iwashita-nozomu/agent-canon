@@ -124,7 +124,7 @@ def test_native_zizmor_rejects_uploaded_checkout_credentials() -> None:
         write_workflow(root, vulnerable_workflow)
         result = run_checker(root)
         output = result.stdout + result.stderr
-        assert result.returncode != 0
+        assert result.returncode != 0, f"checker args={result.args!r}\n{output}"
         assert "artipacked" in output
         assert "GITHUB_WORKFLOW_TOOL_EXIT=zizmor code=" in output
         assert "GITHUB_WORKFLOW_TOOL_EXIT=zizmor code=0" not in output
