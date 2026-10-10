@@ -3484,6 +3484,167 @@ exit "$rc"
     assert "\nexec\t" not in "\n" + calls
 
 
+@pytest.mark.parametrize(
+    ("failed_kind", "attempted_kinds"),
+    [
+        ("mount-registry", ["mount-registry"]),
+        ("host-mounts", ["mount-registry", "host-mounts"]),
+        ("private-log", ["mount-registry", "host-mounts", "private-log"]),
+    ],
+)
+def test_public_exec_stops_when_existing_resident_host_input_import_fails(
+    tmp_path: Path, failed_kind: str, attempted_kinds: list[str]
+) -> None:
+    """A failed ordered volume import must stop ensure before controller exec."""
+    _state, _owned, repository, control, runtime, state_path, _name, environment = (
+        _gc_fixture(tmp_path)
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "add", "origin", str(repository)],
+        check=True,
+    )
+    target = tmp_path / "target"
+    target.mkdir()
+    state_root = runtime / "container-state"
+    (state_root / "mounts.toml").write_text(
+        'schema = "agent-canon.mount-registry.v2"\n', encoding="utf-8"
+    )
+    (state_root / "mounts.tsv").write_text("", encoding="utf-8")
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_root = state_path.parent / f".fake-volume-{volume_name}"
+    volume_root.mkdir()
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    docker_state["volumes"] = {
+        volume_name: {
+            "Name": volume_name,
+            "Labels": {
+                "io.agent-canon.runtime": "shared-v1",
+                "io.agent-canon.control-root-digest": control_digest,
+                "io.agent-canon.state": "controller-v1",
+            },
+            "Mountpoint": str(volume_root),
+        }
+    }
+    state_path.write_text(json.dumps(docker_state), encoding="utf-8")
+
+    fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    copy_log = tmp_path / "copy-kinds.log"
+    wrapper = tmp_path / "docker-fail-selected-volume-import"
+    wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"fake_docker={str(fake_docker)!r}\n"
+        'original=("$@")\n'
+        'if [[ "${1:-}: ${2:-}" == "run: --rm" ]]; then\n'
+        "  direction= kind=\n"
+        "  while (($#)); do\n"
+        '    if [[ "$1" == --env && $# -ge 2 ]]; then\n'
+        '      case "$2" in\n'
+        "        AGENT_CANON_COPY_DIRECTION=*) direction=${2#*=} ;;\n"
+        "        AGENT_CANON_COPY_KIND=*) kind=${2#*=} ;;\n"
+        "      esac\n"
+        "      shift 2\n"
+        "    else\n"
+        "      shift\n"
+        "    fi\n"
+        "  done\n"
+        '  if [[ "$direction" == import ]]; then\n'
+        f'    printf "%s\\n" "$kind" >> {str(copy_log)!r}\n'
+        '    [[ "$kind" != "$AGENT_CANON_TEST_FAIL_KIND" ]] || exit 17\n'
+        "  fi\n"
+        "fi\n"
+        'exec "$fake_docker" "${original[@]}"\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    execution_environment = {
+        **environment,
+        "HOME": str(tmp_path),
+        "AGENT_CANON_DOCKER": str(wrapper),
+        "AGENT_CANON_TEST_FAIL_KIND": failed_kind,
+    }
+    script = f"""
+source {str(ADAPTER)!r}
+_agent_canon_validate_existing_container() {{ :; }}
+bootstrap_host_entrypoint {str(repository)!r} \\
+  --control-parent-root {str(control)!r} \\
+  exec --root {str(target)!r} -- agent-canon --version
+"""
+
+    completed = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=execution_environment,
+    )
+
+    assert completed.returncode == 2
+    assert json.loads(completed.stderr.splitlines()[-1])["code"] == "volume_copy_failed"
+    assert copy_log.read_text(encoding="utf-8").splitlines() == attempted_kinds
+    assert "\nexec\t" not in "\n" + (tmp_path / "docker.calls").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_codex_home_import_failure_stops_before_private_feedback_sync(
+    tmp_path: Path,
+) -> None:
+    """A successful later feedback sync cannot mask Codex import failure."""
+    home = tmp_path / "home"
+    control = tmp_path / "control"
+    repository = tmp_path / "repository"
+    project = tmp_path / "project"
+    for path in (home, control, repository, project):
+        path.mkdir()
+    private_log = tmp_path / "agent-canon-log"
+    private_log.mkdir()
+    runtime = control / ".runtime"
+    state_root = runtime / "container-state"
+    feedback_called = tmp_path / "private-feedback-called"
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_DOCKER=/bin/true
+AGENT_CANON_CODEX=/bin/true
+export AGENT_CANON_DOCKER AGENT_CANON_CODEX HOME={str(home)!r}
+_agent_canon_prepare_host_runtime() {{
+  AGENT_CANON_STATE_ROOT={str(state_root)!r}
+  AGENT_CANON_STATE_VOLUME_NAME=test-volume
+  mkdir -p "$AGENT_CANON_STATE_ROOT/codex-home"
+  export AGENT_CANON_STATE_ROOT AGENT_CANON_STATE_VOLUME_NAME
+}}
+_agent_canon_use_active_image() {{ :; }}
+_agent_canon_ensure_container() {{ printf resident; }}
+_agent_canon_run_controller() {{ return 0; }}
+_agent_canon_volume_copy() {{
+  if [[ "$1:$2" == export:codex-home ]]; then return 0; fi
+  if [[ "$1:$2" == import:codex-home ]]; then
+    _agent_canon_json_error volume_copy_failed "codex-home import failed"
+    return $?
+  fi
+  return 0
+}}
+_agent_canon_private_feedback_sync() {{ : > {str(feedback_called)!r}; return 0; }}
+bootstrap_host_entrypoint {str(repository)!r} \\
+  --control-parent-root {str(control)!r} \\
+  codex launch --project-root {str(project)!r}
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+"""
+
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+
+    assert completed.returncode == 2
+    assert "rc=2" in completed.stdout
+    assert json.loads(completed.stderr.splitlines()[-1])["code"] == "volume_copy_failed"
+    assert not feedback_called.exists()
+
+
 def test_container_exec_forwards_only_explicit_stdin(tmp_path: Path) -> None:
     """The one TOML call keeps stdin open without changing default execs."""
     docker = tmp_path / "docker"
