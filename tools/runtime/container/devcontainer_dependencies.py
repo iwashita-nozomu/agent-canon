@@ -79,9 +79,6 @@ except ImportError:  # direct script execution
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
-import tomllib
-
-
 # This schema is intentionally neutral: dependency planning belongs to the
 # bootstrap-owned tool image, not to a project's editor/developer-container
 # integration.  Keep the old Python module importable below, but do not expose
