@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -654,6 +657,272 @@ def test_multi_target_registry_and_admission_race_guard(
     with pytest.raises(BootstrapError, match="mount_update_blocked"):
         manager.target_add(target_a)
     manager.release_task("task-a")
+
+
+def _admit_process_owned_task(
+    manager: BootstrapRuntime, task_id: str, target: Path
+) -> tuple[dict[str, Any], int]:
+    """Admit one runtime-owned worker and retain its process lease descriptor."""
+    with manager.locked():
+        state = manager._read_state()
+        record, lease_fd = manager._admit_task_locked(
+            state, task_id, target_root=target, process_owned=True
+        )
+    assert lease_fd is not None
+    return record, lease_fd
+
+
+def _run_process_owned_worker_controller(
+    manager: BootstrapRuntime,
+    task_id: str,
+    target: Path,
+    ready_file: Path,
+    exchange_root: Path,
+) -> None:
+    """Spawn one resident worker that keeps its admitted process lease."""
+    os.environ["AGENT_CANON_CONTAINER_CONTROL"] = "1"
+    os.environ["AGENT_CANON_EXCHANGE_ROOT"] = str(exchange_root)
+    _, lease_fd = _admit_process_owned_task(manager, task_id, target)
+    try:
+        manager.docker.exec_container(
+            "resident",
+            cwd=str(target),
+            argv=[
+                "/bin/sh",
+                "-c",
+                'printf "%s\\n" "$$" > "$READY_FILE"; exec /bin/sleep 30',
+            ],
+            environment={"READY_FILE": str(ready_file)},
+            pass_fds=(lease_fd,),
+        )
+    finally:
+        os.close(lease_fd)
+
+
+def _ready_runtime_with_target(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> tuple[BootstrapRuntime, Path]:
+    """Build the minimum ready runtime state for task lease tests."""
+    manager = runtime(tmp_path, fake_docker)
+    target = tmp_path / "target"
+    target.mkdir()
+    manager.install()
+    manager.start()
+    manager.target_add(target)
+    return manager, target
+
+
+def test_resident_exec_passes_process_lease_to_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The local resident worker receives the FD that protects its task lease."""
+    lease_path = tmp_path / "process-lease.lock"
+    lease_fd = os.open(lease_path, os.O_CREAT | os.O_RDWR, 0o600)
+    observed: dict[str, tuple[int, ...]] = {}
+
+    def fake_run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["pass_fds"] = tuple(kwargs["pass_fds"])
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setattr(bootstrap_runtime_module.subprocess, "run", fake_run)
+    try:
+        result = DockerAdapter().exec_container(
+            "resident",
+            cwd="/",
+            argv=["worker"],
+            pass_fds=(lease_fd,),
+        )
+    finally:
+        os.close(lease_fd)
+
+    assert result.returncode == 0
+    assert observed["pass_fds"] == (lease_fd,)
+
+
+def test_process_lease_survives_controller_death_until_worker_exits(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """A live child keeps its lease after controller death until admission recovers."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    task_id = "exec-controller-death"
+    ready_file = tmp_path / "worker.pid"
+    exchange_root = manager.paths.runtime_root / "process-lease-exchange"
+    exchange_root.mkdir()
+    exchange_root.chmod(0o700)
+    controller = multiprocessing.get_context("fork").Process(
+        target=_run_process_owned_worker_controller,
+        args=(manager, task_id, target, ready_file, exchange_root),
+    )
+    worker_pid: int | None = None
+    worker_stop_sent = False
+    next_task_admitted = False
+
+    def ready_worker_pid() -> int | None:
+        try:
+            value = ready_file.read_text(encoding="ascii").strip()
+        except OSError:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    controller.start()
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            worker_pid = ready_worker_pid()
+            if worker_pid is not None:
+                break
+            if not controller.is_alive():
+                break
+            time.sleep(0.01)
+        assert worker_pid is not None, "resident worker did not publish its PID"
+
+        controller_pid = controller.pid
+        assert controller_pid is not None
+        os.kill(controller_pid, signal.SIGKILL)
+        controller.join(timeout=5)
+        assert not controller.is_alive(), "controller did not exit after SIGKILL"
+        assert controller.exitcode == -signal.SIGKILL
+        os.kill(worker_pid, 0)
+
+        with pytest.raises(BootstrapError) as live_worker:
+            manager.admit_task("exec-next", target_root=target)
+        assert live_worker.value.code == "target_busy"
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert state["tasks"][task_id]["state"] == "active"
+        assert state["tasks"][task_id]["pinned"] is True
+
+        try:
+            os.kill(worker_pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        worker_stop_sent = True
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                result = manager.admit_task("exec-next", target_root=target)
+            except BootstrapError as exc:
+                if exc.code != "target_busy" or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
+            else:
+                next_task_admitted = True
+                break
+
+        assert result["code"] == "task_reserved"
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert state["tasks"][task_id]["state"] == "cancelled"
+        assert state["tasks"][task_id]["outcome"] == "terminated"
+        assert state["tasks"][task_id]["pinned"] is False
+        assert state["tasks"]["exec-next"]["state"] == "active"
+    finally:
+        if worker_pid is None and controller.is_alive():
+            deadline = time.monotonic() + 1
+            while time.monotonic() < deadline:
+                worker_pid = ready_worker_pid()
+                if worker_pid is not None or not controller.is_alive():
+                    break
+                time.sleep(0.01)
+        if controller.is_alive():
+            controller_pid = controller.pid
+            if controller_pid is not None:
+                os.kill(controller_pid, signal.SIGKILL)
+            controller.join(timeout=5)
+        if worker_pid is not None and not worker_stop_sent:
+            try:
+                os.kill(worker_pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            worker_stop_sent = True
+        if worker_pid is not None:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                lease_fd = manager._open_task_process_lease(task_id)
+                if lease_fd is not None:
+                    os.close(lease_fd)
+                    break
+                time.sleep(0.01)
+        if next_task_admitted:
+            manager.release_task("exec-next")
+
+
+def test_dead_process_task_lease_is_reconciled_before_next_admission(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """An unlocked exec lease is released before it can keep its target busy."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    record, lease_fd = _admit_process_owned_task(manager, "exec-old", target)
+    os.close(lease_fd)
+
+    result = manager.admit_task("exec-next", target_root=target)
+
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert record["lease_kind"] == "process"
+    assert result["code"] == "task_reserved"
+    assert state["tasks"]["exec-old"]["state"] == "cancelled"
+    assert state["tasks"]["exec-old"]["outcome"] == "terminated"
+    assert state["tasks"]["exec-old"]["pinned"] is False
+    assert state["tasks"]["exec-next"]["state"] == "active"
+    manager.release_task("exec-next")
+
+
+def test_live_process_task_lease_and_manual_release_stay_protected(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """A held worker lock blocks both admission and explicit task release."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    record, lease_fd = _admit_process_owned_task(manager, "exec-live", target)
+    try:
+        with pytest.raises(BootstrapError, match="target_busy"):
+            manager.admit_task("exec-next", target_root=target)
+        with pytest.raises(BootstrapError, match="task_process_active"):
+            manager.release_task("exec-live", outcome="terminated")
+
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert state["tasks"][record["id"]]["state"] == "active"
+        assert state["tasks"][record["id"]]["pinned"] is True
+    finally:
+        os.close(lease_fd)
+
+
+def test_manual_task_lease_remains_persistent_without_process_marker(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """Caller-owned reservations remain pinned until their explicit release."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    receipt = manager.admit_task("caller-lease", target_root=target)
+
+    with pytest.raises(BootstrapError, match="target_busy"):
+        manager.admit_task("exec-next", target_root=target)
+
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert "lease_kind" not in receipt["details"]["task"]
+    assert state["tasks"]["caller-lease"]["state"] == "active"
+    assert state["tasks"]["caller-lease"]["pinned"] is True
+    manager.release_task("caller-lease")
+
+
+def test_closed_admission_does_not_reconcile_process_task_lease(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """Closed lifecycle states reject before reconciliation mutates task state."""
+    manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
+    record, lease_fd = _admit_process_owned_task(manager, "exec-old", target)
+    os.close(lease_fd)
+    with manager.locked():
+        state = manager._read_state()
+        state["state"] = "stopped"
+        manager._write_state(state)
+
+    with pytest.raises(BootstrapError, match="task_admission_closed"):
+        manager.admit_task("exec-next", target_root=target)
+
+    after = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert after["tasks"][record["id"]]["state"] == "active"
+    assert after["tasks"][record["id"]]["pinned"] is True
 
 
 def test_target_add_prunes_missing_target_and_is_idempotent(

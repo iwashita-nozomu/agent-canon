@@ -935,6 +935,7 @@ class DockerAdapter:
         timeout: int | None = None,
         environment: Mapping[str, str] | None = None,
         stdin: str | None = None,
+        pass_fds: Sequence[int] = (),
     ) -> subprocess.CompletedProcess[str]:
         """Run one allowlisted Docker argv and return its captured result."""
         if (
@@ -961,6 +962,7 @@ class DockerAdapter:
                 input=stdin,
                 env={**os.environ, **dict(environment or {})},
                 timeout=timeout or self.timeout,
+                pass_fds=tuple(pass_fds),
             )
         except subprocess.TimeoutExpired as exc:
             raise BootstrapError(
@@ -1242,6 +1244,7 @@ class DockerAdapter:
         environment: Mapping[str, str] | None = None,
         embedding_exchange: Path | None = None,
         embedding_allowed_endpoints: set[str] | None = None,
+        pass_fds: Sequence[int] = (),
     ) -> subprocess.CompletedProcess[str]:
         """Execute an argv list in the resident container."""
         if not argv or any(not isinstance(item, str) for item in argv):
@@ -1260,6 +1263,7 @@ class DockerAdapter:
                     capture_output=True,
                     text=True,
                     timeout=self.timeout,
+                    pass_fds=tuple(pass_fds),
                 )
             except subprocess.TimeoutExpired as exc:
                 raise BootstrapError(
@@ -1276,7 +1280,7 @@ class DockerAdapter:
             command.extend(("--env", f"{key}={value}"))
         command.extend((identifier, *argv))
         if embedding_exchange is None:
-            return self.run(command, check=False)
+            return self.run(command, check=False, pass_fds=pass_fds)
         self.commands.append(command)
         try:
             process = subprocess.Popen(
@@ -1285,6 +1289,7 @@ class DockerAdapter:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                pass_fds=tuple(pass_fds),
             )
         except OSError as exc:
             raise BootstrapError(
@@ -3676,14 +3681,95 @@ class BootstrapRuntime:
                     ) from exc
                 raise
 
+    def _task_process_lease_path(self, task_id: str) -> Path:
+        return self.paths.tasks / _slug(task_id) / "locks" / "process-lease.lock"
+
+    def _open_task_process_lease(
+        self, task_id: str, *, create: bool = False
+    ) -> int | None:
+        """Open and exclusively lock one task's process-owned lease file."""
+        path = self._task_process_lease_path(task_id)
+        if not create:
+            try:
+                _existing_no_symlink(path.parent, field="task process lease directory")
+            except BootstrapError as exc:
+                if exc.code == "path_missing":
+                    raise BootstrapError(
+                        "task_lease_missing", "process-owned task lease file is missing"
+                    ) from exc
+                raise
+        flags = os.O_RDWR | os.O_NOFOLLOW
+        if create:
+            flags |= os.O_CREAT | os.O_EXCL
+        try:
+            descriptor = os.open(path, flags, 0o600)
+        except FileNotFoundError as exc:
+            raise BootstrapError(
+                "task_lease_missing", "process-owned task lease file is missing"
+            ) from exc
+        except OSError as exc:
+            code = (
+                "task_lease_exists"
+                if exc.errno == errno.EEXIST
+                else "task_lease_invalid"
+            )
+            raise BootstrapError(
+                code, "cannot open process-owned task lease file"
+            ) from exc
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise BootstrapError(
+                    "task_lease_invalid",
+                    "process-owned task lease is not a regular file",
+                )
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(descriptor)
+            return None
+        except OSError as exc:
+            os.close(descriptor)
+            raise BootstrapError(
+                "task_lease_lock_failed", "cannot lock process-owned task lease"
+            ) from exc
+        except BootstrapError:
+            os.close(descriptor)
+            raise
+        return descriptor
+
+    def _reconcile_process_task_leases_locked(self, state: dict[str, Any]) -> None:
+        """Release only process-owned leases whose inherited lock has drained."""
+        tasks = state.get("tasks", {})
+        if not isinstance(tasks, dict):
+            raise BootstrapError("state_invalid", "task state is not an object")
+        for task_id, task in list(tasks.items()):
+            if (
+                not isinstance(task, dict)
+                or task.get("state") != "active"
+                or task.get("lease_kind") != "process"
+            ):
+                continue
+            lease_fd = self._open_task_process_lease(task_id)
+            if lease_fd is None:
+                continue
+            try:
+                self._release_task_locked(state, task_id, outcome="terminated")
+            finally:
+                os.close(lease_fd)
+
     def _admit_task_locked(
-        self, state: dict[str, Any], task_id: str, *, target_root: Path | None = None
-    ) -> dict[str, Any]:
+        self,
+        state: dict[str, Any],
+        task_id: str,
+        *,
+        target_root: Path | None = None,
+        process_owned: bool = False,
+    ) -> tuple[dict[str, Any], int | None]:
         task_id = _slug(task_id)
         if state.get("state") not in ADMISSION_STATES:
             raise BootstrapError(
                 "task_admission_closed", f"runtime state is {state.get('state')}"
             )
+        self._reconcile_process_task_leases_locked(state)
         if task_id in state.get("tasks", {}):
             raise BootstrapError(
                 "task_already_exists", f"task already exists: {task_id}"
@@ -3716,6 +3802,15 @@ class BootstrapRuntime:
         _ensure_directory(task_path)
         for child in ("tmp", "locks", "reports", "logs", "receipts"):
             _ensure_directory(task_path / child)
+        lease_fd = (
+            self._open_task_process_lease(task_id, create=True)
+            if process_owned
+            else None
+        )
+        if process_owned and lease_fd is None:
+            raise BootstrapError(
+                "task_lease_lock_failed", "cannot hold process-owned task lease"
+            )
         record = {
             "id": task_id,
             "state": "active",
@@ -3724,11 +3819,18 @@ class BootstrapRuntime:
             "started_at": _now(),
             "pinned": True,
         }
+        if process_owned:
+            record["lease_kind"] = "process"
         state.setdefault("tasks", {})[task_id] = record
         state["active_task_count"] = int(state.get("active_task_count", 0)) + 1
         state["state"] = "running"
-        self._write_state(state)
-        return record
+        try:
+            self._write_state(state)
+        except BaseException:
+            if lease_fd is not None:
+                os.close(lease_fd)
+            raise
+        return record, lease_fd
 
     def admit_task(
         self, task_id: str, *, target_root: Path | None = None
@@ -3737,7 +3839,15 @@ class BootstrapRuntime:
         with self.locked():
             state = self._read_state()
             before = state["state"]
-            record = self._admit_task_locked(state, task_id, target_root=target_root)
+            record, lease_fd = self._admit_task_locked(
+                state, task_id, target_root=target_root
+            )
+            if lease_fd is not None:
+                os.close(lease_fd)
+                raise BootstrapError(
+                    "task_lease_scope_invalid",
+                    "manual task admission cannot own a process lease",
+                )
             return self._result(
                 self._receipt(
                     "task_admit",
@@ -3776,7 +3886,24 @@ class BootstrapRuntime:
         with self.locked():
             state = self._read_state()
             before = state["state"]
-            task = self._release_task_locked(state, task_id, outcome=outcome)
+            task_record = state.get("tasks", {}).get(_slug(task_id))
+            lease_fd = None
+            if (
+                isinstance(task_record, dict)
+                and task_record.get("state") == "active"
+                and task_record.get("lease_kind") == "process"
+            ):
+                lease_fd = self._open_task_process_lease(task_id)
+                if lease_fd is None:
+                    raise BootstrapError(
+                        "task_process_active",
+                        "cannot release a process-owned task while its worker is live",
+                    )
+            try:
+                task = self._release_task_locked(state, task_id, outcome=outcome)
+            finally:
+                if lease_fd is not None:
+                    os.close(lease_fd)
             return self._result(
                 self._receipt(
                     "task_release",
@@ -4077,7 +4204,14 @@ class BootstrapRuntime:
                 _changed_source_paths(root) if mutation_before is not None else set()
             )
             task_id = f"exec-{secrets.token_hex(6)}"
-            self._admit_task_locked(state, task_id, target_root=root)
+            _, lease_fd = self._admit_task_locked(
+                state, task_id, target_root=root, process_owned=True
+            )
+            if lease_fd is None:
+                raise BootstrapError(
+                    "task_lease_scope_invalid",
+                    "exec admission did not return its process lease",
+                )
             try:
                 c = (
                     {"id": os.environ.get("AGENT_CANON_CONTAINER_ID")}
@@ -4119,6 +4253,8 @@ class BootstrapRuntime:
                         ).split(",")
                         if value.strip()
                     },
+                    # The worker keeps the reservation locked if this controller dies.
+                    pass_fds=(lease_fd,),
                 )
                 task_path = self.paths.tasks / task_id
                 io = _io_evidence(
@@ -4199,7 +4335,10 @@ class BootstrapRuntime:
                     )
                 )
             finally:
-                self._release_task_locked(state, task_id)
+                try:
+                    self._release_task_locked(state, task_id)
+                finally:
+                    os.close(lease_fd)
 
     def tool_run(
         self,
@@ -4373,7 +4512,13 @@ class BootstrapRuntime:
                 raise BootstrapError(
                     "eval_target_not_read_only", "eval root is not mounted read-only"
                 )
-            self._admit_task_locked(state, task_id, target_root=source)
+            _, lease_fd = self._admit_task_locked(state, task_id, target_root=source)
+            if lease_fd is not None:
+                os.close(lease_fd)
+                raise BootstrapError(
+                    "task_lease_scope_invalid",
+                    "eval admission cannot own an exec process lease",
+                )
             task_path = self.paths.tasks / task_id
             try:
                 _ensure_directory(spool)
