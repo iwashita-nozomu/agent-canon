@@ -749,6 +749,7 @@ def test_process_lease_survives_controller_death_until_worker_exits(
         args=(manager, task_id, target, ready_file),
     )
     worker_pid: int | None = None
+    worker_stop_sent = False
     next_task_admitted = False
 
     def ready_worker_pid() -> int | None:
@@ -788,7 +789,11 @@ def test_process_lease_survives_controller_death_until_worker_exits(
         assert state["tasks"][task_id]["state"] == "active"
         assert state["tasks"][task_id]["pinned"] is True
 
-        os.kill(worker_pid, signal.SIGTERM)
+        try:
+            os.kill(worker_pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        worker_stop_sent = True
         deadline = time.monotonic() + 5
         while True:
             try:
@@ -820,11 +825,13 @@ def test_process_lease_survives_controller_death_until_worker_exits(
             if controller_pid is not None:
                 os.kill(controller_pid, signal.SIGKILL)
             controller.join(timeout=5)
-        if worker_pid is not None:
+        if worker_pid is not None and not worker_stop_sent:
             try:
                 os.kill(worker_pid, signal.SIGTERM)
             except ProcessLookupError:
                 pass
+            worker_stop_sent = True
+        if worker_pid is not None:
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
                 lease_fd = manager._open_task_process_lease(task_id)
