@@ -573,9 +573,10 @@ consumer of the target command/path contract.
 
 ### PR #468 changed-path closure and readback
 
-The review baseline is commit `3042f159ac0333463fc7430e1cdfc617b05c81a0`; the table below closes
-all 19 paths changed by that commit. Each row records an exact forward edge from a design clause to
-the projection section and an exact reverse edge from that projection to its evidence/readback.
+The review baseline is commit `3042f159ac0333463fc7430e1cdfc617b05c81a0`; the table below records
+the still-active consumer mappings for that 19-path change. Each row records an exact forward edge
+from a design clause to the projection section and an exact reverse edge from that projection to its
+evidence/readback.
 
 | exact changed path | forward: design clause → projection section/ref | reverse: projection section/ref → evidence/readback and design ref |
 | --- | --- | --- |
@@ -597,7 +598,6 @@ the projection section and an exact reverse edge from that projection to its evi
 | `documents/tools/README.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#Tool Detail Notes` C++ OOP command block | `cpp/include cpp/src tests/cpp cpp/experiments` command → tool inventory/readability evidence, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
 | `documents/tools/oop/cpp/readability.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#実行例` | C++ OOP scan paths and build-evidence boundary → readability command/readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
 | `tools/validation/documentation/formatting/render_runtime_profile_inventory.py` | `D-VALIDATION` → `DEPENDENCY_HEADER`, `render_validation_failure_response`, `bridge_inventory_to_markdown` | JSON-to-Markdown generator output → `render_runtime_profile_inventory.py --check`, `RDC-RUNTIME-MATRIX` |
-| `tools/validation/code/static/cpp/README.md` | `D-PROJECT-ROOT`, `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-VALIDATION` → `#Default command` and native project evidence paragraph | readability plus configure/build/CTest/install/target evidence → static-analysis readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
 
 The review repair adds two route-owner rows without replacing any of the 19 baseline rows:
 

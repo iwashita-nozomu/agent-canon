@@ -42,6 +42,11 @@ execution-route decisions. Public Skill identity and prerequisites come from the
 deliverable or unresolved owner decision; an available candidate is not an
 activation.
 
+When task routing activates mathematical intent, the
+[computational-optimization](computational-optimization.md) Skill owns the
+packet schema and numerical scope; this guide routes to that owner without
+duplicating its fields.
+
 Use bounded_fast_path when scope and contract are resolved, there is one root,
 owner, and writer, and no dependency, collision, publication, or resumption need
 requires coordination. Otherwise follow the catalog's coordination route. Task

@@ -1,7 +1,8 @@
 # The standalone image is built with the repository root as context:
 #   docker build -f bootstrap/container/image/Dockerfile .
 # Keep the context deny-by-default while explicitly exposing every Dockerfile
-# COPY source.  In particular, do not rely on the removed .devcontainer tree.
+# COPY source. The disposable live-regression image needs only the bootstrap
+# entrypoint and its fixture; never rely on the removed .devcontainer tree.
 **
 !AGENTS.md
 !ROOT_AGENTS.md
@@ -14,10 +15,16 @@
 .codex/personal/
 .codex/personal/**
 !bootstrap/
+!bootstrap.sh
 !bootstrap/container/
 !bootstrap/container/**
 !bootstrap/host/
 !bootstrap/host/manifest.toml
+!tests/
+!tests/bootstrap/
+!tests/bootstrap/conftest.py
+!tests/bootstrap/docker.sh
+!tests/bootstrap/test_live_projection_authority.py
 !agents/
 !agents/**
 !documents/

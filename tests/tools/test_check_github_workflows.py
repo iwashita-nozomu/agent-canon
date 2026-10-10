@@ -62,7 +62,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - run: echo standalone
@@ -76,6 +76,8 @@ def test_standalone_repository_passes() -> None:
         write_workflow(root, VALID_WORKFLOW)
         result = run_checker(root)
         assert result.returncode == 0, result.stdout + result.stderr
+        assert "GITHUB_WORKFLOW_TOOL_EXIT=actionlint code=0" in result.stdout
+        assert "GITHUB_WORKFLOW_TOOL_EXIT=zizmor code=0" in result.stdout
         assert "GITHUB_WORKFLOWS=pass" in result.stdout
 
 
@@ -92,17 +94,40 @@ def test_checker_only_scans_standalone_workflows() -> None:
         assert "GITHUB_WORKFLOWS_CHECKED=1" in result.stdout
 
 
-def test_invalid_checkout_settings_fail() -> None:
+def test_native_actionlint_failure_is_visible() -> None:
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         copy_required_surfaces(root)
-        write_workflow(
-            root,
-            VALID_WORKFLOW.replace("persist-credentials: false", "persist-credentials: true"),
-        )
+        write_workflow(root, "name: Broken\njobs: [\n")
         result = run_checker(root)
         assert result.returncode != 0
-        assert "checkout_1_missing_persist_credentials_false" in result.stdout
+        output = result.stdout + result.stderr
+        assert "GITHUB_WORKFLOW_TOOL_EXIT=actionlint code=" in output
+        assert "GITHUB_WORKFLOW_TOOL_EXIT=actionlint code=0" not in output
+        assert "GITHUB_WORKFLOWS=fail" in output
+
+
+def test_native_zizmor_rejects_default_checkout_credentials_in_artifact() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        copy_required_surfaces(root)
+        vulnerable_workflow = VALID_WORKFLOW.replace(
+            "        with:\n          persist-credentials: false\n", ""
+        ).replace(
+            "      - run: echo standalone\n",
+            "      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2\n"
+            "        with:\n"
+            "          name: checkout-git-config\n"
+            "          path: .\n"
+            "          include-hidden-files: true\n",
+        )
+        write_workflow(root, vulnerable_workflow)
+        result = run_checker(root)
+        output = result.stdout + result.stderr
+        assert result.returncode != 0, f"checker args={result.args!r}\n{output}"
+        assert "artipacked" in output
+        assert "GITHUB_WORKFLOW_TOOL_EXIT=zizmor code=" in output
+        assert "GITHUB_WORKFLOW_TOOL_EXIT=zizmor code=0" not in output
 
 
 def test_static_gate_uses_bootstrap_container_units() -> None:

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Runs one-shot LSP 3.17 code analysis and emits deterministic code facts.
+# responsibility Owns bounded LSP file discovery, language mapping, one-shot analysis, and deterministic code facts.
 # upstream design ../../../documents/structured-analysis/code-analysis.md code-analysis boundary
 # upstream design ../../../documents/tools/lsp_code_analysis.md LSP adapter contract
-# upstream implementation ../search/vector_search.py owns bounded LSP discovery and language mapping
+# upstream implementation ../../runtime/authority/tool_path_policy.py filters retired tool paths
 # downstream implementation ../../../tests/agent_tools/test_lsp_code_analysis.py verifies protocol and report behavior
 # downstream implementation ../search/search.py consumes in-memory code-deps facts
 # @dependency-end
@@ -37,7 +37,7 @@ from typing import Any
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from tools.analysis.search import vector_search
+from tools.runtime.authority.tool_path_policy import is_retired_legacy_tool_path
 from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactError,
     runtime_artifact_boundary,
@@ -53,6 +53,35 @@ IMAGE_RECEIPT_ROOT = Path(
     "/usr/local/share/agent-canon/image-dependencies/receipts"
 )
 IMAGE_MANIFEST_ROOT = Path("/usr/local/share/agent-canon/runtime")
+LSP_DEFAULT_SURFACES = (
+    "tools",
+    "agents",
+    ".agents",
+    ".codex",
+    "documents",
+    "mcp",
+    "python",
+    "src",
+    "include",
+    "tests",
+)
+LSP_EXCLUDED_PARTS = frozenset(
+    {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "build",
+        "dist",
+        "legacy",
+        "node_modules",
+        "reports",
+        "vendor",
+        "workspace",
+    }
+)
 
 
 class LspAnalysisError(RuntimeError):
@@ -754,7 +783,35 @@ class LspProcessSession:
 
 def language_for_path(path: Path) -> str | None:
     """Map a source suffix to its manifest language identifier."""
-    return vector_search.language_for_path(path)
+    suffix = path.suffix.lower()
+    if suffix in {".py", ".pyi"}:
+        return "python"
+    if suffix == ".c":
+        return "c"
+    if suffix in {".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}:
+        return "cpp"
+    if suffix in {".sh", ".bash", ".zsh"}:
+        return "shellscript"
+    if suffix == ".rs":
+        return "rust"
+    return None
+
+
+def matches_exclude(relative: str, excludes: Sequence[str]) -> bool:
+    """Return whether a relative path matches a caller-supplied exclusion."""
+    parts = set(Path(relative).parts)
+    for raw_exclude in excludes:
+        exclude = raw_exclude.strip("/")
+        if not exclude:
+            continue
+        if (
+            relative == exclude
+            or relative.startswith(f"{exclude}/")
+            or exclude in parts
+            or Path(relative).match(exclude)
+        ):
+            return True
+    return False
 
 
 def _contains_symlink(path: Path, root: Path) -> bool:
@@ -773,6 +830,74 @@ def _contains_symlink(path: Path, root: Path) -> bool:
         if current.is_symlink():
             return True
     return False
+
+
+def discover_lsp_files(
+    root: Path,
+    requested_files: Sequence[str] = (),
+    excludes: Sequence[str] = (),
+) -> tuple[Path, ...]:
+    """Discover bounded, non-symlink source files for canonical LSP analysis."""
+    root = root.resolve()
+    surfaces = tuple(requested_files) or LSP_DEFAULT_SURFACES
+    discovered: dict[str, Path] = {}
+
+    def relative_safe(path: Path) -> str | None:
+        try:
+            return path.resolve(strict=False).relative_to(root).as_posix()
+        except ValueError:
+            return None
+
+    def accepted(path: Path) -> bool:
+        if _contains_symlink(path, root) or path.is_symlink() or not path.is_file():
+            return False
+        relative = relative_safe(path)
+        if relative is None or language_for_path(path) is None:
+            return False
+        if set(Path(relative).parts) & LSP_EXCLUDED_PARTS:
+            return False
+        if is_retired_legacy_tool_path(relative):
+            return False
+        return not matches_exclude(relative, excludes)
+
+    def walk_surface(surface: Path) -> None:
+        if _contains_symlink(surface, root) or surface.is_symlink():
+            return
+        if surface.is_file():
+            if accepted(surface):
+                relative = relative_safe(surface)
+                if relative is not None:
+                    discovered[relative] = surface
+            return
+        if not surface.is_dir() or relative_safe(surface) is None:
+            return
+        for current_root, dirnames, filenames in os.walk(surface, followlinks=False):
+            current = Path(current_root)
+            kept_dirs: list[str] = []
+            for dirname in sorted(dirnames):
+                candidate = current / dirname
+                relative = relative_safe(candidate)
+                if (
+                    candidate.is_symlink()
+                    or relative is None
+                    or set(Path(relative).parts) & LSP_EXCLUDED_PARTS
+                    or is_retired_legacy_tool_path(relative)
+                    or matches_exclude(relative, excludes)
+                ):
+                    continue
+                kept_dirs.append(dirname)
+            dirnames[:] = kept_dirs
+            for filename in sorted(filenames):
+                candidate = current / filename
+                if accepted(candidate):
+                    relative = relative_safe(candidate)
+                    if relative is not None:
+                        discovered[relative] = candidate
+
+    for raw_surface in surfaces:
+        surface = Path(raw_surface)
+        walk_surface(surface if surface.is_absolute() else root / surface)
+    return tuple(discovered[key] for key in sorted(discovered))
 
 
 def _symbol_from(raw: Mapping[str, Any], uri: str) -> CodeSymbol:
@@ -1313,7 +1438,7 @@ def _parse_server_specs(values: Sequence[str]) -> dict[str, LspServerSpec]:
 def _files_from_args(root: Path, values: Sequence[str] | None) -> list[Path]:
     if values is not None:
         return [Path(value) for value in values]
-    return list(vector_search.discover_lsp_files(root))
+    return list(discover_lsp_files(root))
 
 
 def _legacy_lines(report: CodeAnalysisReport, root: Path, *, print_unresolved: bool = False) -> list[str]:
@@ -1434,7 +1559,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             changed = subprocess.run(["git", "diff", "--name-only", "HEAD", "--"], cwd=root, check=False, capture_output=True, text=True).stdout.splitlines()
             untracked = subprocess.run(["git", "ls-files", "--others", "--exclude-standard"], cwd=root, check=False, capture_output=True, text=True).stdout.splitlines()
             candidates = tuple(value for value in [*changed, *untracked] if value)
-            files = list(vector_search.discover_lsp_files(root, candidates)) if candidates else []
+            files = list(discover_lsp_files(root, candidates)) if candidates else []
         except OSError:
             files = []
     else:

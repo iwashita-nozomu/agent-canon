@@ -19,9 +19,7 @@
     "build": true,
     "logs": true
   },
-  "clangd.arguments": [
-    "--compile-commands-dir=${workspaceFolder}/build/cpp/dev"
-  ],
+  "cmake.copyCompileCommands": "${workspaceFolder}/compile_commands.json",
   "clangd.path": "clangd",
   "clang-format.executable": "clang-format",
   "[c]": {

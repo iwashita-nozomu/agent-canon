@@ -56,7 +56,6 @@ if __package__ in {None, ""}:
 from tools.experiments.execution.execution_resource_plan import (
     CALLER_ALLOCATION_PROVENANCE,
     COMPLETION_COVERAGE_FILENAME,
-    HOST_RUNTIME_ROOT,
     AdmittedEnvironment,
     CompletionCoverageAdapter,
     ConcurrentRunEvidence,
@@ -82,8 +81,7 @@ from tools.experiments.execution.execution_resource_plan import (
     ResourcePlanError,
     ResourceRequest,
     RunGpuAdmissionReceipt,
-    RuntimeIdentityReader,
-    RuntimeIdentityReceipt,
+    RuntimeRoute,
     SourceFreezeOwner,
     TypedPreflightFailure,
     UuidVisibilityEvidence,
@@ -93,8 +91,6 @@ from tools.experiments.execution.execution_resource_plan import (
     build_source_path_set,
     freeze_resource_plan,
     managed_run_adapter_integration_contract,
-    read_shared_runtime_provision,
-    read_shared_runtime_readback,
 )
 from tools.experiments.lifecycle.experiment_identity import (
     ExperimentIdentity,
@@ -384,18 +380,18 @@ def _lifecycle_quiescence_is_proven(
 
 def build_admitted_environment(
     plan: ExecutionResourcePlan,
-    runtime_identity: RuntimeIdentityReceipt,
+    runtime_route: RuntimeRoute | None,
     *,
     admission_fingerprint: str | None,
 ) -> AdmittedEnvironment:
     """Build the exact UUID environment only after plan freeze and admission."""
-    if runtime_identity.runtime_route != "MANAGED_CONTAINER":
+    selected = tuple(plan.gpu_allocation.selected_ids)
+    if selected and runtime_route != "MANAGED_CONTAINER":
         raise TypedPreflightFailure(
             "runtime_identity_route_invalid",
-            "managed admission requires the managed-container runtime identity",
-            runtime_route=runtime_identity.runtime_route,
+            "managed GPU admission requires the selected managed-container runtime route",
+            runtime_route=runtime_route,
         )
-    selected = tuple(plan.gpu_allocation.selected_ids)
     bound_fingerprint = admission_fingerprint
     if selected and (not isinstance(bound_fingerprint, str) or not bound_fingerprint):
         raise TypedPreflightFailure(
@@ -2729,7 +2725,7 @@ def _resource_request_for_managed_run(
         lock_root=Path(lock_root_value),
         lock_namespace_shared_across_schedulers=True,
         lock_namespace_host_safe=True,
-        lock_namespace_visibility_witness="shared-runtime-receipt",
+        lock_namespace_visibility_witness="container-local-shared-lock",
     )
 
 
@@ -2802,7 +2798,10 @@ def execute_managed_run(
     )
     admission_context = RunGpuAdmissionContext.create(source_request)
     source_freeze = None
-    runtime_identity = None
+    runtime_route: RuntimeRoute | None = None
+    runtime_namespace_id = ""
+    runtime_identity_fingerprint = ""
+    namespace_inode = 0
     admission: RunGpuAdmissionReceipt | None = None
     frozen_plan = None
     admitted_environment = None
@@ -2832,34 +2831,25 @@ def execute_managed_run(
             source_freeze = source_owner.freeze(source_request)
             admission_context.register_release(source_owner.close)
 
-            runtime_root = os.environ.get(
-                "AGENT_CANON_SHARED_RUNTIME_SOURCE",
-                HOST_RUNTIME_ROOT,
-            )
-            if runtime_root != HOST_RUNTIME_ROOT:
-                raise TypedPreflightFailure(
-                    "runtime_identity_path_mismatch",
-                    "managed execution requires the exact shared runtime root",
-                    runtime_root=runtime_root,
+            if request.gpu_requested_count:
+                observed_runtime_route = request.environment.get(
+                    "AGENT_CANON_RUNTIME_ROUTE"
                 )
-            expected_provision_path = (
-                f"{HOST_RUNTIME_ROOT}/shared-runtime-provision.json"
-            )
-            provision_path = os.environ.get(
-                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
-                expected_provision_path,
-            )
-            if provision_path != expected_provision_path:
-                raise TypedPreflightFailure(
-                    "runtime_identity_path_mismatch",
-                    "managed execution requires the exact provision receipt path",
-                    provision_path=provision_path,
+                if observed_runtime_route != "MANAGED_CONTAINER":
+                    raise TypedPreflightFailure(
+                        "runtime_identity_route_invalid",
+                        "managed GPU admission requires the selected project runtime route",
+                        runtime_route=observed_runtime_route,
+                    )
+                runtime_route = cast(RuntimeRoute, observed_runtime_route)
+                namespace_inode = os.stat("/proc/self/ns/pid").st_ino
+                runtime_namespace_id = f"pid:[{namespace_inode}]"
+                runtime_identity_fingerprint = _r5_evidence_fingerprint(
+                    {
+                        "runtime_route": runtime_route,
+                        "namespace_id": runtime_namespace_id,
+                    }
                 )
-            provision = read_shared_runtime_provision(provision_path)
-            readback = read_shared_runtime_readback(
-                f"{HOST_RUNTIME_ROOT}/shared-runtime-readback.json"
-            )
-            runtime_identity = RuntimeIdentityReader().read(provision, readback)
 
             probe = NvidiaSMIResourceProbe.discover(
                 request.environment,
@@ -2875,7 +2865,6 @@ def execute_managed_run(
                         "gpu_inventory_unproven",
                         "GPU admission requires the strict NVIDIA inventory owner output",
                     )
-                namespace_inode = os.stat("/proc/self/ns/pid").st_ino
                 occupancy_initial = GpuProcessOccupancyProbe(
                     inventory=inventory,
                     namespace_inode=namespace_inode,
@@ -3143,7 +3132,7 @@ def execute_managed_run(
                         ).encode("utf-8")
                     ).hexdigest(),
                     reservation_fingerprint=allocation.readback_fingerprint,
-                    runtime_identity_fingerprint=runtime_identity.readback_fingerprint,
+                    runtime_identity_fingerprint=runtime_identity_fingerprint,
                     lock_readback=coverage_lock_readback,
                     actual_gpu_processes=coverage_processes,
                     concurrent_run_evidence=coverage_concurrent,
@@ -3201,7 +3190,7 @@ def execute_managed_run(
             coverage_attempted.add("effective_environment")
             admitted_environment = build_admitted_environment(
                 frozen_plan,
-                runtime_identity,
+                runtime_route,
                 admission_fingerprint=(
                     admission.admission_fingerprint if admission is not None else None
                 ),
@@ -3215,15 +3204,15 @@ def execute_managed_run(
                     nvidia_visible_devices=admitted_environment.nvidia_visible_devices,
                     disposition="explicit",
                     visible_uuids=tuple(allocation.selected_ids),
-                    namespace_id=f"pid:[{runtime_identity.namespace_inode}]",
-                    provision_receipt_fingerprint=runtime_identity.provision_fingerprint,
+                    namespace_id=runtime_namespace_id,
+                    runtime_identity_fingerprint=runtime_identity_fingerprint,
                     fingerprint=_r5_evidence_fingerprint(
                         {
                             "cuda": exact_visible,
                             "nvidia": admitted_environment.nvidia_visible_devices,
                             "visible_uuids": allocation.selected_ids,
-                            "namespace_id": f"pid:[{runtime_identity.namespace_inode}]",
-                            "provision_receipt_fingerprint": runtime_identity.provision_fingerprint,
+                            "namespace_id": runtime_namespace_id,
+                            "runtime_identity_fingerprint": runtime_identity_fingerprint,
                         }
                     ),
                 )
@@ -3322,7 +3311,6 @@ def execute_managed_run(
         planned_chunk_ids=request.requested_chunks,
         admission=admission,
         source_freeze=source_freeze,
-        runtime_identity=runtime_identity,
         runner_lifecycle=runner_lifecycle,
         primary_failure=primary_failure,
         secondary_failures=secondary_failures,
@@ -3369,7 +3357,6 @@ def execute_managed_run(
             outcome,
             admission,
             source_freeze,
-            runtime_identity,
             absence_dispositions,
         )
     )

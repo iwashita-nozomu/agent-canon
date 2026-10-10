@@ -32,7 +32,7 @@ jobs:
       AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # Preserve the candidate history while staging its local source clone.
           fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
@@ -80,7 +80,7 @@ jobs:
           echo "guide_path=${guide_path}" >> "$GITHUB_OUTPUT"
 
       - name: Upload improvement guide
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: agent-improvement-guide-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.guide.outputs.guide_path }}

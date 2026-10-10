@@ -49,6 +49,33 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         self.assertNotIn('mkdir -p "${report_dir}"', text)
         self.assertIn("--output-mode 644", text)
 
+    def test_candidate_runtime_and_cleanup_remain_source_isolated(self) -> None:
+        """Runtime setup and cleanup must operate on the staged PR candidate."""
+        text = WORKFLOW.read_text(encoding="utf-8")
+        bootstrap_lines = [
+            line.strip() for line in text.splitlines() if "bootstrap.sh" in line
+        ]
+        self.assertTrue(bootstrap_lines)
+        self.assertTrue(
+            all(
+                line.startswith('"${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh"')
+                for line in bootstrap_lines
+            )
+        )
+        self.assertFalse(
+            any(line.startswith("./bootstrap.sh") for line in bootstrap_lines)
+        )
+        self.assertTrue(any(line.endswith(" install") for line in bootstrap_lines))
+        self.assertFalse(any(line.endswith(" update") for line in bootstrap_lines))
+        self.assertTrue(any(line.endswith(" start") for line in bootstrap_lines))
+        self.assertTrue(any(" target add " in line for line in bootstrap_lines))
+        self.assertFalse(any("--runtime-root" in line for line in bootstrap_lines))
+        self.assertIn(
+            'rm -rf -- "${AGENT_CANON_CANDIDATE_BARE:-}" '
+            '"${AGENT_CANON_CANDIDATE_SOURCE:-}"',
+            text,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

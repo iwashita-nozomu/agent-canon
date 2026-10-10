@@ -11,7 +11,7 @@ downstream implementation ../../tools/analysis/dependencies/graph_client.py expo
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs owns the explicit graph-analysis source snapshot parser
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates canonical source manifests
 downstream implementation ../../tools/validation/semantic/tools/tool_drift.py consumes source-derived dependency facts
-downstream implementation ../../tools/analysis/search/vector_search.py consumes source-derived dependency facts
+downstream implementation ../../tools/analysis/search/search.py routes selected dependency requests through the source graph owner
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh owns source review and opt-in graph preparation
 downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py verifies source projection invariants
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies source header regression coverage

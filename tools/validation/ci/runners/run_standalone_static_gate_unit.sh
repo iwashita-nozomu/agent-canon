@@ -169,7 +169,6 @@ run_contracts() {
     tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_dependency_headers \
     tests.agent_tools.test_tool_drift \
-    tests.agent_tools.test_vector_search \
     tests/agent_tools/test_dependency_*.py
   python3 -m pytest -p no:cacheprovider \
     tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
@@ -251,7 +250,9 @@ run_eval() (
 run_workflow_container() {
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_standalone_static_gate_units.py \
-    tests/tools/test_read_only_full_check.py
+    tests/tools/test_read_only_full_check.py \
+    tests/tools/test_check_github_workflows.py \
+    tests/tools/test_agent_improvement_guide_workflow.py
   python3 "${ROOT}/tools/validation/ci/checks/check_github_workflows.py"
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \

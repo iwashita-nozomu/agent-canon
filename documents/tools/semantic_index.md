@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents the semantic-index candidate-generation tool and Eval harness.
-upstream design search-coordination.md coordinated search provider boundary
+upstream design search-coordination.md native search provider selection and result boundary
 upstream design ../design/rust-agent-tool-migration.md Rust CLI migration policy
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs implements the Rust semantic-index CLI
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs routes the semantic-index command
@@ -42,8 +42,9 @@ generation boundaries so search output is not mistaken for edit authority.
   candidate evidence. It does not replace source ownership, dependency-header
   closure, exact symbol search, static analysis, tests, or review judgement.
 - Parent-doc alignment:
-  The coordinated-search document owns provider order. This document owns the
-  semantic-index cache and context-pack evidence contract.
+  The repository-search document owns explicit provider selection and keeps
+  results separate. This document owns the semantic-index cache, native ranking,
+  and context-pack evidence contract.
 
 ## Generated Cache
 

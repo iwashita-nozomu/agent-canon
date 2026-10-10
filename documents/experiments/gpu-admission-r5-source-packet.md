@@ -24,57 +24,39 @@ handshake の実装正本です。AgentCanon の managed-run 実装は親の
 generic runner lifecycle は外部 CLI が所有し、AgentCanon は request/result artifact、
 admission、検証、terminal evidence、closeout の境界だけを所有します。
 
-hooks/resource projection の public schema はこの packet の変更対象ではありません。
-`pstree` は capability detection と bounded diagnostic に限り、proc が完全なら
-`pstree` 不在でも admission を継続します。
+Hook wrapper schema と plan artifact schema はこの packet の変更対象ではありません。
+PostToolUse GPU projection は `execution-resource-plan-projection/v2` とし、admission
+field を `runtime_identity_fingerprint` に改名します。`pstree` は capability detection と
+bounded diagnostic に限り、proc が完全なら `pstree` 不在でも admission を継続します。
 
 ## Default devcontainer boundary
 
 この packet は GPU admission 実験を実行する場合の source authority であり、
 既定 devcontainer の起動要件ではない。default profile は host `sudo`、system
-group、shared lock、`/var/lib/agent-canon/runtime` の bind、provision/readback
-receipt、GPU auto-request を選択しない。`finalize-shared-runtime.sh`、scheduler、
-managed experiment、receipt owner は AgentCanon source に保持し、GPU capability と
-host runtime provisioning は
+group、GPU reservation lock、GPU runtime route、GPU auto-request を選択しない。
+GPU capability と project runtime provisioning は
 `.devcontainer/gpu-admission/devcontainer.json` と `.devcontainer/gpu-admission.sh`
 の明示 selector/entrypoint からだけ選択する。
 
 ## Devcontainer GPU-admission profile composition
 
 Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) の opt-in owner は
-`.devcontainer/gpu-admission.sh` です。entrypoint は `devcontainer` CLI と
-`nvidia-smi -L` を先に確認し、`${repository_root}/.agent-canon/runtime` を primary
-UID/GID の provenance を記録する source として作成して provision receipt を発行し、
-profile selector の generator に渡します。profile Compose は host source を container の
-`/var/lib/agent-canon/runtime` target に bind し、primary `PROJECT_UID:PROJECT_GID` を
-維持して `gpus: all`、`DEVCONTAINER_GPU_MODE=enabled`、
-`DEVCONTAINER_GPU_REQUEST=all`、`AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER` を出力
-します。default selector はこれらの fields、host path、GPU probe、receipt に依存しません。
+`.devcontainer/gpu-admission.sh` です。profile は project の GPU runtime を選択し、
+`gpus: all`、`DEVCONTAINER_GPU_MODE=enabled`、`DEVCONTAINER_GPU_REQUEST=all` と
+`AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER` を出力します。default selector はこれらの
+fields、GPU probe、managed GPU admission に依存しません。
 
-profile output は `.agent-canon/gpu-admission-compose.generated.yml`、Compose project
-identity は `-gpu-admission` suffix とし、default container/project を profile 起動で
-再利用しません。`devcontainer up` が成功した後だけ entrypoint が
-同じ profile `--config` の `devcontainer exec` と source-root resolver で
-`finalize-shared-runtime.sh` を実行します。provision、Compose generation、up、finalize
-のいずれかが失敗した場合は default へ降格せず non-zero で停止します。provision/Compose generation/up/finalize
-failure は検証済み profile Compose/project だけを cleanup し、cleanup 結果と独立に元の
-rc を保持します。finalize の provision/readback parse と atomic publication は
-`tools/experiments/execution/execution_resource_plan.py` が唯一の owner です。RDC-003 の bind
-acceptance は `finalize-shared-runtime.sh` が container-side target で
-create/write/read/remove を証明できることとし、host-visible owner、host-vs-container
-UID/GID、inode owner の exact equality を oracle にしません。`host_uid`/`host_gid`/
-`host_supplementary_gids` と `container_uid`/`container_gid`/
-`container_supplementary_gids` は typed provenance/observation fields として receipt に
-残します。
+managed run は GPU request の場合だけ `AGENT_CANON_RUNTIME_ROUTE` を確認し、現在の
+`/proc/self/ns/pid` を process observation の namespace として使います。route と namespace
+から作る fingerprint は選択された route と現在の process namespace を識別するだけで、
+host-side PID translation や host process inventory の完全性を証明しません。PID/UUID join
+または inventory が不明なら既存の `UNKNOWN` disposition を維持し、選択候補にしません。
+CPU-only managed run は GPU runtime route を要求しません。
 
-この mapping-neutral 緩和は route/path、repository-local source と canonical target、
-symlink/type/mode、source/target device/inode、open-fd/path race、mount namespace と
-mount id/root、closed probe、schema/fingerprint、receipt lock、atomic publication、
-within-side group shape、UID non-zero/GID numeric の gate を弱めません。特に
-`tools/experiments/execution/execution_resource_plan.py` の `read_shared_runtime_provision`、
-`read_shared_runtime_readback`、`RuntimeIdentityReader.read` は receipt-file-owner と
-host/container numeric identity の mapping-sensitive equality だけを acceptance gate から
-外し、他の typed and fingerprinted evidence を保持します。
+GPU reservation は選択された project runtime 内の `/var/lib/agent-canon/runtime/locks`
+を使います。これは AgentCanon bootstrap tool runtime の `.runtime` とは別の所有境界です。
+managed run は未生成の shared-runtime provision/readback file を読みません。GPU UUID lock、
+lock-held fresh readback、quiescence、terminal coverage の acceptance 条件は変更しません。
 
 default 境界の authority は linked design/implementation であり、default 経路からの
 非選択は実験機能の wholesale deletion や R5 の runner/lifecycle semantics の変更を
