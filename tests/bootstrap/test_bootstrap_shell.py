@@ -3541,8 +3541,8 @@ def test_public_exec_stops_when_existing_resident_host_input_import_fails(
         "  while (($#)); do\n"
         '    if [[ "$1" == --env && $# -ge 2 ]]; then\n'
         '      case "$2" in\n'
-        '        AGENT_CANON_COPY_DIRECTION=*) direction=${2#*=} ;;\n'
-        '        AGENT_CANON_COPY_KIND=*) kind=${2#*=} ;;\n'
+        "        AGENT_CANON_COPY_DIRECTION=*) direction=${2#*=} ;;\n"
+        "        AGENT_CANON_COPY_KIND=*) kind=${2#*=} ;;\n"
         "      esac\n"
         "      shift 2\n"
         "    else\n"
