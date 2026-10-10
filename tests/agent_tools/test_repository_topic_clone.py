@@ -2441,6 +2441,46 @@ def test_cleanup_accepts_identity_complete_legacy_module_markers_read_only(
     assert not request.clone.exists()
 
 
+def test_cleanup_rejects_legacy_namespace_with_only_retired_digest(
+    tmp_path: Path,
+) -> None:
+    """A legacy namespace with no retained identity fields remains incomplete."""
+    _, remote_url = init_remote(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url,
+        "repo-legacy-partial",
+        workspace,
+        "topic-legacy-partial",
+        "feature/cleanup",
+        checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+    install_legacy_module_markers(request.clone, request.request)
+    for field in rtc.LEGACY_MARKER_FIELDS:
+        run_git(
+            request.clone,
+            "config",
+            "--local",
+            "--unset-all",
+            f"{rtc.LEGACY_MARKER_PREFIX}.{field}",
+        )
+    run_git(
+        request.clone,
+        "config",
+        "--local",
+        f"{rtc.LEGACY_MARKER_PREFIX}.owner-evidence-sha256",
+        "stale-from-older-marker",
+    )
+
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError, match="legacy-marker-incomplete"
+    ):
+        rtc.cleanup(request.request, apply=False)
+
+
 def test_cleanup_rejects_partial_or_mismatched_legacy_module_markers(
     tmp_path: Path,
 ) -> None:
@@ -2457,21 +2497,15 @@ def test_cleanup_rejects_partial_or_mismatched_legacy_module_markers(
         "feature/cleanup",
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
-    install_legacy_module_markers(
-        request.clone, request.request, role="unknown"
-    )
+    install_legacy_module_markers(request.clone, request.request, role="unknown")
     with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
         rtc.cleanup(request.request, apply=False)
 
-    install_legacy_module_markers(
-        request.clone, request.request, placement="unknown"
-    )
+    install_legacy_module_markers(request.clone, request.request, placement="unknown")
     with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
         rtc.cleanup(request.request, apply=False)
 
-    install_legacy_module_markers(
-        request.clone, request.request, module="vendor/other"
-    )
+    install_legacy_module_markers(request.clone, request.request, module="vendor/other")
     with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
         rtc.cleanup(request.request, apply=False)
 

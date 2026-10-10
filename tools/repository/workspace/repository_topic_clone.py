@@ -724,7 +724,12 @@ def _inspect(
             LEGACY_MARKER_FIELDS,
             checkout_mode=request.checkout_mode,
         )
-        if any(legacy.values()):
+        legacy_present = any(legacy.values()) or _marker_namespace_present(
+            path,
+            LEGACY_MARKER_PREFIX,
+            checkout_mode=request.checkout_mode,
+        )
+        if legacy_present:
             if request.checkout_mode == CHECKOUT_MODE_LINKED:
                 return CloneState(path, "repository-mismatch")
             if not all(legacy.values()):
