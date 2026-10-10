@@ -24,13 +24,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import TypedDict
 
-from tools.repository.workspace.workspace_scope import resolve_report_root, resolve_runtime_artifact_path
+from tools.repository.workspace.workspace_scope import (
+    resolve_report_root,
+    resolve_runtime_artifact_path,
+)
 from tools.runtime.values import (
     is_object_list,
     is_object_list_or_tuple,
     is_string_object_dict,
     is_string_object_mapping,
 )
+
 LEDGER_SEMANTIC_KINDS = (
     "request_clause",
     "responsibility_unit",
@@ -56,6 +60,7 @@ MONITOR_PASSTHROUGH_FIELDS = frozenset(
         "monitoring_evidence",
     }
 )
+
 
 class LedgerSnapshot(TypedDict):
     """Validated projection returned by the canonical ledger reader."""
@@ -221,7 +226,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Workspace root used for explicit runtime selection; state is external.",
     )
     parser.add_argument("--report-dir", help="Explicit run bundle directory to update.")
-    parser.add_argument("--run-id", help="Run id under the external reports/agents root.")
+    parser.add_argument(
+        "--run-id", help="Run id under the external reports/agents root."
+    )
     parser.add_argument(
         "--report-root",
         help=(
@@ -437,7 +444,7 @@ def _log_run_work_entry(
     separator = b"\n" if existing else b""
     _parent_write(
         work_log_path,
-        existing + separator + f"- {entry}\n".encode("utf-8"),
+        existing + separator + f"- {entry}\n".encode(),
         "work-log",
         runtime_root,
     )

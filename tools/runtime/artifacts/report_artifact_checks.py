@@ -25,7 +25,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import TypeGuard, TypedDict
+from typing import TypedDict, TypeGuard
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (
@@ -44,13 +44,6 @@ except ImportError:
         attest_parent_root,
     )
 
-from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes, git_blob_oid
-from tools.runtime.values import (
-    is_object_list,
-    is_object_list_or_tuple,
-    is_string_object_mapping,
-)
-from tools.runtime.archive.work_log import MIN_GROUP_MEMBER_COUNT
 from tools.agent.orchestration.mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,
@@ -62,6 +55,17 @@ from tools.agent.orchestration.mid_task_user_input_policy import (
     MID_TASK_TARGET_REQUIRED_CLASSIFICATIONS,
     has_reuse_marker,
     is_empty_policy_value,
+)
+from tools.runtime.archive.work_log import MIN_GROUP_MEMBER_COUNT
+from tools.runtime.artifacts.artifact_identity import (
+    canonical_body_sha256,
+    canonical_json_bytes,
+    git_blob_oid,
+)
+from tools.runtime.values import (
+    is_object_list,
+    is_object_list_or_tuple,
+    is_string_object_mapping,
 )
 
 PLACEHOLDER_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
@@ -472,7 +476,10 @@ def _current_validation_candidate(
     candidates: list[dict[str, object]] = []
     for event in events:
         payload = event.get("automatic_review")
-        if is_string_object_mapping(payload) and payload.get("record_kind") == "candidate":
+        if (
+            is_string_object_mapping(payload)
+            and payload.get("record_kind") == "candidate"
+        ):
             candidates.append(dict(payload))
     if not candidates:
         raise ValidationMaterializerError("validation_result:candidate_missing")
@@ -647,10 +654,14 @@ def _write_validation_leaf(path: Path, data: bytes) -> None:
     if configured:
         parent = Path(configured).resolve(strict=True)
         attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="validation-artifact")
+            ParentRootAttestationRequest(
+                cwd=parent, explicit_root=parent, purpose="validation-artifact"
+            )
         )
         boundary = ParentRootSideEffectBoundary()
-        receipt = boundary.resolve_parent_owned_path(attestation, path, "validation-artifact", create=False)
+        receipt = boundary.resolve_parent_owned_path(
+            attestation, path, "validation-artifact", create=False
+        )
         try:
             existing = boundary.read_parent_owned_file(receipt)
         except ParentRootSideEffectError as exc:
@@ -798,7 +809,10 @@ def _verify_validation_replay(
             ):
                 raise ValidationMaterializerError("validation_result:stream_mismatch")
             artifact = stream.get("artifact")
-            if not is_string_object_mapping(artifact) or artifact.get("path") != leaf_name:
+            if (
+                not is_string_object_mapping(artifact)
+                or artifact.get("path") != leaf_name
+            ):
                 raise ValidationMaterializerError("validation_result:stream_mismatch")
             leaf_bytes = _validation_stable_bytes(manifest_path.parent / leaf_name)
             if artifact.get("size_bytes") != len(leaf_bytes):
@@ -1142,9 +1156,7 @@ def _validation_projection(
     }
     writer = candidate.get("writer")
     writer_runtime_agent_id = (
-        writer.get("runtime_agent_id")
-        if is_string_object_mapping(writer)
-        else None
+        writer.get("runtime_agent_id") if is_string_object_mapping(writer) else None
     )
     failure_value = manifest.get("failure_codes", [])
     failure_codes = (
@@ -1392,7 +1404,11 @@ def _open_state_errors(value: object, field: str) -> list[str]:
 def _taxonomy_values(field: str) -> frozenset[str]:
     """Read one canonical validation taxonomy set without copying its values."""
     raw = json.loads(RUNTIME_PROFILE_TAXONOMY_PATH.read_text(encoding="utf-8"))
-    policy = raw.get("validation_failure_response") if is_string_object_mapping(raw) else None
+    policy = (
+        raw.get("validation_failure_response")
+        if is_string_object_mapping(raw)
+        else None
+    )
     values = policy.get(field) if is_string_object_mapping(policy) else None
     if not is_object_list(values) or not values:
         raise ValueError(f"validation taxonomy missing {field}")
@@ -1570,9 +1586,7 @@ def _resource_certificate_errors(
             if any(not is_string_object_mapping(item) for item in gpu_items):
                 errors.append("gpu_semantics:item_shape")
             observed = [
-                item.get("item")
-                for item in gpu_items
-                if is_string_object_mapping(item)
+                item.get("item") for item in gpu_items if is_string_object_mapping(item)
             ]
             if observed != list(GPU_CERTIFICATE_SEQUENCE) or len(gpu_items) != len(
                 GPU_CERTIFICATE_SEQUENCE
@@ -1642,7 +1656,10 @@ def generated_completion_coverage_errors(
     if not isinstance(snapshot_identity, str) or not snapshot_identity.strip():
         return ["ledger_snapshot_identity_missing"]
     try:
-        from tools.runtime.archive.work_log import ledger_snapshot_digest, read_ledger_snapshot
+        from tools.runtime.archive.work_log import (
+            ledger_snapshot_digest,
+            read_ledger_snapshot,
+        )
 
         snapshot = read_ledger_snapshot(report_dir, snapshot_identity)
         expected = project_completion_coverage(snapshot, source_binding)
@@ -2023,9 +2040,7 @@ def check_completion_coverage(
     ):
         errors["empty"].append("owner_contract")
     owner_evidence = completion_coverage.get("owner_boundary_evidence", [])
-    owner_evidence_items = (
-        owner_evidence if is_object_list(owner_evidence) else []
-    )
+    owner_evidence_items = owner_evidence if is_object_list(owner_evidence) else []
     if not owner_evidence_items:
         errors["empty"].append("owner_boundary_evidence")
     for evidence in owner_evidence_items:
@@ -2055,9 +2070,7 @@ def check_completion_coverage(
     ):
         errors["empty"].append("owner_contract:correspondence")
     gate_evidence = completion_coverage.get("gate_evidence", [])
-    gate_evidence_items = (
-        gate_evidence if is_object_list(gate_evidence) else []
-    )
+    gate_evidence_items = gate_evidence if is_object_list(gate_evidence) else []
     if not gate_evidence_items:
         errors["empty"].append("gate_evidence")
     gate_ids: set[str] = set()
@@ -2096,7 +2109,9 @@ def check_completion_coverage(
             errors["redundant"].append(f"resource_certificate:{certificate_id}")
         certificate_ids.add(certificate_id)
     for certificate_result in certificate_results:
-        if is_string_object_mapping(certificate_result) and certificate_result.get("errors"):
+        if is_string_object_mapping(certificate_result) and certificate_result.get(
+            "errors"
+        ):
             errors["empty"].append(
                 f"resource_certificate:{certificate_result.get('certificate_id', '')}"
             )
@@ -2106,9 +2121,7 @@ def check_completion_coverage(
         if is_string_object_mapping(mapping)
     }
     semantic_events = completion_coverage.get("semantic_events", [])
-    semantic_event_items = (
-        semantic_events if is_object_list(semantic_events) else []
-    )
+    semantic_event_items = semantic_events if is_object_list(semantic_events) else []
     if not semantic_event_items:
         errors["empty"].append("semantic_events")
     events_by_id = {
@@ -2273,7 +2286,10 @@ def check_completion_coverage(
         if clause_id not in expected_set:
             continue
         mapping = mappings_by_clause.get(clause_id)
-        if not is_string_object_mapping(mapping) or mapping.get("mapping_mode") != "direct":
+        if (
+            not is_string_object_mapping(mapping)
+            or mapping.get("mapping_mode") != "direct"
+        ):
             errors["empty"].append(f"resource_mapping:{clause_id}")
             continue
         source_event_ref = str(mapping.get("source_event_ref", ""))
@@ -2308,11 +2324,10 @@ def check_completion_coverage(
                 if is_string_object_mapping(item)
             ] != list(GPU_CERTIFICATE_SEQUENCE):
                 errors["empty"].append("resource_mapping:W2-19:ordered_gpu_semantics")
-    if (
-        len(resource_mapping_event_refs)
-        == len(RESOURCE_MAPPING_REQUIRED_CLAUSE_IDS)
-        and len(set(resource_mapping_event_refs.values()))
-        != len(resource_mapping_event_refs)
+    if len(resource_mapping_event_refs) == len(
+        RESOURCE_MAPPING_REQUIRED_CLAUSE_IDS
+    ) and len(set(resource_mapping_event_refs.values())) != len(
+        resource_mapping_event_refs
     ):
         errors["empty"].append("resource_mapping:distinct_source_events")
     responses = completion_coverage.get("failure_responses", [])
@@ -2533,9 +2548,7 @@ def write_completion_coverage_artifact(
         completion_boundary.get("overall_delivery_complete")
     )
     error_sets = coverage_check["error_sets"]
-    coverage_check["ok"] = not any(error_sets.values()) and all(
-        gate_results.values()
-    )
+    coverage_check["ok"] = not any(error_sets.values()) and all(gate_results.values())
     artifact = {
         **coverage,
         "coverage_check": coverage_check,
@@ -2630,15 +2643,13 @@ def evaluate_completion_boundary(
         open_work_state_non_routing.get("planned_work_complete"), bool
     )
     coverage_gate_results = coverage_check["gate_results"]
-    coverage_ready_before_delivery = (
-        all(
-            coverage_gate_results.get(gate) is True
-            for gate in (
-                "G1_CLAUSE_COVERAGE",
-                "G2_OWNER_BOUNDARY",
-                "G3_STAGE_EVIDENCE",
-                "G4_VALIDATION_RESPONSE",
-            )
+    coverage_ready_before_delivery = all(
+        coverage_gate_results.get(gate) is True
+        for gate in (
+            "G1_CLAUSE_COVERAGE",
+            "G2_OWNER_BOUNDARY",
+            "G3_STAGE_EVIDENCE",
+            "G4_VALIDATION_RESPONSE",
         )
     )
     planned = bool(
@@ -2761,8 +2772,7 @@ def markdown_without_adjudicated_rejected_hypotheses(text: str) -> str:
     for line in lines:
         cells = tuple(cell.strip() for cell in line.split("|")[1:-1])
         normalized = tuple(
-            re.sub(r"[^a-z0-9]+", "_", cell.lower()).strip("_")
-            for cell in cells
+            re.sub(r"[^a-z0-9]+", "_", cell.lower()).strip("_") for cell in cells
         )
         if {
             "adjudication",

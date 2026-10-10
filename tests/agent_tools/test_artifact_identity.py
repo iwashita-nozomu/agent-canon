@@ -15,7 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.runtime.artifacts.artifact_identity import (  # noqa: E402
+from tools.runtime.artifacts.artifact_identity import (
     ArtifactIdentityError,
     canonical_json_bytes,
     materialize_artifact_identity,

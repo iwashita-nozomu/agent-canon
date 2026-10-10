@@ -31,10 +31,10 @@ HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
-import hook_dispatcher  # noqa: E402
-import hook_event_log  # noqa: E402
+import hook_dispatcher
+import hook_event_log
 
-from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import (
     PromptClassifierInputs,
     prompt_intake_signals,
 )

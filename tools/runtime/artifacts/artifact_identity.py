@@ -31,7 +31,7 @@ from tools.runtime.values import (
     is_string_object_mapping,
 )
 
-UTC = timezone.utc  # noqa: UP017
+UTC = timezone.utc
 
 ARTIFACT_IDENTITY_SCHEMA = "agent-canon.artifact-identity.v1"
 ARTIFACT_ROLES = frozenset(

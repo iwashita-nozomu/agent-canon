@@ -33,6 +33,9 @@ from pathlib import Path
 from typing import TypedDict
 
 import yaml
+
+from tools.agent.orchestration.team_config import load_team_config, resolve_role
+from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot
 from tools.runtime.artifacts.artifact_identity import (
     canonical_body_sha256,
     canonical_json_bytes,
@@ -41,10 +44,10 @@ from tools.runtime.artifacts.artifact_identity import (
 from tools.runtime.artifacts.external_artifact_binding import (
     materialize_external_projection_acknowledgement,
 )
-from tools.agent.orchestration.team_config import load_team_config, resolve_role
+from tools.runtime.artifacts.report_artifact_checks import (
+    markdown_without_adjudicated_rejected_hypotheses,
+)
 from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER
-from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot
-from tools.runtime.artifacts.report_artifact_checks import markdown_without_adjudicated_rejected_hypotheses
 from tools.runtime.values import (
     is_object_list,
     is_string_object_dict,
@@ -150,14 +153,16 @@ def parse_finding_rows(markdown: str) -> tuple[dict[str, str], ...]:
 
     def table_cells(line: str) -> list[str] | None:
         stripped = line.strip()
-        if not stripped.startswith("|") or stripped.count("|") < MINIMUM_TABLE_PIPE_COUNT:
+        if (
+            not stripped.startswith("|")
+            or stripped.count("|") < MINIMUM_TABLE_PIPE_COUNT
+        ):
             return None
         return [cell.strip() for cell in stripped.strip("|").split("|")]
 
     def separator_row(cells: Sequence[str]) -> bool:
         return bool(cells) and all(
-            bool(re.fullmatch(r":?-+:?", cell.replace(" ", "")))
-            for cell in cells
+            bool(re.fullmatch(r":?-+:?", cell.replace(" ", ""))) for cell in cells
         )
 
     def header_name(value: str) -> str:
@@ -925,8 +930,8 @@ def record_current_review_decision(
         raise AutomaticReviewError("automatic_review:decision_missing")
     if decisions and len(set(decisions)) != 1:
         raise AutomaticReviewError("automatic_review:decision_ambiguous")
-    decision = decisions[-1] if decisions else canonicalize_review_decision(
-        derived_outcome
+    decision = (
+        decisions[-1] if decisions else canonicalize_review_decision(derived_outcome)
     )
     explicit_escalate_decision = "ESCALATE" in decisions
     if derived_outcome == "changes-required" and decision == "APPROVE":
@@ -1084,9 +1089,7 @@ def resolve_review_eligibility(workspace: Path) -> ReviewEligibilityProjection:
     )
     writer = candidate.get("writer")
     writer_runtime_agent_id = (
-        writer.get("runtime_agent_id")
-        if is_string_object_mapping(writer)
-        else None
+        writer.get("runtime_agent_id") if is_string_object_mapping(writer) else None
     )
     if assigned_runtime_agent_id != producer_runtime_agent_id:
         failure_codes.append("review_eligibility:producer_not_assigned_reviewer")

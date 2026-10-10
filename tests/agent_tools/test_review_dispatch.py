@@ -18,8 +18,10 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.agent.orchestration import review_dispatch  # noqa: E402
-from tools.runtime.artifacts.artifact_identity import canonical_body_sha256  # noqa: E402
+from tools.agent.orchestration import review_dispatch
+from tools.runtime.artifacts.artifact_identity import (
+    canonical_body_sha256,
+)
 
 
 def candidate() -> dict[str, object]:
@@ -106,7 +108,10 @@ class ReviewDispatchTest(unittest.TestCase):
         """The owning decision is derived from finding status, not style severity."""
         self.assertEqual(
             review_dispatch.derive_review_outcome(
-                [{"severity": "style", "status": "non-blocking"}, {"status": "blocking"}]
+                [
+                    {"severity": "style", "status": "non-blocking"},
+                    {"status": "blocking"},
+                ]
             ),
             "changes-required",
         )
@@ -153,12 +158,15 @@ class ReviewDispatchTest(unittest.TestCase):
     def test_invalid_review_decisions_fail_closed(self) -> None:
         """Unknown and mistyped review decisions cannot enter the ledger."""
         for value in (None, "", "BLOCK", "APPROVED"):
-            with self.subTest(value=value), self.assertRaises(
-                review_dispatch.AutomaticReviewError
+            with (
+                self.subTest(value=value),
+                self.assertRaises(review_dispatch.AutomaticReviewError),
             ):
                 review_dispatch.canonicalize_review_decision(value)
 
-    def test_record_decision_canonicalizes_aliases_and_blocking_derived_state(self) -> None:
+    def test_record_decision_canonicalizes_aliases_and_blocking_derived_state(
+        self,
+    ) -> None:
         """Recorded events retain APPROVE/REVISE for publication consumers."""
         candidate_payload = {
             "candidate_id": "candidate-1",
@@ -189,7 +197,9 @@ class ReviewDispatchTest(unittest.TestCase):
                 (report_dir / "change_review.md").write_text(text, encoding="utf-8")
                 captured: list[dict[str, object]] = []
 
-                def payloads(_report_dir: Path, kind: str | None = None) -> list[dict[str, object]]:
+                def payloads(
+                    _report_dir: Path, kind: str | None = None
+                ) -> list[dict[str, object]]:
                     if kind == "frame":
                         return [frame]
                     if kind == "resume_event":
@@ -205,9 +215,17 @@ class ReviewDispatchTest(unittest.TestCase):
                     captured.append(dict(payload))
 
                 with (
-                    patch.object(review_dispatch, "_active_report_dir", return_value=report_dir),
-                    patch.object(review_dispatch, "_current_candidate", return_value=candidate_payload),
-                    patch.object(review_dispatch, "_automatic_payloads", side_effect=payloads),
+                    patch.object(
+                        review_dispatch, "_active_report_dir", return_value=report_dir
+                    ),
+                    patch.object(
+                        review_dispatch,
+                        "_current_candidate",
+                        return_value=candidate_payload,
+                    ),
+                    patch.object(
+                        review_dispatch, "_automatic_payloads", side_effect=payloads
+                    ),
                     patch.object(
                         review_dispatch,
                         "_review_route",

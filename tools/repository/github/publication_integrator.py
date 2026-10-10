@@ -29,6 +29,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
+from tools.agent.orchestration.packets import (
+    OwnerGuaranteePacket,
+    normalize_owner_guarantee_packet,
+    owner_receipt_is_compatible,
+    owner_receipt_key,
+)
+from tools.agent.orchestration.review_dispatch import (
+    ReviewEligibilityProjection,
+    resolve_current_review_state,
+    resolve_review_eligibility,
+)
 from tools.repository.workspace.parent_root_side_effects import (
     ParentRootAttestationRequest,
     ParentRootReject,
@@ -36,12 +47,9 @@ from tools.repository.workspace.parent_root_side_effects import (
     ParentRootSideEffectError,
     attest_parent_root,
 )
-
-from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes
-from tools.agent.orchestration.review_dispatch import (
-    ReviewEligibilityProjection,
-    resolve_current_review_state,
-    resolve_review_eligibility,
+from tools.runtime.artifacts.artifact_identity import (
+    canonical_body_sha256,
+    canonical_json_bytes,
 )
 from tools.runtime.lifecycle.update_lifecycle_contract import (
     binding_identity,
@@ -50,21 +58,12 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
     validate_record_binding,
 )
 from tools.runtime.values import is_object_list, is_string_object_mapping
-from tools.agent.orchestration.packets import (
-    OwnerGuaranteePacket,
-    normalize_owner_guarantee_packet,
-    owner_receipt_is_compatible,
-    owner_receipt_key,
-)
 
 TREE_DELTA_SCHEMA = "agent-canon.git-tree-delta-observation.v1"
 TREE_DELTA_SERIALIZATION = "agent-canon.git-tree-delta.v1"
 PUBLICATION_AUTHORITY_SCHEMA = "agent-canon.publication-authority.v3"
 PUBLICATION_ELIGIBILITY_SCHEMA = "agent-canon.publication-eligibility-projection.v1"
-CANONICAL_INTERFACE_PATH = (
-    "documents/contracts/"
-    "ordered_integration_interface.json"
-)
+CANONICAL_INTERFACE_PATH = "documents/contracts/ordered_integration_interface.json"
 ZERO_OID = "0" * 40
 ALLOWED_MODES = frozenset({"100644", "100755", "120000"})
 
@@ -79,10 +78,14 @@ def _publication_temp_dir() -> str | None:
         )
     parent = Path(configured).resolve(strict=True)
     attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="publication-integrator")
+        ParentRootAttestationRequest(
+            cwd=parent, explicit_root=parent, purpose="publication-integrator"
+        )
     )
     directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-        attestation, parent / ".agent-canon" / "tmp" / "publication", "publication-staging"
+        attestation,
+        parent / ".agent-canon" / "tmp" / "publication",
+        "publication-staging",
     )
     return str(directory.physical_path)
 
@@ -179,7 +182,10 @@ def owner_receipt_projection(
             # Same property/owner/input is one receipt, not corroboration.
             continue
         keys.add(key)
-        if packet["correspondence_state"] != "verified" or packet["observation_outcome"] != "observed_pass":
+        if (
+            packet["correspondence_state"] != "verified"
+            or packet["observation_outcome"] != "observed_pass"
+        ):
             # Advisory/unproven/refuted claims do not create integration blockers.
             continue
         if not owner_receipt_is_compatible(packet, candidate_digest=candidate_digest):
@@ -192,9 +198,7 @@ def owner_receipt_projection(
         if owner_ref not in owner_refs:
             missing.append(f"missing_owner:{owner_ref}")
     declared_edges = {
-        str(edge)
-        for packet in normalized
-        for edge in packet["downstream_edges"]
+        str(edge) for packet in normalized for edge in packet["downstream_edges"]
     }
     missing.extend(
         f"missing_dependency_edge:{edge}"
@@ -553,7 +557,9 @@ def resolve_publication_authority(
     if receipt_projection["publication_state"] != "ready":
         raise PublicationError(
             "publication_eligibility:owner_receipts_incompatible",
-            ",".join(str(item) for item in receipt_projection["missing_or_incompatible"]),
+            ",".join(
+                str(item) for item in receipt_projection["missing_or_incompatible"]
+            ),
         )
     validation = _validation_provenance(root)
     candidate_commit = _hex_oid(candidate.get("candidate_commit"), "candidate_commit")
@@ -637,9 +643,7 @@ def resolve_publication_authority(
     source = {"commit": source_commit, "tree": source_tree}
     validation_provenance_ref = {
         "validation_result_id": validation["validation_result_id"],
-        "validation_result_body_sha256": validation[
-            "validation_result_body_sha256"
-        ],
+        "validation_result_body_sha256": validation["validation_result_body_sha256"],
     }
     selection_payload = {
         "candidate_authority": candidate_authority,
@@ -974,9 +978,7 @@ def integrate_publication(
     candidate_commit = _hex_oid(
         candidate_authority["candidate_commit"], "candidate_commit"
     )
-    candidate_tree = _hex_oid(
-        candidate_authority["candidate_tree"], "candidate_tree"
-    )
+    candidate_tree = _hex_oid(candidate_authority["candidate_tree"], "candidate_tree")
     publication_pr_number: int | None = None
     authority_second = resolve_publication_authority(
         root,
@@ -1077,17 +1079,12 @@ def integrate_publication(
             or readback_candidate["tree_sha"] != candidate_tree
             or readback_pr["head_sha"] != candidate_commit
             or readback_pr["merge_cas_base_sha"] != expected
-            or readback_pr["merge_cas_base_tree_sha"]
-            != target["expected_target_tree"]
+            or readback_pr["merge_cas_base_tree_sha"] != target["expected_target_tree"]
         ):
             raise PublicationError("publication_integrator:pr_identity_mismatch")
         publication_pr_number = cast(int, readback_pr["number"])
-        observed_result = _hex_oid(
-            readback_pr["merge_commit_sha"], "merge_commit_sha"
-        )
-        observed_result_tree = _hex_oid(
-            readback_pr["merge_tree_sha"], "merge_tree_sha"
-        )
+        observed_result = _hex_oid(readback_pr["merge_commit_sha"], "merge_commit_sha")
+        observed_result_tree = _hex_oid(readback_pr["merge_tree_sha"], "merge_tree_sha")
         post_cas_ref_oid = _hex_oid(
             response.get("post_cas_ref_oid"), "post_cas_ref_oid"
         )

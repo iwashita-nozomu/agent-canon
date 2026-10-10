@@ -8,9 +8,9 @@
 
 from __future__ import annotations
 
-import sys
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from collections.abc import Mapping, Sequence
@@ -20,18 +20,18 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.repository.github.publication_integrator import (  # noqa: E402
+from tools.repository.github.publication_integrator import (
     CANONICAL_INTERFACE_PATH,
     CommandResult,
-    PublicationError,
     PublicationAuthority,
+    PublicationError,
     integrate_publication,
     resolve_publication_eligibility,
 )
-from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
+from tools.runtime.lifecycle.update_lifecycle_contract import (
     materialize_gate_verdict,
 )
-from tools.runtime.values import is_string_object_mapping  # noqa: E402
+from tools.runtime.values import is_string_object_mapping
 
 
 def lifecycle_binding() -> dict[str, object]:
@@ -262,7 +262,9 @@ class PublicationIntegratorTest(unittest.TestCase):
                 current_ref = base_oid
                 authority = authority_for(interface_path)
                 with (
-                    patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}),
+                    patch.dict(
+                        os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+                    ),
                     patch(
                         "tools.repository.github.publication_integrator.resolve_publication_authority",
                         side_effect=[authority, authority],
@@ -345,8 +347,14 @@ class PublicationIntegratorTest(unittest.TestCase):
                 "tools.repository.github.publication_integrator.resolve_publication_authority",
                 side_effect=[authority, authority],
             ),
-            patch("tools.repository.github.publication_integrator._git_text", side_effect=read_git),
-            patch("tools.repository.github.publication_integrator._worktree_status", return_value=""),
+            patch(
+                "tools.repository.github.publication_integrator._git_text",
+                side_effect=read_git,
+            ),
+            patch(
+                "tools.repository.github.publication_integrator._worktree_status",
+                return_value="",
+            ),
         ):
             receipt = integrate_publication(
                 PROJECT_ROOT,
@@ -455,9 +463,18 @@ class PublicationIntegratorTest(unittest.TestCase):
             return expected_tree if command[-1].endswith("^{tree}") else expected_base
 
         with (
-            patch("tools.repository.github.publication_integrator.resolve_publication_authority", return_value=authority),
-            patch("tools.repository.github.publication_integrator._git_text", side_effect=read_git),
-            patch("tools.repository.github.publication_integrator._worktree_status", return_value=""),
+            patch(
+                "tools.repository.github.publication_integrator.resolve_publication_authority",
+                return_value=authority,
+            ),
+            patch(
+                "tools.repository.github.publication_integrator._git_text",
+                side_effect=read_git,
+            ),
+            patch(
+                "tools.repository.github.publication_integrator._worktree_status",
+                return_value="",
+            ),
             self.assertRaises(PublicationError) as raised,
         ):
             integrate_publication(

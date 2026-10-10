@@ -17,7 +17,10 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 
-from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes
+from tools.runtime.artifacts.artifact_identity import (
+    canonical_body_sha256,
+    canonical_json_bytes,
+)
 from tools.runtime.values import is_object_list, is_object_mapping
 
 ACK_SCHEMA = "agent-canon.external-projection-acknowledgement.v1"
