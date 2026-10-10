@@ -1,0 +1,37 @@
+# @dependency-start
+# contract environment
+# responsibility Pins the exact Lean toolchain for the disposable native proof profile.
+# downstream implementation ./docker.sh invokes this manifest only in the lean-proof profile
+# downstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs these typed records
+# downstream implementation ./docker.sh runs the selected native proof checks
+# @dependency-end
+
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "elan-init"
+package = "elan-init"
+method = "release-asset"
+version = "4.2.4"
+source = "https://github.com/leanprover/elan/releases/download/v4.2.4"
+assets = { aarch64 = "elan-aarch64-unknown-linux-gnu.tar.gz", x86_64 = "elan-x86_64-unknown-linux-gnu.tar.gz" }
+checksums = { aarch64 = "05febd124d84ebf994b2e7479922a5650b1e950c17ae3bd1ddd776b65bb72bf9", x86_64 = "42b94d4244e8353142c456ec0e4ca6528fd898a6c604d4059f494e706e431f63" }
+archive_format = "tar.gz"
+extract = "elan-init"
+destination = "/usr/local/bin/elan-init"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/elan-init", args = ["--version"], output_contains = "4.2.4" }
+deps = []
+provides = ["elan-init"]
+failure_policy = "fail"
+
+[[records]]
+id = "lean-toolchain"
+package = "lean"
+method = "lean-toolchain"
+version = "leanprover/lean4:v4.30.0"
+source = "https://github.com/leanprover/lean4"
+verification = { kind = "lean-toolchain" }
+deps = ["elan-init"]
+provides = ["elan", "lean", "lake"]
+failure_policy = "fail"

@@ -837,7 +837,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# @dependency-start",
                         "# contract test",
                         "# responsibility Rejects root-escaping dependency paths.",
-                        "# upstream design ../../../outside.md escapes root",
+                        "# upstream reference ../../../outside.md escapes root",
                         "# @dependency-end",
                         "name: Agent Improvement Guide",
                         "",
@@ -2243,7 +2243,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "@dependency-start",
                         "contract test",
                         "responsibility Defines target test fixture context.",
-                        "downstream design source.md source reads target",
+                        "downstream reference source.md source cites target",
                         "@dependency-end",
                         "-->",
                         "",
@@ -2259,7 +2259,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "@dependency-start",
                         "contract test",
                         "responsibility Defines source test fixture context.",
-                        "upstream design target.md target context",
+                        "upstream reference target.md target is evidence",
                         "@dependency-end",
                         "-->",
                         "",
@@ -2275,7 +2275,13 @@ class DependencyManifestToolTest(unittest.TestCase):
                 text=True,
             )
 
-            result = run_tool(str(REPO_REVIEW), "--root", str(root), root=root)
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--check-bidirectional",
+                root=root,
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)

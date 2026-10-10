@@ -90,15 +90,21 @@ design fact を再定義しません。
 - 裸の数値リテラルは、[documents/conventions/common/01_principles.md](common/01_principles.md) のマジックナンバー規約に従います。
 - `constexpr` / `inline constexpr` の名前付き定数、typed configuration、または public API 引数へ分離できる値は、式の途中に直接書きません。
 - `-1`、`0`、`1`、`2`、`0.5` のような普遍的な符号・倍数以外を実装に置く場合は、`// NOLINT(readability-magic-numbers)` で数式や標準上の根拠を書きます。
-- C++ source / header を変更した後は、次を実行します。
+- C++ project の source / header を変更した場合は、次を実行します。
 
 ```bash
-python3 tools/validation/code/static/cpp/static_analysis.py clang-tidy \
-  --workspace-root <workspace-root> \
-  --source <source> \
-  --build-dir <module-build-dir> \
-  --config-file <workspace-root>/clang/clang-tidy.yaml
+run-clang-tidy.py -p <module-build-dir> <source>
 ```
+
+`<module-build-dir>` は、project CMake preset または明示 configure command が選択した
+実際の binary directory です。この引数は compile database の場所だけを指定し、runtime
+backend を選びません。compile database の生成・更新は project build owner が行い、
+この repository は active symlink や既定 compile database を作りません。native tool は
+project の `.clang-tidy` を自動検出します。独自の config file を置く場合は native
+`run-clang-tidy.py -config-file=<path>` 引数で明示してください。
+
+AgentCanon 自体には C++ CMake project や compile database がないため、この repository
+の編集だけを理由にそれらを生成しません。
 
 ## 5. テスト
 

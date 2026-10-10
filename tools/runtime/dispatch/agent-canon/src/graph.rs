@@ -4070,6 +4070,55 @@ mod tests {
     }
 
     #[test]
+    fn reference_edges_are_context_evidence_without_parent_authority() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        fs::remove_file(fixture.root.join("reports/agents/.active_run"))
+            .expect("remove source-stale runtime pointer");
+        fs::write(
+            fixture.root.join("src/source.md"),
+            concat!(
+                "<!--\n",
+                "@dependency-start\n",
+                "contract design\n",
+                "responsibility Cites supporting source evidence.\n",
+                "upstream reference evidence.md supporting record\n",
+                "@dependency-end\n",
+                "-->\n",
+            ),
+        )
+        .expect("reference source");
+        fs::write(
+            fixture.root.join("src/evidence.md"),
+            "# Supporting evidence\n",
+        )
+        .expect("evidence target");
+        fixture_git(&fixture.root, &["add", "src/source.md", "src/evidence.md"]);
+        fixture_git(
+            &fixture.root,
+            &["commit", "-qm", "reference context fixture"],
+        );
+
+        let mut args = graph_args(&fixture.root);
+        args.path = Some("src/source.md".to_string());
+        let build = build_graph_with_failure(&args).expect("reference graph build");
+        assert_eq!(build["status"], "fresh");
+        assert_eq!(build["exit_code"], 0);
+
+        let context = context_graph(&args).expect("reference context");
+        assert_eq!(context["status"], "fresh");
+        assert_eq!(context["parent_paths"], json!([]));
+        assert_eq!(
+            context["evidence_paths"],
+            json!(["src/evidence.md", "src/source.md"])
+        );
+        assert_eq!(
+            context["dependency_witnesses"][0]["dependency_detail"]["kind"],
+            "reference"
+        );
+    }
+
+    #[test]
     fn graph_build_and_query_succeed_without_active_runtime_evidence() {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
@@ -4407,7 +4456,7 @@ mod tests {
             .expect("remove active runtime pointer");
         fs::write(
             fixture.root.join("src/manifest.md"),
-            "<!--\n@dependency-start\ncontract implementation\nupstream design missing.md missing target\n@dependency-end\n-->\n",
+            "<!--\n@dependency-start\ncontract implementation\nupstream reference missing.md missing evidence target\n@dependency-end\n-->\n",
         )
         .expect("incomplete manifest");
         let args = graph_args(&fixture.root);

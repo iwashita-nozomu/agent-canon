@@ -339,6 +339,9 @@ for row in Path(edges_path).read_text().splitlines():
     direction, kind, source, target = row.split("\t")
     if not all((direction, kind, source, target)):
         continue  # The projection check above already records incomplete rows.
+    # Reference edges document evidence, not prerequisite ordering.
+    if kind == "reference":
+        continue
     prerequisite, consumer = (target, source) if direction == "upstream" else (source, target)
     adjacency[prerequisite].add(consumer)
     reverse[consumer].add(prerequisite)

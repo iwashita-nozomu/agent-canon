@@ -25,7 +25,6 @@ except ModuleNotFoundError:
 
 from tools.runtime.dispatch import tool_dispatch
 
-
 ROOT = Path(__file__).resolve().parents[2]
 CONTAINER = ROOT / "bootstrap" / "container"
 DOCKERFILE = CONTAINER / "image" / "Dockerfile"
@@ -268,7 +267,7 @@ def test_typed_tool_wrapper_rejects_arbitrary_dispatch() -> None:
     assert '[[ "${1:-}" != "tool" || "${2:-}" != "run" ]]' in text
 
 
-def test_dependency_manifest_is_python_rust_lsp_only() -> None:
+def test_dependency_manifest_contains_only_shared_language_and_workflow_tools() -> None:
     document = tomllib.loads(DEPENDENCIES.read_text(encoding="utf-8"))
     assert document["schema"] == "agent-canon.tool-dependencies"
     assert document["schema_version"] == 2
@@ -287,6 +286,9 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "tree",
         "clangd-language-server",
         "rust-toolchain",
+        "shellcheck",
+        "actionlint",
+        "zizmor",
         "python3-pytest",
     }
     assert not ids & {"github-cli", "codex-cli"}
@@ -295,6 +297,7 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "apt-repository",
         "npm-global",
         "pipx",
+        "release-asset",
         "rust-toolchain",
     }
     assert all("project" not in str(record).lower() for record in records)

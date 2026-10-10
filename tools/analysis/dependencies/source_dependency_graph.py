@@ -50,8 +50,10 @@ HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
 MANIFEST_REASON_MAX_SPLIT = MANIFEST_FIELD_COUNT - 1
 DEFAULT_CONTEXT_DEPTH = 3
-DEPENDENCY_KINDS = frozenset({"design", "implementation", "environment"})
-CONTEXT_KINDS = frozenset({"design", "implementation"})
+DEPENDENCY_KINDS = frozenset(
+    {"design", "implementation", "environment", "reference"}
+)
+CONTEXT_KINDS = frozenset({"design", "implementation", "reference"})
 TEXT_SUFFIXES = frozenset(
     {
         ".bash",
@@ -526,7 +528,7 @@ def build_context_projection(
     path: str,
     depth: int = DEFAULT_CONTEXT_DEPTH,
 ) -> SourceContextProjection:
-    """Build deterministic design/implementation context directly from source manifests."""
+    """Build deterministic dependency evidence context from source manifests."""
     if depth < 0:
         raise SourceDependencyError("context depth must be non-negative")
     root = root.resolve()

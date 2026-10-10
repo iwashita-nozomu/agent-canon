@@ -1,8 +1,9 @@
 # The standalone image is built with the repository root as context:
 #   docker build -f bootstrap/container/image/Dockerfile .
-# Keep the context deny-by-default while explicitly exposing every Dockerfile
-# COPY source. The disposable live-regression image needs only the bootstrap
-# entrypoint and its fixture; never rely on the removed .devcontainer tree.
+# Keep the context deny-by-default while explicitly exposing Dockerfile inputs.
+# The disposable test image reuses one source snapshot for the live projection
+# and native Lean proof suites; its test-only dependency manifest stays outside
+# the shared tool-image dependency manifest.
 **
 !AGENTS.md
 !ROOT_AGENTS.md
@@ -24,6 +25,7 @@
 !tests/bootstrap/
 !tests/bootstrap/conftest.py
 !tests/bootstrap/docker.sh
+!tests/bootstrap/lean-proof-dependencies.toml
 !tests/bootstrap/test_live_projection_authority.py
 !agents/
 !agents/**
