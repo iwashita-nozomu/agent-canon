@@ -19,6 +19,7 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, cast
 
 try:
     from . import parent_root_side_effects as _parent_boundary
@@ -87,7 +88,6 @@ class DependencyModule:
 
     path: str
     url: str
-    branch: str | None
 
     @property
     def basename(self) -> str:
@@ -129,7 +129,7 @@ def _parse_gitmodules(root: Path) -> tuple[DependencyModule, ...]:
         key, sep, value = record.partition("\n")
         if not sep:
             continue
-        match = re.fullmatch(r"submodule\.(.+)\.(path|url|branch)", key)
+        match = re.fullmatch(r"submodule\.(.+)\.(path|url)", key)
         if match:
             name, field = match.groups()
             values.setdefault(name, {})[field] = value
@@ -149,7 +149,7 @@ def _parse_gitmodules(root: Path) -> tuple[DependencyModule, ...]:
             raise DependencyModuleChangeError(
                 f"topic-identity-required: submodule path must be relative: {path!r}"
             )
-        modules.append(DependencyModule(path, url, fields.get("branch")))
+        modules.append(DependencyModule(path, url))
     if not modules:
         raise DependencyModuleChangeError(
             f"topic-identity-required: no dependency modules found in {manifest}"
@@ -222,7 +222,9 @@ def _topic_request_from_args(
     )
 
 
-def _prepare(args: argparse.Namespace, *, command: str) -> int:
+def _prepare(
+    args: argparse.Namespace, *, command: Literal["prepare", "merge-main"]
+) -> int:
     """Handle prepare and merge-main by deferring to generic owner implementation."""
     workspace_root = Path(args.root).absolute()
     owner_evidence = workspace_root / args.owner_evidence
@@ -250,14 +252,10 @@ def _prepare(args: argparse.Namespace, *, command: str) -> int:
         print(f"TOPIC_ROOT={topic_root}")
         print(f"SOURCE_CLONE={receipt.clone}")
         print(f"SOURCE_BRANCH={receipt.branch}")
-    elif command == "merge-main":
+    else:
         merged = generic_merge_main(request)
         print(f"MERGE_CANDIDATE_SHA={merged.candidate_sha}")
         print(f"MERGE_INTEGRATED_SHA={merged.merged_sha}")
-    else:
-        raise DependencyModuleChangeError(
-            f"topic-identity-required: unknown command {command!r}"
-        )
     return 0
 
 
@@ -360,18 +358,15 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run adapter CLI commands."""
     args = _build_parser().parse_args(argv)
+    command = cast(Literal["prepare", "merge-main", "status", "cleanup"], args.command)
     try:
-        if args.command == "prepare":
+        if command == "prepare":
             return _prepare(args, command="prepare")
-        if args.command == "merge-main":
+        if command == "merge-main":
             return _prepare(args, command="merge-main")
-        if args.command == "status":
+        if command == "status":
             return _status(args)
-        if args.command == "cleanup":
-            return _cleanup(args)
-        raise DependencyModuleChangeError(
-            f"topic-identity-required: unknown command {args.command!r}"
-        )
+        return _cleanup(args)
     except DependencyModuleChangeError as exc:
         print(f"DEPENDENCY_MODULE_CHANGE_ERROR={exc}", file=sys.stderr)
         return 2

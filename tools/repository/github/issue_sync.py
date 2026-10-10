@@ -4,6 +4,7 @@
 # responsibility Reads and transports repository-qualified GitHub Issue metadata through the private log.
 # upstream design ../../../documents/runtime/private-feedback-knowledge.md private packet policy
 # upstream design ../../../documents/operations/issue-label-taxonomy.toml GitHub lifecycle labels
+# upstream implementation ./github_publish.py owns shared GitHub subprocess capture
 # downstream implementation ../../../tests/agent_tools/test_issue_sync.py focused GitHub and packet tests
 # @dependency-end
 """Host-side GitHub Issue adapter with a private metadata-only offline route.
@@ -36,6 +37,7 @@ from urllib.parse import urlsplit
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
+from tools.repository.github.github_publish import CommandResult, subprocess_runner
 from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 
 GITHUB_URL_RE = re.compile(r"^https://github\.com/(?P<repo>[^/]+/[^/]+)/issues/(?P<number>[1-9][0-9]*)$")
@@ -700,10 +702,7 @@ def build_container_receipt_stager(
     execution: str = "run",
 ) -> ContainerReceiptStager:
     """Build the executable resident-container receipt route."""
-    try:
-        from tools.agent.orchestration.tool_calls import build_issue_receipt_stage_command
-    except ImportError:  # pragma: no cover - direct script execution
-        from tools.agent.orchestration.tool_calls import build_issue_receipt_stage_command
+    from tools.agent.orchestration.tool_calls import build_issue_receipt_stage_command
 
     identity = (
         checkout_identity.as_dict()
@@ -1511,8 +1510,8 @@ class GitHubIssueClient:
         return normalize_repository(reference.repo or self.default_repo)
 
     @staticmethod
-    def _run(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        result = subprocess.run(list(argv), check=False, capture_output=True, text=True)
+    def _run(argv: Sequence[str]) -> CommandResult:
+        result = subprocess_runner(argv)
         if result.returncode:
             detail = (result.stderr or result.stdout or "GitHub adapter failed").strip().splitlines()[-1]
             raise IssueSyncError("github_adapter_failed", detail[:240])

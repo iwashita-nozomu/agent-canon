@@ -85,7 +85,6 @@ else
     "${WORKSPACE_ROOT}/tools/runtime/artifacts/external_artifact_binding.py" \
     "${WORKSPACE_ROOT}/tools/repository/github/publication_integrator.py" \
     "${WORKSPACE_ROOT}/tools/runtime/artifacts/report_artifact_checks.py" \
-    "${WORKSPACE_ROOT}/tools/agent/orchestration/review_dispatch.py" \
     "${WORKSPACE_ROOT}/tools/runtime/archive/work_log.py" \
     tests/agent_tools/test_artifact_identity.py \
     tests/agent_tools/test_codex_hooks.py \

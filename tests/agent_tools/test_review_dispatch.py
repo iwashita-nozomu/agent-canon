@@ -8,17 +8,18 @@
 
 from __future__ import annotations
 
-import sys
 import tempfile
 import unittest
+from collections.abc import Mapping
 from pathlib import Path
 from unittest.mock import patch
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT))
+from tools.agent.orchestration import review_dispatch
+from tools.runtime.artifacts.artifact_identity import (
+    canonical_body_sha256,
+)
 
-from tools.agent.orchestration import review_dispatch  # noqa: E402
-from tools.runtime.artifacts.artifact_identity import canonical_body_sha256  # noqa: E402
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def candidate() -> dict[str, object]:
@@ -45,8 +46,14 @@ def decision(name: str) -> dict[str, object]:
 class ReviewDispatchTest(unittest.TestCase):
     """Verify only the current candidate's explicit decision unlocks publication."""
 
-    def project(self, review_decision: dict[str, object]) -> dict[str, object]:
+    def project(self, review_decision: dict[str, object]) -> Mapping[str, object]:
         """Project a patched canonical state without caller identity overrides."""
+
+        def automatic_payloads(
+            _report_dir: Path, kind: str | None = None
+        ) -> list[dict[str, object]]:
+            return [review_decision] if kind == "decision" else []
+
         with (
             patch.object(
                 review_dispatch, "_active_report_dir", return_value=PROJECT_ROOT
@@ -57,9 +64,7 @@ class ReviewDispatchTest(unittest.TestCase):
             patch.object(
                 review_dispatch,
                 "_automatic_payloads",
-                side_effect=lambda _report_dir, kind=None: (
-                    [review_decision] if kind == "decision" else []
-                ),
+                side_effect=automatic_payloads,
             ),
         ):
             return review_dispatch.resolve_current_review_state(PROJECT_ROOT)
@@ -101,7 +106,10 @@ class ReviewDispatchTest(unittest.TestCase):
         """The owning decision is derived from finding status, not style severity."""
         self.assertEqual(
             review_dispatch.derive_review_outcome(
-                [{"severity": "style", "status": "non-blocking"}, {"status": "blocking"}]
+                [
+                    {"severity": "style", "status": "non-blocking"},
+                    {"status": "blocking"},
+                ]
             ),
             "changes-required",
         )
@@ -148,12 +156,15 @@ class ReviewDispatchTest(unittest.TestCase):
     def test_invalid_review_decisions_fail_closed(self) -> None:
         """Unknown and mistyped review decisions cannot enter the ledger."""
         for value in (None, "", "BLOCK", "APPROVED"):
-            with self.subTest(value=value), self.assertRaises(
-                review_dispatch.AutomaticReviewError
+            with (
+                self.subTest(value=value),
+                self.assertRaises(review_dispatch.AutomaticReviewError),
             ):
                 review_dispatch.canonicalize_review_decision(value)
 
-    def test_record_decision_canonicalizes_aliases_and_blocking_derived_state(self) -> None:
+    def test_record_decision_canonicalizes_aliases_and_blocking_derived_state(
+        self,
+    ) -> None:
         """Recorded events retain APPROVE/REVISE for publication consumers."""
         candidate_payload = {
             "candidate_id": "candidate-1",
@@ -162,7 +173,7 @@ class ReviewDispatchTest(unittest.TestCase):
             "candidate_commit": "a" * 40,
             "candidate_tree": "b" * 40,
         }
-        frame = {
+        frame: dict[str, object] = {
             "review_role_id": "change_reviewer",
             "candidate_id": "candidate-1",
             "review_frame_id": "frame-1",
@@ -173,7 +184,7 @@ class ReviewDispatchTest(unittest.TestCase):
             "review_frame_body_sha256": "frame-hash",
             "event_order_index": 1,
         }
-        resume_event = {
+        resume_event: dict[str, object] = {
             "review_frame_id": "frame-1",
             "observed_result": {"nested_runtime_agent_id": "reviewer-1"},
         }
@@ -184,17 +195,35 @@ class ReviewDispatchTest(unittest.TestCase):
                 (report_dir / "change_review.md").write_text(text, encoding="utf-8")
                 captured: list[dict[str, object]] = []
 
-                def payloads(_report_dir: Path, kind: str | None = None) -> list[dict[str, object]]:
+                def payloads(
+                    _report_dir: Path, kind: str | None = None
+                ) -> list[dict[str, object]]:
                     if kind == "frame":
                         return [frame]
                     if kind == "resume_event":
                         return [resume_event]
                     return [frame, resume_event]
 
+                def append_automatic_event(
+                    _path: Path,
+                    payload: Mapping[str, object],
+                    outcome: str,
+                ) -> None:
+                    del outcome
+                    captured.append(dict(payload))
+
                 with (
-                    patch.object(review_dispatch, "_active_report_dir", return_value=report_dir),
-                    patch.object(review_dispatch, "_current_candidate", return_value=candidate_payload),
-                    patch.object(review_dispatch, "_automatic_payloads", side_effect=payloads),
+                    patch.object(
+                        review_dispatch, "_active_report_dir", return_value=report_dir
+                    ),
+                    patch.object(
+                        review_dispatch,
+                        "_current_candidate",
+                        return_value=candidate_payload,
+                    ),
+                    patch.object(
+                        review_dispatch, "_automatic_payloads", side_effect=payloads
+                    ),
                     patch.object(
                         review_dispatch,
                         "_review_route",
@@ -214,7 +243,7 @@ class ReviewDispatchTest(unittest.TestCase):
                     patch.object(
                         review_dispatch,
                         "_append_automatic_event",
-                        side_effect=lambda _path, payload, outcome: captured.append(payload),
+                        side_effect=append_automatic_event,
                     ),
                 ):
                     review_dispatch.record_current_review_decision(report_dir)
