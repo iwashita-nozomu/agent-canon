@@ -673,10 +673,15 @@ def _admit_process_owned_task(
 
 
 def _run_process_owned_worker_controller(
-    manager: BootstrapRuntime, task_id: str, target: Path, ready_file: Path
+    manager: BootstrapRuntime,
+    task_id: str,
+    target: Path,
+    ready_file: Path,
+    exchange_root: Path,
 ) -> None:
     """Spawn one resident worker that keeps its admitted process lease."""
     os.environ["AGENT_CANON_CONTAINER_CONTROL"] = "1"
+    os.environ["AGENT_CANON_EXCHANGE_ROOT"] = str(exchange_root)
     _, lease_fd = _admit_process_owned_task(manager, task_id, target)
     try:
         manager.docker.exec_container(
@@ -744,9 +749,12 @@ def test_process_lease_survives_controller_death_until_worker_exits(
     manager, target = _ready_runtime_with_target(tmp_path, fake_docker)
     task_id = "exec-controller-death"
     ready_file = tmp_path / "worker.pid"
+    exchange_root = manager.paths.runtime_root / "process-lease-exchange"
+    exchange_root.mkdir()
+    exchange_root.chmod(0o700)
     controller = multiprocessing.get_context("fork").Process(
         target=_run_process_owned_worker_controller,
-        args=(manager, task_id, target, ready_file),
+        args=(manager, task_id, target, ready_file, exchange_root),
     )
     worker_pid: int | None = None
     worker_stop_sent = False
