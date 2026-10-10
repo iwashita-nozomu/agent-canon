@@ -678,7 +678,7 @@ class CodexHooksTest(unittest.TestCase):
             "plan_path": f"reports/agents/{run_id}/runtime/execution_resource_plan.json",
             "projection": "post_tool_use",
             "run_id": run_id,
-            "schema_version": "execution-resource-plan/v1",
+            "schema_version": "execution-resource-plan-projection/v2",
         }
         projection_stdout = (
             json.dumps(projection, sort_keys=True, separators=(",", ":")) + "\n"
@@ -888,7 +888,7 @@ class CodexHooksTest(unittest.TestCase):
             "plan_path": "reports/agents/r5/runtime/execution_resource_plan.json",
             "projection": "post_tool_use",
             "run_id": "r5",
-            "schema_version": "execution-resource-plan/v1",
+            "schema_version": "execution-resource-plan-projection/v2",
         }
         projection_stdout = (
             json.dumps(valid_projection, sort_keys=True, separators=(",", ":")) + "\n"

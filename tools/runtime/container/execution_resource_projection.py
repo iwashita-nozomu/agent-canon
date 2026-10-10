@@ -41,7 +41,7 @@ ADMISSION_KEYS = {
     "admission_fingerprint",
     "guarantee",
     "namespace_id",
-    "provision_receipt_fingerprint",
+    "runtime_identity_fingerprint",
     "selected_uuids",
 }
 ERROR_KEYS = {"kind"}
@@ -49,6 +49,7 @@ PROJECTION_ERROR_CONSTANTS = frozenset(
     {"managed_gpu_failure", "managed_gpu_execution", "see_execution_resource_plan"}
 )
 ADMISSION_GUARANTEE = "run-level-opaque-uuid-admission"
+PROJECTION_SCHEMA_VERSION = "execution-resource-plan-projection/v2"
 OPAQUE_NAMESPACE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:\[\]-]{0,63}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -128,7 +129,7 @@ def validate_admission(value: object) -> None:
     if not isinstance(value, dict) or set(value) != ADMISSION_KEYS:
         raise ProjectionError("admission fields are not exact")
     require_sha256(value["admission_fingerprint"], "admission_fingerprint")
-    require_sha256(value["provision_receipt_fingerprint"], "provision_receipt_fingerprint")
+    require_sha256(value["runtime_identity_fingerprint"], "runtime_identity_fingerprint")
     if value["guarantee"] != ADMISSION_GUARANTEE:
         raise ProjectionError("admission guarantee is not exact")
     if not isinstance(value["namespace_id"], str) or OPAQUE_NAMESPACE_RE.fullmatch(value["namespace_id"]) is None:
@@ -164,8 +165,8 @@ def validate_projection_bytes(stdout: str) -> dict[str, Any]:
     )
     if not isinstance(projection, dict) or set(projection) != PROJECTION_KEYS:
         raise ProjectionError("projection fields are not the exact nine-key set")
-    if projection["schema_version"] != "execution-resource-plan/v1":
-        raise ProjectionError("projection schema_version is not execution-resource-plan/v1")
+    if projection["schema_version"] != PROJECTION_SCHEMA_VERSION:
+        raise ProjectionError("projection schema_version is not execution-resource-plan-projection/v2")
     if projection["projection"] != "post_tool_use":
         raise ProjectionError("projection kind is not post_tool_use")
     run_id = projection["run_id"]

@@ -1649,7 +1649,7 @@ class DirectGpuCommandResult:
             disposition="explicit",
             visible_uuids=self.plan.selected_ids,
             namespace_id=f"pid-session:{self.execution.lifecycle.session_id}",
-            provision_receipt_fingerprint=self.admission.runtime_identity_fingerprint,
+            runtime_identity_fingerprint=self.admission.runtime_identity_fingerprint,
             fingerprint=_fingerprint(
                 {
                     "plan_fingerprint": self.plan.plan_fingerprint,

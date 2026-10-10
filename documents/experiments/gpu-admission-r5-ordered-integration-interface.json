@@ -1,6 +1,6 @@
 {
   "schema": "agent-canon.gpu-admission-r5.ordered-integration-interface.v1",
-  "source_packet_sha256": "607d1c291a2a31f319973406786f6813c9399d2fa8228a1efd74f98308052523",
+  "source_packet_sha256": "88749914e34af61b35e3adaaa80a310fff4d105889138bebca54da89df0a2e83",
   "managed_run_executable": "experiment-runner-admitted",
   "provider_repository": "https://github.com/iwashita-nozomu/experiment-runner",
   "provider_commit": "71b3630266151703bdf88b11741b7492eca92fb4",
@@ -36,7 +36,7 @@
   ],
   "route": [
     "SourceFreezeOwner.freeze",
-    "RuntimeIdentityReader.read",
+    "AGENT_CANON_RUNTIME_ROUTE + /proc/self/ns/pid (GPU requests only)",
     "NvidiaInventoryProbe.observe",
     "GpuProcessOccupancyProbe.observe",
     "GpuReservationTransaction.try_reserve",

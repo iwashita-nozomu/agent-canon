@@ -56,6 +56,7 @@ except ImportError:  # pragma: no cover - this owner is Unix/container-only.
     fcntl = None  # type: ignore[assignment]
 
 PLAN_SCHEMA_VERSION = "execution-resource-plan/v1"
+POST_TOOL_USE_PROJECTION_SCHEMA_VERSION = "execution-resource-plan-projection/v2"
 ENVIRONMENT_CERTIFICATE_SCHEMA_VERSION = "environment-certificate/v1"
 COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION = "completion-coverage/v2"
 HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
@@ -215,9 +216,6 @@ _EVIDENCE_ABSENCE_FIELD_ORDER = (
 )
 
 SOURCE_FREEZE_SCHEMA_VERSION = "source-freeze/v2"
-RUNTIME_IDENTITY_SCHEMA_VERSION = "runtime-identity/v1"
-SHARED_RUNTIME_PROVISION_SCHEMA_VERSION = "shared-runtime-provision/v1"
-SHARED_RUNTIME_READBACK_SCHEMA_VERSION = "shared-runtime-readback/v1"
 PROCESS_UMASK = 0o0007
 _AT_EMPTY_PATH = 0x1000
 
@@ -321,80 +319,6 @@ def _strict_json_object(raw: bytes, *, path: str) -> dict[str, JsonValue]:
     return decoded
 
 
-def _read_runtime_receipt(
-    path: AbsolutePosixPath,
-) -> tuple[dict[str, JsonValue], os.stat_result]:
-    validate_absolute_posix_path(path)
-    parent = os.path.dirname(path)
-    name = os.path.basename(path)
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
-    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
-    directory = -1
-    descriptor = -1
-    try:
-        directory = os.open(parent, directory_flags)
-        descriptor = os.open(name, flags, dir_fd=directory)
-    except OSError as exc:
-        if directory >= 0:
-            os.close(directory)
-        raise TypedPreflightFailure(
-            "runtime_receipt_unavailable",
-            "runtime receipt could not be opened with no-follow flags",
-            path=path,
-            errno=exc.errno,
-        ) from exc
-    try:
-        parent_stat = os.fstat(directory)
-        before = os.fstat(descriptor)
-        if (
-            not stat.S_ISREG(before.st_mode)
-            or before.st_dev != parent_stat.st_dev
-            or stat.S_IMODE(before.st_mode) != 0o660
-            or before.st_size <= 0
-            or before.st_size > 65536
-        ):
-            raise TypedPreflightFailure(
-                "runtime_receipt_invalid",
-                "runtime receipt fd identity, mode, or size is invalid",
-                path=path,
-            )
-        chunks: list[bytes] = []
-        while True:
-            chunk = os.read(descriptor, 1024 * 1024)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        after = os.fstat(descriptor)
-        if (
-            before.st_dev,
-            before.st_ino,
-            before.st_size,
-            before.st_mode,
-            before.st_uid,
-            before.st_gid,
-            before.st_mtime_ns,
-            before.st_ctime_ns,
-        ) != (
-            after.st_dev,
-            after.st_ino,
-            after.st_size,
-            after.st_mode,
-            after.st_uid,
-            after.st_gid,
-            after.st_mtime_ns,
-            after.st_ctime_ns,
-        ):
-            raise TypedPreflightFailure(
-                "runtime_receipt_raced",
-                "runtime receipt identity changed while reading",
-                path=path,
-            )
-        return _strict_json_object(b"".join(chunks), path=path), before
-    finally:
-        os.close(descriptor)
-        os.close(directory)
-
-
 def _write_all(descriptor: int, payload: bytes) -> None:
     offset = 0
     while offset < len(payload):
@@ -433,106 +357,6 @@ def _link_tmpfile(descriptor: int, directory: int, name: bytes) -> None:
         )
 
 
-def write_runtime_receipt_atomic(
-    path: AbsolutePosixPath,
-    payload: Mapping[str, JsonValue],
-) -> None:
-    """Publish one canonical receipt atomically under the runtime receipt lock."""
-    validate_absolute_posix_path(path)
-    if fcntl is None:
-        raise TypedPreflightFailure(
-            "runtime_receipt_lock_unavailable",
-            "runtime receipt publication requires POSIX flock",
-            path=path,
-        )
-    parent = os.path.dirname(path)
-    name = os.path.basename(path).encode("utf-8")
-    lock_path = os.path.join(parent, "locks", "shared-runtime-receipt.lock")
-    validate_absolute_posix_path(lock_path)
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
-    temporary_flags = os.O_WRONLY | os.O_TMPFILE | os.O_CLOEXEC
-    directory = os.open(parent, directory_flags)
-    lock_descriptor = -1
-    descriptor = -1
-    staging_name: bytes | None = None
-    try:
-        parent_stat = os.fstat(directory)
-        try:
-            lock_descriptor = os.open(
-                lock_path,
-                os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW,
-                0o660,
-            )
-        except OSError as exc:
-            raise TypedPreflightFailure(
-                "runtime_receipt_lock_unavailable",
-                "runtime receipt publication lock could not be opened",
-                path=lock_path,
-                errno=exc.errno,
-            ) from exc
-        lock_stat = os.fstat(lock_descriptor)
-        if (
-            not stat.S_ISREG(lock_stat.st_mode)
-            or lock_stat.st_dev != parent_stat.st_dev
-            or stat.S_IMODE(lock_stat.st_mode) != 0o660
-        ):
-            raise TypedPreflightFailure(
-                "runtime_receipt_lock_tampered",
-                "runtime receipt publication lock identity is not exact",
-                path=lock_path,
-            )
-        fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
-
-        descriptor = os.open(".", temporary_flags, 0o660, dir_fd=directory)
-        os.fchmod(descriptor, 0o660)
-        encoded = (_canonical_json(_json_safe(payload)) + "\n").encode("utf-8")
-        _write_all(descriptor, encoded)
-        os.fsync(descriptor)
-        try:
-            existing = os.stat(name, dir_fd=directory, follow_symlinks=False)
-        except FileNotFoundError:
-            existing = None
-        if existing is None:
-            _link_tmpfile(descriptor, directory, name)
-        else:
-            if (
-                not stat.S_ISREG(existing.st_mode)
-                or existing.st_dev != parent_stat.st_dev
-                or stat.S_IMODE(existing.st_mode) != 0o660
-            ):
-                raise TypedPreflightFailure(
-                    "runtime_receipt_target_tampered",
-                    "runtime receipt target identity is not replaceable",
-                    path=path,
-                )
-            staging_name = (
-                f".{os.path.basename(path)}.{secrets.token_hex(16)}.tmp".encode("utf-8")
-            )
-            _link_tmpfile(descriptor, directory, staging_name)
-            os.replace(
-                staging_name,
-                name,
-                src_dir_fd=directory,
-                dst_dir_fd=directory,
-            )
-            staging_name = None
-        os.fsync(directory)
-    finally:
-        if staging_name is not None:
-            try:
-                os.unlink(staging_name, dir_fd=directory)
-            except FileNotFoundError:
-                pass
-        if descriptor >= 0:
-            os.close(descriptor)
-        if lock_descriptor >= 0:
-            try:
-                fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
-            finally:
-                os.close(lock_descriptor)
-        os.close(directory)
-
-
 @dataclass(frozen=True)
 class GpuRunRequest:
     gpu_count: int
@@ -545,20 +369,6 @@ class GpuRunRequest:
     runtime_route: RuntimeRoute
     source_paths: tuple[RelativePosixPath, ...]
     planned_chunk_ids: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class SharedRuntimeProvisionReceipt:
-    schema_version: Literal["shared-runtime-provision/v1"]
-    runtime_route: RuntimeRoute
-    host_uid: int
-    host_gid: int
-    host_supplementary_gids: tuple[int, ...]
-    host_umask: int
-    bind_source_path: AbsolutePosixPath
-    bind_source_dev: int
-    bind_source_ino: int
-    provision_fingerprint: Sha256Hex
 
 
 @dataclass(frozen=True)
@@ -618,43 +428,6 @@ class SourceFreezeReceipt:
 
 
 @dataclass(frozen=True)
-class SharedRuntimeReadbackReceipt:
-    schema_version: Literal["shared-runtime-readback/v1"]
-    runtime_route: RuntimeRoute
-    container_uid: int
-    container_gid: int
-    container_supplementary_gids: tuple[int, ...]
-    container_umask: int
-    bind_target_path: AbsolutePosixPath
-    bind_target_dev: int
-    bind_target_ino: int
-    namespace_inode: int
-    mount_id: int
-    mount_parent_id: int
-    mount_root: str
-    probe_fd_disposition: Literal["closed"]
-    readback_fingerprint: Sha256Hex
-
-
-@dataclass(frozen=True)
-class RuntimeIdentityReceipt:
-    schema_version: Literal["runtime-identity/v1"]
-    runtime_route: RuntimeRoute
-    namespace_inode: int
-    uid: int
-    gid: int
-    supplementary_gids: tuple[int, ...]
-    umask: int
-    bind_source_dev: int
-    bind_source_ino: int
-    bind_target_dev: int
-    bind_target_ino: int
-    provision_fingerprint: Sha256Hex
-    readback_fingerprint: Sha256Hex
-    receipt_fingerprint: Sha256Hex
-
-
-@dataclass(frozen=True)
 class CudaRuntimeCapabilityReceipt:
     """The capability obtained from one exact configured CUDA library fd."""
 
@@ -665,398 +438,6 @@ class CudaRuntimeCapabilityReceipt:
     cuda_runtime_major: int
     cuda_runtime_minor: int
     receipt_fingerprint: Sha256Hex
-
-
-def _receipt_field(
-    payload: Mapping[str, JsonValue],
-    name: str,
-    expected_type: type[object],
-    *,
-    path: str,
-) -> object:
-    value = payload.get(name)
-    if expected_type is int:
-        valid = type(value) is int
-    else:
-        valid = isinstance(value, expected_type)
-    if not valid:
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime receipt field has the wrong type",
-            path=path,
-            field=name,
-        )
-    return value
-
-
-def _receipt_gids(
-    payload: Mapping[str, JsonValue],
-    name: str,
-    *,
-    path: str,
-) -> tuple[int, ...]:
-    value = _receipt_field(payload, name, list, path=path)
-    if any(type(item) is not int or item < 0 for item in cast(list[object], value)):
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime supplementary groups must be non-negative integers",
-            path=path,
-            field=name,
-        )
-    groups = tuple(cast(list[int], value))
-    if groups != tuple(sorted(set(groups))):
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime supplementary groups must be sorted and unique",
-            path=path,
-            field=name,
-        )
-    return groups
-
-
-def _require_receipt_shape(
-    payload: Mapping[str, JsonValue],
-    fields: frozenset[str],
-    *,
-    path: str,
-) -> None:
-    if set(payload) != fields:
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime receipt schema contains missing or extra fields",
-            path=path,
-            expected_fields=tuple(sorted(fields)),
-            observed_fields=tuple(sorted(payload)),
-        )
-
-
-def read_shared_runtime_provision(
-    path: AbsolutePosixPath,
-) -> SharedRuntimeProvisionReceipt:
-    payload, _receipt_stat = _read_runtime_receipt(path)
-    _require_receipt_shape(
-        payload,
-        frozenset(
-            {
-                "schema_version",
-                "runtime_route",
-                "host_uid",
-                "host_gid",
-                "host_supplementary_gids",
-                "host_umask",
-                "bind_source_path",
-                "bind_source_dev",
-                "bind_source_ino",
-                "provision_fingerprint",
-            }
-        ),
-        path=path,
-    )
-    schema_version = _receipt_field(payload, "schema_version", str, path=path)
-    route = _receipt_field(payload, "runtime_route", str, path=path)
-    bind_source_path = _receipt_field(payload, "bind_source_path", str, path=path)
-    if schema_version != SHARED_RUNTIME_PROVISION_SCHEMA_VERSION:
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime provision receipt schema version is unsupported",
-            path=path,
-        )
-    if route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime provision receipt route is unsupported",
-            path=path,
-        )
-    validate_absolute_posix_path(cast(str, bind_source_path))
-    typed_payload = {
-        "schema_version": schema_version,
-        "runtime_route": route,
-        "host_uid": _receipt_field(payload, "host_uid", int, path=path),
-        "host_gid": _receipt_field(payload, "host_gid", int, path=path),
-        "host_supplementary_gids": _receipt_gids(
-            payload,
-            "host_supplementary_gids",
-            path=path,
-        ),
-        "host_umask": _receipt_field(payload, "host_umask", int, path=path),
-        "bind_source_path": bind_source_path,
-        "bind_source_dev": _receipt_field(payload, "bind_source_dev", int, path=path),
-        "bind_source_ino": _receipt_field(payload, "bind_source_ino", int, path=path),
-        "provision_fingerprint": _receipt_field(
-            payload,
-            "provision_fingerprint",
-            str,
-            path=path,
-        ),
-    }
-    expected = _canonical_fingerprint(typed_payload, "provision_fingerprint")
-    if typed_payload["provision_fingerprint"] != expected:
-        raise TypedPreflightFailure(
-            "runtime_receipt_fingerprint_mismatch",
-            "runtime provision receipt fingerprint does not match its payload",
-            path=path,
-        )
-    if typed_payload["host_uid"] <= 0 or typed_payload["host_gid"] < 0:
-        raise TypedPreflightFailure(
-            "runtime_identity_invalid",
-            "runtime provision receipt UID/GID must be nonzero/nonnegative",
-            path=path,
-        )
-    if typed_payload["host_supplementary_gids"] != (typed_payload["host_gid"],):
-        raise TypedPreflightFailure(
-            "runtime_identity_invalid",
-            "runtime provision receipt supplementary groups must equal its primary GID",
-            path=path,
-        )
-    return SharedRuntimeProvisionReceipt(
-        schema_version=cast(
-            Literal["shared-runtime-provision/v1"],
-            typed_payload["schema_version"],
-        ),
-        runtime_route=cast(RuntimeRoute, typed_payload["runtime_route"]),
-        host_uid=cast(int, typed_payload["host_uid"]),
-        host_gid=cast(int, typed_payload["host_gid"]),
-        host_supplementary_gids=cast(
-            tuple[int, ...],
-            typed_payload["host_supplementary_gids"],
-        ),
-        host_umask=cast(int, typed_payload["host_umask"]),
-        bind_source_path=cast(
-            AbsolutePosixPath,
-            typed_payload["bind_source_path"],
-        ),
-        bind_source_dev=cast(int, typed_payload["bind_source_dev"]),
-        bind_source_ino=cast(int, typed_payload["bind_source_ino"]),
-        provision_fingerprint=cast(
-            Sha256Hex,
-            typed_payload["provision_fingerprint"],
-        ),
-    )
-
-
-def read_shared_runtime_readback(
-    path: AbsolutePosixPath,
-) -> SharedRuntimeReadbackReceipt:
-    payload, _receipt_stat = _read_runtime_receipt(path)
-    _require_receipt_shape(
-        payload,
-        frozenset(
-            {
-                "schema_version",
-                "runtime_route",
-                "container_uid",
-                "container_gid",
-                "container_supplementary_gids",
-                "container_umask",
-                "bind_target_path",
-                "bind_target_dev",
-                "bind_target_ino",
-                "namespace_inode",
-                "mount_id",
-                "mount_parent_id",
-                "mount_root",
-                "probe_fd_disposition",
-                "readback_fingerprint",
-            }
-        ),
-        path=path,
-    )
-    schema_version = _receipt_field(payload, "schema_version", str, path=path)
-    route = _receipt_field(payload, "runtime_route", str, path=path)
-    bind_target_path = _receipt_field(payload, "bind_target_path", str, path=path)
-    mount_root = _receipt_field(payload, "mount_root", str, path=path)
-    probe_disposition = _receipt_field(
-        payload,
-        "probe_fd_disposition",
-        str,
-        path=path,
-    )
-    if schema_version != SHARED_RUNTIME_READBACK_SCHEMA_VERSION:
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime readback receipt schema version is unsupported",
-            path=path,
-        )
-    if route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime readback receipt route is unsupported",
-            path=path,
-        )
-    if probe_disposition != "closed":
-        raise TypedPreflightFailure(
-            "runtime_receipt_invalid",
-            "runtime readback receipt must report a closed probe",
-            path=path,
-        )
-    validate_absolute_posix_path(cast(str, bind_target_path))
-    typed_payload = {
-        "schema_version": schema_version,
-        "runtime_route": route,
-        "container_uid": _receipt_field(payload, "container_uid", int, path=path),
-        "container_gid": _receipt_field(payload, "container_gid", int, path=path),
-        "container_supplementary_gids": _receipt_gids(
-            payload,
-            "container_supplementary_gids",
-            path=path,
-        ),
-        "container_umask": _receipt_field(payload, "container_umask", int, path=path),
-        "bind_target_path": bind_target_path,
-        "bind_target_dev": _receipt_field(payload, "bind_target_dev", int, path=path),
-        "bind_target_ino": _receipt_field(payload, "bind_target_ino", int, path=path),
-        "namespace_inode": _receipt_field(payload, "namespace_inode", int, path=path),
-        "mount_id": _receipt_field(payload, "mount_id", int, path=path),
-        "mount_parent_id": _receipt_field(payload, "mount_parent_id", int, path=path),
-        "mount_root": mount_root,
-        "probe_fd_disposition": probe_disposition,
-        "readback_fingerprint": _receipt_field(
-            payload,
-            "readback_fingerprint",
-            str,
-            path=path,
-        ),
-    }
-    expected = _canonical_fingerprint(typed_payload, "readback_fingerprint")
-    if typed_payload["readback_fingerprint"] != expected:
-        raise TypedPreflightFailure(
-            "runtime_receipt_fingerprint_mismatch",
-            "runtime readback receipt fingerprint does not match its payload",
-            path=path,
-        )
-    if typed_payload["container_uid"] <= 0 or typed_payload["container_gid"] < 0:
-        raise TypedPreflightFailure(
-            "runtime_identity_invalid",
-            "runtime readback receipt UID/GID must be nonzero/nonnegative",
-            path=path,
-        )
-    if typed_payload["container_supplementary_gids"] != (
-        typed_payload["container_gid"],
-    ):
-        raise TypedPreflightFailure(
-            "runtime_identity_invalid",
-            "runtime readback receipt supplementary groups must equal its primary GID",
-            path=path,
-        )
-    return SharedRuntimeReadbackReceipt(
-        schema_version=cast(
-            Literal["shared-runtime-readback/v1"],
-            typed_payload["schema_version"],
-        ),
-        runtime_route=cast(RuntimeRoute, typed_payload["runtime_route"]),
-        container_uid=cast(int, typed_payload["container_uid"]),
-        container_gid=cast(int, typed_payload["container_gid"]),
-        container_supplementary_gids=cast(
-            tuple[int, ...],
-            typed_payload["container_supplementary_gids"],
-        ),
-        container_umask=cast(int, typed_payload["container_umask"]),
-        bind_target_path=cast(
-            AbsolutePosixPath,
-            typed_payload["bind_target_path"],
-        ),
-        bind_target_dev=cast(int, typed_payload["bind_target_dev"]),
-        bind_target_ino=cast(int, typed_payload["bind_target_ino"]),
-        namespace_inode=cast(int, typed_payload["namespace_inode"]),
-        mount_id=cast(int, typed_payload["mount_id"]),
-        mount_parent_id=cast(int, typed_payload["mount_parent_id"]),
-        mount_root=cast(str, typed_payload["mount_root"]),
-        probe_fd_disposition=cast(
-            Literal["closed"],
-            typed_payload["probe_fd_disposition"],
-        ),
-        readback_fingerprint=cast(
-            Sha256Hex,
-            typed_payload["readback_fingerprint"],
-        ),
-    )
-
-
-class RuntimeIdentityReader:
-    """Validate script-owned runtime receipts without mutating runtime state."""
-
-    def read(
-        self,
-        provision: SharedRuntimeProvisionReceipt,
-        readback: SharedRuntimeReadbackReceipt,
-    ) -> RuntimeIdentityReceipt:
-        if provision.runtime_route != readback.runtime_route:
-            raise TypedPreflightFailure(
-                "runtime_identity_mismatch",
-                "provision and readback routes differ",
-            )
-        if (
-            provision.host_uid <= 0
-            or provision.host_gid < 0
-            or provision.host_supplementary_gids != (provision.host_gid,)
-            or readback.container_uid <= 0
-            or readback.container_gid < 0
-            or readback.container_supplementary_gids != (readback.container_gid,)
-        ):
-            raise TypedPreflightFailure(
-                "runtime_identity_invalid",
-                "runtime provision/readback numeric identity is invalid under the mapping-neutral identity contract",
-            )
-        if (
-            provision.host_umask != 0o0007
-            or readback.container_umask != 0o0007
-            or provision.bind_source_dev != readback.bind_target_dev
-            or provision.bind_source_ino != readback.bind_target_ino
-            or readback.probe_fd_disposition != "closed"
-            or readback.namespace_inode <= 0
-            or readback.mount_id <= 0
-            or readback.mount_parent_id < 0
-        ):
-            raise TypedPreflightFailure(
-                "runtime_identity_mismatch",
-                "runtime provision/readback evidence is invalid under the mapping-neutral identity contract",
-            )
-        receipt_payload = {
-            "schema_version": RUNTIME_IDENTITY_SCHEMA_VERSION,
-            "runtime_route": provision.runtime_route,
-            "namespace_inode": readback.namespace_inode,
-            "uid": readback.container_uid,
-            "gid": readback.container_gid,
-            "supplementary_gids": readback.container_supplementary_gids,
-            "umask": readback.container_umask,
-            "bind_source_dev": provision.bind_source_dev,
-            "bind_source_ino": provision.bind_source_ino,
-            "bind_target_dev": readback.bind_target_dev,
-            "bind_target_ino": readback.bind_target_ino,
-            "provision_fingerprint": provision.provision_fingerprint,
-            "readback_fingerprint": readback.readback_fingerprint,
-        }
-        receipt_fingerprint = _canonical_fingerprint(
-            receipt_payload,
-            "receipt_fingerprint",
-        )
-        return RuntimeIdentityReceipt(
-            schema_version=cast(
-                Literal["runtime-identity/v1"],
-                receipt_payload["schema_version"],
-            ),
-            runtime_route=cast(RuntimeRoute, receipt_payload["runtime_route"]),
-            namespace_inode=cast(int, receipt_payload["namespace_inode"]),
-            uid=cast(int, receipt_payload["uid"]),
-            gid=cast(int, receipt_payload["gid"]),
-            supplementary_gids=cast(
-                tuple[int, ...],
-                receipt_payload["supplementary_gids"],
-            ),
-            umask=cast(int, receipt_payload["umask"]),
-            bind_source_dev=cast(int, receipt_payload["bind_source_dev"]),
-            bind_source_ino=cast(int, receipt_payload["bind_source_ino"]),
-            bind_target_dev=cast(int, receipt_payload["bind_target_dev"]),
-            bind_target_ino=cast(int, receipt_payload["bind_target_ino"]),
-            provision_fingerprint=cast(
-                Sha256Hex,
-                receipt_payload["provision_fingerprint"],
-            ),
-            readback_fingerprint=cast(
-                Sha256Hex,
-                receipt_payload["readback_fingerprint"],
-            ),
-            receipt_fingerprint=receipt_fingerprint,
-        )
 
 
 def capture_cuda_runtime_capability(
@@ -4136,7 +3517,7 @@ class UuidVisibilityEvidence:
     disposition: VisibilityDisposition
     visible_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
     namespace_id: str
-    provision_receipt_fingerprint: Sha256Hex
+    runtime_identity_fingerprint: Sha256Hex
     fingerprint: Sha256Hex
 
 
@@ -4360,7 +3741,7 @@ def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, objec
                 "disposition": value.container_visible_uuid_mapping.disposition,
                 "visible_uuids": value.container_visible_uuid_mapping.visible_uuids,
                 "namespace_id": value.container_visible_uuid_mapping.namespace_id,
-                "provision_receipt_fingerprint": value.container_visible_uuid_mapping.provision_receipt_fingerprint,
+                "runtime_identity_fingerprint": value.container_visible_uuid_mapping.runtime_identity_fingerprint,
                 "fingerprint": value.container_visible_uuid_mapping.fingerprint,
             }
             if value.container_visible_uuid_mapping is not None
@@ -6521,7 +5902,6 @@ class ManagedGpuOutcomeReducer:
         planned_chunk_ids: tuple[str, ...],
         admission: RunGpuAdmissionReceipt | None,
         source_freeze: SourceFreezeReceipt | None,
-        runtime_identity: RuntimeIdentityReceipt | None,
         runner_lifecycle: RunnerLifecycleEvidence | None,
         primary_failure: FailureRecord | None,
         secondary_failures: tuple[FailureRecord, ...],
@@ -6653,21 +6033,10 @@ def build_completion_coverage_input(
     outcome: ManagedGpuOutcome,
     admission: RunGpuAdmissionReceipt | None,
     source_freeze: SourceFreezeReceipt | None,
-    runtime_identity: RuntimeIdentityReceipt | None,
     evidence_absence: tuple[EvidenceAbsence, ...],
 ) -> CompletionCoverageInput:
     """Assemble one exact coverage input without becoming a second owner."""
     visibility = admission.container_visible_uuid_mapping if admission is not None else None
-    if visibility is not None:
-        if runtime_identity is None:
-            raise CompletionCoverageFailure(
-                "runtime identity is required for UUID visibility coverage"
-            )
-        visibility = replace(
-            visibility,
-            namespace_id=f"pid:[{runtime_identity.namespace_inode}]",
-            provision_receipt_fingerprint=runtime_identity.provision_fingerprint,
-        )
     return CompletionCoverageInput(
         schema_version=COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
         outcome=outcome,
@@ -7165,15 +6534,15 @@ class PostToolUseProjectionReducer:
                 raise CompletionCoverageFailure(
                     "GPU projection requires typed UUID visibility and runtime identity evidence"
                 )
-            if not admission_source.namespace_id or not admission_source.provision_receipt_fingerprint:
+            if not admission_source.namespace_id or not admission_source.runtime_identity_fingerprint:
                 raise CompletionCoverageFailure(
-                    "GPU projection requires non-empty runtime namespace and provision fingerprints"
+                    "GPU projection requires non-empty runtime namespace and identity fingerprints"
                 )
             admission = {
                 "admission_fingerprint": outcome.admission_fingerprint,
                 "guarantee": PROJECTION_ADMISSION_GUARANTEE,
                 "namespace_id": admission_source.namespace_id,
-                "provision_receipt_fingerprint": admission_source.provision_receipt_fingerprint,
+                "runtime_identity_fingerprint": admission_source.runtime_identity_fingerprint,
                 "selected_uuids": selected,
             }
         coarse_error = _projection_error_constant(outcome.primary_failure, outcome.exit_code)
@@ -7189,7 +6558,7 @@ class PostToolUseProjectionReducer:
             "plan_path": f"reports/agents/{outcome.run_id}/runtime/execution_resource_plan.json",
             "projection": "post_tool_use",
             "run_id": outcome.run_id,
-            "schema_version": "execution-resource-plan/v1",
+            "schema_version": POST_TOOL_USE_PROJECTION_SCHEMA_VERSION,
         }
         return (_canonical_json(projection) + "\n").encode("utf-8")
 
@@ -10153,6 +9522,7 @@ __all__ = [
     "AdmittedEnvironment",
     "CALLER_ALLOCATION_PROVENANCE",
     "COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION",
+    "POST_TOOL_USE_PROJECTION_SCHEMA_VERSION",
     "CONTAINER_RUNTIME_ROOT",
     "CleanupEvidence",
     "CloseoutEvidence",
@@ -10211,15 +9581,11 @@ __all__ = [
     "ReservationEvidence",
     "RunGpuAdmissionReceipt",
     "build_lock_bound_admission_receipt",
-    "RuntimeIdentityReader",
-    "RuntimeIdentityReceipt",
     "RuntimeRoute",
     "DescendantRetentionEvidence",
     "MigEvidence",
     "UuidVisibilityEvidence",
     "LockPlacementEvidence",
-    "SharedRuntimeProvisionReceipt",
-    "SharedRuntimeReadbackReceipt",
     "Sha256Hex",
     "LockReadback",
     "SourceFileRecord",
@@ -10247,10 +9613,7 @@ __all__ = [
     "parse_nvidia_smi_list",
     "parse_nvidia_smi_xml",
     "record_terminal",
-    "read_shared_runtime_provision",
-    "read_shared_runtime_readback",
     "release_runner_owned_gpu_leases",
     "validate_absolute_posix_path",
     "verify_effective_environment",
-    "write_runtime_receipt_atomic",
 ]
