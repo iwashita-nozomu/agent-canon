@@ -195,7 +195,6 @@ def _topic_request_from_args(
     topic: str,
     module_path: str,
     branch: str,
-    owner_evidence: Path,
     allowed_paths: Sequence[str],
 ) -> RepositoryTopicCloneRequest:
     root = _attested_workspace_root(root)
@@ -216,7 +215,6 @@ def _topic_request_from_args(
         workspace_root=root,
         topic=topic,
         branch=branch,
-        owner_evidence=owner_evidence,
         allowed_paths=tuple(allowed_paths),
         checkout_mode=CHECKOUT_MODE_INDEPENDENT,
     )
@@ -227,14 +225,12 @@ def _prepare(
 ) -> int:
     """Handle prepare and merge-main by deferring to generic owner implementation."""
     workspace_root = Path(args.root).absolute()
-    owner_evidence = workspace_root / args.owner_evidence
     allowed_paths = tuple(args.allowed_path) or CANONICAL_DEPENDENCY_ALLOWED_PATHS
     request = _topic_request_from_args(
         workspace_root,
         args.topic,
         args.module,
         args.branch,
-        owner_evidence,
         allowed_paths,
     )
     if command == "prepare":
@@ -244,7 +240,6 @@ def _prepare(
             request.workspace_root,
             request.topic,
             request.branch,
-            request.owner_evidence,
             allowed_paths=request.allowed_paths,
             checkout_mode=CHECKOUT_MODE_INDEPENDENT,
         )
@@ -280,14 +275,12 @@ def _status(args: argparse.Namespace) -> int:
 def _cleanup(args: argparse.Namespace) -> int:
     """Handle cleanup by delegating to generic cleanup."""
     workspace_root = Path(args.root).absolute()
-    owner_evidence = workspace_root / args.owner_evidence
     allowed_paths = tuple(args.allowed_path) or CANONICAL_DEPENDENCY_ALLOWED_PATHS
     request = _topic_request_from_args(
         workspace_root,
         args.topic,
         args.module,
         args.branch,
-        owner_evidence,
         allowed_paths,
     )
     result = generic_cleanup(
@@ -313,7 +306,6 @@ def _build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--topic", required=True)
     prepare.add_argument("--module", required=True)
     prepare.add_argument("--branch", required=True)
-    prepare.add_argument("--owner-evidence", required=True)
     prepare.add_argument(
         "--allowed-path",
         action="append",
@@ -325,7 +317,6 @@ def _build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--topic", required=True)
     merge.add_argument("--module", required=True)
     merge.add_argument("--branch", required=True)
-    merge.add_argument("--owner-evidence", required=True)
     merge.add_argument(
         "--allowed-path",
         action="append",
@@ -341,7 +332,6 @@ def _build_parser() -> argparse.ArgumentParser:
     cleanup.add_argument("--topic", required=True)
     cleanup.add_argument("--module", required=True)
     cleanup.add_argument("--branch", required=True)
-    cleanup.add_argument("--owner-evidence", required=True)
     cleanup.add_argument(
         "--allowed-path",
         action="append",

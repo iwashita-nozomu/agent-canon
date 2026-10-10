@@ -150,10 +150,10 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - active な subagent 数は spawn budget で縛ります
 - selected coordination route の capacity/lifecycle owner が active descendants と独立 workstream の起動を管理します。名前付き intake wave や固定 stage sequence をこの inventory から materialize しません
 - 独立 source workstream を選択する parent packet は、各 stream の substantial replaceable responsibility unit、`repository-topic-clone` typed route、disjoint write scope、dependency/merge order、validation route、reviewer ownership を固定します。generic prepare は exact clone/branch を再利用し、無い branch を最新 `origin/main` から作成します。dependency などの specialized skill は prepare 後の decorator であり、前提不一致は generic operation を止めません。ready な非衝突 stream は全て launch し、parent / delegated stage owner は全 descendants を monitor します。
-- canonical lifecycle の owner evidence と computed identity が揃った repo-local
+- canonical lifecycle の Git identity と computed path が揃った repo-local
   `workspace/<topic-slug>/<repo-name>` prepare/reuse/use は operation-level の追加承認を
   要求しません。raw shared-checkout Git の protected mutation は従来の authority gate を
-  維持します。closeout は lifecycle skill の cleanup dispatch、CAS/PR/publication/owner
+  維持します。closeout は lifecycle skill の cleanup dispatch、CAS/PR/publication
   evidence の preflight、`CleanupProof` / receipt、typed hold の順で handback し、proof-free
   deletion を完了扱いにしません。
 - 同じ responsibility unit の follow-up は compatible な worker context を再利用します。file-sized slice、細粒度の fresh agent、または同じ oracle を共有する断片化は parallel source workstream として起動しません。依存または衝突する stream は記録済み merge order の ordered wave にします。

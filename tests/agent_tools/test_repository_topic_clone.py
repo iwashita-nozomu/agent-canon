@@ -185,12 +185,6 @@ def init_file(path: Path, filename: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def write_evidence(tmp_path: Path) -> Path:
-    evidence = tmp_path / "owner-evidence.md"
-    evidence.write_text("evidence\n", encoding="utf-8")
-    return evidence
-
-
 def lifecycle_binding(candidate_sha: str, candidate_tree: str) -> dict[str, object]:
     return {
         "transaction_id": "tx:" + "1" * 64,
@@ -324,14 +318,17 @@ def publication_artifacts(
 def install_legacy_module_markers(
     clone: Path,
     request: rtc.RepositoryTopicCloneRequest,
-    owner_sha: str,
     *,
     role: str = "module",
     module: str | None = None,
     placement: str = "workspace-continuation",
 ) -> None:
     """Replace canonical markers with the historical module marker namespace."""
-    for field in (*rtc.CANONICAL_MARKER_FIELDS, "branch-source"):
+    for field in (
+        *rtc.CANONICAL_MARKER_FIELDS,
+        "owner-evidence-sha256",
+        "branch-source",
+    ):
         subprocess.run(
             [
                 "git",
@@ -353,7 +350,6 @@ def install_legacy_module_markers(
         "url": request.url.removesuffix(".git"),
         "branch": request.branch,
         "placement": placement,
-        "owner-evidence-sha256": owner_sha,
     }
     for field, value in values.items():
         run_git(
@@ -367,7 +363,6 @@ def install_legacy_module_markers(
 
 def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -380,7 +375,6 @@ def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
         workspace,
         topic,
         "feature/local",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(initial.clone, "config", "user.name", "Test")
@@ -391,7 +385,6 @@ def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
         workspace,
         topic,
         "feature/local",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     assert reused_local.clone == initial.clone
@@ -413,7 +406,6 @@ def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
         workspace,
         topic,
         "feature/remote",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     assert reused_remote.branch == "feature/remote"
@@ -431,7 +423,6 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -452,7 +443,6 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
         workspace,
         "topic-target",
         "feature/target",
-        evidence,
         allowed_paths=("src/owned.py",),
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
@@ -464,7 +454,6 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
         workspace,
         "topic-target",
         "feature/target",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     assert reused.request.allowed_paths == ("src/owned.py",)
@@ -478,7 +467,6 @@ def test_request_and_merge_preserve_existing_writer_target_paths(
         workspace,
         "topic-target",
         "feature/target",
-        evidence,
         allowed_paths=("src/owned.py", "tests/test_owned.py"),
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
@@ -491,7 +479,6 @@ def test_prepare_allows_source_discovery_without_writer_scope_then_materializes_
 ) -> None:
     """A reader preparation can be reused when the actual write scope is known."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -502,22 +489,16 @@ def test_prepare_allows_source_discovery_without_writer_scope_then_materializes_
         workspace_root=workspace,
         topic="topic-discovery-before-scope",
         branch="feature/discovery-before-scope",
-        owner_evidence=evidence,
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
 
     discovered = rtc.request(**request)
-    marker_sha = run_git(
-        discovered.clone,
-        "config",
-        "--worktree",
-        "--get",
-        f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
-    )
     packet_path = discovered.clone / rtc.WRITER_TARGET_PACKET_RELATIVE
     assert discovered.writer_target_packet is None
     assert not packet_path.exists()
-    assert marker_sha == rtc._evidence_sha256(evidence)
+    assert "owner-evidence-sha256" not in run_git(
+        discovered.clone, "config", "--worktree", "--list"
+    )
     assert not run_git(discovered.clone, "status", "--porcelain")
 
     index_path = git_metadata_path(discovered.clone, "index")
@@ -548,7 +529,6 @@ def test_prepare_rejects_nested_parent_repo_without_mutating_ancestor(
 ) -> None:
     """A computed directory inside the anchor repo cannot inherit its Git identity."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -559,7 +539,6 @@ def test_prepare_rejects_nested_parent_repo_without_mutating_ancestor(
         workspace_root=workspace,
         topic="topic-nested-parent",
         branch=branch,
-        owner_evidence=evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     nested = (
@@ -603,7 +582,6 @@ def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
 ) -> None:
     """A clean unmarked native worktree is identified by its path and Git facts."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -614,7 +592,6 @@ def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
         workspace_root=workspace,
         topic="topic-unmarked-linked",
         branch="feature/unmarked-linked",
-        owner_evidence=evidence,
         allowed_paths=("agents/skills/README.md",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -686,7 +663,6 @@ def test_prepare_holds_unmarked_linked_worktree_from_foreign_common_root(
 ) -> None:
     """Matching branch and remote do not adopt a worktree registered elsewhere."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -700,7 +676,6 @@ def test_prepare_holds_unmarked_linked_worktree_from_foreign_common_root(
         workspace_root=workspace,
         topic="topic-foreign-common-dir",
         branch="feature/foreign-common-dir",
-        owner_evidence=evidence,
         allowed_paths=("agents/skills/README.md",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -745,7 +720,6 @@ def test_merge_main_keeps_dirty_independent_checkout_hold_after_metadata_refresh
 ) -> None:
     """Metadata reuse does not let merge-main proceed on a dirty independent clone."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -766,7 +740,6 @@ def test_merge_main_keeps_dirty_independent_checkout_hold_after_metadata_refresh
         workspace_root=workspace,
         topic="topic-independent-dirty-metadata",
         branch="feature/independent-dirty-metadata",
-        owner_evidence=evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     prepared = rtc.request(**request, allowed_paths=("old.py",))
@@ -793,7 +766,6 @@ def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
 ) -> None:
     """Linked topics share Git objects but keep indexes, markers, and packets separate."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     workspace.chmod(mode)
@@ -817,7 +789,6 @@ def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
         workspace,
         "topic-first",
         "feature/first",
-        evidence,
         allowed_paths=("first.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -827,7 +798,6 @@ def test_linked_worktrees_use_native_common_dir_and_per_worktree_state(
         workspace,
         "topic-second",
         "feature/second",
-        evidence,
         allowed_paths=("second.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -890,7 +860,6 @@ def test_linked_anchor_resolution_accepts_explicit_linked_workspace_root(
     run_git(parent, "remote", "add", "origin", remote_url)
     anchor = tmp_path / "anchor"
     run_git(parent, "worktree", "add", "-b", "anchor", anchor, "main")
-    evidence = anchor / "parent.txt"
 
     def fake_identity(path: Path) -> CheckoutIdentity:
         root = path.resolve()
@@ -909,7 +878,6 @@ def test_linked_anchor_resolution_accepts_explicit_linked_workspace_root(
         anchor,
         "topic-nested",
         "feature/nested",
-        evidence,
         allowed_paths=("nested.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -927,7 +895,6 @@ def test_linked_url_mismatch_is_rejected_before_worktree_mutation(
     _, remote_url = init_remote(tmp_path)
     wrong_remote = tmp_path / "wrong.git"
     subprocess.run(["git", "init", "--bare", str(wrong_remote)], check=True)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -942,7 +909,6 @@ def test_linked_url_mismatch_is_rejected_before_worktree_mutation(
             workspace,
             "topic-mismatch",
             "feature/mismatch",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_LINKED,
         )
 
@@ -955,7 +921,6 @@ def test_linked_url_mismatch_is_rejected_before_worktree_mutation(
 def test_request_requires_explicit_checkout_mode(tmp_path: Path) -> None:
     """The public request API cannot silently select a checkout implementation."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -966,7 +931,6 @@ def test_request_requires_explicit_checkout_mode(tmp_path: Path) -> None:
             workspace,
             "topic-required-mode",
             "feature/required-mode",
-            evidence,
         )
 
     required_args = [
@@ -981,8 +945,6 @@ def test_request_requires_explicit_checkout_mode(tmp_path: Path) -> None:
         "topic-required-mode",
         "--branch",
         "feature/required-mode",
-        "--owner-evidence",
-        str(evidence),
     ]
     with pytest.raises(SystemExit):
         rtc._parse_args(required_args)
@@ -993,7 +955,6 @@ def test_linked_foreign_occupant_does_not_mutate_common_git_state(
 ) -> None:
     """An unverified linked occupant is rejected before config or lifecycle mutation."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1014,7 +975,6 @@ def test_linked_foreign_occupant_does_not_mutate_common_git_state(
             workspace,
             "foreign-topic",
             "feature/request",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_LINKED,
         )
 
@@ -1024,7 +984,6 @@ def test_linked_foreign_occupant_does_not_mutate_common_git_state(
         workspace_root=workspace,
         topic="foreign-topic",
         branch="feature/request",
-        owner_evidence=evidence,
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
     with pytest.raises(rtc.RepositoryTopicCloneError, match="branch mismatch"):
@@ -1042,7 +1001,6 @@ def test_linked_reuse_preserves_owned_dirty_wip_and_branch_in_use(
 ) -> None:
     """Exact managed reuse keeps scoped WIP and never switches a linked branch."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1064,7 +1022,6 @@ def test_linked_reuse_preserves_owned_dirty_wip_and_branch_in_use(
         workspace_root=workspace,
         topic="topic-first",
         branch="feature/first",
-        owner_evidence=evidence,
         allowed_paths=("first.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1080,7 +1037,6 @@ def test_linked_reuse_preserves_owned_dirty_wip_and_branch_in_use(
             workspace,
             "topic-second",
             "feature/first",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_LINKED,
         )
 
@@ -1138,7 +1094,6 @@ def test_prepare_updates_dirty_linked_target_without_touching_checkout_data(
 ) -> None:
     """An explicit current target changes only reserved prepare metadata."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1149,7 +1104,6 @@ def test_prepare_updates_dirty_linked_target_without_touching_checkout_data(
         workspace_root=workspace,
         topic="topic-dirty-target-extension",
         branch="feature/dirty-target-extension",
-        owner_evidence=evidence,
         allowed_paths=("first.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1264,7 +1218,6 @@ def test_prepare_holds_symlinked_writer_packet_without_mutating_outside_target(
 ) -> None:
     """An ignored packet symlink cannot redirect the reserved metadata write."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1275,7 +1228,6 @@ def test_prepare_holds_symlinked_writer_packet_without_mutating_outside_target(
         workspace_root=workspace,
         topic="topic-symlinked-writer-packet",
         branch="feature/symlinked-writer-packet",
-        owner_evidence=evidence,
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
     prepared = rtc.request(**request, allowed_paths=("first.py",))
@@ -1304,12 +1256,11 @@ def test_prepare_holds_symlinked_writer_packet_without_mutating_outside_target(
     assert outside_packet.read_bytes() == packet_contents
 
 
-def test_prepare_refreshes_changed_owner_evidence_and_current_writer_scope(
+def test_cleanup_ignores_retired_owner_digest_and_preserves_writer_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Exact clean reuse advances evidence and carries or updates the writer target."""
+    """An old digest marker cannot block cleanup of the exact recoverable checkout."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1320,42 +1271,22 @@ def test_prepare_refreshes_changed_owner_evidence_and_current_writer_scope(
         workspace_root=workspace,
         topic="topic-evidence-refresh",
         branch="feature/evidence-refresh",
-        owner_evidence=evidence,
         allowed_paths=("first.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
 
     prepared = rtc.request(**request)
-    original_sha = run_git(
+    run_git(
         prepared.clone,
         "config",
         "--worktree",
-        "--get",
         f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
+        "stale-from-older-marker",
     )
-    evidence.write_text("updated task evidence\n", encoding="utf-8")
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError,
-        match="cleanup hold: owner-evidence-mismatch",
-    ):
-        rtc.cleanup(prepared.request, apply=True)
-    assert prepared.clone.is_dir()
 
     continued = rtc.request(**{**request, "allowed_paths": ()})
     assert continued.clone == prepared.clone
     assert continued.request.allowed_paths == ("first.py",)
-    current_sha = rtc._evidence_sha256(evidence)
-    assert current_sha != original_sha
-    assert (
-        run_git(
-            continued.clone,
-            "config",
-            "--worktree",
-            "--get",
-            f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
-        )
-        == current_sha
-    )
     retained_target, _ = read_writer_target_packet(continued.clone)
     assert retained_target.allowed_paths == ("first.py",)
 
@@ -1365,14 +1296,16 @@ def test_prepare_refreshes_changed_owner_evidence_and_current_writer_scope(
     proof = rtc.cleanup(updated_scope.request, apply=False)
     assert not proof.removed
     assert proof.evidence == "linked-superproject-head"
+    removed = rtc.cleanup(updated_scope.request, apply=True)
+    assert removed.removed
+    assert not updated_scope.clone.exists()
 
 
-def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content(
+def test_prepare_reuses_exact_target_without_rewriting_dirty_content(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Current exact identity can refresh metadata without adopting dirty content."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1383,39 +1316,18 @@ def test_prepare_refreshes_exact_target_metadata_without_rewriting_dirty_content
         workspace_root=workspace,
         topic="topic-dirty-evidence",
         branch="feature/dirty-evidence",
-        owner_evidence=evidence,
         allowed_paths=("first.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
 
     prepared = rtc.request(**request)
-    original_sha = run_git(
-        prepared.clone,
-        "config",
-        "--worktree",
-        "--get",
-        f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
-    )
-    evidence.write_text("updated task evidence\n", encoding="utf-8")
     dirty = prepared.clone / "untracked.txt"
     dirty.write_text("preserve\n", encoding="utf-8")
 
     continued = rtc.request(**request)
 
-    current_sha = rtc._evidence_sha256(evidence)
-    assert current_sha != original_sha
     assert continued.request.allowed_paths == ("first.py",)
     assert dirty.read_text(encoding="utf-8") == "preserve\n"
-    assert (
-        run_git(
-            continued.clone,
-            "config",
-            "--worktree",
-            "--get",
-            f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
-        )
-        == current_sha
-    )
     assert run_git(
         continued.clone,
         "status",
@@ -1445,7 +1357,6 @@ def test_prepare_holds_external_info_exclude_symlink_without_mutation(
 ) -> None:
     """An exclude symlink outside the parent cannot receive writer metadata."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     anchor = tmp_path / "parent"
     init_workspace_parent(anchor)
     run_git(anchor, "remote", "add", "origin", remote_url)
@@ -1460,7 +1371,6 @@ def test_prepare_holds_external_info_exclude_symlink_without_mutation(
         workspace_root=workspace,
         topic="topic-external-exclude",
         branch="feature/external-exclude",
-        owner_evidence=evidence,
         allowed_paths=("first.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1510,12 +1420,11 @@ def test_prepare_holds_external_info_exclude_symlink_without_mutation(
         assert packet.read_bytes() == packet_before
 
 
-def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
+def test_prepare_rejects_foreign_topic_marker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Evidence refresh does not adopt a checkout with mismatched topic metadata."""
+    """A mismatched topic marker remains a collision regardless of other metadata."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1526,19 +1435,11 @@ def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
         workspace_root=workspace,
         topic="topic-unknown-owner",
         branch="feature/unknown-owner",
-        owner_evidence=evidence,
         allowed_paths=("first.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
 
     prepared = rtc.request(**request)
-    original_sha = run_git(
-        prepared.clone,
-        "config",
-        "--worktree",
-        "--get",
-        f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
-    )
     run_git(
         prepared.clone,
         "config",
@@ -1546,21 +1447,10 @@ def test_prepare_owner_evidence_refresh_preserves_unknown_marker_owner(
         f"{rtc.MARKER_PREFIX}.topic",
         "foreign-topic",
     )
-    evidence.write_text("updated task evidence\n", encoding="utf-8")
 
     with pytest.raises(rtc.RepositoryTopicCloneError, match="topic-mismatch"):
         rtc.request(**request)
 
-    assert (
-        run_git(
-            prepared.clone,
-            "config",
-            "--worktree",
-            "--get",
-            f"{rtc.MARKER_PREFIX}.owner-evidence-sha256",
-        )
-        == original_sha
-    )
     assert (
         run_git(
             prepared.clone,
@@ -1578,7 +1468,6 @@ def test_linked_merge_conflict_keeps_native_merge_state(
 ) -> None:
     """A linked checkout retains merge state in the native Git index."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1600,7 +1489,6 @@ def test_linked_merge_conflict_keeps_native_merge_state(
         workspace,
         "topic-conflict",
         "feature/conflict",
-        evidence,
         allowed_paths=("base.txt",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1644,7 +1532,6 @@ def test_linked_cleanup_removes_one_worktree_and_keeps_branch_and_sibling(
 ) -> None:
     """Native cleanup unregisters one worktree without deleting its branch or sibling."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1666,7 +1553,6 @@ def test_linked_cleanup_removes_one_worktree_and_keeps_branch_and_sibling(
         workspace,
         "topic-first",
         "feature/first",
-        evidence,
         allowed_paths=("first.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1676,7 +1562,6 @@ def test_linked_cleanup_removes_one_worktree_and_keeps_branch_and_sibling(
         workspace,
         "topic-second",
         "feature/second",
-        evidence,
         allowed_paths=("second.py",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1706,7 +1591,6 @@ def test_linked_cleanup_requires_external_retention_for_local_only_content(
     submodule_root = tmp_path / "submodule-source"
     submodule_root.mkdir()
     _, submodule_url = init_remote(submodule_root)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1718,7 +1602,6 @@ def test_linked_cleanup_requires_external_retention_for_local_only_content(
         workspace,
         "topic-submodule-cleanup",
         "feature/submodule-cleanup",
-        evidence,
         allowed_paths=("src/",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1728,7 +1611,6 @@ def test_linked_cleanup_requires_external_retention_for_local_only_content(
         workspace,
         "topic-submodule-sibling",
         "feature/submodule-sibling",
-        evidence,
         allowed_paths=("tests/",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1889,7 +1771,6 @@ def test_linked_cleanup_holds_dirty_submodule_before_removal(
     submodule_root = tmp_path / "submodule-source"
     submodule_root.mkdir()
     _, submodule_url = init_remote(submodule_root)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1900,7 +1781,6 @@ def test_linked_cleanup_holds_dirty_submodule_before_removal(
         workspace,
         "topic-dirty-submodule",
         "feature/dirty-submodule",
-        evidence,
         allowed_paths=("src/",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1958,7 +1838,6 @@ def test_linked_cleanup_surfaces_native_remove_failures(
 ) -> None:
     """Native removal errors remain visible and keep the registered worktree."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     run_git(workspace, "remote", "add", "origin", remote_url)
@@ -1969,7 +1848,6 @@ def test_linked_cleanup_surfaces_native_remove_failures(
         workspace,
         "topic-unknown-remove-error",
         "feature/unknown-remove-error",
-        evidence,
         allowed_paths=("src/",),
         checkout_mode=rtc.CHECKOUT_MODE_LINKED,
     )
@@ -1999,7 +1877,6 @@ def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(
 ) -> None:
     """Existing clean local branches remain reusable without an origin/main fetch."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2009,7 +1886,6 @@ def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(
         workspace,
         "topic-offline",
         "feature/local",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     original_run_git = rtc._run_git
@@ -2026,7 +1902,6 @@ def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(
         workspace,
         "topic-offline",
         "feature/local",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     assert reused.clone == initial.clone
@@ -2038,7 +1913,6 @@ def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(
             workspace,
             "topic-offline",
             "feature/new",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
         )
 
@@ -2047,7 +1921,6 @@ def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
     tmp_path: Path,
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2058,7 +1931,6 @@ def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
             workspace,
             "topic",
             "feature/topic",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
         )
 
@@ -2072,7 +1944,6 @@ def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
             workspace,
             "topic",
             "feature/topic",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
         )
     assert list(external.iterdir()) == []
@@ -2083,7 +1954,6 @@ def test_clone_failure_aborts_partial_target_and_preserves_sibling(
 ) -> None:
     """A failed clone removes only its newly reserved target, including residue."""
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     sibling = workspace / "workspace" / "topic-failure" / "sibling"
@@ -2111,7 +1981,6 @@ def test_clone_failure_aborts_partial_target_and_preserves_sibling(
             workspace,
             "topic-failure",
             "feature/failure",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
         )
 
@@ -2124,7 +1993,6 @@ def test_unrelated_dirty_module_does_not_trigger_managed_relation(
     tmp_path: Path,
 ) -> None:
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     vendor = workspace / "vendor" / "agent-canon"
@@ -2168,7 +2036,6 @@ def test_unrelated_dirty_module_does_not_trigger_managed_relation(
         workspace,
         "topic",
         "feature/topic",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     assert prepared.clone.is_dir()
@@ -2178,7 +2045,6 @@ def test_matching_but_unmanaged_module_uses_generic_relation(
     tmp_path: Path,
 ) -> None:
     _, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     vendor = workspace / "vendor" / "requested-repo"
@@ -2220,7 +2086,6 @@ def test_matching_but_unmanaged_module_uses_generic_relation(
         workspace,
         "topic",
         "feature/topic",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     assert prepared.clone.is_dir()
@@ -2246,7 +2111,6 @@ def test_prepare_rejects_invalid_workspace_roots_before_creation(
 ) -> None:
     """Reject every non-canonical parent before creating workspace/topic paths."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     if root_kind == "non-repository":
         workspace = tmp_path / "non-repository"
         workspace.mkdir()
@@ -2284,7 +2148,6 @@ def test_prepare_rejects_invalid_workspace_roots_before_creation(
             workspace,
             f"invalid-{root_kind}",
             "feature/invalid",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
         )
     assert not (workspace / "workspace").exists()
@@ -2292,7 +2155,6 @@ def test_prepare_rejects_invalid_workspace_roots_before_creation(
 
 def test_merge_main_before_publication_receipt_is_created(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2306,7 +2168,6 @@ def test_merge_main_before_publication_receipt_is_created(tmp_path: Path) -> Non
         workspace,
         topic,
         "feature/merge",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(receipt.clone, "config", "user.name", "Test")
@@ -2363,7 +2224,6 @@ def test_merge_main_before_publication_receipt_is_created(tmp_path: Path) -> Non
 
 def test_merge_main_leaves_actual_conflict_in_native_git_state(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     source = tmp_path / "source"
@@ -2374,7 +2234,6 @@ def test_merge_main_leaves_actual_conflict_in_native_git_state(tmp_path: Path) -
         workspace,
         "topic-conflict",
         "feature/conflict",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(receipt.clone, "config", "user.name", "Test")
@@ -2400,7 +2259,6 @@ def test_merge_main_leaves_actual_conflict_in_native_git_state(tmp_path: Path) -
             workspace,
             "topic-conflict",
             "feature/conflict",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
         )
 
@@ -2408,7 +2266,6 @@ def test_merge_main_leaves_actual_conflict_in_native_git_state(tmp_path: Path) -
 def test_finalize_merge_uses_native_index_and_readback(tmp_path: Path) -> None:
     """A resolved native index can finish after main advances, then catch up."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     source = tmp_path / "source"
@@ -2418,7 +2275,6 @@ def test_finalize_merge_uses_native_index_and_readback(tmp_path: Path) -> None:
         workspace,
         "topic-finalize",
         "feature/finalize",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(receipt.clone, "config", "user.name", "Test")
@@ -2492,7 +2348,6 @@ def test_finalize_merge_uses_native_index_and_readback(tmp_path: Path) -> None:
 def test_cleanup_without_publication_packet_matches_remote_head(tmp_path: Path) -> None:
     """A clean pushed topic head is sufficient for dry-run and apply cleanup."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2502,7 +2357,6 @@ def test_cleanup_without_publication_packet_matches_remote_head(tmp_path: Path) 
         workspace,
         "topic-no-packet",
         "feature/cleanup",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
@@ -2523,7 +2377,6 @@ def test_stale_binding_directory_does_not_promote_generic_cleanup(
 ) -> None:
     """Stale historical binding artifacts do not select managed cleanup."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
     request = rtc.request(
@@ -2532,7 +2385,6 @@ def test_stale_binding_directory_does_not_promote_generic_cleanup(
         workspace,
         "topic-managed-partial",
         "feature/cleanup",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
@@ -2552,12 +2404,11 @@ def test_stale_binding_directory_does_not_promote_generic_cleanup(
     assert stale.read_text(encoding="utf-8") == "stale\n"
 
 
-def test_cleanup_accepts_exact_legacy_module_markers_read_only(
+def test_cleanup_accepts_identity_complete_legacy_module_markers_read_only(
     tmp_path: Path,
 ) -> None:
-    """Historical module markers authorize cleanup without being rewritten."""
+    """Legacy identity markers remain usable without the retired evidence digest."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2567,12 +2418,17 @@ def test_cleanup_accepts_exact_legacy_module_markers_read_only(
         workspace,
         "topic-legacy",
         "feature/cleanup",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
-    owner_sha = rtc._evidence_sha256(evidence)
-    install_legacy_module_markers(request.clone, request.request, owner_sha)
+    install_legacy_module_markers(request.clone, request.request)
+    run_git(
+        request.clone,
+        "config",
+        "--local",
+        f"{rtc.LEGACY_MARKER_PREFIX}.owner-evidence-sha256",
+        "stale-from-older-marker",
+    )
     before = run_git(request.clone, "config", "--local", "--list")
 
     dry_run = rtc.cleanup(request.request, apply=False)
@@ -2585,12 +2441,49 @@ def test_cleanup_accepts_exact_legacy_module_markers_read_only(
     assert not request.clone.exists()
 
 
+def test_cleanup_rejects_legacy_namespace_with_only_retired_digest(
+    tmp_path: Path,
+) -> None:
+    """A legacy namespace with no retained identity fields remains incomplete."""
+    _, remote_url = init_remote(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url,
+        "repo-legacy-partial",
+        workspace,
+        "topic-legacy-partial",
+        "feature/cleanup",
+        checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+    install_legacy_module_markers(request.clone, request.request)
+    for field in rtc.LEGACY_MARKER_FIELDS:
+        run_git(
+            request.clone,
+            "config",
+            "--local",
+            "--unset-all",
+            f"{rtc.LEGACY_MARKER_PREFIX}.{field}",
+        )
+    run_git(
+        request.clone,
+        "config",
+        "--local",
+        f"{rtc.LEGACY_MARKER_PREFIX}.owner-evidence-sha256",
+        "stale-from-older-marker",
+    )
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-incomplete"):
+        rtc.cleanup(request.request, apply=False)
+
+
 def test_cleanup_rejects_partial_or_mismatched_legacy_module_markers(
     tmp_path: Path,
 ) -> None:
     """Legacy compatibility is exact and never accepts unknown role/placement."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2600,30 +2493,21 @@ def test_cleanup_rejects_partial_or_mismatched_legacy_module_markers(
         workspace,
         "topic-legacy-invalid",
         "feature/cleanup",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
-    owner_sha = rtc._evidence_sha256(evidence)
-
-    install_legacy_module_markers(
-        request.clone, request.request, owner_sha, role="unknown"
-    )
+    install_legacy_module_markers(request.clone, request.request, role="unknown")
     with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
         rtc.cleanup(request.request, apply=False)
 
-    install_legacy_module_markers(
-        request.clone, request.request, owner_sha, placement="unknown"
-    )
+    install_legacy_module_markers(request.clone, request.request, placement="unknown")
     with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
         rtc.cleanup(request.request, apply=False)
 
-    install_legacy_module_markers(
-        request.clone, request.request, owner_sha, module="vendor/other"
-    )
+    install_legacy_module_markers(request.clone, request.request, module="vendor/other")
     with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
         rtc.cleanup(request.request, apply=False)
 
-    install_legacy_module_markers(request.clone, request.request, owner_sha)
+    install_legacy_module_markers(request.clone, request.request)
     run_git(
         request.clone,
         "config",
@@ -2640,7 +2524,6 @@ def test_cleanup_rejects_remote_head_mismatch_without_publication_packet(
 ) -> None:
     """A remote branch advance is a reconstructibility hold, not a delete signal."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2650,7 +2533,6 @@ def test_cleanup_rejects_remote_head_mismatch_without_publication_packet(
         workspace,
         "topic-remote-mismatch",
         "feature/cleanup",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
@@ -2681,7 +2563,6 @@ def test_cleanup_rejects_remote_head_mismatch_without_publication_packet(
 def test_cleanup_rejects_partial_optional_publication_packet(tmp_path: Path) -> None:
     """Lifecycle packet fields are optional together, never as an invented half-set."""
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2691,7 +2572,6 @@ def test_cleanup_rejects_partial_optional_publication_packet(tmp_path: Path) -> 
         workspace,
         "topic-partial",
         "feature/cleanup",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     with pytest.raises(
@@ -2709,7 +2589,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     tmp_path: Path,
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2722,7 +2601,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
         workspace,
         topic,
         "feature/cleanup",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(request.clone, "config", "user.name", "Test")
@@ -2862,7 +2740,6 @@ def test_failure_when_receipt_is_arbitrary_mapping_or_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2872,7 +2749,6 @@ def test_failure_when_receipt_is_arbitrary_mapping_or_missing(
         workspace,
         "topic-fail",
         "feature/fail",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     run_git(request.clone, "config", "user.name", "Test")
@@ -2916,7 +2792,6 @@ def test_prepare_dirty_collision_and_cleanup_rejects_detached_branch(
     tmp_path: Path,
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2926,7 +2801,6 @@ def test_prepare_dirty_collision_and_cleanup_rejects_detached_branch(
         workspace,
         "topic-clean",
         "feature/clean",
-        evidence,
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
     (clone.clone / "dirty.txt").write_text("dirty\n", encoding="utf-8")
@@ -2939,7 +2813,6 @@ def test_prepare_dirty_collision_and_cleanup_rejects_detached_branch(
             workspace,
             "topic-clean",
             "feature/clean",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
         )
 
@@ -2952,7 +2825,6 @@ def test_prepare_dirty_collision_and_cleanup_rejects_detached_branch(
             workspace,
             "topic-clean",
             "feature/clean",
-            evidence,
             checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
         )
 
@@ -2961,7 +2833,6 @@ def test_repository_policy_decorator_runs_for_prepare_merge_only(
     tmp_path: Path,
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
     init_workspace_parent(workspace)
 
@@ -2983,7 +2854,6 @@ def test_repository_policy_decorator_runs_for_prepare_merge_only(
         workspace,
         "topic-decor",
         "feature/decor",
-        evidence,
         policy=Spy(),
         checkout_mode=rtc.CHECKOUT_MODE_INDEPENDENT,
     )
