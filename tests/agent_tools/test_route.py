@@ -227,9 +227,7 @@ class RouteToolTest(unittest.TestCase):
                 (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
                 standalone = root / "agents" / "skills" / "catalog.yaml"
                 standalone.parent.mkdir(parents=True, exist_ok=True)
-                standalone.write_text(
-                    "version: 1\nskill_families:\n", encoding="utf-8"
-                )
+                standalone.write_text("version: 1\nskill_families:\n", encoding="utf-8")
                 resolution = agent_canon_source_root.resolve_agent_canon_source_root(
                     root
                 )
@@ -244,9 +242,7 @@ class RouteToolTest(unittest.TestCase):
                     agent_canon_source_root.resolve_agent_canon_source_root(
                         Path(tmp_dir)
                     )
-                self.assertEqual(
-                    exc.exception.code, "agent_canon_source_root_missing"
-                )
+                self.assertEqual(exc.exception.code, "agent_canon_source_root_missing")
 
     def test_long_proposed_tool_name_resolves_to_short_area(self) -> None:
         """Long candidate-list tool names should become aliases."""
