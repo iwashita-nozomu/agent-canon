@@ -4281,9 +4281,17 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(dockerfile.count("\nRUN ") + dockerfile.startswith("RUN "), 2)
         self.assertNotIn("ARG TARGETVARIANT", dockerfile)
         self.assertNotIn("FROM node:", dockerfile)
+        # #1049 replaced a crate-specific bind with the generic Cargo scan root.
         self.assertIn(
-            "--mount=type=bind,source=tools/runtime/dispatch/agent-canon", dockerfile
+            "--mount=type=bind,source=tools,target=/src/all-tools,readonly",
+            dockerfile,
         )
+        self.assertTrue(
+            (ROOT / "tools/runtime/dispatch/agent-canon/Cargo.toml").is_file()
+        )
+        self.assertIn("!tools/**", dockerignore)
+        self.assertIn("for manifest in /src/all-tools/**/Cargo.toml", dockerfile)
+        self.assertIn('cargo fetch --locked --manifest-path "$manifest"', dockerfile)
         self.assertIn(
             "--mount=type=bind,source=tools/repository/workspace/parent_root_side_effects.py",
             dockerfile,
