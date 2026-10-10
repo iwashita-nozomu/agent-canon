@@ -1,6 +1,6 @@
 # @dependency-start
 # contract environment
-# responsibility Declares only the shared AgentCanon Python, Rust, and LSP image capabilities.
+# responsibility Declares shared AgentCanon Python, Rust, LSP, and native workflow-checking image capabilities.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
 # downstream implementation ./Dockerfile image-install and immutable receipts
 # downstream implementation ../../../tools/analysis/dependencies/dependency_plan.py typed dependency planner
@@ -137,6 +137,54 @@ checksums = { x86_64 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073d
 verification = { kind = "rust-toolchain", executable = "rustc", args = ["--version"], output_contains = "rustc 1.89.0" }
 deps = ["rustup-init", "build-essential", "curl"]
 provides = ["rust", "cargo", "rust-src", "rust-analyzer", "rustfmt", "clippy"]
+failure_policy = "fail"
+
+[[records]]
+id = "shellcheck"
+package = "shellcheck"
+method = "release-asset"
+version = "0.11.0"
+source = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0"
+assets = { aarch64 = "shellcheck-v0.11.0.linux.aarch64.tar.xz", x86_64 = "shellcheck-v0.11.0.linux.x86_64.tar.xz" }
+checksums = { aarch64 = "12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588", x86_64 = "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198" }
+archive_format = "tar.xz"
+extract = "shellcheck"
+destination = "/usr/local/bin/shellcheck"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/shellcheck", args = ["--version"], output_contains = "0.11.0" }
+deps = []
+provides = ["shellcheck"]
+failure_policy = "fail"
+
+[[records]]
+id = "actionlint"
+package = "actionlint"
+method = "release-asset"
+version = "1.7.12"
+source = "https://github.com/rhysd/actionlint/releases/download/v1.7.12"
+assets = { aarch64 = "actionlint_1.7.12_linux_arm64.tar.gz", x86_64 = "actionlint_1.7.12_linux_amd64.tar.gz" }
+checksums = { aarch64 = "325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6", x86_64 = "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8" }
+archive_format = "tar.gz"
+extract = "actionlint"
+destination = "/usr/local/bin/actionlint"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/actionlint", args = ["-version"], output_contains = "1.7.12" }
+deps = ["shellcheck"]
+provides = ["actionlint"]
+failure_policy = "fail"
+
+[[records]]
+id = "zizmor"
+package = "zizmor"
+method = "release-asset"
+version = "1.30.1"
+source = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1"
+assets = { aarch64 = "zizmor-aarch64-unknown-linux-gnu.tar.gz", x86_64 = "zizmor-x86_64-unknown-linux-gnu.tar.gz" }
+checksums = { aarch64 = "7ff1dce33bdd18fd2a4affe63bdd47efcccca97b2cec1c1863ec26e9e2647540", x86_64 = "e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a" }
+archive_format = "tar.gz"
+extract = "zizmor"
+destination = "/usr/local/bin/zizmor"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/zizmor", args = ["--version"], output_contains = "1.30.1" }
+deps = []
+provides = ["zizmor"]
 failure_policy = "fail"
 
 [[records]]

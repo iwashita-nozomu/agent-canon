@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -47,12 +47,14 @@ jobs:
           evidence_root="${control_parent_root}/agent-runtime-dashboard-evidence"
           export_root="${control_parent_root}/agent-runtime-dashboard-export"
           dashboard_run_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          printf 'AGENT_CANON_CANDIDATE_BARE=%s\n' "${candidate_bare}" >> "${GITHUB_ENV}"
-          printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\n' "${candidate_source}" >> "${GITHUB_ENV}"
-          printf 'AGENT_CANON_CONTROL_PARENT_ROOT=%s\n' "${control_parent_root}" >> "${GITHUB_ENV}"
-          printf 'AGENT_CANON_DASHBOARD_EVIDENCE_ROOT=%s\n' "${evidence_root}" >> "${GITHUB_ENV}"
-          printf 'AGENT_CANON_DASHBOARD_EXPORT_ROOT=%s\n' "${export_root}" >> "${GITHUB_ENV}"
-          printf 'AGENT_CANON_DASHBOARD_RUN_ID=%s\n' "${dashboard_run_id}" >> "${GITHUB_ENV}"
+          {
+            printf 'AGENT_CANON_CANDIDATE_BARE=%s\n' "${candidate_bare}"
+            printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\n' "${candidate_source}"
+            printf 'AGENT_CANON_CONTROL_PARENT_ROOT=%s\n' "${control_parent_root}"
+            printf 'AGENT_CANON_DASHBOARD_EVIDENCE_ROOT=%s\n' "${evidence_root}"
+            printf 'AGENT_CANON_DASHBOARD_EXPORT_ROOT=%s\n' "${export_root}"
+            printf 'AGENT_CANON_DASHBOARD_RUN_ID=%s\n' "${dashboard_run_id}"
+          } >> "${GITHUB_ENV}"
           mkdir -p -- "${evidence_root}"
           git init --bare "${candidate_bare}"
           git push "${candidate_bare}" HEAD:refs/heads/main
@@ -193,7 +195,7 @@ jobs:
 
       - name: Upload runtime dashboard
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: agent-runtime-dashboard-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
