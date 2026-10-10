@@ -4583,87 +4583,89 @@ class BootstrapRuntime:
         remain exclusively on the host side of the bootstrap boundary.
         """
         _slug(run_id)
-        spool = self.paths.spool / run_id
-        if not spool.is_dir() or spool.is_symlink():
-            raise BootstrapError(
-                "eval_spool_missing", f"eval spool does not exist: {run_id}"
-            )
-        collection_path = spool / "collection.json"
-        try:
-            collection = json.loads(
-                _safe_read(collection_path, field="eval collection").decode("utf-8")
-            )
-        except (BootstrapError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise BootstrapError(
-                "eval_collection_invalid", f"invalid eval collection: {run_id}"
-            ) from exc
-        if not isinstance(collection, dict) or collection.get("run_id") != run_id:
-            raise BootstrapError(
-                "eval_collection_invalid", "eval collection run id mismatch"
-            )
-        if (
-            collection.get("status") != "collected"
-            or collection.get("source_tree_unchanged") is not True
-        ):
-            raise BootstrapError(
-                "eval_collection_failed",
-                "only a successful source-unchanged collection may be published",
-            )
         with self.locked():
+            spool = self.paths.spool / run_id
+            if not spool.is_dir() or spool.is_symlink():
+                raise BootstrapError(
+                    "eval_spool_missing", f"eval spool does not exist: {run_id}"
+                )
+            collection_path = spool / "collection.json"
+            try:
+                collection = json.loads(
+                    _safe_read(collection_path, field="eval collection").decode("utf-8")
+                )
+            except (BootstrapError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise BootstrapError(
+                    "eval_collection_invalid", f"invalid eval collection: {run_id}"
+                ) from exc
+            if not isinstance(collection, dict) or collection.get("run_id") != run_id:
+                raise BootstrapError(
+                    "eval_collection_invalid", "eval collection run id mismatch"
+                )
+            if (
+                collection.get("status") != "collected"
+                or collection.get("source_tree_unchanged") is not True
+            ):
+                raise BootstrapError(
+                    "eval_collection_failed",
+                    "only a successful source-unchanged collection may be published",
+                )
             state = self._read_state()
-        if collection.get("manifest_digest") != state.get("manifest_digest"):
-            raise BootstrapError(
-                "eval_collection_generation_mismatch",
-                "eval collection is not bound to the installed runtime generation",
+            if collection.get("manifest_digest") != state.get("manifest_digest"):
+                raise BootstrapError(
+                    "eval_collection_generation_mismatch",
+                    "eval collection is not bound to the installed runtime generation",
+                )
+            source_root = collection.get("source_repository")
+            target_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST", "")
+            if not isinstance(source_root, str) or not source_root.startswith("/"):
+                raise BootstrapError(
+                    "eval_collection_invalid", "eval source root is not absolute"
+                )
+            if any(character in source_root for character in "\x00\t\n\r"):
+                raise BootstrapError(
+                    "eval_collection_invalid",
+                    "eval source root contains a control character",
+                )
+            if not target_digest and source_root.startswith("/targets/"):
+                target_digest = source_root.removeprefix("/targets/")
+            if target_digest and not re.fullmatch(
+                r"[A-Za-z0-9_.-]{1,128}", target_digest
+            ):
+                raise BootstrapError(
+                    "eval_collection_invalid", "eval target digest is invalid"
+                )
+            request_path = spool / "sync-request.tsv"
+            if request_path.is_symlink():
+                raise BootstrapError(
+                    "eval_sync_request_invalid", "eval sync request is a symlink"
+                )
+            lines = [
+                "schema\tagent-canon.eval-sync-request.v1",
+                "operation\tsync",
+                "execution-plane\tagentcanon_tool_container",
+                f"run-id\t{run_id}",
+                f"target-digest\t{target_digest}",
+                f"source-root\t{source_root}",
+            ]
+            _atomic_bytes(
+                request_path, ("\n".join(lines) + "\n").encode("utf-8"), mode=0o600
             )
-        source_root = collection.get("source_repository")
-        target_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST", "")
-        if not isinstance(source_root, str) or not source_root.startswith("/"):
-            raise BootstrapError(
-                "eval_collection_invalid", "eval source root is not absolute"
+            return self._result(
+                self._receipt(
+                    "eval_sync",
+                    "ok",
+                    "host_archive_requested",
+                    before=None,
+                    after=None,
+                    details={
+                        "execution_plane": "host_archive_adapter",
+                        "status": "requested",
+                        "run_id": run_id,
+                    },
+                    state=state,
+                )
             )
-        if any(character in source_root for character in "\x00\t\n\r"):
-            raise BootstrapError(
-                "eval_collection_invalid",
-                "eval source root contains a control character",
-            )
-        if not target_digest and source_root.startswith("/targets/"):
-            target_digest = source_root.removeprefix("/targets/")
-        if target_digest and not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", target_digest):
-            raise BootstrapError(
-                "eval_collection_invalid", "eval target digest is invalid"
-            )
-        request_path = spool / "sync-request.tsv"
-        if request_path.is_symlink():
-            raise BootstrapError(
-                "eval_sync_request_invalid", "eval sync request is a symlink"
-            )
-        lines = [
-            "schema\tagent-canon.eval-sync-request.v1",
-            "operation\tsync",
-            "execution-plane\tagentcanon_tool_container",
-            f"run-id\t{run_id}",
-            f"target-digest\t{target_digest}",
-            f"source-root\t{source_root}",
-        ]
-        _atomic_bytes(
-            request_path, ("\n".join(lines) + "\n").encode("utf-8"), mode=0o600
-        )
-        return self._result(
-            self._receipt(
-                "eval_sync",
-                "ok",
-                "host_archive_requested",
-                before=None,
-                after=None,
-                details={
-                    "execution_plane": "host_archive_adapter",
-                    "status": "requested",
-                    "run_id": run_id,
-                },
-                state=state,
-            )
-        )
 
     def rollback(self) -> dict[str, Any]:
         """Activate the last verified generation after stopping the current one."""
