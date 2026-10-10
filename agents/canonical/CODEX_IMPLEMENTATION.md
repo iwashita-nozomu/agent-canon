@@ -99,19 +99,11 @@ the common [Validation Routing](../../ROOT_AGENTS.md#validation-routing).
 
 ## Library And Reuse Sweep
 
-Before any new code path, helper, API, module, test, or script, inspect the owning
-abstractions and the existing dependency/build declarations, public configuration,
-extension points, source, and actual callers. Use
-[reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-and [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding).
-Choose direct use/configuration/composition for new functionality; reconsider
-preservation and compare removal/replacement for repairs. Record the verified
-remaining gap and engineering basis in the owning design.
-
-An existing `reuse_survey` supplies current asset and test context; reuse it under
-matching premises. Tests are evidence of current behavior, not a veto on the
-agreed correction. Preserve the necessary shared asset/history findings through
-related handoffs and consolidate changes to the same responsibility.
+When the common direct-use rule in [ROOT_AGENTS.md](../../ROOT_AGENTS.md) leaves
+an unknown entrypoint, failed invocation, or unmet behavior, use [reuse
+feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+and [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding)
+only to resolve the decision that could change the next action.
 
 When a related branch/PR or prepared checkout exists, verify it serves the same
 owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
