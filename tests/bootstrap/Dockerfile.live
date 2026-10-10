@@ -51,7 +51,7 @@ RUN cp /opt/agent-canon/source/tests/bootstrap/.agent-canon-dockerignore-input \
 # read-only before the test container runs it.
 RUN if [ "${TEST_PROFILE}" = "full-checks" ]; then \
       apt-get update; \
-      apt-get install --yes --no-install-recommends build-essential python3-yaml; \
+      apt-get install --yes --no-install-recommends build-essential cmake python3-yaml; \
       case "${TARGETARCH}" in \
         amd64) rustup_target=x86_64-unknown-linux-gnu; rustup_sha=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c ;; \
         arm64) rustup_target=aarch64-unknown-linux-gnu; rustup_sha=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c ;; \
