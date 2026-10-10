@@ -251,7 +251,9 @@ run_eval() (
 run_workflow_container() {
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_standalone_static_gate_units.py \
-    tests/tools/test_read_only_full_check.py
+    tests/tools/test_read_only_full_check.py \
+    tests/tools/test_check_github_workflows.py \
+    tests/tools/test_agent_improvement_guide_workflow.py
   python3 "${ROOT}/tools/validation/ci/checks/check_github_workflows.py"
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
