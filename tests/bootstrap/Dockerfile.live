@@ -3,7 +3,7 @@
 # responsibility Defines AgentCanon's disposable live, proof, and full-check test image.
 # upstream implementation ./docker.sh selects and runs each test capability profile
 # downstream design ./lean-proof-dependencies.toml pins the native Lean test toolchain
-# downstream test tests/bootstrap/test_live_projection_authority.py exercises the shared host Docker daemon
+# downstream implementation tests/bootstrap/test_live_projection_authority.py exercises the shared host Docker daemon
 # downstream implementation ../../bootstrap/container/image/dependencies.toml pins full-check providers
 # downstream implementation ../../tools/analysis/proof/lean_proof_env.py owns native Lean behavior
 # @dependency-end

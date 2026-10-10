@@ -269,7 +269,6 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> int:
     )
     runtime_root = args.runtime_root
     boundary = runtime_artifact_boundary(root, runtime_root)
-    boundary.ensure_directory("eval-results")
     log_dir = resolve_log_dir(root, args.log_dir, str(args.run_id), runtime_root)
     boundary.ensure_directory(log_dir.relative_to(boundary.root))
     producers = build_producers(
