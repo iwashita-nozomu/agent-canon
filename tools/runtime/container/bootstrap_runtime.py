@@ -4,6 +4,7 @@
 # responsibility Owns container-side TOML/JSON/state/tool/check/eval logic for the shared AgentCanon tool container without implicit source writes.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 # upstream implementation ../source/agent_canon_source_root.py standalone source identity
+# upstream implementation ../../../bootstrap/container/image/Dockerfile builds the resident runtime image
 # downstream implementation ../../../bootstrap.sh fixed host entrypoint
 # downstream implementation ../../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 # @dependency-end

@@ -165,8 +165,10 @@ AGENT_CANON_CI_EVAL_LOG_TEMP_CREATED=0
 AGENT_CANON_CI_EXPLICIT_EVAL_CREATED=0
 AGENT_CANON_CI_SETUP_COMPLETE=0
 AGENT_CANON_CI_EVAL_LOG_DIR_VALUE=""
-AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_CI_RUNTIME_ROOT}/archive/agent-canon-log}"
-AGENT_CANON_CI_HOOK_ARCHIVE_DIR="$(runtime_boundary_path "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}")"
+# Keep the default relative so the archive owner resolves it under the explicit
+# runtime root rather than requiring an external private-log mount.
+AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-archive/agent-canon-log}"
+AGENT_CANON_CI_HOOK_ARCHIVE_PATH="$(runtime_boundary_path "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}")"
 if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
   AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(runtime_boundary_path "${AGENT_CANON_CI_EVAL_LOG_DIR}")"
   if [[ ! -d "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" ]]; then
@@ -193,7 +195,7 @@ cleanup_run_all_checks_temp() {
 }
 trap cleanup_run_all_checks_temp EXIT
 
-mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"
+mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_PATH}"
 if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
   mkdir -p "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
 else
@@ -342,7 +344,7 @@ echo "════════════════════════�
 echo ""
 echo "Python interpreter: ${PYTHON_BIN}"
 echo "JAX test platform: ${JAX_PLATFORMS}"
-echo "AgentCanon CI log archive: ${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"
+echo "AgentCanon CI log archive: ${AGENT_CANON_CI_HOOK_ARCHIVE_PATH}"
 echo ""
 
 EXIT_CODE=0
@@ -373,7 +375,7 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/validation/notebook_quality.py" --all 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/validation/notebooks/notebook_quality.py" --all 2>&1; then
   echo "✅ notebook quality checks 成功"
 else
   echo "❌ notebook quality checks 失敗"

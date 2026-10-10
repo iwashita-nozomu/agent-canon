@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Materializes and verifies canonical artifact byte identities.
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns artifact identity schemas and import rules.
+# upstream implementation ../values.py refines decoded canonical JSON mappings.
 # downstream implementation ../../agent/orchestration/review_dispatch.py imports review target and decision identities.
 # downstream implementation ../../repository/github/publication_integrator.py imports approval and publication identities.
 # downstream implementation ../../repository/github/github_publish.py verifies publication packet identities before network mutation.
@@ -24,7 +25,13 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
-UTC = timezone.utc  # noqa: UP017
+from tools.runtime.values import (
+    is_object_list_or_tuple,
+    is_object_mapping,
+    is_string_object_mapping,
+)
+
+UTC = timezone.utc
 
 ARTIFACT_IDENTITY_SCHEMA = "agent-canon.artifact-identity.v1"
 ARTIFACT_ROLES = frozenset(
@@ -67,12 +74,12 @@ def _reject_noncanonical_json(value: object) -> None:
     """Reject values whose JSON representation is not stable in this contract."""
     if isinstance(value, float):
         raise ArtifactIdentityError("artifact_identity:float_forbidden")
-    if isinstance(value, Mapping):
+    if is_object_mapping(value):
         for key, item in value.items():
             if not isinstance(key, str):
                 raise ArtifactIdentityError("artifact_identity:non_string_key")
             _reject_noncanonical_json(item)
-    elif isinstance(value, (list, tuple)):
+    elif is_object_list_or_tuple(value):
         for item in value:
             _reject_noncanonical_json(item)
 
@@ -401,7 +408,7 @@ def verify_identity_record(
         raise ArtifactIdentityError("artifact_identity:artifact_role_invalid")
     source_binding = record.get("source_binding")
     if (
-        not isinstance(source_binding, Mapping)
+        not is_string_object_mapping(source_binding)
         or source_binding.get("kind") not in SOURCE_BINDING_KINDS
     ):
         raise ArtifactIdentityError("artifact_identity:source_binding_invalid")
@@ -464,7 +471,7 @@ def verify_artifact_identity(
     root = workspace.resolve()
     relative = _normalized_relative_path(root, identity_record_path)
     loaded = json.loads((root / relative).read_text(encoding="utf-8"))
-    if not isinstance(loaded, Mapping):
+    if not is_string_object_mapping(loaded):
         raise ArtifactIdentityError("artifact_identity:record_not_object")
     return verify_identity_record(root, loaded)
 
