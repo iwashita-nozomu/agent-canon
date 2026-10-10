@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Extracts source-code dependency edges independently from manifest headers.
-# upstream design ../../agents/skills/dependency-analysis.md analysis-first dependency contract
-# downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies scanner behavior
-# downstream design ../../tools/README.md documents agent tool inventory
+# upstream design ../../../agents/skills/dependency-analysis.md analysis-first dependency contract
+# downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies scanner behavior
+# downstream design ../../README.md documents agent tool inventory
 # @dependency-end
 set -euo pipefail
 

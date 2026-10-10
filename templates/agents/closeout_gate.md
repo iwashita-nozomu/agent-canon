@@ -6,7 +6,6 @@ contract template
 responsibility Documents Closeout Gate for this repository.
 downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces closeout keys
 downstream design workflow_monitoring.md records in-workflow monitoring and self-improvement decisions
-downstream design ../../documents/design/dependency-manifest-design.md defines dependency manifest evidence
 @dependency-end
 -->
 
@@ -17,7 +16,7 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 ## Reader Map（読者 map）
 
 - この template は user-facing completion を unlock できる時点を判定する closeout evidence ledger を所有します。
-- 冒頭で gate status と unlock rule を記録し、その後 dependency manifest、static analysis、AgentCanon sync、spec coverage、review integration、document structure、tool warning、subagent lifecycle、diff-check、tree-head、report placement、evaluation、log、最終 evidence を確認します。
+- 冒頭で gate status と unlock rule を記録し、その後 selected validation、AgentCanon sync、spec coverage、review integration、document structure、tool warning、subagent lifecycle、diff-check、tree-head、report placement、evaluation、log、最終 evidence を確認します。
 - verifier と auditor は `## Gate Status` と `## Unlock Rule` から読み始め、current run profile が有効にした evidence section だけを埋めます。
 - 分割して読む場合は status key を checklist anchor とし、対応 key が pending の section だけを開きます。
 
@@ -46,8 +45,6 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - canonical_dispatcher_schema_status: pending
 - validation_failure_response_status: pending
 - unfinished_tasks_absent: no
-- dependency_headers_complete: no
-- repo_wide_dependency_tools_complete: no
 - repo_wide_static_analysis_complete: no
 - agent_canon_latest_complete: no
 - review_findings_integrated: no
@@ -82,8 +79,6 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - all_planned_chunks_complete: yes
 - overall_delivery_complete: yes
 - unfinished_tasks_absent: yes
-- dependency_headers_complete: yes
-- repo_wide_dependency_tools_complete: yes
 - `repo_wide_static_analysis_complete`: `yes` for full static analysis, or `profile_selected` when the runtime profile selected targeted validation
 - agent_canon_latest_complete: yes
 - completion_coverage_consumer: yes
@@ -124,14 +119,6 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - open_repairs:
 - open_crossing_edges:
 - canonical_gate_basis: G1_CLAUSE_COVERAGE,G2_OWNER_BOUNDARY,G3_STAGE_EVIDENCE,G4_VALIDATION_RESPONSE,G5_DELIVERY_BOUNDARY
-
-## Dependency Manifest Evidence（dependency manifest evidence）
-
-<!-- 作成・編集した human-authored text file がすべて top-of-file の @dependency-start/@dependency-end manifest block を持つことを確認します。持てない file は scan-tool classification reason と代替 manifest/design artifact を記録します。dependency edge が変わった場合は check_dependency_headers.py、scan_dependency_headers.sh、check_dependency_header_format.sh、check_dependency_graph.sh の output を含めます。migration 中は既存 full-repo graph baseline を別記録し、old-format header、self reference、reverse-edge gap、kind mismatch、cycle を新たに導入していないことを確認します。 -->
-
-## Repo-Wide Dependency Tool Evidence（repo-wide dependency tool evidence）
-
-<!-- checkpoint と final review では全 repository に `bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing` を実行します。changed-file dependency check だけなら closeout を unlock しません。REPO_DEPENDENCY_REVIEW=pass と checked path count を記録し、header が missing/invalid なら修正して rerun します。 -->
 
 ## Canonical Formatter And Static Evidence（canonical formatter/static evidence）
 

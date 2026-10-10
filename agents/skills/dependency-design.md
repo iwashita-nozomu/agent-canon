@@ -25,24 +25,23 @@ Dockerfile -> canonical image -> docker run <canonical-full-test-command> -> pas
 所有します。Dev Container、Compose、CI、post-create、host setup、mounted workspaceは
 dependency installerになりません。
 
-## Workflow
+## Decision Route
 
-1. supported profile、canonical image target、canonical full test commandを固定します。
-1. commandが必要とするOS package、language runtime、compiler、library、CLI、
-   test/build/docs toolを列挙します。
-1. 各dependencyを次のいずれか一つへ配置します。
-   - 標準commandに必要: canonical Dockerfile target
-   - optional workflowに必要: workflowが明示選択するDockerfile/OCI image target
-   - source/data/model/credential/GPU driver/device: runtime external input
-1. image-owned dependencyはprovider、exact version/immutable revision、lock/checksum、
-   build stage、runtime verificationを定義します。
-1. Dev Container、Compose、CI、lifecycle hookが同dependencyを再導入しないことを確認します。
-1. `environment-maintenance`へimage target、test command、dependency placement、
-   runtime input、validationを渡します。
+For each requirement, identify only the commands and profiles it can affect.
+Place dependencies needed by standard commands in the canonical Dockerfile
+target; place optional capabilities in an image target selected by that
+workflow; keep source, data, model, credential, driver, and device inputs
+external. For image-owned dependencies, choose the provider, version or
+immutable revision, lock/checksum, build stage, and runtime evidence. Check
+Dev Container, Compose, CI, or lifecycle hooks for duplicate installation only
+where they can reach that dependency. Keep the configured canonical full test
+command as completion evidence when the selected change alters that image or
+command. If implementation is in scope, pass the applicable placement decision
+to `environment-maintenance`; otherwise return the decision to its caller.
 
 ## Placement Packet
 
-次を一つのdecisionとして記録します。
+次のうち、対象 dependency の判断に必要な情報を既存の decision record に残します。
 
 - dependencyのrequirement ownerとconsumer command
 - canonical image target
@@ -69,7 +68,10 @@ declarative inputとして扱います。manifest engine、receipt、provider cl
 
 ## Tool Commands
 
-manifestをbuild inputとして使う場合だけ、typed validationを実行します。
+Select only commands that establish the chosen placement or changed image
+contract. Manifest validation applies when the typed build-input manifest is
+used; image build and full-test execution apply when the canonical image or
+command changes. These commands are not a fixed sequence for every decision.
 
 ```bash
 python3 tools/runtime/container/devcontainer_dependencies.py validate --workspace . --vendor-root . --format text
@@ -81,6 +83,7 @@ docker run --rm <runtime-wiring> <image> <canonical-full-test-command>
 
 ## Environment Maintenance Handoff
 
-placement packetがpassしたら`environment-maintenance`へ渡します。handoff後もcompletion ownerは
-canonical imageの`docker run`によるrepository標準テスト一式であり、manifest validationや
-package inventoryだけをcompletion evidenceにしません。
+実装が作業範囲にある場合は、決定した placement を`environment-maintenance`へ渡します。
+canonical image を変更する作業の completion owner は image の`docker run`による
+repository標準テスト一式であり、manifest validationやpackage inventoryだけをcompletion
+evidenceにしません。

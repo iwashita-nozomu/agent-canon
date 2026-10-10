@@ -28,27 +28,23 @@ downstream design adaptive-improvement-loop.md backlog-driven iteration owner
 
 ## Procedure
 
-実装または正式な run の前に、`Question`、`Scope`、`Comparison Target`、
-`Evidence Targets`、`Protocol`、`Operational Stop Condition` を一つの note に固定します。
-数値問題では問題設定・仮定・停止条件と実装 path の対応も残します。研究上の結論を
-plan-time の成功条件にせず、runtime success や parity を claim と同一視しません。
+研究上の問いと、結果から支えたい claim を特定します。比較 claim には同じ protocol
+を適用した baseline/current evidence が必要です。数値問題では、結果を読むために必要な
+problem setting、assumptions、stopping semantics と実装 path の対応を残します。
+run の再現に必要な protocol、source、command、environment、seed、identity を記録し、
+結論を plan-time の成功条件にせず runtime success や parity と同一視しません。
 
-1. `$literature-survey` の source packet を受け取り、source claim と task claim の対応を決める。
-2. baseline/current state を同じ protocol で記録する。
-3. 一つの code、protocol、または runtime change を選ぶ。複数種類を一 iteration に混ぜない。
-4. `$experiment-lifecycle` で fresh run を行い、source・command・環境・seed・run identity を残す。
-5. `$experiment-review` で比較、仕様・数式との一致、trade-off、overclaim を確認する。
-6. 必要なら `$report-writing` で reader-facing report を作り、次の状態を一つ選ぶ。
+`literature-survey`、`experiment-lifecycle`、`experiment-review`、および
+`report-writing` を、実際に外部資料、run、比較判断、または reader-facing report が
+必要な範囲で使います。複数の変更を一緒に比較する場合は、設計がその帰属を支えない
+限り個別効果を主張しません。結果を見た後は、説明更新、追加検証、fresh rerun、次の
+変更、または範囲を限定した終了のうち、evidence が支持する次の action を選びます。
+以下の state 名は代表例であり、すべての task が同じ branch を通る必要はありません。
 
-Decision は次の post-run state に限定します。
-
-- `report_rewrite_required`: 同じ result で report の説明だけを更新する
-- `extra_validation_required`: 同じ仮説と protocol のまま追加 case、figure、集計を行う
-- `rerun_required`: protocol または実装を直し、新しい run identity で fresh run を行う
-- `approved`: evidence と exit criteria が十分なら loop を閉じる。不十分なら次の変更へ進む
-
-いずれかの rewrite、追加検証、rerun が残る間は結論を閉じません。`approved` は
-research claim の受理を意味せず、定めた範囲での次の action が決まったことだけを示します。
+- `report_rewrite_required`: 同じ result の説明を直す
+- `extra_validation_required`: 同じ仮説・protocol を保った追加検証
+- `rerun_required`: protocol または実装を直して新しい run identity を作る
+- `approved`: 指定範囲で次の action が決まった。これは claim 受理を意味しない
 
 ## Evidence Reading
 
@@ -62,9 +58,9 @@ research claim の受理を意味せず、定めた範囲での次の action が
 - `Results` は観測、`Discussion` は解釈、`Limitations` は言えない範囲として分ける
 - claim は source と artifact に辿れるようにし、推測を観測事実として書かない
 
-Run note には、問い・比較・protocol、変更、観測、解釈、limitation、decision、next action と、
-commit / run path を必要な範囲で残します。artifact identity と report の構成はそれぞれの
-owner に委譲します。
+Run note には、解釈に必要な問い・比較・protocol、変更、観測、limitation、decision、
+next action、および利用した commit/run path を残します。artifact identity と report の
+構成はそれぞれの owner に委譲します。
 
 ## Boundary
 

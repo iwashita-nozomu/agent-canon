@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Materializes typed external projection acknowledgements for canonical local review events.
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns external projection acknowledgement schemas.
+# upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns external projection acknowledgement schemas.
 # upstream implementation ./artifact_identity.py provides canonical JSON and body hashing.
-# downstream implementation ./review_dispatch.py binds Codex reviewer dispatch projections.
-# downstream implementation ./github_publish.py binds GitHub PR-head and review-state projections.
-# downstream implementation ./publication_integrator.py verifies current external projections before CAS.
-# downstream implementation ../../tests/agent_tools/test_external_artifact_binding.py validates mapping and null rules.
+# downstream implementation ../../agent/orchestration/review_dispatch.py binds Codex reviewer dispatch projections.
+# downstream implementation ../../repository/github/github_publish.py binds GitHub PR-head and review-state projections.
+# downstream implementation ../../repository/github/publication_integrator.py verifies current external projections before CAS.
+# downstream implementation ../../../tests/agent_tools/test_external_artifact_binding.py validates mapping and null rules.
 # @dependency-end
 """Map provider readback to one canonical local review event without authority inversion."""
 

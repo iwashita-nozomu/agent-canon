@@ -90,7 +90,7 @@ AgentCanon の更新・再構築を要求しません。
   writer placement は [Parallel Write Safety](CODEX_SUBAGENTS.md#parallel-write-safety)
   に従い、同じ checkout root を同時利用しません。bounded route はこの handoff wave
   を作りません。
-- repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 checkout と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` を選び、どちらも同じ `<anchor>/workspace/<topic>/<repo>` placement にします。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が状態を保持して意図的に解消します。競合を検出したら `conflict_preservation.py` で merge-base、base/ours/theirs の stage/blob、hunk、unaffected user/unknown content、disposition、原因、期待機構、正確な edit delta を記録し、解消後の保存 readback を通します。whole-file checkout/reset/reclone/overwrite/regeneration は reconstruction map なしでは不許可です。`origin/main` の read/CAS だけでは merge 済みの代替になりません。writer target は短命な handoff 値であり、claim、PID、expiry、daemon、writer registry は作成しません。
+- repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 checkout と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` を選び、どちらも同じ `<anchor>/workspace/<topic>/<repo>` placement にします。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が native Git index に残った実際の競合を source owner とレビューして解消します。解消後は canonical finalizer が `MERGE_HEAD` と resolved index tree に基づく commit parents/tree を確認します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。writer target は短命な handoff 値であり、claim、PID、expiry、daemon、writer registry は作成しません。
 
 ## Context Sweep
 
@@ -105,8 +105,8 @@ state と acceptance criteria は `requested_scope` として保存し、選択�
 である evidence がある場合だけ `not_applicable` にします。
 Large delivery / Shared canon でも、bounded responsibility route は作業順序を
 決める artifact です。対象範囲の正本は `requested_scope` に残します。読む
-slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfaces`、
-`omitted_surfaces` と理由を残してから進めます。
+slice を選ぶための coverage map は事前に要求しません。実際の範囲更新は、共通の
+[scope principle](../../ROOT_AGENTS.md#always-on-boundary) に従います。
 
 - `documents/`
 - repository-qualified GitHub Issue URLs/numbers and private packet locators
@@ -124,36 +124,14 @@ memory は固定 packet/read の対象にしません。owner/path、failure evi
 decision が選択された後、必要な topic だけを `agent-canon k search` / `k read` で private
 logへ on-demand に検索します。stable preference は対象 owner への明示変更として扱います。
 
-raw text search の hit だけで編集対象を決めません。
-user、parent、handoff、router が示した path は候補として保存し、候補の確定と edit owner の確定を同一視しません。編集に入る前に既存の [`Owner-First Read Trace`](../skills/agent-orchestration.md#owner-first-read-trace) で selected Skill と operational owner を解決し、必要な dependency/downstream edge を入口、呼び元、実装、consumer、既存 test のうち判断を変える面へ bounded にたどって、候補が本当にその owner の差し替え可能な単位かを確認します。判断を変えない面は既存の `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` に理由付きで分類し、候補が支持されない場合は route を更新してから編集します。検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を作ります。write-capable child handoff は `agents/task_catalog.yaml#workflow_activation_policy` が要求する typed route だけで materialize します。空の unresolved-decision set は即時に選択 route へ遷移し、owner gate は完了後だけです。bounded owner/path/targeted-validation request は選択済み execution owner が直接扱い、child を要求する coordination route の場合だけ同じ typed handoff を使います。
-asset reuse investigation は decomposition / prototyping より前に行います。
-split / extraction または suspected predecessor の現行欠落では splitter が
-current module/helper/type/test/docs と `git log`、`-S`、deleted paths、prior PR /
-Issue、predecessor tests を調査します。bounded non-split edit には historical
-scan を一律適用しません。known な asset path、capability、disposition、reason、
-test paths は既存 `reuse_survey` に advisory context として載せ、選択した asset
-と test context から slice を導きます。同一 asset に触れる slice を merge してから
-child handoff に同じ known context を渡します。context の不在は dispatch または
-writing を block しません。
-bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。#335 の既存 tool 先行実行を維持し、結果の解釈や修正の直前に、Owner-First Read Trace が選んだ共通制約と現在必要な分岐・委譲先の節だけを `section_eof=true` まで読みます。compact/canonical の全文 EOF や未到達分岐の読了は要求しません。`implementation_read=ready` は必要節の読了後だけ使い、可視 prefix や既知 path だけでは unlock しません。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
-
-## Skill read admission
-
-The canonical [`agent-orchestration` Owner-First Read Trace](../skills/agent-orchestration.md#owner-first-read-trace)
-owns point-of-use branch selection, required-section EOF, and the
-no-duplicate-receipt/body rule. This workflow preserves its existing-tool-before-read
-exception. Readiness applies only to the current action; inactive branches and
-whole-file EOF are not admission requirements.
-
-```bash
-git grep -l "topic keywords" -- <responsibility-scoped dirs> \
-  | sed -n '1,200p' > reports/search_hits.txt
-bash tools/analysis/dependencies/run_repo_dependency_review.sh \
-  --report-dir reports/dependency-review \
-  --search-hits-file reports/search_hits.txt
-```
-
-`dependency_edit_scope.txt` は path artifact として残します。会話、Issue、PR body、または run bundle の本文には、件数、主要 path、編集した file、確認した file、意図的に外した candidate だけを書きます。
+Search hits and nominated paths are candidates, not edit authority. Confirm the
+selected owner and affected callers/consumers; follow only dependency edges that
+can change scope or validation.
+Before splitting or retiring an implementation, use the shared
+[owner and retirement rule](../../ROOT_AGENTS.md#always-on-boundary) to check
+existing assets and callers. A bounded edit needs no broad history scan. When
+the next action is settled, proceed through its owner; read the relevant owner
+before interpreting or repairing tool output.
 
 ## Missing File Or Path Triage
 

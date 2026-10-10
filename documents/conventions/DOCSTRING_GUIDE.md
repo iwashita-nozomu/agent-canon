@@ -230,10 +230,10 @@ normalization の意味、owner、evidence、validation を、次の短い struc
 
 | id | normalization meaning | owner | evidence | validation |
 | --- | --- | --- | --- | --- |
-| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | canonical dependency readback と design document source anchor | canonical CI/readback、`check_design_doc_claims.py`、native-path candidate |
-| DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | C++ projection record の adapter owner、target identity、header/source anchor | design claim checker と C++ adapter readback |
+| DAL-01 | C++ native consumer は build design が選ぶ `cpp/include/<project>/...` / `cpp/src/...` target identity に正規化する | [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | canonical dependency readback と design document source anchor | canonical CI/readback、prose/source-reference readback、native-path candidate |
+| DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | C++ projection record の adapter owner、target identity、header/source anchor | DIC source trace と C++ adapter readback |
 | DAL-03 | reviewer 選択は changed-surface evidence を existing language/docs candidates へ正規化し、OOP ownerだけを capability projection へ渡す | `tools/agent/orchestration/agent_team.py` + `agents/skills/catalog.yaml` | candidate list、OOP route packet、dependency order | `language_review_candidates`、`route.py`、orchestration check |
-| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | DIC path / section / clause / evidence trace | docs check、prose readback、design claim checker |
+| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | DIC path / section / clause / evidence trace | docs check と DIC source-trace readback |
 
 ## Language projection boundary
 

@@ -64,7 +64,6 @@ structured-analysis integration references the Rust CLI directly.
 | Kind | Meaning | Structured severity |
 | --- | --- | --- |
 | `generated_report` | `reports/...` が source policy と混同される可能性。 | `info` |
-| `missing_dependency_manifest` | source doc に dependency manifest がない。 | `blocker` |
 | `stale_name_candidate` | path name が old / copy / duplicate / legacy / snapshot / stale を示す。 | `warn` |
 | `duplicate_heading_candidate` | active document が同じ H1 title を共有する。 | `warn` |
 

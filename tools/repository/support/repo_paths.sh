@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Resolves the standalone AgentCanon repository root and tool view.
-# downstream implementation ../ci/run_all_checks.sh uses the resolved tool view for repository checks.
-# downstream implementation ../ci/run_standalone_static_gate_unit.sh uses the resolved tool view.
+# downstream implementation ../../validation/ci/runners/run_all_checks.sh uses the resolved tool view for repository checks.
+# downstream implementation ../../validation/ci/runners/run_standalone_static_gate_unit.sh uses the resolved tool view.
 # @dependency-end
 
 agent_canon_repo_root() {
