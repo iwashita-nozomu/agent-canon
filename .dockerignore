@@ -11,6 +11,7 @@
 !.editorconfig
 !.gitattributes
 !.gitignore
+!.markdownlint-cli2.jsonc
 !.vscode/
 !.vscode/**
 !CONTAINER_OPERATIONS.md
