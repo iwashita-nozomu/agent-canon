@@ -4,6 +4,7 @@
 # contract test
 # responsibility Tests integrated CI shell wiring that is too expensive to execute wholesale.
 # upstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs repository and AgentCanon CI gates
+# upstream implementation ../../tests/bootstrap/docker.sh provides the full-check image runtime environment
 # upstream implementation ../../eval/producers/run_accumulated_agent_evals.py writes accumulated eval reports
 # upstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated eval reports
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted log archive paths
@@ -16,6 +17,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh"
+DOCKER_RUNNER = PROJECT_ROOT / "tests" / "bootstrap" / "docker.sh"
 PR_SCRIPT = (
     PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_agent_canon_pr.sh"
 )
@@ -143,6 +145,16 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertIn("runtime_boundary_path()", text)
         self.assertIn('mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_PATH}"', text)
         self.assertNotIn('"${WORKSPACE_ROOT}/.agent-canon', text)
+
+    def test_full_check_image_uses_runtime_tmpdir(self) -> None:
+        """CTest scratch uses the writable runtime bind instead of container /tmp."""
+        text = DOCKER_RUNNER.read_text(encoding="utf-8")
+
+        self.assertIn(
+            '--env "AGENT_CANON_RUNTIME_ROOT=${TEST_WORKAREA}/runtime"',
+            text,
+        )
+        self.assertIn('--env "TMPDIR=${TEST_WORKAREA}/runtime/tmp"', text)
 
     def test_all_checks_removes_home_tools_defaults_for_cli_target(self) -> None:
         """CLI fallback should no longer infer target paths from HOME/.tools."""

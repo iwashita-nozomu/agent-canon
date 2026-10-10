@@ -251,6 +251,7 @@ else
     --env "AGENT_CANON_CHILD_PURPOSE=standalone-static-gate-unit"
     --env "AGENT_CANON_CLI_CMD=/usr/local/bin/agent-canon"
     --env "CARGO_HOME=${TEST_WORKAREA}/runtime/cache/cargo-home"
+    --env "TMPDIR=${TEST_WORKAREA}/runtime/tmp"
     --env "RUFF_CACHE_DIR=${TEST_WORKAREA}/runtime/cache/ruff"
     --env "PYTEST_ADDOPTS=-o cache_dir=${TEST_WORKAREA}/runtime/cache/pytest"
     --env "HOME=${TEST_WORKAREA}/cache/home"
