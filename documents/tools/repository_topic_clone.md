@@ -44,7 +44,9 @@ python3 tools/repository/workspace/repository_topic_clone.py cleanup \
 container 側に checkout-mode の別 flag はなく、exact target metadata から自動判定します。
 write-capable handoff の各 allowed path は repeated `--allowed-path <relative-path>` で渡します。
 exact identity の既存 checkout では、current owner evidence と明示 scope に応じて task marker、reserved packet の
-worktree `info/exclude` entry、および ignored writer-target packet のみを更新できます。これは source や Git index を変更せず、dirty checkout を clean 扱い
+Git common-directory `info/exclude` entry、および ignored writer-target packet のみを更新できます。
+linked worktree ではその ignore entry は共有されますが、writer packet は各 worktree に属します。
+これは source や Git index を変更せず、dirty checkout を clean 扱い
 しません。merge / cleanup の clean-state 条件も変更しません。dirty 状態を保った場合は prepare の出力に
 `REQUEST_CHECKOUT_STATUS=dirty-preserved` を含めます。
 

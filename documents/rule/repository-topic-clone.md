@@ -54,6 +54,9 @@ linked worktree は native Git の shared refs/config と per-worktree index を
 新規worktreeの公開rootはanchorのアクセスmodeを引き継ぎます。準備中のscratchの
 private modeを公開checkoutへ固定し、設定済みtool residentの読取を妨げません。
 writer packet と task marker は各 worktree に属し、別 worktree の状態を共有・上書きしません。
+reserved packet 用の `info/exclude` entry は Git の common directory に属し、
+linked worktree 間で共有されます。
+これは ignore rule の共有であり、worktree ごとの writer packet 自体は共有しません。
 同じcheckoutを再prepareする明示的なallowed pathsは、その親packetの更新として反映します。
 省略時は既存のscopeを保持し、branch・remote・rootのidentity確認は継続します。
 independent clone も同じ path、marker、writer packet、branch identity の検証を通ります。
@@ -75,8 +78,9 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
   未知の Git facts、packet の symlink/不整合、escaped path は引き続き hold します。
   legacy module marker の互換性は従来どおり exact digest を要求します。
 - source/index に触れない既存 target metadata 更新は、`prepare` の通常の identity 検証前に行います。
-  この操作が更新するのは task marker、reserved packet 用の worktree `info/exclude` entry、および ignored writer
-  packet だけです。checkout、Git index、packet 以外の tracked / untracked / ignored worktree file を編集・移動・削除せず、
+  この操作が更新するのは task marker、Git が選択した common-directory
+  `info/exclude` の reserved packet entry、および ignored writer packet だけです。
+  checkout、Git index、packet 以外の tracked / untracked / ignored worktree file を編集・移動・削除せず、
   dirty state を clean と報告しません。dirty content の所有権を割り当てる操作でもありません。
   新規 checkout、branch 変更、`merge-main` は従来どおり clean state を要求します。
 - requested branch が local/remote のどちらにも無い場合だけ、最新 `origin/main` から作る。
