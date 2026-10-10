@@ -2246,6 +2246,8 @@ class BootstrapRuntime:
 
     def eval_collect(self, root: Path, run_id: str) -> dict[str, Any]:
         """Run every registered eval producer inside the resident tool image."""
+        from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root
+
         _slug(run_id)
         source = _existing_no_symlink(root, field="eval source root")
         spool = self.paths.spool / run_id
@@ -2397,8 +2399,12 @@ class BootstrapRuntime:
                 # that bundle to host spool before releasing task admission.
                 eval_export = spool / "eval-results"
                 log_export = spool / "producer-logs"
+                eval_source = (
+                    mounted_log_archive_root(self.repository_root, exchange_runtime)
+                    / "eval-results"
+                )
                 _copy_resident_export(
-                    source=f"{exchange_runtime}/eval-results",
+                    source=str(eval_source),
                     destination=eval_export,
                     allowed_root=self.paths.spool,
                 )
