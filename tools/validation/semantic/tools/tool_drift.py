@@ -113,6 +113,7 @@ CONTRACTS = (
             LinkCheck("agents/skills/agent-canon-update.md"),
             LinkCheck(".github/AGENTS.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
+            LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
             LinkCheck("README.md"),
         ),
     ),
