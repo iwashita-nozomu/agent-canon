@@ -450,14 +450,29 @@ def generate_graph_tsv(root: Path, target_path: Path, *, scope: str) -> GraphInp
 
 
 def load_edges(path: Path) -> tuple[Edge, ...]:
-    """Load graph TSV edges."""
+    """Load the existing four-column dependency graph TSV representation."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    header = "direction\tkind\tsource\ttarget"
+    first_content = next(
+        (index for index, line in enumerate(lines) if line.strip()), None
+    )
+    if first_content is None or lines[first_content] != header:
+        raise ValueError("dependency graph TSV must start with the four-column header")
+
     edges: list[Edge] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip() or line.startswith("direction\t"):
+    for line_index, line in enumerate(lines[first_content + 1 :], start=first_content + 2):
+        if not line.strip():
             continue
         fields = line.split("\t")
         if len(fields) != GRAPH_TSV_FIELD_COUNT:
-            continue
+            raise ValueError(
+                f"dependency graph TSV line {line_index} has {len(fields)} fields; "
+                f"expected {GRAPH_TSV_FIELD_COUNT}"
+            )
+        if line == header:
+            raise ValueError(
+                f"dependency graph TSV line {line_index} repeats the header"
+            )
         edges.append(Edge(*fields))
     return tuple(edges)
 
@@ -2977,26 +2992,32 @@ def main() -> int:
         bundle_dir=Path(args.bundle_dir).resolve() if args.bundle_dir else None,
     )
     if args.bundle_dir:
-        manifest, report = write_bundle(
-            root=root,
-            scope=args.scope,
-            graph_tsv=graph_tsv,
-            bundle_dir=Path(args.bundle_dir),
-            title=args.title,
-        )
+        try:
+            manifest, report = write_bundle(
+                root=root,
+                scope=args.scope,
+                graph_tsv=graph_tsv,
+                bundle_dir=Path(args.bundle_dir),
+                title=args.title,
+            )
+        except ValueError as error:
+            parser.error(str(error))
         if args.format == "json":
             print(json.dumps(manifest, indent=2, sort_keys=True))
         else:
             print_text_envelope(manifest)
         return 1 if args.fail_on_broken and report.broken_targets else 0
 
-    envelope, report = write_projection(
-        root=root,
-        scope=args.scope,
-        graph_tsv=graph_tsv,
-        paths=selected_projection_paths,
-        title=args.title,
-    )
+    try:
+        envelope, report = write_projection(
+            root=root,
+            scope=args.scope,
+            graph_tsv=graph_tsv,
+            paths=selected_projection_paths,
+            title=args.title,
+        )
+    except ValueError as error:
+        parser.error(str(error))
     if args.format == "json":
         print(json.dumps(envelope, indent=2, sort_keys=True))
     else:

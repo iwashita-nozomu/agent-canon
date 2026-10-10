@@ -706,7 +706,7 @@ skill_families:
     shim: .codex/personal/skills/code-visualization/SKILL.md
     discovery:
       name: code-visualization
-      description: "Sole public visualization owner for code, repository structure, runtime behavior, state, data movement, dependencies, types, proof state, interactive graphs, and document diagrams; builds the complete typed universe and coverage manifest before delegating renderer-only projection."
+      description: "Use when visualizing code, repository structure, runtime behavior, state, data movement, dependencies, types, proof status, or document diagrams; selects the source owner, useful view, and existing renderer."
     routing:
       stage_policy: active
       triggers:

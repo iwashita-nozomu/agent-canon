@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Materializes and validates the complete typed public skill/tool invocation graph.
-# upstream design ../../../agents/skills/catalog.yaml owns public skill identity and command phases
+# responsibility Materializes and validates the public skill/dependency graph.
+# upstream design ../../../agents/skills/catalog.yaml owns public skill identity and capability metadata
 # upstream design ../../../agents/skills/skill-dependencies.yaml owns skill relations and invocation order
-# upstream design ../../catalog.yaml owns canonical ToolIDs
 # upstream design ../../../documents/design/skill-tool-invocation-graph.md owns the v2 schema and digest rules
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md owns the external runtime and explicit mutation boundary
-# upstream implementation ./skill_route_catalog.py owns typed visualization owner/adapter routing
 # upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external artifact publication and source exclusion
 # downstream implementation ../../../documents/runtime/skill-dependency-graph.md is generated Mermaid
 # downstream implementation ../../../documents/runtime/skill-dependency-graph.json is generated machine graph
 # downstream implementation ../../validation/semantic/skills/check_skill_tool_invocation_graph.py is the public checker entrypoint
-# downstream implementation ../../../tests/agent_tools/test_skill_dependency_map.py checks graph completeness
+# downstream implementation ../../../tests/agent_tools/test_skill_dependency_map.py checks graph identity and readback
 # @dependency-end
-"""Materialize and validate the deterministic public skill/tool graph."""
+"""Materialize and validate the deterministic public skill/dependency graph."""
 
 from __future__ import annotations
 
@@ -38,14 +36,7 @@ import yaml
 
 from tools.agent.skills.skill_route_catalog import (
     SKILL_DEPENDENCY_MAP_PATH,
-    VISUALIZATION_ADAPTER_TOOL_IDS,
-    VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
-    VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
-    VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
-    VISUALIZATION_OWNER_TOOL_ID,
     SkillDependencyRule,
-    build_visualization_adapter_tool_call,
-    build_visualization_owner_tool_call,
     derive_skill_invocation_order,
     load_skill_catalog,
     load_skill_dependency_map,
@@ -56,12 +47,6 @@ from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactError,
     RuntimeRootRequired,
     runtime_artifact_boundary,
-)
-from tools.validation.semantic.tools.visualization_contract import (
-    TOOL_ARGUMENT_SCHEMAS,
-    VisualizationSourceItem,
-    build_source_universe,
-    serialize_tool_call,
 )
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[3]
@@ -79,7 +64,6 @@ SOURCE_MUTATION_ALLOWED_PATHS = tuple(
 GRAPH_SCHEMA = "agent_canon.skill_tool_invocation_graph.v2"
 CHECK_SCHEMA = "agent_canon.skill_tool_invocation_check.v1"
 GRAPH_ARTIFACT_ID = "skill-tool-invocation-graph"
-GRAPH_RENDERER_ID = VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID
 EDGE_TYPES = (
     "prerequisite",
     "successor",
@@ -121,27 +105,23 @@ IDENTITY_KINDS = (
     "command",
     "tool",
     "capability",
-    "toolcall",
     "edge",
     "source",
     "manifest",
-    "coverage",
     "readback",
 )
-GRAPH_HEADER = "<!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->"
+GRAPH_HEADER = "<!-- Generated from the public skill/dependency graph; do not edit by hand. -->"
 GRAPH_DEPENDENCY_HEADER = """<!--
 @dependency-start
 contract reference
-responsibility Publishes the generated public skill/tool invocation graph as the canonical Mermaid reader surface.
-upstream design ../../documents/design/skill-tool-invocation-graph.md owns the graph universe, serialization, and readback contract
-upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes the typed graph and renders the Mermaid projection
+responsibility Publishes the generated public skill/dependency graph as a Mermaid reader surface.
+upstream design ../../documents/design/skill-tool-invocation-graph.md owns graph identity, serialization, and readback
+upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes skill and dependency records and renders the Mermaid projection
 downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py validates source/artifact equality and actual Mermaid syntax readback
-downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py covers completeness, determinism, and stale-artifact failures
+downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py covers identity, determinism, and stale-artifact failures
 @dependency-end
 -->"""
-MERMAID_HEADER_RE = re.compile(
-    r"^<!-- graph_digest=([0-9a-f]{64}) coverage_digest=([0-9a-f]{64}) -->$"
-)
+MERMAID_HEADER_RE = re.compile(r"^<!-- graph_digest=([0-9a-f]{64}) -->$")
 MERMAID_KV_RE = re.compile(r"([a-z_]+)=([^ ]+)")
 MERMAID_NODE_RE = re.compile(
     r'^\s+(n_[A-Za-z0-9_]+)(?:\[\["(.*)"\]\]|\["(.*)"\]|\{"(.*)"\})$'
@@ -377,7 +357,7 @@ def _label(value: str) -> str:
 
 
 def _route_snapshot(rules: Sequence[object]) -> list[dict[str, object]]:
-    """Create a logical, ToolCall-free route packet snapshot."""
+    """Snapshot public skill routing and dependency fields."""
     result: list[dict[str, object]] = []
     for rule in rules:
         typed = cast(Any, rule)
@@ -397,56 +377,11 @@ def _route_snapshot(rules: Sequence[object]) -> list[dict[str, object]]:
                     }
                     for route in typed.capabilities
                 ],
-                "visualization_role": typed.visualization_role,
-                "tool_id": typed.tool_id,
-                "argument_schema": typed.argument_schema,
                 "required_prerequisites": list(typed.required_prerequisites),
                 "successors": list(typed.successors),
             }
         )
     return result
-
-
-def _build_owner_and_adapter_calls(
-    capability_id: str,
-) -> tuple[dict[str, object], dict[str, object]]:
-    """Invoke the typed visualization owner before its dependency adapter."""
-    owner = build_visualization_owner_tool_call(
-        f"capability:{capability_id}",
-        f"agents/skills/catalog.yaml#capability:{capability_id}",
-    )
-    serialize_tool_call(owner)
-    adapter = build_visualization_adapter_tool_call(owner)
-    serialize_tool_call(adapter)
-    return cast(dict[str, object], owner), cast(dict[str, object], adapter)
-
-
-def _legacy_source_item(
-    kind: str, origin: str, locator: str, ordinal: int, payload: Mapping[str, object]
-) -> VisualizationSourceItem:
-    """Build the source item accepted by the public owner ToolCall contract."""
-    return {
-        "item_id": _digest(
-            {
-                "kind": kind,
-                "origin": origin,
-                "locator": locator,
-                "ordinal": ordinal,
-                "payload": payload,
-            }
-        ),
-        "kind": cast(Any, kind),
-        "origin": cast(Any, origin),
-        "source_locator": locator,
-        "source_start": None,
-        "source_end": None,
-        "ordinal": ordinal,
-        # visualization_contract owns this compatibility envelope's sorted-key
-        # serializer; the v2 graph never persists this full source payload.
-        "payload_json": json.dumps(
-            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ),
-    }
 
 
 def _source_record(
@@ -503,7 +438,7 @@ def _validate_projection_refs(
     graph: Mapping[str, object], identities: _IdentityStore
 ) -> None:
     """Validate every Ref-only projection against the IdentityRecord store."""
-    for field in ("skills", "phases", "commands", "tools", "capabilities", "toolcalls"):
+    for field in ("skills", "phases", "commands", "tools", "capabilities"):
         for item in cast(Sequence[Mapping[str, object]], graph[field]):
             identities.require(cast(Mapping[str, object], item["ref"]))
             if (
@@ -575,7 +510,6 @@ def _projection_digest(graph: Mapping[str, object]) -> dict[str, str]:
                     "commands",
                     "tools",
                     "capabilities",
-                    "toolcalls",
                 )
             }
         ),
@@ -587,23 +521,20 @@ def _projection_digest(graph: Mapping[str, object]) -> dict[str, str]:
 def _source_snapshot(
     root: Path,
     rules: Sequence[object],
-    toolcall_packet: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
-    """Build the skill/dependency source snapshot without command packets."""
+    """Build the skill/dependency source snapshot from public source owners."""
     route_packet = _route_snapshot(rules)
     locators = {
         "catalog_sha256": "agents/skills/catalog.yaml",
         "dependencies_sha256": "agents/skills/skill-dependencies.yaml",
         "reader_index_sha256": "agents/canonical/skills.md",
         "route_packet_sha256": "agents/skills/catalog.yaml#routing",
-        "toolcall_packet_sha256": "agents/skills/catalog.yaml#typed-visualization-toolcalls",
     }
     return {
         "catalog_sha256": _file_digest(root, locators["catalog_sha256"]),
         "dependencies_sha256": _file_digest(root, locators["dependencies_sha256"]),
         "reader_index_sha256": _file_digest(root, locators["reader_index_sha256"]),
         "route_packet_sha256": _digest(route_packet),
-        "toolcall_packet_sha256": _digest(toolcall_packet),
         "source_locators": locators,
     }
 
@@ -629,17 +560,8 @@ def _validate_design_correspondence(root: Path) -> dict[str, object]:
     design_text = design_path.read_text(encoding="utf-8")
     required_tokens = (*DESIGN_CLAUSE_IDS, *DIC_CLAUSE_IDS, *IMPLEMENTATION_TRACE_PATHS)
     missing = [token for token in required_tokens if token not in design_text]
-    adapter_pairs = tuple(
-        (tool_id, TOOL_ARGUMENT_SCHEMAS[tool_id])
-        for tool_id in VISUALIZATION_ADAPTER_TOOL_IDS
-    )
-    missing_pairs = [
-        f"{tool_id}|{argument_schema}"
-        for tool_id, argument_schema in adapter_pairs
-        if tool_id not in design_text or argument_schema not in design_text
-    ]
-    if missing or missing_pairs:
-        detail = ",".join((*missing, *missing_pairs))
+    if missing:
+        detail = ",".join(missing)
         raise ValueError(f"design_correspondence_missing:{detail}")
     return {
         "design_locator": DESIGN_LOCATOR,
@@ -647,15 +569,11 @@ def _validate_design_correspondence(root: Path) -> dict[str, object]:
         "clause_ids": list(DESIGN_CLAUSE_IDS),
         "dic_clause_ids": list(DIC_CLAUSE_IDS),
         "implementation_target_paths": list(IMPLEMENTATION_TRACE_PATHS),
-        "adapter_pairs": [
-            {"tool_id": tool_id, "argument_schema": argument_schema}
-            for tool_id, argument_schema in adapter_pairs
-        ],
     }
 
 
 def build_graph(root: Path) -> dict[str, object]:
-    """Build the complete v2 graph without truncating any source identity."""
+    """Build the current v2 skill/dependency graph without truncating identities."""
     _validate_reader_parity(root)
     design_correspondence = _validate_design_correspondence(root)
     catalog = load_skill_catalog(root)
@@ -724,9 +642,6 @@ def build_graph(root: Path) -> dict[str, object]:
                     "owner_id": skill,
                     "type": cap.activation,
                     "phase_id": f"phase:{skill}:conditional",
-                    "adapter_id": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID
-                    if cap.capability_id == "dependency_manifest_graph"
-                    else None,
                 },
             )
             _source_record(
@@ -740,104 +655,7 @@ def build_graph(root: Path) -> dict[str, object]:
                 phase=cap.phase,
             )
 
-    capability_id = "dependency_manifest_graph"
-    if not any(
-        route.capability_id == capability_id
-        for rule in route_rules
-        for route in rule.capabilities
-    ):
-        raise ValueError(
-            "typed_visualization_capability_missing:dependency_manifest_graph"
-        )
-    owner_call, adapter_call = _build_owner_and_adapter_calls(capability_id)
-    toolcall_summaries = (
-        {
-            "id": "toolcall:canonical-owner",
-            "tool_id": VISUALIZATION_OWNER_TOOL_ID,
-            "argument_schema_id": VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
-            "order": 0,
-            "locator_refs": [
-                "agents/skills/catalog.yaml#capability:dependency_manifest_graph"
-            ],
-        },
-        {
-            "id": "toolcall:dependency-manifest-adapter",
-            "tool_id": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
-            "argument_schema_id": VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
-            "order": 1,
-            "locator_refs": ["tools/analysis/dependencies/render_dependency_manifest_graph.py"],
-        },
-    )
-    toolcall_refs: dict[str, dict[str, str]] = {}
-    for summary in toolcall_summaries:
-        toolcall_refs[cast(str, summary["id"])] = identities.add(
-            "toolcall",
-            cast(str, summary["id"]),
-            {
-                "id": summary["id"],
-                "tool_id": summary["tool_id"],
-                "input_refs": [],
-                "output_refs": [],
-                "locator_refs": summary["locator_refs"],
-                "order": summary["order"],
-            },
-        )
-    _source_record(
-        identities,
-        source_inventory,
-        "module",
-        "agents/skills/code-visualization.md",
-        0,
-        toolcall_refs["toolcall:canonical-owner"],
-        owner_tool_id=VISUALIZATION_OWNER_TOOL_ID,
-    )
-
-    # Exercise the public source-universe contract after the owner ToolCall and before the adapter.
-    literal_items = [
-        _legacy_source_item(
-            "identity",
-            "literal_request",
-            "route:capability:dependency_manifest_graph",
-            0,
-            {"request": "complete public skill/tool invocation graph"},
-        )
-    ]
-    owner_items = [
-        _legacy_source_item(
-            "module",
-            "owner_closure",
-            "agents/skills/code-visualization.md",
-            0,
-            {"owner_skill": "code-visualization"},
-        )
-    ]
-    dependency_items = [
-        _legacy_source_item(
-            cast(str, item["kind"]),
-            "dependency_closure",
-            cast(str, item["source_locator"]),
-            cast(int, item["ordinal"]),
-            {"ref": item["ref"]},
-        )
-        for item in source_inventory
-    ]
-    source_universe = build_source_universe(
-        request_id=cast(
-            str, cast(Mapping[str, object], owner_call["arguments"])["request_id"]
-        ),
-        literal_request=cast(
-            str, cast(Mapping[str, object], owner_call["arguments"])["literal_request"]
-        ),
-        literal_items=literal_items,
-        owner_closure=owner_items,
-        dependency_closure=dependency_items,
-    )
-    if len(source_universe["items"]) != len(literal_items) + len(owner_items) + len(
-        dependency_items
-    ):
-        raise ValueError("source_universe_omission")
-
-    source_snapshot = _source_snapshot(root, route_rules, toolcall_summaries)
+    source_snapshot = _source_snapshot(root, route_rules)
     for key, locator in cast(
         Mapping[str, str], source_snapshot["source_locators"]
     ).items():
@@ -854,17 +672,6 @@ def build_graph(root: Path) -> dict[str, object]:
 
     edges: list[dict[str, object]] = []
     edge_order = 0
-    _add_edge(
-        identities,
-        edges,
-        source_inventory,
-        "order",
-        toolcall_refs["toolcall:canonical-owner"],
-        toolcall_refs["toolcall:dependency-manifest-adapter"],
-        edge_order,
-        {"reason": "owner-before-adapter"},
-    )
-    edge_order += 1
     for skill in skill_ids:
         rule = rules[skill]
         for prerequisite in rule.required_prerequisites:
@@ -944,14 +751,6 @@ def build_graph(root: Path) -> dict[str, object]:
         _projection_entry(ref, capability_id)
         for capability_id, ref in capability_refs.items()
     ]
-    toolcalls_projection = [
-        _projection_entry(
-            toolcall_refs[cast(str, summary["id"])],
-            cast(str, summary["tool_id"]),
-            cast(int, summary["order"]),
-        )
-        for summary in toolcall_summaries
-    ]
     invocation_projection = [
         {"ref": dict(skill_refs[skill]), "order": invocation_ordinals[skill]}
         for skill in invocation_order
@@ -966,7 +765,6 @@ def build_graph(root: Path) -> dict[str, object]:
         "commands": commands_projection,
         "tools": tools_projection,
         "capabilities": capabilities_projection,
-        "toolcalls": toolcalls_projection,
         "edges": edges,
         "invocation_order": invocation_projection,
         "source_snapshot": source_snapshot,
@@ -976,36 +774,17 @@ def build_graph(root: Path) -> dict[str, object]:
         "responsibility_groups": {
             skill: rules[skill].responsibility_group for skill in skill_ids
         },
-        "tool_call_order": [
-            "toolcall:canonical-owner",
-            "toolcall:dependency-manifest-adapter",
-        ],
-        "owner_tool_call_ref": dict(toolcall_refs["toolcall:canonical-owner"]),
-        "adapter_tool_call_ref": dict(
-            toolcall_refs["toolcall:dependency-manifest-adapter"]
-        ),
         "projection_digests": {},
     }
     graph["projection_digests"] = _projection_digest(graph)
     identity_refs = [_ref(record) for record in identities.records]
     edge_refs = [cast(dict[str, str], edge["edge_ref"]) for edge in edges]
     source_digest = _digest(source_snapshot)
-    coverage_payload = {
-        "id": "coverage:skill-tool-invocation-graph",
-        "source_digest": source_digest,
-        "source_refs": identity_refs,
-        "projection_digests": graph["projection_digests"],
-        "counts": graph["source_counts"],
-    }
-    coverage_ref = identities.add(
-        "coverage", cast(str, coverage_payload["id"]), coverage_payload
-    )
     manifest_payload = {
         "id": "manifest:skill-tool-invocation-graph",
         "source_digest": source_digest,
         "identity_refs": identity_refs,
         "edge_refs": edge_refs,
-        "coverage_refs": [coverage_ref],
         "counts": {
             "skills": len(skills_projection),
             "phases": len(phases_projection),
@@ -1021,7 +800,6 @@ def build_graph(root: Path) -> dict[str, object]:
         "id": "readback:skill-tool-invocation-graph",
         "source_digest": source_digest,
         "projection_digests": graph["projection_digests"],
-        "coverage_ref": coverage_ref,
         "manifest_ref": manifest_ref,
         "counts": graph["source_counts"],
     }
@@ -1034,18 +812,8 @@ def build_graph(root: Path) -> dict[str, object]:
         "source_digest": source_digest,
         "identity_refs": identity_refs,
         "edge_refs": edge_refs,
-        "coverage_refs": [coverage_ref],
         "counts": manifest_payload["counts"],
     }
-    graph["coverage"] = {
-        "ref": coverage_ref,
-        "source_digest": source_digest,
-        "projection_digests": graph["projection_digests"],
-        "source_counts": graph["source_counts"],
-        "rendered_counts": graph["source_counts"],
-        "readback_counts": graph["source_counts"],
-    }
-    graph["coverage_digest"] = coverage_ref["digest"]
     graph["manifest_digest"] = manifest_ref["digest"]
     graph["source_digests"] = {
         key: source_snapshot[key]
@@ -1054,7 +822,6 @@ def build_graph(root: Path) -> dict[str, object]:
             "dependencies_sha256",
             "reader_index_sha256",
             "route_packet_sha256",
-            "toolcall_packet_sha256",
         )
     }
     graph["readback_ref"] = readback_ref
@@ -1100,7 +867,6 @@ def _projection_nodes(
         ("command", "commands"),
         ("tool", "tools"),
         ("capability", "capabilities"),
-        ("toolcall", "toolcalls"),
     ):
         for index, item in enumerate(
             cast(Sequence[Mapping[str, object]], graph[field])
@@ -1130,13 +896,13 @@ def _rendered_edge_label(
 
 
 def render_graph_mermaid(graph: Mapping[str, object]) -> str:
-    """Render one complete graph with compact Ref metadata and no manifest marker."""
+    """Render the skill/dependency graph with compact Ref metadata."""
     lines = [
         GRAPH_DEPENDENCY_HEADER,
         GRAPH_HEADER,
-        "# Public Skill/Tool Invocation Graph",
+        "# Public Skill Dependency Graph",
         "",
-        f"<!-- graph_digest={graph['graph_digest']} coverage_digest={cast(Mapping[str, object], graph['coverage'])['ref']['digest']} -->",
+        f"<!-- graph_digest={graph['graph_digest']} -->",
         "```mermaid",
         "graph LR",
     ]
@@ -1168,7 +934,6 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
     for kind, field, title, shape in (
         ("tool", "tools", "ToolID catalog", "[["),
         ("capability", "capabilities", "Typed capabilities", "[["),
-        ("toolcall", "toolcalls", "ToolCall order", "[["),
     ):
         entries = cast(Sequence[Mapping[str, object]], graph[field])
         if not entries:
@@ -1220,7 +985,6 @@ def render_graph_mermaid(graph: Mapping[str, object]) -> str:
             "- `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.",
             "- `routing` and `parallel`: dashed directed edges.",
             "",
-            f"Coverage digest: `{cast(Mapping[str, object], graph['coverage'])['ref']['digest']}`.",
             f"Graph digest: `{graph['graph_digest']}`.",
             "",
         ]
@@ -1242,7 +1006,6 @@ def _parse_mermaid_metadata(
     assert header_match is not None
     header = {
         "graph_digest": header_match.group(1),
-        "coverage_digest": header_match.group(2),
     }
     nodes: list[dict[str, str]] = []
     edges: list[dict[str, str]] = []
@@ -1320,13 +1083,7 @@ def readback_mermaid(graph: Mapping[str, object], text: str) -> dict[str, object
     """Compare actual Mermaid node/edge/source refs, order, and digests."""
     header, nodes, edges, sources = _parse_mermaid_metadata(text)
     actual_nodes, actual_edges = _parse_mermaid_syntax(text)
-    coverage_ref = cast(
-        Mapping[str, object], cast(Mapping[str, object], graph["coverage"])["ref"]
-    )
-    if header != {
-        "graph_digest": graph["graph_digest"],
-        "coverage_digest": coverage_ref["digest"],
-    }:
+    if header != {"graph_digest": graph["graph_digest"]}:
         raise ValueError("mermaid_readback_digest_mismatch")
     expected_actual_nodes: dict[str, tuple[str, int | None, str]] = {}
     for kind, item, _index in _projection_nodes(graph):
@@ -1455,7 +1212,7 @@ def readback_mermaid(graph: Mapping[str, object], text: str) -> dict[str, object
         for item in sources
     }
     if observed_sources != expected_sources:
-        raise ValueError("mermaid_readback_source_coverage_mismatch")
+        raise ValueError("mermaid_readback_source_inventory_mismatch")
     return {
         "status": "pass",
         "node_count": len(nodes),

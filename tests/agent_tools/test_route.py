@@ -720,121 +720,37 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("tool-finding-report", decision["related_skill_candidates"])
         self.assertIn("agent-log-analysis", decision["related_skill_candidates"])
 
-    def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
-        """The canonical owner exposes the exact renderer route."""
-        runtime_text = (
-            PROJECT_ROOT
-            / ".codex"
-            / "personal"
-            / "skills"
-            / "code-visualization"
-            / "SKILL.md"
-        ).read_text(encoding="utf-8")
-        self.assertIn("Canonical workflow and policy", runtime_text)
+    def test_code_visualization_owner_documents_native_renderer_input(self) -> None:
+        """The canonical owner exposes its native renderer route."""
         canonical_text = (
             PROJECT_ROOT / "agents" / "skills" / "code-visualization.md"
         ).read_text(encoding="utf-8")
         direct_start = canonical_text.index("## Source Evidence Routes")
-        renderer_choice = canonical_text.index("## Renderer Choice")
-        direct_text = canonical_text[direct_start:renderer_choice]
-        self.assertLess(direct_start, renderer_choice)
-        for command in (
-            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
-            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
-        ):
-            self.assertIn(command, direct_text)
-        self.assertNotIn("<path>", direct_text)
-        self.assertNotIn("<provided-path>", direct_text)
-        self.assertIn(
-            "Use this exact changed-scope command only when changed scope is explicit",
-            direct_text,
-        )
-        self.assertIn("`--json` is invalid", direct_text)
-        direct_flat = " ".join(direct_text.split())
-        for invariant in (
-            "Treat these two commands as immutable flag templates.",
-            "`--root .` and `--format json` are mandatory in both routes.",
-            "Do not remove, add, or rename any flag.",
-        ):
-            self.assertIn(invariant, direct_flat)
-        for boundary in (
-            "The canonical graph owns dependency status and facts.",
-            "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
-        ):
-            self.assertIn(boundary, direct_flat)
-        self.assertNotIn("tools/analysis/dependencies/check_dependency_graph.sh", direct_flat)
-        self.assertIn(
-            "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
-            direct_flat,
-        )
-        self.assertEqual(
-            [
-                "dependency_graph.tsv",
-                "dependency_graph.ir.json",
-                "dependency_graph.md",
-                "dependency_graph.dot",
-                "dependency_graph.html",
-                "manifest.json",
-            ],
-            [
-                line.split("`", 2)[1]
-                for line in direct_text.splitlines()
-                if line.strip().startswith(tuple(f"{index}." for index in range(1, 7)))
-            ],
-        )
+        direct_text = canonical_text[direct_start:]
+        self.assertIn("render_dependency_manifest_graph.py", direct_text)
+        self.assertIn("`--graph-tsv`", direct_text)
+        self.assertIn("existing checker TSV", direct_text)
+        self.assertIn("default checker input", direct_text)
+        self.assertIn("`--fail-on-broken`", direct_text)
 
-    def test_code_visualization_canonical_skill_mirrors_renderer_invariant(
+    def test_prompt_routes_code_visualization_for_native_graph_input(
         self,
     ) -> None:
-        """The canonical owner keeps full and changed graph routes synchronized."""
-        canonical_text = (
-            PROJECT_ROOT / "agents" / "skills" / "code-visualization.md"
-        ).read_text(encoding="utf-8")
-        source_start = canonical_text.index("## Source Evidence Routes")
-        source_text = canonical_text[source_start:]
-        self.assertIn(
-            "changed-scope command only when changed scope is explicit", source_text
+        """A native dependency graph rendering request selects its owning skill."""
+        result = self.run_route(
+            "--prompt",
+            (
+                "$code-visualization render the existing dependency graph "
+                "from native TSV input"
+            ),
+            "--format",
+            "json",
         )
-        self.assertIn("--bundle-dir reports/dependency-graph", source_text)
-        self.assertNotIn("<path>", source_text)
-        self.assertNotIn("<provided-path>", source_text)
-        self.assertIn("`--json` is invalid", source_text)
-        source_flat = " ".join(source_text.split())
-        for invariant in (
-            "Treat these two commands as immutable flag templates.",
-            "`--root .` and `--format json` are mandatory in both routes.",
-            "Do not remove, add, or rename any flag.",
-        ):
-            self.assertIn(invariant, source_flat)
-        for boundary in (
-            "The canonical graph owns dependency status and facts.",
-            "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
-        ):
-            self.assertIn(boundary, source_flat)
-        self.assertNotIn("tools/analysis/dependencies/check_dependency_graph.sh", source_flat)
-        self.assertIn(
-            "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
-            source_flat,
-        )
-        self.assertNotIn(
-            "renderer invokes the external checker and owns checker authority",
-            source_flat,
-        )
-        for forbidden in (
-            "route.py",
-            "scan_code_dependencies.py",
-            "helper_function_inventory.py",
-        ):
-            self.assertNotIn(forbidden, source_text)
-        for basename in (
-            "dependency_graph.tsv",
-            "dependency_graph.ir.json",
-            "dependency_graph.md",
-            "dependency_graph.dot",
-            "dependency_graph.html",
-            "manifest.json",
-        ):
-            self.assertIn(f"`{basename}`", source_text)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("code-visualization", decision["matched_skills"])
+        self.assertIn("code-visualization", decision["active_skills"])
 
     def test_prompt_file_routes_through_python_owner(self) -> None:
         """Prompt files should use the Python routing owner."""
