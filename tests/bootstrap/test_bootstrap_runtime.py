@@ -632,6 +632,13 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     monkeypatch.setenv("AGENT_CANON_HOST_CACHE_ROOT", str(cache))
     monkeypatch.setenv("AGENT_CANON_PRIVATE_LOG_ROOT", str(private_log))
     monkeypatch.setenv("AGENT_CANON_HOST_PRIVATE_LOG", str(private_log))
+    # The autouse fixture redirects filesystem checks; this oracle separately
+    # verifies the fixed path passed to a resident worker.
+    monkeypatch.setattr(
+        bootstrap_runtime_module,
+        "PRIVATE_LOG_DESTINATION",
+        "/var/lib/agent-canon/private-log",
+    )
     monkeypatch.setattr(
         BootstrapRuntime,
         "private_log_root",
