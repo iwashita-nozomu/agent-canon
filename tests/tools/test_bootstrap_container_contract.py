@@ -267,13 +267,14 @@ def test_typed_tool_wrapper_rejects_arbitrary_dispatch() -> None:
     assert '[[ "${1:-}" != "tool" || "${2:-}" != "run" ]]' in text
 
 
-def test_dependency_manifest_contains_only_shared_language_and_workflow_tools() -> None:
+def test_dependency_manifest_contains_only_shared_tools() -> None:
     document = tomllib.loads(DEPENDENCIES.read_text(encoding="utf-8"))
     assert document["schema"] == "agent-canon.tool-dependencies"
     assert document["schema_version"] == 2
     assert "container" not in document
     records = document["records"]
     ids = {record["id"] for record in records}
+    # run_all_checks.sh's docs command invokes both providers for Markdown style.
     assert ids == {
         "pipx",
         "check-jsonschema",
@@ -282,6 +283,8 @@ def test_dependency_manifest_contains_only_shared_language_and_workflow_tools() 
         "basedpyright",
         "pyright-language-server",
         "bash-language-server",
+        "markdownlint-cli2",
+        "markdownlint-cli2-formatter-json",
         "jq",
         "tree",
         "clangd-language-server",
