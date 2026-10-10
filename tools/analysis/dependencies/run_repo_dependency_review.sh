@@ -6,14 +6,10 @@
 # upstream design ../../../documents/design/dependency-manifest-design.md dependency manifest DSL and review projections
 # upstream design ../../../agents/canonical/CODEX_WORKFLOW.md closeout requires dependency evidence
 # upstream design ../../../templates/agents/closeout_gate.md closeout dependency evidence gate
-# upstream design ../../../.github/PULL_REQUEST_TEMPLATE.md standalone PR dependency checklist
-# upstream design ../../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR dependency checklist
-# upstream design ../../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream implementation ./scan_dependency_headers.sh scans repo-wide manifest coverage
 # upstream implementation ../../validation/semantic/dependencies/check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates source-derived dependency relations
 # upstream implementation ../../validation/semantic/documents/check_design_doc_claims.py validates design claims against dependency evidence
-# downstream implementation ../../validation/ci/checks/check_agent_canon_pr.sh runs strict dependency review
 # downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
 # @dependency-end
 set -euo pipefail
@@ -83,9 +79,6 @@ LIST_CHANGED_DEPENDENCIES=0
 REPORT_DIR="${AGENT_RUN_REPORT_DIR:-}"
 GRAPH_TSV_OUTPUT=""
 SEARCH_HITS_FILE=""
-CHANGED_PATH_PACKET=""
-TRUSTED_BASE_SHA=""
-HEADER_SCAN_ONLY=0
 CHECK_DESIGN_DOC_CLAIMS=0
 ENSURE_GRAPH_ONLY=0
 declare -a DESIGN_DOC_CLAIM_PATHS=()
@@ -93,11 +86,12 @@ declare -a DESIGN_DOC_CLAIM_PATHS=()
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [--header-scan-only] [--ensure-graph] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--ensure-graph] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
-Missing manifests are report-only by default until the repository-wide migration is complete.
+Missing manifests are report-only by default. `--fail-missing` applies only to an
+explicitly selected review.
 With --list-changed-dependencies, the source graph checker also prints every dependency
 edge declared by, or pointing at, each changed file.
 When --report-dir is set, a stable dependency_graph.tsv artifact is generated
@@ -107,11 +101,6 @@ expanded into dependency edit-scope candidates and saved beside the graph when
 receives changed-file dependency edit-scope evidence.
 With --cycle-report-only, dependency cycles stay visible but do not block the
 wrapper. Use this only with a durable source-derived graph report artifact.
-With --changed-path-packet, selector-owned trusted base/head path evidence is
-passed to the canonical scan; unchanged missing headers remain baseline evidence.
-With --trusted-base-sha, the packet base is bound to an independent caller authority.
-With --header-scan-only, source relation/cycle validation and graph projections are
-skipped while the strict canonical header scan and format check still run.
 With --ensure-graph, the opt-in persisted graph status/build operation runs once
 and exits before source-owned dependency-header review.
 With --check-design-doc-claims, changed design documents are compared with
@@ -145,20 +134,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --explain-missing)
       EXPLAIN_MISSING=1
-      shift
-      ;;
-    --changed-path-packet)
-      [[ $# -ge 2 ]] || { echo "REPO_DEPENDENCY_REVIEW=fail reason=changed_path_packet_argument_missing"; exit 2; }
-      CHANGED_PATH_PACKET="$2"
-      shift 2
-      ;;
-    --trusted-base-sha)
-      [[ $# -ge 2 ]] || { echo "REPO_DEPENDENCY_REVIEW=fail reason=trusted_base_argument_missing"; exit 2; }
-      TRUSTED_BASE_SHA="$2"
-      shift 2
-      ;;
-    --header-scan-only)
-      HEADER_SCAN_ONLY=1
       shift
       ;;
     --ensure-graph)
@@ -214,15 +189,6 @@ if [[ -n "$REPORT_DIR" ]]; then
   mkdir -p "$REPORT_DIR"
 fi
 cd "$ROOT_DIR"
-
-if [[ "$HEADER_SCAN_ONLY" -eq 1 && "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
-  echo "REPO_DEPENDENCY_REVIEW=fail reason=header_scan_and_ensure_graph_are_mutually_exclusive"
-  exit 2
-fi
-if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_BASE_SHA" ) ]]; then
-  echo "REPO_DEPENDENCY_REVIEW=fail reason=header_scan_trusted_packet_required"
-  exit 2
-fi
 
 CANON_TOOLS_ROOT="$script_dir"
 SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/scan_dependency_headers.sh"
@@ -343,15 +309,9 @@ echo "REPO_DEPENDENCY_REVIEW_PATHS=${#checkable_paths[@]}"
 
 scan_args=("$SCAN_DEPENDENCY_HEADERS")
 format_args=("$CHECK_DEPENDENCY_HEADER_FORMAT")
-if [[ -n "$CHANGED_PATH_PACKET" ]]; then
-  scan_args+=(--changed-path-packet "$CHANGED_PATH_PACKET")
-  scan_args+=(--trusted-base-sha "$TRUSTED_BASE_SHA")
-fi
 if [[ "$FAIL_MISSING" -eq 1 ]]; then
   scan_args+=(--fail-missing)
-  if [[ -z "$CHANGED_PATH_PACKET" ]]; then
-    format_args+=(--require-header)
-  fi
+  format_args+=(--require-header)
 fi
 if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
   scan_args+=(--allow-frontmatter)
@@ -361,23 +321,8 @@ if [[ "$EXPLAIN_MISSING" -eq 1 ]]; then
   scan_args+=(--explain-missing)
 fi
 
-if [[ -n "$CHANGED_PATH_PACKET" ]]; then
-  bash "${scan_args[@]}"
-else
-  bash "${scan_args[@]}" "${checkable_paths[@]}"
-fi
+bash "${scan_args[@]}" "${checkable_paths[@]}"
 bash "${format_args[@]}" "${checkable_paths[@]}"
-
-if [[ "$HEADER_SCAN_ONLY" -eq 1 ]]; then
-  echo "REPO_DEPENDENCY_REVIEW=pass"
-  if [[ -n "$REPORT_DIR" ]]; then
-    python3 "$WORKFLOW_MONITOR" \
-      --report-dir "$REPORT_DIR" \
-      --signal "repo_dependency_review=pass header_scan_only=yes paths=${#checkable_paths[@]} fail_missing=${FAIL_MISSING} changed_path_packet=${CHANGED_PATH_PACKET:-none}" \
-      --intervention "run_repo_dependency_review.sh recorded header scan pass"
-  fi
-  exit 0
-fi
 
 if [[ -n "$REPORT_DIR" ]]; then
   mkdir -p "$REPORT_DIR"
@@ -453,6 +398,6 @@ echo "REPO_DEPENDENCY_REVIEW=pass"
 if [[ -n "$REPORT_DIR" ]]; then
   python3 "$WORKFLOW_MONITOR" \
     --report-dir "$REPORT_DIR" \
-    --signal "repo_dependency_review=pass paths=${#checkable_paths[@]} check_bidirectional=${CHECK_BIDIRECTIONAL} fail_missing=${FAIL_MISSING} changed_path_packet=${CHANGED_PATH_PACKET:-none}" \
+    --signal "repo_dependency_review=pass paths=${#checkable_paths[@]} check_bidirectional=${CHECK_BIDIRECTIONAL} fail_missing=${FAIL_MISSING}" \
     --intervention "run_repo_dependency_review.sh recorded dependency review pass"
 fi

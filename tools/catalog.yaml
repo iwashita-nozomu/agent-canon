@@ -1268,7 +1268,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md
@@ -1348,7 +1348,7 @@ entries:
     dispatch: {argv: ["bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh"]}
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1358,7 +1358,7 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-dependency-headers
-    summary: Checks changed files for required dependency manifests and registered contract kinds.
+    summary: Checks selected files for dependency manifests and registered contract kinds.
     path: tools/validation/semantic/dependencies/check_dependency_headers.py
     family: agent_tools
     role: checker
@@ -1367,7 +1367,7 @@ entries:
     dispatch: {argv: ["python3", "tools/validation/semantic/dependencies/check_dependency_headers.py"]}
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1495,29 +1495,6 @@ entries:
       - documents/rule/repository-topic-clone.md
     tests:
       - tests/agent_tools/test_repository_topic_clone.py
-
-  - id: conflict-preservation
-    public: true
-    summary: Captures and validates three-way conflict and focused rework content-preservation packets.
-    path: tools/repository/git/conflict_preservation.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    audience: skill
-    placement: skill_helper
-    command: python3 tools/repository/git/conflict_preservation.py
-    dispatch: {argv: ["python3", "tools/repository/git/conflict_preservation.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/conflict_preservation.md
-      - agents/skills/pr-processing.md
-    tests:
-      - tests/agent_tools/test_conflict_preservation.py
 
   - id: dependency-module-change
     public: true

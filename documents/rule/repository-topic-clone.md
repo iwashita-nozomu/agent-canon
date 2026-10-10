@@ -63,33 +63,34 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
 ## clone ライフサイクル
 
 - `prepare` は必ず `workspace/<topic-slug>/<repo-name>` の computed path を返す。
-- 既存 canonical checkout が computed root、URL、repository、topic、checkout mode、named branch と一致すれば、
-  source/index を変更せず task marker と ignored writer packet のみを current request metadata に更新できます。
-  `--owner-evidence` digest は lifecycle metadata であり、現在の task/handoff authority の代替ではありません。
-  allowlist の明示更新時はその scope を反映し、省略時は検証済みの既存 scope を維持します。metadata 更新は
-  dirty status を clean と扱わず、未知の Git identity、packet の symlink/不整合、escaped path は引き続き hold します。
-- clean な既存 checkout が exact identity と一致すれば local/remote named branch を再利用する。
-  computed path の occupant、URL、repository、topic、checkout mode、branch が不一致なら typed
-  collision として状態を保持する。canonical marker と他の identity が一致する checkout は、
-  `prepare` / `merge-main` で `owner-evidence` の内容 digest を current file に更新できます。
-  更新前に existing writer-target packet を検証します。current `--allowed-path` があればその scope を
-  materialize し、省略時は既存 scope を引き継ぎます。owner-evidence の内容や digest は承認ではなく、
-  実行 authority は current task / handoff と exact checkout identity によります。canonical marker の欠落・不完全、
-  他 identity mismatch は引き続き hold します。
+- 既存 checkout の identity は computed path と実際の Git facts から照合します。remote URL、actual branch、
+  checkout mode を確認し、`linked-worktree` は selected workspace と同じ Git common dir に登録されていることも
+  検証します。canonical marker があれば repository/topic/URL/branch と facts の一致を要求し、partial/mismatch は
+  hold します。marker がないこと自体は collision ではなく、current request が指定した exact path と Git facts が
+  一致すれば `prepare` が canonical marker を materialize できます。owner-evidence digest は marker がある場合の
+  lifecycle metadata であり、承認・identity・current task/handoff authority の代替ではありません。
+- clean な exact checkout は local/remote named branch を再利用します。existing writer-target packet があれば検証し、
+  current `--allowed-path` があればその scope を materialize し、省略時は検証済み scope を引き継ぎます。
+  packet/marker の metadata-only 更新は source/index を変更せず、dirty status を clean と扱いません。
+  未知の Git facts、packet の symlink/不整合、escaped path は引き続き hold します。
   legacy module marker の互換性は従来どおり exact digest を要求します。
 - source/index に触れない既存 target metadata 更新は、`prepare` の通常の identity 検証前に行います。
-  この操作が更新するのは task marker、reserved packet 用の worktree `info/exclude` entry、および ignored writer packet
-  だけです。checkout、Git index、packet 以外の tracked / untracked / ignored worktree file を編集・移動・削除せず、
+  この操作が更新するのは task marker、reserved packet 用の worktree `info/exclude` entry、および ignored writer
+  packet だけです。checkout、Git index、packet 以外の tracked / untracked / ignored worktree file を編集・移動・削除せず、
   dirty state を clean と報告しません。dirty content の所有権を割り当てる操作でもありません。
   新規 checkout、branch 変更、`merge-main` は従来どおり clean state を要求します。
 - requested branch が local/remote のどちらにも無い場合だけ、最新 `origin/main` から作る。
 - write-capable clone の `writer-target.json` は handoff の repeated `--allowed-path` を
   materialize する。既存 packet は検証し、`--allowed-path` 省略時は既存 scope を引き継ぎます。
   明示入力時の更新は current handoff scope のみ反映します。新規 prepare に allowed path がない場合は
-  packet を作りません。
+  packet を作りません。source discovery の `prepare` は scope を推測せずに実行でき、実際の writer scope が
+  決まった後に同じ identity を使って再prepareし、current `--allowed-path` を packet にします。
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
 - raw `git merge` / `git rebase` は writer route では使わず、integration executor が
   `repository_topic_clone.py merge-main`、`finalize-merge`、`resume-merge` を通す。
+  これは選択した integration workflow の owner route です。runtime は一般の
+  `git commit` を integration executor に限定しません。path-scoped commit admission や
+  role id は、実競合レビューや finalizer の parent/tree readback の証明にはなりません。
 - task owner の非空 `--owner-evidence` と computed path、remote、branch identity が一致
   する限り、canonical `prepare` と `merge-main` は operation-level の追加承認なしで
   実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
@@ -102,10 +103,12 @@ mode の選択・作成は lifecycle command が行い、manual clone や手動 
 
 ### 競合の再開
 
-競合で停止した merge の再開・完了は `finalize-merge` またはその alias
-`resume-merge` だけが行います。両方とも保存された inventory と plan を current checkout に
-対して検証し、unmerged state、hunk identity、unaffected content の readback が通らなければ
-commit しません。`conflict_preservation.py validate` 単体は診断用です。
+競合で停止した merge は native Git の `MERGE_HEAD` と index に状態が残ります。
+integration executor は実際の unmerged paths を確認し、各競合をその source owner と
+レビューして解消します。`finalize-merge` は未解決 index を `git write-tree` が拒否する
+場合は commit せず、解決済み index の tree と `MERGE_HEAD` を親とする commit を read back
+します。競合後に `origin/main` が進んでも、停止中 merge の相手は保存された
+`MERGE_HEAD` です。別 inventory / plan は lifecycle の前提ではありません。
 操作構文は [CLI 参照の競合の再開](../tools/repository_topic_clone.md#競合の再開) を使います。
 
 ## クリーンアップ
@@ -144,8 +147,11 @@ commit しません。`conflict_preservation.py validate` 単体は診断用で�
   compatibility として ready を認めます。partial/mismatch/unknown role・placement は typed
   hold とし、dry-run は Git config marker を書き換えません。
 - cleanup は上記の利用終了・内容保全確認後、または closeout の残存確認時に canonical tool を呼び、request から計算した
-  exact clone path、owner evidence/marker digest、URL、branch、clean non-detached state を検証します。
-  `cleanup` は marker digest と current owner-evidence digest の exact match を引き続き要求します。
+  exact clone path、actual Git URL、branch、checkout mode、clean non-detached state を検証します。
+  canonical marker がある場合は identity と current owner-evidence digest の一致を要求し、marker の partial/mismatch は
+  hold します。marker がない場合も identity は current request と実際の Git facts から照合します。
+  owner-evidence digest は marker がある場合の
+  lifecycle consistency metadata であり、Git identity や whole-tree retention proof の代替ではありません。
   linked-worktree の `linked-superproject-head` evidence は保持された local branch と共有 Git common objects から
   superproject の commit/tree を再取得できることだけを示し、remote branch を要求しません。ignored file や submodule
   object の再取得保証ではありません。`independent-clone` は fetch した `origin/<branch>` の
