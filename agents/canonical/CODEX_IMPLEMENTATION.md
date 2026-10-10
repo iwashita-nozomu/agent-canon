@@ -99,20 +99,11 @@ the common [Validation Routing](../../ROOT_AGENTS.md#validation-routing).
 
 ## Library And Reuse Sweep
 
-Follow this order:
-
-1. For a known, selected CLI, API, helper, configuration, or composition that
-   meets the request, invoke it through its existing owner. Reuse results or
-   artifacts while their inputs, owner, and required guarantees still match; do
-   not copy or rebuild the existing flow.
-2. If the entrypoint is unknown, the invocation fails, or required behavior is
-   unmet, use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-   and [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding)
-   only to resolve a gap that could change the next action. For repairs, trace
-   the first failure to its source owner.
-3. For a confirmed gap, correct its owner, migrate affected callers, and retire
-   obsolete support as required. Rerun only operations or checks invalidated by
-   changed inputs or failure conditions.
+When the common direct-use rule in [ROOT_AGENTS.md](../../ROOT_AGENTS.md) leaves
+an unknown entrypoint, failed invocation, or unmet behavior, use [reuse
+feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+and [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding)
+only to resolve the decision that could change the next action.
 
 When a related branch/PR or prepared checkout exists, verify it serves the same
 owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
