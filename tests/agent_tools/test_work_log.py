@@ -26,7 +26,8 @@ class WorkLogTest(unittest.TestCase):
         """Explicit report-dir mode should append the run-local work log."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-1"
+            runtime_root = Path(tmp_dir) / "runtime"
+            report_dir = runtime_root / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True, exist_ok=True)
             (report_dir / "work_log.md").write_text(
                 "\n".join(
@@ -51,6 +52,8 @@ class WorkLogTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--kind",
                     "edit",
                     "--request-clause-id",
@@ -138,7 +141,8 @@ class WorkLogTest(unittest.TestCase):
         """Run-bundle preflight notes can be recorded before clauses exist."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-3"
+            runtime_root = Path(tmp_dir) / "runtime"
+            report_dir = runtime_root / "reports" / "agents" / "run-3"
 
             result = subprocess.run(
                 [
@@ -148,6 +152,8 @@ class WorkLogTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--kind",
                     "preflight",
                     "--allow-missing-request-clause-id",
@@ -174,7 +180,8 @@ class WorkLogTest(unittest.TestCase):
         """Clause-free logging must be an explicit exception."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-4"
+            runtime_root = Path(tmp_dir) / "runtime"
+            report_dir = runtime_root / "reports" / "agents" / "run-4"
 
             result = subprocess.run(
                 [
@@ -184,6 +191,8 @@ class WorkLogTest(unittest.TestCase):
                     str(workspace_root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--kind",
                     "preflight",
                     "--allow-missing-request-clause-id",
