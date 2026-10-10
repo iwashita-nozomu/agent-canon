@@ -14,15 +14,14 @@
 set -euo pipefail
 
 if [[ "$#" -lt 1 ]]; then
-  echo "usage: $0 {docs|rust|contracts|eval|workflow-container|full} [docs-paths|contracts-baseline|full-check-options...]" >&2
+  echo "usage: $0 {docs|rust|contracts|eval|workflow-container|full} [docs-paths|full-check-options...]" >&2
   exit 2
 fi
 
 UNIT="$1"
 shift
 UNIT_ARGS=("$@")
-if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${UNIT}" != "contracts" && "${#UNIT_ARGS[@]}" -ne 0 ]] ||
-   [[ "${UNIT}" == "contracts" && "${#UNIT_ARGS[@]}" -gt 1 ]]; then
+if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${#UNIT_ARGS[@]}" -ne 0 ]]; then
   echo "standalone static-gate unit does not accept arguments: ${UNIT}" >&2
   exit 2
 fi
