@@ -20,10 +20,19 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.validation.semantic.dependencies import check_dependency_headers as header_checker
+from tools.validation.semantic.dependencies import (
+    check_dependency_headers as header_checker,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_headers.py"
+SCRIPT = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "dependencies"
+    / "check_dependency_headers.py"
+)
 VISUALIZATION_QUEUE_PATHS = (
     "agents/skills/algorithm-flowchart.md",
     "agents/skills/catalog.yaml",
@@ -85,7 +94,9 @@ def manifest(
     return "\n".join(lines)
 
 
-def run_cli(root: Path, *paths: str, allow_frontmatter: bool = False) -> subprocess.CompletedProcess[str]:
+def run_cli(
+    root: Path, *paths: str, allow_frontmatter: bool = False
+) -> subprocess.CompletedProcess[str]:
     """Run the production CLI against one explicit repository root."""
     command = [sys.executable, str(SCRIPT), "--root", str(root)]
     if allow_frontmatter:
@@ -106,10 +117,9 @@ def write_contract_registry(root: Path, declaration: str) -> None:
     registry.parent.mkdir(parents=True, exist_ok=True)
     registry.write_text(
         'schema = "agent_canon.dependency_contract_kinds.v1"\n'
-        'allowed_kinds = [\n'
+        "allowed_kinds = [\n"
         '  "tool",\n'
-        ']\n'
-        + declaration,
+        "]\n" + declaration,
         encoding="utf-8",
     )
 
@@ -210,7 +220,9 @@ class DependencyHeaderCheckTest(unittest.TestCase):
         """Reject a checkable source file without a dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / "tool.py").write_text('"""Missing dependency header."""\n', encoding="utf-8")
+            (root / "tool.py").write_text(
+                '"""Missing dependency header."""\n', encoding="utf-8"
+            )
 
             result = run_cli(root, "tool.py")
 
@@ -321,7 +333,9 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
                 'header_surfaces = ["scoped.py"]\n',
             )
             scoped = root / "scoped.py"
-            scoped.write_text("# scoped\n" + manifest(contract="tool"), encoding="utf-8")
+            scoped.write_text(
+                "# scoped\n" + manifest(contract="tool"), encoding="utf-8"
+            )
 
             result, output = self.run_main(
                 root,
@@ -378,7 +392,10 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             "header_surfaces = [\n",
             "header_surfaces = []\n",
         ):
-            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(declaration=declaration),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 root = Path(tmp_dir)
                 (root / ".git").mkdir()
                 write_contract_registry(root, declaration)

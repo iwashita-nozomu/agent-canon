@@ -39,7 +39,9 @@ from tools.agent.orchestration.team_config import (  # noqa: E402
     load_task_catalog,
     load_team_config,
 )
-from tools.agent.orchestration.implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import (
+    declared_team_capacity_derivation,
+)  # noqa: E402
 from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
 
 
@@ -53,9 +55,16 @@ class RouteToolTest(unittest.TestCase):
             inputs = root / "agents" / "skills"
             inputs.mkdir(parents=True)
             for name in ("catalog.yaml", "skill-dependencies.yaml"):
-                shutil.copyfile(PROJECT_ROOT / "agents" / "skills" / name, inputs / name)
-            with patch.dict("os.environ", {"PATH": ""}), patch.object(
-                subprocess, "run", side_effect=AssertionError("unexpected subprocess")
+                shutil.copyfile(
+                    PROJECT_ROOT / "agents" / "skills" / name, inputs / name
+                )
+            with (
+                patch.dict("os.environ", {"PATH": ""}),
+                patch.object(
+                    subprocess,
+                    "run",
+                    side_effect=AssertionError("unexpected subprocess"),
+                ),
             ):
                 rules = catalog_module.load_skill_route_rules(root)
         self.assertIsInstance(rules, tuple)
@@ -96,9 +105,7 @@ class RouteToolTest(unittest.TestCase):
         source_catalog = yaml.safe_load(
             (PROJECT_ROOT / "agents/skills/catalog.yaml").read_text(encoding="utf-8")
         )
-        entries = {
-            entry["id"]: entry for entry in source_catalog["skill_families"]
-        }
+        entries = {entry["id"]: entry for entry in source_catalog["skill_families"]}
         source_catalog["skill_families"] = [
             copy.deepcopy(entries[skill]) for skill in skill_ids
         ]
@@ -235,7 +242,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AREA=search", result.stdout)
         self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
-        self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
+        self.assertIn(
+            "python3 tools/analysis/search/search.py --purpose", result.stdout
+        )
 
     def test_search_alias_resolves_to_search_area(self) -> None:
         """Legacy vector-search names should route to coordinated search."""
@@ -293,7 +302,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
 
-    def test_math_correction_routes_math_owner_before_infrastructure_symptom(self) -> None:
+    def test_math_correction_routes_math_owner_before_infrastructure_symptom(
+        self,
+    ) -> None:
         """A mathematical correction keeps a JIT-looking symptom in the math route."""
         result = self.run_route(
             "--prompt",
@@ -401,7 +412,9 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("benchmark_reviewer", waves["research_review"])
         self.assertNotIn("benchmark_reviewer", waves["final_review"])
 
-    def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(self) -> None:
+    def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(
+        self,
+    ) -> None:
         """The route contract carries the math packet and refuses non-math scope drift."""
         orchestration = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
@@ -442,7 +455,14 @@ class RouteToolTest(unittest.TestCase):
             with self.subTest(field=field):
                 self.assertIn(field, optimization)
                 self.assertIn(field, orchestration)
-        for surface in ("architecture", "JIT", "backend", "runtime", "routing", "environment"):
+        for surface in (
+            "architecture",
+            "JIT",
+            "backend",
+            "runtime",
+            "routing",
+            "environment",
+        ):
             with self.subTest(surface=surface):
                 self.assertIn(surface, orchestration)
                 self.assertIn(surface, optimization)
@@ -480,7 +500,10 @@ class RouteToolTest(unittest.TestCase):
         self,
     ) -> None:
         """Direct review prompts should activate change-review, not implementation handoff."""
-        for prompt in ("$change-review レビューしてください", "$change-review 変更レビューして"):
+        for prompt in (
+            "$change-review レビューしてください",
+            "$change-review 変更レビューして",
+        ):
             with self.subTest(prompt=prompt):
                 result = self.run_route("--prompt", prompt, "--format", "json")
 
@@ -573,7 +596,9 @@ class RouteToolTest(unittest.TestCase):
                 decision = json.loads(result.stdout)
                 self.assertIn("grilling", decision["matched_skills"])
                 self.assertIn("grilling", decision["active_skills"])
-                self.assertIn("agent-orchestration", decision["related_skill_candidates"])
+                self.assertIn(
+                    "agent-orchestration", decision["related_skill_candidates"]
+                )
 
     def test_prompt_does_not_route_grilling_for_ordinary_implementation(self) -> None:
         """Ordinary implementation language remains outside the grilling route."""
@@ -777,7 +802,10 @@ class RouteToolTest(unittest.TestCase):
     def test_prompt_routes_old_tool_document_cleanup(self) -> None:
         """Old tool and document cleanup requests should enter document-canon cleanup."""
         result = self.run_route(
-            "--prompt", "$document-canon-cleanup 古いツール，文書の掃除を", "--format", "json"
+            "--prompt",
+            "$document-canon-cleanup 古いツール，文書の掃除を",
+            "--format",
+            "json",
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -857,7 +885,9 @@ class RouteToolTest(unittest.TestCase):
             catalog.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
             dependencies = root / "agents/skills/skill-dependencies.yaml"
             dependency_data = yaml.safe_load(dependencies.read_text(encoding="utf-8"))
-            dependency_data["skill_dependencies"]["_private-skill"] = dependency_data["skill_dependencies"].pop("task-routing")
+            dependency_data["skill_dependencies"]["_private-skill"] = dependency_data[
+                "skill_dependencies"
+            ].pop("task-routing")
             dependencies.write_text(
                 yaml.safe_dump(dependency_data, sort_keys=False), encoding="utf-8"
             )
@@ -1686,7 +1716,8 @@ class RouteToolTest(unittest.TestCase):
                         "    order_constraints: []",
                         "    parallel_independent: []",
                     ]
-                ) + "\n",
+                )
+                + "\n",
                 encoding="utf-8",
             )
             result = self.run_route(
@@ -1814,7 +1845,9 @@ class RouteToolTest(unittest.TestCase):
 
     def test_prompt_routes_oracle_spec_mismatch_to_test_design(self) -> None:
         """Oracle/spec mismatch prompts should still activate test-design."""
-        prompt = "$test-design The test oracle has a spec mismatch; update the test design."
+        prompt = (
+            "$test-design The test oracle has a spec mismatch; update the test design."
+        )
         python_result = self.run_route("--prompt", prompt, "--format", "json")
 
         self.assertEqual(
@@ -1913,7 +1946,8 @@ class CapabilityRouteTest(unittest.TestCase):
                     "skill_families:",
                     entries,
                 ]
-            ) + "\n",
+            )
+            + "\n",
             encoding="utf-8",
         )
         skill_ids = [
@@ -1943,10 +1977,14 @@ class CapabilityRouteTest(unittest.TestCase):
             "tool-catalog.schema.json",
             "yamllint.yaml",
         ):
-            shutil.copyfile(PROJECT_ROOT / "schemas" / "agent-canon" / schema, schema_root / schema)
+            shutil.copyfile(
+                PROJECT_ROOT / "schemas" / "agent-canon" / schema, schema_root / schema
+            )
         tools_root = root / "tools"
         tools_root.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(PROJECT_ROOT / "tools" / "catalog.yaml", tools_root / "catalog.yaml")
+        shutil.copyfile(
+            PROJECT_ROOT / "tools" / "catalog.yaml", tools_root / "catalog.yaml"
+        )
         return path
 
     def write_dependency_map(self, root: Path, body: str) -> Path:
@@ -2135,9 +2173,7 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertEqual(
             capability_payload["matches"][0]["activation"], "explicit_capability"
         )
-        self.assertIn(
-            "parent-repository-audit", capability_payload["active_skills"]
-        )
+        self.assertIn("parent-repository-audit", capability_payload["active_skills"])
 
     def test_capability_route_rejects_multiple_capabilities(self) -> None:
         """The first capability version does not arbitrate multiple IDs."""

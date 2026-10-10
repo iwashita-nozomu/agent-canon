@@ -65,6 +65,8 @@ CATALOG_SCHEMA_PATHS = {
 }
 PRIVATE_SKILL_PREFIX = "_"
 CAPABILITY_ID_RE = re.compile(r"^[a-z0-9_]+$")
+
+
 @dataclass(frozen=True)
 class CapabilityRoute:
     """One catalog capability route owned by a public skill."""
@@ -144,7 +146,13 @@ def validate_catalog_schemas(root: Path) -> tuple[Mapping[str, object], ...]:
     documents = tuple(root / path for path in CATALOG_SCHEMA_PATHS)
     config = root / CATALOG_SCHEMA_ROOT / "yamllint.yaml"
     yaml_result = subprocess.run(
-        ["yamllint", "--strict", "--config-file", str(config), *(str(path) for path in documents)],
+        [
+            "yamllint",
+            "--strict",
+            "--config-file",
+            str(config),
+            *(str(path) for path in documents),
+        ],
         cwd=root,
         check=False,
         capture_output=True,
@@ -171,7 +179,11 @@ def validate_catalog_schemas(root: Path) -> tuple[Mapping[str, object], ...]:
                 "tool": "check-jsonschema",
                 "schema": schema.as_posix(),
                 "document": document.relative_to(root).as_posix(),
-                "argv": ["--schemafile", schema.as_posix(), document.relative_to(root).as_posix()],
+                "argv": [
+                    "--schemafile",
+                    schema.as_posix(),
+                    document.relative_to(root).as_posix(),
+                ],
                 "exit_code": result.returncode,
             }
         )
@@ -240,7 +252,9 @@ def trigger_groups(value: object, field: str) -> tuple[tuple[str, ...], ...]:
     del field
     if value is None:
         return ()
-    return tuple(tuple(cast(Sequence[str], group)) for group in cast(Sequence[object], value))
+    return tuple(
+        tuple(cast(Sequence[str], group)) for group in cast(Sequence[object], value)
+    )
 
 
 def optional_metadata_string(value: object, field: str) -> str:

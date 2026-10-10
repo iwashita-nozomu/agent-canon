@@ -259,9 +259,7 @@ def _source_snapshot_digest(
     return domain_digest("agent-canon.skill-runtime-shim.source-snapshot.v1", files)
 
 
-def build_context(
-    root: Path, *, output_root: Path | None = None
-) -> BuildContext:
+def build_context(root: Path, *, output_root: Path | None = None) -> BuildContext:
     """Load canonical inputs and validate their materialization relationships."""
     root = root.resolve()
     output = (output_root or root).resolve()
@@ -410,7 +408,9 @@ def _render_shim_template(
     skill = cast(str, record["skill_id"])
     description = json.dumps(cast(str, discovery["description"]), ensure_ascii=False)
     canonical_doc = cast(str, owner["canonical_doc"])
-    canonical_link = posixpath.relpath(canonical_doc, f"{RUNTIME_ROOT.as_posix()}/{skill}")
+    canonical_link = posixpath.relpath(
+        canonical_doc, f"{RUNTIME_ROOT.as_posix()}/{skill}"
+    )
     lines = [
         "---",
         f"name: {discovery['name']}",
@@ -471,7 +471,9 @@ def _legacy_generated_schema_matches(candidate: str, expected: str) -> bool:
         expected_metadata = yaml.safe_load(expected_match.group(1))
     except yaml.YAMLError:
         return False
-    if not isinstance(candidate_metadata, Mapping) or not isinstance(expected_metadata, Mapping):
+    if not isinstance(candidate_metadata, Mapping) or not isinstance(
+        expected_metadata, Mapping
+    ):
         return False
     if candidate_metadata.get("name") != expected_metadata.get("name"):
         return False
@@ -483,7 +485,7 @@ def _legacy_generated_schema_matches(candidate: str, expected: str) -> bool:
         body = value[value_match.end() :]
         normalized = re.sub(
             r'("record_digest":")[0-9a-f]{64}',
-            r'\1<record-digest>',
+            r"\1<record-digest>",
             body,
         )
         return re.sub(r'("version":)\d+', r"\1<version>", normalized)

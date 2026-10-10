@@ -323,14 +323,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root", default=".", help="Repository root.")
     parser.add_argument("--graph-tsv", help="Existing dependency graph TSV to render.")
     parser.add_argument("--scope", choices=("full", "changed"), default="full")
-    parser.add_argument("--bundle-dir", help="Write the fixed six-file dependency graph bundle.")
+    parser.add_argument(
+        "--bundle-dir", help="Write the fixed six-file dependency graph bundle."
+    )
     parser.add_argument("--ir-out", help="Write repo-local graph IR JSON to this path.")
     parser.add_argument("--markdown-out", help="Write Markdown summary to this path.")
     parser.add_argument("--dot-out", help="Write Graphviz DOT to this path.")
-    parser.add_argument("--html-out", help="Write a self-contained HTML graph viewer to this path.")
-    parser.add_argument("--title", default="Code Space Dependency Graph", help="HTML report title.")
+    parser.add_argument(
+        "--html-out", help="Write a self-contained HTML graph viewer to this path."
+    )
+    parser.add_argument(
+        "--title", default="Code Space Dependency Graph", help="HTML report title."
+    )
     parser.add_argument("--format", choices=("text", "json"), default="text")
-    parser.add_argument("--fail-on-broken", action="store_true", help="Exit non-zero when broken targets exist.")
+    parser.add_argument(
+        "--fail-on-broken",
+        action="store_true",
+        help="Exit non-zero when broken targets exist.",
+    )
     return parser
 
 
@@ -344,7 +354,9 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def file_descriptor(path: Path, *, artifact_name: str | None = None) -> ArtifactDescriptor:
+def file_descriptor(
+    path: Path, *, artifact_name: str | None = None
+) -> ArtifactDescriptor:
     """Return a deterministic manifest artifact descriptor for a committed file."""
     payload = path.read_bytes()
     media_types = {
@@ -433,7 +445,9 @@ def generate_graph_tsv(root: Path, target_path: Path, *, scope: str) -> GraphInp
         capture_output=True,
         text=True,
     )
-    if result.returncode != 0 and (not target_path.exists() or target_path.stat().st_size == 0):
+    if result.returncode != 0 and (
+        not target_path.exists() or target_path.stat().st_size == 0
+    ):
         sys.stderr.write(result.stdout)
         sys.stderr.write(result.stderr)
         raise SystemExit(result.returncode)
@@ -460,7 +474,9 @@ def load_edges(path: Path) -> tuple[Edge, ...]:
         raise ValueError("dependency graph TSV must start with the four-column header")
 
     edges: list[Edge] = []
-    for line_index, line in enumerate(lines[first_content + 1 :], start=first_content + 2):
+    for line_index, line in enumerate(
+        lines[first_content + 1 :], start=first_content + 2
+    ):
         if not line.strip():
             continue
         fields = line.split("\t")
@@ -545,8 +561,12 @@ def directory_containment(
                 child_kind="repo_path",
             )
         )
-    directory_order = tuple(sorted(directory_paths, key=lambda value: (value != ".", value)))
-    edge_order = tuple(sorted(edge_set, key=lambda edge: (edge.source, edge.target, edge.child_kind)))
+    directory_order = tuple(
+        sorted(directory_paths, key=lambda value: (value != ".", value))
+    )
+    edge_order = tuple(
+        sorted(edge_set, key=lambda edge: (edge.source, edge.target, edge.child_kind))
+    )
     return directory_order, edge_order
 
 
@@ -568,7 +588,7 @@ def detect_cycles(edges: tuple[Edge, ...]) -> tuple[tuple[str, ...], ...]:
         if node_state == "done":
             return
         if node in visiting:
-            cycle = visiting[visiting.index(node):] + [node]
+            cycle = visiting[visiting.index(node) :] + [node]
             canonical = min(
                 tuple(cycle[index:-1] + cycle[:index] + [cycle[index]])
                 for index in range(len(cycle) - 1)
@@ -587,7 +607,9 @@ def detect_cycles(edges: tuple[Edge, ...]) -> tuple[tuple[str, ...], ...]:
     return tuple(sorted(cycles))
 
 
-def detect_direction_cycles(edges: tuple[Edge, ...], direction: str) -> tuple[tuple[str, ...], ...]:
+def detect_direction_cycles(
+    edges: tuple[Edge, ...], direction: str
+) -> tuple[tuple[str, ...], ...]:
     """Detect cycles using only dependency edges from one direction."""
     return detect_cycles(tuple(edge for edge in edges if edge.direction == direction))
 
@@ -603,8 +625,12 @@ def build_report(root: Path, edges: tuple[Edge, ...]) -> GraphReport:
         degree[edge.target] += 1
         outgoing[edge.source] += 1
         incoming[edge.target] += 1
-    orphan_nodes = tuple(sorted(node for node in node_set if incoming[node] == 0 and outgoing[node] == 0))
-    broken = tuple(sorted(node for node in node_set if not repo_path_exists(root, node)))
+    orphan_nodes = tuple(
+        sorted(node for node in node_set if incoming[node] == 0 and outgoing[node] == 0)
+    )
+    broken = tuple(
+        sorted(node for node in node_set if not repo_path_exists(root, node))
+    )
     high_degree = tuple(sorted(degree.items(), key=lambda item: (-item[1], item[0])))
     return GraphReport(
         nodes=tuple(sorted(node_set)),
@@ -639,8 +665,7 @@ def render_markdown(report: GraphReport) -> str:
         "| --- | ---: |",
     ]
     lines.extend(
-        f"| `{path}` | {degree} |"
-        for path, degree in report.high_degree_nodes
+        f"| `{path}` | {degree} |" for path, degree in report.high_degree_nodes
     )
     lines.extend(["", "## Upstream Directional Topology Diagnostics", ""])
     if report.upstream_cycles:
@@ -657,11 +682,10 @@ def render_markdown(report: GraphReport) -> str:
         lines.extend(f"- `{path}`" for path in report.broken_targets)
     else:
         lines.append("- none")
-    node_ids = {
-        node: f"N{index}"
-        for index, node in enumerate(sorted(report.nodes))
-    }
-    lines.extend(["", "## Complete Dependency Projection", "", "```mermaid", "flowchart TD"])
+    node_ids = {node: f"N{index}" for index, node in enumerate(sorted(report.nodes))}
+    lines.extend(
+        ["", "## Complete Dependency Projection", "", "```mermaid", "flowchart TD"]
+    )
     for node in sorted(report.nodes):
         lines.append(f'    {node_ids[node]}["{html.escape(node, quote=True)}"]')
     for edge in sorted(
@@ -689,8 +713,14 @@ def render_dot(report: GraphReport) -> str:
     for node in report.nodes:
         lines.append(f"  {dot_id(node)};")
     for edge in report.edges:
-        label = edge.kind if edge.direction == "upstream" else f"{edge.direction}:{edge.kind}"
-        lines.append(f"  {dot_id(edge.source)} -> {dot_id(edge.target)} [label={dot_id(label)}];")
+        label = (
+            edge.kind
+            if edge.direction == "upstream"
+            else f"{edge.direction}:{edge.kind}"
+        )
+        lines.append(
+            f"  {dot_id(edge.source)} -> {dot_id(edge.target)} [label={dot_id(label)}];"
+        )
     lines.append("}")
     return "\n".join(lines) + "\n"
 
@@ -733,13 +763,17 @@ def path_display(path: str) -> DisplayRecord:
             "full": path,
         }
     if path.startswith("#"):
-        return {"label": compact_middle(path, limit=28), "parent": "anchor", "full": path}
+        return {
+            "label": compact_middle(path, limit=28),
+            "parent": "anchor",
+            "full": path,
+        }
     stripped = path.rstrip("/")
     parts = stripped.split("/") if stripped else [path]
     label = parts[-1] or path
     parent = "/".join(parts[:-1]) if len(parts) > 1 else group
     if parent.startswith(f"{group}/"):
-        parent = f"{group}/{parent[len(group) + 1:]}"
+        parent = f"{group}/{parent[len(group) + 1 :]}"
     return {
         "label": compact_middle(label, limit=32),
         "parent": compact_middle(parent or group, limit=42),
@@ -853,7 +887,9 @@ def dependency_edge_records(edges: tuple[Edge, ...]) -> list[GraphEdgeRecord]:
             "from_node_id": edge.source,
             "to_node_id": edge.target,
             "order_kind": "none",
-            "label": edge.kind if edge.direction == "upstream" else f"{edge.direction}:{edge.kind}",
+            "label": edge.kind
+            if edge.direction == "upstream"
+            else f"{edge.direction}:{edge.kind}",
             "source_locator": f"dependency_graph.tsv:{index + 2}",
             "source_start": index + 2,
             "source_end": index + 2,
@@ -875,7 +911,9 @@ def dependency_source_item_id(index: int, edge: Edge) -> str:
     return f"edge:{index}:{edge.direction}:{edge.kind}:{edge.source}:{edge.target}"
 
 
-def containment_edge_records(edges: tuple[ContainmentEdge, ...]) -> list[GraphEdgeRecord]:
+def containment_edge_records(
+    edges: tuple[ContainmentEdge, ...],
+) -> list[GraphEdgeRecord]:
     """Return IR edge records for inferred directory containment."""
     return [
         {
@@ -963,11 +1001,15 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> Graph
         containment_incoming[edge.target] += 1
     broken_targets = set(report.broken_targets)
     nodes: list[GraphNodeRecord] = [
-        dependency_node_record(node, incoming=incoming, outgoing=outgoing, broken_targets=broken_targets)
+        dependency_node_record(
+            node, incoming=incoming, outgoing=outgoing, broken_targets=broken_targets
+        )
         for node in report.nodes
     ]
     nodes.extend(
-        directory_node_record(path, incoming=containment_incoming, outgoing=containment_outgoing)
+        directory_node_record(
+            path, incoming=containment_incoming, outgoing=containment_outgoing
+        )
         for path in directory_paths
     )
     dependency_edges = dependency_edge_records(report.edges)
@@ -1029,8 +1071,7 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> Graph
         "directions": sorted({edge.direction for edge in report.edges}),
         "kinds": sorted({edge.kind for edge in report.edges}),
         "highDegree": [
-            {"id": path, "degree": degree}
-            for path, degree in report.high_degree_nodes
+            {"id": path, "degree": degree} for path, degree in report.high_degree_nodes
         ],
         "cycles": {
             "upstream": [list(cycle) for cycle in report.upstream_cycles],
@@ -1085,8 +1126,7 @@ def graph_payload(
         "summary": ir["summary"],
         "nodes": nodes,
         "edges": [
-            cast(DependencyPayload, edge["payload_json"])
-            for edge in dependency_edges
+            cast(DependencyPayload, edge["payload_json"]) for edge in dependency_edges
         ],
         "directoryTree": {
             "nodes": [
@@ -1121,9 +1161,13 @@ def render_ir(
     ir_payload: GraphIR | None = None,
 ) -> str:
     """Render the repo-local graph IR JSON."""
-    ir = ir_payload if ir_payload is not None else graph_ir(
-        report,
-        source_locator=source_locator,
+    ir = (
+        ir_payload
+        if ir_payload is not None
+        else graph_ir(
+            report,
+            source_locator=source_locator,
+        )
     )
     return json.dumps(ir, indent=2, sort_keys=True) + "\n"
 
@@ -1143,7 +1187,7 @@ def script_json(payload: object) -> str:
 
 def short_html_label(value: str, *, limit: int = 46) -> str:
     """Return a bounded display label for static graph text."""
-    return value if len(value) <= limit else f"{value[:limit - 3]}..."
+    return value if len(value) <= limit else f"{value[: limit - 3]}..."
 
 
 def static_group_node_columns(count: int) -> int:
@@ -1166,9 +1210,7 @@ def static_graph_layout(
         group_nodes.sort(key=lambda item: str(item["id"]))
 
     max_group_width = (
-        STATIC_GROUP_PAD_X * 2
-        + 4 * STATIC_NODE_W
-        + 3 * STATIC_NODE_COL_GAP
+        STATIC_GROUP_PAD_X * 2 + 4 * STATIC_NODE_W + 3 * STATIC_NODE_COL_GAP
     )
     column_width = max_group_width + STATIC_GROUP_GAP_X
     column_heights = [0] * STATIC_GROUP_COLUMNS
@@ -1191,7 +1233,9 @@ def static_graph_layout(
             + max(0, node_rows - 1) * STATIC_NODE_ROW_GAP
             + STATIC_GROUP_PAD_BOTTOM
         )
-        column = min(range(STATIC_GROUP_COLUMNS), key=lambda index: column_heights[index])
+        column = min(
+            range(STATIC_GROUP_COLUMNS), key=lambda index: column_heights[index]
+        )
         group_x = 36 + column * column_width
         group_y = 42 + column_heights[column]
         column_heights[column] += group_height + STATIC_GROUP_GAP_Y
@@ -1200,11 +1244,15 @@ def static_graph_layout(
         for index, node in enumerate(group_nodes):
             node_column = index % node_columns
             node_row = index // node_columns
-            node_x = group_x + STATIC_GROUP_PAD_X + node_column * (
-                STATIC_NODE_W + STATIC_NODE_COL_GAP
+            node_x = (
+                group_x
+                + STATIC_GROUP_PAD_X
+                + node_column * (STATIC_NODE_W + STATIC_NODE_COL_GAP)
             )
-            node_y = group_y + STATIC_GROUP_PAD_TOP + node_row * (
-                STATIC_NODE_H + STATIC_NODE_ROW_GAP
+            node_y = (
+                group_y
+                + STATIC_GROUP_PAD_TOP
+                + node_row * (STATIC_NODE_H + STATIC_NODE_ROW_GAP)
             )
             positions[str(node["id"])] = (node_x, node_y)
 
@@ -1219,7 +1267,9 @@ def static_graph_dimensions_from_nodes(nodes: list[HtmlGraphNode]) -> tuple[int,
     return width, height
 
 
-def halfplane_score(point: tuple[float, float], seed: tuple[float, float], other: tuple[float, float]) -> float:
+def halfplane_score(
+    point: tuple[float, float], seed: tuple[float, float], other: tuple[float, float]
+) -> float:
     """Return signed distance proxy for seed-nearer half-plane clipping."""
     x, y = point
     sx, sy = seed
@@ -1308,7 +1358,13 @@ def territory_seed_points(
                 )
             )
     center = (width / 2, height / 2)
-    spots.sort(key=lambda point: (abs(point[0] - center[0]) + abs(point[1] - center[1]), point[1], point[0]))
+    spots.sort(
+        key=lambda point: (
+            abs(point[0] - center[0]) + abs(point[1] - center[1]),
+            point[1],
+            point[0],
+        )
+    )
     group_order = sorted(groups, key=lambda group: (-group_counts[group], group))
     seeds: dict[str, tuple[float, float]] = {}
     for group, spot in zip(group_order, spots):
@@ -1338,7 +1394,12 @@ def territory_map_svg(report: GraphReport) -> str:
     width = 1180
     height = 420
     seeds = territory_seed_points(groups, group_counts, width=width, height=height)
-    bounds = [(10.0, 10.0), (width - 10.0, 10.0), (width - 10.0, height - 10.0), (10.0, height - 10.0)]
+    bounds = [
+        (10.0, 10.0),
+        (width - 10.0, 10.0),
+        (width - 10.0, height - 10.0),
+        (10.0, height - 10.0),
+    ]
     cells: dict[str, list[tuple[float, float]]] = {}
     label_points: dict[str, tuple[float, float]] = {}
     for group in groups:
@@ -1365,7 +1426,9 @@ def territory_map_svg(report: GraphReport) -> str:
         "</defs>",
         '<g class="territory-cells">',
     ]
-    for index, group in enumerate(sorted(groups, key=lambda item: (-group_counts[item], item))):
+    for index, group in enumerate(
+        sorted(groups, key=lambda item: (-group_counts[item], item))
+    ):
         color = TERRITORY_COLORS[index % len(TERRITORY_COLORS)]
         title = html.escape(f"{group}: {group_counts[group]} nodes")
         parts.append(
@@ -1462,7 +1525,7 @@ def static_graph_svg(
             f'<rect width="{group_width}" height="{group_height}"></rect>'
             f'<text class="static-group" x="12" y="24">{html.escape(group)}</text>'
             f'<text class="static-group-sub" x="12" y="40">'
-            f'{sum(1 for node in nodes if str(node["group"]) == group)} nodes</text></g>'
+            f"{sum(1 for node in nodes if str(node['group']) == group)} nodes</text></g>"
         )
     parts.append("</g>")
 
@@ -1477,7 +1540,9 @@ def static_graph_svg(
         end_x = target[0]
         end_y = target[1] + STATIC_NODE_H / 2
         curve = max(54, abs(end_x - start_x) / 2)
-        title = html.escape(f"{edge.direction}/{edge.kind}: {edge.source} -> {edge.target}")
+        title = html.escape(
+            f"{edge.direction}/{edge.kind}: {edge.source} -> {edge.target}"
+        )
         source_id = html.escape(dependency_source_item_id(edge_index, edge), quote=True)
         parts.append(
             f'<path class="static-edge {html.escape(edge.kind, quote=True)}" '
@@ -1495,7 +1560,9 @@ def static_graph_svg(
         node_class = "static-node broken" if broken[node_id] else "static-node"
         label = html.escape(str(node.get("label", short_html_label(node_id, limit=29))))
         parent_label = str(node.get("parentLabel", path_group(node_id)))
-        subtitle = html.escape(f"{short_html_label(parent_label, limit=30)} / d {degree[node_id]}")
+        subtitle = html.escape(
+            f"{short_html_label(parent_label, limit=30)} / d {degree[node_id]}"
+        )
         title = html.escape(node_id)
         source_id = html.escape(f"node:{node_id}", quote=True)
         parts.append(
@@ -1576,8 +1643,8 @@ def directory_table_html(report: GraphReport) -> str:
             "</tbody>",
             "</table>",
             '<table id="directory-edge-table">',
-        "<thead><tr><th>Parent</th><th>Child</th><th>Child kind</th></tr></thead>",
-        "<tbody>",
+            "<thead><tr><th>Parent</th><th>Child</th><th>Child kind</th></tr></thead>",
+            "<tbody>",
         ]
     )
     for index, edge in enumerate(edges):
@@ -2503,9 +2570,13 @@ def render_html(
     ir_payload: GraphIR | None = None,
 ) -> str:
     """Render a self-contained dependency graph HTML viewer."""
-    complete_ir = ir_payload if ir_payload is not None else graph_ir(
-        report,
-        source_locator=source_locator,
+    complete_ir = (
+        ir_payload
+        if ir_payload is not None
+        else graph_ir(
+            report,
+            source_locator=source_locator,
+        )
     )
     payload = graph_payload(report, ir_payload=complete_ir)
     page_title = html.escape(title, quote=True)
@@ -2680,9 +2751,13 @@ def render_outputs(
     ir_payload: GraphIR | None = None,
 ) -> dict[str, str]:
     """Return every deterministic projection body keyed by bundle basename."""
-    complete_ir = ir_payload if ir_payload is not None else graph_ir(
-        report,
-        source_locator=source_locator,
+    complete_ir = (
+        ir_payload
+        if ir_payload is not None
+        else graph_ir(
+            report,
+            source_locator=source_locator,
+        )
     )
     return {
         "dependency_graph.ir.json": render_ir(

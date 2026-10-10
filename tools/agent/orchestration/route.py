@@ -798,9 +798,7 @@ def decide_skills(
     effective_rules = tuple(rules)
     rules_by_skill = {rule.skill: rule for rule in effective_rules}
     catalog_matches = matched_skill_routes(public_prompt, effective_rules)
-    matches = dedupe_skill_route_matches(
-        catalog_matches
-    )
+    matches = dedupe_skill_route_matches(catalog_matches)
     matched_skills = tuple(match.skill for match in matches)
     base_skills = ["agent-orchestration"]
     if active_mode == "repo-changing":

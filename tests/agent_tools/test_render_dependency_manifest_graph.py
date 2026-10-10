@@ -28,7 +28,9 @@ RENDER_GRAPH = (
 )
 
 
-def run_renderer(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def run_renderer(
+    *args: str, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     """Run the renderer CLI and capture text output."""
     return subprocess.run(
         [sys.executable, str(RENDER_GRAPH), *args],
@@ -72,9 +74,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
                 "out=''\n"
-                "while [ \"$#\" -gt 0 ]; do\n"
-                "  case \"$1\" in\n"
-                "    --graph-tsv) out=\"$2\"; shift 2 ;;\n"
+                'while [ "$#" -gt 0 ]; do\n'
+                '  case "$1" in\n'
+                '    --graph-tsv) out="$2"; shift 2 ;;\n'
                 "    *) shift ;;\n"
                 "  esac\n"
                 "done\n"
@@ -111,7 +113,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             manifest = json.loads(
                 (bundle / "manifest.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(manifest["schema"], "agent_canon.dependency_graph_bundle.v1")
+            self.assertEqual(
+                manifest["schema"], "agent_canon.dependency_graph_bundle.v1"
+            )
             self.assertEqual(manifest["status"], "pass")
             self.assertEqual(manifest["summary"]["node_count"], 2)
             self.assertEqual(manifest["summary"]["edge_count"], 1)
@@ -127,7 +131,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 (bundle / "dependency_graph.ir.json").read_text(encoding="utf-8")
             )
             self.assertEqual(graph_ir["schema"], "agent_canon.graph_ir.v2")
-            relations = {(edge["relation"], edge["label"]) for edge in graph_ir["edges"]}
+            relations = {
+                (edge["relation"], edge["label"]) for edge in graph_ir["edges"]
+            }
             self.assertIn(("upstream", "design"), relations)
             self.assertIn(("contains", "contains"), relations)
 
@@ -156,7 +162,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertEqual(
                 (bundle / "dependency_graph.tsv").read_bytes(), graph.read_bytes()
             )
-            manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+            manifest = json.loads(
+                (bundle / "manifest.json").read_text(encoding="utf-8")
+            )
             self.assertEqual(manifest["source"]["origin_kind"], "supplied")
             self.assertEqual(
                 manifest["source"]["origin_locator"], graph.resolve().as_posix()
@@ -167,14 +175,20 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
         """Default checker failure remains visible even after writing a TSV."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            checker = root / "tools" / "analysis" / "dependencies" / "check_dependency_graph.sh"
+            checker = (
+                root
+                / "tools"
+                / "analysis"
+                / "dependencies"
+                / "check_dependency_graph.sh"
+            )
             checker.parent.mkdir(parents=True)
             checker.write_text(
                 "#!/usr/bin/env bash\n"
                 "out=''\n"
-                "while [ \"$#\" -gt 0 ]; do\n"
-                "  case \"$1\" in\n"
-                "    --graph-tsv) out=\"$2\"; shift 2 ;;\n"
+                'while [ "$#" -gt 0 ]; do\n'
+                '  case "$1" in\n'
+                '    --graph-tsv) out="$2"; shift 2 ;;\n'
                 "    *) shift ;;\n"
                 "  esac\n"
                 "done\n"
@@ -218,7 +232,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertTrue((bundle / "manifest.json").exists())
-            manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+            manifest = json.loads(
+                (bundle / "manifest.json").read_text(encoding="utf-8")
+            )
             self.assertEqual(manifest["status"], "fail")
             self.assertEqual(manifest["summary"]["broken_target_count"], 1)
             self.assertIn("summary.broken_target_count=1", result.stdout)
@@ -261,7 +277,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 json.loads(text_result.stdout)
             self.assertEqual(json_result.returncode, 0, json_result.stderr)
             payload = json.loads(json_result.stdout)
-            self.assertEqual(payload["schema"], "agent_canon.dependency_graph_bundle.v1")
+            self.assertEqual(
+                payload["schema"], "agent_canon.dependency_graph_bundle.v1"
+            )
             self.assertIn("manifest_path", payload)
             self.assertIn("manifest_sha256", payload)
 
@@ -311,9 +329,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertIn('id="static-graph"', rendered_html)
             self.assertIn('aria-live="polite"', rendered_html)
             self.assertIn('role: "button"', rendered_html)
-            self.assertIn(
-                '"aria-label": `Inspect ${node.id}`', rendered_html
-            )
+            self.assertIn('"aria-label": `Inspect ${node.id}`', rendered_html)
             self.assertIn('event.key === "Enter" || event.key === " "', rendered_html)
             self.assertIn("<noscript>", rendered_html)
             self.assertIn("Complete node list (506)", rendered_html)
@@ -393,7 +409,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertIn("a.md", html_text)
             self.assertIn("b.md", html_text)
 
-            missing_output = run_renderer("--root", str(root), "--graph-tsv", str(graph))
+            missing_output = run_renderer(
+                "--root", str(root), "--graph-tsv", str(graph)
+            )
             self.assertEqual(missing_output.returncode, 2)
             self.assertIn("requires at least one named output", missing_output.stderr)
 

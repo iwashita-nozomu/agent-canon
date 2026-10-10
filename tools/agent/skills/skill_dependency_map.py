@@ -57,7 +57,9 @@ DEFAULT_JSON_PATH = Path("documents/runtime/skill-dependency-graph.json")
 # external runtime projection.  The tracked pair is retained solely as a
 # checked-in reader surface and requires an explicit mutation capability.
 DEFAULT_EXTERNAL_GRAPH_PATH = Path("graphs/skill-dependency-graph.md")
-SOURCE_MUTATION_EVIDENCE_PATH = Path("graphs/skill-dependency-graph-source-mutation.json")
+SOURCE_MUTATION_EVIDENCE_PATH = Path(
+    "graphs/skill-dependency-graph-source-mutation.json"
+)
 SOURCE_MUTATION_ALLOWED_PATHS = tuple(
     path.as_posix() for path in (DEFAULT_GRAPH_PATH, DEFAULT_JSON_PATH)
 )
@@ -110,7 +112,9 @@ IDENTITY_KINDS = (
     "manifest",
     "readback",
 )
-GRAPH_HEADER = "<!-- Generated from the public skill/dependency graph; do not edit by hand. -->"
+GRAPH_HEADER = (
+    "<!-- Generated from the public skill/dependency graph; do not edit by hand. -->"
+)
 GRAPH_DEPENDENCY_HEADER = """<!--
 @dependency-start
 contract reference
@@ -1296,13 +1300,21 @@ def _load_source_mutation_capability(path: Path | None) -> dict[str, object] | N
         raise GraphSourceMutationError(
             f"source_mutation_capability_invalid:{path}:{exc}"
         ) from exc
-    if not isinstance(raw, Mapping) or set(raw) != {"allowed_paths", "purpose", "authority"}:
+    if not isinstance(raw, Mapping) or set(raw) != {
+        "allowed_paths",
+        "purpose",
+        "authority",
+    }:
         raise GraphSourceMutationError("source_mutation_capability_invalid:fields")
     allowed = raw.get("allowed_paths")
-    if not isinstance(allowed, list) or not allowed or not all(
-        isinstance(item, str) for item in allowed
+    if (
+        not isinstance(allowed, list)
+        or not allowed
+        or not all(isinstance(item, str) for item in allowed)
     ):
-        raise GraphSourceMutationError("source_mutation_capability_invalid:allowed_paths")
+        raise GraphSourceMutationError(
+            "source_mutation_capability_invalid:allowed_paths"
+        )
     normalized: list[str] = []
     for item in allowed:
         relative = PurePosixPath(item)
@@ -1327,7 +1339,9 @@ def _load_source_mutation_capability(path: Path | None) -> dict[str, object] | N
     }
 
 
-def _source_file_evidence(root: Path, relative_paths: Sequence[str]) -> dict[str, object]:
+def _source_file_evidence(
+    root: Path, relative_paths: Sequence[str]
+) -> dict[str, object]:
     """Capture deterministic before/after evidence for the fixed source pair."""
     files: list[dict[str, object]] = []
     for relative in relative_paths:
@@ -1343,7 +1357,9 @@ def _source_file_evidence(root: Path, relative_paths: Sequence[str]) -> dict[str
                 }
             )
         except FileNotFoundError:
-            files.append({"path": relative, "exists": False, "sha256": None, "mode": None})
+            files.append(
+                {"path": relative, "exists": False, "sha256": None, "mode": None}
+            )
         except OSError as exc:
             raise GraphSourceMutationError(
                 f"source_mutation_evidence_unreadable:{relative}:{exc}"
@@ -1437,7 +1453,9 @@ def _write_graph_output(
 ) -> Path:
     """Write one graph projection through the selected boundary."""
     if boundary is not None and _is_within(path, boundary.root):
-        return boundary.atomic_write_bytes(path.relative_to(boundary.root), payload, mode=0o644)
+        return boundary.atomic_write_bytes(
+            path.relative_to(boundary.root), payload, mode=0o644
+        )
     return _atomic_write_path(path, payload)
 
 
@@ -1507,7 +1525,9 @@ def write_artifacts(
         if is_source_mutation
         else None
     )
-    _write_graph_output(root, markdown, render_graph_mermaid(graph).encode("utf-8"), boundary)
+    _write_graph_output(
+        root, markdown, render_graph_mermaid(graph).encode("utf-8"), boundary
+    )
     _write_graph_output(root, json_path, _json_text(graph).encode("utf-8"), boundary)
     if is_source_mutation:
         assert boundary is not None
@@ -1516,11 +1536,13 @@ def write_artifacts(
             relative
             for relative in SOURCE_MUTATION_ALLOWED_PATHS
             if next(
-                item for item in cast(Sequence[Mapping[str, object]], before["files"])
+                item
+                for item in cast(Sequence[Mapping[str, object]], before["files"])
                 if item["path"] == relative
             )
             != next(
-                item for item in cast(Sequence[Mapping[str, object]], after["files"])
+                item
+                for item in cast(Sequence[Mapping[str, object]], after["files"])
                 if item["path"] == relative
             )
         ]
@@ -1543,7 +1565,9 @@ def write_artifacts(
                 evidence_target.relative_to(boundary.root), evidence, mode=0o600
             )
         except RuntimeArtifactError as exc:
-            raise GraphSourceMutationError(f"source_mutation_evidence_write_failed:{exc}") from exc
+            raise GraphSourceMutationError(
+                f"source_mutation_evidence_write_failed:{exc}"
+            ) from exc
     return markdown, json_path, graph
 
 
@@ -1679,7 +1703,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         evidence = ""
         if args.source_mutation or args.source_mutation_capability is not None:
-            evidence_path = args.source_mutation_evidence or SOURCE_MUTATION_EVIDENCE_PATH
+            evidence_path = (
+                args.source_mutation_evidence or SOURCE_MUTATION_EVIDENCE_PATH
+            )
             evidence = f" evidence={evidence_path}"
         print(
             f"SKILL_TOOL_INVOCATION_GRAPH=pass schema={GRAPH_SCHEMA} skills={graph['skill_count']} commands={len(graph['commands'])} tools={len(graph['tools'])} edges={len(graph['edges'])} json={json_path} mermaid={markdown}{evidence}"
