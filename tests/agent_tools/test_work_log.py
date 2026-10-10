@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -75,9 +76,11 @@ class WorkLogTest(unittest.TestCase):
         """Active-run pointer mode should append the run-local work log."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "run-2"
+            runtime_root = Path(tmp_dir) / "runtime"
+            # Full checks supply a runtime root, so keep the active pointer external too.
+            report_dir = runtime_root / "reports" / "agents" / "run-2"
             report_dir.mkdir(parents=True, exist_ok=True)
-            active_pointer = workspace_root / "reports" / "agents" / ".active_run"
+            active_pointer = runtime_root / "reports" / "agents" / ".active_run"
             active_pointer.write_text("run-2\n", encoding="utf-8")
             (report_dir / "user_request_contract.md").write_text(
                 "# User Request Contract\n",
@@ -117,6 +120,10 @@ class WorkLogTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+                },
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)

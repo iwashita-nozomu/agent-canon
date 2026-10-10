@@ -1,7 +1,6 @@
 # @dependency-start
 # contract environment
-# responsibility Defines the disposable test image for AgentCanon live, native
-# proof, and full-check profiles.
+# responsibility Defines AgentCanon's disposable live, proof, and full-check test image.
 # upstream implementation ./docker.sh selects and runs each test capability profile
 # downstream design ./lean-proof-dependencies.toml pins the native Lean test toolchain
 # downstream test ./test_live_projection_authority.py exercises the shared host Docker daemon

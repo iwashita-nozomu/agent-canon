@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Runs AgentCanon live, native proof, and full-check profiles in one disposable test image.
+# responsibility Runs live-projection, lean-proof, and full-check profiles in one disposable test image.
 # upstream implementation ./Dockerfile.live provides Python, Git, and Docker CLI
 # downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh owns the full-check body
 # downstream test ./test_live_projection_authority.py validates live projection authority
@@ -242,6 +242,7 @@ else
     "${TEST_WORKAREA}/control" \
     "${TEST_WORKAREA}/runtime" \
     "${TEST_WORKAREA}/runtime/cache/ruff" \
+    "${TEST_WORKAREA}/runtime/cache/pytest" \
     "${TEST_WORKAREA}/cache/home"
   DOCKER_RUN_ARGS+=(
     --read-only
@@ -251,6 +252,7 @@ else
     --env "AGENT_CANON_CLI_CMD=/usr/local/bin/agent-canon"
     --env "CARGO_HOME=${TEST_WORKAREA}/runtime/cache/cargo-home"
     --env "RUFF_CACHE_DIR=${TEST_WORKAREA}/runtime/cache/ruff"
+    --env "PYTEST_ADDOPTS=-o cache_dir=${TEST_WORKAREA}/runtime/cache/pytest"
     --env "HOME=${TEST_WORKAREA}/cache/home"
   )
   DOCKER_WORKDIR="${SOURCE_IMAGE}"

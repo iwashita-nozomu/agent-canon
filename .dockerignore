@@ -11,6 +11,8 @@
 !.editorconfig
 !.gitattributes
 !.gitignore
+!.vscode/
+!.vscode/**
 !CONTAINER_OPERATIONS.md
 !LICENSE
 !PHILOSOPHY.md
@@ -19,6 +21,8 @@
 !responsibility-scope.toml
 !ruff.toml
 !rustfmt.toml
+!codex-cli-guide/
+!codex-cli-guide/**
 !.agents/
 !.agents/**
 !.codex/
@@ -55,7 +59,6 @@
 !tools/
 !tools/**
 tools/validation/tests/run_pytest_with_logs.sh
-tools/validation/dependencies/docker_dependency_validator.sh
 !tools/repository/workspace/parent_root_side_effects.py
 !tools/runtime/dispatch/agent-canon/
 !tools/runtime/dispatch/agent-canon/**

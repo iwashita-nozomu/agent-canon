@@ -39,7 +39,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
         """Accumulated eval producers need a writable AgentCanon log archive."""
         text = SCRIPT.read_text(encoding="utf-8")
 
-        archive_marker = 'AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_CI_RUNTIME_ROOT}/archive/agent-canon-log}"'
+        archive_marker = 'AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-archive/agent-canon-log}"'
+        archive_path_marker = 'AGENT_CANON_CI_HOOK_ARCHIVE_PATH="$(runtime_boundary_path "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}")"'
+        archive_mkdir_marker = 'mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_PATH}"'
         runtime_marker = 'AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_CI_RUNTIME_ROOT}"'
         eval_runtime_marker = '--runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}"'
         producer_marker = (
@@ -51,6 +53,8 @@ class RunAllChecksScriptTest(unittest.TestCase):
         )
 
         self.assertIn(archive_marker, text)
+        self.assertIn(archive_path_marker, text)
+        self.assertIn(archive_mkdir_marker, text)
         self.assertIn(runtime_marker, text)
         self.assertGreaterEqual(text.count(eval_runtime_marker), 2)
         self.assertIn(command_env_marker, text)
