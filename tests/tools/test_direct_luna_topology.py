@@ -12,7 +12,8 @@ def test_physical_team_is_profile_sized_and_luna_first() -> None:
 
     assert topology["default_subagent"]["model"] == "gpt-6-luna"
     assert topology["default_subagent"]["fork_turns"] == "none"
-    assert topology["default_subagent"]["effective_runtime_readback"] == "required"
+    assert topology["default_subagent"]["effective_runtime_readback"] == "unverified"
+    assert topology["default_subagent"]["unavailable_policy"] == "no_profile_fallback"
     assert len(profiles) == 6
     assert [profile["id"] for profile in profiles[:3]] == [
         "luna_reasoning_high",
