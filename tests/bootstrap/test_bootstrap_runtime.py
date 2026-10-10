@@ -222,11 +222,16 @@ def test_source_override_does_not_constrain_distinct_log_repository() -> None:
     assert log["normalized_remote"] != source_result["normalized_remote"]
 
 
-def runtime(tmp_path: Path, name: str = "runtime") -> BootstrapRuntime:
-    """Construct a runtime rooted inside the test-owned temporary directory."""
+def runtime(
+    tmp_path: Path,
+    name: str = "runtime",
+    *,
+    repository_root: Path | None = None,
+) -> BootstrapRuntime:
+    """Keep control state temporary while selecting the source tree explicitly."""
     control = tmp_path / "control"
     control.mkdir()
-    source = materialize_source_fixture(tmp_path)
+    source = repository_root or materialize_source_fixture(tmp_path)
     return BootstrapRuntime(control, control / name, repository_root=source)
 
 
@@ -354,9 +359,11 @@ def _run_process_owned_worker_controller(
         os.close(lease_fd)
 
 
-def _ready_runtime_with_target(tmp_path: Path) -> tuple[BootstrapRuntime, Path]:
+def _ready_runtime_with_target(
+    tmp_path: Path, *, repository_root: Path | None = None
+) -> tuple[BootstrapRuntime, Path]:
     """Build the minimum resident state for task lease tests."""
-    manager = runtime(tmp_path)
+    manager = runtime(tmp_path, repository_root=repository_root)
     target = tmp_path / "target"
     target.mkdir()
     manager._ensure_layout()
@@ -1701,3 +1708,116 @@ def test_eval_precondition_failure_creates_no_spool_or_exchange(
     assert not (
         manager.paths.container_runtime / "tasks" / "eval-precondition"
     ).exists()
+
+
+def test_eval_collect_runs_existing_producers_and_prepares_sync_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The resident executes both real producers and releases their task lease."""
+    container_runtime_root = tmp_path / "container-runtime"
+    exchange = container_runtime_root / "exchange"
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "TOOL_SOURCE_DESTINATION", str(REPOSITORY_ROOT)
+    )
+    monkeypatch.setattr(
+        bootstrap_runtime_module,
+        "CONTAINER_RUNTIME_DESTINATION",
+        str(container_runtime_root),
+    )
+    monkeypatch.setenv("AGENT_CANON_EXCHANGE_ROOT", str(exchange))
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "resident-test")
+
+    manager, target = _ready_runtime_with_target(
+        tmp_path, repository_root=REPOSITORY_ROOT
+    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=target, check=True)
+    (target / "README.md").write_text("eval fixture\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=target, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Eval Fixture",
+            "-c",
+            "user.email=eval@example.invalid",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+        cwd=target,
+        check=True,
+    )
+    state = manager._read_state()
+    target_digest = next(iter(state["targets"]))
+    container_target = f"/targets/{target_digest}"
+    monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", target_digest)
+
+    resident_command = bootstrap_runtime_module._run_resident_command
+
+    def run_mounted_command(
+        argv: list[str],
+        *,
+        cwd: str,
+        environment: dict[str, str] | None = None,
+        timeout: int,
+        pass_fds: tuple[int, ...] = (),
+    ) -> subprocess.CompletedProcess[str]:
+        """Map only the resident's fixed target mount into this temp fixture."""
+        mapped_argv = [
+            str(target) if value == container_target else value for value in argv
+        ]
+        mapped_environment = dict(environment or {})
+        for key in (
+            "AGENT_CANON_TARGET_ROOT",
+            "AGENT_CANON_TASK_ROOT",
+            "GIT_CONFIG_VALUE_0",
+        ):
+            if mapped_environment.get(key) == container_target:
+                mapped_environment[key] = str(target)
+        return resident_command(
+            mapped_argv,
+            cwd=cwd,
+            environment=mapped_environment,
+            timeout=timeout,
+            pass_fds=pass_fds,
+        )
+
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "_run_resident_command", run_mounted_command
+    )
+    run_id = "resident-eval-success"
+    result = manager.eval_collect(target, run_id)
+
+    assert result["code"] == "eval_spooled"
+    collection = result["details"]["collection"]
+    assert collection["status"] == "collected"
+    assert collection["source_tree_unchanged"] is True
+    assert {
+        producer["name"]: producer["status"]
+        for producer in collection["producer_matrix"]
+    } == {
+        "codex-agent-role": "pass",
+        "workflow-selection": "pass",
+    }
+    spool = manager.paths.spool / run_id
+    assert (spool / "eval-results").is_dir()
+    assert (spool / "producer-logs").is_dir()
+    assert collection["exported_files"]["eval_results"] > 0
+    assert collection["exported_files"]["producer_logs"] > 0
+    after_collection = manager._read_state()
+    task = after_collection["tasks"][f"eval-{run_id}"]
+    assert task["state"] == "completed"
+    assert task["outcome"] == "completed"
+    assert task["pinned"] is False
+    assert after_collection["active_task_count"] == 0
+
+    sync = manager.eval_sync_prepare(run_id)
+    assert sync["code"] == "host_archive_requested"
+    assert (spool / "sync-request.tsv").read_text(encoding="utf-8") == (
+        "schema\tagent-canon.eval-sync-request.v1\n"
+        "operation\tsync\n"
+        "execution-plane\tagentcanon_tool_container\n"
+        f"run-id\t{run_id}\n"
+        f"target-digest\t{target_digest}\n"
+        f"source-root\t{target}\n"
+    )
